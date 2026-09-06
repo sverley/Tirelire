@@ -7,7 +7,15 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @tirelire/web dev",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "prepare": "simple-git-hooks"
   },
-  "packageManager": "pnpm@10.28.0"
+  "packageManager": "pnpm@10.28.0",
+  "devDependencies": {
+    "simple-git-hooks": "^2.14.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm -r typecheck && pnpm --filter @tirelire/core test",
+    "pre-push": "pnpm build"
+  }
 }

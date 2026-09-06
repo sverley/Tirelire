@@ -2,6 +2,7 @@
   import { app } from '../lib/state.svelte';
   import { centsToInput, inputToCents } from '../lib/format';
   import { budgetYearContaining, MONTHS_FR } from '@tirelire/core';
+  import { saveFile } from '../lib/platform';
 
   let month = $state(String(app.ledger.settings.budgetYearStart.month));
   let day = $state(String(app.ledger.settings.budgetYearStart.day));
@@ -28,13 +29,8 @@
   }
 
   async function exportFile() {
-    const blob = await app.exportFile();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tirelire-${app.asOf}.sqlite`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const bytes = await app.exportBytes();
+    await saveFile(`tirelire-${app.asOf}.sqlite`, bytes, 'application/x-sqlite3');
   }
 
   async function importFile(e: Event) {

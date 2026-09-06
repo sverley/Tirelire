@@ -95,10 +95,9 @@ class AppState {
   }
 
   /** Export du fichier SQLite. */
-  async exportFile(): Promise<Blob> {
+  async exportBytes(): Promise<Uint8Array> {
     await this.opened?.flush();
-    const bytes = this.store.export();
-    return new Blob([bytes as BlobPart], { type: 'application/x-sqlite3' });
+    return this.store.export();
   }
 
   /** Remplace la base par un fichier SQLite importé. */

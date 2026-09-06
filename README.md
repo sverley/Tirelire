@@ -44,3 +44,23 @@ données de l'analyse pour voir le plan tout de suite.
 - Jamais de suppression physique : `deletedAt`.
 - Ce qui se recalcule ne se stocke pas (soldes, plan, soldes à régler).
 - Aucun fichier bancaire réel dans le dépôt.
+
+## Android
+
+L'application Android est le même code web emballé avec Capacitor (`apps/web/android`).
+
+- À chaque push sur `main`, l'intégration continue construit l'APK et le publie dans la
+  release GitHub **« Dernière version de test »** (tag `latest`, fichier `tirelire-latest.apk`).
+  Installer l'APK sur le téléphone (autoriser les sources inconnues), puis chaque nouvelle
+  version s'installe par-dessus la précédente : même clé de test (voir
+  `apps/web/android/keystore/README.md`).
+- Un tag `vX.Y.Z` produit une release nommée, avec notes générées.
+- Pour une vraie clé de publication : renseigner les secrets `ANDROID_KEYSTORE_*` (voir le même README).
+
+En local (Android Studio ou SDK installé) : `pnpm build && cd apps/web && npx cap sync android && npx cap open android`.
+
+## Hooks git
+
+`pnpm install` installe les hooks (simple-git-hooks) : `pre-commit` vérifie les types et lance
+les tests du cœur ; `pre-push` construit l'application. Pour passer outre ponctuellement :
+`git commit --no-verify`.

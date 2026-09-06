@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tirelire</string>
+    <string name="title_activity_main">Tirelire</string>
+    <string name="package_name">fr.tirelire.app</string>
+    <string name="custom_url_scheme">fr.tirelire.app</string>
+</resources>
