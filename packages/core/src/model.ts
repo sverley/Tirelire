@@ -9,6 +9,8 @@
  *    facultatif : on ne supprime jamais physiquement, on marque.
  */
 
+import type { ImportProfile } from './importer.js';
+
 export type Cents = number;
 export type ISODate = string;
 export type Id = string;
@@ -170,6 +172,8 @@ export interface Operation {
   date: ISODate;
   label: string;
   normalizedLabel: string;
+  /** Libellé complet fourni par la banque (références, motifs). */
+  details?: string;
   /** Signé : négatif = débit du compte. */
   amount: Cents;
   status: OperationStatus;
@@ -247,6 +251,7 @@ export interface Ledger {
   operations: Operation[];
   allocations: Allocation[];
   rules: Rule[];
+  importProfiles: ImportProfile[];
   settings: Settings;
 }
 
@@ -259,6 +264,7 @@ export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
     operations: [],
     allocations: [],
     rules: [],
+    importProfiles: [],
     settings: { ...DEFAULT_SETTINGS, ...settings },
   };
 }
