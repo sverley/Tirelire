@@ -150,16 +150,16 @@ describe('identifiants', () => {
   });
 
   it('normalisation des libellés', () => {
-    expect(normalizeLabel('CARTE X2009 02/09 CARREFOUR AIX')).toBe('CARREFOUR AIX');
-    expect(normalizeLabel('Prélèvement européen 6303920409 DE: SAUR')).toBe('PRELEVEMENT EUROPEEN DE SAUR');
+    expect(normalizeLabel('CARTE X2009 02/09 SUPERMARCHE LYON')).toBe('SUPERMARCHE LYON');
+    expect(normalizeLabel('Prélèvement européen 6303920409 DE: EAU DU VILLAGE')).toBe('PRELEVEMENT EUROPEEN DE EAU DU VILLAGE');
     expect(normalizeLabel('VIR RECU    6584639237S DE: DUPONT')).toBe('VIR RECU DE DUPONT');
     expect(normalizeLabel('VIR PERM TIRELIRE TAXE FONCIERE')).toBe('VIR PERM TIRELIRE TAXE FONCIERE');
   });
 
   it('clé d’opération déterministe', () => {
-    const k1 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE SAUR', 0);
-    const k2 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE SAUR', 0);
-    const k3 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE SAUR', 1);
+    const k1 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 0);
+    const k2 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 0);
+    const k3 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 1);
     expect(k1).toBe(k2);
     expect(k1).not.toBe(k3);
     expect(k1).toMatch(/^op_[0-9a-f]{32}$/);

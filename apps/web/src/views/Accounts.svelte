@@ -1,0 +1,140 @@
+<script lang="ts">
+  import { app } from '../lib/state.svelte';
+  import { money, moneyClass, shortDate, centsToInput, inputToCents, ACCOUNT_KINDS } from '../lib/format';
+  import { accountBalance, indexLedger, settlementBalance, unallocated, alive, type Account, type AccountKind, type SettlementDirection } from '@tirelire/core';
+
+  let editing = $state<Account | undefined>(undefined);
+  let form = $state({
+    name: '',
+    kind: 'holding' as AccountKind,
+    bank: '',
+    openingBalance: '',
+    openingDate: app.asOf,
+    payDay: '1',
+    settlementThreshold: '10,00',
+    settlementDirection: 'both' as SettlementDirection,
+  });
+  let error = $state('');
+
+  const accounts = $derived(alive(app.ledger.accounts));
+  const idx = $derived(indexLedger(app.ledger));
+  const hasPivot = $derived(accounts.some((a) => a.kind === 'pivot'));
+
+  function startNew() {
+    editing = { id: app.newId(), name: '', kind: hasPivot ? 'holding' : 'pivot', openingBalance: 0, openingDate: app.asOf };
+    form = { name: '', kind: editing.kind, bank: '', openingBalance: '0,00', openingDate: app.asOf, payDay: '1', settlementThreshold: '10,00', settlementDirection: 'both' };
+    error = '';
+  }
+
+  function startEdit(a: Account) {
+    editing = a;
+    form = {
+      name: a.name,
+      kind: a.kind,
+      bank: a.bank ?? '',
+      openingBalance: centsToInput(a.openingBalance),
+      openingDate: a.openingDate,
+      payDay: String(a.payDay ?? 1),
+      settlementThreshold: centsToInput(a.settlementThreshold ?? 1000),
+      settlementDirection: a.settlementDirection ?? 'both',
+    };
+    error = '';
+  }
+
+  function save(e: Event) {
+    e.preventDefault();
+    if (!editing) return;
+    const openingBalance = inputToCents(form.openingBalance);
+    if (!form.name.trim()) return void (error = 'Le nom est obligatoire.');
+    if (openingBalance === undefined) return void (error = 'Solde initial invalide.');
+    if (form.kind === 'pivot' && accounts.some((a) => a.kind === 'pivot' && a.id !== editing!.id))
+      return void (error = 'Il ne peut y avoir qu’un seul compte pivot.');
+    const payDay = Number(form.payDay);
+    const row: Account = {
+      id: editing.id,
+      name: form.name.trim(),
+      kind: form.kind,
+      openingBalance,
+      openingDate: form.openingDate,
+      ...(form.bank.trim() ? { bank: form.bank.trim() } : {}),
+      ...(form.kind === 'pivot' ? { payDay: Math.min(31, Math.max(1, payDay || 1)) } : {}),
+      ...(form.kind === 'third'
+        ? { settlementThreshold: inputToCents(form.settlementThreshold) ?? 0, settlementDirection: form.settlementDirection }
+        : {}),
+    };
+    app.upsert('accounts', row);
+    editing = undefined;
+  }
+
+  function remove(a: Account) {
+    if (confirm(`Supprimer le compte « ${a.name} » ?`)) app.remove('accounts', a.id);
+  }
+</script>
+
+<h1>Comptes</h1>
+<p class="muted small">Le pivot est le compte réel par lequel tout transite. Les comptes d'accueil hébergent des enveloppes ; les comptes tiers ne sont pas importés, on y saisit à la main ce qui concerne le plan.</p>
+
+<div class="actions">
+  <button class="btn primary" onclick={startNew}>Ajouter un compte</button>
+</div>
+
+{#if editing}
+  <form class="edit" onsubmit={save}>
+    <div class="grid">
+      <label class="f">Nom <input bind:value={form.name} placeholder="Compte courant" /></label>
+      <label class="f">Type
+        <select bind:value={form.kind}>
+          {#each Object.entries(ACCOUNT_KINDS) as [k, label]}<option value={k}>{label}</option>{/each}
+        </select>
+      </label>
+      <label class="f">Banque (facultatif) <input bind:value={form.bank} /></label>
+      <label class="f">Solde initial <input bind:value={form.openingBalance} inputmode="decimal" /></label>
+      <label class="f">Date du solde initial <input type="date" bind:value={form.openingDate} /></label>
+      {#if form.kind === 'pivot'}
+        <label class="f">Jour de paie (début de période) <input type="number" min="1" max="31" bind:value={form.payDay} /></label>
+      {/if}
+      {#if form.kind === 'third'}
+        <label class="f">Seuil de règlement <input bind:value={form.settlementThreshold} inputmode="decimal" /></label>
+        <label class="f">Sens autorisé
+          <select bind:value={form.settlementDirection}>
+            <option value="both">Dans les deux sens</option>
+            <option value="toThird">Pivot → ce compte seulement</option>
+            <option value="fromThird">Ce compte → pivot seulement</option>
+          </select>
+        </label>
+      {/if}
+    </div>
+    {#if error}<div class="err">{error}</div>{/if}
+    <div class="actions" style="margin:0">
+      <button class="btn primary" type="submit">Enregistrer</button>
+      <button class="btn" type="button" onclick={() => (editing = undefined)}>Annuler</button>
+    </div>
+  </form>
+{/if}
+
+{#each accounts as a (a.id)}
+  <div class="card" class:accent={a.kind === 'pivot'}>
+    <div class="row">
+      <div class="label">
+        <strong>{a.name}</strong> <span class="pill">{a.kind === 'pivot' ? 'pivot' : a.kind === 'holding' ? 'accueil' : 'tiers'}</span>
+        <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.kind === 'pivot' ? ` · paie le ${a.payDay ?? 1}` : ''}</span>
+      </div>
+      <div>
+        <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>
+        <button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>
+      </div>
+    </div>
+    {#if a.kind === 'third'}
+      {@const owes = settlementBalance(a, app.ledger, idx, app.asOf)}
+      <div class="row">
+        <div class="label">{owes >= 0 ? 'Le pivot lui doit' : 'Il doit au pivot'}</div>
+        <div class="num">{money(Math.abs(owes))}</div>
+      </div>
+    {:else}
+      <div class="row"><div class="label">Solde reconstruit au {shortDate(app.asOf)}</div><div class="num">{money(accountBalance(a, app.ledger, app.asOf))}</div></div>
+      <div class="row"><div class="label">Non affecté (solde − enveloppes hébergées)</div><div class="{moneyClass(unallocated(a, app.ledger, idx, app.asOf))}">{money(unallocated(a, app.ledger, idx, app.asOf))}</div></div>
+    {/if}
+  </div>
+{:else}
+  <div class="empty">Aucun compte. Commence par le pivot.</div>
+{/each}
