@@ -13,3 +13,4 @@ export * from './csv.js';
 export * from './importer.js';
 export * from './matching.js';
 export * from './review.js';
+export * from './sync.js';

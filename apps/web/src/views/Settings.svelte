@@ -1,8 +1,48 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { centsToInput, inputToCents } from '../lib/format';
-  import { budgetYearContaining, MONTHS_FR } from '@tirelire/core';
+  import { budgetYearContaining, MONTHS_FR, exportBundle, importBundle, knownPeers, type ChangeBundle } from '@tirelire/core';
   import { saveFile } from '../lib/platform';
+
+  let deviceName = $state(readDeviceName());
+  let peerFilter = $state('');
+  function readDeviceName(): string {
+    try {
+      return localStorage.getItem('tirelire.deviceName') ?? '';
+    } catch {
+      return '';
+    }
+  }
+  function saveDeviceName() {
+    try {
+      localStorage.setItem('tirelire.deviceName', deviceName.trim());
+    } catch {
+      /* stockage indisponible */
+    }
+    msg = 'Nom de l’appareil enregistré.';
+  }
+  const peers = $derived(app.ready ? knownPeers(app.store) : []);
+  async function exportChanges() {
+    const since = peerFilter ? (peers.find((p) => p.site === peerFilter)?.cursor ?? 0) : 0;
+    const bundle = exportBundle(app.store, since, deviceName.trim() || undefined);
+    const bytes = new TextEncoder().encode(JSON.stringify(bundle));
+    await saveFile(`tirelire-changements-${app.store.siteId}-${bundle.upTo}.json`, bytes, 'application/json');
+    msg = `${bundle.entries.length} changements exportés.`;
+  }
+  async function importChanges(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const bundle = JSON.parse(await file.text()) as ChangeBundle;
+      const r = importBundle(app.store, bundle);
+      app.reload();
+      msg = `Paquet de ${bundle.name ?? bundle.site} : ${r.applied} changements appliqués, ${r.ignored} déjà connus, ${r.stale} dépassés.`;
+    } catch (err) {
+      msg = `Import impossible : ${err instanceof Error ? err.message : String(err)}`;
+    }
+    input.value = '';
+  }
 
   let month = $state(String(app.ledger.settings.budgetYearStart.month));
   let day = $state(String(app.ledger.settings.budgetYearStart.day));
@@ -97,6 +137,23 @@
     <button class="btn danger" onclick={erase}>Tout effacer</button>
   </div>
   <p class="small muted">Appareil : <span class="num">{app.ledger.settings.siteId}</span> · changements journalisés : <span class="num">{app.ready ? app.store.lastSeq : 0}</span></p>
+</div>
+
+<h2>Synchronisation entre appareils</h2>
+<div class="card">
+  <p class="small muted">En attendant la synchronisation directe : exporte un paquet de changements ici, importe-le sur l'autre appareil, et inversement. Chaque appareil retient ce qu'il a déjà reçu de chaque autre ; les paquets peuvent se recouvrir sans risque.</p>
+  <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+    <label class="f">Nom de cet appareil <input bind:value={deviceName} placeholder="Téléphone de Simon" /></label>
+    <button class="btn" onclick={saveDeviceName}>Enregistrer</button>
+  </div>
+  <div class="actions">
+    <select class="btn" bind:value={peerFilter}>
+      <option value="">Tout le journal</option>
+      {#each peers as p (p.site)}<option value={p.site}>Depuis le dernier échange avec {p.site}</option>{/each}
+    </select>
+    <button class="btn primary" onclick={exportChanges}>Exporter un paquet de changements</button>
+    <label class="btn">Importer un paquet… <input type="file" accept=".json,application/json" onchange={importChanges} hidden /></label>
+  </div>
 </div>
 
 {#if msg}<p class="small">{msg}</p>{/if}
