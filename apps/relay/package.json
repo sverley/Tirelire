@@ -1,0 +1,13 @@
+{
+  "name": "@tirelire/relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Relais minimal pour synchroniser Tirelire entre appareils via un serveur privé. Ne voit que des paquets chiffrés.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test",
+    "typecheck": "echo ok",
+    "build": "echo ok"
+  }
+}

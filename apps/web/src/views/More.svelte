@@ -5,6 +5,7 @@
     { id: 'envelopes', label: 'Enveloppes', desc: 'Provisions, objectifs d’épargne, budgets' },
     { id: 'flows', label: 'Flux prévus', desc: 'Revenus, charges fixes, échéances' },
     { id: 'entries', label: 'Saisie manuelle', desc: 'Dépenses des comptes tiers, virements faits' },
+    { id: 'sync', label: 'Synchronisation', desc: 'D’appareil à appareil, ou par un relais privé' },
     { id: 'settings', label: 'Réglages', desc: 'Année budgétaire, coussin, sauvegarde' },
   ];
 </script>

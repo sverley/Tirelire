@@ -10,13 +10,14 @@
   import Import from './views/Import.svelte';
   import More from './views/More.svelte';
   import Review from './views/Review.svelte';
+  import Sync from './views/Sync.svelte';
 
   const tabs: Array<{ id: View; label: string; ico: string; group: View[] }> = [
     { id: 'plan', label: 'Plan', ico: '▤', group: ['plan'] },
     { id: 'operations', label: 'Opérations', ico: '☰', group: ['operations'] },
     { id: 'import', label: 'Import', ico: '⇩', group: ['import'] },
     { id: 'review', label: 'Bilan', ico: '◔', group: ['review'] },
-    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'envelopes', 'flows', 'entries', 'settings'] },
+    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'envelopes', 'flows', 'entries', 'settings', 'sync'] },
   ];
 </script>
 
@@ -52,6 +53,8 @@
     <Flows />
   {:else if app.view === 'entries'}
     <Entries />
+  {:else if app.view === 'sync'}
+    <Sync />
   {:else}
     <Settings />
   {/if}

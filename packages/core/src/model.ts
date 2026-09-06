@@ -243,6 +243,16 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 /** L'ensemble des données d'un foyer, tel que chargé en mémoire. */
+/** Un appareil connu du foyer (synchronisé) : identifiant = `siteId`. */
+export interface Device {
+  id: Id;
+  name: string;
+  /** Prénom ou nom de la personne qui utilise l'appareil. */
+  user?: string;
+  lastSeen?: string;
+  deletedAt?: string;
+}
+
 export interface Ledger {
   accounts: Account[];
   envelopes: Envelope[];
@@ -252,6 +262,7 @@ export interface Ledger {
   allocations: Allocation[];
   rules: Rule[];
   importProfiles: ImportProfile[];
+  devices: Device[];
   settings: Settings;
 }
 
@@ -265,6 +276,7 @@ export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
     allocations: [],
     rules: [],
     importProfiles: [],
+    devices: [],
     settings: { ...DEFAULT_SETTINGS, ...settings },
   };
 }
