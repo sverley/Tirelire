@@ -114,6 +114,7 @@
   }
 </script>
 
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
 <h1>Saisie</h1>
 <p class="muted small">Dépenses et revenus non importables (comptes tiers, espèces), et virements internes faits depuis le pivot. Une catégorie et une enveloppe par opération ; la ventilation en plusieurs lignes arrivera avec l'import.</p>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, moneyClass, shortDate, STATUS_LABELS, ENVELOPE_KINDS } from '../lib/format';
-  import { periodsAround, type Period } from '@tirelire/core';
+  import { periodsAround, missingFlows, addDays, type Period } from '@tirelire/core';
 
   const plan = $derived(app.plan);
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
@@ -16,6 +16,8 @@
   const virtualLines = $derived(plan.lines.filter((l) => l.virtual));
   const transferLines = $derived(plan.lines.filter((l) => !l.virtual));
   const netOut = $derived(plan.transfers.reduce((s, t) => s + t.net, 0));
+  const missing = $derived(missingFlows(app.ledger, addDays(plan.period.start, -60), app.asOf));
+  const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
 
 {#if !hasData}
@@ -25,6 +27,7 @@
     <div class="actions">
       <button class="btn primary" onclick={() => app.loadExample()}>Charger l'exemple</button>
       <button class="btn" onclick={() => (app.view = 'accounts')}>Créer mes comptes</button>
+      <button class="btn" onclick={() => (app.view = 'settings')}>Importer une sauvegarde</button>
     </div>
   </div>
 {:else}
@@ -49,6 +52,15 @@
     <div class="warnings">
       {#each plan.warnings as w}
         <div>{w.message}</div>
+      {/each}
+    </div>
+  {/if}
+
+  {#if hasImports && missing.length}
+    <h2>Attendus, non reçus</h2>
+    <div class="card warn">
+      {#each missing as m (m.flowId + m.expectedDate)}
+        <div class="row"><div class="label">{m.name}<span class="sub">attendu le {shortDate(m.expectedDate)}, fenêtre close le {shortDate(m.windowEnd)}</span></div><div class="num">{money(m.amount)}</div></div>
       {/each}
     </div>
   {/if}

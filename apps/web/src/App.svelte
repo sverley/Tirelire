@@ -6,14 +6,17 @@
   import Flows from './views/Flows.svelte';
   import Entries from './views/Entries.svelte';
   import Settings from './views/Settings.svelte';
+  import Operations from './views/Operations.svelte';
+  import Import from './views/Import.svelte';
+  import More from './views/More.svelte';
+  import Review from './views/Review.svelte';
 
-  const tabs: Array<{ id: View; label: string; ico: string }> = [
-    { id: 'plan', label: 'Plan', ico: '▤' },
-    { id: 'accounts', label: 'Comptes', ico: '🏦' },
-    { id: 'envelopes', label: 'Enveloppes', ico: '✉' },
-    { id: 'flows', label: 'Flux', ico: '↻' },
-    { id: 'entries', label: 'Saisie', ico: '✎' },
-    { id: 'settings', label: 'Réglages', ico: '⚙' },
+  const tabs: Array<{ id: View; label: string; ico: string; group: View[] }> = [
+    { id: 'plan', label: 'Plan', ico: '▤', group: ['plan'] },
+    { id: 'operations', label: 'Opérations', ico: '☰', group: ['operations'] },
+    { id: 'import', label: 'Import', ico: '⇩', group: ['import'] },
+    { id: 'review', label: 'Bilan', ico: '◔', group: ['review'] },
+    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'envelopes', 'flows', 'entries', 'settings'] },
   ];
 </script>
 
@@ -33,6 +36,14 @@
     <p class="muted">Ouverture de la base…</p>
   {:else if app.view === 'plan'}
     <Plan />
+  {:else if app.view === 'operations'}
+    <Operations />
+  {:else if app.view === 'import'}
+    <Import />
+  {:else if app.view === 'review'}
+    <Review />
+  {:else if app.view === 'more'}
+    <More />
   {:else if app.view === 'accounts'}
     <Accounts />
   {:else if app.view === 'envelopes'}
@@ -48,7 +59,7 @@
 
 <nav class="tabbar">
   {#each tabs as t (t.id)}
-    <button class:active={app.view === t.id} onclick={() => (app.view = t.id)} aria-label={t.label}>
+    <button class:active={t.group.includes(app.view)} onclick={() => (app.view = t.id)} aria-label={t.label}>
       <span class="ico" aria-hidden="true">{t.ico}</span>{t.label}
     </button>
   {/each}

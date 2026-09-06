@@ -61,6 +61,7 @@
   }
 </script>
 
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
 <h1>Réglages</h1>
 
 <h2>Année budgétaire</h2>

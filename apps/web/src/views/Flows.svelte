@@ -112,6 +112,7 @@
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? '?';
 </script>
 
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
 <h1>Flux prévus</h1>
 <p class="muted small">Revenus, charges fixes, échéances payées par une enveloppe. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au pointage.</p>
 

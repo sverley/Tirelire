@@ -10,13 +10,14 @@ import {
   uuidv7,
   type Ledger,
   type LedgerStore,
+  type Patch,
   type Plan,
   type Settings,
 } from '@tirelire/core';
 import type { LedgerKey } from '@tirelire/core';
 import { eraseStore, openStore, type OpenedStore } from './db';
 
-export type View = 'plan' | 'accounts' | 'envelopes' | 'flows' | 'entries' | 'settings';
+export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'envelopes' | 'flows' | 'entries' | 'settings';
 
 class AppState {
   ledger = $state<Ledger>(emptyLedger());
@@ -66,6 +67,21 @@ class AppState {
     return uuidv7();
   }
 
+  /** Écrit un patch (opérations + ventilations) d'un seul coup. */
+  applyPatch(patch: Patch): void {
+    for (const o of patch.operations) this.store.upsert('operations', o);
+    for (const a of patch.allocations) this.store.upsert('allocations', a);
+    if (patch.operations.length || patch.allocations.length) this.reload();
+  }
+
+  /** Applique un patch sans recharger (pour enchaîner), puis rend le grand livre relu. */
+  applyPatchQuiet(patch: Patch): Ledger {
+    for (const o of patch.operations) this.store.upsert('operations', o);
+    for (const a of patch.allocations) this.store.upsert('allocations', a);
+    this.ledger = this.store.load();
+    return this.ledger;
+  }
+
   /** Charge le jeu d'exemple de l'analyse (remplace les données courantes). */
   async loadExample(): Promise<void> {
     await this.replaceWith(exampleLedger());
@@ -81,6 +97,8 @@ class AppState {
     for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
     for (const o of l.operations) s.upsert('operations', o);
     for (const a of l.allocations) s.upsert('allocations', a);
+    for (const r of l.rules) s.upsert('rules', r);
+    for (const p of l.importProfiles) s.upsert('importProfiles', p);
     s.setSetting('budgetYearStart', l.settings.budgetYearStart);
     s.setSetting('pivotCushion', l.settings.pivotCushion);
     this.reload();
