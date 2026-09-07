@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { centsToInput, inputToCents } from '../lib/format';
-  import { budgetYearContaining, MONTHS_FR, exportBundle, importBundle, knownPeers, type ChangeBundle } from '@tirelire/core';
+  import { exportBundle, importBundle, knownPeers, type ChangeBundle } from '@tirelire/core';
   import { saveFile } from '../lib/platform';
 
   let deviceName = $state(readDeviceName());
@@ -44,23 +44,13 @@
     input.value = '';
   }
 
-  let month = $state(String(app.ledger.settings.budgetYearStart.month));
-  let day = $state(String(app.ledger.settings.budgetYearStart.day));
   let cushion = $state(centsToInput(app.ledger.settings.pivotCushion));
   let msg = $state('');
 
   $effect(() => {
-    month = String(app.ledger.settings.budgetYearStart.month);
-    day = String(app.ledger.settings.budgetYearStart.day);
     cushion = centsToInput(app.ledger.settings.pivotCushion);
   });
 
-  const year = $derived(budgetYearContaining(app.asOf, app.ledger.settings.budgetYearStart.month, app.ledger.settings.budgetYearStart.day));
-
-  function saveYear() {
-    app.setSetting('budgetYearStart', { month: Math.min(12, Math.max(1, Number(month) || 1)), day: Math.min(31, Math.max(1, Number(day) || 1)) });
-    msg = 'Année budgétaire enregistrée.';
-  }
   function saveCushion() {
     const c = inputToCents(cushion);
     if (c === undefined) return void (msg = 'Montant invalide.');
@@ -103,20 +93,6 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Réglages</h1>
-
-<h2>Année budgétaire</h2>
-<div class="card">
-  <p class="small muted">L'année budgétaire commence à une date de ton choix ; les budgets annuels et les bilans la suivent. Actuellement : du {year.start} au {year.end} ({year.label}).</p>
-  <div class="grid" style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
-    <label class="f">Mois
-      <select bind:value={month}>
-        {#each MONTHS_FR as m, i}<option value={String(i + 1)}>{m}</option>{/each}
-      </select>
-    </label>
-    <label class="f">Jour <input type="number" min="1" max="31" bind:value={day} /></label>
-    <button class="btn" onclick={saveYear}>Enregistrer</button>
-  </div>
-</div>
 
 <h2>Coussin du pivot</h2>
 <div class="card">

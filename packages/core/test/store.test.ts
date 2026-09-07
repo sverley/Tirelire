@@ -17,7 +17,6 @@ async function seeded(site: string) {
   for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
   for (const o of l.operations) s.upsert('operations', o);
   for (const a of l.allocations) s.upsert('allocations', a);
-  s.setSetting('budgetYearStart', l.settings.budgetYearStart);
   s.setSetting('pivotCushion', l.settings.pivotCushion);
   return s;
 }
@@ -30,7 +29,7 @@ describe('dépôt SQLite', () => {
     const fromStore = computePlan(loaded, '2026-09-06');
     expect(fromStore.totals).toEqual(fromMemory.totals);
     expect(fromStore.transfers).toEqual(fromMemory.transfers);
-    expect(loaded.settings.budgetYearStart).toEqual({ month: 9, day: 1 });
+    expect(loaded.settings.pivotCushion).toBe(exampleLedger().settings.pivotCushion);
     expect(loaded.settings.siteId).toBe('A');
   });
 

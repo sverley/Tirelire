@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, budgetYearContaining, type CategoryReview, type Rule } from '@tirelire/core';
+  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, type CategoryReview, type Rule } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -13,7 +13,6 @@
   const rules = $derived(alive(app.ledger.rules).sort((a, b) => a.priority - b.priority));
   const categories = $derived(alive(app.ledger.categories));
   const envelopes = $derived(alive(app.ledger.envelopes));
-  const year = $derived(budgetYearContaining(app.asOf, app.ledger.settings.budgetYearStart.month, app.ledger.settings.budgetYearStart.day));
   const hasOps = $derived(app.ledger.operations.some((o) => !o.deletedAt));
 
   const keyOf = (r: CategoryReview) => `${r.categoryId ?? ''}|${r.envelopeId ?? ''}`;
@@ -40,7 +39,7 @@
 </script>
 
 <h1>Bilan</h1>
-<p class="muted small">Dépensé par période de paie et par catégorie, hors virements internes ; les dépenses ponctuelles sont exclues des moyennes. Année budgétaire {year.label} (du {shortDate(year.start)} au {shortDate(year.end)}).</p>
+<p class="muted small">Dépensé par période de paie et par catégorie, hors virements internes ; les dépenses ponctuelles sont exclues des moyennes. Une période « partielle » commence avant la première opération connue : la comparer aux autres serait trompeur.</p>
 
 <div class="actions" style="margin-top:0">
   {#each [3, 6, 12] as n}
@@ -74,7 +73,7 @@
               <thead><tr><th>Période</th><th class="n">Dépensé</th><th class="n">dont ponctuel</th><th class="n">Opérations</th></tr></thead>
               <tbody>
                 {#each [...r.periods].reverse() as p (p.key)}
-                  <tr><td>{p.label}</td><td class="n">{money(p.spent)}</td><td class="n">{p.oneOff ? money(p.oneOff) : ''}</td><td class="n">{p.count}</td></tr>
+                  <tr><td>{p.label}{#if p.partial}<span class="sub" title="historique incomplet"> · partiel</span>{/if}</td><td class="n">{money(p.spent)}</td><td class="n">{p.oneOff ? money(p.oneOff) : ''}</td><td class="n">{p.count}</td></tr>
                 {/each}
               </tbody>
             </table>

@@ -76,32 +76,6 @@ export function periodsUntil(from: Period, date: ISODate, payDay: number): numbe
 }
 
 // ---------------------------------------------------------------------------
-// Année budgétaire
-// ---------------------------------------------------------------------------
-
-export interface BudgetYear {
-  start: ISODate;
-  end: ISODate;
-  /** « 2026-2027 » si l'année est à cheval, « 2026 » sinon. */
-  label: string;
-}
-
-/** Année budgétaire contenant `date`, commençant chaque année le `month`/`day`. */
-export function budgetYearContaining(
-  date: ISODate,
-  startMonth: number,
-  startDay: number,
-): BudgetYear {
-  const { y } = parseDate(date);
-  let start = dateInMonth(y, startMonth, startDay);
-  if (start > date) start = dateInMonth(y - 1, startMonth, startDay);
-  const end = addDays(addMonths(start, 12), -1);
-  const sy = parseDate(start).y;
-  const ey = parseDate(end).y;
-  return { start, end, label: sy === ey ? String(sy) : `${sy}-${ey}` };
-}
-
-// ---------------------------------------------------------------------------
 // Périodicités
 // ---------------------------------------------------------------------------
 

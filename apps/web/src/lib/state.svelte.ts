@@ -129,7 +129,6 @@ class AppState {
     for (const r of l.rules) s.upsert('rules', r);
     for (const p of l.importProfiles) s.upsert('importProfiles', p);
     for (const d of l.devices) s.upsert('devices', d);
-    s.setSetting('budgetYearStart', l.settings.budgetYearStart);
     s.setSetting('pivotCushion', l.settings.pivotCushion);
     this.reload();
   }

@@ -252,8 +252,6 @@ export interface Rule {
 // ---------------------------------------------------------------------------
 
 export interface Settings {
-  /** Début de l'année budgétaire (mois 1-12, jour 1-31). */
-  budgetYearStart: { month: number; day: number };
   /** Coussin minimum à laisser en non affecté sur le pivot. */
   pivotCushion: Cents;
   /** Identifiant de cet appareil (pour l'horloge logique et le journal). */
@@ -261,7 +259,6 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  budgetYearStart: { month: 1, day: 1 },
   pivotCushion: 0,
   siteId: 'local',
 };

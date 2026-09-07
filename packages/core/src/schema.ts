@@ -11,6 +11,11 @@ export interface ColumnDef {
   /** Nom de la colonne SQL (snake_case). */
   col: string;
   type: ColumnType;
+  /**
+   * Colonne retirée du modèle (D30) : gardée dans le schéma, ignorée à la lecture et à
+   * l'écriture locale, acceptée d'un pair non migré, lue par les migrations.
+   */
+  deprecated?: boolean;
 }
 
 export interface TableDef {
@@ -23,6 +28,12 @@ const c = (prop: string, type: ColumnType = 'text'): ColumnDef => ({
   col: prop.replace(/[A-Z]/g, (m) => '_' + m.toLowerCase()),
   type,
 });
+
+/** Colonne dépréciée (voir `ColumnDef.deprecated`). */
+const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop, type), deprecated: true });
+
+/** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
+export const MODEL_VERSION = 1;
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {
@@ -133,6 +144,11 @@ export const TABLES: Record<string, TableDef> = {
     ],
   },
 };
+
+/** Colonnes vivantes d'une table (hors dépréciées). */
+export function liveColumns(t: TableDef): ColumnDef[] {
+  return t.columns.filter((col) => !col.deprecated);
+}
 
 /** Clé de `Ledger` correspondant à chaque table. */
 export const LEDGER_KEYS = ['accounts', 'envelopes', 'categories', 'plannedFlows', 'operations', 'allocations', 'rules', 'importProfiles', 'devices'] as const;

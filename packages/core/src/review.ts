@@ -16,6 +16,11 @@ export interface PeriodSpend {
   /** Dont ponctuel (exclu des moyennes). */
   oneOff: Cents;
   count: number;
+  /**
+   * Historique incomplet : la période commence avant la première opération connue (D25).
+   * Une comparaison avec une période complète serait trompeuse.
+   */
+  partial: boolean;
 }
 
 export interface CategoryReview {
@@ -50,6 +55,13 @@ export function lastPeriods(ledger: Ledger, asOf: ISODate, n: number): Period[] 
   return out;
 }
 
+/** Date de la première opération connue, tous comptes confondus (undefined sans opération). */
+export function historyStart(ledger: Ledger): ISODate | undefined {
+  let first: ISODate | undefined;
+  for (const o of alive(ledger.operations)) if (first === undefined || o.date < first) first = o.date;
+  return first;
+}
+
 function average(values: Cents[]): Cents {
   if (values.length === 0) return 0;
   return Math.round(values.reduce((s, v) => s + v, 0) / values.length);
@@ -68,11 +80,13 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
   const categories = alive(ledger.categories);
   const envelopes = alive(ledger.envelopes);
   const byKey = new Map<string, CategoryReview>();
+  const firstKnown = historyStart(ledger);
+  const partial = (p: Period) => firstKnown === undefined || p.start < firstKnown;
   const periodOf = (date: ISODate): Period | undefined => periods.find((p) => date >= p.start && date <= p.end);
   const ensure = (key: string, init: () => Omit<CategoryReview, 'periods' | 'avg3' | 'avg6' | 'avg12' | 'min' | 'max' | 'last' | 'totalSpent'>) => {
     let r = byKey.get(key);
     if (!r) {
-      r = { ...init(), periods: periods.map((p) => ({ key: p.key, label: p.label, spent: 0, oneOff: 0, count: 0 })), avg3: 0, avg6: 0, avg12: 0, min: 0, max: 0, last: 0, totalSpent: 0 };
+      r = { ...init(), periods: periods.map((p) => ({ key: p.key, label: p.label, spent: 0, oneOff: 0, count: 0, partial: partial(p) })), avg3: 0, avg6: 0, avg12: 0, min: 0, max: 0, last: 0, totalSpent: 0 };
       byKey.set(key, r);
     }
     return r;

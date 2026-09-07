@@ -7,7 +7,7 @@ import { emptyLedger } from './model.js';
 import { euros } from './money.js';
 
 export function exampleLedger(): Ledger {
-  const l = emptyLedger({ budgetYearStart: { month: 9, day: 1 }, pivotCushion: euros(600) });
+  const l = emptyLedger({ pivotCushion: euros(600) });
 
   l.accounts.push(
     { id: 'acc-pivot', name: 'Compte courant', kind: 'pivot', openingBalance: euros(2340), openingDate: '2026-08-27', payDay: 28 },

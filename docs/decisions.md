@@ -228,3 +228,46 @@ courant. Remplace la typologie provision / budget / objectif de D06, qui devient
 besoins, et `Envelope.kind` disparaît. Le **regroupement d'enveloppes est écarté** : les totaux
 passent par l'arbre des catégories, et le seul apport propre d'un groupe — arbitrer une masse commune
 entre ses membres — s'obtient en fusionnant les enveloppes plutôt qu'en les coiffant.
+
+## D29 · 2026-09-07 · Dotation calculée, virements neutres, report par libération
+
+Précise D06, D19 et D20 et remplace la part de D05 sur le « financement virtuel ». Chaque besoin
+(D28) est **doté** au début de chaque période de ce qu'il demande — croisière ou rattrapage —
+sous forme de composante calculée sur le pivot (ou sur le compte de placement s'il n'y a pas de
+pivot), jamais stockée. Un virement interne ventilé sur une enveloppe **ne change pas son solde** :
+il déplace une composante d'un compte vers un autre ; le solde ne bouge que par les dotations, les
+revenus ventilés et les dépenses. Le financement par priorité de D06 devient une **lecture** : le
+plan dit ce que les revenus de la période couvrent et signale les lignes réduites ; la dotation,
+elle, est acquise, et le non affecté du pivot dit si l'argent y est. Le report reste une propriété
+de l'enveloppe (`rollover`) : en fin de période, pour `none` tout solde positif au-delà de la
+réserve des besoins non récurrents (somme de leurs cibles) est **libéré** vers le non affecté du
+compte de placement ; pour `capped` c'est ce qui dépasse la réserve plus N croisières. Libération
+calculée, datée du dernier jour de la période, comptée comme composante négative. Les deux
+invariants de D19 tiennent puisque dotations et libérations sont des composantes comme les autres.
+Le solde d'une enveloppe s'attribue à ses besoins dans l'ordre des priorités (un besoin à échéance
+retient jusqu'à sa cible, un objectif jusqu'à la sienne, le récurrent prend le reste) ; un déficit
+pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin.
+
+## D30 · 2026-09-07 · Colonnes dépréciées et version de modèle
+
+Une colonne retirée du modèle n'est jamais supprimée du schéma : elle est marquée **dépréciée**
+dans `schema.ts`, ignorée à la lecture et à l'écriture locale, mais toujours acceptée par
+`applyRemote`, pour qu'un appareil non migré puisse encore envoyer son journal (D08). Une
+**version de modèle** (`meta.model_version`) déclenche à l'ouverture une migration locale
+idempotente qui lit les colonnes dépréciées et écrit les nouvelles via `upsert`, donc journalisées
+et propagées ; deux appareils qui migrent chacun produisent les mêmes valeurs, la fusion colonne par
+colonne converge. Le compactage du journal, plus tard, purgera les colonnes dépréciées.
+
+## D31 · 2026-09-07 · Rang d'une règle = clé triable
+
+Précise D23. Le rang est stocké comme **chaîne triable** (`rank`, ordre lexicographique, générée
+entre deux voisins à l'insertion ou au déplacement), pas comme index entier : deux appareils qui
+réordonnent en même temps ne produisent pas de doublons destructeurs, et une égalité se tranche par
+l'identifiant. L'interface montre une liste ordonnée, rang 1 en tête, sans exposer la clé. Les
+règles s'appliquent de la fin de la liste vers le rang 1.
+
+## D32 · 2026-09-07 · Enveloppe par défaut d'une catégorie
+
+`Category.envelopeId` survit à D28 comme **enveloppe par défaut** : quand une règle ou une action
+pose une catégorie sans enveloppe, la ventilation prend l'enveloppe par défaut de la catégorie. Ce
+n'est qu'un raccourci de saisie, pas un lien comptable.

@@ -11,7 +11,7 @@ import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
 import { HLC } from './hlc.js';
 import { sha256Hex, uuidv7 } from './ids.js';
 import { DEFAULT_SETTINGS, emptyLedger, type Ledger, type Settings } from './model.js';
-import { createTableSQL, LEDGER_KEYS, SYSTEM_SQL, TABLES, type ColumnDef, type LedgerKey, type TableDef } from './schema.js';
+import { createTableSQL, LEDGER_KEYS, liveColumns, MODEL_VERSION, SYSTEM_SQL, TABLES, type ColumnDef, type LedgerKey, type TableDef } from './schema.js';
 
 export interface ChangeEntry {
   seq: number;
@@ -62,10 +62,14 @@ export class LedgerStore {
     const db = opts.bytes ? new SQL.Database(opts.bytes) : new SQL.Database();
     for (const sql of SYSTEM_SQL) db.run(sql);
     for (const t of Object.values(TABLES)) db.run(createTableSQL(t));
+    const fresh = !opts.bytes;
     migrate(db);
     let siteId = opts.siteId ?? readMeta(db, 'site_id');
     if (!siteId) siteId = uuidv7().slice(-12);
     db.run(`INSERT OR REPLACE INTO meta (key, value) VALUES ('site_id', ?)`, [siteId]);
+    // Un dépôt neuf est au modèle courant ; un dépôt existant garde sa version jusqu'à `migrateModel`.
+    if (fresh && readMeta(db, 'model_version') === undefined)
+      db.run(`INSERT OR REPLACE INTO meta (key, value) VALUES ('model_version', ?)`, [String(MODEL_VERSION)]);
     return new LedgerStore(db, siteId, opts.now ?? (() => Date.now()));
   }
 
@@ -82,15 +86,29 @@ export class LedgerStore {
     return ledger;
   }
 
-  private readTable(t: TableDef): Row[] {
+  private readTable(t: TableDef, includeDeprecated = false): Row[] {
     const stmt = this.db.prepare(`SELECT * FROM ${t.name}`);
     const rows: Row[] = [];
     try {
-      while (stmt.step()) rows.push(fromRow(t, stmt.getAsObject() as Row));
+      while (stmt.step()) rows.push(fromRow(t, stmt.getAsObject() as Row, includeDeprecated));
     } finally {
       stmt.free();
     }
     return rows;
+  }
+
+  /** Lignes brutes d'une table, colonnes dépréciées comprises : réservé aux migrations (D30). */
+  readRawTable(key: LedgerKey): Row[] {
+    return this.readTable(TABLES[key]!, true);
+  }
+
+  /** Version du modèle enregistrée dans ce dépôt (0 pour un dépôt antérieur à D30). */
+  get modelVersion(): number {
+    return Number(this.getMeta('model_version') ?? 0);
+  }
+
+  setModelVersion(v: number): void {
+    this.setMeta('model_version', String(v));
   }
 
   readSettings(): Settings {
@@ -119,7 +137,7 @@ export class LedgerStore {
     this.transaction(() => {
       const existing = this.readRow(t, r['id'] as string);
       this.db.run(`INSERT OR IGNORE INTO ${t.name} (id) VALUES (?)`, [r['id'] as string]);
-      for (const col of t.columns) {
+      for (const col of liveColumns(t)) {
         if (col.prop === 'id') continue;
         const next = r[col.prop];
         const prev = existing ? existing[col.prop] : undefined;
@@ -378,9 +396,10 @@ function toSql(col: ColumnDef, value: unknown): string | number | null {
   }
 }
 
-function fromRow(t: TableDef, raw: Row): Row {
+function fromRow(t: TableDef, raw: Row, includeDeprecated = false): Row {
   const out: Row = {};
   for (const col of t.columns) {
+    if (col.deprecated && !includeDeprecated) continue;
     const v = raw[col.col];
     if (v === null || v === undefined) continue;
     switch (col.type) {
