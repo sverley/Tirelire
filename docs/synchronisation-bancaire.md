@@ -47,6 +47,24 @@ Bridge), doublés de scraping pour les banques mal couvertes.
 - **Réserve** : le mode restreint n'est pas contractuel ; Enable Banking peut le fermer. D'où
   l'import CSV conservé.
 
+## 3 bis. Les banques concernées : Société Générale et BoursoBank
+
+Les deux sont intégrées chez Enable Banking, connecteurs **stables** (drapeau bêta retiré en
+février 2024).
+
+- **Société Générale** : marque ASPSP « Société Générale » (clients particuliers, `psu_type`
+  `personal` ; les marques « Professionnels » et « Entreprises » sont distinctes). Parcours
+  redirection ; l'authentification forte passe par une notification dans **L'Appli SG**.
+  Pas de bascule automatique vers l'application : sur téléphone, il faudra revenir soi-même
+  dans le navigateur après validation.
+- **BoursoBank** : marque ASPSP « Boursorama » (FR). Journal des changements d'Enable Banking :
+  périmètre d'historique étendu demandé (juin 2023), `entry_reference` fourni sur les
+  opérations (juin 2024), donc déduplication exacte possible. Parcours redirection classique.
+
+Reste à vérifier à l'essai, pour chacune : profondeur d'historique réellement servie, validité
+maximale de consentement (`maximum_consent_validity`, 180 jours attendus), et si les opérations
+carte à débit différé apparaissent en `PDNG` ou seulement au débit.
+
 ## 4. Ce que ça change dans Tirelire
 
 Presque rien dans le cœur : `prepareImport(ledger, rows: ParsedRow[], profile)` est déjà
@@ -104,7 +122,7 @@ n'envisager que si le relais s'avère trop lourd à héberger.
 
 ## 7. Questions ouvertes pour Simon
 
-- Quelle est la banque du pivot (et celle des comptes des enfants) ? Tout dépend de sa couverture.
+- Lequel des deux (Société Générale, BoursoBank) est le pivot, et où sont les comptes des enfants ?
 - Accepte-t-il qu'un serveur à lui détienne une clé qui lit ses relevés ? Sinon, on reste au CSV.
 - Suffit-il d'un rafraîchissement à l'ouverture de l'application, ou faut-il du vrai
   arrière-plan (architecture B) ?
