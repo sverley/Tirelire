@@ -6,3 +6,7 @@ dist/
 coverage/
 *.csv
 *.sqlite
+
+# Connecteur bancaire : clés et sessions restent hors du dépôt
+*.pem
+.tirelire-banque/

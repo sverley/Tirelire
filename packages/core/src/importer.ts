@@ -51,6 +51,9 @@ export interface ParsedRow {
   amount: Cents;
   accountKey?: string;
   suggestedCategory?: string;
+  /** Référence attribuée par la banque (connecteur DSP2 : `entry_reference`). Pas encore
+   *  utilisée pour la clé, qui reste déterministe (D09) ; conservée pour l'avenir. */
+  externalRef?: string;
 }
 
 export interface ParseResult {

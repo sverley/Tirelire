@@ -21,6 +21,12 @@ Tirelire/
 │   ├── src/store.ts        dépôt sql.js : upsert/remove journalisés, applyRemote, chaîne d'empreintes
 │   ├── src/sync.ts         protocole de synchronisation, paquets par fichier
 │   └── src/example.ts      jeu de données de l'analyse
+├── packages/banque/        connecteur bancaire Node (Enable Banking, DSP2) → CSV/JSON d'import
+│   ├── src/jwt.ts          jeton d'application RS256
+│   ├── src/enable-banking.ts  client minimal (banques, autorisation, session, opérations paginées)
+│   ├── src/conversion.ts   opérations → ParsedRow → CSV reconnu par l'écran d'import
+│   ├── src/sg.ts           profil Société Générale (particuliers)
+│   └── src/cli.ts          banques | connecter | comptes | operations (état hors dépôt)
 ├── apps/web/               PWA Svelte 5 + Vite
 │   ├── src/lib/db.ts       ouverture du dépôt, persistance IndexedDB
 │   ├── src/lib/state.svelte.ts  état réactif (ledger, asOf, plan dérivé, vue)

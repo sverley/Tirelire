@@ -115,3 +115,15 @@ tiers. Transports : fichier (main), WebRTC à signalisation manuelle et relais p
 
 Les fichiers bancaires servent à vérifier l'import localement et ne sont jamais versionnés
 (`*.csv`, `*.sqlite` ignorés). Les exemples et tests utilisent des données inventées.
+
+## D18 · 2026-09-07 · Connecteur bancaire par agrégateur DSP2, hors de la PWA
+
+Les opérations peuvent être lues automatiquement via **Enable Banking** en mode *production
+restreinte* (gratuit, réservé aux comptes que Simon lie lui-même ; voir
+`docs/synchronisation-bancaire.md`). Le connecteur (`packages/banque`) tourne en Node sur un
+serveur privé : la clé privée de l'application et la session de consentement n'entrent jamais
+dans la PWA ni dans le dépôt. Il produit des `ParsedRow` (ou un CSV que l'écran d'import lit
+tel quel) : le rapprochement, la clé `op_` (D09) et le pointage prudent (D12) restent inchangés.
+Seules les opérations comptabilisées (`BOOK`) sont importées ; `entry_reference` est conservé
+dans `ParsedRow.externalRef` sans encore servir de clé. L'import CSV manuel reste le socle et le
+repli. Première banque : Société Générale ; BoursoBank ensuite.

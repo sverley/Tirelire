@@ -1,0 +1,26 @@
+{
+  "name": "@tirelire/banque",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Connecteur bancaire : lit les opérations via Enable Banking (DSP2) et les rend au format d'import de Tirelire. Tourne côté serveur (Node), jamais dans la PWA.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "cli": "node --experimental-strip-types --no-warnings src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "echo ok"
+  },
+  "dependencies": {
+    "@tirelire/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

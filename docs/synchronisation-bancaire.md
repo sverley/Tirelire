@@ -105,7 +105,13 @@ La PWA seule (clé stockée dans IndexedDB, appels directs) éviterait tout serv
 prévue serveur à serveur (CORS non garanti) et la clé serait lisible sur chaque appareil. À
 n'envisager que si le relais s'avère trop lourd à héberger.
 
-## 6. Plan d'essai (une demi-journée, puis décision D18)
+## 6. État au 7 septembre : connecteur SG écrit, à essayer en vrai
+
+Décision D18 prise. `packages/banque` contient le client Enable Banking, la conversion vers
+`ParsedRow`/CSV et une ligne de commande ; mode d'emploi dans `docs/connecteur-banque.md`.
+Le plan ci-dessous reste celui de l'essai réel.
+
+## 7. Plan d'essai
 
 1. Simon crée un compte sur enablebanking.com, une application **production**, génère la paire
    de clés, et **lie ses comptes** (liste blanche) ; vérifier que sa banque est dans la liste
@@ -120,7 +126,7 @@ n'envisager que si le relais s'avère trop lourd à héberger.
    `source: 'connector'`, point d'entrée dans le relais, écran de rafraîchissement avec aperçu,
    rappel de renouvellement du consentement.
 
-## 7. Questions ouvertes pour Simon
+## 8. Questions ouvertes pour Simon
 
 - Lequel des deux (Société Générale, BoursoBank) est le pivot, et où sont les comptes des enfants ?
 - Accepte-t-il qu'un serveur à lui détienne une clé qui lit ses relevés ? Sinon, on reste au CSV.
