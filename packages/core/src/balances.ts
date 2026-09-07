@@ -76,6 +76,8 @@ export interface LedgerIndex {
   payDay: number;
   /** Mémo des chronologies par enveloppe (dotations et libérations), étendues à la demande. */
   timelines: Map<Id, PeriodSnapshot[]>;
+  /** Montant résolu de chaque ligne de ventilation (D27), part variable comprise. */
+  amountsByAllocation: Map<Id, Cents>;
 }
 
 export function indexLedger(ledger: Ledger): LedgerIndex {
@@ -108,7 +110,12 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
     pivot,
     payDay: pivot?.payDay ?? 1,
     timelines: new Map(),
+    amountsByAllocation: new Map(),
   };
+  for (const [opId, allocs] of allocationsByOperation) {
+    const op = operationsById.get(opId)!;
+    for (const [id, amount] of resolveShares(op, allocs)) idx.amountsByAllocation.set(id, amount);
+  }
   for (const [opId, allocs] of allocationsByOperation) {
     const op = operationsById.get(opId)!;
     for (const al of allocs) {
@@ -125,9 +132,53 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
   return idx;
 }
 
-/** Montant d'une ligne de ventilation (D10 : part du montant de l'opération, dans son signe). */
-export function allocationAmount(al: Allocation): Cents {
-  return al.amount;
+/**
+ * Montants résolus des lignes d'une opération (D27) : une part fixe vaut son montant, une part
+ * en pourcentage se calcule sur le montant de l'opération, et la part variable prend le reste,
+ * bornée à zéro — jamais de signe opposé à l'opération. Les lignes sont résolues dans l'ordre
+ * reçu, ce qui rend le calcul déterministe et rejouable à montant inconnu d'avance.
+ */
+export function resolveShares(op: Operation, allocations: Allocation[]): Map<Id, Cents> {
+  const out = new Map<Id, Cents>();
+  const sign = op.amount < 0 ? -1 : 1;
+  let used = 0;
+  let variable: Allocation | undefined;
+  for (const al of allocations) {
+    if (al.share.kind === 'variable') {
+      // Une seule ligne variable (D27) : les suivantes ne prennent rien.
+      if (variable) out.set(al.id, 0);
+      else variable = al;
+      continue;
+    }
+    const amount = al.share.kind === 'fixed' ? al.share.amount : Math.round((op.amount * al.share.pct) / 100);
+    out.set(al.id, amount);
+    used += amount;
+  }
+  if (variable) {
+    const rest = op.amount - used;
+    out.set(variable.id, sign * rest > 0 ? rest : 0);
+  }
+  return out;
+}
+
+/** Reste non couvert par les lignes fixes et en pourcentage, borné à zéro (part variable, D27). */
+export function variableRest(op: Operation, allocations: Allocation[]): Cents {
+  const sign = op.amount < 0 ? -1 : 1;
+  const used = allocations.reduce((s, al) => {
+    if (al.share.kind === 'fixed') return s + al.share.amount;
+    if (al.share.kind === 'percent') return s + Math.round((op.amount * al.share.pct) / 100);
+    return s;
+  }, 0);
+  const rest = op.amount - used;
+  return sign * rest > 0 ? rest : 0;
+}
+
+/** Montant résolu d'une ligne de ventilation, dans le signe de l'opération (D27). */
+export function allocationAmount(al: Allocation, idx?: LedgerIndex): Cents {
+  const memo = idx?.amountsByAllocation.get(al.id);
+  if (memo !== undefined) return memo;
+  if (al.share.kind === 'fixed') return al.share.amount;
+  return 0;
 }
 
 /**
@@ -138,7 +189,7 @@ export function allocationAmount(al: Allocation): Cents {
  *    alors lui-même sa composante).
  */
 export function allocationEffects(op: Operation, al: Allocation, idx: LedgerIndex): ComponentEffect[] {
-  const amount = allocationAmount(al);
+  const amount = allocationAmount(al, idx);
   const own: ComponentEffect = { accountId: op.accountId, amount };
   if (!op.transferAccountId) return [own];
   if (op.transferOperationId) {
@@ -367,7 +418,7 @@ export function unallocated(a: Account, ledger: Ledger, idx: LedgerIndex, asOf: 
 /** Part d'une opération non couverte par ses lignes de ventilation (dans le signe de l'opération). */
 export function unallocatedAmount(op: Operation, idx: LedgerIndex): Cents {
   const allocs = idx.allocationsByOperation.get(op.id) ?? [];
-  return op.amount - allocs.reduce((s, a) => s + allocationAmount(a), 0);
+  return op.amount - allocs.reduce((s, a) => s + allocationAmount(a, idx), 0);
 }
 
 /**

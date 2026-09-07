@@ -4,7 +4,7 @@
  * dans le journal de changements ; elle est idempotente et déterministe (mêmes identifiants sur
  * tous les appareils) pour que deux migrations indépendantes convergent à la fusion.
  */
-import type { Envelope, Need, NeedKind, Periodicity, Rollover } from './model.js';
+import type { Allocation, Envelope, Need, NeedKind, Operation, OperationState, Periodicity, Rollover } from './model.js';
 import { MODEL_VERSION } from './schema.js';
 import type { LedgerStore } from './store.js';
 
@@ -19,6 +19,7 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   const from = store.modelVersion;
   const steps: MigrationReport['steps'] = [];
   if (from < 2) steps.push({ version: 2, written: migrateTo2(store) });
+  if (from < 3) steps.push({ version: 3, written: migrateTo3(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
@@ -68,6 +69,39 @@ function migrateTo2(store: LedgerStore): number {
       ...(envelope.deletedAt ? { deletedAt: envelope.deletedAt } : {}),
     };
     store.upsert('needs', need);
+    written++;
+  }
+  return written;
+}
+
+/**
+ * 2 → 3 (D22, D27) : `Operation.status` devient un état parmi trois, `Allocation.amount` devient
+ * une part fixe.
+ *
+ * L'ancien modèle ne distingue pas ce que l'utilisateur a classé à la main de ce qu'une règle a
+ * posé : tout ce qui était traité devient donc `reconciled`, malléable, et jamais `locked` —
+ * verrouiller d'office prétendrait à une vérité que l'ancien modèle ne portait pas. Ce qui doit
+ * l'être se verrouille ensuite par action groupée (D26). `oneOff` était un statut : il devient un
+ * attribut, ce qui le rend compatible avec un état.
+ */
+function migrateTo3(store: LedgerStore): number {
+  let written = 0;
+  for (const raw of store.readRawTable('operations')) {
+    const status = raw['status'] as string | undefined;
+    if (!status || raw['state']) continue;
+    const state: OperationState = status === 'pending' ? 'untreated' : 'reconciled';
+    const op = { ...(raw as unknown as Operation), state };
+    if (status === 'oneOff') op.oneOff = true;
+    delete (op as Record<string, unknown>)['status'];
+    store.upsert('operations', op);
+    written++;
+  }
+  for (const raw of store.readRawTable('allocations')) {
+    const amount = raw['amount'] as number | undefined;
+    if (amount === undefined || raw['share']) continue;
+    const al = { ...(raw as unknown as Allocation), share: { kind: 'fixed' as const, amount } };
+    delete (al as Record<string, unknown>)['amount'];
+    store.upsert('allocations', al);
     written++;
   }
   return written;

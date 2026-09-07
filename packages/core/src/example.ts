@@ -173,7 +173,7 @@ export function exampleLedger(): Ledger {
       label: 'VIR SALAIRE AOUT',
       normalizedLabel: 'VIR SALAIRE AOUT',
       amount: euros(3400),
-      status: 'matched',
+      state: 'reconciled',
       plannedFlowId: 'flow-salaire',
     },
     {
@@ -184,7 +184,7 @@ export function exampleLedger(): Ledger {
       label: 'Dentiste (payé par Marie)',
       normalizedLabel: 'DENTISTE PAYE PAR MARIE',
       amount: euros(-80),
-      status: 'categorized',
+      state: 'reconciled',
     },
     {
       id: 'op-caf-marie',
@@ -194,7 +194,7 @@ export function exampleLedger(): Ledger {
       label: 'Allocations reçues sur le compte de Marie',
       normalizedLabel: 'ALLOCATIONS RECUES SUR LE COMPTE DE MARIE',
       amount: euros(100),
-      status: 'categorized',
+      state: 'reconciled',
     },
     {
       id: 'op-vir-enfants',
@@ -204,7 +204,7 @@ export function exampleLedger(): Ledger {
       label: 'VIR PERM TIRELIRE CARTE ENFANTS',
       normalizedLabel: 'VIR PERM TIRELIRE CARTE ENFANTS',
       amount: euros(-200),
-      status: 'transfer',
+      state: 'reconciled',
       transferAccountId: 'acc-enfants',
     },
     {
@@ -215,7 +215,7 @@ export function exampleLedger(): Ledger {
       label: 'Fournitures scolaires',
       normalizedLabel: 'FOURNITURES SCOLAIRES',
       amount: euros(-146),
-      status: 'categorized',
+      state: 'reconciled',
     },
     {
       id: 'op-enfants-2',
@@ -225,16 +225,16 @@ export function exampleLedger(): Ledger {
       label: 'Inscription judo',
       normalizedLabel: 'INSCRIPTION JUDO',
       amount: euros(-90),
-      status: 'categorized',
+      state: 'reconciled',
     },
   );
   l.allocations.push(
-    { id: 'al-salaire-08', operationId: 'op-salaire-08', categoryId: 'cat-salaire', amount: euros(3400) },
-    { id: 'al-dentiste', operationId: 'op-dentiste', categoryId: 'cat-sante', envelopeId: 'env-sante', amount: euros(-80) },
-    { id: 'al-caf-marie', operationId: 'op-caf-marie', categoryId: 'cat-alloc', amount: euros(100) },
-    { id: 'al-vir-enfants', operationId: 'op-vir-enfants', categoryId: 'cat-transfert', envelopeId: 'env-enfants', amount: euros(-200) },
-    { id: 'al-enfants-1', operationId: 'op-enfants-1', categoryId: 'cat-enfants', envelopeId: 'env-enfants', amount: euros(-146) },
-    { id: 'al-enfants-2', operationId: 'op-enfants-2', categoryId: 'cat-enfants', envelopeId: 'env-enfants', amount: euros(-90) },
+    { id: 'al-salaire-08', operationId: 'op-salaire-08', categoryId: 'cat-salaire', share: { kind: 'fixed', amount: euros(3400) } },
+    { id: 'al-dentiste', operationId: 'op-dentiste', categoryId: 'cat-sante', envelopeId: 'env-sante', share: { kind: 'fixed', amount: euros(-80) } },
+    { id: 'al-caf-marie', operationId: 'op-caf-marie', categoryId: 'cat-alloc', share: { kind: 'fixed', amount: euros(100) } },
+    { id: 'al-vir-enfants', operationId: 'op-vir-enfants', categoryId: 'cat-transfert', envelopeId: 'env-enfants', share: { kind: 'fixed', amount: euros(-200) } },
+    { id: 'al-enfants-1', operationId: 'op-enfants-1', categoryId: 'cat-enfants', envelopeId: 'env-enfants', share: { kind: 'fixed', amount: euros(-146) } },
+    { id: 'al-enfants-2', operationId: 'op-enfants-2', categoryId: 'cat-enfants', envelopeId: 'env-enfants', share: { kind: 'fixed', amount: euros(-90) } },
   );
 
   return l;

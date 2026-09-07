@@ -313,7 +313,7 @@ export function prepareImport(ledger: Ledger, parsed: ParsedRow[], profile: Impo
       ...(row.fullLabel ? { details: row.fullLabel } : {}),
       normalizedLabel: normalized,
       amount: row.amount,
-      status: 'pending',
+      state: 'untreated',
       rank,
       ...(row.suggestedCategory ? { suggestedCategory: row.suggestedCategory } : {}),
     };

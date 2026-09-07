@@ -95,7 +95,8 @@
       label: form.label.trim(),
       normalizedLabel: normalizeLabel(form.label),
       amount,
-      status: form.nature === 'transfer' ? 'transfer' : 'categorized',
+      // Une saisie manuelle est de la vérité : elle naît verrouillée (D22).
+      state: 'locked',
       ...(form.nature === 'transfer' ? { transferAccountId: form.transferAccountId } : {}),
     };
     app.upsert('operations', op);
@@ -103,7 +104,8 @@
     const al: Allocation = {
       id: existing?.id ?? app.newId(),
       operationId: id,
-      amount,
+      // Une ligne unique variable prend l'intégralité du montant (D27).
+      share: { kind: 'variable' },
       ...(categoryId ? { categoryId } : {}),
       ...(form.envelopeId ? { envelopeId: form.envelopeId } : {}),
     };

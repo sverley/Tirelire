@@ -202,17 +202,22 @@ export interface PlannedFlow {
 
 export type OperationOrigin = 'imported' | 'manual';
 
-export type OperationStatus =
-  | 'pending' // à traiter
-  | 'matched' // rapprochée d'un flux prévu
-  | 'categorized' // catégorisée
-  | 'transfer' // transfert interne apparié
-  | 'oneOff'; // dépense ponctuelle
+/**
+ * État d'une opération (D22). La vérité est ce qui est verrouillé :
+ *  - `untreated` : aucune règle ne l'a vue ; elle peut porter une classification proposée
+ *    par une règle « Ne rien faire », qui n'est donc pas une décision ;
+ *  - `reconciled` : classée par une règle, reprise à chaque passage, malléable ;
+ *  - `locked` : plus aucune règle ne l'atteint ; toute modification manuelle verrouille.
+ * Seul l'utilisateur déverrouille, à l'unité ou par action groupée (D26).
+ */
+export type OperationState = 'untreated' | 'reconciled' | 'locked';
+
+export const OPERATION_STATES: OperationState[] = ['untreated', 'reconciled', 'locked'];
 
 /**
- * Une opération est ventilée en une ou plusieurs lignes (`Allocation`), chacune
- * portant une catégorie et une enveloppe. L'opération simple a une seule ligne.
- * Sans aucune ligne, l'opération pèse sur le « non affecté » du compte.
+ * Une opération est ventilée en une ou plusieurs lignes (`Allocation`) à parts (D27), chacune
+ * portant une catégorie et une enveloppe. Sans aucune ligne, elle vaut une ligne variable sans
+ * classement : tout son montant pèse sur le « non affecté » du compte.
  */
 export interface Operation {
   id: Id;
@@ -225,10 +230,13 @@ export interface Operation {
   details?: string;
   /** Signé : négatif = débit du compte. */
   amount: Cents;
-  status: OperationStatus;
+  /** État de traitement (D22) ; la nature (virement, ponctuelle) est portée à part. */
+  state: OperationState;
+  /** Dépense exceptionnelle : comptée dans les soldes, exclue des moyennes du bilan. */
+  oneOff?: boolean;
   /** Catégorie proposée par la source (banque, Linxo), à confirmer. */
   suggestedCategory?: string;
-  /** Flux prévu rapproché (rapprochement de flux, D22). */
+  /** Flux prévu rapproché (rapprochement de flux, D22) : ne change aucun état à lui seul. */
   plannedFlowId?: Id;
   /** Transfert interne : compte de contrepartie. */
   transferAccountId?: Id;
@@ -239,24 +247,41 @@ export interface Operation {
   deletedAt?: string;
 }
 
+/** Une opération verrouillée est de la vérité : aucune règle ne la réécrit (D22). */
+export function isLocked(op: Operation): boolean {
+  return op.state === 'locked';
+}
+
 /**
- * Ligne de ventilation. `amount` est une part du montant de l'opération, dans
- * le même signe (une dépense de 85 € ventilée en −60 alimentation et −25 vêtements).
+ * Part d'une ligne de ventilation (D27) : un montant fixe, un pourcentage du montant de
+ * l'opération, ou la part variable — le reste, bornée à zéro, jamais négative. Une seule ligne
+ * variable par ventilation ; une opération sans ligne vaut une ligne variable non classée.
+ */
+export type Share =
+  | { kind: 'fixed'; amount: Cents }
+  | { kind: 'percent'; pct: number }
+  | { kind: 'variable' };
+
+/**
+ * Ligne de ventilation. Son montant résolu est une part du montant de l'opération, dans le même
+ * signe (une dépense de 85 € ventilée en −60 alimentation et le reste en vêtements).
  *
- * Effet sur l'enveloppe :
- *  - dépense ou revenu : `amount` tel quel (−80 € sur un budget) ;
- *  - virement interne (`transferAccountId` sur l'opération) : −`amount` si
- *    l'opération est lue côté compte de départ, +`amount` côté compte hôte de
- *    l'enveloppe (un virement de 350 € qui quitte le pivot vers le livret,
- *    ventilé −100/−50/−200, donne +100/+50/+200 aux enveloppes du livret).
+ * Effet sur l'enveloppe (D19) : le montant sur le compte de l'opération ; pour un virement
+ * interne, aussi son opposé sur le compte de contrepartie, ce qui déplace une composante sans
+ * changer le solde.
  */
 export interface Allocation {
   id: Id;
   operationId: Id;
   categoryId?: Id;
   envelopeId?: Id;
-  amount: Cents;
+  share: Share;
   deletedAt?: string;
+}
+
+/** Ligne fixe (raccourci de lecture). */
+export function fixedShare(amount: Cents): Share {
+  return { kind: 'fixed', amount };
 }
 
 // ---------------------------------------------------------------------------

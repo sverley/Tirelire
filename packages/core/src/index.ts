@@ -9,6 +9,7 @@ export * from './hlc.js';
 export * from './schema.js';
 export * from './store.js';
 export * from './migration.js';
+export * from './edit.js';
 export * from './example.js';
 export * from './csv.js';
 export * from './importer.js';

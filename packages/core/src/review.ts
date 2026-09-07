@@ -4,7 +4,7 @@
  */
 import type { Cents, Envelope, Id, ISODate, Ledger, Need } from './model.js';
 import { alive, needName } from './model.js';
-import { envelopeBalance, indexLedger, needCruise } from './balances.js';
+import { allocationAmount, envelopeBalance, indexLedger, needCruise } from './balances.js';
 import { occurrencesBetween, payPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, diffDays } from './dates.js';
 
@@ -118,7 +118,7 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
     ensure(`env:${e.id}`, () => ({ envelopeId: e.id, name: `Budget « ${e.name} »`, nature: 'expense', target }));
   }
   for (const op of idx.operationsById.values()) {
-    if (op.transferAccountId || op.status === 'transfer') continue;
+    if (op.transferAccountId) continue;
     const p = periodOf(op.date);
     if (!p) continue;
     const pi = periods.indexOf(p);
@@ -134,10 +134,11 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
       }
       for (const t of targets) {
         const ps = t.periods[pi]!;
-        const spent = t.nature === 'income' ? al.amount : -al.amount;
+        const amount = allocationAmount(al, idx);
+        const spent = t.nature === 'income' ? amount : -amount;
         ps.spent += spent;
         ps.count++;
-        if (op.status === 'oneOff') ps.oneOff += spent;
+        if (op.oneOff) ps.oneOff += spent;
       }
     }
   }

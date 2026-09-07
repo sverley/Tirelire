@@ -11,21 +11,26 @@
     addDays,
     type Allocation,
     type Category,
+    editAllocations,
+    unlock,
+    variableRest,
+    type AllocationDraft,
     type MatchProposal,
     type Operation,
-    type OperationStatus,
+    type OperationState,
     type Rule,
   } from '@tirelire/core';
 
-  type Filter = 'pending' | 'all' | 'matched' | 'transfer';
-  let filter = $state<Filter>('pending');
+  type Filter = 'untreated' | 'all' | 'reconciled' | 'locked' | 'transfer';
+  let filter = $state<Filter>('untreated');
   let accountFilter = $state('');
   let periodOnly = $state(false);
   let search = $state('');
   let editingId = $state<string | undefined>(undefined);
 
-  // Formulaire de ventilation
-  let lines = $state<Array<{ id?: string; categoryId: string; envelopeId: string; amount: string }>>([]);
+  // Formulaire de ventilation : chaque ligne porte une part (D27).
+  type LineForm = { id?: string; categoryId: string; envelopeId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
+  let lines = $state<LineForm[]>([]);
   let newCategory = $state('');
   let oneOff = $state(false);
   let makeRule = $state(false);
@@ -53,40 +58,80 @@
   });
   const operations = $derived(
     alive(app.ledger.operations)
-      .filter((o) => (filter === 'all' ? true : filter === 'pending' ? o.status === 'pending' : o.status === filter))
+      .filter((o) => (filter === 'all' ? true : filter === 'transfer' ? !!o.transferAccountId : o.state === filter))
       .filter((o) => !accountFilter || o.accountId === accountFilter)
       .filter((o) => !periodOnly || (o.date >= period.start && o.date <= period.end))
       .filter((o) => !search || (o.label + ' ' + (o.details ?? '')).toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Math.abs(b.amount) - Math.abs(a.amount)))
       .slice(0, 300),
   );
-  const pendingCount = $derived(alive(app.ledger.operations).filter((o) => o.status === 'pending').length);
+  const untreatedCount = $derived(alive(app.ledger.operations).filter((o) => o.state === 'untreated').length);
 
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
   const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
   const flowName = (id: string | undefined) => flows.find((f) => f.id === id)?.name;
 
-  function statusLabel(s: OperationStatus): string {
-    return { pending: 'à traiter', matched: 'flux rapproché', categorized: 'classée', transfer: 'virement interne', oneOff: 'ponctuelle' }[s];
+  /** D22 : l'état dit qui a le droit d'écrire, pas ce que l'opération est. */
+  function stateLabel(s: OperationState): string {
+    return { untreated: 'non traitée', reconciled: 'rapprochée', locked: 'verrouillée' }[s];
   }
 
   function startEdit(op: Operation) {
     editingId = op.id;
     const existing = allocByOp.get(op.id) ?? [];
     lines = existing.length
-      ? existing.map((a) => ({ id: a.id, categoryId: a.categoryId ?? '', envelopeId: a.envelopeId ?? '', amount: centsToInput(a.amount) }))
-      : [{ categoryId: '', envelopeId: '', amount: centsToInput(op.amount) }];
+      ? existing.map((a) => ({
+          id: a.id,
+          categoryId: a.categoryId ?? '',
+          envelopeId: a.envelopeId ?? '',
+          kind: a.share.kind,
+          value: a.share.kind === 'fixed' ? centsToInput(a.share.amount) : a.share.kind === 'percent' ? String(a.share.pct) : '',
+        }))
+      // Toute opération a par défaut une ligne unique variable, qui prend l'intégralité du montant.
+      : [{ categoryId: '', envelopeId: '', kind: 'variable' as const, value: '' }];
     newCategory = '';
-    oneOff = op.status === 'oneOff';
+    oneOff = !!op.oneOff;
     makeRule = false;
     rulePattern = suggestPattern(op);
     error = '';
   }
 
   function addLine(op: Operation) {
-    const used = lines.reduce((s, l) => s + (inputToCents(l.amount) ?? 0), 0);
-    lines.push({ categoryId: '', envelopeId: '', amount: centsToInput(op.amount - used) });
+    // Ajouter une ligne réduit d'autant la ligne variable ; s'il n'y en a pas, la nouvelle l'est.
+    const hasVariable = lines.some((l) => l.kind === 'variable');
+    lines.push(
+      hasVariable
+        ? { categoryId: '', envelopeId: '', kind: 'fixed', value: centsToInput(rest(op)) }
+        : { categoryId: '', envelopeId: '', kind: 'variable', value: '' },
+    );
+  }
+
+  /** Parts saisies, converties pour le cœur. */
+  function drafts(): AllocationDraft[] {
+    return lines.map((l) => ({
+      ...(l.id ? { id: l.id } : {}),
+      ...(l.categoryId ? { categoryId: l.categoryId } : {}),
+      ...(l.envelopeId ? { envelopeId: l.envelopeId } : {}),
+      share:
+        l.kind === 'fixed'
+          ? ({ kind: 'fixed', amount: inputToCents(l.value) ?? 0 } as const)
+          : l.kind === 'percent'
+            ? ({ kind: 'percent', pct: Number(l.value.replace(',', '.')) || 0 } as const)
+            : ({ kind: 'variable' } as const),
+    }));
+  }
+
+  /** Ce que prendrait la part variable en l'état de la saisie (D27). */
+  function rest(op: Operation): number {
+    const allocs = drafts().map((d, i) => ({ id: String(i), operationId: op.id, share: d.share }));
+    return variableRest(op, allocs);
+  }
+
+  function lineAmount(op: Operation, l: LineForm): number {
+    if (l.kind === 'fixed') return inputToCents(l.value) ?? 0;
+    if (l.kind === 'percent') return Math.round((op.amount * (Number(l.value.replace(',', '.')) || 0)) / 100);
+    return rest(op);
   }
 
   function onCategory(i: number) {
@@ -94,15 +139,8 @@
     if (c?.envelopeId && !lines[i]!.envelopeId) lines[i]!.envelopeId = c.envelopeId;
   }
 
-  function remaining(op: Operation): number {
-    return op.amount - lines.reduce((s, l) => s + (inputToCents(l.amount) ?? 0), 0);
-  }
-
   function save(op: Operation) {
     error = '';
-    const parsedLines = lines.map((l) => ({ ...l, cents: inputToCents(l.amount) }));
-    if (parsedLines.some((l) => l.cents === undefined)) return void (error = 'Montant de ligne invalide.');
-    if (remaining(op) !== 0) return void (error = `La ventilation doit couvrir le montant (reste ${money(remaining(op))}).`);
     let createdCategory: Category | undefined;
     if (newCategory.trim()) {
       const nature = op.amount < 0 ? 'expense' : 'income';
@@ -112,31 +150,22 @@
         app.store.upsert('categories', createdCategory);
       }
     }
-    const existing = allocByOp.get(op.id) ?? [];
-    const keep = new Set<string>();
-    for (const l of parsedLines) {
-      const categoryId = l.categoryId || (createdCategory && !l.categoryId ? createdCategory.id : '');
-      const al: Allocation = {
-        id: l.id ?? app.newId(),
-        operationId: op.id,
-        amount: l.cents!,
-        ...(categoryId ? { categoryId } : {}),
-        ...(l.envelopeId ? { envelopeId: l.envelopeId } : {}),
-      };
-      keep.add(al.id);
-      app.store.upsert('allocations', al);
+    const drafted = drafts().map((d) => (createdCategory && !d.categoryId ? { ...d, categoryId: createdCategory!.id } : d));
+    try {
+      // Le cœur valide les parts et verrouille l'opération : c'est la modification qui change l'état.
+      app.applyPatch(editAllocations(app.ledger, op.id, drafted, { oneOff }));
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+      return;
     }
-    for (const a of existing) if (!keep.has(a.id)) app.store.remove('allocations', a.id);
-    const status: OperationStatus = oneOff ? 'oneOff' : op.status === 'matched' || op.status === 'transfer' ? op.status : 'categorized';
-    app.store.upsert('operations', { ...op, status });
     if (makeRule && rulePattern.trim()) {
-      const first = parsedLines[0]!;
+      const first = drafted[0];
       const rule: Rule = {
         id: app.newId(),
         pattern: rulePattern.trim(),
         priority: 50,
-        ...(first.categoryId || createdCategory ? { categoryId: first.categoryId || createdCategory!.id } : {}),
-        ...(first.envelopeId ? { envelopeId: first.envelopeId } : {}),
+        ...(first?.categoryId ? { categoryId: first.categoryId } : {}),
+        ...(first?.envelopeId ? { envelopeId: first.envelopeId } : {}),
       };
       app.store.upsert('rules', rule);
     }
@@ -153,11 +182,18 @@
 
   function markTransfer(op: Operation, accountId: string) {
     if (!accountId) return;
-    app.upsert('operations', { ...op, status: 'transfer', transferAccountId: accountId });
+    // Désigner un virement est une modification manuelle : elle verrouille (D22).
+    app.upsert('operations', { ...op, state: 'locked', transferAccountId: accountId });
   }
 
+  /** Déverrouiller : l'opération repart aux règles, sans rien perdre (D22). */
+  function unlockOp(op: Operation) {
+    app.upsert('operations', unlock(op));
+  }
+
+  /** Repartir de zéro : plus de flux, plus de virement, plus de ventilation. */
   function unlink(op: Operation) {
-    const next: Operation = { ...op, status: 'pending' };
+    const next: Operation = { ...op, state: 'untreated' };
     delete next.plannedFlowId;
     delete next.transferAccountId;
     delete next.transferOperationId;
@@ -174,13 +210,14 @@
   }
 </script>
 
-<h1>Opérations {#if pendingCount}<span class="pill catchUp">{pendingCount} à traiter</span>{/if}</h1>
+<h1>Opérations {#if untreatedCount}<span class="pill catchUp">{untreatedCount} non traitées</span>{/if}</h1>
 
 <div class="actions" style="margin-top:8px">
   <select bind:value={filter} class="btn">
-    <option value="pending">À traiter</option>
+    <option value="untreated">Non traitées</option>
     <option value="all">Toutes</option>
-    <option value="matched">Flux rapprochés</option>
+    <option value="reconciled">Rapprochées</option>
+    <option value="locked">Verrouillées</option>
     <option value="transfer">Virements internes</option>
   </select>
   <select bind:value={accountFilter} class="btn">
@@ -199,13 +236,14 @@
       <button class="label" style="text-align:left;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit" onclick={() => (editingId === op.id ? (editingId = undefined) : startEdit(op))}>
         <strong>{op.label}</strong>
         <span class="sub">
-          {shortDate(op.date)} · {accountName(op.accountId)} · <span class="pill {op.status === 'pending' ? 'catchUp' : 'ok'}">{statusLabel(op.status)}</span>
+          {shortDate(op.date)} · {accountName(op.accountId)} · <span class="pill {op.state === 'untreated' ? 'catchUp' : 'ok'}">{stateLabel(op.state)}</span>
+          {#if op.oneOff} · ponctuelle{/if}
           {#if op.plannedFlowId} · {flowName(op.plannedFlowId)}{/if}
           {#if op.transferAccountId} · → {accountName(op.transferAccountId)}{/if}
           {#if allocs.length} · {allocs.map((a) => [categoryName(a.categoryId), envelopeName(a.envelopeId)].filter(Boolean).join(' / ')).join(' + ')}{/if}
           {#if op.suggestedCategory && !allocs.length} · banque : {op.suggestedCategory}{/if}
         </span>
-        {#if prop && op.status === 'pending'}
+        {#if prop && op.state !== 'locked'}
           <span class="sub" style="color:var(--accent)">Proposition : rapprocher du flux « {flowName(prop.flowId)} » ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
         {/if}
       </button>
@@ -214,7 +252,7 @@
       {#if editingId === op.id}
         <form class="edit" style="width:100%" onsubmit={(e) => { e.preventDefault(); save(op); }}>
           {#if op.details}<p class="small muted">{op.details}</p>{/if}
-          {#if prop && op.status === 'pending'}
+          {#if prop && op.state !== 'locked'}
             <div class="actions" style="margin:0">
               <button class="btn primary" type="button" onclick={() => acceptMatch(op)}>Rapprocher du flux « {flowName(prop.flowId)} »</button>
             </div>
@@ -234,13 +272,25 @@
                   {#each envelopes as e}<option value={e.id}>{e.name} ({accountName(e.placementAccountId)})</option>{/each}
                 </select>
               </label>
-              <label class="f">Montant <input bind:value={l.amount} inputmode="decimal" /></label>
+              <label class="f">Part
+                <select bind:value={l.kind}>
+                  <option value="variable">Le reste</option>
+                  <option value="fixed">Montant fixe</option>
+                  <option value="percent">Pourcentage</option>
+                </select>
+              </label>
+              {#if l.kind !== 'variable'}
+                <label class="f">{l.kind === 'percent' ? '%' : 'Montant'} <input bind:value={l.value} inputmode="decimal" /></label>
+              {/if}
+              <div class="f"><span class="sub">soit {money(lineAmount(op, l))}</span></div>
               {#if lines.length > 1}<button class="btn small danger" type="button" style="align-self:end" onclick={() => lines.splice(i, 1)}>Retirer</button>{/if}
             </div>
           {/each}
           <div class="actions" style="margin:0">
             <button class="btn small" type="button" onclick={() => addLine(op)}>Ajouter une ligne</button>
-            {#if remaining(op) !== 0}<span class="small neg">reste {money(remaining(op))}</span>{/if}
+            {#if !lines.some((l) => l.kind === 'variable') && rest(op) !== 0}
+              <span class="small neg">non affecté : {money(op.amount - lines.reduce((s, l) => s + lineAmount(op, l), 0))}</span>
+            {/if}
           </div>
           <div class="grid">
             <label class="f">Nouvelle catégorie (si absente) <input bind:value={newCategory} /></label>
@@ -255,7 +305,8 @@
               <option value="">Virement interne vers…</option>
               {#each accounts.filter((a) => a.id !== op.accountId) as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
-            {#if op.status !== 'pending'}<button class="btn" type="button" onclick={() => unlink(op)}>Remettre à traiter</button>{/if}
+            {#if op.state === 'locked'}<button class="btn" type="button" onclick={() => unlockOp(op)}>Déverrouiller</button>{/if}
+            {#if op.state !== 'untreated' || allocs.length}<button class="btn" type="button" onclick={() => unlink(op)}>Tout remettre à zéro</button>{/if}
             <button class="btn danger" type="button" onclick={() => remove(op)}>Supprimer</button>
             <button class="btn" type="button" onclick={() => (editingId = undefined)}>Fermer</button>
           </div>
@@ -263,6 +314,6 @@
       {/if}
     </div>
   {:else}
-    <div class="muted">Rien à afficher{filter === 'pending' ? ' : tout est trié.' : '.'}</div>
+    <div class="muted">Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}</div>
   {/each}
 </div>

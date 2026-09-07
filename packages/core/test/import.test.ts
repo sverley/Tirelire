@@ -153,7 +153,8 @@ describe('rapprochement', () => {
     expect(enfants.get('acc-enfants')).toBe(euros(200));
     expect(envelopeBalance(idx.envelopesById.get('env-enfants')!, idx, '2026-09-06')).toBe(euros(200));
     const op = l2.operations.find((o) => o.normalizedLabel.includes('LIVRET A'))!;
-    expect(op.status).toBe('transfer');
+    expect(op.state).toBe('reconciled');
+    expect(op.transferAccountId).toBeDefined();
     expect(op.transferAccountId).toBe('acc-livret');
   });
 
@@ -176,7 +177,7 @@ describe('rapprochement', () => {
     const m = proposeMatches(l, '2026-08-01', '2026-09-30').find((p) => p.flowId === 'flow-credit')!;
     const l2 = applyPatchToLedger(l, applyMatch(l, m));
     const op = l2.operations.find((o) => o.id === m.operationId)!;
-    expect(op.status).toBe('matched');
+    expect(op.state).toBe('reconciled');
     expect(op.plannedFlowId).toBe('flow-credit');
     expect(l2.allocations.find((a) => a.operationId === op.id)?.categoryId).toBe('cat-logement');
     // La même occurrence n'est plus proposée.
@@ -203,7 +204,7 @@ describe('rapprochement', () => {
     expect(report.autoMatched).toBe(2);
     expect(report.ruled).toBe(2);
     expect(report.proposals.map((p) => p.flowId)).toEqual(['flow-salaire']);
-    const pending = l.operations.filter((o) => o.status === 'pending');
+    const pending = l.operations.filter((o) => o.state === 'untreated');
     // Restent : salaire (à confirmer) et l'eau (aucune règle)
     expect(pending.length).toBe(2);
     // Le loyer locatif du 5 septembre n'est pas arrivé (fenêtre 5 j écoulée au 20 septembre)
@@ -229,11 +230,11 @@ describe('rapprochement', () => {
       label: 'VIR TIRELIRE LIVRET A',
       normalizedLabel: 'VIR TIRELIRE LIVRET A',
       amount: euros(100),
-      status: 'pending',
+      state: 'untreated',
     });
     const patch = pairInternalTransfers(l);
     expect(patch.operations.length).toBe(2);
-    expect(patch.operations.every((o) => o.status === 'transfer')).toBe(true);
+    expect(patch.operations.every((o) => o.state === 'reconciled' && o.transferAccountId)).toBe(true);
     // Puis le virement est ventilé côté pivot, sans double compte côté livret.
     let l2 = applyPatchToLedger(l, patch);
     l2 = applyPatchToLedger(l2, matchEnvelopeTransfers(l2));

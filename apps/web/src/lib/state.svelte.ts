@@ -100,13 +100,15 @@ class AppState {
   applyPatch(patch: Patch): void {
     for (const o of patch.operations) this.store.upsert('operations', o);
     for (const a of patch.allocations) this.store.upsert('allocations', a);
-    if (patch.operations.length || patch.allocations.length) this.reload();
+    for (const id of patch.removedAllocations ?? []) this.store.remove('allocations', id);
+    if (patch.operations.length || patch.allocations.length || patch.removedAllocations?.length) this.reload();
   }
 
   /** Applique un patch sans recharger (pour enchaîner), puis rend le grand livre relu. */
   applyPatchQuiet(patch: Patch): Ledger {
     for (const o of patch.operations) this.store.upsert('operations', o);
     for (const a of patch.allocations) this.store.upsert('allocations', a);
+    for (const id of patch.removedAllocations ?? []) this.store.remove('allocations', id);
     this.ledger = this.store.load();
     return this.ledger;
   }
