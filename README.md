@@ -15,7 +15,7 @@ Nom de code. Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](d
   chaîné par empreinte et horloge logique hybride, prêt pour la synchronisation.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
-- `docs` — analyse, formats d'import.
+- `docs` — analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
 
 ## Démarrer
 
@@ -32,11 +32,13 @@ données de l'analyse pour voir le plan tout de suite.
 ## Lots
 
 - **A · Plan** (fait) : comptes, enveloppes, flux prévus, saisie manuelle, plan de période.
-- **B · Import et pointage** : profils d'import (banque, Linxo), déduplication, doublons
-  probables, transferts internes, pointage des flux prévus, ventilation, alertes.
-- **C · Budgets et calibrage** : règles de catégorisation, file de tri, budget vs réel par
-  période, moyennes glissantes, suggestions de cibles.
-- Plus tard : synchronisation entre appareils (fichier d'échange, serveur privé, WebRTC).
+- **B · Import et pointage** (fait) : profils d'import CSV/Excel (banque multi-comptes, Linxo,
+  générique), déduplication, doublons probables, virements internes, pointage des flux prévus
+  avec propositions, ventilation, flux attendus non reçus.
+- **C · Budgets et calibrage** (fait) : règles de classement créées depuis le tri, bilan par
+  catégorie et par période, moyennes glissantes 3/6/12, cibles suggérées, provisions prévu vs payé.
+- **Synchronisation** : paquets de changements par fichier sur `main` ; direct WebRTC (QR code)
+  et relais privé chiffré sur la branche `feature/sync-p2p` (voir `docs/synchronisation.md`).
 
 ## Conventions
 
