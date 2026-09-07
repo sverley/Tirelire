@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
-  import { periodsAround, missingFlows, addDays, type Period } from '@tirelire/core';
+  import { periodsAround, missingFlows, addDays, alive, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
 
   const plan = $derived(app.plan);
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
@@ -20,6 +20,21 @@
   // Écarts qui n'impliquent pas le pivot : ils ne sont dans aucun virement pivot ↔ compte.
   const pivotId = $derived(app.ledger.accounts.find((a) => a.kind === 'pivot' && !a.deletedAt)?.id);
   const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== pivotId && g.toAccountId !== pivotId));
+  const transferFlows = $derived(alive(app.ledger.plannedFlows).filter((f) => f.kind === 'transfer'));
+  const flowFor = (t: PlanTransfer) => transferFlows.find((f) => f.counterpartAccountId === t.accountId);
+
+  /**
+   * Enregistre le virement permanent comme flux attendu (D21) : à l'import, la ligne bancaire sera
+   * reconnue par montant et libellé, et sa ventilation proposée.
+   */
+  function saveStandingOrder(t: PlanTransfer) {
+    if (!pivotId) return;
+    const existing = flowFor(t);
+    const flow = standingTransferFlow(plan, t, pivotId, existing?.id ?? app.newId());
+    if (!flow) return;
+    if (!confirm(`${existing ? 'Mettre à jour' : 'Enregistrer'} le virement permanent vers « ${t.accountName} » (${money(t.standing)}) ?`)) return;
+    app.upsert('plannedFlows', flow);
+  }
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
 
@@ -98,7 +113,15 @@
         </div>
       {/if}
       {#if t.standing > 0 || t.exceptional > 0}
-        <div class="row"><div class="label">Virement permanent (total)</div><div class="num">{money(t.standing)}</div></div>
+        <div class="row">
+          <div class="label">Virement permanent (total){#if flowFor(t)}<span class="sub">enregistré comme flux attendu</span>{/if}</div>
+          <div class="num">{money(t.standing)}</div>
+        </div>
+        {#if t.standing > 0}
+          <div class="actions" style="margin:6px 0 0">
+            <button class="btn small" onclick={() => saveStandingOrder(t)}>{flowFor(t) ? 'Mettre à jour le flux' : 'Enregistrer comme flux attendu'}</button>
+          </div>
+        {/if}
       {/if}
       {#if t.exceptional > 0}
         <div class="row"><div class="label">Complément exceptionnel ce mois</div><div class="num neg">{money(t.exceptional)}</div></div>

@@ -108,6 +108,7 @@ export const TABLES: Record<string, TableDef> = {
       c('activeFrom'),
       c('activeTo'),
       c('makesRule', 'boolean'),
+      c('plannedAllocation', 'json'),
       c('deletedAt'),
     ],
   },

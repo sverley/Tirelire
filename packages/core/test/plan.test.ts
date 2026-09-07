@@ -12,6 +12,10 @@ import {
   transferLabel,
   unallocated,
   type Ledger,
+  standingTransferFlow,
+  applyMatch,
+  applyPatchToLedger,
+  type Operation,
 } from '../src/index.js';
 
 const asOf = '2026-09-06';
@@ -248,5 +252,52 @@ describe('libellés de virement', () => {
     expect(transferLabel('Livret A')).toBe('TIRELIRE LIVRET A');
     expect(transferLabel('Épargne de précaution')).toBe('TIRELIRE EPARGNE DE PRECAUTION');
     expect(transferLabel('Taxe foncière').length).toBeLessThanOrEqual(35);
+  });
+});
+
+describe('virement permanent à ventilation prévue (D21)', () => {
+  it('un flux par couple de comptes, ventilation calculée d’avance', () => {
+    const l = exampleLedger();
+    const plan = computePlan(l, '2026-09-06');
+    const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
+    const flow = standingTransferFlow(plan, t, 'acc-pivot', 'flow-vir')!;
+    expect(flow.kind).toBe('transfer');
+    expect(flow.counterpartAccountId).toBe(t.accountId);
+    expect(flow.labelPattern).toBe(t.label);
+    // Le permanent, pas le total : le complément de ce mois-ci n'est pas un ordre permanent.
+    expect(flow.amount).toBe(-t.standing);
+    expect(flow.plannedAllocation!.reduce((s, a) => s + (a.share.kind === 'fixed' ? a.share.amount : 0), 0)).toBe(-t.standing);
+  });
+
+  it('au montant prévu, la ventilation prévue s’applique ; sinon l’ordre de financement rejoue', () => {
+    let l = exampleLedger();
+    const plan = computePlan(l, '2026-09-06');
+    const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
+    const flow = standingTransferFlow(plan, t, 'acc-pivot', 'flow-vir')!;
+    l.plannedFlows.push(flow);
+
+    const virement = (id: string, amount: number): Operation => ({
+      id,
+      accountId: 'acc-pivot',
+      origin: 'imported',
+      date: '2026-09-28',
+      label: flow.labelPattern!,
+      normalizedLabel: flow.labelPattern!,
+      amount,
+      state: 'untreated',
+    });
+
+    // Montant exact : on retrouve la ventilation prévue.
+    l.operations.push(virement('op-vir-exact', flow.amount));
+    let patch = applyMatch(l, { operationId: 'op-vir-exact', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
+    expect(patch.allocations.map((a) => a.envelopeId)).toEqual(flow.plannedAllocation!.map((a) => a.envelopeId));
+
+    // Montant moindre : les planchers passent d'abord, on ne saupoudre pas au prorata.
+    const moindre = Math.round(flow.amount / 2);
+    l = applyPatchToLedger(l, { operations: [virement('op-vir-court', moindre)], allocations: [] });
+    patch = applyMatch(l, { operationId: 'op-vir-court', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
+    const total = patch.allocations.reduce((s, a) => s + (a.share.kind === 'fixed' ? a.share.amount : 0), 0);
+    expect(total).toBe(moindre);
+    expect(patch.allocations.length).toBeLessThanOrEqual(flow.plannedAllocation!.length);
   });
 });

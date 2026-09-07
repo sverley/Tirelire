@@ -195,6 +195,12 @@ export interface PlannedFlow {
   activeTo?: ISODate;
   /** Le flux engendre-t-il une règle déterministe (D24) ? */
   makesRule?: boolean;
+  /**
+   * Virement permanent : ventilation prévue par couple de comptes (D21), calculée d'avance par le
+   * plan. Si le montant constaté diffère du prévu, elle est rejouée par l'ordre de financement de
+   * D06 plutôt qu'appliquée telle quelle — un prorata saupoudrerait au lieu de servir les planchers.
+   */
+  plannedAllocation?: Array<{ envelopeId: Id; share: Share }>;
   deletedAt?: string;
 }
 

@@ -232,6 +232,31 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
   patch.operations.push(next);
   const existing = allocationsOf(ledger, op.id);
+  // Virement permanent (D21) : la ventilation prévue vaut si le montant est celui qu'on attendait ;
+  // sinon on rejoue l'ordre de financement, planchers d'abord, sur le montant réellement viré.
+  if (f.kind === 'transfer' && f.plannedAllocation?.length && existing.length === 0) {
+    const target = f.counterpartAccountId ?? op.transferAccountId;
+    const exact = op.amount === f.amount;
+    const category = f.categoryId;
+    const lines = exact
+      ? f.plannedAllocation.map((l) => ({ envelopeId: l.envelopeId, share: l.share }))
+      : target
+        ? distributeTransfer(ledger, target, op.amount, op.date).map((part) => ({
+            envelopeId: part.envelopeId,
+            share: { kind: 'fixed' as const, amount: op.amount < 0 ? -part.amount : part.amount },
+          }))
+        : [];
+    for (const line of lines) {
+      patch.allocations.push({
+        id: uuidv7(),
+        operationId: op.id,
+        envelopeId: line.envelopeId,
+        share: line.share,
+        ...(category ? { categoryId: category } : {}),
+      });
+    }
+    return patch;
+  }
   if (existing.length === 0 && (f.categoryId || f.envelopeId)) {
     patch.allocations.push({
       id: uuidv7(),

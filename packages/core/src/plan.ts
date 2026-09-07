@@ -369,6 +369,34 @@ function flowLines(flows: PlannedFlow[], p: Period): PlanFlowLine[] {
   return out.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
 }
 
+/**
+ * Flux attendu correspondant au virement permanent vers un compte (D21) : un seul par couple de
+ * comptes, mensuel, avec sa ventilation calculée d'avance. Enregistré, il rend le virement
+ * reconnaissable à l'import par montant et libellé, et sa ventilation proposée.
+ *
+ * Le montant retenu est la part permanente, pas le total : le complément exceptionnel de ce
+ * mois-ci n'a pas vocation à devenir un ordre permanent.
+ */
+export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, pivotId: Id, id: Id): PlannedFlow | undefined {
+  if (transfer.standing <= 0) return undefined;
+  const allocation = transfer.orders
+    .filter((o) => o.standing > 0)
+    .map((o) => ({ envelopeId: o.envelopeId, share: { kind: 'fixed' as const, amount: -o.standing } }));
+  return {
+    id,
+    name: `Virement ${transfer.accountName}`,
+    kind: 'transfer',
+    amount: -transfer.standing,
+    accountId: pivotId,
+    counterpartAccountId: transfer.accountId,
+    periodicity: { intervalMonths: 1, anchorDate: plan.period.start },
+    dateWindowDays: 5,
+    labelPattern: transfer.label,
+    amountTolerance: { pct: 20 },
+    plannedAllocation: allocation,
+  };
+}
+
 /** Fenêtre de périodes autour de `asOf`, utile pour naviguer dans l'interface. */
 export function periodsAround(ledger: Ledger, asOf: ISODate, before: number, after: number): Period[] {
   const pivot = alive(ledger.accounts).find((a) => a.kind === 'pivot');
