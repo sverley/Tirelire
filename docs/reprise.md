@@ -1,10 +1,10 @@
 # Prompt de reprise
 
-À coller tel quel au début d'une nouvelle session (avec accès au dépôt GitHub `Sigmun/Tirelire`).
+À coller tel quel au début d'une nouvelle session (avec accès au dépôt GitHub `sverley/Tirelire`).
 
 ---
 
-Tu reprends le projet **Tirelire** (dépôt `github.com/Sigmun/Tirelire`) : une application de
+Tu reprends le projet **Tirelire** (dépôt `github.com/sverley/Tirelire`) : une application de
 comptes de famille en TypeScript — cœur pur dans `packages/core`, PWA Svelte 5 dans `apps/web`,
 emballage Android Capacitor dans `apps/web/android`, relais de synchronisation dans `apps/relay`
 (branche `feature/sync-p2p`). Langue de travail : français, y compris code, commentaires,
