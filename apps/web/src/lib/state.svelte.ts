@@ -17,7 +17,7 @@ import {
 import type { LedgerKey } from '@tirelire/core';
 import { eraseStore, openStore, type OpenedStore } from './db';
 
-export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'envelopes' | 'categories' | 'flows' | 'entries' | 'settings';
+export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'envelopes' | 'categories' | 'flows' | 'entries' | 'settings' | 'sync';
 
 class AppState {
   ledger = $state<Ledger>(emptyLedger());
@@ -128,6 +128,7 @@ class AppState {
     for (const a of l.allocations) s.upsert('allocations', a);
     for (const r of l.rules) s.upsert('rules', r);
     for (const p of l.importProfiles) s.upsert('importProfiles', p);
+    for (const d of l.devices) s.upsert('devices', d);
     s.setSetting('budgetYearStart', l.settings.budgetYearStart);
     s.setSetting('pivotCushion', l.settings.pivotCushion);
     this.reload();

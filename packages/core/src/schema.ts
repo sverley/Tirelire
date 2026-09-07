@@ -111,6 +111,10 @@ export const TABLES: Record<string, TableDef> = {
     name: 'rules',
     columns: [c('id'), c('pattern'), c('categoryId'), c('envelopeId'), c('priority', 'integer'), c('deletedAt')],
   },
+  devices: {
+    name: 'devices',
+    columns: [c('id'), c('name'), c('user'), c('lastSeen'), c('deletedAt')],
+  },
   importProfiles: {
     name: 'import_profiles',
     columns: [
@@ -131,7 +135,7 @@ export const TABLES: Record<string, TableDef> = {
 };
 
 /** Clé de `Ledger` correspondant à chaque table. */
-export const LEDGER_KEYS = ['accounts', 'envelopes', 'categories', 'plannedFlows', 'operations', 'allocations', 'rules', 'importProfiles'] as const;
+export const LEDGER_KEYS = ['accounts', 'envelopes', 'categories', 'plannedFlows', 'operations', 'allocations', 'rules', 'importProfiles', 'devices'] as const;
 export type LedgerKey = (typeof LEDGER_KEYS)[number];
 
 export function createTableSQL(t: TableDef): string {
