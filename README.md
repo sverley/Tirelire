@@ -15,7 +15,7 @@ Nom de code. Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](d
   chaîné par empreinte et horloge logique hybride, prêt pour la synchronisation.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
-- `docs` — analyse, formats d'import.
+- `docs` — analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
 
 ## Démarrer
 
