@@ -8,7 +8,7 @@
 
   const categories = $derived(alive(app.ledger.categories));
   const envelopes = $derived(alive(app.ledger.envelopes));
-  const budgetEnvelopes = $derived(envelopes.filter((e) => e.kind === 'budget'));
+  const budgetEnvelopes = $derived(envelopes);
   const byId = $derived(new Map(categories.map((c) => [c.id, c])));
   const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
 

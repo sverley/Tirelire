@@ -53,45 +53,70 @@ export interface Account {
 }
 
 // ---------------------------------------------------------------------------
-// Enveloppes (sous-comptes comptables)
+// Enveloppes et besoins
 // ---------------------------------------------------------------------------
-
-/**
- * - `provision` : accumule pour une échéance (montant `target`, périodicité) puis se vide.
- * - `goal`      : épargne alimentée d'un montant mensuel fixe, cible facultative.
- * - `budget`    : dépense courante, montant par période (mensuel ou annuel), avec ou sans report.
- */
-export type EnvelopeKind = 'provision' | 'goal' | 'budget';
 
 export type Rollover = { mode: 'none' } | { mode: 'unlimited' } | { mode: 'capped'; months: number };
 
+/**
+ * Une enveloppe est un pot à solde unique (D28), réparti sur plusieurs comptes (D19) : sa
+ * position réelle est un vecteur « compte → composante », reconstruit et jamais stocké
+ * (`envelopeComponents`). Elle déclare où son argent devrait dormir (`placementAccountId`,
+ * D20) ; l'écart entre position et placement nourrit le plan. Le report (D05, D29) porte sur
+ * l'enveloppe : en fin de période, l'excédent au-delà de la réserve des besoins non récurrents
+ * est libéré (`none`) ou plafonné (`capped`).
+ */
 export interface Envelope {
   id: Id;
   name: string;
-  kind: EnvelopeKind;
-  /** Compte réel qui héberge l'enveloppe. */
-  accountId: Id;
+  /** Compte où l'argent de l'enveloppe devrait se trouver. */
+  placementAccountId: Id;
+  /** Solde à `openingDate`, réputé sur le compte de placement. */
   openingBalance: Cents;
   openingDate: ISODate;
-  /** provision : montant de l'échéance ; goal : cible facultative ; budget : montant par période. */
-  target?: Cents;
-  /** provision : échéance (intervalle + ancrage) ; budget : 1 (mensuel) ou 12 (annuel) avec ancrage. */
-  periodicity?: Periodicity;
-  /** goal : montant mensuel fixe. */
-  monthlyAmount?: Cents;
-  /** budget : sort du reliquat en fin de période. */
+  /** Sort de l'excédent en fin de période ; `unlimited` par défaut. */
   rollover?: Rollover;
-  /** Ordre de financement : plus petit = financé en premier. */
+  deletedAt?: string;
+}
+
+/**
+ * Un besoin de financement porté par une enveloppe (D28) :
+ * - `recurring` : `amount` par période (lissé sur `periodicity.intervalMonths` périodes, 1 par défaut) ;
+ * - `dueDate`   : `amount` pour chaque échéance de `periodicity`, rattrapage lissé sur les périodes restantes ;
+ * - `goal`      : `monthlyAmount` par période jusqu'à `amount` (cible facultative).
+ * Les priorités et planchers de D06 se posent sur les besoins ; le solde de l'enveloppe leur est
+ * attribué dans l'ordre des priorités (D29).
+ */
+export type NeedKind = 'recurring' | 'dueDate' | 'goal';
+
+export interface Need {
+  id: Id;
+  envelopeId: Id;
+  kind: NeedKind;
+  /** Libellé facultatif (« Taxe foncière ») ; sinon le nom de l'enveloppe. */
+  name?: string;
+  /** recurring : montant par période ; dueDate : montant de l'échéance ; goal : cible facultative. */
+  amount?: Cents;
+  /** recurring : 1 (mensuel) ou 12 (annuel) avec ancrage ; dueDate : échéance (intervalle + ancrage). */
+  periodicity?: Periodicity;
+  /** goal : mensualité. */
+  monthlyAmount?: Cents;
+  /** Ordre de financement : plus petit = servi en premier. */
   priority: number;
   deletedAt?: string;
 }
 
-/** Priorités par défaut ; les provisions passent avant, les budgets confort après. */
-export const DEFAULT_PRIORITY: Record<EnvelopeKind, number> = {
-  provision: 10,
-  budget: 20,
+/** Priorités par défaut ; les échéances passent avant, les objectifs après. */
+export const DEFAULT_PRIORITY: Record<NeedKind, number> = {
+  dueDate: 10,
+  recurring: 20,
   goal: 30,
 };
+
+/** Nom affiché d'un besoin. */
+export function needName(n: Need, e: Envelope | undefined): string {
+  return n.name ?? e?.name ?? '';
+}
 
 // ---------------------------------------------------------------------------
 // Catégories
@@ -103,7 +128,7 @@ export interface Category {
   id: Id;
   name: string;
   parentId?: Id;
-  /** Enveloppe budget que cette catégorie consomme (facultatif : sinon simple suivi). */
+  /** Enveloppe par défaut de la catégorie (D32) : proposée quand une règle ou une saisie n'en fixe pas. */
   envelopeId?: Id;
   /** `income` pour les catégories de revenus. */
   nature: CategoryNature;
@@ -254,12 +279,15 @@ export interface Rule {
 export interface Settings {
   /** Coussin minimum à laisser en non affecté sur le pivot. */
   pivotCushion: Cents;
+  /** En dessous de ce montant, un écart de placement (D20) est « à surveiller » plutôt qu'« à faire ». */
+  transferThreshold: Cents;
   /** Identifiant de cet appareil (pour l'horloge logique et le journal). */
   siteId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   pivotCushion: 0,
+  transferThreshold: 1000,
   siteId: 'local',
 };
 
@@ -277,6 +305,7 @@ export interface Device {
 export interface Ledger {
   accounts: Account[];
   envelopes: Envelope[];
+  needs: Need[];
   categories: Category[];
   plannedFlows: PlannedFlow[];
   operations: Operation[];
@@ -291,6 +320,7 @@ export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
   return {
     accounts: [],
     envelopes: [],
+    needs: [],
     categories: [],
     plannedFlows: [],
     operations: [],

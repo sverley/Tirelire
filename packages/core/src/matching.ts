@@ -9,7 +9,8 @@ import type { Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow, Ru
 import { alive } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
-import { transferLabel } from './plan.js';
+import { fundByPriority, transferLabel } from './plan.js';
+import { envelopeComponents, indexLedger, periodSnapshot } from './balances.js';
 import { uuidv7 } from './ids.js';
 
 export interface Patch {
@@ -62,28 +63,70 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
 }
 
 // ---------------------------------------------------------------------------
-// Virements vers les enveloppes, reconnus par leur libellé « TIRELIRE … »
+// Virements vers un compte, reconnus par leur libellé « TIRELIRE <COMPTE> » (D21)
 // ---------------------------------------------------------------------------
 
 /**
- * Une opération dont le libellé contient le libellé de virement d'une enveloppe
- * hébergée sur un autre compte est un virement interne vers ce compte,
- * ventilé sur cette enveloppe.
+ * Répartit un virement constaté du pivot vers `accountId` entre les enveloppes placées sur ce
+ * compte, par l'ordre de financement de D06 : les planchers (rattrapages d'échéances) d'abord,
+ * puis les écarts de placement par priorité ; le reste, s'il y en a, va à la première enveloppe.
+ * Rend, par enveloppe, la part (positive) à ventiler.
+ */
+export function distributeTransfer(ledger: Ledger, accountId: Id, amount: Cents, asOf: ISODate): Array<{ envelopeId: Id; amount: Cents }> {
+  const idx = indexLedger(ledger);
+  const pivot = idx.pivot;
+  const lines: Array<{ envelopeId: Id; name: string; priority: number; dueDate: string; floor: Cents; requested: Cents; funded: Cents }> = [];
+  for (const e of idx.envelopesById.values()) {
+    if (e.placementAccountId !== accountId) continue;
+    const comps = envelopeComponents(e, idx, asOf);
+    const gap = pivot ? (comps.get(pivot.id) ?? 0) : 0;
+    if (gap <= 0) continue;
+    const snap = periodSnapshot(e, idx, asOf);
+    const floor = Math.min(gap, snap?.needs.reduce((s, n) => s + n.floor, 0) ?? 0);
+    const priority = Math.min(...(idx.needsByEnvelope.get(e.id) ?? []).map((n) => n.priority), 1000);
+    const dueDate = (snap?.needs.map((n) => n.dueDate).filter((d): d is string => !!d).sort()[0]) ?? '9999-12-31';
+    lines.push({ envelopeId: e.id, name: e.name, priority, dueDate, floor, requested: gap, funded: 0 });
+  }
+  // À priorité égale, l'échéance la plus proche d'abord.
+  lines.sort((a, b) => a.priority - b.priority || a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, 'fr'));
+  const rest = fundByPriority(lines, Math.abs(amount));
+  const out = lines.filter((l) => l.funded > 0).map((l) => ({ envelopeId: l.envelopeId, amount: l.funded }));
+  if (rest > 0) {
+    if (out.length > 0) out[0]!.amount += rest;
+    else if (lines.length > 0) out.push({ envelopeId: lines[0]!.envelopeId, amount: rest });
+  }
+  return out;
+}
+
+/**
+ * Une opération importée dont le libellé contient le libellé de virement d'un autre compte suivi
+ * est un virement interne vers ce compte ; son montant est ventilé sur les enveloppes qui y sont
+ * placées (`distributeTransfer`). Sans enveloppe placée là, le virement est reconnu sans ventilation.
  */
 export function matchEnvelopeTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
-  const envelopes = alive(ledger.envelopes);
-  const labels = envelopes.map((e) => ({ e, label: transferLabel(e.name).replace(/^TIRELIRE /, '') }));
+  const accounts = alive(ledger.accounts).map((a) => ({ a, label: transferLabel(a.name).replace(/^TIRELIRE /, '') }));
+  const transferCategory = alive(ledger.categories).find((c) => /^virement/i.test(c.name));
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
     if (op.status !== 'pending' && !(op.status === 'transfer' && allocationsOf(ledger, op.id).length === 0)) continue;
     if (!/TIRELIRE/.test(op.normalizedLabel)) continue;
-    const hit = labels
-      .filter(({ e, label }) => e.accountId !== op.accountId && op.normalizedLabel.includes(label))
+    const hit = accounts
+      .filter(({ a, label }) => a.id !== op.accountId && label.length > 0 && op.normalizedLabel.includes(label))
       .sort((a, b) => b.label.length - a.label.length)[0];
     if (!hit) continue;
-    patch.operations.push({ ...op, status: 'transfer', transferAccountId: op.transferAccountId ?? hit.e.accountId });
-    patch.allocations.push({ id: uuidv7(), operationId: op.id, envelopeId: hit.e.id, amount: op.amount });
+    const target = op.transferAccountId ?? hit.a.id;
+    patch.operations.push({ ...op, status: 'transfer', transferAccountId: target });
+    if (op.amount >= 0) continue;
+    for (const part of distributeTransfer(ledger, target, op.amount, op.date)) {
+      patch.allocations.push({
+        id: uuidv7(),
+        operationId: op.id,
+        envelopeId: part.envelopeId,
+        amount: -part.amount,
+        ...(transferCategory ? { categoryId: transferCategory.id } : {}),
+      });
+    }
   }
   return patch;
 }

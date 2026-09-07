@@ -17,7 +17,7 @@ function withHistory(): Ledger {
   // Taxe foncière 2025 : provision à 1 200, payée 1 260 le 15 octobre 2025.
   l.envelopes.find((e) => e.id === 'env-tf')!.openingDate = '2025-01-01';
   l.envelopes.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
-  l.envelopes.find((e) => e.id === 'env-tf')!.periodicity = { intervalMonths: 12, anchorDate: '2025-10-15' };
+  l.needs.find((n) => n.id === 'need-tf')!.periodicity = { intervalMonths: 12, anchorDate: '2025-10-15' };
   l.operations.push({ id: 'op-tf-2025', accountId: 'acc-pivot', origin: 'imported', date: '2025-10-16', label: 'DGFIP TAXE FONCIERE', normalizedLabel: 'DGFIP TAXE FONCIERE', amount: euros(-1260), status: 'matched', plannedFlowId: 'flow-tf' });
   l.allocations.push({ id: 'al-tf-2025', operationId: 'op-tf-2025', categoryId: 'cat-logement', envelopeId: 'env-tf', amount: euros(-1260) });
   return l;
@@ -50,7 +50,7 @@ describe('bilan des provisions', () => {
   it('provisionné vs payé à l’échéance', () => {
     const l = withHistory();
     const rows = reviewProvisions(l, '2025-01-01', '2026-09-06');
-    const tf = rows.find((r) => r.envelopeId === 'env-tf' && r.dueDate === '2025-10-15')!;
+    const tf = rows.find((r) => r.needId === 'need-tf' && r.dueDate === '2025-10-15')!;
     expect(tf.provisioned).toBe(euros(1200));
     expect(tf.paid).toBe(euros(1260));
     expect(tf.variance).toBe(euros(60));

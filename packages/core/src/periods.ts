@@ -1,6 +1,6 @@
 /**
- * Périodes budgétaires (de paie à paie), année budgétaire à date configurable,
- * et occurrences d'une périodicité « tous les N mois à partir d'une date ».
+ * Périodes budgétaires (de paie à paie) et occurrences d'une périodicité
+ * « tous les N mois à partir d'une date ».
  */
 import type { ISODate, Periodicity } from './model.js';
 import { addDays, addMonths, dateInMonth, daysInMonth, parseDate, MONTHS_FR, formatDate } from './dates.js';

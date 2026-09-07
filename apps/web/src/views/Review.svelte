@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, type CategoryReview, type Rule } from '@tirelire/core';
+  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, needCruise, type CategoryReview, type Rule } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -17,13 +17,24 @@
 
   const keyOf = (r: CategoryReview) => `${r.categoryId ?? ''}|${r.envelopeId ?? ''}`;
 
+  /**
+   * Adopter une cible : la suggestion porte sur la dotation par période, donc sur les besoins
+   * récurrents de l'enveloppe (D28). S'il y en a plusieurs, on ajuste celui qui pèse le plus.
+   */
   function adopt(r: CategoryReview) {
     if (!r.envelopeId || r.suggestion === undefined) return;
     const e = envelopes.find((x) => x.id === r.envelopeId);
     if (!e) return;
-    const n = e.periodicity?.intervalMonths ?? 1;
-    if (!confirm(`Passer le budget « ${e.name} » à ${money(r.suggestion)} par période ?`)) return;
-    app.upsert('envelopes', { ...e, target: r.suggestion * n });
+    const recurring = alive(app.ledger.needs)
+      .filter((n) => n.envelopeId === e.id && n.kind === 'recurring')
+      .sort((a, b) => needCruise(b) - needCruise(a));
+    const need = recurring[0];
+    if (!need) return;
+    const others = recurring.slice(1).reduce((s, n) => s + needCruise(n), 0);
+    const interval = need.periodicity?.intervalMonths ?? 1;
+    const amount = Math.max(0, r.suggestion - others) * interval;
+    if (!confirm(`Passer « ${need.name ?? e.name} » à ${money(amount)} ${interval === 1 ? 'par période' : `tous les ${interval} mois`} ?`)) return;
+    app.upsert('needs', { ...need, amount });
   }
 
   function gap(r: CategoryReview): number | undefined {

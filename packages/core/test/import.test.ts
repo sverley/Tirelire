@@ -5,6 +5,7 @@ import {
   decodeBytes,
   detectDelimiter,
   envelopeBalance,
+  envelopeComponents,
   euros,
   exampleLedger,
   guessColumns,
@@ -33,8 +34,8 @@ import {
 const CSV = [
   'Date transaction;Date comptabilisation;Num Compte;Libellé Compte;Libellé opération;Libellé complet;Catégorie;Sous-Catégorie;Montant;Pointée;',
   '28/08/2026;28/08/2026;00011111111;Compte Joint;VIR RECU DE: EMPLOYEUR SA;VIR RECU 123456789S DE: EMPLOYEUR SA MOTIF: SALAIRE AOUT REF: 1D0;Revenus du travail;Salaires;3400,00;Non;',
-  '28/08/2026;28/08/2026;00011111111;Compte Joint;VIR PERM TIRELIRE TAXE FONCIERE;VIR PERM 000123 TIRELIRE TAXE FONCIERE;Mouvements internes débiteurs;;-100,00;Non;',
-  '28/08/2026;28/08/2026;00011111111;Compte Joint;VIR PERM TIRELIRE ENFANTS ET LOISIRS;VIR PERM 000124 TIRELIRE ENFANTS ET LOISIRS;Mouvements internes débiteurs;;-200,00;Non;',
+  '28/08/2026;28/08/2026;00011111111;Compte Joint;VIR PERM TIRELIRE LIVRET A;VIR PERM 000123 TIRELIRE LIVRET A;Mouvements internes débiteurs;;-100,00;Non;',
+  '28/08/2026;28/08/2026;00011111111;Compte Joint;VIR PERM TIRELIRE CARTE ENFANTS;VIR PERM 000124 TIRELIRE CARTE ENFANTS;Mouvements internes débiteurs;;-200,00;Non;',
   '05/09/2026;05/09/2026;00011111111;Compte Joint;ECHEANCE PRET 0001234;ECHEANCE PRET 0001234 CAPITAL 700 INTERETS 250;Logement;Prêt;-950,00;Non;',
   '07/09/2026;07/09/2026;00011111111;Compte Joint;VIR RECU DE: CAF DU DEPARTEMENT;VIR RECU 6593641146S DE: CAF DU DEPARTEMENT MOTIF: 2070401CXXX REF: 831;Allocations;Allocations familiales;100,00;Non;',
   '03/09/2026;03/09/2026;00011111111;Compte Joint;CARTE X2009 02/09 SUPERMARCHE LYON;CARTE X2009 02/09 SUPERMARCHE LYON;Vie quotidienne;Alimentation;-85,40;Non;',
@@ -136,19 +137,24 @@ describe('rapprochement', () => {
     return { ...ledger, operations: prep.candidates.filter((c) => !c.exact).map((c) => c.operation) };
   }
 
-  it('virements « TIRELIRE » reconnus par le libellé de l’enveloppe', () => {
+  it('virements « TIRELIRE <COMPTE> » reconnus par compte et répartis par l’ordre de financement (D21)', () => {
     const l = imported();
     const patch = matchEnvelopeTransfers(l);
     expect(patch.operations.length).toBe(2);
     const l2 = applyPatchToLedger(l, patch);
     const idx = indexLedger(l2);
-    // 900 initial + 100 viré
-    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1000));
-    // budget enfants sur compte tiers : +200 (aucune dépense saisie dans ce test)
+    // 100 € vers le livret : le plancher de la taxe foncière (rattrapage 150) passe avant tout ; le solde ne bouge pas.
+    const tf = envelopeComponents(idx.envelopesById.get('env-tf')!, idx, '2026-09-06');
+    expect(tf.get('acc-livret')).toBe(euros(1000));
+    expect(tf.get('acc-pivot')).toBe(euros(50));
+    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
+    // 200 € vers la carte enfants : dotation déplacée là (aucune dépense saisie dans ce test)
+    const enfants = envelopeComponents(idx.envelopesById.get('env-enfants')!, idx, '2026-09-06');
+    expect(enfants.get('acc-enfants')).toBe(euros(200));
     expect(envelopeBalance(idx.envelopesById.get('env-enfants')!, idx, '2026-09-06')).toBe(euros(200));
-    const tf = l2.operations.find((o) => o.normalizedLabel.includes('TAXE FONCIERE'))!;
-    expect(tf.status).toBe('transfer');
-    expect(tf.transferAccountId).toBe('acc-livret');
+    const op = l2.operations.find((o) => o.normalizedLabel.includes('LIVRET A'))!;
+    expect(op.status).toBe('transfer');
+    expect(op.transferAccountId).toBe('acc-livret');
   });
 
   it('rapprochement de flux : automatique quand libellé et montant concordent', () => {
@@ -204,10 +210,13 @@ describe('rapprochement', () => {
     const missing = missingFlows(l, '2026-08-01', '2026-09-20');
     expect(missing.map((m) => m.flowId)).toContain('flow-loyer');
     expect(missing.map((m) => m.flowId)).not.toContain('flow-credit');
-    // Non affecté du pivot : 2340 + 3400 − 100 − 200 − 950 + 100 − 170,8 − 76 − (900−170,8 + 200 + 250 + 100)
+    // Non affecté du pivot : solde bancaire − composantes portées, dotations non encore virées comprises
+    // (taxe foncière 150 − 100 virés, assurance auto 50, vacances 200, précaution 300, budgets du pivot).
     const idx = indexLedger(l);
     const pivot = idx.accountsById.get('acc-pivot')!;
-    expect(unallocated(pivot, l, idx, '2026-09-20')).toBe(euros(2340 + 3400 - 100 - 200 - 950 + 100 - 170.8 - 76 - (900 - 170.8) - 200 - 250 - 100));
+    const bank = 2340 + 3400 - 100 - 200 - 950 + 100 - 170.8 - 76;
+    const reserved = 50 + 50 + 200 + 300 + (900 - 170.8) + 200 + 250 + 100;
+    expect(unallocated(pivot, l, idx, '2026-09-20')).toBe(euros(bank - reserved));
   });
 
   it('virements internes appariés entre deux comptes importés', () => {
@@ -217,19 +226,21 @@ describe('rapprochement', () => {
       accountId: 'acc-livret',
       origin: 'imported',
       date: '2026-08-29',
-      label: 'VIR TIRELIRE TAXE FONCIERE',
-      normalizedLabel: 'VIR TIRELIRE TAXE FONCIERE',
+      label: 'VIR TIRELIRE LIVRET A',
+      normalizedLabel: 'VIR TIRELIRE LIVRET A',
       amount: euros(100),
       status: 'pending',
     });
     const patch = pairInternalTransfers(l);
     expect(patch.operations.length).toBe(2);
     expect(patch.operations.every((o) => o.status === 'transfer')).toBe(true);
-    // Puis l'enveloppe est reconnue côté pivot, sans double compte côté livret.
+    // Puis le virement est ventilé côté pivot, sans double compte côté livret.
     let l2 = applyPatchToLedger(l, patch);
     l2 = applyPatchToLedger(l2, matchEnvelopeTransfers(l2));
     const idx = indexLedger(l2);
-    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1000));
+    const tf = envelopeComponents(idx.envelopesById.get('env-tf')!, idx, '2026-09-06');
+    expect(tf.get('acc-livret')).toBe(euros(1000));
+    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
   });
 });
 

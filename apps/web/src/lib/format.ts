@@ -1,4 +1,4 @@
-import { formatCents, parseCents, parseDate, MONTHS_FR, type Cents, type EnvelopeKind, type AccountKind, type PlannedFlowKind } from '@tirelire/core';
+import { formatCents, parseCents, parseDate, MONTHS_FR, type Cents, type NeedKind, type AccountKind, type PlannedFlowKind } from '@tirelire/core';
 
 export const money = (c: Cents, sign = false) => formatCents(c, { sign });
 
@@ -29,10 +29,23 @@ export const ACCOUNT_KINDS: Record<AccountKind, string> = {
   third: 'Compte tiers (saisie manuelle)',
 };
 
-export const ENVELOPE_KINDS: Record<EnvelopeKind, string> = {
-  provision: 'Provision (échéance)',
-  goal: "Objectif d'épargne",
-  budget: 'Budget courant',
+export const NEED_KINDS: Record<NeedKind, string> = {
+  dueDate: 'Échéance (montant à une date)',
+  recurring: 'Récurrent (tant par période)',
+  goal: "Objectif (montant sans date)",
+};
+
+/** Nom court pour la pastille d'une ligne de plan. */
+export const NEED_KINDS_SHORT: Record<NeedKind, string> = {
+  dueDate: 'échéance',
+  recurring: 'courant',
+  goal: 'objectif',
+};
+
+export const ROLLOVER_LABELS: Record<'none' | 'unlimited' | 'capped', string> = {
+  none: 'Libéré en fin de période',
+  unlimited: 'Reporté',
+  capped: 'Reporté, plafonné',
 };
 
 export const FLOW_KINDS: Record<PlannedFlowKind, string> = {

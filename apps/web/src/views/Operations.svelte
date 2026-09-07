@@ -231,7 +231,7 @@
               <label class="f">Enveloppe
                 <select bind:value={l.envelopeId}>
                   <option value="">— (non affecté)</option>
-                  {#each envelopes as e}<option value={e.id}>{e.name} ({accountName(e.accountId)})</option>{/each}
+                  {#each envelopes as e}<option value={e.id}>{e.name} ({accountName(e.placementAccountId)})</option>{/each}
                 </select>
               </label>
               <label class="f">Montant <input bind:value={l.amount} inputmode="decimal" /></label>

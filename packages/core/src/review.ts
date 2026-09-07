@@ -2,9 +2,9 @@
  * Bilan et calibrage : budget vs réel par période, moyennes glissantes,
  * suggestions de cibles, provisions provisionné vs payé.
  */
-import type { Cents, Envelope, Id, ISODate, Ledger } from './model.js';
-import { alive } from './model.js';
-import { budgetPerPeriod, envelopeBalance, indexLedger } from './balances.js';
+import type { Cents, Envelope, Id, ISODate, Ledger, Need } from './model.js';
+import { alive, needName } from './model.js';
+import { envelopeBalance, indexLedger, needCruise } from './balances.js';
 import { occurrencesBetween, payPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, diffDays } from './dates.js';
 
@@ -41,6 +41,13 @@ export interface CategoryReview {
   /** Cible suggérée : moyenne 6 périodes + 5 %, arrondie à la dizaine d'euros. */
   suggestion?: Cents;
   totalSpent: Cents;
+}
+
+/** Dotation récurrente d'une enveloppe par période (somme des croisières de ses besoins récurrents), undefined sans besoin récurrent. */
+export function recurringPerPeriod(ledger: Ledger, e: Envelope): Cents | undefined {
+  const needs = alive(ledger.needs).filter((n) => n.envelopeId === e.id && n.kind === 'recurring');
+  if (needs.length === 0) return undefined;
+  return needs.reduce((s, n) => s + needCruise(n), 0);
 }
 
 /** Les N périodes de paie jusqu'à celle qui contient `asOf` (incluse), de la plus ancienne à la plus récente. */
@@ -91,18 +98,24 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
     }
     return r;
   };
-  // Toutes les catégories et budgets apparaissent, même sans dépense.
+  // Toutes les catégories et enveloppes à besoin récurrent apparaissent, même sans dépense.
+  const budgetOf = new Map<Id, Cents>();
+  for (const e of envelopes) {
+    const t = recurringPerPeriod(ledger, e);
+    if (t !== undefined) budgetOf.set(e.id, t);
+  }
   for (const c of categories) {
-    const env = c.envelopeId ? envelopes.find((e) => e.id === c.envelopeId) : undefined;
+    const target = c.envelopeId ? budgetOf.get(c.envelopeId) : undefined;
     ensure(`cat:${c.id}`, () => ({
       categoryId: c.id,
       name: c.name,
       nature: c.nature,
-      ...(env?.kind === 'budget' ? { envelopeId: env.id, target: budgetPerPeriod(env) } : {}),
+      ...(target !== undefined && c.envelopeId ? { envelopeId: c.envelopeId, target } : {}),
     }));
   }
-  for (const e of envelopes.filter((x) => x.kind === 'budget')) {
-    ensure(`env:${e.id}`, () => ({ envelopeId: e.id, name: `Budget « ${e.name} »`, nature: 'expense', target: budgetPerPeriod(e) }));
+  for (const [envelopeId, target] of budgetOf) {
+    const e = envelopes.find((x) => x.id === envelopeId)!;
+    ensure(`env:${e.id}`, () => ({ envelopeId: e.id, name: `Budget « ${e.name} »`, nature: 'expense', target }));
   }
   for (const op of idx.operationsById.values()) {
     if (op.transferAccountId || op.status === 'transfer') continue;
@@ -115,9 +128,9 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
         const c = categories.find((x) => x.id === al.categoryId);
         if (c) targets.push(ensure(`cat:${c.id}`, () => ({ categoryId: c.id, name: c.name, nature: c.nature })));
       }
-      if (al.envelopeId) {
-        const e = envelopes.find((x) => x.id === al.envelopeId);
-        if (e?.kind === 'budget') targets.push(ensure(`env:${e.id}`, () => ({ envelopeId: e.id, name: `Budget « ${e.name} »`, nature: 'expense', target: budgetPerPeriod(e) })));
+      if (al.envelopeId && budgetOf.has(al.envelopeId)) {
+        const e = envelopes.find((x) => x.id === al.envelopeId)!;
+        targets.push(ensure(`env:${e.id}`, () => ({ envelopeId: e.id, name: `Budget « ${e.name} »`, nature: 'expense', target: budgetOf.get(e.id)! })));
       }
       for (const t of targets) {
         const ps = t.periods[pi]!;
@@ -151,6 +164,7 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
 }
 
 export interface ProvisionReview {
+  needId: Id;
   envelopeId: Id;
   name: string;
   dueDate: ISODate;
@@ -164,17 +178,20 @@ export interface ProvisionReview {
   variance: Cents;
 }
 
-/** Pour chaque provision, les échéances passées : provisionné vs payé. */
+/** Pour chaque besoin à échéance, les échéances passées : provisionné (solde de l'enveloppe la veille) vs payé. */
 export function reviewProvisions(ledger: Ledger, from: ISODate, asOf: ISODate): ProvisionReview[] {
   const idx = indexLedger(ledger);
   const out: ProvisionReview[] = [];
-  for (const e of alive(ledger.envelopes).filter((x): x is Envelope & { periodicity: NonNullable<Envelope['periodicity']> } => x.kind === 'provision' && !!x.periodicity)) {
-    for (const due of occurrencesBetween(e.periodicity, from, asOf)) {
+  for (const n of alive(ledger.needs).filter((x): x is Need & { periodicity: NonNullable<Need['periodicity']> } => x.kind === 'dueDate' && !!x.periodicity)) {
+    const e = idx.envelopesById.get(n.envelopeId);
+    if (!e) continue;
+    const target = n.amount ?? 0;
+    for (const due of occurrencesBetween(n.periodicity, from, asOf)) {
       const before = envelopeBalance(e, idx, addDays(due, -1));
       const entries = (idx.entriesByEnvelope.get(e.id) ?? []).filter(({ operation, effect }) => effect < 0 && Math.abs(diffDays(operation.date, due)) <= 15);
       const paid = entries.reduce((s, x) => s - x.effect, 0);
       if (paid === 0 && due > asOf) continue;
-      out.push({ envelopeId: e.id, name: e.name, dueDate: due, target: e.target ?? 0, provisioned: before, paid, variance: paid - (e.target ?? 0) });
+      out.push({ needId: n.id, envelopeId: e.id, name: needName(n, e), dueDate: due, target, provisioned: before, paid, variance: paid - target });
     }
   }
   return out.sort((a, b) => (a.dueDate < b.dueDate ? 1 : -1));

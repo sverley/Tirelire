@@ -139,7 +139,7 @@
         <label class="f">Enveloppe qui paie
           <select bind:value={form.envelopeId}>
             <option value="">—</option>
-            {#each envelopes.filter((e) => e.kind === 'provision') as e}<option value={e.id}>{e.name}</option>{/each}
+            {#each envelopes as e}<option value={e.id}>{e.name}</option>{/each}
           </select>
         </label>
       {/if}

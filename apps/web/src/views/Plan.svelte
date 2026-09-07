@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
-  import { money, moneyClass, shortDate, STATUS_LABELS, ENVELOPE_KINDS } from '../lib/format';
+  import { money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
   import { periodsAround, missingFlows, addDays, type Period } from '@tirelire/core';
 
   const plan = $derived(app.plan);
@@ -17,6 +17,9 @@
   const transferLines = $derived(plan.lines.filter((l) => !l.virtual));
   const netOut = $derived(plan.transfers.reduce((s, t) => s + t.net, 0));
   const missing = $derived(missingFlows(app.ledger, addDays(plan.period.start, -60), app.asOf));
+  // Écarts qui n'impliquent pas le pivot : ils ne sont dans aucun virement pivot ↔ compte.
+  const pivotId = $derived(app.ledger.accounts.find((a) => a.kind === 'pivot' && !a.deletedAt)?.id);
+  const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== pivotId && g.toAccountId !== pivotId));
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
 
@@ -74,7 +77,7 @@
       <div class="row">
         <div class="label">
           <strong>{t.accountName}</strong>
-          <span class="sub">{t.accountKind === 'third' ? 'compte tiers' : "compte d'accueil"}</span>
+          <span class="sub">{t.accountKind === 'third' ? 'compte tiers' : "compte d'accueil"}{t.label ? ' · libellé : ' : ''}{#if t.label}<span class="num">{t.label}</span>{/if}</span>
         </div>
         <div class="{moneyClass(-t.net)}" style="font-size:18px">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
       </div>
@@ -84,11 +87,11 @@
             <div class="row">
               <div class="label">
                 {o.envelopeName}
-                <span class="sub">libellé : <span class="num">{o.label}</span></span>
+                <span class="sub">{o.status === 'watch' ? 'petit écart, à surveiller' : 'à faire'}</span>
               </div>
               <div class="num">
                 {money(o.standing)}
-                {#if o.exceptional > 0}<span class="neg"> + {money(o.exceptional)} ce mois</span>{/if}
+                {#if o.exceptional !== 0}<span class="neg"> {o.exceptional > 0 ? '+' : '−'} {money(Math.abs(o.exceptional))} ce mois</span>{/if}
               </div>
             </div>
           {/each}
@@ -117,18 +120,32 @@
   {#if plan.transfers.length > 1}
     <div class="row total"><div class="label">Total net à sortir du pivot</div><div class="num">{money(netOut)}</div></div>
   {/if}
+  {#if otherGaps.length}
+    <h2>Écarts entre deux comptes</h2>
+    <div class="card">
+      {#each otherGaps as g (g.envelopeId + g.fromAccountId)}
+        <div class="row">
+          <div class="label">
+            {g.envelopeName}
+            <span class="sub">{accountsById.get(g.fromAccountId)?.name ?? '?'} → {accountsById.get(g.toAccountId)?.name ?? '?'} · {g.status === 'watch' ? 'à surveiller' : 'à faire'}</span>
+          </div>
+          <div class="num">{money(g.amount)}</div>
+        </div>
+      {/each}
+    </div>
+  {/if}
 
   <h2>Enveloppes</h2>
   <div class="card">
-    {#each [...transferLines, ...virtualLines] as l (l.envelopeId)}
+    {#each [...transferLines, ...virtualLines] as l (l.needId)}
       <div class="row">
         <div class="label">
-          <strong>{l.name}</strong> <span class="pill {l.status}">{STATUS_LABELS[l.status]}</span>
+          <strong>{l.name}</strong>{#if l.name !== l.envelopeName}<span class="sub"> dans {l.envelopeName}</span>{/if} <span class="pill {l.status}">{STATUS_LABELS[l.status]}</span>
           <span class="sub">
-            {ENVELOPE_KINDS[l.kind]} · {accountsById.get(l.accountId)?.name ?? '?'}{l.virtual ? ' (réservé sur place)' : ''}{l.dueDate ? ` · échéance ${shortDate(l.dueDate)}` : ''}{l.target !== undefined && l.kind !== 'budget' ? ` · cible ${money(l.target)}` : ''}
+            {NEED_KINDS_SHORT[l.kind]} · {accountsById.get(l.accountId)?.name ?? '?'}{l.virtual ? ' (réservé sur place)' : ''}{l.dueDate ? ` · échéance ${shortDate(l.dueDate)}` : ''}{l.target !== undefined && l.kind !== 'recurring' ? ` · cible ${money(l.target)}` : ''}
           </span>
           <span class="sub num">
-            solde <span class={l.balance < 0 ? 'neg' : ''}>{money(l.balance)}</span> · croisière {money(l.cruise)}{l.requested !== l.cruise ? ` · demandé ${money(l.requested)}` : ''}
+            retenu <span class={l.held < 0 ? 'neg' : ''}>{money(l.held)}</span> · croisière {money(l.cruise)}{l.requested !== l.cruise ? ` · demandé ${money(l.requested)}` : ''}
           </span>
         </div>
         <div class="num" style="font-size:17px">{money(l.funded)}</div>

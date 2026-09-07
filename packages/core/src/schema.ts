@@ -33,7 +33,7 @@ const c = (prop: string, type: ColumnType = 'text'): ColumnDef => ({
 const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop, type), deprecated: true });
 
 /** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
-export const MODEL_VERSION = 1;
+export const MODEL_VERSION = 2;
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {
@@ -57,14 +57,30 @@ export const TABLES: Record<string, TableDef> = {
     columns: [
       c('id'),
       c('name'),
-      c('kind'),
-      c('accountId'),
+      c('placementAccountId'),
       c('openingBalance', 'integer'),
       c('openingDate'),
-      c('target', 'integer'),
+      c('rollover', 'json'),
+      c('deletedAt'),
+      // Modèle D01–D18 (migration 1 → 2) :
+      old('kind'),
+      old('accountId'),
+      old('target', 'integer'),
+      old('periodicity', 'json'),
+      old('monthlyAmount', 'integer'),
+      old('priority', 'integer'),
+    ],
+  },
+  needs: {
+    name: 'needs',
+    columns: [
+      c('id'),
+      c('envelopeId'),
+      c('kind'),
+      c('name'),
+      c('amount', 'integer'),
       c('periodicity', 'json'),
       c('monthlyAmount', 'integer'),
-      c('rollover', 'json'),
       c('priority', 'integer'),
       c('deletedAt'),
     ],
@@ -151,7 +167,7 @@ export function liveColumns(t: TableDef): ColumnDef[] {
 }
 
 /** Clé de `Ledger` correspondant à chaque table. */
-export const LEDGER_KEYS = ['accounts', 'envelopes', 'categories', 'plannedFlows', 'operations', 'allocations', 'rules', 'importProfiles', 'devices'] as const;
+export const LEDGER_KEYS = ['accounts', 'envelopes', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'rules', 'importProfiles', 'devices'] as const;
 export type LedgerKey = (typeof LEDGER_KEYS)[number];
 
 export function createTableSQL(t: TableDef): string {
