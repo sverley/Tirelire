@@ -1,12 +1,13 @@
-# Synchronisation entre appareils (branche `feature/sync-p2p`)
+# Synchronisation entre appareils
 
-Trois transports, un seul protocole (`packages/core/src/sync.ts`) :
+Quatre transports, un seul protocole (`packages/core/src/sync.ts`) :
 
 | Transport | Où | Serveur | État |
 |---|---|---|---|
 | Paquet de changements (fichier JSON) | Réglages | aucun | sur `main` |
-| Direct WebRTC, signalisation par QR code ou copier-coller | Plus → Synchronisation | aucun (un STUN public pour sortir du réseau local) | cette branche, testé entre deux navigateurs |
-| Relais privé (`apps/relay`), paquets chiffrés AES-GCM côté client | Plus → Synchronisation | le tien, Node sans dépendance | cette branche, testé de bout en bout |
+| Direct WebRTC, signalisation par QR code ou copier-coller | Plus → Synchronisation | aucun (un STUN public pour sortir du réseau local) | sur `main`, testé entre deux navigateurs |
+| Relais privé (`apps/relay`), paquets chiffrés AES-GCM côté client | Plus → Synchronisation | le tien, Node sans dépendance | sur `main`, testé de bout en bout |
+| Même relais en PHP (`apps/hebergement`), servi avec la PWA par un hébergement mutualisé | Plus → Synchronisation (adresse proposée d'office) | hébergement web Apache + PHP, sans VPS | sur `main`, testé avec le serveur intégré de PHP (voir `docs/hebergement-web.md`) |
 
 ## Protocole
 

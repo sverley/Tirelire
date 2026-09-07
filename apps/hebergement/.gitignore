@@ -1,0 +1,5 @@
+dist/
+tirelire-hebergement.zip
+serveur/donnees/*
+!serveur/donnees/.htaccess
+serveur/relais.config.php

@@ -303,3 +303,32 @@ portaient pas gardent leur état de traitement. Verrouiller de trop se défait e
 
 Vaut pour la migration seule. Une opération classée par une règle après D23 reste rapprochée et
 donc reprise à chaque passage, comme D22 le prévoit.
+## D35 · 2026-09-07 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
+
+Pour être utilisable depuis un hébergement web mutualisé (OVHcloud sans VPS : Apache, PHP,
+pas de Node ni de processus persistant), l'application ne change pas de modèle : les données
+restent sur les appareils (D08), le serveur ne fait que servir les fichiers de la PWA et
+relayer des paquets chiffrés. `apps/hebergement` fournit `relais.php` (même contrat que
+`apps/relay/server.mjs`, fichiers `.jsonl` sous verrou), `.htaccess`, `.ovhconfig` et un
+assembleur qui construit la PWA avec un préfixe d'adresse (`vite --base`). L'adresse du site
+est proposée d'office comme relais. Une version « serveur de vérité » (comptes utilisateurs,
+base MySQL, logique côté serveur) a été écartée : elle contredirait D07/D08, imposerait une
+authentification et retirerait le fonctionnement hors ligne. Livraison : archive jointe aux
+releases, dépôt FTPS automatique si des secrets `OVH_FTP_*` existent (D15).
+
+## D36 · 2026-09-07 · Le filtre de recherche est la sélection d'une règle
+
+L'écran Opérations offrait un filtre pauvre (état, compte, période, texte libre) sans rapport avec
+la sélection d'une règle, et proposait de *deviner* un filtre à partir des lignes cochées. C'est le
+chemin le plus long vers une règle, et il part d'une approximation alors que l'utilisateur vient
+d'exprimer exactement ce qu'il voulait.
+
+Le filtre de recherche porte donc les champs de `RuleSelection` — motif de libellé, compte, montant
+minimum et maximum, dates — et rien d'autre. Les critères propres à la consultation (état,
+période courante) restent à côté et ne partent jamais dans une règle. Le bloc d'action porte les
+champs de `RuleAction` et reste visible sans rien cocher.
+
+Trois gestes en découlent, du même écran : appliquer aux lignes cochées, appliquer à tout ce que
+le filtre retourne, ou en faire une règle — auquel cas le filtre est repris tel quel, sans
+inférence. L'inférence de D26 sert le chemin inverse, quand on part de lignes cochées sans avoir
+su écrire le filtre : elle propose un filtre, qui reste modifiable avant d'être enregistré.

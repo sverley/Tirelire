@@ -32,9 +32,48 @@ jobs:
           path: apps/web/dist
           retention-days: 30
 
+  hebergement:
+    name: Site pour hébergement mutualisé
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      FTP_HOST: ${{ secrets.OVH_FTP_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version lue dans package.json (packageManager)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Assembler (PWA + relais PHP + .htaccess + .ovhconfig)
+        env:
+          # Sous-dossier où le site sera installé (« / » par défaut = racine du domaine ou sous-domaine).
+          TIRELIRE_BASE: ${{ vars.TIRELIRE_BASE || '/' }}
+        run: pnpm --filter @tirelire/hebergement assembler
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tirelire-hebergement
+          path: apps/hebergement/tirelire-hebergement.zip
+          retention-days: 30
+      - name: Déposer par FTP sur l'hébergement (seulement si les secrets OVH_FTP_* existent)
+        if: github.event_name != 'pull_request' && env.FTP_HOST != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.OVH_FTP_HOST }}
+          username: ${{ secrets.OVH_FTP_USER }}
+          password: ${{ secrets.OVH_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: apps/hebergement/dist/
+          server-dir: ${{ secrets.OVH_FTP_DIR || 'www/' }}
+          # Ne jamais toucher aux paquets de synchronisation ni à la configuration locale du relais.
+          exclude: |
+            donnees/**
+            relais.config.php
+
   android:
     name: APK Android
-    needs: test
+    needs: [test, hebergement]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -120,6 +159,12 @@ jobs:
           path: ${{ env.APK }}
           retention-days: 30
 
+      - name: Récupérer l'archive pour hébergement
+        uses: actions/download-artifact@v4
+        with:
+          name: tirelire-hebergement
+          path: ${{ runner.temp }}
+
       - name: Déplacer le tag « latest » sur ce commit
         if: github.ref == 'refs/heads/main'
         run: |
@@ -137,8 +182,11 @@ jobs:
             Version de test construite automatiquement depuis `main` (${{ github.sha }}).
             Signée avec la clé de test : les mises à jour s'installent par-dessus la précédente.
             Fichier : `tirelire-latest.apk` (toujours le plus récent).
+            `tirelire-hebergement.zip` : le site à déposer sur un hébergement web mutualisé (voir `docs/hebergement-web.md`).
           prerelease: true
-          files: ${{ runner.temp }}/tirelire-latest.apk
+          files: |
+            ${{ runner.temp }}/tirelire-latest.apk
+            ${{ runner.temp }}/tirelire-hebergement.zip
 
       - name: Release taguée
         if: startsWith(github.ref, 'refs/tags/v')
@@ -146,4 +194,6 @@ jobs:
         with:
           name: Tirelire ${{ steps.version.outputs.name }}
           generate_release_notes: true
-          files: ${{ env.APK }}
+          files: |
+            ${{ env.APK }}
+            ${{ runner.temp }}/tirelire-hebergement.zip

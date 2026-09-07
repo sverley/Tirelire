@@ -1,0 +1,13 @@
+{
+  "name": "@tirelire/hebergement",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tirelire à déposer sur un hébergement web mutualisé (Apache + PHP) : la PWA et son relais de synchronisation en PHP.",
+  "scripts": {
+    "assembler": "node assembler.mjs",
+    "test": "node --test",
+    "typecheck": "echo ok",
+    "build": "echo \"(l'assemblage du site se lance avec pnpm --filter @tirelire/hebergement assembler)\""
+  }
+}

@@ -1,0 +1,30 @@
+# Tirelire sur hébergement mutualisé (Apache 2.4). Fonctionne à la racine ou dans un sous-dossier.
+
+# Toujours en HTTPS (la PWA et le service worker l'exigent).
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Le relais de synchronisation : /r/<salon> → relais.php
+RewriteRule ^r/([A-Za-z0-9_-]+)/?$ relais.php?salon=$1 [QSA,L]
+
+# Types MIME dont la PWA a besoin.
+AddType application/wasm .wasm
+AddType application/manifest+json .webmanifest
+
+# Cache : les fichiers hachés de assets/ pour longtemps, le reste jamais (mises à jour immédiates).
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|wasm|svg|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^(index\.html|sw\.js|registerSW\.js|manifest\.webmanifest|workbox-.*\.js)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+# Rien à lister, rien de sensible à servir.
+Options -Indexes
+<FilesMatch "\.(jsonl|config\.php)$">
+  Require all denied
+</FilesMatch>

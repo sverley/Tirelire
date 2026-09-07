@@ -24,6 +24,7 @@ pnpm install
 pnpm test          # tests du cœur (vitest)
 pnpm dev           # interface sur http://localhost:5173 (accessible sur le réseau local)
 pnpm build         # apps/web/dist : fichiers statiques à servir sur un serveur privé
+pnpm --filter @tirelire/hebergement assembler   # apps/hebergement/dist : site + relais PHP pour hébergement mutualisé
 ```
 
 Dans l'interface, « Charger l'exemple » (écran d'accueil ou Réglages) installe le jeu de
@@ -37,8 +38,11 @@ données de l'analyse pour voir le plan tout de suite.
   avec propositions, ventilation, flux attendus non reçus.
 - **C · Budgets et calibrage** (fait) : règles de classement créées depuis le tri, bilan par
   catégorie et par période, moyennes glissantes 3/6/12, cibles suggérées, provisions prévu vs payé.
-- **Synchronisation** : paquets de changements par fichier sur `main` ; direct WebRTC (QR code)
-  et relais privé chiffré sur la branche `feature/sync-p2p` (voir `docs/synchronisation.md`).
+- **Synchronisation** : paquets de changements par fichier, direct WebRTC (QR code) et relais
+  privé chiffré (voir `docs/synchronisation.md`).
+- **Hébergement web mutualisé** : la PWA et son relais en PHP à déposer par FTP sur un
+  hébergement Apache + PHP (OVHcloud sans VPS), archive `tirelire-hebergement.zip` jointe aux
+  releases (voir `docs/hebergement-web.md`).
 
 ## Conventions
 
