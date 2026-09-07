@@ -1,18 +1,18 @@
 # Tirelire
 
-Comptes de la famille : enveloppes budgétaires hébergées sur des comptes réels, provisions
-pour les charges annuelles, objectifs d'épargne, plan de virements mensuels, comptes tiers
-saisis à la main, et (lot B) rapprochement avec les relevés bancaires.
+Comptes de la famille : des enveloppes réparties sur les comptes réels, portant leurs besoins
+(charges récurrentes, échéances, objectifs), un plan de virements mensuels, des comptes tiers
+saisis à la main, l'import des relevés et un moteur de règles pour les classer.
 
 Nom de code. Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
 
 ## Structure
 
 - `packages/core` — le cœur, en TypeScript pur, sans dépendance à l'interface :
-  modèle, périodes de paie et année budgétaire, calcul du plan (croisière / rattrapage,
-  financement par priorité, virements par compte et par enveloppe, règlements avec les
-  comptes tiers), soldes reconstruits, dépôt SQLite (sql.js) avec journal de changements
-  chaîné par empreinte et horloge logique hybride, prêt pour la synchronisation.
+  modèle, périodes de paie, calcul du plan (croisière / rattrapage, financement par priorité des
+  besoins, écarts de placement, virements par couple de comptes, règlements avec les comptes
+  tiers), positions reconstruites par compte, moteur de règles et actions groupées, dépôt SQLite
+  (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
 - `docs` — analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
@@ -44,7 +44,8 @@ données de l'analyse pour voir le plan tout de suite.
 
 - Montants en centimes (entiers), dates `AAAA-MM-JJ` sans fuseau.
 - Jamais de suppression physique : `deletedAt`.
-- Ce qui se recalcule ne se stocke pas (soldes, plan, soldes à régler).
+- Ce qui se recalcule ne se stocke pas (positions, dotations, plan, soldes à régler).
+- La vérité est ce qui est verrouillé ; le reste, les règles le reprennent.
 - Aucun fichier bancaire réel dans le dépôt.
 
 ## Android
