@@ -95,9 +95,24 @@ jobs:
             [ -z "${!v}" ] && unset "$v"
           done
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease
+          set -o pipefail
+          ./gradlew --no-daemon assembleRelease 2>&1 | tee "$RUNNER_TEMP/gradle.log"
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/tirelire-${TIRELIRE_VERSION_NAME}.apk"
           echo "APK=$RUNNER_TEMP/tirelire-${TIRELIRE_VERSION_NAME}.apk" >> "$GITHUB_ENV"
+
+      - name: En cas d'échec, publier la fin du journal Gradle en commentaire du commit
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "La construction de l'APK a échoué (run ${GITHUB_RUN_NUMBER}). Fin du journal Gradle :"
+            echo
+            echo '```'
+            grep -vE '^\s*at |^\s*\.\.\. [0-9]+ more' "$RUNNER_TEMP/gradle.log" | tail -n 120
+            echo '```'
+          } > "$RUNNER_TEMP/comment.md"
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -F body=@"$RUNNER_TEMP/comment.md" > /dev/null
 
       - uses: actions/upload-artifact@v4
         with:
