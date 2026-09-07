@@ -315,3 +315,20 @@ est proposée d'office comme relais. Une version « serveur de vérité » (comp
 base MySQL, logique côté serveur) a été écartée : elle contredirait D07/D08, imposerait une
 authentification et retirerait le fonctionnement hors ligne. Livraison : archive jointe aux
 releases, dépôt FTPS automatique si des secrets `OVH_FTP_*` existent (D15).
+
+## D36 · 2026-09-07 · Le filtre de recherche est la sélection d'une règle
+
+L'écran Opérations offrait un filtre pauvre (état, compte, période, texte libre) sans rapport avec
+la sélection d'une règle, et proposait de *deviner* un filtre à partir des lignes cochées. C'est le
+chemin le plus long vers une règle, et il part d'une approximation alors que l'utilisateur vient
+d'exprimer exactement ce qu'il voulait.
+
+Le filtre de recherche porte donc les champs de `RuleSelection` — motif de libellé, compte, montant
+minimum et maximum, dates — et rien d'autre. Les critères propres à la consultation (état,
+période courante) restent à côté et ne partent jamais dans une règle. Le bloc d'action porte les
+champs de `RuleAction` et reste visible sans rien cocher.
+
+Trois gestes en découlent, du même écran : appliquer aux lignes cochées, appliquer à tout ce que
+le filtre retourne, ou en faire une règle — auquel cas le filtre est repris tel quel, sans
+inférence. L'inférence de D26 sert le chemin inverse, quand on part de lignes cochées sans avoir
+su écrire le filtre : elle propose un filtre, qui reste modifiable avant d'être enregistré.
