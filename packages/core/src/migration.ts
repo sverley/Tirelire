@@ -4,8 +4,9 @@
  * dans le journal de changements ; elle est idempotente et déterministe (mêmes identifiants sur
  * tous les appareils) pour que deux migrations indépendantes convergent à la fusion.
  */
-import type { Allocation, Envelope, Need, NeedKind, Operation, OperationState, Periodicity, Rollover } from './model.js';
+import type { Allocation, Envelope, Need, NeedKind, Operation, OperationState, Periodicity, Rollover, Rule } from './model.js';
 import { MODEL_VERSION } from './schema.js';
+import { rankBetween } from './rules.js';
 import type { LedgerStore } from './store.js';
 
 export interface MigrationReport {
@@ -20,6 +21,7 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   const steps: MigrationReport['steps'] = [];
   if (from < 2) steps.push({ version: 2, written: migrateTo2(store) });
   if (from < 3) steps.push({ version: 3, written: migrateTo3(store) });
+  if (from < 4) steps.push({ version: 4, written: migrateTo4(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
@@ -78,18 +80,19 @@ function migrateTo2(store: LedgerStore): number {
  * 2 → 3 (D22, D27) : `Operation.status` devient un état parmi trois, `Allocation.amount` devient
  * une part fixe.
  *
- * L'ancien modèle ne distingue pas ce que l'utilisateur a classé à la main de ce qu'une règle a
- * posé : tout ce qui était traité devient donc `reconciled`, malléable, et jamais `locked` —
- * verrouiller d'office prétendrait à une vérité que l'ancien modèle ne portait pas. Ce qui doit
- * l'être se verrouille ensuite par action groupée (D26). `oneOff` était un statut : il devient un
+ * Une opération qui portait une ventilation devient verrouillée (D34) : rien dans l'ancien modèle
+ * ne la reproduisait, donc la laisser malléable reviendrait à la laisser effacer par le premier
+ * passage du moteur de D23. Verrouiller de trop se défait par une action groupée ; effacer ne se
+ * défait pas. Les autres gardent leur état de traitement. `oneOff` était un statut : il devient un
  * attribut, ce qui le rend compatible avec un état.
  */
 function migrateTo3(store: LedgerStore): number {
   let written = 0;
+  const classified = new Set(store.readRawTable('allocations').map((a) => a['operationId'] as string));
   for (const raw of store.readRawTable('operations')) {
     const status = raw['status'] as string | undefined;
     if (!status || raw['state']) continue;
-    const state: OperationState = status === 'pending' ? 'untreated' : 'reconciled';
+    const state: OperationState = classified.has(raw['id'] as string) ? 'locked' : status === 'pending' ? 'untreated' : 'reconciled';
     const op = { ...(raw as unknown as Operation), state };
     if (status === 'oneOff') op.oneOff = true;
     delete (op as Record<string, unknown>)['status'];
@@ -103,6 +106,39 @@ function migrateTo3(store: LedgerStore): number {
     delete (al as Record<string, unknown>)['amount'];
     store.upsert('allocations', al);
     written++;
+  }
+  return written;
+}
+
+/**
+ * 3 → 4 (D23, D31) : une règle « motif → catégorie » devient sélection + action + rang.
+ *
+ * L'ancienne priorité était un entier croissant appliqué en premier ; le rang est une clé
+ * triable appliquée en dernier, donc l'ordre s'inverse. Les anciennes règles ne touchaient que
+ * les opérations non classées : leur action devient *Rapprocher*, jamais *Verrouiller* — elles
+ * n'ont jamais eu valeur de vérité.
+ */
+function migrateTo4(store: LedgerStore): number {
+  let written = 0;
+  const rows = store.readRawTable('rules').filter((r) => r['pattern'] !== undefined && !r['selection']);
+  // Priorité croissante = appliquée d'abord ; rang décroissant = appliqué en dernier.
+  rows.sort((a, b) => ((a['priority'] as number) ?? 0) - ((b['priority'] as number) ?? 0));
+  let rank = rankBetween(undefined, undefined);
+  for (const raw of [...rows].reverse()) {
+    const rule: Rule = {
+      id: raw['id'] as string,
+      selection: { labelPattern: raw['pattern'] as string },
+      action: {
+        ...(raw['categoryId'] ? { categoryId: raw['categoryId'] as string } : {}),
+        ...(raw['envelopeId'] ? { envelopeId: raw['envelopeId'] as string } : {}),
+        state: 'reconcile',
+      },
+      rank,
+      ...(raw['deletedAt'] ? { deletedAt: raw['deletedAt'] as string } : {}),
+    };
+    store.upsert('rules', rule);
+    written++;
+    rank = rankBetween(rank, undefined);
   }
   return written;
 }

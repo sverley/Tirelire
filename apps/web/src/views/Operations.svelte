@@ -6,12 +6,16 @@
     applyMatch,
     findCategoryByName,
     proposeMatches,
-    suggestPattern,
     payPeriodContaining,
     addDays,
     type Allocation,
     type Category,
+    applyBulkAction,
     editAllocations,
+    inferSelection,
+    previewRules,
+    suggestPattern,
+    topRank,
     unlock,
     variableRest,
     type AllocationDraft,
@@ -36,6 +40,15 @@
   let makeRule = $state(false);
   let rulePattern = $state('');
   let error = $state('');
+
+  // Sélection pour action groupée (D26) : ne se conserve pas, seuls ses effets restent.
+  let selected = $state<Set<string>>(new Set());
+  let bulkOpen = $state(false);
+  let bulkCategory = $state('');
+  let bulkEnvelope = $state('');
+  let bulkState = $state<'lock' | 'reconcile' | 'none' | 'unlock'>('lock');
+  let bulkOneOff = $state<'' | 'yes' | 'no'>('');
+  let bulkRulePattern = $state('');
 
   const accounts = $derived(alive(app.ledger.accounts));
   const envelopes = $derived(alive(app.ledger.envelopes));
@@ -162,15 +175,81 @@
       const first = drafted[0];
       const rule: Rule = {
         id: app.newId(),
-        pattern: rulePattern.trim(),
-        priority: 50,
-        ...(first?.categoryId ? { categoryId: first.categoryId } : {}),
-        ...(first?.envelopeId ? { envelopeId: first.envelopeId } : {}),
+        selection: { labelPattern: rulePattern.trim() },
+        action: {
+          state: 'reconcile',
+          ...(first?.categoryId ? { categoryId: first.categoryId } : {}),
+          ...(first?.envelopeId ? { envelopeId: first.envelopeId } : {}),
+        },
+        rank: topRank(app.ledger),
       };
       app.store.upsert('rules', rule);
     }
     app.reload();
     editingId = undefined;
+  }
+
+  function toggle(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selected = next;
+  }
+
+  function selectAllVisible() {
+    selected = new Set(operations.map((o) => o.id));
+  }
+
+  function clearSelection() {
+    selected = new Set();
+    bulkOpen = false;
+  }
+
+  /** Action de l'aperçu et de l'application : les mêmes champs qu'une règle, plus Déverrouiller. */
+  function bulkActionValue() {
+    return {
+      ...(bulkCategory ? { categoryId: bulkCategory } : {}),
+      ...(bulkEnvelope ? { envelopeId: bulkEnvelope } : {}),
+      ...(bulkOneOff ? { oneOff: bulkOneOff === 'yes' } : {}),
+      state: bulkState,
+    };
+  }
+
+  /** Aperçu obligatoire (D26) : ce que l'action changerait, avant de l'appliquer. */
+  const bulkPreview = $derived.by(() => {
+    if (!bulkOpen) return [];
+    const ids = [...selected];
+    const patch = applyBulkAction(app.ledger, ids, bulkActionValue());
+    return patch.operations.map((next) => {
+      const before = app.ledger.operations.find((o) => o.id === next.id)!;
+      return { label: before.label, from: stateLabel(before.state), to: stateLabel(next.state) };
+    });
+  });
+
+  function applyBulk() {
+    app.applyPatch(applyBulkAction(app.ledger, [...selected], bulkActionValue()));
+    clearSelection();
+  }
+
+  /** Chemin inverse (D26) : la sélection propose un filtre, donc une règle. */
+  function ruleFromSelection() {
+    const ops = app.ledger.operations.filter((o) => selected.has(o.id));
+    const selection = inferSelection(ops);
+    bulkRulePattern = selection.labelPattern ?? '';
+    const rule: Rule = {
+      id: app.newId(),
+      selection,
+      action: {
+        state: 'reconcile',
+        ...(bulkCategory ? { categoryId: bulkCategory } : {}),
+        ...(bulkEnvelope ? { envelopeId: bulkEnvelope } : {}),
+      },
+      rank: topRank(app.ledger),
+    };
+    const touched = previewRules(app.ledger, rule).filter((d) => d.changed).length;
+    if (!confirm(`Créer une règle « ${selection.labelPattern ?? 'tout'} » ? Elle toucherait ${touched} opération(s).`)) return;
+    app.upsert('rules', rule);
+    clearSelection();
   }
 
   function acceptMatch(op: Operation) {
@@ -228,11 +307,67 @@
   <input class="btn" placeholder="Rechercher…" bind:value={search} style="flex:1;min-width:120px" />
 </div>
 
+<div class="actions" style="margin-top:0">
+  <button class="btn small" onclick={selectAllVisible}>Tout sélectionner ({operations.length})</button>
+  {#if selected.size}
+    <button class="btn small" onclick={clearSelection}>Désélectionner</button>
+    <button class="btn small primary" onclick={() => (bulkOpen = !bulkOpen)}>Action sur {selected.size} opération(s)</button>
+  {/if}
+</div>
+
+{#if bulkOpen && selected.size}
+  <form class="edit" onsubmit={(e) => { e.preventDefault(); applyBulk(); }}>
+    <h3 style="margin-top:0">Action groupée</h3>
+    <div class="grid">
+      <label class="f">Catégorie
+        <select bind:value={bulkCategory}>
+          <option value="">— (ne pas toucher)</option>
+          {#each categories as c}<option value={c.id}>{c.name}</option>{/each}
+        </select>
+      </label>
+      <label class="f">Enveloppe
+        <select bind:value={bulkEnvelope}>
+          <option value="">— (ne pas toucher)</option>
+          {#each envelopes as e}<option value={e.id}>{e.name}</option>{/each}
+        </select>
+      </label>
+      <label class="f">État
+        <select bind:value={bulkState}>
+          <option value="lock">Verrouiller</option>
+          <option value="reconcile">Rapprocher</option>
+          <option value="none">Ne rien faire</option>
+          <option value="unlock">Déverrouiller</option>
+        </select>
+      </label>
+      <label class="f">Ponctuelle
+        <select bind:value={bulkOneOff}>
+          <option value="">— (ne pas toucher)</option>
+          <option value="yes">Oui</option>
+          <option value="no">Non</option>
+        </select>
+      </label>
+    </div>
+    <h3>Aperçu</h3>
+    <div class="card">
+      {#each bulkPreview.slice(0, 8) as p}
+        <div class="row"><div class="label">{p.label}<span class="sub">{p.from} → {p.to}</span></div></div>
+      {/each}
+      {#if bulkPreview.length > 8}<div class="sub">…et {bulkPreview.length - 8} autre(s).</div>{/if}
+    </div>
+    <div class="actions" style="margin:0">
+      <button class="btn primary" type="submit">Appliquer</button>
+      <button class="btn" type="button" onclick={ruleFromSelection}>En faire une règle</button>
+      <button class="btn" type="button" onclick={clearSelection}>Annuler</button>
+    </div>
+  </form>
+{/if}
+
 <div class="card">
   {#each operations as op (op.id)}
     {@const allocs = allocByOp.get(op.id) ?? []}
     {@const prop = proposals.get(op.id)}
     <div class="row" style="flex-wrap:wrap">
+      <input type="checkbox" checked={selected.has(op.id)} onchange={() => toggle(op.id)} style="margin-right:8px;align-self:flex-start" aria-label="Sélectionner" />
       <button class="label" style="text-align:left;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit" onclick={() => (editingId === op.id ? (editingId = undefined) : startEdit(op))}>
         <strong>{op.label}</strong>
         <span class="sub">

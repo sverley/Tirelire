@@ -186,7 +186,7 @@ describe('rapprochement', () => {
 
   it('règles : motif → catégorie et enveloppe du budget', () => {
     const l = imported();
-    l.rules.push({ id: 'r1', pattern: 'SUPERMARCHE', categoryId: 'cat-alim', priority: 10 });
+    l.rules.push({ id: 'r1', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' }, rank: 'm' });
     const patch = applyRules(l);
     expect(patch.operations.length).toBe(2);
     expect(patch.allocations[0]!.envelopeId).toBe('env-alim');
@@ -198,7 +198,7 @@ describe('rapprochement', () => {
 
   it('pipeline complet et flux manquants', () => {
     let l = imported();
-    l.rules.push({ id: 'r1', pattern: 'SUPERMARCHE', categoryId: 'cat-alim', priority: 10 });
+    l.rules.push({ id: 'r1', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' }, rank: 'm' });
     const report = runPipeline(l, '2026-08-01', '2026-09-30', (p: Patch) => (l = applyPatchToLedger(l, p)));
     expect(report.envelopeTransfers).toBe(2);
     expect(report.autoMatched).toBe(2);

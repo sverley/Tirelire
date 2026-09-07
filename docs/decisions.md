@@ -271,3 +271,35 @@ règles s'appliquent de la fin de la liste vers le rang 1.
 `Category.envelopeId` survit à D28 comme **enveloppe par défaut** : quand une règle ou une action
 pose une catégorie sans enveloppe, la ventilation prend l'enveloppe par défaut de la catégorie. Ce
 n'est qu'un raccourci de saisie, pas un lien comptable.
+
+## D33 · 2026-09-07 · Le moteur de règles part de ce que l'import a établi
+
+D23 fait repartir les règles de zéro à chaque passage sur les opérations non verrouillées, pour
+que retirer une règle défasse ce qu'elle avait posé. Mais le rapprochement de flux (D12, D22) et
+l'appariement des virements internes ne sont pas des règles, et un moteur qui repart vraiment de
+rien les efface aussitôt posés — le pipeline se défait lui-même.
+
+Le calcul part donc de ce que l'import a établi : une opération rapprochée d'un flux ou appariée
+en virement interne est *rapprochée*, avec la ventilation que cette étape lui a donnée ; les
+autres partent vierges et non traitées. Les règles écrivent par-dessus, champ par champ, selon
+D23. Retirer une règle rend l'opération à cet état d'import, pas à rien.
+
+Conséquence : un flux qui engendre une règle (D24) et le rapprochement de ce même flux disent la
+même chose, ce qui est cohérent — la règle verrouille et gagne, le rapprochement reste la trace
+de l'échéance servie.
+
+## D34 · 2026-09-07 · Une classification que rien ne reproduit est verrouillée d'office à la migration
+
+Corrige la migration 2 → 3 décidée au lot 2. Puisque le moteur de D23 recalcule tout ce qui n'est
+pas verrouillé, une opération *rapprochée* que plus aucune règle ne sélectionne perd sa
+classification au premier passage. C'est la conséquence assumée de D22 pour ce que les règles
+produisent — mais l'historique d'avant D23 n'a pas été produit par des règles : il a été saisi.
+Le laisser en *rapproché* ne le rendrait pas malléable, cela le détruirait.
+
+À la migration, une opération qui portait une ventilation devient donc **verrouillée** : dans
+l'ancien modèle, rien ne la reproduisait, elle était de la vérité de fait. Celles qui n'en
+portaient pas gardent leur état de traitement. Verrouiller de trop se défait en une action groupée
+(D26) ; effacer ne se défait pas.
+
+Vaut pour la migration seule. Une opération classée par une règle après D23 reste rapprochée et
+donc reprise à chaque passage, comme D22 le prévoit.

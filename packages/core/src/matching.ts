@@ -5,13 +5,14 @@
  * Toutes les fonctions sont pures : elles reçoivent le grand livre et rendent
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
  */
-import type { Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow, Rule } from './model.js';
+import type { Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
 import { alive, isLocked } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
 import { fundByPriority, transferLabel } from './plan.js';
 import { envelopeComponents, indexLedger, periodSnapshot } from './balances.js';
-import { uuidv7 } from './ids.js';
+import { uuidv7, normalizeLabel } from './ids.js';
+import { applyRules } from './rules.js';
 
 export interface Patch {
   operations: Operation[];
@@ -242,51 +243,6 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
     });
   }
   return patch;
-}
-
-// ---------------------------------------------------------------------------
-// Règles de catégorisation
-// ---------------------------------------------------------------------------
-
-export function ruleMatches(rule: Rule, op: Operation): boolean {
-  try {
-    const re = new RegExp(rule.pattern, 'i');
-    return re.test(op.label) || re.test(op.normalizedLabel) || (!!op.details && re.test(op.details));
-  } catch {
-    return false;
-  }
-}
-
-/** Applique la première règle (par priorité) qui matche à chaque opération en attente non ventilée. */
-export function applyRules(ledger: Ledger): Patch {
-  const patch = emptyPatch();
-  const rules = alive(ledger.rules).sort((a, b) => a.priority - b.priority);
-  if (rules.length === 0) return patch;
-  const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
-  for (const op of alive(ledger.operations)) {
-    if (isLocked(op)) continue;
-    if (allocationsOf(ledger, op.id).length > 0) continue;
-    const rule = rules.find((r) => ruleMatches(r, op));
-    if (!rule) continue;
-    const envelopeId = rule.envelopeId ?? (rule.categoryId ? categories.get(rule.categoryId)?.envelopeId : undefined);
-    patch.operations.push({ ...op, state: 'reconciled' });
-    patch.allocations.push({
-      id: uuidv7(),
-      operationId: op.id,
-      share: { kind: 'variable' },
-      ...(rule.categoryId ? { categoryId: rule.categoryId } : {}),
-      ...(envelopeId ? { envelopeId } : {}),
-    });
-  }
-  return patch;
-}
-
-/** Propose un motif de règle à partir d'un libellé : les premiers mots significatifs. */
-export function suggestPattern(op: Operation): string {
-  const words = op.normalizedLabel.split(' ').filter((w) => w.length > 2 && !/^\d+$/.test(w));
-  const skip = new Set(['CARTE', 'PRELEVEMENT', 'EUROPEEN', 'VIR', 'VIREMENT', 'RECU', 'EMIS', 'PERM', 'INST', 'SEPA', 'DE', 'DE:']);
-  const kept = words.filter((w) => !skip.has(w)).slice(0, 2);
-  return (kept.length ? kept : words.slice(0, 2)).join('.*');
 }
 
 // ---------------------------------------------------------------------------

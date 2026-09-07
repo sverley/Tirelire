@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel } from '../lib/format';
-  import { alive, nextOccurrence, type PlannedFlow, type PlannedFlowKind } from '@tirelire/core';
+  import { alive, nextOccurrence, syncFlowRules, todayISO, type PlannedFlow, type PlannedFlowKind } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
   let form = $state({
@@ -19,6 +19,7 @@
     tolerancePct: '',
     labelPattern: '',
     variable: false,
+    makesRule: false,
     activeFrom: '',
     activeTo: '',
   });
@@ -37,7 +38,7 @@
   function startNew() {
     const pivot = accounts.find((a) => a.kind === 'pivot');
     editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: pivot?.id ?? '', periodicity: { intervalMonths: 1, anchorDate: app.asOf }, dateWindowDays: 3 };
-    form = { ...form, name: '', kind: 'income', amount: '', accountId: pivot?.id ?? '', envelopeId: '', categoryId: '', counterpartAccountId: '', intervalMonths: '1', anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, activeFrom: '', activeTo: '' };
+    form = { ...form, name: '', kind: 'income', amount: '', accountId: pivot?.id ?? '', envelopeId: '', categoryId: '', counterpartAccountId: '', intervalMonths: '1', anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesRule: false, activeFrom: '', activeTo: '' };
     error = '';
   }
 
@@ -58,6 +59,7 @@
       tolerancePct: f.amountTolerance?.pct !== undefined ? String(f.amountTolerance.pct) : '',
       labelPattern: f.labelPattern ?? '',
       variable: !!f.variable,
+      makesRule: !!f.makesRule,
       activeFrom: f.activeFrom ?? '',
       activeTo: f.activeTo ?? '',
     };
@@ -98,10 +100,14 @@
         : {}),
       ...(form.labelPattern.trim() ? { labelPattern: form.labelPattern.trim() } : {}),
       ...(form.variable ? { variable: true } : {}),
+      ...(form.makesRule ? { makesRule: true } : {}),
       ...(form.activeFrom ? { activeFrom: form.activeFrom } : {}),
       ...(form.activeTo ? { activeTo: form.activeTo } : {}),
     };
     app.upsert('plannedFlows', row);
+    // D24 : modifier un flux archive sa règle et en crée une nouvelle, sans réécrire le passé.
+    for (const rule of syncFlowRules(app.ledger, todayISO()).rules) app.store.upsert('rules', rule);
+    app.reload();
     editing = undefined;
   }
 
@@ -166,6 +172,7 @@
       <label class="f">Actif à partir du <input type="date" bind:value={form.activeFrom} /></label>
       <label class="f">Actif jusqu'au <input type="date" bind:value={form.activeTo} /></label>
       <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (rapprochement à confirmer)</label>
+      <label class="f check"><input type="checkbox" bind:checked={form.makesRule} /> Classer automatiquement les opérations de ce flux (crée une règle qui verrouille)</label>
     </div>
     {#if error}<div class="err">{error}</div>{/if}
     <div class="actions" style="margin:0">
@@ -181,7 +188,7 @@
     {#each g.flows as f (f.id)}
       <div class="row">
         <div class="label">
-          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}
+          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · règle' : ''}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</span>
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>

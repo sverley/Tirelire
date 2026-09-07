@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, needCruise, type CategoryReview, type Rule } from '@tirelire/core';
+  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, needCruise, rulesByRank, ruleLabel, type CategoryReview, type Rule } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -10,7 +10,7 @@
   const periods = $derived(lastPeriods(app.ledger, app.asOf, horizon));
   const rows = $derived(reviewCategories(app.ledger, periods).filter((r) => showIncome || r.nature === 'expense'));
   const provisions = $derived(reviewProvisions(app.ledger, addMonths(app.asOf, -24), app.asOf));
-  const rules = $derived(alive(app.ledger.rules).sort((a, b) => a.priority - b.priority));
+  const rules = $derived(rulesByRank(app.ledger));
   const categories = $derived(alive(app.ledger.categories));
   const envelopes = $derived(alive(app.ledger.envelopes));
   const hasOps = $derived(app.ledger.operations.some((o) => !o.deletedAt));
@@ -43,7 +43,14 @@
   }
 
   function removeRule(rule: Rule) {
-    if (confirm(`Supprimer la règle « ${rule.pattern} » ?`)) app.remove('rules', rule.id);
+    if (confirm(`Supprimer la règle « ${ruleLabel(rule)} » ?`)) app.remove('rules', rule.id);
+  }
+
+  /** Ce que la règle pose, en clair. */
+  function ruleEffect(rule: Rule): string {
+    const parts = [categoryName(rule.action.categoryId), envelopeName(rule.action.envelopeId) ? `enveloppe ${envelopeName(rule.action.envelopeId)}` : undefined].filter(Boolean);
+    const state = { lock: 'verrouille', reconcile: 'rapproche', none: 'ne change pas l’état', unlock: 'déverrouille' }[rule.action.state ?? 'none'];
+    return [parts.join(' · ') || 'rien', state].join(' · ');
   }
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
   const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
@@ -116,11 +123,14 @@
 {/if}
 
 <h2>Règles de classement</h2>
-<p class="muted small">Appliquées à l'import, dans l'ordre de priorité, aux opérations sans ventilation. On les crée depuis l'écran Opérations en classant une opération.</p>
+<p class="muted small">Rejouées à chaque import sur les opérations non verrouillées, du rang le plus élevé au rang 1 : la plus haute écrit en dernier. On les crée depuis l'écran Opérations, en classant une opération ou depuis une sélection.</p>
 <div class="card">
   {#each rules as rule (rule.id)}
     <div class="row">
-      <div class="label"><span class="num">{rule.pattern}</span><span class="sub">→ {[categoryName(rule.categoryId), envelopeName(rule.envelopeId) ? `enveloppe ${envelopeName(rule.envelopeId)}` : undefined].filter(Boolean).join(' · ') || 'rien'} · priorité {rule.priority}</span></div>
+      <div class="label">
+        <span class="num">{ruleLabel(rule)}</span>
+        <span class="sub">→ {ruleEffect(rule)}{rule.flowId ? ' · issue d’un flux' : ''}{rule.validTo ? ` · archivée le ${rule.validTo}` : ''}</span>
+      </div>
       <button class="btn small danger" onclick={() => removeRule(rule)}>×</button>
     </div>
   {:else}

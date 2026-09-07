@@ -193,6 +193,8 @@ export interface PlannedFlow {
   variable?: boolean;
   activeFrom?: ISODate;
   activeTo?: ISODate;
+  /** Le flux engendre-t-il une règle déterministe (D24) ? */
+  makesRule?: boolean;
   deletedAt?: string;
 }
 
@@ -285,15 +287,69 @@ export function fixedShare(amount: Cents): Share {
 }
 
 // ---------------------------------------------------------------------------
-// Règles de catégorisation
+// Règles (D23)
 // ---------------------------------------------------------------------------
 
-export interface Rule {
-  id: Id;
-  pattern: string;
+/**
+ * Sélection d'une règle ou d'une action groupée : tous les critères renseignés doivent être
+ * remplis. `labelPattern` est une expression régulière insensible à la casse, éprouvée sur le
+ * libellé, le libellé normalisé et le détail.
+ */
+export interface RuleSelection {
+  labelPattern?: string;
+  accountId?: Id;
+  /** Bornes de montant, dans le signe de l'opération (−5000 à −1000 pour de grosses dépenses). */
+  amountMin?: Cents;
+  amountMax?: Cents;
+  dateFrom?: ISODate;
+  dateTo?: ISODate;
+}
+
+/**
+ * Effet d'une règle sur l'état d'une opération (D23) :
+ *  - `lock`      : verrouille, l'opération devient de la vérité ;
+ *  - `reconcile` : la marque rapprochée, donc reprise à chaque passage ;
+ *  - `none`      : ne touche pas à l'état — l'opération peut porter une classification tout en
+ *                  restant non traitée, ce que l'interface doit savoir distinguer de « rien dessus » ;
+ *  - `unlock`    : réservé aux actions groupées (D26), indisponible dans une règle.
+ */
+export type RuleStateAction = 'lock' | 'reconcile' | 'none' | 'unlock';
+
+/**
+ * Action d'une règle : chaque champ est facultatif, et seuls les champs renseignés écrasent ce
+ * qu'une règle moins prioritaire a posé. `allocation` remplace la ventilation entière ; une part
+ * variable la rend rejouable à montant inconnu d'avance (D27).
+ */
+export interface RuleAction {
   categoryId?: Id;
   envelopeId?: Id;
-  priority: number;
+  allocation?: Array<{ categoryId?: Id; envelopeId?: Id; share: Share }>;
+  oneOff?: boolean;
+  state?: RuleStateAction;
+}
+
+/**
+ * Une règle est un automatisme, pas de la vérité : elle se rejoue à chaque passage sur les
+ * opérations non verrouillées. Le `rank` tranche les désaccords — les règles s'appliquent du rang
+ * le plus élevé au rang 1, la plus prioritaire écrivant en dernier. Il est stocké comme clé
+ * triable (D31) plutôt que comme index, pour que deux appareils qui réordonnent en même temps
+ * convergent au lieu de produire des doublons.
+ *
+ * Les périodes de validité rendent les règles rejouables dans l'ordre chronologique sur un
+ * historique importé : une règle archivée (`validTo`) ne sélectionne plus rien après sa fin.
+ */
+export interface Rule {
+  id: Id;
+  name?: string;
+  selection: RuleSelection;
+  action: RuleAction;
+  /** Clé de rang triable ; comparée en ordre lexicographique, l'identifiant tranche les égalités. */
+  rank: string;
+  /** Validité : bornes sur la date de l'opération, pas sur l'horloge. */
+  validFrom?: ISODate;
+  validTo?: ISODate;
+  /** Règle engendrée par un flux prévu (D24) : archivée et remplacée quand le flux change. */
+  flowId?: Id;
   deletedAt?: string;
 }
 

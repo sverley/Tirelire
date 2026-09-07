@@ -184,7 +184,7 @@ export function exampleLedger(): Ledger {
       label: 'Dentiste (payé par Marie)',
       normalizedLabel: 'DENTISTE PAYE PAR MARIE',
       amount: euros(-80),
-      state: 'reconciled',
+      state: 'locked',
     },
     {
       id: 'op-caf-marie',
@@ -194,7 +194,7 @@ export function exampleLedger(): Ledger {
       label: 'Allocations reçues sur le compte de Marie',
       normalizedLabel: 'ALLOCATIONS RECUES SUR LE COMPTE DE MARIE',
       amount: euros(100),
-      state: 'reconciled',
+      state: 'locked',
     },
     {
       id: 'op-vir-enfants',
@@ -215,7 +215,7 @@ export function exampleLedger(): Ledger {
       label: 'Fournitures scolaires',
       normalizedLabel: 'FOURNITURES SCOLAIRES',
       amount: euros(-146),
-      state: 'reconciled',
+      state: 'locked',
     },
     {
       id: 'op-enfants-2',
@@ -225,7 +225,7 @@ export function exampleLedger(): Ledger {
       label: 'Inscription judo',
       normalizedLabel: 'INSCRIPTION JUDO',
       amount: euros(-90),
-      state: 'reconciled',
+      state: 'locked',
     },
   );
   l.allocations.push(

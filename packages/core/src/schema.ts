@@ -33,7 +33,7 @@ const c = (prop: string, type: ColumnType = 'text'): ColumnDef => ({
 const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop, type), deprecated: true });
 
 /** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
-export const MODEL_VERSION = 3;
+export const MODEL_VERSION = 4;
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {
@@ -107,6 +107,7 @@ export const TABLES: Record<string, TableDef> = {
       c('variable', 'boolean'),
       c('activeFrom'),
       c('activeTo'),
+      c('makesRule', 'boolean'),
       c('deletedAt'),
     ],
   },
@@ -148,7 +149,22 @@ export const TABLES: Record<string, TableDef> = {
   },
   rules: {
     name: 'rules',
-    columns: [c('id'), c('pattern'), c('categoryId'), c('envelopeId'), c('priority', 'integer'), c('deletedAt')],
+    columns: [
+      c('id'),
+      c('name'),
+      c('selection', 'json'),
+      c('action', 'json'),
+      c('rank'),
+      c('validFrom'),
+      c('validTo'),
+      c('flowId'),
+      c('deletedAt'),
+      // Modèle D01–D18 (migration 3 → 4) :
+      old('pattern'),
+      old('categoryId'),
+      old('envelopeId'),
+      old('priority', 'integer'),
+    ],
   },
   devices: {
     name: 'devices',
