@@ -332,3 +332,15 @@ Trois gestes en découlent, du même écran : appliquer aux lignes cochées, app
 le filtre retourne, ou en faire une règle — auquel cas le filtre est repris tel quel, sans
 inférence. L'inférence de D26 sert le chemin inverse, quand on part de lignes cochées sans avoir
 su écrire le filtre : elle propose un filtre, qui reste modifiable avant d'être enregistré.
+
+## D37 · 2026-09-07 · Dépôt du site par lftp, sans supprimer ce qui vit sur le serveur
+
+Le dépôt sur l'hébergement (D35) se fait avec `lftp` dans `apps/hebergement/deposer.sh`, appelé
+par la CI et utilisable à la main, plutôt qu'avec une action tierce : un seul outil pour FTPS et
+SFTP, secrets qui ne sortent pas du script, comportement testable. Le script est vérifié contre
+un vrai serveur FTP local (`deposer.test.mjs`). Deux règles : les fichiers d'entrée
+(`index.html`, `sw.js`, `registerSW.js`, `manifest.webmanifest`) partent en dernier, pour qu'on
+ne charge jamais une page pointant vers des ressources absentes ; `donnees/*.jsonl` et
+`relais.config.php` sont exclus de l'envoi **et** du nettoyage, car ils appartiennent au serveur.
+Le nettoyage des anciens fichiers est facultatif (`TIRELIRE_FTP_NETTOYER`) et désactivé par
+défaut : un appareil pas encore rechargé demande encore les fragments de la version précédente.

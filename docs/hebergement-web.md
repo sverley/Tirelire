@@ -23,6 +23,8 @@ Cloud Web et les VPS) ; le relais est donc réécrit en PHP, sans dépendance.
 | `serveur/relais.config.exemple.php` | pour déplacer `donnees` hors du dossier web (recommandé quand on a accès au dossier parent de `www`) |
 | `assembler.mjs` | construit la PWA avec le bon préfixe et produit `dist/` et `tirelire-hebergement.zip` |
 | `relais.test.mjs` | vérifie le relais PHP avec le serveur intégré de PHP (sauté si `php` est absent) |
+| `deposer.sh` | dépôt du site par FTPS ou SFTP (`lftp`), utilisé par la CI et à la main |
+| `deposer.test.mjs` | vérifie le dépôt contre un vrai serveur FTP local (sauté si `lftp` ou `pyftpdlib` manquent) |
 
 ## Installer
 
@@ -41,13 +43,60 @@ Le premier déploiement est le vrai test des règles `.htaccess` (réécriture e
 sont écrites pour Apache 2.4 tel que configuré chez OVHcloud, mais n'ont été vérifiées ici
 qu'avec le serveur intégré de PHP.
 
-## Mises à jour
+## Mises à jour et dépôt automatique
 
-À chaque push sur `main`, la CI produit l'archive et la joint à la release `latest`. Si les
-secrets `OVH_FTP_HOST`, `OVH_FTP_USER`, `OVH_FTP_PASSWORD` (et, facultatif, `OVH_FTP_DIR`,
-défaut `www/`) existent dans le dépôt, elle dépose aussi `dist/` par FTPS, sans jamais toucher
-à `donnees/` ni à `relais.config.php`. La variable de dépôt `TIRELIRE_BASE` fixe le
-sous-dossier. Le service worker met les appareils à jour au chargement suivant.
+À chaque push sur `main`, la CI assemble le site, joint `tirelire-hebergement.zip` à la release
+`latest`, puis le **dépose par FTP** si les secrets sont renseignés. Sans secrets, le job le dit
+dans son résumé et ne fait rien d'autre : l'archive reste téléchargeable.
+
+### Secrets à créer (Paramètres du dépôt → Secrets and variables → Actions → *Secrets*)
+
+| Secret | Valeur | Où la trouver |
+|---|---|---|
+| `OVH_FTP_HOST` | `ftp.clusterXXX.hosting.ovh.net` | espace client OVHcloud → Hébergements → *FTP - SSH* |
+| `OVH_FTP_USER` | l'utilisateur FTP (souvent le nom de l'hébergement) | même onglet |
+| `OVH_FTP_PASSWORD` | son mot de passe | à (re)définir depuis le même onglet |
+
+Le mot de passe ne doit contenir ni guillemet double ni barre oblique inverse (il est passé tel
+quel à `lftp`). Un utilisateur FTP dédié, limité au dossier du site, est préférable au compte
+principal.
+
+### Réglages facultatifs (mêmes écrans, onglet *Variables*)
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `TIRELIRE_BASE` | `/` | sous-dossier d'installation (`/tirelire/` par exemple) |
+| `TIRELIRE_FTP_DOSSIER` | `www` | dossier distant (`www/tirelire` pour un sous-dossier) |
+| `TIRELIRE_FTP_PROTOCOLE` | `ftps` | `ftps` (FTP chiffré, port 21) ou `sftp` (port 22) |
+| `TIRELIRE_FTP_VERIFIER_CERTIFICAT` | `oui` | passer à `non` seulement si le certificat du serveur FTP ne correspond pas à son nom |
+| `TIRELIRE_FTP_NETTOYER` | `non` | `oui` supprime du serveur les fichiers absents du site (les anciens fragments restent utiles aux appareils pas encore rechargés) |
+| `TIRELIRE_SITE_URL` | — | adresse publique : la CI vérifie alors le site après dépôt |
+
+### Ce que fait le dépôt
+
+`apps/hebergement/deposer.sh` (lancé par la CI, utilisable aussi à la main) transfère avec `lftp`
+en deux passes : d'abord tout sauf `index.html`, `sw.js`, `registerSW.js` et
+`manifest.webmanifest`, puis ces fichiers d'entrée — ainsi personne ne charge une page qui
+pointerait vers des ressources pas encore montées. Sont **toujours** exclus, à l'envoi comme au
+nettoyage : `donnees/*.jsonl` (les paquets de synchronisation des appareils) et
+`relais.config.php` (la configuration locale du relais).
+
+Si `TIRELIRE_SITE_URL` est renseignée, la CI vérifie ensuite en ligne : la page d'accueil
+répond, `/r/<salon>` répond `200` (donc la réécriture `.htaccess` fonctionne), un salon invalide
+est refusé (`400`) et le dossier `donnees/` n'est pas servi.
+
+L'entrée manuelle du workflow (onglet Actions → *Lancer le workflow*) propose `essai-a-blanc`,
+qui liste ce qui serait transféré sans rien envoyer, et `ignorer`, qui saute le dépôt.
+
+À la main, sans la CI :
+
+```sh
+pnpm --filter @tirelire/hebergement assembler
+HOTE=ftp.clusterXXX.hosting.ovh.net UTILISATEUR=moncompte MOTDEPASSE=… \
+  bash apps/hebergement/deposer.sh
+```
+
+Le service worker met les appareils à jour au chargement suivant.
 
 ## Sécurité et limites
 
