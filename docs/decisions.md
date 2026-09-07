@@ -126,3 +126,105 @@ la colonne compte qui correspond à un numéro déjà mémorisé pré-remplit la
 y compris avec un profil nouvellement détecté, contrairement à `profile.accountMap` qui ne vaut
 que pour ce profil. Une case à cocher propose de mémoriser une nouvelle valeur sur le compte
 choisi ; décision explicite, jamais un écrasement silencieux.
+
+## D19 · 2026-09-07 · Enveloppe répartie sur plusieurs comptes
+
+Une enveloppe n'est plus hébergée par un compte : elle porte une **répartition par compte**,
+reconstruite depuis les ventilations, jamais stockée. Deux invariants au lieu d'un : la somme des
+composantes d'une enveloppe fait son solde ; la somme des composantes portées par un compte plus
+le non affecté fait le solde bancaire. Une composante peut être **négative** — une dépense consomme
+l'enveloppe là où elle sort, même si l'argent dort ailleurs (taxe foncière prélevée sur le pivot,
+provisionnée sur le livret). Un virement interne au sein d'une même enveloppe déplace une composante
+vers une autre sans changer le solde. Remplace l'hébergement de D01 et de D05 : `balances.ts` rend
+un vecteur, plus un scalaire, et `Envelope.accountId` disparaît au profit d'un placement voulu (D20).
+
+## D20 · 2026-09-07 · Placement voulu et écart
+
+Chaque enveloppe déclare **où son argent devrait dormir**. L'écart entre position réelle et position
+voulue produit des propositions de virement dans le plan : jamais une correction d'office, jamais un
+blocage. Laisser un écart est légitime — un revenu arrive, on provisionnera plus tard — donc le plan
+doit pouvoir présenter un écart comme « à surveiller » plutôt que « à faire ». Le pivot est un lieu
+de stockage comme un autre, à durée de séjour courte : aucune règle particulière ne lui est attachée.
+
+## D21 · 2026-09-07 · Virement groupé à ventilation prévue
+
+Les écarts vers un même compte cible donnent un **virement permanent unique**, avec sa ventilation
+calculée d'avance et enregistrée comme flux attendu. À l'import, la ligne bancaire est reconnue par
+montant et libellé, et sa ventilation proposée. Si le montant constaté diffère du prévu — permanent
+posé il y a six mois, besoins qui ont bougé — la répartition rejoue l'ordre de financement de D06,
+planchers d'abord puis priorités, plutôt qu'un prorata qui saupoudrerait. L'écart retourne dans les
+positions d'enveloppes et se represente au tour suivant. Le libellé de D11 devient un libellé par
+couple de comptes, plus un libellé par enveloppe.
+
+## D22 · 2026-09-07 · Trois états d'une opération, la vérité est ce qui est verrouillé
+
+*Non traitée* (aucune règle ne l'a vue), *rapprochée* (classée par une règle, reprise à chaque
+passage, malléable), *verrouillée* (plus aucune règle ne l'atteint). Est vérité — donc stocké et
+synchronisé — ce qui est verrouillé. Toute modification manuelle d'une opération la verrouille :
+c'est la modification qui change l'état, pas l'ouverture de l'éditeur. Seul l'utilisateur
+déverrouille, à l'unité ou par action groupée (D26). Renomme le pointage de D12 en **rapprochement
+de flux**, qui reste la mise en correspondance avec une échéance attendue et ne change aucun état
+à lui seul ; les deux sens du mot ne doivent plus cohabiter dans le code ni dans l'interface.
+
+## D23 · 2026-09-07 · Règles : sélection, action, rang
+
+Une règle a une **sélection** (libellé, montant, compte, date, période de validité) et une **action**
+dont chaque champ est facultatif : catégorie, enveloppe, ventilation, état. L'état prend quatre
+valeurs — *Verrouiller*, *Rapprocher*, *Ne rien faire*, *Déverrouiller* — la dernière indisponible
+dans une règle. Défauts : *Rapprocher* pour une règle déterministe, *Ne rien faire* pour une règle
+contextuelle ou bayésienne, *Verrouiller* pour une règle issue d'un flux du budget et portant toute
+la classification. Le **rang** est l'index dans la liste ; les règles s'appliquent du rang le plus
+élevé au rang 1, chaque champ renseigné écrasant la valeur posée par une règle moins prioritaire,
+les champs vides laissant en place. Pas de détection de conflit : le rang tranche. Aperçu obligatoire
+avant validation, montrant l'avant et l'après sur les opérations concernées. Les règles ne sont pas
+de la vérité, ce sont des automatismes ; elles s'exportent avec leurs périodes de validité, ce qui
+les rend rejouables dans l'ordre chronologique sur un historique importé. Conséquence à traiter dans
+l'interface : avec *Ne rien faire*, une opération peut porter une classification tout en restant non
+traitée — « rien dessus » et « quelque chose que personne n'a regardé » doivent se distinguer.
+
+## D24 · 2026-09-07 · Un flux peut engendrer une règle
+
+Un flux prévu engendre optionnellement une règle déterministe. Modifier le flux **archive** la règle
+en lui posant une fin de validité et en crée une nouvelle : les opérations déjà classées ne sont pas
+réécrites, puisqu'aucune règle nouvelle ne les sélectionne.
+
+## D25 · 2026-09-07 · Abandon de l'année budgétaire
+
+Remplace D03. Pour un particulier, le budget évolue au fil de la vie — salaire, activité en cours
+d'année, achat, investissement — et aucune date d'arrêté n'a de sens. Les provisions gardent leur
+ancrage propre (`periodicity.anchorDate`) ; les bilans se lisent sur un horizon glissant. Une
+comparaison entre deux périodes doit signaler quand la profondeur d'historique disponible diffère,
+plutôt que de laisser croire à une baisse de dépenses.
+
+## D26 · 2026-09-07 · Action groupée
+
+Un filtre de recherche, une sélection ajustable à la main — tout sélectionner ou désélectionner sur
+les opérations visibles, plus la sélection individuelle — et les mêmes actions qu'une règle **plus
+*Déverrouiller***. Ne se conserve pas et ne se rejoue pas : seuls ses effets restent dans les
+opérations. Aperçu avant application, avec l'avant et l'après. Chemin inverse également : une
+sélection manuelle peut proposer un filtre qui tente de la reproduire, et donc engendrer une règle.
+C'est la porte d'entrée vers les règles pour qui n'en écrirait jamais.
+
+## D27 · 2026-09-07 · Ventilation à parts, dont une part variable
+
+Une ligne de ventilation porte un **montant fixe**, un **pourcentage** du montant de l'opération, ou
+la part **variable** — calculée, égale au montant de l'opération moins les autres lignes. Toute
+opération a par défaut une ligne unique variable, qui prend donc l'intégralité du montant ; ajouter
+des lignes la réduit d'autant, jusqu'à zéro, jamais en négatif. Une seule ligne variable par
+ventilation. La ventilation ne dépend que de l'opération : le rejeu reste déterministe même à montant
+inconnu d'avance, donc un flux à montant variable peut engendrer une règle verrouillante. Une
+ventilation qui dépendrait du contexte — solde d'une enveloppe, état du plan — sort de ce cadre :
+elle est une aide, et son résultat doit être figé sur l'opération au moment où il est produit.
+Remplace la ventilation de D10, dont « une catégorie et une enveloppe par ligne » reste valable.
+
+## D28 · 2026-09-07 · Enveloppe sans type, besoins multiples
+
+Une enveloppe est un pot à **solde unique** portant un ou plusieurs **besoins** : récurrent (tant par
+période, avec le report de D05), à échéance (un montant pour une date, rattrapage lissé sur les
+virements restants), ou objectif (un montant sans date). Le besoin de financement de la période est
+leur somme. Les priorités et planchers de D06 portent désormais sur les besoins, pas sur les
+enveloppes : une même enveloppe « Charges » sert ainsi le plancher de la taxe foncière avant son
+courant. Remplace la typologie provision / budget / objectif de D06, qui devient une typologie de
+besoins, et `Envelope.kind` disparaît. Le **regroupement d'enveloppes est écarté** : les totaux
+passent par l'arbre des catégories, et le seul apport propre d'un groupe — arbitrer une masse commune
+entre ses membres — s'obtient en fusionnant les enveloppes plutôt qu'en les coiffant.
