@@ -45,11 +45,11 @@ libération), **D30** (colonnes dépréciées et version de modèle), **D31** (r
 2. **Rejouer les scénarios navigateur** : l'interface a beaucoup bougé (Enveloppes, Plan,
    Opérations, Flux, Bilan) et n'a pas de tests automatisés. À faire avant de s'y fier.
 3. **Branches non fusionnées**, toutes en retard sur `main` et à décider avec Simon :
-   `feature/serveur-web` (hébergement PHP + Pages), `feature/connecteur-banque` (Enable Banking),
-   `feature/assistant-configuration` (**obsolète** : elle crée des enveloppes typées, à refaire
-   plutôt qu'à rebaser), `etude/apprentissage-classification`, `etude/synchronisation-bancaire`.
-   Les deux premières portent chacune un « D18 » qui entre en collision avec celui de `main` :
-   à renuméroter à partir de D35.
+   `feature/connecteur-banque` (Enable Banking), `feature/assistant-configuration`
+   (**obsolète** : elle crée des enveloppes typées, à refaire plutôt qu'à rebaser),
+   `etude/apprentissage-classification`, `etude/synchronisation-bancaire`. La première porte
+   un « D18 » qui entre en collision avec celui de `main` : à renuméroter à partir de D36.
+   (`feature/serveur-web` a été rebasée, renumérotée D35 et fusionnée le 7 septembre.)
 4. **Export Linxo** de Simon, à ne jamais versionner, pour figer un profil d'import.
 5. Chantiers suivants : compactage du journal de changements ; import du second compte (les
    enfants) ; onboarding guidé, qui s'appuiera sur l'inférence de filtre (D26) ; tests

@@ -30,8 +30,9 @@ Tirelire/
 │   ├── src/lib/platform.ts     navigateur vs Android (enregistrer / partager un fichier)
 │   ├── src/views/*.svelte  Plan, Operations, Import, Review, More, Accounts, Envelopes, Flows, Entries, Settings
 │   └── android/            projet Capacitor (icônes, signature, versions par variables d'environnement)
-├── apps/relay/             (branche feature/sync-p2p) relais HTTP minimal, paquets chiffrés
-├── docs/                   analyse, décisions, formats d'import, synchronisation, reprise
+├── apps/relay/             relais HTTP minimal (Node), paquets chiffrés
+├── apps/hebergement/       site pour hébergement mutualisé : PWA + relais PHP, .htaccess, .ovhconfig, assembleur
+├── docs/                   analyse, décisions, formats d'import, synchronisation, hébergement web, reprise
 └── .github/workflows/ci.yml  tests, build web, APK, releases
 ```
 
@@ -101,7 +102,7 @@ automatique des flux sûrs → moteur de règles → file de tri (interface).
 chaînée ; `applyRemote` n'écrase une cellule que si l'horodatage reçu est plus récent
 (`cell_versions`), conserve les entrées reçues pour les relayer, vérifie les empreintes.
 `sync.ts` : protocole symétrique par curseurs, transport abstrait ; fichier JSON sur `main`,
-WebRTC et relais sur `feature/sync-p2p`.
+WebRTC, relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`).
 
 ## Vérification
 

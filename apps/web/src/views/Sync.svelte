@@ -3,6 +3,7 @@
   import { alive, runSync, knownPeers, type Device, type SyncResult } from '@tirelire/core';
   import { WebRtcPeer } from '../lib/webrtc';
   import { relaySync, newRoomId, type RelayConfig } from '../lib/relay';
+  import { isNative } from '../lib/platform';
   import QRCode from 'qrcode';
 
   // --- Appareil et utilisateur ---------------------------------------------
@@ -166,11 +167,18 @@
   // --- Relais -----------------------------------------------------------------
   let relay = $state<RelayConfig>(readRelay());
   let relayBusy = $state(false);
+  /** Adresse du relais proposée par défaut : le site lui-même quand il est servi par un hébergement
+   * (le dossier `apps/hebergement` y installe `relais.php` à côté de la PWA). */
+  function relaisParDefaut(): string {
+    if (isNative || typeof location === 'undefined' || !/^https?:$/.test(location.protocol)) return '';
+    return location.origin + import.meta.env.BASE_URL.replace(/\/$/, '');
+  }
   function readRelay(): RelayConfig {
     try {
-      return JSON.parse(localStorage.getItem('tirelire.relay') ?? '') as RelayConfig;
+      const saved = JSON.parse(localStorage.getItem('tirelire.relay') ?? '') as RelayConfig;
+      return { ...saved, url: saved.url || relaisParDefaut() };
     } catch {
-      return { url: '', room: '', passphrase: '' };
+      return { url: relaisParDefaut(), room: '', passphrase: '' };
     }
   }
   function saveRelay() {
@@ -267,7 +275,7 @@
 
 <h2>Par un serveur privé (relais)</h2>
 <div class="card">
-  <p class="small muted">Un petit serveur à toi (dossier <span class="num">apps/relay</span>) stocke des paquets chiffrés ; il ne peut pas les lire. Même salon et même phrase sur tous les appareils du foyer.</p>
+  <p class="small muted">Un serveur à toi stocke des paquets chiffrés sans pouvoir les lire : soit le petit serveur Node (dossier <span class="num">apps/relay</span>), soit ce site lui-même quand il est installé sur un hébergement web (dossier <span class="num">apps/hebergement</span>, adresse proposée d'office). Même salon et même phrase sur tous les appareils du foyer.</p>
   <div class="grid" style="display:grid;gap:10px">
     <label class="f">Adresse du relais <input bind:value={relay.url} placeholder="https://maison.exemple.fr/tirelire" /></label>
     <label class="f">Salon <span style="display:flex;gap:6px"><input bind:value={relay.room} placeholder="identifiant secret" /><button class="btn small" type="button" onclick={() => (relay.room = newRoomId())}>Générer</button></span></label>
