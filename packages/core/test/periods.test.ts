@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMonths, budgetYearContaining, nextOccurrence, occurrencesBetween, payPeriodContaining, periodsUntil, previousOccurrence, nextPeriod } from '../src/index.js';
+import { addMonths, nextOccurrence, occurrencesBetween, payPeriodContaining, periodsUntil, previousOccurrence, nextPeriod } from '../src/index.js';
 
 describe('dates', () => {
   it('borne le jour en ajoutant des mois', () => {
@@ -48,14 +48,6 @@ describe('périodes de paie', () => {
     expect(periodsUntil(p, '2026-10-15', 28)).toBe(2);
     expect(periodsUntil(p, '2027-03-05', 28)).toBe(7);
     expect(periodsUntil(p, '2026-08-01', 28)).toBe(0);
-  });
-});
-
-describe('année budgétaire', () => {
-  it('commence à une date configurable', () => {
-    expect(budgetYearContaining('2026-09-06', 9, 1)).toEqual({ start: '2026-09-01', end: '2027-08-31', label: '2026-2027' });
-    expect(budgetYearContaining('2026-08-31', 9, 1)).toEqual({ start: '2025-09-01', end: '2026-08-31', label: '2025-2026' });
-    expect(budgetYearContaining('2026-06-01', 1, 1)).toEqual({ start: '2026-01-01', end: '2026-12-31', label: '2026' });
   });
 });
 

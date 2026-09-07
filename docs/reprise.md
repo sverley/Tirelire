@@ -6,46 +6,67 @@
 
 Tu reprends le projet **Tirelire** (dépôt `github.com/sverley/Tirelire`) : une application de
 comptes de famille en TypeScript — cœur pur dans `packages/core`, PWA Svelte 5 dans `apps/web`,
-emballage Android Capacitor dans `apps/web/android`, relais de synchronisation dans `apps/relay`
-(branche `feature/sync-p2p`). Langue de travail : français, y compris code, commentaires,
-commits et interface.
+emballage Android Capacitor dans `apps/web/android`, relais de synchronisation dans `apps/relay`.
+Langue de travail : français, y compris code, commentaires, commits et interface.
 
-Avant toute chose, lis dans cet ordre : `README.md`, `docs/decisions.md` (D01 à D17, à respecter
-ou à remplacer par une nouvelle entrée datée), `docs/architecture.md`, puis
-`docs/analyse-du-besoin.html` si tu as besoin du raisonnement d'origine. `CLAUDE.md` à la racine
-résume les conventions.
+Avant toute chose, lis dans cet ordre : `README.md`, `docs/decisions.md` (**D01 à D34**),
+`docs/architecture.md`, puis `docs/analyse-du-besoin.html` si tu as besoin du raisonnement
+d'origine. `CLAUDE.md` à la racine résume les conventions.
 
-État au 6 septembre 2026 :
+## État au 7 septembre 2026
 
-- Lots A (plan), B (import et rapprochement), C (bilan et calibrage) faits sur `main`, 55 tests
-  verts, build OK, scénarios navigateur joués. Échange de changements par fichier sur `main`.
-- Branche `feature/sync-p2p` : WebRTC à signalisation manuelle (QR / copier-coller), relais privé
-  chiffré, table `devices`. Testée entre deux navigateurs, pas encore fusionnée dans `main`.
-- CI (`.github/workflows/ci.yml`) : tests, build web, APK signé avec la clé de test, release
-  `latest` à chaque push sur `main`, release nommée sur tag `v*`. **La partie Gradle n'a jamais
-  tourné** (téléchargements Android bloqués dans la session précédente) : le premier run de CI
-  est le vrai test ; corrige le workflow ou `apps/web/android` si besoin.
-- Hooks git via simple-git-hooks (`pnpm install` les pose).
+L'alignement du code sur les décisions D19 à D28 est **fait** sur `main`, en cinq commits (lots 0
+à 4), avec 102 tests verts, typecheck et build OK. Ce qui a changé :
 
-Premières actions attendues :
+- **Enveloppes** : plus de compte hôte ni de type. Une enveloppe est un pot à solde unique réparti
+  sur les comptes (`envelopeComponents`, composantes négatives comprises), qui déclare un placement
+  voulu et porte des besoins (`needs` : récurrent, échéance, objectif) avec leurs priorités. Les
+  deux invariants de D19 sont testés.
+- **Opérations** : trois états (non traitée, rapprochée, verrouillée), « ponctuelle » devenue un
+  attribut, ventilation à parts (fixe, pourcentage, variable). Toute écriture manuelle passe par
+  `edit.ts` et verrouille.
+- **Règles** (`rules.ts`) : sélection + action à champs facultatifs + rang triable, rejouées du
+  rang le plus élevé au rang 1 sur les opérations non verrouillées, aperçu avant/après, actions
+  groupées avec déverrouillage, inférence de filtre depuis une sélection, règles engendrées par
+  les flux et archivées par période de validité.
+- **Virements** : un permanent par couple de comptes, enregistrable comme flux attendu avec sa
+  ventilation prévue ; à montant différent, la répartition rejoue l'ordre de financement.
+- **Migrations** (`migration.ts`) : versions 1 → 4, écrites par `upsert` donc propagées par le
+  journal, idempotentes, testées sur un journal écrit au modèle 1. Lancées à l'ouverture du dépôt.
 
-1. Vérifier que `main` et `feature/sync-p2p` sont bien sur GitHub (sinon les pousser depuis le
-   bundle fourni), puis lancer le workflow et **faire passer la construction de l'APK**.
-2. Ouvrir une pull request `feature/sync-p2p` → `main` avec résumé et points d'attention
-   (`docs/synchronisation.md`), la fusionner si les tests passent.
-3. Demander à Simon un export Linxo (à ne jamais versionner) pour figer un profil d'import
-   Linxo dans `importer.ts` (aujourd'hui : profil générique détecté depuis les en-têtes).
+Décisions ajoutées en cours de route, à lire avant de toucher au modèle : **D29** (report par
+libération), **D30** (colonnes dépréciées et version de modèle), **D31** (rang = clé triable),
+**D32** (enveloppe par défaut d'une catégorie), **D33** (le moteur part de ce que l'import a
+établi), **D34** (la migration verrouille ce que rien ne reproduit).
 
-Chantiers suivants, par valeur décroissante : compactage du journal de changements une fois
-tous les pairs à jour ; import du second compte (les enfants) comme comptes d'accueil ou tiers
-selon ce que Simon décide ; onboarding guidé (créer pivot, enveloppes, flux à partir d'un premier
-import) ; tests d'interface (Playwright) dans la CI ; module natif Capacitor si le WebRTC local
-ne suffit pas.
+## Ce qui reste
 
-Règles de travail : ne jamais committer de données bancaires réelles (`*.csv`, `*.sqlite`
-ignorés) ; tester avec `pnpm test`, `pnpm typecheck`, `pnpm build` avant de pousser ; commits
-en français, un lot ou une décision par commit ; toute décision nouvelle va dans
-`docs/decisions.md`. Simon travaille surtout depuis son téléphone : réponses concises, en prose,
-et une question à la fois.
+1. **Vérifier la CI** : le workflow doit passer, APK compris, sur les commits d'alignement.
+2. **Rejouer les scénarios navigateur** : l'interface a beaucoup bougé (Enveloppes, Plan,
+   Opérations, Flux, Bilan) et n'a pas de tests automatisés. À faire avant de s'y fier.
+3. **Branches non fusionnées**, toutes en retard sur `main` et à décider avec Simon :
+   `feature/serveur-web` (hébergement PHP + Pages), `feature/connecteur-banque` (Enable Banking),
+   `feature/assistant-configuration` (**obsolète** : elle crée des enveloppes typées, à refaire
+   plutôt qu'à rebaser), `etude/apprentissage-classification`, `etude/synchronisation-bancaire`.
+   Les deux premières portent chacune un « D18 » qui entre en collision avec celui de `main` :
+   à renuméroter à partir de D35.
+4. **Export Linxo** de Simon, à ne jamais versionner, pour figer un profil d'import.
+5. Chantiers suivants : compactage du journal de changements ; import du second compte (les
+   enfants) ; onboarding guidé, qui s'appuiera sur l'inférence de filtre (D26) ; tests
+   d'interface Playwright dans la CI.
+
+## Accès GitHub
+
+Normalement la session reçoit ses droits parce que le dépôt lui est rattaché. Le jeton d'accès
+personnel qui figurait dans la version précédente de ce document **doit être considéré comme
+compromis** (il a circulé en clair) : demander à Simon de le révoquer s'il ne l'a pas fait.
+
+## Règles de travail
+
+Ne jamais committer de données bancaires réelles (`*.csv`, `*.sqlite` ignorés). Tester avec
+`pnpm test`, `pnpm typecheck`, `pnpm build` avant de pousser. Commits en français, un lot ou une
+décision par commit. Toute décision nouvelle va dans `docs/decisions.md`, datée, en remplacement
+plutôt qu'en réécriture. Simon travaille surtout depuis son téléphone : réponses concises, en
+prose, et **une seule question à la fois**.
 
 ---

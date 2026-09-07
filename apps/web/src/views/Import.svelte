@@ -4,7 +4,9 @@
   import {
     alive,
     decodeBytes,
+    matchAccountByNumber,
     newProfileFromRows,
+    normalizeAccountNumber,
     parseCsv,
     parseRows,
     prepareImport,
@@ -27,6 +29,7 @@
   let parsed = $state<ParseResult | undefined>(undefined);
   let prep = $state<ImportPreparation | undefined>(undefined);
   let decisions = $state<Record<number, boolean>>({}); // ligne → importer malgré doublon probable
+  let rememberNumber = $state<Record<string, boolean>>({}); // valeur de la colonne compte → mémoriser sur le compte choisi
   let report = $state<(PipelineReport & { inserted: number }) | undefined>(undefined);
   let error = $state('');
   let busy = $state(false);
@@ -78,7 +81,22 @@
   function reparse() {
     if (!profile) return;
     parsed = parseRows(rows, profile);
-    for (const k of accountKeys) if (!(k in profile.accountMap)) profile.accountMap[k] = '';
+    for (const k of accountKeys) {
+      if (k in profile.accountMap) continue;
+      // Numéro de compte déjà mémorisé sur un compte : proposer la correspondance tout de suite,
+      // y compris avec un profil qu'on découvre (nouveau fichier, nouvelle source).
+      const match = matchAccountByNumber(accounts, k);
+      profile.accountMap[k] = match?.id ?? '';
+      rememberNumber[k] = true;
+    }
+  }
+
+  /** Le compte choisi pour cette valeur n'a pas encore ce numéro mémorisé exactement. */
+  function needsRemember(accountId: string, key: string): boolean {
+    const acc = accounts.find((a) => a.id === accountId);
+    if (!acc || !key.trim()) return false;
+    if (!acc.accountNumber) return true;
+    return normalizeAccountNumber(acc.accountNumber) !== normalizeAccountNumber(key);
   }
 
   function toPreview() {
@@ -106,10 +124,16 @@
     busy = true;
     try {
       const ops = prep.candidates.filter(toImport).map((c) => c.operation);
-      // Enregistrer le profil (avec la correspondance des comptes), puis les opérations, puis la chaîne automatique.
+      // Enregistrer le profil (avec la correspondance des comptes), les numéros à mémoriser,
+      // puis les opérations, puis la chaîne automatique.
       const cleaned: Record<string, string> = {};
       for (const [k, v] of Object.entries(profile.accountMap)) if (v) cleaned[k] = v;
-      app.upsert('importProfiles', { ...$state.snapshot(profile), accountMap: cleaned });
+      app.store.upsert('importProfiles', { ...$state.snapshot(profile), accountMap: cleaned });
+      for (const [k, accId] of Object.entries(cleaned)) {
+        if (!rememberNumber[k] || !needsRemember(accId, k)) continue;
+        const acc = accounts.find((a) => a.id === accId);
+        if (acc) app.store.upsert('accounts', { ...acc, accountNumber: k.trim() });
+      }
       for (const o of ops) app.store.upsert('operations', o);
       app.reload();
       const dates = ops.map((o) => o.date).sort();
@@ -133,6 +157,7 @@
     prep = undefined;
     report = undefined;
     error = '';
+    rememberNumber = {};
   }
 
   const columnFields: Array<[keyof ImportProfile['columns'], string]> = [
@@ -218,6 +243,12 @@
               {#each accounts.filter((a) => a.kind !== 'third') as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
+          {#if profile.accountMap[k] && needsRemember(profile.accountMap[k], k)}
+            <label class="f check" style="align-self:end">
+              <input type="checkbox" bind:checked={rememberNumber[k]} />
+              Mémoriser « {k} » comme numéro de {accounts.find((a) => a.id === profile!.accountMap[k])?.name}
+            </label>
+          {/if}
         {/each}
       </div>
     {:else}
@@ -283,12 +314,12 @@
     <div class="row"><div class="label">Opérations importées</div><div class="num">{report.inserted}</div></div>
     <div class="row"><div class="label">Virements internes appariés</div><div class="num">{report.transfersPaired}</div></div>
     <div class="row"><div class="label">Virements vers des enveloppes reconnus</div><div class="num">{report.envelopeTransfers}</div></div>
-    <div class="row"><div class="label">Flux prévus pointés automatiquement</div><div class="num">{report.autoMatched}</div></div>
-    <div class="row"><div class="label">Pointages à confirmer</div><div class="num">{report.proposals.length}</div></div>
+    <div class="row"><div class="label">Flux prévus rapprochés automatiquement</div><div class="num">{report.autoMatched}</div></div>
+    <div class="row"><div class="label">Rapprochements de flux à confirmer</div><div class="num">{report.proposals.length}</div></div>
     <div class="row"><div class="label">Classées par une règle</div><div class="num">{report.ruled}</div></div>
   </div>
   <div class="actions">
-    <button class="btn primary" onclick={() => (app.view = 'operations')}>Trier les opérations</button>
+    <button class="btn primary" onclick={() => app.switchTab('operations')}>Trier les opérations</button>
     <button class="btn" onclick={reset}>Importer un autre fichier</button>
   </div>
 {/if}

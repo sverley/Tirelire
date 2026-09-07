@@ -1,6 +1,6 @@
 /**
- * Périodes budgétaires (de paie à paie), année budgétaire à date configurable,
- * et occurrences d'une périodicité « tous les N mois à partir d'une date ».
+ * Périodes budgétaires (de paie à paie) et occurrences d'une périodicité
+ * « tous les N mois à partir d'une date ».
  */
 import type { ISODate, Periodicity } from './model.js';
 import { addDays, addMonths, dateInMonth, daysInMonth, parseDate, MONTHS_FR, formatDate } from './dates.js';
@@ -73,32 +73,6 @@ export function periodsUntil(from: Period, date: ISODate, payDay: number): numbe
     if (n > 1200) throw new Error('periodsUntil : boucle trop longue');
   }
   return n;
-}
-
-// ---------------------------------------------------------------------------
-// Année budgétaire
-// ---------------------------------------------------------------------------
-
-export interface BudgetYear {
-  start: ISODate;
-  end: ISODate;
-  /** « 2026-2027 » si l'année est à cheval, « 2026 » sinon. */
-  label: string;
-}
-
-/** Année budgétaire contenant `date`, commençant chaque année le `month`/`day`. */
-export function budgetYearContaining(
-  date: ISODate,
-  startMonth: number,
-  startDay: number,
-): BudgetYear {
-  const { y } = parseDate(date);
-  let start = dateInMonth(y, startMonth, startDay);
-  if (start > date) start = dateInMonth(y - 1, startMonth, startDay);
-  const end = addDays(addMonths(start, 12), -1);
-  const sy = parseDate(start).y;
-  const ey = parseDate(end).y;
-  return { start, end, label: sy === ey ? String(sy) : `${sy}-${ey}` };
 }
 
 // ---------------------------------------------------------------------------

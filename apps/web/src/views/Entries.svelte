@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
-  import { alive, normalizeLabel, type Allocation, type Category, type Operation } from '@tirelire/core';
+  import { alive, normalizeLabel, findCategoryByName, type Allocation, type Category, type Operation } from '@tirelire/core';
 
   type Nature = 'expense' | 'income' | 'transfer';
 
@@ -75,9 +75,15 @@
 
     let categoryId = form.categoryId;
     if (form.newCategory.trim()) {
-      const c: Category = { id: app.newId(), name: form.newCategory.trim(), nature: form.nature === 'income' ? 'income' : 'expense' };
-      app.upsert('categories', c);
-      categoryId = c.id;
+      const nature = form.nature === 'income' ? 'income' : 'expense';
+      const existing = findCategoryByName(categories, form.newCategory, nature);
+      if (existing) {
+        categoryId = existing.id;
+      } else {
+        const c: Category = { id: app.newId(), name: form.newCategory.trim(), nature };
+        app.upsert('categories', c);
+        categoryId = c.id;
+      }
     }
     const id = editingId ?? app.newId();
     const amount = form.nature === 'income' ? abs : -abs;
@@ -89,7 +95,8 @@
       label: form.label.trim(),
       normalizedLabel: normalizeLabel(form.label),
       amount,
-      status: form.nature === 'transfer' ? 'transfer' : 'categorized',
+      // Une saisie manuelle est de la vérité : elle naît verrouillée (D22).
+      state: 'locked',
       ...(form.nature === 'transfer' ? { transferAccountId: form.transferAccountId } : {}),
     };
     app.upsert('operations', op);
@@ -97,7 +104,8 @@
     const al: Allocation = {
       id: existing?.id ?? app.newId(),
       operationId: id,
-      amount,
+      // Une ligne unique variable prend l'intégralité du montant (D27).
+      share: { kind: 'variable' },
       ...(categoryId ? { categoryId } : {}),
       ...(form.envelopeId ? { envelopeId: form.envelopeId } : {}),
     };
@@ -114,7 +122,7 @@
   }
 </script>
 
-<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Saisie</h1>
 <p class="muted small">Dépenses et revenus non importables (comptes tiers, espèces), et virements internes faits depuis le pivot. Une catégorie et une enveloppe par opération ; la ventilation en plusieurs lignes arrivera avec l'import.</p>
 
@@ -158,7 +166,7 @@
       <label class="f">Enveloppe
         <select bind:value={form.envelopeId}>
           <option value="">— (non affecté)</option>
-          {#each envelopes as e}<option value={e.id}>{e.name} ({accountName(e.accountId)})</option>{/each}
+          {#each envelopes as e}<option value={e.id}>{e.name} ({accountName(e.placementAccountId)})</option>{/each}
         </select>
       </label>
     </div>

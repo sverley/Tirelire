@@ -11,6 +11,11 @@ export interface ColumnDef {
   /** Nom de la colonne SQL (snake_case). */
   col: string;
   type: ColumnType;
+  /**
+   * Colonne retirée du modèle (D30) : gardée dans le schéma, ignorée à la lecture et à
+   * l'écriture locale, acceptée d'un pair non migré, lue par les migrations.
+   */
+  deprecated?: boolean;
 }
 
 export interface TableDef {
@@ -24,6 +29,12 @@ const c = (prop: string, type: ColumnType = 'text'): ColumnDef => ({
   type,
 });
 
+/** Colonne dépréciée (voir `ColumnDef.deprecated`). */
+const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop, type), deprecated: true });
+
+/** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
+export const MODEL_VERSION = 4;
+
 export const TABLES: Record<string, TableDef> = {
   accounts: {
     name: 'accounts',
@@ -32,6 +43,7 @@ export const TABLES: Record<string, TableDef> = {
       c('name'),
       c('kind'),
       c('bank'),
+      c('accountNumber'),
       c('openingBalance', 'integer'),
       c('openingDate'),
       c('payDay', 'integer'),
@@ -45,14 +57,30 @@ export const TABLES: Record<string, TableDef> = {
     columns: [
       c('id'),
       c('name'),
-      c('kind'),
-      c('accountId'),
+      c('placementAccountId'),
       c('openingBalance', 'integer'),
       c('openingDate'),
-      c('target', 'integer'),
+      c('rollover', 'json'),
+      c('deletedAt'),
+      // Modèle D01–D18 (migration 1 → 2) :
+      old('kind'),
+      old('accountId'),
+      old('target', 'integer'),
+      old('periodicity', 'json'),
+      old('monthlyAmount', 'integer'),
+      old('priority', 'integer'),
+    ],
+  },
+  needs: {
+    name: 'needs',
+    columns: [
+      c('id'),
+      c('envelopeId'),
+      c('kind'),
+      c('name'),
+      c('amount', 'integer'),
       c('periodicity', 'json'),
       c('monthlyAmount', 'integer'),
-      c('rollover', 'json'),
       c('priority', 'integer'),
       c('deletedAt'),
     ],
@@ -79,6 +107,8 @@ export const TABLES: Record<string, TableDef> = {
       c('variable', 'boolean'),
       c('activeFrom'),
       c('activeTo'),
+      c('makesRule', 'boolean'),
+      c('plannedAllocation', 'json'),
       c('deletedAt'),
     ],
   },
@@ -93,22 +123,53 @@ export const TABLES: Record<string, TableDef> = {
       c('normalizedLabel'),
       c('details'),
       c('amount', 'integer'),
-      c('status'),
+      c('state'),
+      c('oneOff', 'boolean'),
       c('suggestedCategory'),
       c('plannedFlowId'),
       c('transferAccountId'),
       c('transferOperationId'),
       c('rank', 'integer'),
       c('deletedAt'),
+      // Modèle D01–D18 (migration 2 → 3) :
+      old('status'),
     ],
   },
   allocations: {
     name: 'allocations',
-    columns: [c('id'), c('operationId'), c('categoryId'), c('envelopeId'), c('amount', 'integer'), c('deletedAt')],
+    columns: [
+      c('id'),
+      c('operationId'),
+      c('categoryId'),
+      c('envelopeId'),
+      c('share', 'json'),
+      c('deletedAt'),
+      // Modèle D01–D18 (migration 2 → 3) :
+      old('amount', 'integer'),
+    ],
   },
   rules: {
     name: 'rules',
-    columns: [c('id'), c('pattern'), c('categoryId'), c('envelopeId'), c('priority', 'integer'), c('deletedAt')],
+    columns: [
+      c('id'),
+      c('name'),
+      c('selection', 'json'),
+      c('action', 'json'),
+      c('rank'),
+      c('validFrom'),
+      c('validTo'),
+      c('flowId'),
+      c('deletedAt'),
+      // Modèle D01–D18 (migration 3 → 4) :
+      old('pattern'),
+      old('categoryId'),
+      old('envelopeId'),
+      old('priority', 'integer'),
+    ],
+  },
+  devices: {
+    name: 'devices',
+    columns: [c('id'), c('name'), c('user'), c('lastSeen'), c('deletedAt')],
   },
   importProfiles: {
     name: 'import_profiles',
@@ -129,8 +190,13 @@ export const TABLES: Record<string, TableDef> = {
   },
 };
 
+/** Colonnes vivantes d'une table (hors dépréciées). */
+export function liveColumns(t: TableDef): ColumnDef[] {
+  return t.columns.filter((col) => !col.deprecated);
+}
+
 /** Clé de `Ledger` correspondant à chaque table. */
-export const LEDGER_KEYS = ['accounts', 'envelopes', 'categories', 'plannedFlows', 'operations', 'allocations', 'rules', 'importProfiles'] as const;
+export const LEDGER_KEYS = ['accounts', 'envelopes', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'rules', 'importProfiles', 'devices'] as const;
 export type LedgerKey = (typeof LEDGER_KEYS)[number];
 
 export function createTableSQL(t: TableDef): string {

@@ -4,7 +4,7 @@
  */
 import initSqlJs from 'sql.js';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
-import { LedgerStore } from '@tirelire/core';
+import { LedgerStore, migrateModel } from '@tirelire/core';
 
 const DB_NAME = 'tirelire';
 const STORE = 'files';
@@ -59,6 +59,10 @@ export async function openStore(bytes?: Uint8Array): Promise<OpenedStore> {
   const sqlJs = await initSqlJs({ locateFile: () => wasmUrl });
   const existing = bytes ?? (await idbGet(KEY));
   const store = await LedgerStore.create({ sqlJs, ...(existing ? { bytes: existing } : {}) });
+  // Un dépôt écrit sous un modèle antérieur est amené au modèle courant (D30) dès l'ouverture ;
+  // la migration écrit par `upsert`, donc elle se propage aux autres appareils par le journal.
+  const migration = migrateModel(store);
+  const migrated = migration.steps.some((s) => s.written > 0);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   let saving: Promise<void> = Promise.resolve();
@@ -70,7 +74,7 @@ export async function openStore(bytes?: Uint8Array): Promise<OpenedStore> {
     if (timer) clearTimeout(timer);
     timer = setTimeout(save, 400);
   });
-  if (bytes) await save();
+  if (bytes || migrated) await save();
   window.addEventListener('beforeunload', () => {
     if (timer) {
       clearTimeout(timer);

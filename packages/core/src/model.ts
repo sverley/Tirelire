@@ -39,6 +39,8 @@ export interface Account {
   name: string;
   kind: AccountKind;
   bank?: string;
+  /** Numéro de compte ou IBAN, saisi ou mémorisé depuis un import (voir `matchAccountByNumber`). */
+  accountNumber?: string;
   openingBalance: Cents;
   openingDate: ISODate;
   /** Jour de paie (1-31), seulement pour le pivot : début de la période budgétaire. */
@@ -51,59 +53,106 @@ export interface Account {
 }
 
 // ---------------------------------------------------------------------------
-// Enveloppes (sous-comptes comptables)
+// Enveloppes et besoins
 // ---------------------------------------------------------------------------
-
-/**
- * - `provision` : accumule pour une échéance (montant `target`, périodicité) puis se vide.
- * - `goal`      : épargne alimentée d'un montant mensuel fixe, cible facultative.
- * - `budget`    : dépense courante, montant par période (mensuel ou annuel), avec ou sans report.
- */
-export type EnvelopeKind = 'provision' | 'goal' | 'budget';
 
 export type Rollover = { mode: 'none' } | { mode: 'unlimited' } | { mode: 'capped'; months: number };
 
+/**
+ * Une enveloppe est un pot à solde unique (D28), réparti sur plusieurs comptes (D19) : sa
+ * position réelle est un vecteur « compte → composante », reconstruit et jamais stocké
+ * (`envelopeComponents`). Elle déclare où son argent devrait dormir (`placementAccountId`,
+ * D20) ; l'écart entre position et placement nourrit le plan. Le report (D05, D29) porte sur
+ * l'enveloppe : en fin de période, l'excédent au-delà de la réserve des besoins non récurrents
+ * est libéré (`none`) ou plafonné (`capped`).
+ */
 export interface Envelope {
   id: Id;
   name: string;
-  kind: EnvelopeKind;
-  /** Compte réel qui héberge l'enveloppe. */
-  accountId: Id;
+  /** Compte où l'argent de l'enveloppe devrait se trouver. */
+  placementAccountId: Id;
+  /** Solde à `openingDate`, réputé sur le compte de placement. */
   openingBalance: Cents;
   openingDate: ISODate;
-  /** provision : montant de l'échéance ; goal : cible facultative ; budget : montant par période. */
-  target?: Cents;
-  /** provision : échéance (intervalle + ancrage) ; budget : 1 (mensuel) ou 12 (annuel) avec ancrage. */
-  periodicity?: Periodicity;
-  /** goal : montant mensuel fixe. */
-  monthlyAmount?: Cents;
-  /** budget : sort du reliquat en fin de période. */
+  /** Sort de l'excédent en fin de période ; `unlimited` par défaut. */
   rollover?: Rollover;
-  /** Ordre de financement : plus petit = financé en premier. */
+  deletedAt?: string;
+}
+
+/**
+ * Un besoin de financement porté par une enveloppe (D28) :
+ * - `recurring` : `amount` par période (lissé sur `periodicity.intervalMonths` périodes, 1 par défaut) ;
+ * - `dueDate`   : `amount` pour chaque échéance de `periodicity`, rattrapage lissé sur les périodes restantes ;
+ * - `goal`      : `monthlyAmount` par période jusqu'à `amount` (cible facultative).
+ * Les priorités et planchers de D06 se posent sur les besoins ; le solde de l'enveloppe leur est
+ * attribué dans l'ordre des priorités (D29).
+ */
+export type NeedKind = 'recurring' | 'dueDate' | 'goal';
+
+export interface Need {
+  id: Id;
+  envelopeId: Id;
+  kind: NeedKind;
+  /** Libellé facultatif (« Taxe foncière ») ; sinon le nom de l'enveloppe. */
+  name?: string;
+  /** recurring : montant par période ; dueDate : montant de l'échéance ; goal : cible facultative. */
+  amount?: Cents;
+  /** recurring : 1 (mensuel) ou 12 (annuel) avec ancrage ; dueDate : échéance (intervalle + ancrage). */
+  periodicity?: Periodicity;
+  /** goal : mensualité. */
+  monthlyAmount?: Cents;
+  /** Ordre de financement : plus petit = servi en premier. */
   priority: number;
   deletedAt?: string;
 }
 
-/** Priorités par défaut ; les provisions passent avant, les budgets confort après. */
-export const DEFAULT_PRIORITY: Record<EnvelopeKind, number> = {
-  provision: 10,
-  budget: 20,
+/** Priorités par défaut ; les échéances passent avant, les objectifs après. */
+export const DEFAULT_PRIORITY: Record<NeedKind, number> = {
+  dueDate: 10,
+  recurring: 20,
   goal: 30,
 };
+
+/** Nom affiché d'un besoin. */
+export function needName(n: Need, e: Envelope | undefined): string {
+  return n.name ?? e?.name ?? '';
+}
 
 // ---------------------------------------------------------------------------
 // Catégories
 // ---------------------------------------------------------------------------
 
+export type CategoryNature = 'expense' | 'income';
+
 export interface Category {
   id: Id;
   name: string;
   parentId?: Id;
-  /** Enveloppe budget que cette catégorie consomme (facultatif : sinon simple suivi). */
+  /** Enveloppe par défaut de la catégorie (D32) : proposée quand une règle ou une saisie n'en fixe pas. */
   envelopeId?: Id;
   /** `income` pour les catégories de revenus. */
-  nature: 'expense' | 'income';
+  nature: CategoryNature;
   deletedAt?: string;
+}
+
+/** Compare deux noms de catégorie sans tenir compte de la casse ni des accents. */
+function sameCategoryName(a: string, b: string): boolean {
+  const fold = (s: string) =>
+    s
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  return fold(a) === fold(b) && fold(a) !== '';
+}
+
+/**
+ * Cherche, parmi les catégories vivantes de même nature, celle qui porte déjà ce nom
+ * (insensible à la casse et aux accents). Sert à éviter les doublons quand une catégorie
+ * est créée à la volée depuis une opération.
+ */
+export function findCategoryByName(categories: Category[], name: string, nature: CategoryNature): Category | undefined {
+  return categories.find((c) => !c.deletedAt && c.nature === nature && sameCategoryName(c.name, name));
 }
 
 // ---------------------------------------------------------------------------
@@ -135,15 +184,23 @@ export interface PlannedFlow {
   counterpartAccountId?: Id;
   categoryId?: Id;
   periodicity: Periodicity;
-  /** Fenêtre de pointage en jours autour de la date attendue. */
+  /** Fenêtre de rapprochement de flux en jours autour de la date attendue. */
   dateWindowDays: number;
   amountTolerance?: AmountTolerance;
-  /** Motif de libellé (expression régulière, insensible à la casse) pour le pointage. */
+  /** Motif de libellé (expression régulière, insensible à la casse) pour le rapprochement de flux. */
   labelPattern?: string;
-  /** Revenu variable : tolérance large, jamais pointé automatiquement sans confirmation. */
+  /** Revenu variable : tolérance large, jamais rapproché d'un flux automatiquement sans confirmation. */
   variable?: boolean;
   activeFrom?: ISODate;
   activeTo?: ISODate;
+  /** Le flux engendre-t-il une règle déterministe (D24) ? */
+  makesRule?: boolean;
+  /**
+   * Virement permanent : ventilation prévue par couple de comptes (D21), calculée d'avance par le
+   * plan. Si le montant constaté diffère du prévu, elle est rejouée par l'ordre de financement de
+   * D06 plutôt qu'appliquée telle quelle — un prorata saupoudrerait au lieu de servir les planchers.
+   */
+  plannedAllocation?: Array<{ envelopeId: Id; share: Share }>;
   deletedAt?: string;
 }
 
@@ -153,17 +210,22 @@ export interface PlannedFlow {
 
 export type OperationOrigin = 'imported' | 'manual';
 
-export type OperationStatus =
-  | 'pending' // à traiter
-  | 'matched' // pointée sur un flux prévu
-  | 'categorized' // catégorisée
-  | 'transfer' // transfert interne apparié
-  | 'oneOff'; // dépense ponctuelle
+/**
+ * État d'une opération (D22). La vérité est ce qui est verrouillé :
+ *  - `untreated` : aucune règle ne l'a vue ; elle peut porter une classification proposée
+ *    par une règle « Ne rien faire », qui n'est donc pas une décision ;
+ *  - `reconciled` : classée par une règle, reprise à chaque passage, malléable ;
+ *  - `locked` : plus aucune règle ne l'atteint ; toute modification manuelle verrouille.
+ * Seul l'utilisateur déverrouille, à l'unité ou par action groupée (D26).
+ */
+export type OperationState = 'untreated' | 'reconciled' | 'locked';
+
+export const OPERATION_STATES: OperationState[] = ['untreated', 'reconciled', 'locked'];
 
 /**
- * Une opération est ventilée en une ou plusieurs lignes (`Allocation`), chacune
- * portant une catégorie et une enveloppe. L'opération simple a une seule ligne.
- * Sans aucune ligne, l'opération pèse sur le « non affecté » du compte.
+ * Une opération est ventilée en une ou plusieurs lignes (`Allocation`) à parts (D27), chacune
+ * portant une catégorie et une enveloppe. Sans aucune ligne, elle vaut une ligne variable sans
+ * classement : tout son montant pèse sur le « non affecté » du compte.
  */
 export interface Operation {
   id: Id;
@@ -176,10 +238,13 @@ export interface Operation {
   details?: string;
   /** Signé : négatif = débit du compte. */
   amount: Cents;
-  status: OperationStatus;
+  /** État de traitement (D22) ; la nature (virement, ponctuelle) est portée à part. */
+  state: OperationState;
+  /** Dépense exceptionnelle : comptée dans les soldes, exclue des moyennes du bilan. */
+  oneOff?: boolean;
   /** Catégorie proposée par la source (banque, Linxo), à confirmer. */
   suggestedCategory?: string;
-  /** Flux prévu pointé. */
+  /** Flux prévu rapproché (rapprochement de flux, D22) : ne change aucun état à lui seul. */
   plannedFlowId?: Id;
   /** Transfert interne : compte de contrepartie. */
   transferAccountId?: Id;
@@ -190,36 +255,107 @@ export interface Operation {
   deletedAt?: string;
 }
 
+/** Une opération verrouillée est de la vérité : aucune règle ne la réécrit (D22). */
+export function isLocked(op: Operation): boolean {
+  return op.state === 'locked';
+}
+
 /**
- * Ligne de ventilation. `amount` est une part du montant de l'opération, dans
- * le même signe (une dépense de 85 € ventilée en −60 alimentation et −25 vêtements).
+ * Part d'une ligne de ventilation (D27) : un montant fixe, un pourcentage du montant de
+ * l'opération, ou la part variable — le reste, bornée à zéro, jamais négative. Une seule ligne
+ * variable par ventilation ; une opération sans ligne vaut une ligne variable non classée.
+ */
+export type Share =
+  | { kind: 'fixed'; amount: Cents }
+  | { kind: 'percent'; pct: number }
+  | { kind: 'variable' };
+
+/**
+ * Ligne de ventilation. Son montant résolu est une part du montant de l'opération, dans le même
+ * signe (une dépense de 85 € ventilée en −60 alimentation et le reste en vêtements).
  *
- * Effet sur l'enveloppe :
- *  - dépense ou revenu : `amount` tel quel (−80 € sur un budget) ;
- *  - virement interne (`transferAccountId` sur l'opération) : −`amount` si
- *    l'opération est lue côté compte de départ, +`amount` côté compte hôte de
- *    l'enveloppe (un virement de 350 € qui quitte le pivot vers le livret,
- *    ventilé −100/−50/−200, donne +100/+50/+200 aux enveloppes du livret).
+ * Effet sur l'enveloppe (D19) : le montant sur le compte de l'opération ; pour un virement
+ * interne, aussi son opposé sur le compte de contrepartie, ce qui déplace une composante sans
+ * changer le solde.
  */
 export interface Allocation {
   id: Id;
   operationId: Id;
   categoryId?: Id;
   envelopeId?: Id;
-  amount: Cents;
+  share: Share;
   deletedAt?: string;
 }
 
+/** Ligne fixe (raccourci de lecture). */
+export function fixedShare(amount: Cents): Share {
+  return { kind: 'fixed', amount };
+}
+
 // ---------------------------------------------------------------------------
-// Règles de catégorisation
+// Règles (D23)
 // ---------------------------------------------------------------------------
 
-export interface Rule {
-  id: Id;
-  pattern: string;
+/**
+ * Sélection d'une règle ou d'une action groupée : tous les critères renseignés doivent être
+ * remplis. `labelPattern` est une expression régulière insensible à la casse, éprouvée sur le
+ * libellé, le libellé normalisé et le détail.
+ */
+export interface RuleSelection {
+  labelPattern?: string;
+  accountId?: Id;
+  /** Bornes de montant, dans le signe de l'opération (−5000 à −1000 pour de grosses dépenses). */
+  amountMin?: Cents;
+  amountMax?: Cents;
+  dateFrom?: ISODate;
+  dateTo?: ISODate;
+}
+
+/**
+ * Effet d'une règle sur l'état d'une opération (D23) :
+ *  - `lock`      : verrouille, l'opération devient de la vérité ;
+ *  - `reconcile` : la marque rapprochée, donc reprise à chaque passage ;
+ *  - `none`      : ne touche pas à l'état — l'opération peut porter une classification tout en
+ *                  restant non traitée, ce que l'interface doit savoir distinguer de « rien dessus » ;
+ *  - `unlock`    : réservé aux actions groupées (D26), indisponible dans une règle.
+ */
+export type RuleStateAction = 'lock' | 'reconcile' | 'none' | 'unlock';
+
+/**
+ * Action d'une règle : chaque champ est facultatif, et seuls les champs renseignés écrasent ce
+ * qu'une règle moins prioritaire a posé. `allocation` remplace la ventilation entière ; une part
+ * variable la rend rejouable à montant inconnu d'avance (D27).
+ */
+export interface RuleAction {
   categoryId?: Id;
   envelopeId?: Id;
-  priority: number;
+  allocation?: Array<{ categoryId?: Id; envelopeId?: Id; share: Share }>;
+  oneOff?: boolean;
+  state?: RuleStateAction;
+}
+
+/**
+ * Une règle est un automatisme, pas de la vérité : elle se rejoue à chaque passage sur les
+ * opérations non verrouillées. Le `rank` tranche les désaccords — les règles s'appliquent du rang
+ * le plus élevé au rang 1, la plus prioritaire écrivant en dernier. Il est stocké comme clé
+ * triable (D31) plutôt que comme index, pour que deux appareils qui réordonnent en même temps
+ * convergent au lieu de produire des doublons.
+ *
+ * Les périodes de validité rendent les règles rejouables dans l'ordre chronologique sur un
+ * historique importé : une règle archivée (`validTo`) ne sélectionne plus rien après sa fin.
+ */
+export interface Rule {
+  id: Id;
+  name?: string;
+  selection: RuleSelection;
+  action: RuleAction;
+  /** Clé de rang triable ; comparée en ordre lexicographique, l'identifiant tranche les égalités. */
+  rank: string;
+  /** Validité : bornes sur la date de l'opération, pas sur l'horloge. */
+  validFrom?: ISODate;
+  validTo?: ISODate;
+  /** Règle engendrée par un flux prévu (D24) : archivée et remplacée quand le flux change. */
+  flowId?: Id;
   deletedAt?: string;
 }
 
@@ -228,30 +364,42 @@ export interface Rule {
 // ---------------------------------------------------------------------------
 
 export interface Settings {
-  /** Début de l'année budgétaire (mois 1-12, jour 1-31). */
-  budgetYearStart: { month: number; day: number };
   /** Coussin minimum à laisser en non affecté sur le pivot. */
   pivotCushion: Cents;
+  /** En dessous de ce montant, un écart de placement (D20) est « à surveiller » plutôt qu'« à faire ». */
+  transferThreshold: Cents;
   /** Identifiant de cet appareil (pour l'horloge logique et le journal). */
   siteId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  budgetYearStart: { month: 1, day: 1 },
   pivotCushion: 0,
+  transferThreshold: 1000,
   siteId: 'local',
 };
 
 /** L'ensemble des données d'un foyer, tel que chargé en mémoire. */
+/** Un appareil connu du foyer (synchronisé) : identifiant = `siteId`. */
+export interface Device {
+  id: Id;
+  name: string;
+  /** Prénom ou nom de la personne qui utilise l'appareil. */
+  user?: string;
+  lastSeen?: string;
+  deletedAt?: string;
+}
+
 export interface Ledger {
   accounts: Account[];
   envelopes: Envelope[];
+  needs: Need[];
   categories: Category[];
   plannedFlows: PlannedFlow[];
   operations: Operation[];
   allocations: Allocation[];
   rules: Rule[];
   importProfiles: ImportProfile[];
+  devices: Device[];
   settings: Settings;
 }
 
@@ -259,12 +407,14 @@ export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
   return {
     accounts: [],
     envelopes: [],
+    needs: [],
     categories: [],
     plannedFlows: [],
     operations: [],
     allocations: [],
     rules: [],
     importProfiles: [],
+    devices: [],
     settings: { ...DEFAULT_SETTINGS, ...settings },
   };
 }

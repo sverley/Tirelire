@@ -57,6 +57,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .topbar .brand img { width: 26px; height: 26px; }
 .topbar .spacer { flex: 1; }
 .topbar input[type='date'] { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.topbar .back { border: 0; background: none; color: inherit; font: inherit; font-size: 22px; line-height: 1; cursor: pointer; padding: 4px 6px 4px 0; margin: -4px 0; }
 
 main { max-width: 860px; margin: 0 auto; padding: 16px; }
 

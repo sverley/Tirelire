@@ -2,7 +2,7 @@
  * Import de relevés : profil (colonnes, formats), lecture des lignes,
  * clés déterministes, déduplication exacte et doublons probables.
  */
-import type { Cents, Id, ISODate, Ledger, Operation } from './model.js';
+import type { Account, Cents, Id, ISODate, Ledger, Operation } from './model.js';
 import { alive } from './model.js';
 import { normalizeLabel, operationKey } from './ids.js';
 import { parseCents } from './money.js';
@@ -135,6 +135,34 @@ export function newProfileFromRows(id: Id, name: string, rows: string[][]): Impo
     debitPositive: true,
     accountMap: {},
   };
+}
+
+// ---------------------------------------------------------------------------
+// Correspondance des comptes par numéro
+// ---------------------------------------------------------------------------
+
+/** Normalise un numéro de compte ou IBAN pour comparaison : espaces et ponctuation retirés, casse uniforme. */
+export function normalizeAccountNumber(s: string): string {
+  return s.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+}
+
+/**
+ * Retrouve, parmi les comptes qui ont un numéro mémorisé (`Account.accountNumber`), celui qui
+ * correspond à cette valeur de la colonne compte d'un fichier importé : égalité une fois
+ * normalisé, ou l'un des deux se termine par l'autre (certains exports ne donnent que les
+ * derniers chiffres). Sert à proposer une correspondance automatique dès la lecture du fichier,
+ * y compris avec un nouveau profil d'import.
+ */
+export function matchAccountByNumber(accounts: Account[], raw: string): Account | undefined {
+  const norm = normalizeAccountNumber(raw);
+  if (norm.length < 4) return undefined; // trop court pour être fiable
+  for (const a of accounts) {
+    if (!a.accountNumber) continue;
+    const an = normalizeAccountNumber(a.accountNumber);
+    if (an.length < 4) continue;
+    if (an === norm || an.endsWith(norm) || norm.endsWith(an)) return a;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +313,7 @@ export function prepareImport(ledger: Ledger, parsed: ParsedRow[], profile: Impo
       ...(row.fullLabel ? { details: row.fullLabel } : {}),
       normalizedLabel: normalized,
       amount: row.amount,
-      status: 'pending',
+      state: 'untreated',
       rank,
       ...(row.suggestedCategory ? { suggestedCategory: row.suggestedCategory } : {}),
     };

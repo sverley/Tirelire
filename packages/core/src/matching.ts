@@ -1,24 +1,28 @@
 /**
- * Rapprochement : virements internes, pointage des flux prévus, virements vers
+ * Après import : virements internes, rapprochement de flux prévus, virements vers
  * les enveloppes (par libellé), règles de catégorisation, flux attendus non reçus.
  *
  * Toutes les fonctions sont pures : elles reçoivent le grand livre et rendent
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
  */
-import type { Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow, Rule } from './model.js';
-import { alive } from './model.js';
+import type { Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
+import { alive, isLocked } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
-import { transferLabel } from './plan.js';
-import { uuidv7 } from './ids.js';
+import { fundByPriority, transferLabel } from './plan.js';
+import { envelopeComponents, indexLedger, periodSnapshot } from './balances.js';
+import { uuidv7, normalizeLabel } from './ids.js';
+import { applyRules } from './rules.js';
 
 export interface Patch {
   operations: Operation[];
   allocations: Allocation[];
+  /** Lignes de ventilation à supprimer (une édition manuelle peut en retirer, D27). */
+  removedAllocations?: Id[];
 }
 
 export function emptyPatch(): Patch {
-  return { operations: [], allocations: [] };
+  return { operations: [], allocations: [], removedAllocations: [] };
 }
 
 function allocationsOf(ledger: Ledger, opId: Id): Allocation[] {
@@ -35,7 +39,7 @@ function allocationsOf(ledger: Ledger, opId: Id): Allocation[] {
  */
 export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
   const patch = emptyPatch();
-  const pending = alive(ledger.operations).filter((o) => o.status === 'pending' && !o.transferOperationId);
+  const pending = alive(ledger.operations).filter((o) => !isLocked(o) && !o.transferAccountId && !o.transferOperationId);
   const used = new Set<Id>();
   const debits = pending.filter((o) => o.amount < 0).sort((a, b) => (a.date < b.date ? -1 : 1));
   const credits = pending.filter((o) => o.amount > 0);
@@ -54,42 +58,85 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
     used.add(d.id);
     used.add(best.id);
     patch.operations.push(
-      { ...d, status: 'transfer', transferAccountId: best.accountId, transferOperationId: best.id },
-      { ...best, status: 'transfer', transferAccountId: d.accountId, transferOperationId: d.id },
+      { ...d, state: 'reconciled', transferAccountId: best.accountId, transferOperationId: best.id },
+      { ...best, state: 'reconciled', transferAccountId: d.accountId, transferOperationId: d.id },
     );
   }
   return patch;
 }
 
 // ---------------------------------------------------------------------------
-// Virements vers les enveloppes, reconnus par leur libellé « TIRELIRE … »
+// Virements vers un compte, reconnus par leur libellé « TIRELIRE <COMPTE> » (D21)
 // ---------------------------------------------------------------------------
 
 /**
- * Une opération dont le libellé contient le libellé de virement d'une enveloppe
- * hébergée sur un autre compte est un virement interne vers ce compte,
- * ventilé sur cette enveloppe.
+ * Répartit un virement constaté du pivot vers `accountId` entre les enveloppes placées sur ce
+ * compte, par l'ordre de financement de D06 : les planchers (rattrapages d'échéances) d'abord,
+ * puis les écarts de placement par priorité ; le reste, s'il y en a, va à la première enveloppe.
+ * Rend, par enveloppe, la part (positive) à ventiler.
+ */
+export function distributeTransfer(ledger: Ledger, accountId: Id, amount: Cents, asOf: ISODate): Array<{ envelopeId: Id; amount: Cents }> {
+  const idx = indexLedger(ledger);
+  const pivot = idx.pivot;
+  const lines: Array<{ envelopeId: Id; name: string; priority: number; dueDate: string; floor: Cents; requested: Cents; funded: Cents }> = [];
+  for (const e of idx.envelopesById.values()) {
+    if (e.placementAccountId !== accountId) continue;
+    const comps = envelopeComponents(e, idx, asOf);
+    const gap = pivot ? (comps.get(pivot.id) ?? 0) : 0;
+    if (gap <= 0) continue;
+    const snap = periodSnapshot(e, idx, asOf);
+    const floor = Math.min(gap, snap?.needs.reduce((s, n) => s + n.floor, 0) ?? 0);
+    const priority = Math.min(...(idx.needsByEnvelope.get(e.id) ?? []).map((n) => n.priority), 1000);
+    const dueDate = (snap?.needs.map((n) => n.dueDate).filter((d): d is string => !!d).sort()[0]) ?? '9999-12-31';
+    lines.push({ envelopeId: e.id, name: e.name, priority, dueDate, floor, requested: gap, funded: 0 });
+  }
+  // À priorité égale, l'échéance la plus proche d'abord.
+  lines.sort((a, b) => a.priority - b.priority || a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, 'fr'));
+  const rest = fundByPriority(lines, Math.abs(amount));
+  const out = lines.filter((l) => l.funded > 0).map((l) => ({ envelopeId: l.envelopeId, amount: l.funded }));
+  if (rest > 0) {
+    if (out.length > 0) out[0]!.amount += rest;
+    else if (lines.length > 0) out.push({ envelopeId: lines[0]!.envelopeId, amount: rest });
+  }
+  return out;
+}
+
+/**
+ * Une opération importée dont le libellé contient le libellé de virement d'un autre compte suivi
+ * est un virement interne vers ce compte ; son montant est ventilé sur les enveloppes qui y sont
+ * placées (`distributeTransfer`). Sans enveloppe placée là, le virement est reconnu sans ventilation.
  */
 export function matchEnvelopeTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
-  const envelopes = alive(ledger.envelopes);
-  const labels = envelopes.map((e) => ({ e, label: transferLabel(e.name).replace(/^TIRELIRE /, '') }));
+  const accounts = alive(ledger.accounts).map((a) => ({ a, label: transferLabel(a.name).replace(/^TIRELIRE /, '') }));
+  const transferCategory = alive(ledger.categories).find((c) => /^virement/i.test(c.name));
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
-    if (op.status !== 'pending' && !(op.status === 'transfer' && allocationsOf(ledger, op.id).length === 0)) continue;
+    if (isLocked(op)) continue;
+    if (op.transferAccountId && allocationsOf(ledger, op.id).length > 0) continue;
     if (!/TIRELIRE/.test(op.normalizedLabel)) continue;
-    const hit = labels
-      .filter(({ e, label }) => e.accountId !== op.accountId && op.normalizedLabel.includes(label))
+    const hit = accounts
+      .filter(({ a, label }) => a.id !== op.accountId && label.length > 0 && op.normalizedLabel.includes(label))
       .sort((a, b) => b.label.length - a.label.length)[0];
     if (!hit) continue;
-    patch.operations.push({ ...op, status: 'transfer', transferAccountId: op.transferAccountId ?? hit.e.accountId });
-    patch.allocations.push({ id: uuidv7(), operationId: op.id, envelopeId: hit.e.id, amount: op.amount });
+    const target = op.transferAccountId ?? hit.a.id;
+    patch.operations.push({ ...op, state: 'reconciled', transferAccountId: target });
+    if (op.amount >= 0) continue;
+    for (const part of distributeTransfer(ledger, target, op.amount, op.date)) {
+      patch.allocations.push({
+        id: uuidv7(),
+        operationId: op.id,
+        envelopeId: part.envelopeId,
+        share: { kind: 'fixed', amount: -part.amount },
+        ...(transferCategory ? { categoryId: transferCategory.id } : {}),
+      });
+    }
   }
   return patch;
 }
 
 // ---------------------------------------------------------------------------
-// Pointage des flux prévus
+// Rapprochement de flux prévus
 // ---------------------------------------------------------------------------
 
 export interface MatchProposal {
@@ -121,8 +168,8 @@ function amountWithinTolerance(flow: PlannedFlow, amount: Cents): { ok: boolean;
  */
 export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): MatchProposal[] {
   const flows = alive(ledger.plannedFlows);
-  const ops = alive(ledger.operations).filter((o) => o.status === 'pending' && o.date >= from && o.date <= to);
-  const taken = new Set<string>(); // flowId|date déjà pointés
+  const ops = alive(ledger.operations).filter((o) => !isLocked(o) && !o.plannedFlowId && o.date >= from && o.date <= to);
+  const taken = new Set<string>(); // flowId|date déjà rapprochés
   for (const o of alive(ledger.operations)) {
     if (o.plannedFlowId) {
       const f = flows.find((x) => x.id === o.plannedFlowId);
@@ -180,65 +227,47 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   const op = alive(ledger.operations).find((o) => o.id === m.operationId);
   const f = alive(ledger.plannedFlows).find((x) => x.id === m.flowId);
   if (!op || !f) return patch;
-  const next: Operation = { ...op, status: f.kind === 'transfer' ? 'transfer' : 'matched', plannedFlowId: f.id };
+  // Le rapprochement de flux ne verrouille pas à lui seul (D22) : il rend l'opération rapprochée.
+  const next: Operation = { ...op, state: isLocked(op) ? 'locked' : 'reconciled', plannedFlowId: f.id };
   if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
   patch.operations.push(next);
   const existing = allocationsOf(ledger, op.id);
+  // Virement permanent (D21) : la ventilation prévue vaut si le montant est celui qu'on attendait ;
+  // sinon on rejoue l'ordre de financement, planchers d'abord, sur le montant réellement viré.
+  if (f.kind === 'transfer' && f.plannedAllocation?.length && existing.length === 0) {
+    const target = f.counterpartAccountId ?? op.transferAccountId;
+    const exact = op.amount === f.amount;
+    const category = f.categoryId;
+    const lines = exact
+      ? f.plannedAllocation.map((l) => ({ envelopeId: l.envelopeId, share: l.share }))
+      : target
+        ? distributeTransfer(ledger, target, op.amount, op.date).map((part) => ({
+            envelopeId: part.envelopeId,
+            share: { kind: 'fixed' as const, amount: op.amount < 0 ? -part.amount : part.amount },
+          }))
+        : [];
+    for (const line of lines) {
+      patch.allocations.push({
+        id: uuidv7(),
+        operationId: op.id,
+        envelopeId: line.envelopeId,
+        share: line.share,
+        ...(category ? { categoryId: category } : {}),
+      });
+    }
+    return patch;
+  }
   if (existing.length === 0 && (f.categoryId || f.envelopeId)) {
     patch.allocations.push({
       id: uuidv7(),
       operationId: op.id,
-      amount: op.amount,
+      // Part variable : la ventilation d'un flux à montant variable reste rejouable (D27).
+      share: { kind: 'variable' },
       ...(f.categoryId ? { categoryId: f.categoryId } : {}),
       ...(f.envelopeId ? { envelopeId: f.envelopeId } : {}),
     });
   }
   return patch;
-}
-
-// ---------------------------------------------------------------------------
-// Règles de catégorisation
-// ---------------------------------------------------------------------------
-
-export function ruleMatches(rule: Rule, op: Operation): boolean {
-  try {
-    const re = new RegExp(rule.pattern, 'i');
-    return re.test(op.label) || re.test(op.normalizedLabel) || (!!op.details && re.test(op.details));
-  } catch {
-    return false;
-  }
-}
-
-/** Applique la première règle (par priorité) qui matche à chaque opération en attente non ventilée. */
-export function applyRules(ledger: Ledger): Patch {
-  const patch = emptyPatch();
-  const rules = alive(ledger.rules).sort((a, b) => a.priority - b.priority);
-  if (rules.length === 0) return patch;
-  const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
-  for (const op of alive(ledger.operations)) {
-    if (op.status !== 'pending') continue;
-    if (allocationsOf(ledger, op.id).length > 0) continue;
-    const rule = rules.find((r) => ruleMatches(r, op));
-    if (!rule) continue;
-    const envelopeId = rule.envelopeId ?? (rule.categoryId ? categories.get(rule.categoryId)?.envelopeId : undefined);
-    patch.operations.push({ ...op, status: 'categorized' });
-    patch.allocations.push({
-      id: uuidv7(),
-      operationId: op.id,
-      amount: op.amount,
-      ...(rule.categoryId ? { categoryId: rule.categoryId } : {}),
-      ...(envelopeId ? { envelopeId } : {}),
-    });
-  }
-  return patch;
-}
-
-/** Propose un motif de règle à partir d'un libellé : les premiers mots significatifs. */
-export function suggestPattern(op: Operation): string {
-  const words = op.normalizedLabel.split(' ').filter((w) => w.length > 2 && !/^\d+$/.test(w));
-  const skip = new Set(['CARTE', 'PRELEVEMENT', 'EUROPEEN', 'VIR', 'VIREMENT', 'RECU', 'EMIS', 'PERM', 'INST', 'SEPA', 'DE', 'DE:']);
-  const kept = words.filter((w) => !skip.has(w)).slice(0, 2);
-  return (kept.length ? kept : words.slice(0, 2)).join('.*');
 }
 
 // ---------------------------------------------------------------------------
@@ -250,11 +279,11 @@ export interface MissingFlow {
   name: string;
   expectedDate: ISODate;
   amount: Cents;
-  /** Fin de la fenêtre de pointage. */
+  /** Fin de la fenêtre de rapprochement. */
   windowEnd: ISODate;
 }
 
-/** Occurrences de flux dont la fenêtre est passée sans opération pointée. */
+/** Occurrences de flux dont la fenêtre est passée sans opération rapprochée. */
 export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): MissingFlow[] {
   const out: MissingFlow[] = [];
   const matched = new Set<string>();
@@ -328,5 +357,6 @@ export function applyPatchToLedger(ledger: Ledger, patch: Patch): Ledger {
   for (const o of patch.operations) ops.set(o.id, o);
   const allocs = new Map(ledger.allocations.map((a) => [a.id, a]));
   for (const a of patch.allocations) allocs.set(a.id, a);
+  for (const id of patch.removedAllocations ?? []) allocs.delete(id);
   return { ...ledger, operations: [...ops.values()], allocations: [...allocs.values()] };
 }

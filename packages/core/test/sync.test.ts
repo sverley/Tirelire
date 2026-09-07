@@ -8,6 +8,7 @@ async function seeded(site: string) {
   const l = exampleLedger();
   for (const a of l.accounts) s.upsert('accounts', a);
   for (const e of l.envelopes) s.upsert('envelopes', e);
+  for (const n of l.needs) s.upsert('needs', n);
   for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
   return s;
 }
@@ -26,15 +27,15 @@ describe('synchronisation', () => {
     expect(knownPeers(a).map((p) => p.site)).toEqual(['B']);
 
     // Modification de chaque côté, second échange : seul le delta circule.
-    const env = b.load().envelopes.find((e) => e.id === 'env-tf')!;
-    b.upsert('envelopes', { ...env, target: euros(1300) });
+    const need = b.load().needs.find((n) => n.id === 'need-tf')!;
+    b.upsert('needs', { ...need, amount: euros(1300) });
     const acc = a.load().accounts.find((x) => x.id === 'acc-pivot')!;
     a.upsert('accounts', { ...acc, name: 'Compte joint' });
     const [t2a, t2b] = memoryTransportPair();
     const [r2a, r2b] = await Promise.all([runSync(a, t2a), runSync(b, t2b)]);
     expect(r2a.sent).toBe(1);
     expect(r2b.sent).toBe(1);
-    expect(a.load().envelopes.find((e) => e.id === 'env-tf')!.target).toBe(euros(1300));
+    expect(a.load().needs.find((n) => n.id === 'need-tf')!.amount).toBe(euros(1300));
     expect(b.load().accounts.find((x) => x.id === 'acc-pivot')!.name).toBe('Compte joint');
   });
 

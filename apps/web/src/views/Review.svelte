@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, budgetYearContaining, type CategoryReview, type Rule } from '@tirelire/core';
+  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, needCruise, rulesByRank, ruleLabel, type CategoryReview, type Rule } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -10,21 +10,31 @@
   const periods = $derived(lastPeriods(app.ledger, app.asOf, horizon));
   const rows = $derived(reviewCategories(app.ledger, periods).filter((r) => showIncome || r.nature === 'expense'));
   const provisions = $derived(reviewProvisions(app.ledger, addMonths(app.asOf, -24), app.asOf));
-  const rules = $derived(alive(app.ledger.rules).sort((a, b) => a.priority - b.priority));
+  const rules = $derived(rulesByRank(app.ledger));
   const categories = $derived(alive(app.ledger.categories));
   const envelopes = $derived(alive(app.ledger.envelopes));
-  const year = $derived(budgetYearContaining(app.asOf, app.ledger.settings.budgetYearStart.month, app.ledger.settings.budgetYearStart.day));
   const hasOps = $derived(app.ledger.operations.some((o) => !o.deletedAt));
 
   const keyOf = (r: CategoryReview) => `${r.categoryId ?? ''}|${r.envelopeId ?? ''}`;
 
+  /**
+   * Adopter une cible : la suggestion porte sur la dotation par période, donc sur les besoins
+   * récurrents de l'enveloppe (D28). S'il y en a plusieurs, on ajuste celui qui pèse le plus.
+   */
   function adopt(r: CategoryReview) {
     if (!r.envelopeId || r.suggestion === undefined) return;
     const e = envelopes.find((x) => x.id === r.envelopeId);
     if (!e) return;
-    const n = e.periodicity?.intervalMonths ?? 1;
-    if (!confirm(`Passer le budget « ${e.name} » à ${money(r.suggestion)} par période ?`)) return;
-    app.upsert('envelopes', { ...e, target: r.suggestion * n });
+    const recurring = alive(app.ledger.needs)
+      .filter((n) => n.envelopeId === e.id && n.kind === 'recurring')
+      .sort((a, b) => needCruise(b) - needCruise(a));
+    const need = recurring[0];
+    if (!need) return;
+    const others = recurring.slice(1).reduce((s, n) => s + needCruise(n), 0);
+    const interval = need.periodicity?.intervalMonths ?? 1;
+    const amount = Math.max(0, r.suggestion - others) * interval;
+    if (!confirm(`Passer « ${need.name ?? e.name} » à ${money(amount)} ${interval === 1 ? 'par période' : `tous les ${interval} mois`} ?`)) return;
+    app.upsert('needs', { ...need, amount });
   }
 
   function gap(r: CategoryReview): number | undefined {
@@ -33,14 +43,21 @@
   }
 
   function removeRule(rule: Rule) {
-    if (confirm(`Supprimer la règle « ${rule.pattern} » ?`)) app.remove('rules', rule.id);
+    if (confirm(`Supprimer la règle « ${ruleLabel(rule)} » ?`)) app.remove('rules', rule.id);
+  }
+
+  /** Ce que la règle pose, en clair. */
+  function ruleEffect(rule: Rule): string {
+    const parts = [categoryName(rule.action.categoryId), envelopeName(rule.action.envelopeId) ? `enveloppe ${envelopeName(rule.action.envelopeId)}` : undefined].filter(Boolean);
+    const state = { lock: 'verrouille', reconcile: 'rapproche', none: 'ne change pas l’état', unlock: 'déverrouille' }[rule.action.state ?? 'none'];
+    return [parts.join(' · ') || 'rien', state].join(' · ');
   }
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
   const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
 </script>
 
 <h1>Bilan</h1>
-<p class="muted small">Dépensé par période de paie et par catégorie, hors virements internes ; les dépenses ponctuelles sont exclues des moyennes. Année budgétaire {year.label} (du {shortDate(year.start)} au {shortDate(year.end)}).</p>
+<p class="muted small">Dépensé par période de paie et par catégorie, hors virements internes ; les dépenses ponctuelles sont exclues des moyennes. Une période « partielle » commence avant la première opération connue : la comparer aux autres serait trompeur.</p>
 
 <div class="actions" style="margin-top:0">
   {#each [3, 6, 12] as n}
@@ -74,7 +91,7 @@
               <thead><tr><th>Période</th><th class="n">Dépensé</th><th class="n">dont ponctuel</th><th class="n">Opérations</th></tr></thead>
               <tbody>
                 {#each [...r.periods].reverse() as p (p.key)}
-                  <tr><td>{p.label}</td><td class="n">{money(p.spent)}</td><td class="n">{p.oneOff ? money(p.oneOff) : ''}</td><td class="n">{p.count}</td></tr>
+                  <tr><td>{p.label}{#if p.partial}<span class="sub" title="historique incomplet"> · partiel</span>{/if}</td><td class="n">{money(p.spent)}</td><td class="n">{p.oneOff ? money(p.oneOff) : ''}</td><td class="n">{p.count}</td></tr>
                 {/each}
               </tbody>
             </table>
@@ -106,11 +123,14 @@
 {/if}
 
 <h2>Règles de classement</h2>
-<p class="muted small">Appliquées à l'import, dans l'ordre de priorité, aux opérations sans ventilation. On les crée depuis l'écran Opérations en classant une opération.</p>
+<p class="muted small">Rejouées à chaque import sur les opérations non verrouillées, du rang le plus élevé au rang 1 : la plus haute écrit en dernier. On les crée depuis l'écran Opérations, en classant une opération ou depuis une sélection.</p>
 <div class="card">
   {#each rules as rule (rule.id)}
     <div class="row">
-      <div class="label"><span class="num">{rule.pattern}</span><span class="sub">→ {[categoryName(rule.categoryId), envelopeName(rule.envelopeId) ? `enveloppe ${envelopeName(rule.envelopeId)}` : undefined].filter(Boolean).join(' · ') || 'rien'} · priorité {rule.priority}</span></div>
+      <div class="label">
+        <span class="num">{ruleLabel(rule)}</span>
+        <span class="sub">→ {ruleEffect(rule)}{rule.flowId ? ' · issue d’un flux' : ''}{rule.validTo ? ` · archivée le ${rule.validTo}` : ''}</span>
+      </div>
       <button class="btn small danger" onclick={() => removeRule(rule)}>×</button>
     </div>
   {:else}

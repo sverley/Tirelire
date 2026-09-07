@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
-  import { money, shortDate, centsToInput, inputToCents, ACCOUNT_KINDS, ENVELOPE_KINDS, periodicityLabel } from '../lib/format';
+  import { money, shortDate, centsToInput, inputToCents, ACCOUNT_KINDS, ROLLOVER_LABELS, periodicityLabel } from '../lib/format';
   import {
     alive,
     indexLedger,
@@ -11,7 +11,7 @@
     type AccountKind,
     type SettlementDirection,
     type Envelope,
-    type EnvelopeKind,
+    type Need,
     type PlannedFlow,
   } from '@tirelire/core';
 
@@ -35,9 +35,12 @@
   const pivot = $derived(accounts.find((a) => a.kind === 'pivot'));
   const others = $derived(accounts.filter((a) => a.kind !== 'pivot'));
   const envelopes = $derived(alive(app.ledger.envelopes));
-  const provisionsAndBudgets = $derived(envelopes.filter((e) => e.kind !== 'goal'));
-  const provisions = $derived(envelopes.filter((e) => e.kind === 'provision'));
-  const goals = $derived(envelopes.filter((e) => e.kind === 'goal'));
+  const needs = $derived(alive(app.ledger.needs));
+  const needsOf = (e: Envelope) => needs.filter((n) => n.envelopeId === e.id);
+  const budgetEnvelopes = $derived(envelopes.filter((e) => needsOf(e).some((n) => n.kind !== 'goal')));
+  const budgetNeeds = $derived(needs.filter((n) => n.kind !== 'goal'));
+  const goalNeeds = $derived(needs.filter((n) => n.kind === 'goal'));
+  const envelopeName = (id: string) => envelopes.find((e) => e.id === id)?.name ?? '?';
   const flows = $derived(alive(app.ledger.plannedFlows));
   const incomeFlows = $derived(flows.filter((f) => f.kind === 'income'));
   const chargeFlows = $derived(flows.filter((f) => f.kind === 'fixedCharge' || f.kind === 'dueDate'));
@@ -53,9 +56,6 @@
   }
   function prev() {
     if (stepIndex > 0) step = STEPS[stepIndex - 1]!.id;
-  }
-  function defaultHost(): string {
-    return others.find((a) => a.kind === 'holding')?.id ?? pivot?.id ?? '';
   }
 
   // --- Pivot ---
@@ -119,83 +119,109 @@
     if (confirm(`Supprimer le compte « ${a.name} » ?`)) app.remove('accounts', a.id);
   }
 
-  // --- Enveloppes (provisions et budgets) ---
-  let envForm = $state({ name: '', kind: 'provision' as EnvelopeKind, accountId: '', openingBalance: '0,00', openingDate: app.asOf, target: '', intervalMonths: '12', anchorDate: app.asOf, rollover: 'none' as 'none' | 'unlimited' | 'capped', rolloverMonths: '3' });
+  // --- Enveloppes : un pot avec un besoin récurrent ou à échéance ---
+  let envForm = $state({
+    name: '',
+    placementAccountId: '',
+    openingBalance: '0,00',
+    openingDate: app.asOf,
+    rollover: 'unlimited' as 'none' | 'unlimited' | 'capped',
+    rolloverMonths: '3',
+    needKind: 'recurring' as 'recurring' | 'dueDate',
+    amount: '',
+    intervalMonths: '1',
+    anchorDate: app.asOf,
+  });
   let envEditing = $state(false);
   let envError = $state('');
 
   function startEnvNew() {
-    envForm = { name: '', kind: 'provision', accountId: defaultHost(), openingBalance: '0,00', openingDate: app.asOf, target: '', intervalMonths: '12', anchorDate: app.asOf, rollover: 'none', rolloverMonths: '3' };
+    envForm = { name: '', placementAccountId: pivot?.id ?? '', openingBalance: '0,00', openingDate: app.asOf, rollover: 'unlimited', rolloverMonths: '3', needKind: 'recurring', amount: '', intervalMonths: '1', anchorDate: app.asOf };
     envEditing = true;
     envError = '';
   }
-  function onEnvKindChange() {
-    envForm.intervalMonths = envForm.kind === 'budget' ? '1' : '12';
+  function onEnvNeedKindChange() {
+    envForm.intervalMonths = envForm.needKind === 'dueDate' ? '12' : '1';
   }
   function saveEnv(e: Event) {
     e.preventDefault();
     if (!envForm.name.trim()) return void (envError = 'Le nom est obligatoire.');
-    if (!envForm.accountId) return void (envError = 'Choisis le compte qui héberge l’enveloppe.');
+    if (!envForm.placementAccountId) return void (envError = 'Choisis le compte où cet argent devrait dormir.');
     const openingBalance = inputToCents(envForm.openingBalance);
     if (openingBalance === undefined) return void (envError = 'Solde initial invalide.');
-    const target = inputToCents(envForm.target);
-    if (target === undefined) return void (envError = envForm.kind === 'provision' ? 'Montant de l’échéance invalide.' : 'Montant du budget invalide.');
+    const amount = inputToCents(envForm.amount);
+    if (amount === undefined) return void (envError = envForm.needKind === 'dueDate' ? 'Montant de l’échéance invalide.' : 'Montant par période invalide.');
+    const envelopeId = app.newId();
     const interval = Math.max(1, Number(envForm.intervalMonths) || 1);
-    const row: Envelope = {
-      id: app.newId(),
+    const envelope: Envelope = {
+      id: envelopeId,
       name: envForm.name.trim(),
-      kind: envForm.kind,
-      accountId: envForm.accountId,
+      placementAccountId: envForm.placementAccountId,
       openingBalance,
       openingDate: envForm.openingDate,
-      target,
-      periodicity: { intervalMonths: interval, anchorDate: envForm.anchorDate },
-      priority: DEFAULT_PRIORITY[envForm.kind],
-      ...(envForm.kind === 'budget' ? { rollover: envForm.rollover === 'capped' ? { mode: 'capped' as const, months: Math.max(1, Number(envForm.rolloverMonths) || 1) } : { mode: envForm.rollover } } : {}),
+      rollover: envForm.rollover === 'capped' ? { mode: 'capped', months: Math.max(1, Number(envForm.rolloverMonths) || 1) } : { mode: envForm.rollover },
     };
-    app.upsert('envelopes', row);
+    const need: Need = {
+      id: app.newId(),
+      envelopeId,
+      kind: envForm.needKind,
+      amount,
+      periodicity: { intervalMonths: interval, anchorDate: envForm.anchorDate },
+      priority: DEFAULT_PRIORITY[envForm.needKind],
+    };
+    app.upsert('envelopes', envelope);
+    app.upsert('needs', need);
     envEditing = false;
   }
-  function removeEnvelope(en: Envelope) {
-    if (confirm(`Supprimer l’enveloppe « ${en.name} » ?`)) app.remove('envelopes', en.id);
+  function removeEnvelopeWithNeeds(e: Envelope) {
+    if (!confirm(`Supprimer l’enveloppe « ${e.name} » et ses besoins ?`)) return;
+    for (const n of needsOf(e)) app.remove('needs', n.id);
+    app.remove('envelopes', e.id);
   }
-  function describeEnv(e: Envelope): string {
-    if (e.kind === 'provision') return `${money(e.target ?? 0)} ${periodicityLabel(e.periodicity)}`;
-    const per = e.periodicity?.intervalMonths === 12 ? 'par an' : e.periodicity && e.periodicity.intervalMonths > 1 ? `tous les ${e.periodicity.intervalMonths} mois` : 'par mois';
-    return `${money(e.target ?? 0)} ${per}`;
+  function describeNeed(n: Need): string {
+    if (n.kind === 'dueDate') return `${money(n.amount ?? 0)} ${periodicityLabel(n.periodicity)}`;
+    const per = n.periodicity?.intervalMonths === 12 ? 'par an' : n.periodicity && n.periodicity.intervalMonths > 1 ? `tous les ${n.periodicity.intervalMonths} mois` : 'par période';
+    return `${money(n.amount ?? 0)} ${per}`;
   }
 
-  // --- Objectifs d'épargne (enveloppes de type goal) ---
-  let goalForm = $state({ name: '', accountId: '', openingBalance: '0,00', openingDate: app.asOf, monthlyAmount: '', target: '' });
+  // --- Objectifs d'épargne : un pot dédié avec un besoin objectif (D28) ---
+  let goalForm = $state({ name: '', placementAccountId: '', openingBalance: '0,00', openingDate: app.asOf, monthlyAmount: '', target: '' });
   let goalEditing = $state(false);
   let goalError = $state('');
 
   function startGoalNew() {
-    goalForm = { name: '', accountId: defaultHost(), openingBalance: '0,00', openingDate: app.asOf, monthlyAmount: '', target: '' };
+    goalForm = { name: '', placementAccountId: pivot?.id ?? '', openingBalance: '0,00', openingDate: app.asOf, monthlyAmount: '', target: '' };
     goalEditing = true;
     goalError = '';
   }
   function saveGoal(e: Event) {
     e.preventDefault();
     if (!goalForm.name.trim()) return void (goalError = 'Le nom est obligatoire.');
-    if (!goalForm.accountId) return void (goalError = 'Choisis le compte qui héberge l’objectif.');
+    if (!goalForm.placementAccountId) return void (goalError = 'Choisis le compte où cet argent devrait dormir.');
     const openingBalance = inputToCents(goalForm.openingBalance);
     if (openingBalance === undefined) return void (goalError = 'Solde initial invalide.');
     const monthly = inputToCents(goalForm.monthlyAmount);
     if (monthly === undefined) return void (goalError = 'Mensualité invalide.');
     const target = inputToCents(goalForm.target);
-    const row: Envelope = {
-      id: app.newId(),
+    const envelopeId = app.newId();
+    const envelope: Envelope = {
+      id: envelopeId,
       name: goalForm.name.trim(),
-      kind: 'goal',
-      accountId: goalForm.accountId,
+      placementAccountId: goalForm.placementAccountId,
       openingBalance,
       openingDate: goalForm.openingDate,
+      rollover: { mode: 'unlimited' },
+    };
+    const need: Need = {
+      id: app.newId(),
+      envelopeId,
+      kind: 'goal',
       monthlyAmount: monthly,
       priority: DEFAULT_PRIORITY.goal,
-      ...(target !== undefined ? { target } : {}),
+      ...(target !== undefined ? { amount: target } : {}),
     };
-    app.upsert('envelopes', row);
+    app.upsert('envelopes', envelope);
+    app.upsert('needs', need);
     goalEditing = false;
   }
 
@@ -245,7 +271,7 @@
     const abs = inputToCents(chgForm.amount);
     if (abs === undefined || abs < 0) return void (chgError = 'Montant invalide (saisis-le en positif).');
     if (!chgForm.accountId) return void (chgError = 'Choisis le compte.');
-    if (chgForm.kind === 'dueDate' && !chgForm.envelopeId) return void (chgError = 'Choisis la provision qui paie l’échéance.');
+    if (chgForm.kind === 'dueDate' && !chgForm.envelopeId) return void (chgError = 'Choisis l’enveloppe qui paie l’échéance.');
     const row: PlannedFlow = {
       id: app.newId(),
       name: chgForm.name.trim(),
@@ -265,14 +291,14 @@
   }
 
   function exitToPlan() {
-    app.view = 'plan';
+    app.switchTab('plan');
   }
   function exitToMore() {
-    app.view = 'more';
+    app.switchTab('more');
   }
 </script>
 
-<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Assistant de configuration</h1>
 <p class="muted small">Construis ton budget étape par étape : compte pivot, enveloppes, objectifs d'épargne, revenus, charges. Tout reste modifiable ensuite depuis Configuration.</p>
 
@@ -285,7 +311,7 @@
 {#if step === 'intro'}
   <div class="card accent">
     <h2 style="margin-top:0">Construire ton budget</h2>
-    <p>Six étapes : le compte pivot (obligatoire), des comptes complémentaires si besoin, tes enveloppes (provisions et budgets), tes objectifs d'épargne, tes revenus, puis tes charges fixes et échéances. Seule la première est obligatoire ; les autres se complètent au fil de l'eau.</p>
+    <p>Six étapes : le compte pivot (obligatoire), des comptes complémentaires si besoin, tes enveloppes (un pot avec un besoin récurrent ou à échéance), tes objectifs d'épargne, tes revenus, puis tes charges fixes et échéances. Seule la première est obligatoire ; les autres se complètent au fil de l'eau.</p>
     <div class="actions" style="margin-bottom:0">
       <button class="btn primary" onclick={next}>Commencer</button>
     </div>
@@ -365,55 +391,56 @@
     <div class="actions"><button class="btn" onclick={startAccNew}>+ Ajouter un compte</button></div>
   {/if}
 {:else if step === 'envelopes'}
-  <p class="muted small">Une provision accumule pour une échéance ; un budget encadre une dépense courante, avec ou sans report.</p>
-  {#each provisionsAndBudgets as e (e.id)}
+  <p class="muted small">Une enveloppe est un pot avec un besoin : récurrent (tant par période) ou à échéance (un montant à une date). Elle déclare où son argent devrait dormir (placement voulu).</p>
+  {#each budgetEnvelopes as e (e.id)}
     {@const bal = envelopeBalance(e, idx, app.asOf)}
     <div class="card">
       <div class="row">
         <div class="label">
-          <strong>{e.name}</strong> <span class="pill">{e.kind === 'provision' ? 'provision' : 'budget'}</span>
-          <span class="sub">{describeEnv(e)}</span>
+          <strong>{e.name}</strong>
+          <span class="sub">placement : {accounts.find((a) => a.id === e.placementAccountId)?.name ?? '?'} · {ROLLOVER_LABELS[e.rollover?.mode ?? 'unlimited'].toLowerCase()}</span>
         </div>
         <div class="num {bal < 0 ? 'neg' : ''}">{money(bal)}</div>
       </div>
-      <div class="actions" style="margin:6px 0 0"><button class="btn small danger" onclick={() => removeEnvelope(e)}>Supprimer</button></div>
+      {#each needsOf(e).filter((n) => n.kind !== 'goal') as n (n.id)}
+        <div class="row" style="padding-left:8px"><div class="label"><span class="pill">{n.kind === 'dueDate' ? 'échéance' : 'courant'}</span> {describeNeed(n)}</div></div>
+      {/each}
+      <div class="actions" style="margin:6px 0 0"><button class="btn small danger" onclick={() => removeEnvelopeWithNeeds(e)}>Supprimer</button></div>
     </div>
   {/each}
   {#if envEditing}
     <form class="edit" onsubmit={saveEnv}>
       <div class="grid">
         <label class="f">Nom <input bind:value={envForm.name} placeholder="Taxe foncière" /></label>
-        <label class="f">Type
-          <select bind:value={envForm.kind} onchange={onEnvKindChange}>
-            <option value="provision">{ENVELOPE_KINDS.provision}</option>
-            <option value="budget">{ENVELOPE_KINDS.budget}</option>
+        <label class="f">Besoin
+          <select bind:value={envForm.needKind} onchange={onEnvNeedKindChange}>
+            <option value="recurring">Récurrent (tant par période)</option>
+            <option value="dueDate">Échéance (montant à une date)</option>
           </select>
         </label>
-        <label class="f">Compte hôte
-          <select bind:value={envForm.accountId}>
+        <label class="f">Placement voulu
+          <select bind:value={envForm.placementAccountId}>
             {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
           </select>
         </label>
         <label class="f">Solde initial <input bind:value={envForm.openingBalance} inputmode="decimal" /></label>
         <label class="f">Date du solde initial <input type="date" bind:value={envForm.openingDate} /></label>
-        {#if envForm.kind === 'provision'}
-          <label class="f">Montant de l'échéance <input bind:value={envForm.target} inputmode="decimal" placeholder="1 200,00" /></label>
+        {#if envForm.needKind === 'dueDate'}
+          <label class="f">Montant de l'échéance <input bind:value={envForm.amount} inputmode="decimal" placeholder="1 200,00" /></label>
           <label class="f">Tous les (mois) <input type="number" min="1" bind:value={envForm.intervalMonths} /></label>
           <label class="f">Première échéance <input type="date" bind:value={envForm.anchorDate} /></label>
         {:else}
-          <label class="f">Montant du budget <input bind:value={envForm.target} inputmode="decimal" placeholder="900,00" /></label>
+          <label class="f">Montant <input bind:value={envForm.amount} inputmode="decimal" placeholder="900,00" /></label>
           <label class="f">Par période de (mois) <input type="number" min="1" bind:value={envForm.intervalMonths} /></label>
           <label class="f">Depuis le <input type="date" bind:value={envForm.anchorDate} /></label>
-          <label class="f">Reliquat en fin de période
-            <select bind:value={envForm.rollover}>
-              <option value="none">Remis à zéro</option>
-              <option value="unlimited">Reporté</option>
-              <option value="capped">Reporté, plafonné</option>
-            </select>
-          </label>
-          {#if envForm.rollover === 'capped'}
-            <label class="f">Plafond (mois de dotation) <input type="number" min="1" bind:value={envForm.rolloverMonths} /></label>
-          {/if}
+        {/if}
+        <label class="f">Excédent en fin de période
+          <select bind:value={envForm.rollover}>
+            {#each Object.entries(ROLLOVER_LABELS) as [k, label]}<option value={k}>{label}</option>{/each}
+          </select>
+        </label>
+        {#if envForm.rollover === 'capped'}
+          <label class="f">Plafond (périodes de dotation) <input type="number" min="1" bind:value={envForm.rolloverMonths} /></label>
         {/if}
       </div>
       {#if envError}<div class="err">{envError}</div>{/if}
@@ -426,26 +453,23 @@
     <div class="actions"><button class="btn" onclick={startEnvNew}>+ Ajouter une enveloppe</button></div>
   {/if}
 {:else if step === 'goals'}
-  <p class="muted small">Un objectif d'épargne se nourrit d'une mensualité fixe, avec une cible facultative.</p>
-  {#each goals as g (g.id)}
-    {@const bal = envelopeBalance(g, idx, app.asOf)}
+  <p class="muted small">Un objectif d'épargne crée un pot dédié, nourri d'une mensualité fixe, avec une cible facultative.</p>
+  {#each goalNeeds as n (n.id)}
     <div class="card">
       <div class="row">
         <div class="label">
-          <strong>{g.name}</strong> <span class="pill">épargne</span>
-          <span class="sub">{money(g.monthlyAmount ?? 0)} par mois{g.target !== undefined ? ` · cible ${money(g.target)}` : ''}</span>
+          <strong>{n.name ?? envelopeName(n.envelopeId)}</strong> <span class="pill">objectif</span>
+          <span class="sub">{money(n.monthlyAmount ?? 0)} par période{n.amount !== undefined ? ` · cible ${money(n.amount)}` : ''}</span>
         </div>
-        <div class="num {bal < 0 ? 'neg' : ''}">{money(bal)}</div>
       </div>
-      <div class="actions" style="margin:6px 0 0"><button class="btn small danger" onclick={() => removeEnvelope(g)}>Supprimer</button></div>
     </div>
   {/each}
   {#if goalEditing}
     <form class="edit" onsubmit={saveGoal}>
       <div class="grid">
         <label class="f">Nom <input bind:value={goalForm.name} placeholder="Vacances" /></label>
-        <label class="f">Compte hôte
-          <select bind:value={goalForm.accountId}>
+        <label class="f">Placement voulu
+          <select bind:value={goalForm.placementAccountId}>
             {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
           </select>
         </label>
@@ -489,7 +513,7 @@
         </label>
         <label class="f">Tous les (mois) <input type="number" min="1" bind:value={incForm.intervalMonths} /></label>
         <label class="f">Première date <input type="date" bind:value={incForm.anchorDate} /></label>
-        <label class="f check"><input type="checkbox" bind:checked={incForm.variable} /> Montant variable (à confirmer au pointage)</label>
+        <label class="f check"><input type="checkbox" bind:checked={incForm.variable} /> Montant variable (rapprochement à confirmer)</label>
       </div>
       {#if incError}<div class="err">{incError}</div>{/if}
       <div class="actions" style="margin:0">
@@ -501,7 +525,7 @@
     <div class="actions"><button class="btn" onclick={startIncNew}>+ Ajouter un revenu</button></div>
   {/if}
 {:else if step === 'charges'}
-  <p class="muted small">Une charge fixe part directement du compte ; une échéance est payée par une provision qui se vide à la date prévue.</p>
+  <p class="muted small">Une charge fixe part directement du compte ; une échéance est payée par une enveloppe qui se vide à la date prévue.</p>
   {#each chargeFlows as f (f.id)}
     <div class="card">
       <div class="row">
@@ -521,7 +545,7 @@
         <label class="f">Type
           <select bind:value={chgForm.kind}>
             <option value="fixedCharge">Charge fixe</option>
-            {#if provisions.length}<option value="dueDate">Échéance payée par une provision</option>{/if}
+            <option value="dueDate">Échéance payée par une enveloppe</option>
           </select>
         </label>
         <label class="f">Montant <input bind:value={chgForm.amount} inputmode="decimal" placeholder="45,00" /></label>
@@ -531,10 +555,10 @@
           </select>
         </label>
         {#if chgForm.kind === 'dueDate'}
-          <label class="f">Provision qui paie
+          <label class="f">Enveloppe qui paie
             <select bind:value={chgForm.envelopeId}>
               <option value="">—</option>
-              {#each provisions as p}<option value={p.id}>{p.name}</option>{/each}
+              {#each envelopes as en}<option value={en.id}>{en.name}</option>{/each}
             </select>
           </label>
         {/if}
@@ -554,8 +578,9 @@
   <h2 style="margin-top:0">C'est prêt</h2>
   <div class="card">
     <div class="row"><div class="label">Comptes</div><div class="num">{accounts.length}</div></div>
-    <div class="row"><div class="label">Enveloppes (provisions et budgets)</div><div class="num">{provisionsAndBudgets.length}</div></div>
-    <div class="row"><div class="label">Objectifs d'épargne</div><div class="num">{goals.length}</div></div>
+    <div class="row"><div class="label">Enveloppes</div><div class="num">{envelopes.length}</div></div>
+    <div class="row"><div class="label">Besoins récurrents et échéances</div><div class="num">{budgetNeeds.length}</div></div>
+    <div class="row"><div class="label">Objectifs d'épargne</div><div class="num">{goalNeeds.length}</div></div>
     <div class="row"><div class="label">Revenus prévus</div><div class="num">{incomeFlows.length}</div></div>
     <div class="row"><div class="label">Charges et échéances</div><div class="num">{chargeFlows.length}</div></div>
   </div>

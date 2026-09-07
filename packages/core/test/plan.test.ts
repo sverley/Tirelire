@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  accountBalance,
   computePlan,
+  componentsOnAccount,
   envelopeBalance,
+  envelopeComponents,
   euros,
   exampleLedger,
   indexLedger,
@@ -9,25 +12,45 @@ import {
   transferLabel,
   unallocated,
   type Ledger,
+  standingTransferFlow,
+  applyMatch,
+  applyPatchToLedger,
+  type Operation,
 } from '../src/index.js';
 
 const asOf = '2026-09-06';
 
-function line(plan: ReturnType<typeof computePlan>, id: string) {
-  const l = plan.lines.find((x) => x.envelopeId === id);
-  if (!l) throw new Error(`ligne ${id} absente`);
+function line(plan: ReturnType<typeof computePlan>, needId: string) {
+  const l = plan.lines.find((x) => x.needId === needId);
+  if (!l) throw new Error(`ligne ${needId} absente`);
   return l;
 }
 
-describe('soldes', () => {
+describe('positions et soldes (D19, D29)', () => {
   const ledger = exampleLedger();
   const idx = indexLedger(ledger);
 
-  it('enveloppes : solde initial + effets', () => {
-    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, asOf)).toBe(euros(900));
-    // budget sur compte tiers : dotation +200 (virement) − 146 − 90
+  it('une enveloppe est répartie sur plusieurs comptes ; sa dotation attend sur le pivot', () => {
+    // Taxe foncière : 900 sur le livret, dotation de septembre (rattrapage 150) sur le pivot.
+    const tf = envelopeComponents(idx.envelopesById.get('env-tf')!, idx, asOf);
+    expect(tf.get('acc-livret')).toBe(euros(900));
+    expect(tf.get('acc-pivot')).toBe(euros(150));
+    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, asOf)).toBe(euros(1050));
+  });
+
+  it('un virement interne déplace une composante sans changer le solde', () => {
+    // Enfants : dotation 200 sur le pivot, virée le jour même sur la carte enfants, puis 236 dépensés là.
+    const c = envelopeComponents(idx.envelopesById.get('env-enfants')!, idx, asOf);
+    expect(c.get('acc-pivot') ?? 0).toBe(0);
+    expect(c.get('acc-enfants')).toBe(euros(-36));
     expect(envelopeBalance(idx.envelopesById.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
-    // budget sur le pivot sans report : dotation − dépensé (dentiste 80 € payé par Marie)
+  });
+
+  it('une dépense consomme l’enveloppe là où elle sort, même si l’argent dort ailleurs', () => {
+    // Santé, placée sur le pivot : dotation 100 sur le pivot, dentiste 80 payé par Marie.
+    const c = envelopeComponents(idx.envelopesById.get('env-sante')!, idx, asOf);
+    expect(c.get('acc-pivot')).toBe(euros(100));
+    expect(c.get('acc-marie')).toBe(euros(-80));
     expect(envelopeBalance(idx.envelopesById.get('env-sante')!, idx, asOf)).toBe(euros(20));
   });
 
@@ -36,16 +59,50 @@ describe('soldes', () => {
     const enfants = idx.accountsById.get('acc-enfants')!;
     // dentiste 80 payé par Marie (le pivot lui doit 80) − allocations 100 reçues chez elle
     expect(settlementBalance(marie, ledger, idx, asOf)).toBe(euros(-20));
-    // la dotation de 200 € alimente l'enveloppe hébergée là : pas une dette
+    // la dotation de 200 € alimente l'enveloppe placée là : pas une dette
     expect(settlementBalance(enfants, ledger, idx, asOf)).toBe(0);
   });
 
-  it('non affecté du pivot et du livret', () => {
+  it('second invariant : solde bancaire = composantes portées + non affecté', () => {
+    for (const a of idx.accountsById.values()) {
+      expect(componentsOnAccount(a, idx, asOf) + unallocated(a, ledger, idx, asOf)).toBe(accountBalance(a, ledger, asOf));
+    }
+    // Pivot : 2340 + 3400 − 200 (virement enfants) − dotations (150 + 50 + 200 + 300 + 900 + 200 + 250 + 200 + 100) + 200 (virement)
     const pivot = idx.accountsById.get('acc-pivot')!;
+    expect(unallocated(pivot, ledger, idx, asOf)).toBe(euros(2340 + 3400 - 200 - 2350 + 200));
     const livret = idx.accountsById.get('acc-livret')!;
-    // 2340 − 200 (virement enfants) − (900 + 200 + 250 + 20) budgets réservés
-    expect(unallocated(pivot, ledger, idx, asOf)).toBe(euros(2340 - 200 - 900 - 200 - 250 - 20));
     expect(unallocated(livret, ledger, idx, asOf)).toBe(euros(15));
+  });
+
+  it('premier invariant : le solde est la somme des composantes', () => {
+    for (const e of idx.envelopesById.values()) {
+      let sum = 0;
+      for (const v of envelopeComponents(e, idx, asOf).values()) sum += v;
+      expect(envelopeBalance(e, idx, asOf)).toBe(sum);
+    }
+  });
+});
+
+describe('report (D05, D29)', () => {
+  it('remise à zéro : l’excédent est libéré en fin de période, un déficit est effacé', () => {
+    const l = exampleLedger();
+    const idx = indexLedger(l);
+    const alim = idx.envelopesById.get('env-alim')!;
+    // Septembre : dotation 900, rien dépensé. Le 27 septembre au soir, 900 ; le 28, libération puis nouvelle dotation.
+    expect(envelopeBalance(alim, idx, '2026-09-27')).toBe(euros(900));
+    expect(envelopeBalance(alim, idx, '2026-09-28')).toBe(euros(900));
+    expect(envelopeComponents(alim, idx, '2026-09-28').get('acc-pivot')).toBe(euros(900));
+    const pivot = idx.accountsById.get('acc-pivot')!;
+    // Le pivot ne porte plus que la nouvelle dotation pour cette enveloppe (ni 1 800 ni moins).
+    expect(componentsOnAccount(pivot, idx, '2026-09-28')).toBeGreaterThan(0);
+  });
+
+  it('report illimité : le déficit d’une période se rattrape à la suivante', () => {
+    const l = exampleLedger();
+    const octobre = computePlan(l, '2026-09-28');
+    expect(line(octobre, 'need-enfants').balance).toBe(euros(-36));
+    expect(line(octobre, 'need-enfants').catchUp).toBe(euros(236));
+    expect(line(octobre, 'need-enfants').requested).toBe(euros(236));
   });
 });
 
@@ -64,8 +121,8 @@ describe('plan de période (exemple de l’analyse)', () => {
     expect(plan.fixedCharges.map((f) => f.name)).not.toContain('Taxe foncière (prélèvement)');
   });
 
-  it('provision en rattrapage : (échéance − solde) ÷ périodes restantes', () => {
-    const tf = line(plan, 'env-tf');
+  it('échéance en rattrapage : (échéance − retenu) ÷ périodes restantes', () => {
+    const tf = line(plan, 'need-tf');
     expect(tf.cruise).toBe(euros(100));
     expect(tf.dueDate).toBe('2026-10-15');
     // deux périodes de paie avant le 15 octobre (28 août et 28 septembre)
@@ -74,8 +131,8 @@ describe('plan de période (exemple de l’analyse)', () => {
     expect(tf.status).toBe('catchUp');
   });
 
-  it('provision en croisière', () => {
-    const auto = line(plan, 'env-auto');
+  it('échéance en croisière', () => {
+    const auto = line(plan, 'need-auto');
     expect(auto.cruise).toBe(euros(50));
     // sept périodes de paie avant le 5 mars : (600 − 300) ÷ 7
     expect(auto.catchUp).toBe(Math.ceil(30000 / 7));
@@ -83,71 +140,164 @@ describe('plan de période (exemple de l’analyse)', () => {
     expect(auto.status).toBe('ahead');
   });
 
-  it('épargne : mensualité fixe', () => {
-    const goal = line(plan, 'env-precaution');
-    expect(goal.requested).toBe(euros(300));
+  it('échéance entièrement provisionnée : dotation nulle', () => {
+    const l = exampleLedger();
+    l.envelopes.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
+    expect(line(computePlan(l, asOf), 'need-tf').requested).toBe(0);
   });
 
-  it('budget hébergé ailleurs en dépassement : complément', () => {
-    const enfants = line(plan, 'env-enfants');
+  it('objectif : mensualité fixe', () => {
+    expect(line(plan, 'need-precaution').requested).toBe(euros(300));
+  });
+
+  it('besoin récurrent placé ailleurs : dotation de croisière, pas virtuel', () => {
+    const enfants = line(plan, 'need-enfants');
     expect(enfants.cruise).toBe(euros(200));
-    expect(enfants.catchUp).toBe(euros(236));
+    expect(enfants.requested).toBe(euros(200));
     expect(enfants.virtual).toBe(false);
   });
 
-  it('budgets sur le pivot : réservés, pas virés', () => {
-    const alim = line(plan, 'env-alim');
+  it('besoins récurrents sur le pivot : réservés, pas virés', () => {
+    const alim = line(plan, 'need-alim');
     expect(alim.virtual).toBe(true);
     expect(alim.requested).toBe(euros(900));
   });
 
-  it('virements par compte, un ordre par enveloppe', () => {
+  it('écarts de placement (D20) : les dotations du livret attendent sur le pivot', () => {
+    const toLivret = plan.gaps.filter((g) => g.toAccountId === 'acc-livret');
+    expect(toLivret.map((g) => [g.envelopeId, g.amount])).toEqual(
+      expect.arrayContaining([
+        ['env-tf', euros(150)],
+        ['env-auto', euros(50)],
+        ['env-vac', euros(200)],
+        ['env-precaution', euros(300)],
+      ]),
+    );
+    expect(toLivret.every((g) => g.status === 'todo')).toBe(true);
+    // Le dentiste payé par Marie relève du règlement, pas d'un écart.
+    expect(plan.gaps.some((g) => g.fromAccountId === 'acc-marie')).toBe(false);
+  });
+
+  it('virements par compte : un ordre par couple de comptes, détaillé par enveloppe (D21)', () => {
     const livret = plan.transfers.find((t) => t.accountId === 'acc-livret')!;
+    expect(livret.label).toBe('TIRELIRE LIVRET A');
     expect(livret.standing).toBe(euros(100 + 50 + 200 + 300));
     expect(livret.exceptional).toBe(euros(50));
-    expect(livret.orders.map((o) => o.label)).toContain('TIRELIRE TAXE FONCIERE');
+    expect(livret.orders.map((o) => o.envelopeName)).toContain('Taxe foncière');
     expect(livret.surplus).toBe(euros(15));
     expect(livret.net).toBe(euros(650 + 50 - 15));
 
-    const enfants = plan.transfers.find((t) => t.accountId === 'acc-enfants')!;
-    expect(enfants.standing).toBe(euros(200));
-    expect(enfants.exceptional).toBe(euros(36));
-    expect(enfants.settlement).toBe(0);
+    // La carte enfants a déjà reçu sa dotation : rien à virer, rien à régler.
+    expect(plan.transfers.find((t) => t.accountId === 'acc-enfants')).toBeUndefined();
 
     const marie = plan.transfers.find((t) => t.accountId === 'acc-marie')!;
     expect(marie.settlement).toBe(euros(-20));
     expect(marie.net).toBe(euros(-20));
   });
 
-  it('marge', () => {
+  it('marge : lecture de ce que les revenus couvrent', () => {
     const funded = plan.totals.funded;
-    expect(funded).toBe(euros(150 + 50 + 200 + 300 + 900 + 200 + 250 + 236 + 100));
+    expect(plan.totals.requested).toBe(euros(150 + 50 + 200 + 300 + 900 + 200 + 250 + 200 + 100));
+    expect(funded).toBe(plan.totals.requested);
     expect(plan.totals.margin).toBe(euros(4200) - plan.totals.fixedCharges - funded);
     expect(plan.warnings.map((w) => w.code)).not.toContain('negativeMargin');
+    expect(plan.warnings.map((w) => w.code)).not.toContain('pivotOverdrawn');
   });
 });
 
-describe('marge négative : réduction par priorité', () => {
-  it('coupe les lignes les moins prioritaires, jamais le rattrapage d’une provision', () => {
+describe('marge négative : lecture par priorité (D06)', () => {
+  it('signale les lignes les moins prioritaires, jamais le rattrapage d’une échéance', () => {
     const ledger: Ledger = exampleLedger();
     const salaire = ledger.plannedFlows.find((f) => f.id === 'flow-salaire')!;
     salaire.amount = euros(1500);
     const plan = computePlan(ledger, asOf);
     expect(plan.warnings.map((w) => w.code)).toContain('negativeMargin');
-    // Le rattrapage de la taxe foncière est un plancher : toujours financé.
-    expect(line(plan, 'env-tf').funded).toBe(euros(150));
+    // Le rattrapage de la taxe foncière est un plancher : toujours couvert.
+    expect(line(plan, 'need-tf').funded).toBe(euros(150));
     // La ligne la moins prioritaire (Divers, 40) saute en premier.
-    expect(line(plan, 'env-divers').funded).toBe(0);
-    expect(line(plan, 'env-divers').status).toBe('unfunded');
+    expect(line(plan, 'need-divers').funded).toBe(0);
+    expect(line(plan, 'need-divers').status).toBe('unfunded');
     // L'épargne (30) est réduite ou coupée avant les budgets (20).
-    expect(line(plan, 'env-precaution').funded).toBeLessThan(euros(300));
+    expect(line(plan, 'need-precaution').funded).toBeLessThan(euros(300));
     expect(plan.totals.margin).toBeGreaterThanOrEqual(0);
+    // La dotation, elle, est acquise (D29) : le plan le dit par le non affecté du pivot.
+    expect(plan.totals.requested).toBe(euros(2350));
+  });
+});
+
+describe('besoins multiples dans une enveloppe (D28)', () => {
+  it('le solde est attribué dans l’ordre des priorités ; le plancher de l’échéance passe avant le courant', () => {
+    const l = exampleLedger();
+    // Une seule enveloppe « Charges » : taxe foncière (échéance, priorité 10) + courant 100/mois (priorité 20).
+    l.envelopes.push({ id: 'env-charges', name: 'Charges', placementAccountId: 'acc-livret', openingBalance: euros(500), openingDate: '2026-08-27' });
+    l.needs.push(
+      { id: 'need-charges-tf', envelopeId: 'env-charges', kind: 'dueDate', name: 'Taxe foncière', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
+      { id: 'need-charges-courant', envelopeId: 'env-charges', kind: 'recurring', name: 'Courant', amount: euros(100), priority: 20 },
+    );
+    const plan = computePlan(l, asOf);
+    const tf = line(plan, 'need-charges-tf');
+    const courant = line(plan, 'need-charges-courant');
+    expect(tf.held).toBe(euros(500));
+    expect(tf.catchUp).toBe(euros(350));
+    expect(tf.floor).toBe(euros(350));
+    expect(courant.held).toBe(0);
+    expect(courant.requested).toBe(euros(100));
+    expect(tf.name).toBe('Taxe foncière');
+    expect(tf.envelopeName).toBe('Charges');
   });
 });
 
 describe('libellés de virement', () => {
-  it('majuscules sans accents, préfixés', () => {
+  it('majuscules sans accents, préfixés, un par compte', () => {
+    expect(transferLabel('Livret A')).toBe('TIRELIRE LIVRET A');
     expect(transferLabel('Épargne de précaution')).toBe('TIRELIRE EPARGNE DE PRECAUTION');
     expect(transferLabel('Taxe foncière').length).toBeLessThanOrEqual(35);
+  });
+});
+
+describe('virement permanent à ventilation prévue (D21)', () => {
+  it('un flux par couple de comptes, ventilation calculée d’avance', () => {
+    const l = exampleLedger();
+    const plan = computePlan(l, '2026-09-06');
+    const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
+    const flow = standingTransferFlow(plan, t, 'acc-pivot', 'flow-vir')!;
+    expect(flow.kind).toBe('transfer');
+    expect(flow.counterpartAccountId).toBe(t.accountId);
+    expect(flow.labelPattern).toBe(t.label);
+    // Le permanent, pas le total : le complément de ce mois-ci n'est pas un ordre permanent.
+    expect(flow.amount).toBe(-t.standing);
+    expect(flow.plannedAllocation!.reduce((s, a) => s + (a.share.kind === 'fixed' ? a.share.amount : 0), 0)).toBe(-t.standing);
+  });
+
+  it('au montant prévu, la ventilation prévue s’applique ; sinon l’ordre de financement rejoue', () => {
+    let l = exampleLedger();
+    const plan = computePlan(l, '2026-09-06');
+    const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
+    const flow = standingTransferFlow(plan, t, 'acc-pivot', 'flow-vir')!;
+    l.plannedFlows.push(flow);
+
+    const virement = (id: string, amount: number): Operation => ({
+      id,
+      accountId: 'acc-pivot',
+      origin: 'imported',
+      date: '2026-09-28',
+      label: flow.labelPattern!,
+      normalizedLabel: flow.labelPattern!,
+      amount,
+      state: 'untreated',
+    });
+
+    // Montant exact : on retrouve la ventilation prévue.
+    l.operations.push(virement('op-vir-exact', flow.amount));
+    let patch = applyMatch(l, { operationId: 'op-vir-exact', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
+    expect(patch.allocations.map((a) => a.envelopeId)).toEqual(flow.plannedAllocation!.map((a) => a.envelopeId));
+
+    // Montant moindre : les planchers passent d'abord, on ne saupoudre pas au prorata.
+    const moindre = Math.round(flow.amount / 2);
+    l = applyPatchToLedger(l, { operations: [virement('op-vir-court', moindre)], allocations: [] });
+    patch = applyMatch(l, { operationId: 'op-vir-court', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
+    const total = patch.allocations.reduce((s, a) => s + (a.share.kind === 'fixed' ? a.share.amount : 0), 0);
+    expect(total).toBe(moindre);
+    expect(patch.allocations.length).toBeLessThanOrEqual(flow.plannedAllocation!.length);
   });
 });

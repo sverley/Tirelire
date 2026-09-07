@@ -1,12 +1,21 @@
 /**
- * Plan de période : à partir des revenus, charges fixes, enveloppes et soldes,
- * déduire ce qu'il faut réserver ou virer, dans quel ordre, et ce qui reste.
+ * Plan de période : à partir des revenus, charges fixes, besoins et positions des enveloppes,
+ * dire ce que la période dote (D29), ce que les revenus couvrent (D06, lecture), et quels
+ * virements ramènent chaque enveloppe à son placement voulu (D20, D21).
  */
-import type { Account, Cents, Envelope, EnvelopeKind, Id, ISODate, Ledger, PlannedFlow } from './model.js';
-import { alive } from './model.js';
-import { budgetPerPeriod, envelopeBalance, indexLedger, isVirtuallyFunded, settlementBalance, unallocated, type LedgerIndex } from './balances.js';
-import { nextOccurrence, occurrencesBetween, payPeriodContaining, periodsUntil, type Period } from './periods.js';
-import { divideCents } from './money.js';
+import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow } from './model.js';
+import { alive, needName } from './model.js';
+import {
+  envelopeBalance,
+  envelopeComponents,
+  indexLedger,
+  needCruise,
+  periodSnapshot,
+  settlementBalance,
+  unallocated,
+  type LedgerIndex,
+} from './balances.js';
+import { occurrencesBetween, payPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays } from './dates.js';
 
 export interface PlanFlowLine {
@@ -22,73 +31,89 @@ export interface PlanFlowLine {
 
 export type LineStatus = 'ok' | 'ahead' | 'catchUp' | 'reduced' | 'unfunded';
 
+/** Une ligne par besoin (D28). */
 export interface PlanLine {
+  needId: Id;
   envelopeId: Id;
+  envelopeName: string;
   name: string;
-  kind: EnvelopeKind;
+  kind: NeedKind;
+  /** Compte de placement de l'enveloppe. */
   accountId: Id;
   priority: number;
-  /** Solde reconstruit au début de la période. */
+  /** Solde de l'enveloppe au début de la période, avant dotation. */
   balance: Cents;
+  /** Part de ce solde attribuée à ce besoin. */
+  held: Cents;
   /** Mensualité de croisière (régime permanent). */
   cruise: Cents;
-  /** Mensualité de rattrapage (ce qu'exige l'échéance compte tenu du solde). */
+  /** Mensualité de rattrapage (ce qu'exige l'échéance ou le déficit). */
   catchUp: Cents;
-  /** Ce que la ligne demande : max(croisière, rattrapage), 0 si l'objectif est atteint. */
+  /** Dotation de la période : max(croisière, rattrapage), 0 si l'objectif est atteint. */
   requested: Cents;
-  /** Plancher en cas de marge négative (le rattrapage d'une provision ne se discute pas). */
+  /** Plancher en cas de marge négative. */
   floor: Cents;
-  /** Ce que le plan finance effectivement. */
+  /** Ce que les revenus de la période couvrent (lecture D06 ; la dotation est acquise). */
   funded: Cents;
-  /** Prochaine échéance (provision) ou cible (goal). */
   dueDate?: ISODate;
   target?: Cents;
-  /** Financé sans virement (budget hébergé sur le pivot). */
+  /** Enveloppe placée sur le pivot : la dotation y reste, aucun virement. */
   virtual: boolean;
   status: LineStatus;
 }
 
-/** Un virement permanent par enveloppe : le libellé nomme l'enveloppe, ce qui rend le pointage sans ambiguïté. */
+/** Écart de placement d'une enveloppe (D20) : ce qui dort ailleurs qu'au placement voulu. */
+export interface PlacementGap {
+  envelopeId: Id;
+  envelopeName: string;
+  /** Compte où la composante se trouve. */
+  fromAccountId: Id;
+  /** Compte de placement voulu. */
+  toAccountId: Id;
+  /** Positif = à virer de `from` vers `to` ; négatif = l'inverse. */
+  amount: Cents;
+  /** `todo` : au-dessus du seuil `settings.transferThreshold` ; `watch` : petit écart, à surveiller. */
+  status: 'todo' | 'watch';
+}
+
+/** Ligne d'un virement par compte : part de l'écart qui concerne une enveloppe. */
 export interface StandingOrder {
   envelopeId: Id;
   envelopeName: string;
-  /** Libellé suggéré pour le virement (« TIRELIRE TAXE FONCIERE »). */
-  label: string;
-  /** Montant permanent (croisière financée). */
+  /** Part permanente (jusqu'à la croisière des besoins de l'enveloppe). */
   standing: Cents;
-  /** Complément exceptionnel ce mois-ci. */
+  /** Complément exceptionnel ce mois-ci (rattrapage, écart ancien). */
   exceptional: Cents;
+  /** Montant total signé : positif = pivot → compte. */
+  amount: Cents;
+  status: 'todo' | 'watch';
 }
 
 export interface PlanTransfer {
   accountId: Id;
   accountName: string;
   accountKind: Account['kind'];
-  /** Détail par enveloppe hébergée. */
+  /** Libellé suggéré pour le virement permanent (D21 : un par couple de comptes). */
+  label: string;
+  /** Détail par enveloppe. */
   orders: StandingOrder[];
-  /** Somme des virements permanents vers ce compte. */
+  /** Somme des parts permanentes. */
   standing: Cents;
-  /** Somme des compléments exceptionnels ce mois-ci (rattrapages, budgets en dépassement). */
+  /** Somme des compléments exceptionnels. */
   exceptional: Cents;
   /** Compte tiers : règlement de la dette. Positif = pivot → tiers, négatif = tiers → pivot. */
   settlement: Cents;
-  /** Compte d'accueil : écart entre solde bancaire et enveloppes. Positif = à rapatrier vers le pivot. */
+  /** Compte d'accueil : argent du compte qui n'appartient à aucune enveloppe. Positif = à rapatrier vers le pivot. */
   surplus: Cents;
   /** Total net à virer ce mois-ci depuis le pivot (négatif = vers le pivot). */
   net: Cents;
 }
 
 export interface PlanWarning {
-  code:
-    | 'noPivot'
-    | 'negativeMargin'
-    | 'belowCushion'
-    | 'unfunded'
-    | 'reduced'
-    | 'settlementBlocked'
-    | 'noIncome';
+  code: 'noPivot' | 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'pivotOverdrawn';
   message: string;
   envelopeId?: Id;
+  needId?: Id;
   accountId?: Id;
 }
 
@@ -98,31 +123,35 @@ export interface Plan {
   incomes: PlanFlowLine[];
   fixedCharges: PlanFlowLine[];
   lines: PlanLine[];
+  /** Écarts de placement, y compris entre deux comptes hors pivot. */
+  gaps: PlacementGap[];
   transfers: PlanTransfer[];
   totals: {
     incomes: Cents;
     fixedCharges: Cents;
+    /** Somme des dotations de la période. */
     requested: Cents;
+    /** Part des dotations couverte par revenus − charges fixes (lecture D06). */
     funded: Cents;
     /** revenus − charges fixes − financé. */
     margin: Cents;
     cushion: Cents;
-    /** Non affecté du pivot à la date de calcul. */
+    /** Non affecté du pivot à la date de calcul, dotations comprises. */
     pivotUnallocated: Cents;
   };
   warnings: PlanWarning[];
 }
 
-const KIND_ORDER: Record<EnvelopeKind, number> = { provision: 0, budget: 1, goal: 2 };
+const KIND_ORDER: Record<NeedKind, number> = { dueDate: 0, recurring: 1, goal: 2 };
 
 /**
- * Calcule le plan de la période contenant `asOf`, avec les soldes à `asOf`.
+ * Calcule le plan de la période contenant `asOf`, avec les positions à `asOf`.
  */
 export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   const idx = indexLedger(ledger);
   const warnings: PlanWarning[] = [];
   const pivot = idx.pivot;
-  const payDay = pivot?.payDay ?? 1;
+  const payDay = idx.payDay;
   const period = payPeriodContaining(asOf, payDay);
   if (!pivot) warnings.push({ code: 'noPivot', message: 'Aucun compte pivot défini.' });
 
@@ -133,17 +162,181 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   const totalFixed = -fixedCharges.reduce((s, l) => s + l.amount, 0);
   if (totalIncomes <= 0) warnings.push({ code: 'noIncome', message: 'Aucun revenu prévu sur la période.' });
 
-  // Soldes à la date de calcul : ce qui a déjà été viré ou dépensé ce mois-ci est pris en compte.
-  const balanceDate = asOf;
-  const lines = alive(ledger.envelopes)
-    .map((e) => envelopeLine(e, idx, period, balanceDate, payDay))
-    .sort(
-      (a, b) =>
-        a.priority - b.priority || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name, 'fr'),
-    );
+  // Une ligne par besoin, d'après l'instantané de la période (dotations D29).
+  const lines: PlanLine[] = [];
+  for (const e of idx.envelopesById.values()) {
+    const snap = periodSnapshot(e, idx, asOf);
+    if (!snap) continue;
+    const needs = idx.needsByEnvelope.get(e.id) ?? [];
+    for (const s of snap.needs) {
+      const n = needs.find((x) => x.id === s.needId)!;
+      lines.push({
+        needId: n.id,
+        envelopeId: e.id,
+        envelopeName: e.name,
+        name: needName(n, e),
+        kind: n.kind,
+        accountId: e.placementAccountId,
+        priority: n.priority,
+        balance: snap.balanceBefore,
+        held: s.held,
+        cruise: s.cruise,
+        catchUp: s.catchUp,
+        requested: s.requested,
+        floor: s.floor,
+        funded: 0,
+        ...(s.dueDate ? { dueDate: s.dueDate } : {}),
+        ...(s.target !== undefined ? { target: s.target } : {}),
+        virtual: pivot !== undefined && e.placementAccountId === pivot.id,
+        status: 'ok',
+      });
+    }
+  }
+  lines.sort(
+    (a, b) => a.priority - b.priority || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name, 'fr'),
+  );
 
-  // Financement par priorité : d'abord les planchers, puis le reste.
-  let available = totalIncomes - totalFixed;
+  // Lecture D06 : ce que les revenus couvrent, planchers d'abord, puis le reste par priorité.
+  fundByPriority(lines, totalIncomes - totalFixed);
+  for (const l of lines) {
+    if (l.requested === 0) l.status = 'ahead';
+    else if (l.funded === 0) l.status = 'unfunded';
+    else if (l.funded < l.requested) l.status = 'reduced';
+    else if (l.catchUp > l.cruise) l.status = 'catchUp';
+    else if (l.catchUp < l.cruise && l.kind === 'dueDate') l.status = 'ahead';
+    else l.status = 'ok';
+    if (l.status === 'unfunded')
+      warnings.push({ code: 'unfunded', message: `« ${l.name} » n'est pas couverte par les revenus ce mois-ci.`, envelopeId: l.envelopeId, needId: l.needId });
+    else if (l.status === 'reduced')
+      warnings.push({ code: 'reduced', message: `« ${l.name} » n'est couverte qu'en partie par les revenus.`, envelopeId: l.envelopeId, needId: l.needId });
+  }
+
+  const totalRequested = lines.reduce((s, l) => s + l.requested, 0);
+  const totalFunded = lines.reduce((s, l) => s + l.funded, 0);
+  const margin = totalIncomes - totalFixed - totalFunded;
+  const cushion = ledger.settings.pivotCushion;
+  if (totalIncomes - totalFixed - totalRequested < 0)
+    warnings.push({
+      code: 'negativeMargin',
+      message: 'Les revenus ne couvrent pas toutes les dotations ; des lignes sont signalées selon leur priorité.',
+    });
+  else if (margin < cushion)
+    warnings.push({ code: 'belowCushion', message: 'La marge est inférieure au coussin minimum du pivot.' });
+
+  // Écarts de placement (D20), tous comptes, sauf les tiers (le règlement les couvre).
+  const threshold = ledger.settings.transferThreshold ?? 0;
+  const gaps: PlacementGap[] = [];
+  for (const e of idx.envelopesById.values()) {
+    for (const [accountId, amount] of envelopeComponents(e, idx, asOf)) {
+      if (accountId === e.placementAccountId) continue;
+      // Une composante qui dort sur un tiers relève du règlement (D04), pas d'un écart.
+      const acc = idx.accountsById.get(accountId);
+      if (acc?.kind === 'third') continue;
+      const status: PlacementGap['status'] = Math.abs(amount) >= threshold ? 'todo' : 'watch';
+      gaps.push({ envelopeId: e.id, envelopeName: e.name, fromAccountId: accountId, toAccountId: e.placementAccountId, amount, status });
+    }
+  }
+
+  // Virements par compte (vue pivot ↔ compte), règlements des tiers, surplus des comptes d'accueil.
+  const transfers: PlanTransfer[] = [];
+  for (const a of idx.accountsById.values()) {
+    if (pivot && a.id === pivot.id) continue;
+    const orders: StandingOrder[] = [];
+    for (const e of idx.envelopesById.values()) {
+      const gapsHere = gaps.filter(
+        (g) =>
+          g.envelopeId === e.id &&
+          ((g.toAccountId === a.id && (!pivot || g.fromAccountId === pivot.id)) || (g.fromAccountId === a.id && (!pivot || g.toAccountId === pivot.id))),
+      );
+      if (gapsHere.length === 0) continue;
+      // Positif = pivot → compte.
+      const amount = gapsHere.reduce((s, g) => s + (g.toAccountId === a.id ? g.amount : -g.amount), 0);
+      if (amount === 0) continue;
+      const cruise = (idx.needsByEnvelope.get(e.id) ?? []).reduce((s, n) => s + needCruise(n), 0);
+      const standing = amount > 0 ? Math.min(amount, cruise) : 0;
+      orders.push({
+        envelopeId: e.id,
+        envelopeName: e.name,
+        standing,
+        exceptional: amount - standing,
+        amount,
+        status: gapsHere.some((g) => g.status === 'todo') ? 'todo' : 'watch',
+      });
+    }
+    orders.sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount));
+    const standing = orders.reduce((s, o) => s + o.standing, 0);
+    const exceptional = orders.reduce((s, o) => s + o.exceptional, 0);
+    let settlement = 0;
+    let surplus = 0;
+    if (a.kind === 'third') {
+      const owes = settlementBalance(a, ledger, idx, asOf);
+      const thr = a.settlementThreshold ?? 0;
+      const dir = a.settlementDirection ?? 'both';
+      if (Math.abs(owes) > thr) {
+        if (owes > 0 && dir !== 'fromThird') settlement = owes;
+        else if (owes < 0 && dir !== 'toThird') settlement = owes;
+        else
+          warnings.push({
+            code: 'settlementBlocked',
+            message: `Un règlement de ${owes} centimes avec « ${a.name} » est bloqué par le sens autorisé.`,
+            accountId: a.id,
+          });
+      }
+    } else if (a.kind === 'holding') {
+      surplus = unallocated(a, ledger, idx, asOf);
+    }
+    const net = standing + exceptional + settlement - surplus;
+    if (orders.length === 0 && settlement === 0 && surplus === 0) continue;
+    transfers.push({
+      accountId: a.id,
+      accountName: a.name,
+      accountKind: a.kind,
+      label: transferLabel(a.name),
+      orders,
+      standing,
+      exceptional,
+      settlement,
+      surplus,
+      net,
+    });
+  }
+  transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
+
+  const pivotUnallocated = pivot ? unallocated(pivot, ledger, idx, asOf) : 0;
+  if (pivot && pivotUnallocated < 0)
+    warnings.push({
+      code: 'pivotOverdrawn',
+      message: 'Les dotations dépassent ce que le pivot contient : le non affecté est négatif.',
+      accountId: pivot.id,
+    });
+
+  return {
+    period,
+    asOf,
+    incomes,
+    fixedCharges,
+    lines,
+    gaps,
+    transfers,
+    totals: {
+      incomes: totalIncomes,
+      fixedCharges: totalFixed,
+      requested: totalRequested,
+      funded: totalFunded,
+      margin,
+      cushion,
+      pivotUnallocated,
+    },
+    warnings,
+  };
+}
+
+/**
+ * Ordre de financement de D06 : les planchers par priorité, puis le demandé par priorité,
+ * jusqu'à épuisement de `available`. Écrit `funded` sur chaque ligne ; rend le reste.
+ * Sert aussi à répartir un virement constaté entre enveloppes (D21).
+ */
+export function fundByPriority<T extends { floor: Cents; requested: Cents; funded: Cents }>(lines: T[], available: Cents): Cents {
   for (const l of lines) {
     const give = Math.max(0, Math.min(l.floor, available));
     l.funded = give;
@@ -155,98 +348,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
     l.funded += give;
     available -= give;
   }
-  for (const l of lines) {
-    if (l.requested === 0) l.status = 'ahead';
-    else if (l.funded === 0) l.status = 'unfunded';
-    else if (l.funded < l.requested) l.status = 'reduced';
-    else if (l.catchUp > l.cruise) l.status = 'catchUp';
-    else if (l.catchUp < l.cruise && l.kind === 'provision') l.status = 'ahead';
-    else l.status = 'ok';
-    if (l.status === 'unfunded')
-      warnings.push({ code: 'unfunded', message: `« ${l.name} » n'est pas financée ce mois-ci.`, envelopeId: l.envelopeId });
-    else if (l.status === 'reduced')
-      warnings.push({ code: 'reduced', message: `« ${l.name} » est financée partiellement.`, envelopeId: l.envelopeId });
-  }
-
-  const totalRequested = lines.reduce((s, l) => s + l.requested, 0);
-  const totalFunded = lines.reduce((s, l) => s + l.funded, 0);
-  const margin = totalIncomes - totalFixed - totalFunded;
-  const cushion = ledger.settings.pivotCushion;
-  if (totalIncomes - totalFixed - totalRequested < 0)
-    warnings.push({
-      code: 'negativeMargin',
-      message: 'Les revenus ne couvrent pas tout ce qui est demandé ; des lignes ont été réduites selon leur priorité.',
-    });
-  else if (margin < cushion)
-    warnings.push({ code: 'belowCushion', message: 'La marge est inférieure au coussin minimum du pivot.' });
-
-  // Virements par compte.
-  const transfers: PlanTransfer[] = [];
-  for (const a of idx.accountsById.values()) {
-    if (pivot && a.id === pivot.id) continue;
-    const hosted = lines.filter((l) => l.accountId === a.id && !l.virtual);
-    const orders: StandingOrder[] = hosted.map((l) => ({
-      envelopeId: l.envelopeId,
-      envelopeName: l.name,
-      label: transferLabel(l.name),
-      standing: Math.min(l.funded, l.cruise),
-      exceptional: Math.max(0, l.funded - l.cruise),
-    }));
-    const standing = orders.reduce((s, o) => s + o.standing, 0);
-    const exceptional = orders.reduce((s, o) => s + o.exceptional, 0);
-    let settlement = 0;
-    let surplus = 0;
-    if (a.kind === 'third') {
-      const owes = settlementBalance(a, ledger, idx, balanceDate);
-      const threshold = a.settlementThreshold ?? 0;
-      const dir = a.settlementDirection ?? 'both';
-      if (Math.abs(owes) > threshold) {
-        if (owes > 0 && dir !== 'fromThird') settlement = owes;
-        else if (owes < 0 && dir !== 'toThird') settlement = owes;
-        else
-          warnings.push({
-            code: 'settlementBlocked',
-            message: `Un règlement de ${owes} centimes avec « ${a.name} » est bloqué par le sens autorisé.`,
-            accountId: a.id,
-          });
-      }
-    } else if (a.kind === 'holding') {
-      surplus = unallocated(a, ledger, idx, balanceDate);
-    }
-    const net = standing + exceptional + settlement - surplus;
-    if (hosted.length === 0 && settlement === 0 && surplus === 0) continue;
-    transfers.push({
-      accountId: a.id,
-      accountName: a.name,
-      accountKind: a.kind,
-      orders,
-      standing,
-      exceptional,
-      settlement,
-      surplus,
-      net,
-    });
-  }
-  transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
-
-  return {
-    period,
-    asOf,
-    incomes,
-    fixedCharges,
-    lines,
-    transfers,
-    totals: {
-      incomes: totalIncomes,
-      fixedCharges: totalFixed,
-      requested: totalRequested,
-      funded: totalFunded,
-      margin,
-      cushion,
-      pivotUnallocated: pivot ? unallocated(pivot, ledger, idx, balanceDate) : 0,
-    },
-    warnings,
-  };
+  return available;
 }
 
 function isActive(f: PlannedFlow, p: Period): boolean {
@@ -267,44 +369,32 @@ function flowLines(flows: PlannedFlow[], p: Period): PlanFlowLine[] {
   return out.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
 }
 
-function envelopeLine(e: Envelope, idx: LedgerIndex, period: Period, balanceDate: ISODate, payDay: number): PlanLine {
-  const balance = envelopeBalance(e, idx, balanceDate);
-  const base = {
-    envelopeId: e.id,
-    name: e.name,
-    kind: e.kind,
-    accountId: e.accountId,
-    priority: e.priority,
-    balance,
-    funded: 0,
-    virtual: isVirtuallyFunded(e, idx),
-    status: 'ok' as LineStatus,
+/**
+ * Flux attendu correspondant au virement permanent vers un compte (D21) : un seul par couple de
+ * comptes, mensuel, avec sa ventilation calculée d'avance. Enregistré, il rend le virement
+ * reconnaissable à l'import par montant et libellé, et sa ventilation proposée.
+ *
+ * Le montant retenu est la part permanente, pas le total : le complément exceptionnel de ce
+ * mois-ci n'a pas vocation à devenir un ordre permanent.
+ */
+export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, pivotId: Id, id: Id): PlannedFlow | undefined {
+  if (transfer.standing <= 0) return undefined;
+  const allocation = transfer.orders
+    .filter((o) => o.standing > 0)
+    .map((o) => ({ envelopeId: o.envelopeId, share: { kind: 'fixed' as const, amount: -o.standing } }));
+  return {
+    id,
+    name: `Virement ${transfer.accountName}`,
+    kind: 'transfer',
+    amount: -transfer.standing,
+    accountId: pivotId,
+    counterpartAccountId: transfer.accountId,
+    periodicity: { intervalMonths: 1, anchorDate: plan.period.start },
+    dateWindowDays: 5,
+    labelPattern: transfer.label,
+    amountTolerance: { pct: 20 },
+    plannedAllocation: allocation,
   };
-  switch (e.kind) {
-    case 'provision': {
-      const target = e.target ?? 0;
-      const per = e.periodicity ?? { intervalMonths: 12, anchorDate: period.start };
-      const dueDate = nextOccurrence(per, period.start);
-      const cruise = divideCents(target, per.intervalMonths);
-      const n = Math.max(1, periodsUntil(period, dueDate, payDay));
-      const catchUp = Math.max(0, Math.ceil(Math.max(0, target - balance) / n));
-      return { ...base, cruise, catchUp, requested: Math.max(cruise, catchUp), floor: catchUp, dueDate, target };
-    }
-    case 'goal': {
-      const monthly = e.monthlyAmount ?? 0;
-      const reached = e.target !== undefined && balance >= e.target;
-      const requested = reached ? 0 : e.target !== undefined ? Math.min(monthly, e.target - balance) : monthly;
-      return { ...base, cruise: monthly, catchUp: requested, requested, floor: 0, ...(e.target !== undefined ? { target: e.target } : {}) };
-    }
-    case 'budget': {
-      const cruise = budgetPerPeriod(e);
-      const rollover = e.rollover ?? { mode: 'none' };
-      const deficit = rollover.mode !== 'none' && balance < 0 ? -balance : 0;
-      // Un budget virtuel se « finance » à hauteur de sa dotation : c'est de la réservation, pas un virement.
-      const catchUp = cruise + deficit;
-      return { ...base, cruise, catchUp, requested: catchUp, floor: 0, ...(e.target !== undefined ? { target: e.target } : {}) };
-    }
-  }
 }
 
 /** Fenêtre de périodes autour de `asOf`, utile pour naviguer dans l'interface. */
@@ -313,7 +403,7 @@ export function periodsAround(ledger: Ledger, asOf: ISODate, before: number, aft
   const payDay = pivot?.payDay ?? 1;
   const out: Period[] = [];
   let p = payPeriodContaining(asOf, payDay);
-  for (let i = 0; i < before; i++) p = payPeriodContaining(addDays(p.start, -1), payDay);
+  for (let i = 0; i < before; i++) p = previousPeriod(p, payDay);
   for (let i = 0; i < before + 1 + after; i++) {
     out.push(p);
     p = payPeriodContaining(addDays(p.end, 1), payDay);
@@ -321,9 +411,9 @@ export function periodsAround(ledger: Ledger, asOf: ISODate, before: number, aft
   return out;
 }
 
-/** Libellé de virement : majuscules sans accents, tronqué à ce que les banques acceptent. */
-export function transferLabel(envelopeName: string): string {
-  const base = envelopeName
+/** Libellé de virement (D21 : un par compte cible) : majuscules sans accents, tronqué à ce que les banques acceptent. */
+export function transferLabel(accountName: string): string {
+  const base = accountName
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toUpperCase()
@@ -332,3 +422,16 @@ export function transferLabel(envelopeName: string): string {
     .trim();
   return `TIRELIRE ${base}`.slice(0, 35);
 }
+
+/** Solde d'une enveloppe et sa position, pour l'interface. */
+export function envelopePosition(ledger: Ledger, envelopeId: Id, asOf: ISODate): { balance: Cents; components: Array<{ accountId: Id; amount: Cents }> } | undefined {
+  const idx = indexLedger(ledger);
+  const e = idx.envelopesById.get(envelopeId);
+  if (!e) return undefined;
+  return {
+    balance: envelopeBalance(e, idx, asOf),
+    components: [...envelopeComponents(e, idx, asOf)].map(([accountId, amount]) => ({ accountId, amount })),
+  };
+}
+
+export type { LedgerIndex };
