@@ -8,6 +8,7 @@
     name: '',
     kind: 'holding' as AccountKind,
     bank: '',
+    accountNumber: '',
     openingBalance: '',
     openingDate: app.asOf,
     payDay: '1',
@@ -22,7 +23,7 @@
 
   function startNew() {
     editing = { id: app.newId(), name: '', kind: hasPivot ? 'holding' : 'pivot', openingBalance: 0, openingDate: app.asOf };
-    form = { name: '', kind: editing.kind, bank: '', openingBalance: '0,00', openingDate: app.asOf, payDay: '1', settlementThreshold: '10,00', settlementDirection: 'both' };
+    form = { name: '', kind: editing.kind, bank: '', accountNumber: '', openingBalance: '0,00', openingDate: app.asOf, payDay: '1', settlementThreshold: '10,00', settlementDirection: 'both' };
     error = '';
   }
 
@@ -32,6 +33,7 @@
       name: a.name,
       kind: a.kind,
       bank: a.bank ?? '',
+      accountNumber: a.accountNumber ?? '',
       openingBalance: centsToInput(a.openingBalance),
       openingDate: a.openingDate,
       payDay: String(a.payDay ?? 1),
@@ -57,6 +59,7 @@
       openingBalance,
       openingDate: form.openingDate,
       ...(form.bank.trim() ? { bank: form.bank.trim() } : {}),
+      ...(form.accountNumber.trim() ? { accountNumber: form.accountNumber.trim() } : {}),
       ...(form.kind === 'pivot' ? { payDay: Math.min(31, Math.max(1, payDay || 1)) } : {}),
       ...(form.kind === 'third'
         ? { settlementThreshold: inputToCents(form.settlementThreshold) ?? 0, settlementDirection: form.settlementDirection }
@@ -89,6 +92,7 @@
         </select>
       </label>
       <label class="f">Banque (facultatif) <input bind:value={form.bank} /></label>
+      <label class="f">Numéro de compte ou IBAN (facultatif) <input bind:value={form.accountNumber} placeholder="FR76 1234 5678 90…" /></label>
       <label class="f">Solde initial <input bind:value={form.openingBalance} inputmode="decimal" /></label>
       <label class="f">Date du solde initial <input type="date" bind:value={form.openingDate} /></label>
       {#if form.kind === 'pivot'}
@@ -118,7 +122,7 @@
     <div class="row">
       <div class="label">
         <strong>{a.name}</strong> <span class="pill">{a.kind === 'pivot' ? 'pivot' : a.kind === 'holding' ? 'accueil' : 'tiers'}</span>
-        <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.kind === 'pivot' ? ` · paie le ${a.payDay ?? 1}` : ''}</span>
+        <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.kind === 'pivot' ? ` · paie le ${a.payDay ?? 1}` : ''}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
       </div>
       <div>
         <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>

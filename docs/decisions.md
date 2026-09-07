@@ -115,3 +115,14 @@ tiers. Transports : fichier (main), WebRTC à signalisation manuelle et relais p
 
 Les fichiers bancaires servent à vérifier l'import localement et ne sont jamais versionnés
 (`*.csv`, `*.sqlite` ignorés). Les exemples et tests utilisent des données inventées.
+
+## D18 · 2026-09-07 · Numéro de compte mémorisé sur le compte, indépendant du profil d'import
+
+`Account.accountNumber` (facultatif, saisi dans le panneau Comptes ou mémorisé depuis l'import)
+porte le numéro de compte ou l'IBAN, comparé après normalisation (espaces et ponctuation
+retirés, casse uniforme) et tolérant qu'un export ne donne que les derniers chiffres
+(`matchAccountByNumber`, `importer.ts`). À la lecture d'un fichier multi-comptes, une valeur de
+la colonne compte qui correspond à un numéro déjà mémorisé pré-remplit la correspondance —
+y compris avec un profil nouvellement détecté, contrairement à `profile.accountMap` qui ne vaut
+que pour ce profil. Une case à cocher propose de mémoriser une nouvelle valeur sur le compte
+choisi ; décision explicite, jamais un écrasement silencieux.

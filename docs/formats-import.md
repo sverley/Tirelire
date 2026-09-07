@@ -8,7 +8,7 @@ Aucune donnée réelle ici : seulement la forme des fichiers.
 - En-tête :
   `Date transaction;Date comptabilisation;Num Compte;Libellé Compte;Libellé opération;Libellé complet;Catégorie;Sous-Catégorie;Montant;Pointée;`
 - Dates `JJ/MM/AAAA`. Les deux dates sont presque toujours égales ; la date de transaction fait foi.
-- **Plusieurs comptes dans le même fichier** (colonne `Num Compte` / `Libellé Compte`) : le profil d'import doit ventiler par compte, comme pour Linxo.
+- **Plusieurs comptes dans le même fichier** (colonne `Num Compte` / `Libellé Compte`) : le profil d'import doit ventiler par compte, comme pour Linxo. Si le compte Tirelire porte déjà ce numéro (`Account.accountNumber`, D18), la correspondance est proposée automatiquement, y compris pour un nouveau profil.
 - Montant signé à virgule décimale (`-76,00`).
 - Deux libellés : court (`CARTE X1234 02/09 SUPERMARCHE …`, `VIR PERM …`, `PRELEVEMENT EUROPEEN DE: …`) et complet (avec références, mandats, motifs).
   Le libellé court sert à la clé et au pointage ; le complet est conservé pour l'affichage.

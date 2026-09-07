@@ -39,6 +39,8 @@ export interface Account {
   name: string;
   kind: AccountKind;
   bank?: string;
+  /** Numéro de compte ou IBAN, saisi ou mémorisé depuis un import (voir `matchAccountByNumber`). */
+  accountNumber?: string;
   openingBalance: Cents;
   openingDate: ISODate;
   /** Jour de paie (1-31), seulement pour le pivot : début de la période budgétaire. */

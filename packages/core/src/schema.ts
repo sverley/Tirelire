@@ -32,6 +32,7 @@ export const TABLES: Record<string, TableDef> = {
       c('name'),
       c('kind'),
       c('bank'),
+      c('accountNumber'),
       c('openingBalance', 'integer'),
       c('openingDate'),
       c('payDay', 'integer'),

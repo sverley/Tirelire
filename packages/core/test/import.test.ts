@@ -9,9 +9,11 @@ import {
   exampleLedger,
   guessColumns,
   indexLedger,
+  matchAccountByNumber,
   matchEnvelopeTransfers,
   missingFlows,
   newProfileFromRows,
+  normalizeAccountNumber,
   pairInternalTransfers,
   parseCsv,
   parseRows,
@@ -22,6 +24,7 @@ import {
   runPipeline,
   suggestPattern,
   unallocated,
+  type Account,
   type Ledger,
   type Patch,
 } from '../src/index.js';
@@ -227,5 +230,32 @@ describe('rapprochement', () => {
     l2 = applyPatchToLedger(l2, matchEnvelopeTransfers(l2));
     const idx = indexLedger(l2);
     expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1000));
+  });
+});
+
+describe('correspondance des comptes par numéro', () => {
+  const pivot: Account = { id: 'acc-pivot', name: 'Pivot', kind: 'pivot', openingBalance: 0, openingDate: '2026-01-01', accountNumber: 'FR76 1234 5678 9012 3456 7890 123' };
+  const livret: Account = { id: 'acc-livret', name: 'Livret', kind: 'holding', openingBalance: 0, openingDate: '2026-01-01', accountNumber: '00012345678' };
+  const sansNumero: Account = { id: 'acc-autre', name: 'Autre', kind: 'holding', openingBalance: 0, openingDate: '2026-01-01' };
+  const accounts = [pivot, livret, sansNumero];
+
+  it('normalise en retirant espaces et ponctuation, insensible à la casse', () => {
+    expect(normalizeAccountNumber('fr76 1234-5678.9012')).toBe('FR76123456789012');
+  });
+
+  it('retrouve un compte par IBAN malgré les espaces', () => {
+    expect(matchAccountByNumber(accounts, 'FR7612345678901234567890123')?.id).toBe('acc-pivot');
+  });
+
+  it('retrouve un compte quand seuls les derniers chiffres sont fournis', () => {
+    expect(matchAccountByNumber(accounts, '5678')?.id).toBe('acc-livret');
+  });
+
+  it('ignore les valeurs trop courtes pour être fiables', () => {
+    expect(matchAccountByNumber(accounts, '78')).toBeUndefined();
+  });
+
+  it("ne renvoie rien si aucun compte n'a de numéro mémorisé correspondant", () => {
+    expect(matchAccountByNumber(accounts, '999999999999')).toBeUndefined();
   });
 });
