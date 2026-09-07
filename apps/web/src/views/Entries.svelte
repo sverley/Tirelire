@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
-  import { alive, normalizeLabel, type Allocation, type Category, type Operation } from '@tirelire/core';
+  import { alive, normalizeLabel, findCategoryByName, type Allocation, type Category, type Operation } from '@tirelire/core';
 
   type Nature = 'expense' | 'income' | 'transfer';
 
@@ -75,9 +75,15 @@
 
     let categoryId = form.categoryId;
     if (form.newCategory.trim()) {
-      const c: Category = { id: app.newId(), name: form.newCategory.trim(), nature: form.nature === 'income' ? 'income' : 'expense' };
-      app.upsert('categories', c);
-      categoryId = c.id;
+      const nature = form.nature === 'income' ? 'income' : 'expense';
+      const existing = findCategoryByName(categories, form.newCategory, nature);
+      if (existing) {
+        categoryId = existing.id;
+      } else {
+        const c: Category = { id: app.newId(), name: form.newCategory.trim(), nature };
+        app.upsert('categories', c);
+        categoryId = c.id;
+      }
     }
     const id = editingId ?? app.newId();
     const amount = form.nature === 'income' ? abs : -abs;

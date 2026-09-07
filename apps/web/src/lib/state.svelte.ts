@@ -17,7 +17,7 @@ import {
 import type { LedgerKey } from '@tirelire/core';
 import { eraseStore, openStore, type OpenedStore } from './db';
 
-export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'envelopes' | 'flows' | 'entries' | 'settings';
+export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'envelopes' | 'categories' | 'flows' | 'entries' | 'settings';
 
 class AppState {
   ledger = $state<Ledger>(emptyLedger());

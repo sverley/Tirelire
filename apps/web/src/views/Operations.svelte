@@ -4,6 +4,7 @@
   import {
     alive,
     applyMatch,
+    findCategoryByName,
     proposeMatches,
     suggestPattern,
     payPeriodContaining,
@@ -104,8 +105,12 @@
     if (remaining(op) !== 0) return void (error = `La ventilation doit couvrir le montant (reste ${money(remaining(op))}).`);
     let createdCategory: Category | undefined;
     if (newCategory.trim()) {
-      createdCategory = { id: app.newId(), name: newCategory.trim(), nature: op.amount < 0 ? 'expense' : 'income' };
-      app.store.upsert('categories', createdCategory);
+      const nature = op.amount < 0 ? 'expense' : 'income';
+      createdCategory = findCategoryByName(categories, newCategory, nature);
+      if (!createdCategory) {
+        createdCategory = { id: app.newId(), name: newCategory.trim(), nature };
+        app.store.upsert('categories', createdCategory);
+      }
     }
     const existing = allocByOp.get(op.id) ?? [];
     const keep = new Set<string>();

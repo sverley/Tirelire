@@ -95,6 +95,8 @@ export const DEFAULT_PRIORITY: Record<EnvelopeKind, number> = {
 // Catégories
 // ---------------------------------------------------------------------------
 
+export type CategoryNature = 'expense' | 'income';
+
 export interface Category {
   id: Id;
   name: string;
@@ -102,8 +104,28 @@ export interface Category {
   /** Enveloppe budget que cette catégorie consomme (facultatif : sinon simple suivi). */
   envelopeId?: Id;
   /** `income` pour les catégories de revenus. */
-  nature: 'expense' | 'income';
+  nature: CategoryNature;
   deletedAt?: string;
+}
+
+/** Compare deux noms de catégorie sans tenir compte de la casse ni des accents. */
+function sameCategoryName(a: string, b: string): boolean {
+  const fold = (s: string) =>
+    s
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  return fold(a) === fold(b) && fold(a) !== '';
+}
+
+/**
+ * Cherche, parmi les catégories vivantes de même nature, celle qui porte déjà ce nom
+ * (insensible à la casse et aux accents). Sert à éviter les doublons quand une catégorie
+ * est créée à la volée depuis une opération.
+ */
+export function findCategoryByName(categories: Category[], name: string, nature: CategoryNature): Category | undefined {
+  return categories.find((c) => !c.deletedAt && c.nature === nature && sameCategoryName(c.name, name));
 }
 
 // ---------------------------------------------------------------------------

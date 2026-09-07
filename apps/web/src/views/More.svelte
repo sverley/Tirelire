@@ -3,6 +3,7 @@
   const items: Array<{ id: View; label: string; desc: string }> = [
     { id: 'accounts', label: 'Comptes', desc: 'Pivot, comptes d’accueil, comptes tiers' },
     { id: 'envelopes', label: 'Enveloppes', desc: 'Provisions, objectifs d’épargne, budgets' },
+    { id: 'categories', label: 'Catégories', desc: 'Classement des dépenses et revenus' },
     { id: 'flows', label: 'Flux prévus', desc: 'Revenus, charges fixes, échéances' },
     { id: 'entries', label: 'Saisie manuelle', desc: 'Dépenses des comptes tiers, virements faits' },
     { id: 'settings', label: 'Réglages', desc: 'Année budgétaire, coussin, sauvegarde' },
