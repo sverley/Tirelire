@@ -7,8 +7,10 @@ android {
         applicationId "fr.tirelire.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("TIRELIRE_VERSION_CODE") ?: "1").toInteger()
-        versionName (System.getenv("TIRELIRE_VERSION_NAME") ?: "0.1.0-dev")
+        // Affectations explicites : « versionCode (x).toInteger() » serait lu par Groovy
+        // comme « versionCode(x).toInteger() », d'où une valeur nulle.
+        versionCode = (System.getenv("TIRELIRE_VERSION_CODE") ?: "1").toInteger()
+        versionName = System.getenv("TIRELIRE_VERSION_NAME") ?: "0.1.0-dev"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -20,10 +22,10 @@ android {
         // Par défaut : la clé de test versionnée (voir keystore/README.md).
         // En CI, des secrets peuvent la remplacer par une vraie clé via les variables TIRELIRE_KEYSTORE_*.
         release {
-            storeFile file(System.getenv("TIRELIRE_KEYSTORE_FILE") ?: "$rootDir/keystore/tirelire-test.jks")
-            storePassword System.getenv("TIRELIRE_KEYSTORE_PASSWORD") ?: "tirelire-test"
-            keyAlias System.getenv("TIRELIRE_KEY_ALIAS") ?: "tirelire"
-            keyPassword System.getenv("TIRELIRE_KEY_PASSWORD") ?: "tirelire-test"
+            storeFile = file(System.getenv("TIRELIRE_KEYSTORE_FILE") ?: "$rootDir/keystore/tirelire-test.jks")
+            storePassword = System.getenv("TIRELIRE_KEYSTORE_PASSWORD") ?: "tirelire-test"
+            keyAlias = System.getenv("TIRELIRE_KEY_ALIAS") ?: "tirelire"
+            keyPassword = System.getenv("TIRELIRE_KEY_PASSWORD") ?: "tirelire-test"
         }
     }
     buildTypes {
