@@ -14,3 +14,4 @@ export * from './importer.js';
 export * from './matching.js';
 export * from './review.js';
 export * from './sync.js';
+export * from './learning.js';
