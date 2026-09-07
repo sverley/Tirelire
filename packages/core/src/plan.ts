@@ -48,7 +48,7 @@ export interface PlanLine {
   status: LineStatus;
 }
 
-/** Un virement permanent par enveloppe : le libellé nomme l'enveloppe, ce qui rend le pointage sans ambiguïté. */
+/** Un virement permanent par enveloppe : le libellé nomme l'enveloppe, ce qui rend le rapprochement de flux sans ambiguïté. */
 export interface StandingOrder {
   envelopeId: Id;
   envelopeName: string;

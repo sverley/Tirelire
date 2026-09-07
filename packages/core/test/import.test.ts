@@ -151,7 +151,7 @@ describe('rapprochement', () => {
     expect(tf.transferAccountId).toBe('acc-livret');
   });
 
-  it('pointage des flux prévus : automatique quand libellé et montant concordent', () => {
+  it('rapprochement de flux : automatique quand libellé et montant concordent', () => {
     const l = imported();
     const proposals = proposeMatches(l, '2026-08-01', '2026-09-30');
     const byFlow = new Map(proposals.map((p) => [p.flowId, p]));

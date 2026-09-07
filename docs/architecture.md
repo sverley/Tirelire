@@ -14,7 +14,7 @@ Tirelire/
 │   ├── src/plan.ts         plan de période : croisière / rattrapage, priorités, virements
 │   ├── src/csv.ts          décodage et parseur CSV
 │   ├── src/importer.ts     profils d'import, lecture des lignes, clés, doublons
-│   ├── src/matching.ts     virements internes, virements TIRELIRE, pointage, règles, pipeline
+│   ├── src/matching.ts     virements internes, virements TIRELIRE, rapprochement de flux, règles, pipeline
 │   ├── src/review.ts       bilan par catégorie, calibrage, provisions prévu vs payé
 │   ├── src/hlc.ts          horloge logique hybride
 │   ├── src/schema.ts       définition des tables (une source pour SQL, lecture, écriture, journal)
@@ -40,7 +40,7 @@ Tirelire/
 | `Envelope` | sous-compte comptable : `provision`, `goal`, `budget` ; hébergée sur un compte | UUID v7 |
 | `Category` | classement des dépenses / revenus ; peut consommer un budget | UUID v7 |
 | `PlannedFlow` | revenu, charge fixe, échéance payée par une enveloppe, virement attendu ; périodicité, fenêtre, tolérance, motif | UUID v7 |
-| `Operation` | ligne de relevé (`imported`) ou saisie (`manual`) ; statut ; transfert ; flux pointé | clé déterministe ou UUID v7 |
+| `Operation` | ligne de relevé (`imported`) ou saisie (`manual`) ; statut ; transfert ; flux rapproché | clé déterministe ou UUID v7 |
 | `Allocation` | ligne de ventilation : catégorie + enveloppe + montant | UUID v7 |
 | `Rule` | motif → catégorie / enveloppe | UUID v7 |
 | `ImportProfile` | colonnes, formats, correspondance des comptes | UUID v7 |
@@ -71,7 +71,7 @@ Montants en centimes entiers signés (négatif = débit). Dates `AAAA-MM-JJ`. Su
 ## Pipeline d'import (`runPipeline`)
 
 lecture (profil) → clés et doublons (`prepareImport`) → insertion → virements internes appariés
-→ virements TIRELIRE → pointage automatique des flux sûrs → règles → file de tri (interface).
+→ virements TIRELIRE → rapprochement automatique des flux sûrs → règles → file de tri (interface).
 
 ## Dépôt et synchronisation
 

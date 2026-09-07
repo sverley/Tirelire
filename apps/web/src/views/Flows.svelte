@@ -114,7 +114,7 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Flux prévus</h1>
-<p class="muted small">Revenus, charges fixes, échéances payées par une enveloppe. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au pointage.</p>
+<p class="muted small">Revenus, charges fixes, échéances payées par une enveloppe. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au rapprochement de flux.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
@@ -159,13 +159,13 @@
       </label>
       <label class="f">Tous les (mois) <input type="number" min="1" bind:value={form.intervalMonths} /></label>
       <label class="f">Première date <input type="date" bind:value={form.anchorDate} /></label>
-      <label class="f">Fenêtre de pointage (± jours) <input type="number" min="0" bind:value={form.dateWindowDays} /></label>
+      <label class="f">Fenêtre de rapprochement (± jours) <input type="number" min="0" bind:value={form.dateWindowDays} /></label>
       <label class="f">Tolérance de montant (€) <input bind:value={form.toleranceAbs} inputmode="decimal" /></label>
       <label class="f">Tolérance de montant (%) <input type="number" min="0" bind:value={form.tolerancePct} /></label>
       <label class="f">Motif de libellé (regex) <input bind:value={form.labelPattern} placeholder="ECHEANCE PRET" /></label>
       <label class="f">Actif à partir du <input type="date" bind:value={form.activeFrom} /></label>
       <label class="f">Actif jusqu'au <input type="date" bind:value={form.activeTo} /></label>
-      <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (à confirmer au pointage)</label>
+      <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (rapprochement à confirmer)</label>
     </div>
     {#if error}<div class="err">{error}</div>{/if}
     <div class="actions" style="margin:0">

@@ -68,7 +68,7 @@
   const flowName = (id: string | undefined) => flows.find((f) => f.id === id)?.name;
 
   function statusLabel(s: OperationStatus): string {
-    return { pending: 'à traiter', matched: 'pointée', categorized: 'classée', transfer: 'virement interne', oneOff: 'ponctuelle' }[s];
+    return { pending: 'à traiter', matched: 'flux rapproché', categorized: 'classée', transfer: 'virement interne', oneOff: 'ponctuelle' }[s];
   }
 
   function startEdit(op: Operation) {
@@ -180,7 +180,7 @@
   <select bind:value={filter} class="btn">
     <option value="pending">À traiter</option>
     <option value="all">Toutes</option>
-    <option value="matched">Pointées</option>
+    <option value="matched">Flux rapprochés</option>
     <option value="transfer">Virements internes</option>
   </select>
   <select bind:value={accountFilter} class="btn">
@@ -206,7 +206,7 @@
           {#if op.suggestedCategory && !allocs.length} · banque : {op.suggestedCategory}{/if}
         </span>
         {#if prop && op.status === 'pending'}
-          <span class="sub" style="color:var(--accent)">Proposition : pointer sur « {flowName(prop.flowId)} » ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
+          <span class="sub" style="color:var(--accent)">Proposition : rapprocher du flux « {flowName(prop.flowId)} » ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
         {/if}
       </button>
       <div class="num {op.amount > 0 ? 'pos' : ''}">{money(op.amount)}</div>
@@ -216,7 +216,7 @@
           {#if op.details}<p class="small muted">{op.details}</p>{/if}
           {#if prop && op.status === 'pending'}
             <div class="actions" style="margin:0">
-              <button class="btn primary" type="button" onclick={() => acceptMatch(op)}>Pointer sur « {flowName(prop.flowId)} »</button>
+              <button class="btn primary" type="button" onclick={() => acceptMatch(op)}>Rapprocher du flux « {flowName(prop.flowId)} »</button>
             </div>
           {/if}
           <h3>Ventilation</h3>

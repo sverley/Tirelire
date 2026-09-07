@@ -1,5 +1,5 @@
 /**
- * Rapprochement : virements internes, pointage des flux prévus, virements vers
+ * Après import : virements internes, rapprochement de flux prévus, virements vers
  * les enveloppes (par libellé), règles de catégorisation, flux attendus non reçus.
  *
  * Toutes les fonctions sont pures : elles reçoivent le grand livre et rendent
@@ -89,7 +89,7 @@ export function matchEnvelopeTransfers(ledger: Ledger): Patch {
 }
 
 // ---------------------------------------------------------------------------
-// Pointage des flux prévus
+// Rapprochement de flux prévus
 // ---------------------------------------------------------------------------
 
 export interface MatchProposal {
@@ -122,7 +122,7 @@ function amountWithinTolerance(flow: PlannedFlow, amount: Cents): { ok: boolean;
 export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): MatchProposal[] {
   const flows = alive(ledger.plannedFlows);
   const ops = alive(ledger.operations).filter((o) => o.status === 'pending' && o.date >= from && o.date <= to);
-  const taken = new Set<string>(); // flowId|date déjà pointés
+  const taken = new Set<string>(); // flowId|date déjà rapprochés
   for (const o of alive(ledger.operations)) {
     if (o.plannedFlowId) {
       const f = flows.find((x) => x.id === o.plannedFlowId);
@@ -250,11 +250,11 @@ export interface MissingFlow {
   name: string;
   expectedDate: ISODate;
   amount: Cents;
-  /** Fin de la fenêtre de pointage. */
+  /** Fin de la fenêtre de rapprochement. */
   windowEnd: ISODate;
 }
 
-/** Occurrences de flux dont la fenêtre est passée sans opération pointée. */
+/** Occurrences de flux dont la fenêtre est passée sans opération rapprochée. */
 export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): MissingFlow[] {
   const out: MissingFlow[] = [];
   const matched = new Set<string>();

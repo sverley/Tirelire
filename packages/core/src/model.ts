@@ -159,12 +159,12 @@ export interface PlannedFlow {
   counterpartAccountId?: Id;
   categoryId?: Id;
   periodicity: Periodicity;
-  /** Fenêtre de pointage en jours autour de la date attendue. */
+  /** Fenêtre de rapprochement de flux en jours autour de la date attendue. */
   dateWindowDays: number;
   amountTolerance?: AmountTolerance;
-  /** Motif de libellé (expression régulière, insensible à la casse) pour le pointage. */
+  /** Motif de libellé (expression régulière, insensible à la casse) pour le rapprochement de flux. */
   labelPattern?: string;
-  /** Revenu variable : tolérance large, jamais pointé automatiquement sans confirmation. */
+  /** Revenu variable : tolérance large, jamais rapproché d'un flux automatiquement sans confirmation. */
   variable?: boolean;
   activeFrom?: ISODate;
   activeTo?: ISODate;
@@ -179,7 +179,7 @@ export type OperationOrigin = 'imported' | 'manual';
 
 export type OperationStatus =
   | 'pending' // à traiter
-  | 'matched' // pointée sur un flux prévu
+  | 'matched' // rapprochée d'un flux prévu
   | 'categorized' // catégorisée
   | 'transfer' // transfert interne apparié
   | 'oneOff'; // dépense ponctuelle
@@ -203,7 +203,7 @@ export interface Operation {
   status: OperationStatus;
   /** Catégorie proposée par la source (banque, Linxo), à confirmer. */
   suggestedCategory?: string;
-  /** Flux prévu pointé. */
+  /** Flux prévu rapproché (rapprochement de flux, D22). */
   plannedFlowId?: Id;
   /** Transfert interne : compte de contrepartie. */
   transferAccountId?: Id;
