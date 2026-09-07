@@ -111,7 +111,7 @@
   }
 </script>
 
-<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Enveloppes</h1>
 <p class="muted small">Une enveloppe est un sous-compte comptable hébergé sur un compte réel : provision pour une échéance, objectif d'épargne, ou budget courant.</p>
 

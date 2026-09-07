@@ -23,6 +23,8 @@ class AppState {
   ledger = $state<Ledger>(emptyLedger());
   asOf = $state<string>(todayISO());
   view = $state<View>('plan');
+  /** Vues traversées pour revenir en arrière (geste Android, chevron) sans quitter l'appli. */
+  history = $state<View[]>([]);
   ready = $state(false);
   error = $state<string | undefined>(undefined);
   private opened: OpenedStore | undefined;
@@ -65,6 +67,33 @@ class AppState {
 
   newId(): string {
     return uuidv7();
+  }
+
+  /** Change d'onglet principal : repart d'une pile vide (nouveau contexte de navigation). */
+  switchTab(view: View): void {
+    this.history = [];
+    this.view = view;
+  }
+
+  /** Ouvre une vue en gardant trace de la précédente pour le retour. */
+  go(view: View): void {
+    if (view === this.view) return;
+    this.history = [...this.history, this.view];
+    this.view = view;
+  }
+
+  /**
+   * Revient à la vue précédente s'il y en a une. Renvoie `false` quand la pile est
+   * vide (on est à la racine d'un onglet) : c'est à l'appelant de décider, par
+   * exemple quitter l'application sur le geste Android.
+   */
+  back(): boolean {
+    const rest = this.history.slice(0, -1);
+    const previous = this.history.at(-1);
+    if (previous === undefined) return false;
+    this.history = rest;
+    this.view = previous;
+    return true;
   }
 
   /** Écrit un patch (opérations + ventilations) d'un seul coup. */

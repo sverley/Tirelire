@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { app, type View } from './lib/state.svelte';
+  import { isNative } from './lib/platform';
   import Plan from './views/Plan.svelte';
   import Accounts from './views/Accounts.svelte';
   import Envelopes from './views/Envelopes.svelte';
@@ -18,9 +20,25 @@
     { id: 'review', label: 'Bilan', ico: '◔', group: ['review'] },
     { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'envelopes', 'flows', 'entries', 'settings'] },
   ];
+
+  // Geste « retour » Android : revient à l'écran précédent au lieu de quitter l'appli
+  // tant qu'il reste quelque chose dans la pile de navigation (voir `app.go`/`app.back`).
+  onMount(() => {
+    if (!isNative) return;
+    let handle: { remove(): void } | undefined;
+    import('@capacitor/app').then(({ App: CapacitorApp }) => {
+      CapacitorApp.addListener('backButton', () => {
+        if (!app.back()) CapacitorApp.exitApp();
+      }).then((h) => (handle = h));
+    });
+    return () => handle?.remove();
+  });
 </script>
 
 <header class="topbar">
+  {#if app.history.length > 0}
+    <button class="back" aria-label="Retour" onclick={() => app.back()}>‹</button>
+  {/if}
   <div class="brand"><img src="/icon.svg" alt="" /> Tirelire</div>
   <div class="spacer"></div>
   <label class="small muted">
@@ -59,7 +77,7 @@
 
 <nav class="tabbar">
   {#each tabs as t (t.id)}
-    <button class:active={t.group.includes(app.view)} onclick={() => (app.view = t.id)} aria-label={t.label}>
+    <button class:active={t.group.includes(app.view)} onclick={() => app.switchTab(t.id)} aria-label={t.label}>
       <span class="ico" aria-hidden="true">{t.ico}</span>{t.label}
     </button>
   {/each}

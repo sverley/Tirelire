@@ -97,11 +97,11 @@
   async function loadExample() {
     if (app.ledger.accounts.length && !confirm("Remplacer les données courantes par l'exemple ?")) return;
     await app.loadExample();
-    app.view = 'plan';
+    app.switchTab('plan');
   }
 </script>
 
-<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Réglages</h1>
 
 <h2>Année budgétaire</h2>

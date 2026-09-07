@@ -288,7 +288,7 @@
     <div class="row"><div class="label">Classées par une règle</div><div class="num">{report.ruled}</div></div>
   </div>
   <div class="actions">
-    <button class="btn primary" onclick={() => (app.view = 'operations')}>Trier les opérations</button>
+    <button class="btn primary" onclick={() => app.switchTab('operations')}>Trier les opérations</button>
     <button class="btn" onclick={reset}>Importer un autre fichier</button>
   </div>
 {/if}

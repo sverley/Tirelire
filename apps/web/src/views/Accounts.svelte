@@ -71,7 +71,7 @@
   }
 </script>
 
-<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
+<p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Comptes</h1>
 <p class="muted small">Le pivot est le compte réel par lequel tout transite. Les comptes d'accueil hébergent des enveloppes ; les comptes tiers ne sont pas importés, on y saisit à la main ce qui concerne le plan.</p>
 
