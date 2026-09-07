@@ -6,6 +6,12 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      deploiement:
+        description: "Dépôt FTP sur l'hébergement"
+        type: choice
+        options: [automatique, essai-a-blanc, ignorer]
+        default: automatique
 
 permissions:
   contents: write
@@ -36,8 +42,6 @@ jobs:
     name: Site pour hébergement mutualisé
     needs: test
     runs-on: ubuntu-latest
-    env:
-      FTP_HOST: ${{ secrets.OVH_FTP_HOST }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4 # version lue dans package.json (packageManager)
@@ -56,20 +60,103 @@ jobs:
           name: tirelire-hebergement
           path: apps/hebergement/tirelire-hebergement.zip
           retention-days: 30
-      - name: Déposer par FTP sur l'hébergement (seulement si les secrets OVH_FTP_* existent)
-        if: github.event_name != 'pull_request' && env.FTP_HOST != ''
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+
+  deploiement:
+    name: Dépôt FTP sur l'hébergement
+    needs: hebergement
+    if: github.event_name != 'pull_request' && inputs.deploiement != 'ignorer'
+    runs-on: ubuntu-latest
+    # Un seul dépôt à la fois : deux transferts simultanés laisseraient le site à moitié à jour.
+    concurrency:
+      group: deploiement-ftp
+      cancel-in-progress: false
+    env:
+      HOTE: ${{ secrets.OVH_FTP_HOST }}
+      UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
+      MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
+      # Variables de dépôt (Settings → Secrets and variables → Actions → Variables), toutes facultatives :
+      DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER || 'www' }}
+      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
+      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
+      NETTOYER: ${{ vars.TIRELIRE_FTP_NETTOYER || 'non' }}
+      ADRESSE_SITE: ${{ vars.TIRELIRE_SITE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets présents ?
+        id: pret
+        run: |
+          if [ -n "$HOTE" ] && [ -n "$UTILISATEUR" ] && [ -n "$MOTDEPASSE" ]; then
+            echo "pret=oui" >> "$GITHUB_OUTPUT"
+          else
+            echo "pret=non" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Dépôt FTP ignoré"
+              echo
+              echo "Les secrets \`OVH_FTP_HOST\`, \`OVH_FTP_USER\` et \`OVH_FTP_PASSWORD\` ne sont pas tous"
+              echo "renseignés dans le dépôt. Le site reste téléchargeable dans la release \`latest\`"
+              echo "(\`tirelire-hebergement.zip\`). Voir \`docs/hebergement-web.md\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Récupérer le site assemblé
+        if: steps.pret.outputs.pret == 'oui'
+        uses: actions/download-artifact@v4
         with:
-          server: ${{ secrets.OVH_FTP_HOST }}
-          username: ${{ secrets.OVH_FTP_USER }}
-          password: ${{ secrets.OVH_FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: apps/hebergement/dist/
-          server-dir: ${{ secrets.OVH_FTP_DIR || 'www/' }}
-          # Ne jamais toucher aux paquets de synchronisation ni à la configuration locale du relais.
-          exclude: |
-            donnees/**
-            relais.config.php
+          name: tirelire-hebergement
+          path: ${{ runner.temp }}/archive
+
+      - name: Ouvrir l'archive
+        if: steps.pret.outputs.pret == 'oui'
+        run: |
+          mkdir -p "$RUNNER_TEMP/site"
+          unzip -q "$RUNNER_TEMP/archive/tirelire-hebergement.zip" -d "$RUNNER_TEMP/site"
+          # Garde-fou : ni configuration locale du relais ni paquets de synchronisation dans ce qui part.
+          rm -f "$RUNNER_TEMP/site/relais.config.php"
+          rm -f "$RUNNER_TEMP/site/donnees/"*.jsonl
+          test -f "$RUNNER_TEMP/site/index.html"
+          test -f "$RUNNER_TEMP/site/relais.php"
+          test -f "$RUNNER_TEMP/site/.htaccess"
+
+      - name: Installer lftp
+        if: steps.pret.outputs.pret == 'oui'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Transférer
+        if: steps.pret.outputs.pret == 'oui'
+        env:
+          SOURCE: ${{ runner.temp }}/site
+          BLANC: ${{ inputs.deploiement == 'essai-a-blanc' && '1' || '' }}
+        run: bash apps/hebergement/deposer.sh
+
+      - name: Vérifier le site en ligne
+        if: steps.pret.outputs.pret == 'oui' && inputs.deploiement != 'essai-a-blanc' && env.ADRESSE_SITE != ''
+        run: |
+          base="${ADRESSE_SITE%/}"
+          echo "Page d'accueil…"
+          curl -fsS --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/index.html" "$base/"
+          grep -qi 'tirelire' "$RUNNER_TEMP/index.html"
+          echo "Relais (réécriture .htaccess)…"
+          code=$(curl -s -o "$RUNNER_TEMP/relais.json" -w '%{http_code}' "$base/r/verification-ci-0000?site=ci&after=0")
+          [ "$code" = "200" ] || { echo "Le relais répond $code"; cat "$RUNNER_TEMP/relais.json"; exit 1; }
+          grep -q '"records"' "$RUNNER_TEMP/relais.json"
+          echo "Salon invalide refusé…"
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$base/r/x")" = "400" ]
+          echo "Données non servies…"
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$base/donnees/")" != "200" ]
+          echo "Tout est en place."
+
+      - name: Résumé
+        if: steps.pret.outputs.pret == 'oui'
+        run: |
+          {
+            echo "### Site déposé sur l'hébergement"
+            echo
+            echo "- Protocole : \`$PROTOCOLE\` vers \`$HOTE\`, dossier \`$DOSSIER\`"
+            echo "- Mode : ${{ inputs.deploiement == 'essai-a-blanc' && 'essai à blanc (rien transféré)' || 'transfert réel' }}"
+            echo "- Anciens fichiers : $([ "$NETTOYER" = oui ] && echo supprimés || echo conservés)"
+            echo "- Jamais touchés : \`donnees/*.jsonl\`, \`relais.config.php\`"
+            if [ -n "$ADRESSE_SITE" ]; then echo "- Vérifié en ligne : $ADRESSE_SITE"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   android:
     name: APK Android

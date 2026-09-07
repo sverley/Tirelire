@@ -31,7 +31,7 @@ Tirelire/
 │   ├── src/views/*.svelte  Plan, Operations, Import, Review, More, Accounts, Envelopes, Flows, Entries, Settings
 │   └── android/            projet Capacitor (icônes, signature, versions par variables d'environnement)
 ├── apps/relay/             relais HTTP minimal (Node), paquets chiffrés
-├── apps/hebergement/       site pour hébergement mutualisé : PWA + relais PHP, .htaccess, .ovhconfig, assembleur
+├── apps/hebergement/       site pour hébergement mutualisé : PWA + relais PHP, .htaccess, .ovhconfig, assembleur, dépôt FTP
 ├── docs/                   analyse, décisions, formats d'import, synchronisation, hébergement web, reprise
 └── .github/workflows/ci.yml  tests, build web, APK, releases
 ```

@@ -41,7 +41,8 @@ données de l'analyse pour voir le plan tout de suite.
 - **Synchronisation** : paquets de changements par fichier, direct WebRTC (QR code) et relais
   privé chiffré (voir `docs/synchronisation.md`).
 - **Hébergement web mutualisé** : la PWA et son relais en PHP à déposer par FTP sur un
-  hébergement Apache + PHP (OVHcloud sans VPS), archive `tirelire-hebergement.zip` jointe aux
+  hébergement Apache + PHP (OVHcloud sans VPS), dépôt FTP automatique dès que les secrets
+  `OVH_FTP_*` existent dans le dépôt, archive `tirelire-hebergement.zip` jointe aux
   releases (voir `docs/hebergement-web.md`).
 
 ## Conventions
