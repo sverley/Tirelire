@@ -303,3 +303,15 @@ portaient pas gardent leur état de traitement. Verrouiller de trop se défait e
 
 Vaut pour la migration seule. Une opération classée par une règle après D23 reste rapprochée et
 donc reprise à chaque passage, comme D22 le prévoit.
+## D35 · 2026-09-07 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
+
+Pour être utilisable depuis un hébergement web mutualisé (OVHcloud sans VPS : Apache, PHP,
+pas de Node ni de processus persistant), l'application ne change pas de modèle : les données
+restent sur les appareils (D08), le serveur ne fait que servir les fichiers de la PWA et
+relayer des paquets chiffrés. `apps/hebergement` fournit `relais.php` (même contrat que
+`apps/relay/server.mjs`, fichiers `.jsonl` sous verrou), `.htaccess`, `.ovhconfig` et un
+assembleur qui construit la PWA avec un préfixe d'adresse (`vite --base`). L'adresse du site
+est proposée d'office comme relais. Une version « serveur de vérité » (comptes utilisateurs,
+base MySQL, logique côté serveur) a été écartée : elle contredirait D07/D08, imposerait une
+authentification et retirerait le fonctionnement hors ligne. Livraison : archive jointe aux
+releases, dépôt FTPS automatique si des secrets `OVH_FTP_*` existent (D15).

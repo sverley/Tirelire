@@ -2,7 +2,9 @@ import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// `--base` (ou TIRELIRE_BASE) permet de servir le site depuis un sous-dossier d'un hébergement.
 export default defineConfig({
+  base: process.env.TIRELIRE_BASE ?? '/',
   plugins: [
     svelte(),
     VitePWA({

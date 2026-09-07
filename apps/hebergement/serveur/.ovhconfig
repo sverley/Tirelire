@@ -1,0 +1,6 @@
+; Configuration OVHcloud (hébergement web mutualisé). Peut aussi vivre à la racine `www/`.
+app.engine=php
+app.engine.version=8.3
+http.firewall=none
+environment=production
+container.image=stable64
