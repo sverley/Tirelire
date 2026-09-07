@@ -224,6 +224,16 @@
     app.upsert('needs', need);
     goalEditing = false;
   }
+  function removeGoal(n: Need) {
+    const e = envelopes.find((e) => e.id === n.envelopeId);
+    if (!confirm(`Supprimer l’objectif « ${n.name ?? e?.name ?? '?'} » ?`)) return;
+    if (e) {
+      for (const other of needsOf(e)) app.remove('needs', other.id);
+      app.remove('envelopes', e.id);
+    } else {
+      app.remove('needs', n.id);
+    }
+  }
 
   // --- Revenus (flux prévus de type income) ---
   let incForm = $state({ name: '', amount: '', accountId: '', intervalMonths: '1', anchorDate: app.asOf, variable: false });
@@ -462,6 +472,7 @@
           <span class="sub">{money(n.monthlyAmount ?? 0)} par période{n.amount !== undefined ? ` · cible ${money(n.amount)}` : ''}</span>
         </div>
       </div>
+      <div class="actions" style="margin:6px 0 0"><button class="btn small danger" onclick={() => removeGoal(n)}>Supprimer</button></div>
     </div>
   {/each}
   {#if goalEditing}
