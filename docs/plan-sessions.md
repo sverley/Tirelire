@@ -17,7 +17,18 @@ Les lots ci-dessous corrigent cela dans l'ordre de ce qui débloque le reste.
 
 ---
 
-## Lot 6 · Filtrer, agir, régler — écran Opérations (D36, D26, D27)
+## Lot 6 · Filtrer, agir, régler — écran Opérations (D36, D26, D27) — **fait le 7 septembre**
+
+Livré : la recherche porte les champs d'une sélection d'automatisme (libellé littéral ou expression
+régulière, compte, fourchette de montants, dates), le bloc d'actions est visible sans rien cocher
+et s'applique aux lignes cochées ou à tout le résultat, l'aperçu est permanent, et *Enregistrer
+l'automatisme* reprend la recherche telle quelle. Le placement voulu d'une enveloppe est devenu une
+répartition (D38) et « règle » s'appelle « automatisme » (D39).
+
+Reste de ce lot, à faire : la ventilation à parts dans le bloc d'actions (aujourd'hui catégorie,
+enveloppe, ponctuelle et état seulement).
+
+## Lot 6 bis · Ancien contenu du lot 6, pour mémoire
 
 Le cœur du problème. Un seul écran doit permettre de chercher, d'agir en masse, et de transformer
 la recherche en règle sans rien ressaisir.
@@ -39,8 +50,8 @@ la recherche en règle sans rien ressaisir.
   `inferSelection` remplit le panneau de filtre, que l'on corrige avant d'enregistrer.
 
 **Fait quand** : depuis une base importée, on peut taper « CASINO », voir le nombre d'opérations
-concernées, choisir catégorie et enveloppe, lire l'aperçu, appliquer aux résultats, puis créer la
-règle correspondante sans ressaisir le filtre.
+concernées, choisir catégorie et enveloppe, lire l'aperçu, appliquer aux résultats, puis créer
+l'automatisme correspondant sans ressaisir le filtre.
 
 ---
 
@@ -73,8 +84,10 @@ une règle d'un cran change le résultat quand deux règles se disputent une op�
   offert, pas découvert), priorité modifiable, et afficher la répartition réelle par compte même
   quand elle est conforme au placement voulu.
 - Opérations : montrer les parts d'une ventilation dans la liste, pas seulement dans l'éditeur.
-- **Jeu d'exemple étoffé** : une enveloppe portant deux besoins, deux ou trois règles dont une
-  issue d'un flux, une opération ventilée en parts, un compte tiers avec un solde à régler. Sans
+- **Jeu d'exemple étoffé** : une enveloppe portant deux besoins, une enveloppe au placement
+  réparti sur deux comptes (D38), deux ou trois automatismes dont un issu d'un flux, une opération
+  ventilée en parts, un compte tiers avec un solde à régler. Les chiffres sont à choisir avec soin :
+  plusieurs tests encodent cet exemple, et chacun doit rester justifié par une décision. Sans
   cela, l'application paraît identique à l'ancienne quand on la découvre.
 
 **Fait quand** : charger l'exemple suffit à voir, sans rien créer, ce que D19 à D28 ont changé.
@@ -108,7 +121,7 @@ typées) : la refaire sur le modèle actuel plutôt que la rebaser.
 
 - Décider avec Simon du sort de `feature/connecteur-banque` (Enable Banking) et des deux branches
   `etude/`. La première porte un « D18 » en collision avec celui de `main` : renuméroter à partir
-  de D37. (`feature/serveur-web` a été fusionnée le 7 septembre, renumérotée D35.)
+  de D39. (`feature/serveur-web` a été fusionnée le 7 septembre, renumérotée D35.)
 - Compactage du journal de changements une fois tous les pairs à jour.
 - Import du second compte (les enfants) comme compte d'accueil ou tiers.
 - Profil d'import Linxo, dès que Simon fournit un export (à ne jamais versionner).

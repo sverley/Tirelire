@@ -66,12 +66,24 @@ export type Rollover = { mode: 'none' } | { mode: 'unlimited' } | { mode: 'cappe
  * l'enveloppe : en fin de période, l'excédent au-delà de la réserve des besoins non récurrents
  * est libéré (`none`) ou plafonné (`capped`).
  */
+/**
+ * Composante voulue du placement (D38) : la part du solde de l'enveloppe qui devrait se trouver
+ * sur ce compte. `variable` désigne le reste ; il n'y en a qu'une.
+ */
+export interface PlacementPart {
+  accountId: Id;
+  share: Share;
+}
+
 export interface Envelope {
   id: Id;
   name: string;
-  /** Compte où l'argent de l'enveloppe devrait se trouver. */
-  placementAccountId: Id;
-  /** Solde à `openingDate`, réputé sur le compte de placement. */
+  /**
+   * Où l'argent de l'enveloppe devrait dormir (D20, D38) : une répartition, pas un compte. Vide,
+   * elle ne produit aucun écart — l'argent est bien là où il est.
+   */
+  placement: PlacementPart[];
+  /** Solde à `openingDate`, réputé sur le premier compte du placement. */
   openingBalance: Cents;
   openingDate: ISODate;
   /** Sort de l'excédent en fin de période ; `unlimited` par défaut. */
@@ -301,7 +313,7 @@ export function fixedShare(amount: Cents): Share {
  * remplis. `labelPattern` est une expression régulière insensible à la casse, éprouvée sur le
  * libellé, le libellé normalisé et le détail.
  */
-export interface RuleSelection {
+export interface AutomationSelection {
   labelPattern?: string;
   accountId?: Id;
   /** Bornes de montant, dans le signe de l'opération (−5000 à −1000 pour de grosses dépenses). */
@@ -319,19 +331,19 @@ export interface RuleSelection {
  *                  restant non traitée, ce que l'interface doit savoir distinguer de « rien dessus » ;
  *  - `unlock`    : réservé aux actions groupées (D26), indisponible dans une règle.
  */
-export type RuleStateAction = 'lock' | 'reconcile' | 'none' | 'unlock';
+export type AutomationStateAction = 'lock' | 'reconcile' | 'none' | 'unlock';
 
 /**
  * Action d'une règle : chaque champ est facultatif, et seuls les champs renseignés écrasent ce
  * qu'une règle moins prioritaire a posé. `allocation` remplace la ventilation entière ; une part
  * variable la rend rejouable à montant inconnu d'avance (D27).
  */
-export interface RuleAction {
+export interface AutomationAction {
   categoryId?: Id;
   envelopeId?: Id;
   allocation?: Array<{ categoryId?: Id; envelopeId?: Id; share: Share }>;
   oneOff?: boolean;
-  state?: RuleStateAction;
+  state?: AutomationStateAction;
 }
 
 /**
@@ -344,11 +356,11 @@ export interface RuleAction {
  * Les périodes de validité rendent les règles rejouables dans l'ordre chronologique sur un
  * historique importé : une règle archivée (`validTo`) ne sélectionne plus rien après sa fin.
  */
-export interface Rule {
+export interface Automation {
   id: Id;
   name?: string;
-  selection: RuleSelection;
-  action: RuleAction;
+  selection: AutomationSelection;
+  action: AutomationAction;
   /** Clé de rang triable ; comparée en ordre lexicographique, l'identifiant tranche les égalités. */
   rank: string;
   /** Validité : bornes sur la date de l'opération, pas sur l'horloge. */
@@ -397,7 +409,7 @@ export interface Ledger {
   plannedFlows: PlannedFlow[];
   operations: Operation[];
   allocations: Allocation[];
-  rules: Rule[];
+  automations: Automation[];
   importProfiles: ImportProfile[];
   devices: Device[];
   settings: Settings;
@@ -412,7 +424,7 @@ export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
     plannedFlows: [],
     operations: [],
     allocations: [],
-    rules: [],
+    automations: [],
     importProfiles: [],
     devices: [],
     settings: { ...DEFAULT_SETTINGS, ...settings },

@@ -12,7 +12,7 @@ import { occurrencesBetween } from './periods.js';
 import { fundByPriority, transferLabel } from './plan.js';
 import { envelopeComponents, indexLedger, periodSnapshot } from './balances.js';
 import { uuidv7, normalizeLabel } from './ids.js';
-import { applyRules } from './rules.js';
+import { applyAutomations } from './automations.js';
 
 export interface Patch {
   operations: Operation[];
@@ -80,7 +80,8 @@ export function distributeTransfer(ledger: Ledger, accountId: Id, amount: Cents,
   const pivot = idx.pivot;
   const lines: Array<{ envelopeId: Id; name: string; priority: number; dueDate: string; floor: Cents; requested: Cents; funded: Cents }> = [];
   for (const e of idx.envelopesById.values()) {
-    if (e.placementAccountId !== accountId) continue;
+    // Enveloppes qui veulent de l'argent sur ce compte (D38).
+    if (!e.placement.some((p) => p.accountId === accountId)) continue;
     const comps = envelopeComponents(e, idx, asOf);
     const gap = pivot ? (comps.get(pivot.id) ?? 0) : 0;
     if (gap <= 0) continue;
@@ -340,7 +341,7 @@ export function runPipeline(ledger: Ledger, from: ISODate, to: ISODate, apply: (
     l = apply(applyMatch(l, m));
     autoMatched++;
   }
-  const r = applyRules(l);
+  const r = applyAutomations(l);
   l = apply(r);
   return {
     transfersPaired: t.operations.length / 2,

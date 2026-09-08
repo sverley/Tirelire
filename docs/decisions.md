@@ -344,3 +344,30 @@ ne charge jamais une page pointant vers des ressources absentes ; `donnees/*.jso
 `relais.config.php` sont exclus de l'envoi **et** du nettoyage, car ils appartiennent au serveur.
 Le nettoyage des anciens fichiers est facultatif (`TIRELIRE_FTP_NETTOYER`) et désactivé par
 défaut : un appareil pas encore rechargé demande encore les fragments de la version précédente.
+## D38 · 2026-09-07 · Le placement voulu est une répartition, pas un compte
+
+Corrige une simplification faite au lot 1 : D20 avait été implémentée avec un compte de placement
+unique, ce qui contredit l'esprit de D19 — une enveloppe est répartie sur plusieurs comptes, donc
+elle doit pouvoir vouloir l'être.
+
+Le placement est une liste de composantes voulues, une par compte, chacune portant une **part** au
+sens de D27 : un montant fixe, un pourcentage du solde de l'enveloppe, ou le reste. Au plus une
+composante « reste » ; en son absence, ce qui dépasse est réputé vouloir rester où il se trouve.
+« 1 200 € sur le livret, le reste sur le pivot » et « 70 % sur le livret, le reste sur le pivot »
+s'écrivent donc de la même façon qu'une ventilation.
+
+Les mêmes règles qu'avant s'appliquent ensuite : l'écart entre position réelle et position voulue
+nourrit le plan, « à faire » au-dessus du seuil, « à surveiller » en dessous, jamais corrigé
+d'office. Une enveloppe sans placement déclaré ne produit aucun écart : elle est bien là où elle est.
+
+## D39 · 2026-09-07 · Une règle s'appelle un automatisme, et se crée depuis la recherche
+
+Le mot « règle » laissait croire à une contrainte ; ce sont des automatismes, qu'on ajoute et
+retire sans cérémonie. Renommage dans l'interface comme dans le code (`Automation`, table
+`automations`).
+
+Conséquence directe de D36 : il n'y a pas d'un côté une recherche et de l'autre un formulaire
+d'automatisme, mais un seul écran. On cherche avec les champs d'une sélection, on ajoute des
+actions à appliquer à ce que la recherche retourne, on applique tout de suite si on veut, et
+« Enregistrer » transforme le couple recherche + actions en automatisme. Créer un automatisme
+n'est donc jamais un geste à part : c'est garder une recherche qu'on vient de faire.

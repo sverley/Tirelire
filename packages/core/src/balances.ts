@@ -220,9 +220,14 @@ function entriesEffect(e: Envelope, idx: LedgerIndex, from: ISODate, to: ISODate
 // Chronologie : dotations et libérations par période (D29)
 // ---------------------------------------------------------------------------
 
-/** Compte qui reçoit les dotations : le pivot, sinon le compte de placement. */
+/** Compte de repli d'une enveloppe : le premier compte de son placement voulu (D38). */
+export function homeAccount(e: Envelope): Id | undefined {
+  return e.placement[0]?.accountId;
+}
+
+/** Compte qui reçoit les dotations : le pivot, sinon le premier compte du placement. */
 export function dotationAccount(e: Envelope, idx: LedgerIndex): Id {
-  return idx.pivot?.id ?? e.placementAccountId;
+  return idx.pivot?.id ?? homeAccount(e) ?? '';
 }
 
 /** Croisière d'un besoin par période de paie. */
@@ -360,12 +365,13 @@ function add(c: Components, accountId: Id, amount: Cents): void {
  */
 export function envelopeComponents(e: Envelope, idx: LedgerIndex, asOf: ISODate): Components {
   const c: Components = new Map();
-  if (e.openingDate <= asOf) add(c, e.placementAccountId, e.openingBalance);
+  const home = homeAccount(e);
+  if (e.openingDate <= asOf && home) add(c, home, e.openingBalance);
   for (const entry of entriesUpTo(e, idx, asOf)) for (const eff of entry.effects) add(c, eff.accountId, eff.amount);
   const dot = dotationAccount(e, idx);
   for (const s of envelopeTimeline(e, idx, asOf)) {
     if (s.period.start <= asOf) add(c, dot, s.dotation);
-    if (s.period.end < asOf) add(c, e.placementAccountId, -s.release);
+    if (s.period.end < asOf && home) add(c, home, -s.release);
   }
   for (const [k, v] of c) if (v === 0) c.delete(k);
   return c;
@@ -378,12 +384,52 @@ export function envelopeBalance(e: Envelope, idx: LedgerIndex, asOf: ISODate): C
   return s;
 }
 
-/** Écarts de placement (D20) : composantes hors du compte de placement. Positif = à déplacer vers le placement. */
+/**
+ * Position voulue d'une enveloppe (D38) : le placement, résolu sur son solde du moment. Les parts
+ * fixes et les pourcentages d'abord, la part « reste » ensuite. Sans placement déclaré, la
+ * position voulue est la position réelle : l'argent est bien là où il est.
+ */
+export function wantedComponents(e: Envelope, idx: LedgerIndex, asOf: ISODate): Components {
+  const real = envelopeComponents(e, idx, asOf);
+  if (e.placement.length === 0) return real;
+  const total = [...real.values()].reduce((s, v) => s + v, 0);
+  const out: Components = new Map();
+  let used = 0;
+  let rest: Id | undefined;
+  for (const part of e.placement) {
+    if (part.share.kind === 'variable') {
+      if (rest === undefined) rest = part.accountId;
+      continue;
+    }
+    const amount = part.share.kind === 'fixed' ? part.share.amount : Math.round((total * part.share.pct) / 100);
+    // On ne veut pas placer plus que ce que l'enveloppe contient : la dernière part absorbe le manque.
+    const capped = total >= 0 ? Math.min(amount, Math.max(0, total - used)) : Math.max(amount, Math.min(0, total - used));
+    add(out, part.accountId, capped);
+    used += capped;
+  }
+  if (rest !== undefined) add(out, rest, total - used);
+  else if (total !== used) {
+    // Pas de part « reste » : le surplus est réputé vouloir rester là où il est déjà.
+    for (const [accountId, amount] of real) {
+      if (e.placement.some((p) => p.accountId === accountId)) continue;
+      add(out, accountId, amount);
+    }
+  }
+  for (const [k, v] of out) if (v === 0) out.delete(k);
+  return out;
+}
+
+/**
+ * Écarts de placement (D20, D38) : par compte, ce qui s'y trouve de trop (positif) ou y manque
+ * (négatif) au regard du placement voulu.
+ */
 export function placementGaps(e: Envelope, idx: LedgerIndex, asOf: ISODate): ComponentEffect[] {
+  const real = envelopeComponents(e, idx, asOf);
+  const wanted = wantedComponents(e, idx, asOf);
   const out: ComponentEffect[] = [];
-  for (const [accountId, amount] of envelopeComponents(e, idx, asOf)) {
-    if (accountId === e.placementAccountId) continue;
-    out.push({ accountId, amount });
+  for (const accountId of new Set([...real.keys(), ...wanted.keys()])) {
+    const amount = (real.get(accountId) ?? 0) - (wanted.get(accountId) ?? 0);
+    if (amount !== 0) out.push({ accountId, amount });
   }
   return out;
 }
@@ -443,7 +489,7 @@ export function settlementBalance(third: Account, ledger: Ledger, idx: LedgerInd
     if (isOnThird && op.transferAccountId) continue;
     const placedHere = (idx.allocationsByOperation.get(op.id) ?? []).reduce((s, al) => {
       const env = al.envelopeId ? idx.envelopesById.get(al.envelopeId) : undefined;
-      return env && env.placementAccountId === third.id ? s + allocationAmount(al) : s;
+      return env && homeAccount(env) === third.id ? s + allocationAmount(al, idx) : s;
     }, 0);
     const outside = op.amount - placedHere;
     owes += isOnThird ? -outside : outside;

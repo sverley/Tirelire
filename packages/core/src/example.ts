@@ -33,15 +33,15 @@ export function exampleLedger(): Ledger {
   );
 
   l.envelopes.push(
-    { id: 'env-tf', name: 'Taxe foncière', placementAccountId: 'acc-livret', openingBalance: euros(900), openingDate: '2026-08-27' },
-    { id: 'env-auto', name: 'Assurance auto', placementAccountId: 'acc-livret', openingBalance: euros(300), openingDate: '2026-08-27' },
-    { id: 'env-vac', name: 'Vacances', placementAccountId: 'acc-livret', openingBalance: euros(400), openingDate: '2026-08-27' },
-    { id: 'env-precaution', name: 'Épargne de précaution', placementAccountId: 'acc-livret', openingBalance: euros(3200), openingDate: '2026-08-27' },
-    { id: 'env-alim', name: 'Alimentation', placementAccountId: 'acc-pivot', openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
-    { id: 'env-essence', name: 'Essence', placementAccountId: 'acc-pivot', openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
-    { id: 'env-divers', name: 'Divers et sorties', placementAccountId: 'acc-pivot', openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
-    { id: 'env-enfants', name: 'Enfants et loisirs', placementAccountId: 'acc-enfants', openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'unlimited' } },
-    { id: 'env-sante', name: 'Santé', placementAccountId: 'acc-pivot', openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-tf', name: 'Taxe foncière', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(900), openingDate: '2026-08-27' },
+    { id: 'env-auto', name: 'Assurance auto', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(300), openingDate: '2026-08-27' },
+    { id: 'env-vac', name: 'Vacances', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(400), openingDate: '2026-08-27' },
+    { id: 'env-precaution', name: 'Épargne de précaution', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(3200), openingDate: '2026-08-27' },
+    { id: 'env-alim', name: 'Alimentation', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-essence', name: 'Essence', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-divers', name: 'Divers et sorties', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-enfants', name: 'Enfants et loisirs', placement: [{ accountId: 'acc-enfants', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'unlimited' } },
+    { id: 'env-sante', name: 'Santé', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
   );
 
   const monthlyNeed = (anchor: string) => ({ intervalMonths: 1, anchorDate: anchor });

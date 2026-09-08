@@ -16,9 +16,10 @@
 
   // Enveloppe : nom, placement voulu (D20), solde initial, report (D05/D29).
   let editing = $state<Envelope | undefined>(undefined);
+  type PlacementForm = { accountId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
   let form = $state({
     name: '',
-    placementAccountId: '',
+    placement: [] as PlacementForm[],
     openingBalance: '0,00',
     openingDate: app.asOf,
     rollover: 'unlimited' as 'none' | 'unlimited' | 'capped',
@@ -46,17 +47,37 @@
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? '?';
   const needsOf = (e: Envelope) => needs.filter((n) => n.envelopeId === e.id).sort((a, b) => a.priority - b.priority);
 
+  // Regroupement d'affichage : par premier compte de placement (D38), ou « sans placement ».
   const byPlacement = $derived(
     accounts
-      .map((a) => ({ account: a, envelopes: envelopes.filter((e) => e.placementAccountId === a.id) }))
+      .map((a) => ({ account: a, envelopes: envelopes.filter((e) => e.placement[0]?.accountId === a.id) }))
       .filter((g) => g.envelopes.length > 0),
   );
-  const orphans = $derived(envelopes.filter((e) => !accounts.some((a) => a.id === e.placementAccountId)));
+  const orphans = $derived(envelopes.filter((e) => e.placement.length === 0 || !accounts.some((a) => a.id === e.placement[0]?.accountId)));
+
+  function placementText(e: Envelope): string {
+    if (e.placement.length === 0) return 'placement libre';
+    return e.placement
+      .map((p) => {
+        const where = accountName(p.accountId);
+        if (p.share.kind === 'fixed') return `${money(p.share.amount)} sur ${where}`;
+        if (p.share.kind === 'percent') return `${p.share.pct} % sur ${where}`;
+        return `le reste sur ${where}`;
+      })
+      .join(', ');
+  }
 
   function startNew() {
     const pivot = accounts.find((a) => a.kind === 'pivot');
-    editing = { id: app.newId(), name: '', placementAccountId: pivot?.id ?? '', openingBalance: 0, openingDate: app.asOf };
-    form = { name: '', placementAccountId: pivot?.id ?? '', openingBalance: '0,00', openingDate: app.asOf, rollover: 'unlimited', rolloverMonths: '3' };
+    editing = { id: app.newId(), name: '', placement: [], openingBalance: 0, openingDate: app.asOf };
+    form = {
+      name: '',
+      placement: pivot ? [{ accountId: pivot.id, kind: 'variable' as const, value: '' }] : [],
+      openingBalance: '0,00',
+      openingDate: app.asOf,
+      rollover: 'unlimited',
+      rolloverMonths: '3',
+    };
     error = '';
   }
 
@@ -64,7 +85,11 @@
     editing = e;
     form = {
       name: e.name,
-      placementAccountId: e.placementAccountId,
+      placement: e.placement.map((p) => ({
+        accountId: p.accountId,
+        kind: p.share.kind,
+        value: p.share.kind === 'fixed' ? centsToInput(p.share.amount) : p.share.kind === 'percent' ? String(p.share.pct) : '',
+      })),
       openingBalance: centsToInput(e.openingBalance),
       openingDate: e.openingDate,
       rollover: e.rollover?.mode ?? 'unlimited',
@@ -77,13 +102,23 @@
     ev.preventDefault();
     if (!editing) return;
     if (!form.name.trim()) return void (error = 'Le nom est obligatoire.');
-    if (!form.placementAccountId) return void (error = 'Choisis le compte où cet argent devrait dormir.');
+    if (form.placement.filter((p) => p.kind === 'variable').length > 1)
+      return void (error = 'Une seule ligne « le reste » : les autres doivent porter un montant ou un pourcentage.');
+    if (form.placement.some((p) => !p.accountId)) return void (error = 'Chaque ligne de placement vise un compte.');
     const openingBalance = inputToCents(form.openingBalance);
     if (openingBalance === undefined) return void (error = 'Solde initial invalide.');
     const row: Envelope = {
       id: editing.id,
       name: form.name.trim(),
-      placementAccountId: form.placementAccountId,
+      placement: form.placement.map((p) => ({
+        accountId: p.accountId,
+        share:
+          p.kind === 'fixed'
+            ? ({ kind: 'fixed', amount: inputToCents(p.value) ?? 0 } as const)
+            : p.kind === 'percent'
+              ? ({ kind: 'percent', pct: Number(p.value.replace(',', '.')) || 0 } as const)
+              : ({ kind: 'variable' } as const),
+      })),
       openingBalance,
       openingDate: form.openingDate,
       rollover:
@@ -189,11 +224,35 @@
   <form class="edit" onsubmit={save}>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Charges" /></label>
-      <label class="f">Placement voulu
-        <select bind:value={form.placementAccountId}>
-          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
-        </select>
-      </label>
+      <div class="f" style="grid-column:1/-1">
+        <span class="sub">Placement voulu — où cet argent devrait dormir. Plusieurs comptes possibles : un montant, un pourcentage, et « le reste ».</span>
+        {#each form.placement as p, i (i)}
+          <div class="grid" style="align-items:end">
+            <label class="f">Compte
+              <select value={p.accountId} onchange={(ev) => (form.placement[i]!.accountId = (ev.currentTarget as HTMLSelectElement).value)}>
+                <option value="">—</option>
+                {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+              </select>
+            </label>
+            <label class="f">Part
+              <select value={p.kind} onchange={(ev) => (form.placement[i]!.kind = (ev.currentTarget as HTMLSelectElement).value as 'fixed' | 'percent' | 'variable')}>
+                <option value="variable">Le reste</option>
+                <option value="fixed">Montant</option>
+                <option value="percent">Pourcentage</option>
+              </select>
+            </label>
+            {#if p.kind !== 'variable'}
+              <label class="f">{p.kind === 'percent' ? '%' : 'Montant'}
+                <input value={p.value} inputmode="decimal" oninput={(ev) => (form.placement[i]!.value = (ev.currentTarget as HTMLInputElement).value)} />
+              </label>
+            {/if}
+            <button class="btn small danger" type="button" onclick={() => form.placement.splice(i, 1)}>Retirer</button>
+          </div>
+        {/each}
+        <button class="btn small" type="button" onclick={() => form.placement.push({ accountId: '', kind: form.placement.some((x) => x.kind === 'variable') ? 'fixed' : 'variable', value: '' })}>
+          Ajouter un compte
+        </button>
+      </div>
       <label class="f">Solde initial <input bind:value={form.openingBalance} inputmode="decimal" /></label>
       <label class="f">Date du solde initial <input type="date" bind:value={form.openingDate} /></label>
       <label class="f">Excédent en fin de période
@@ -250,14 +309,13 @@
   {#each g.envelopes as e (e.id)}
     {@const bal = envelopeBalance(e, idx, app.asOf)}
     {@const pos = positionOf(e)}
-    {@const ailleurs = pos.filter((c) => c.accountId !== e.placementAccountId)}
     <div class="card">
       <div class="row">
         <div class="label">
           <strong>{e.name}</strong>
           <span class="sub">
-            placement : {accountName(e.placementAccountId)}
-            {#if ailleurs.length}· dont {ailleurs.map((c) => `${money(c.amount)} sur ${accountName(c.accountId)}`).join(', ')}{/if}
+            voulu : {placementText(e)}
+            <br />réel : {pos.length ? pos.map((c) => `${money(c.amount)} sur ${accountName(c.accountId)}`).join(', ') : 'rien'}
             · {ROLLOVER_LABELS[e.rollover?.mode ?? 'unlimited'].toLowerCase()}
           </span>
         </div>
@@ -289,7 +347,7 @@
 {#if orphans.length}
   <h2>Sans compte de placement</h2>
   {#each orphans as e (e.id)}
-    <div class="card warn"><div class="row"><div class="label">{e.name}</div><button class="btn small" onclick={() => startEdit(e)}>Rattacher</button></div></div>
+    <div class="card warn"><div class="row"><div class="label">{e.name}<span class="sub">aucun placement voulu : aucun écart ne sera proposé</span></div><button class="btn small" onclick={() => startEdit(e)}>Placer</button></div></div>
   {/each}
 {/if}
 {#if envelopes.length === 0 && accounts.length > 0}

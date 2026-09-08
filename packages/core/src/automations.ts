@@ -10,7 +10,7 @@
  * chaque champ renseigné écrasant ce qu'une règle moins prioritaire avait posé, les champs vides
  * laissant en place. Il n'y a pas de détection de conflit ; le rang tranche.
  */
-import type { Allocation, Category, Id, Ledger, Operation, OperationState, PlannedFlow, Rule, RuleAction, RuleSelection, RuleStateAction, Share } from './model.js';
+import type { Allocation, Category, Id, Ledger, Operation, OperationState, PlannedFlow, Automation, AutomationAction, AutomationSelection, AutomationStateAction, Share } from './model.js';
 import { alive, isLocked } from './model.js';
 import { emptyPatch, type Patch } from './matching.js';
 import { uuidv7 } from './ids.js';
@@ -49,13 +49,13 @@ export function rankBetween(before: string | undefined, after: string | undefine
 }
 
 /** Règles vivantes, du rang le plus élevé au rang 1 : l'ordre d'application (D23). */
-export function rulesByRank(ledger: Ledger): Rule[] {
-  return alive(ledger.rules).sort((a, b) => (a.rank < b.rank ? 1 : a.rank > b.rank ? -1 : b.id.localeCompare(a.id)));
+export function automationsByRank(ledger: Ledger): Automation[] {
+  return alive(ledger.automations).sort((a, b) => (a.rank < b.rank ? 1 : a.rank > b.rank ? -1 : b.id.localeCompare(a.id)));
 }
 
 /** Rang à donner à une nouvelle règle pour qu'elle passe avant toutes les autres. */
 export function topRank(ledger: Ledger): string {
-  const highest = rulesByRank(ledger)[0];
+  const highest = automationsByRank(ledger)[0];
   return rankBetween(highest?.rank, undefined);
 }
 
@@ -64,7 +64,7 @@ export function topRank(ledger: Ledger): string {
 // ---------------------------------------------------------------------------
 
 /** L'opération remplit-elle tous les critères renseignés ? */
-export function selects(sel: RuleSelection, op: Operation): boolean {
+export function selects(sel: AutomationSelection, op: Operation): boolean {
   if (sel.accountId && op.accountId !== sel.accountId) return false;
   if (sel.amountMin !== undefined && op.amount < sel.amountMin) return false;
   if (sel.amountMax !== undefined && op.amount > sel.amountMax) return false;
@@ -82,14 +82,14 @@ export function selects(sel: RuleSelection, op: Operation): boolean {
 }
 
 /** La règle s'applique-t-elle à cette opération, période de validité comprise ? */
-export function ruleApplies(rule: Rule, op: Operation): boolean {
+export function automationApplies(rule: Automation, op: Operation): boolean {
   if (rule.validFrom && op.date < rule.validFrom) return false;
   if (rule.validTo && op.date > rule.validTo) return false;
   return selects(rule.selection, op);
 }
 
 /** Libellé lisible d'une règle : son nom, sinon ce qu'elle sélectionne. */
-export function ruleLabel(rule: Rule): string {
+export function automationLabel(rule: Automation): string {
   if (rule.name) return rule.name;
   const s = rule.selection;
   const parts = [s.labelPattern, s.amountMin !== undefined || s.amountMax !== undefined ? 'montant' : undefined, s.accountId ? 'compte' : undefined].filter(Boolean);
@@ -111,7 +111,7 @@ export interface Outcome {
   by: Id[];
 }
 
-function stateAfter(current: OperationState, action: RuleStateAction | undefined): OperationState {
+function stateAfter(current: OperationState, action: AutomationStateAction | undefined): OperationState {
   switch (action) {
     case 'lock':
       return 'locked';
@@ -125,7 +125,7 @@ function stateAfter(current: OperationState, action: RuleStateAction | undefined
 }
 
 /** Ventilation à une seule ligne, celle que pose une action qui ne fixe qu'une catégorie. */
-function singleLine(action: RuleAction, categories: Map<Id, Category>): Outcome['allocation'] {
+function singleLine(action: AutomationAction, categories: Map<Id, Category>): Outcome['allocation'] {
   const envelopeId = action.envelopeId ?? (action.categoryId ? categories.get(action.categoryId)?.envelopeId : undefined);
   if (!action.categoryId && !envelopeId) return [];
   return [
@@ -145,7 +145,7 @@ function singleLine(action: RuleAction, categories: Map<Id, Category>): Outcome[
  * d'un flux ou appariée en virement interne garde cet acquis, les autres partent vierges. Sans
  * cela, le moteur effacerait le travail que le pipeline vient de faire.
  */
-export function outcomeFor(op: Operation, rules: Rule[], categories: Map<Id, Category>, base: Allocation[] = []): Outcome {
+export function outcomeFor(op: Operation, automations: Automation[], categories: Map<Id, Category>, base: Allocation[] = []): Outcome {
   const fromImport = !!op.plannedFlowId || !!op.transferAccountId;
   const out: Outcome = {
     operationId: op.id,
@@ -156,8 +156,8 @@ export function outcomeFor(op: Operation, rules: Rule[], categories: Map<Id, Cat
       : [],
     by: [],
   };
-  for (const rule of [...rules].reverse()) {
-    if (!ruleApplies(rule, op)) continue;
+  for (const rule of [...automations].reverse()) {
+    if (!automationApplies(rule, op)) continue;
     const a = rule.action;
     let wrote = false;
     if (a.allocation) {
@@ -181,7 +181,7 @@ export function outcomeFor(op: Operation, rules: Rule[], categories: Map<Id, Cat
 }
 
 /** Différence lisible entre ce qu'une opération porte et ce qu'elle porterait (aperçu, D23). */
-export interface RuleDiff {
+export interface AutomationDiff {
   operation: Operation;
   before: { state: OperationState; oneOff: boolean; allocation: Allocation[] };
   after: Outcome;
@@ -201,8 +201,8 @@ function sameAllocation(before: Allocation[], after: Outcome['allocation']): boo
  * `extra` permet d'essayer une règle qui n'est pas encore enregistrée, ce que l'interface fait
  * avant validation — l'aperçu est obligatoire (D23), donc il doit être calculable sans écrire.
  */
-export function previewRules(ledger: Ledger, extra?: Rule): RuleDiff[] {
-  const rules = extra ? [...rulesByRank(ledger), extra].sort((a, b) => (a.rank < b.rank ? 1 : a.rank > b.rank ? -1 : b.id.localeCompare(a.id))) : rulesByRank(ledger);
+export function previewAutomations(ledger: Ledger, extra?: Automation): AutomationDiff[] {
+  const rules = extra ? [...automationsByRank(ledger), extra].sort((a, b) => (a.rank < b.rank ? 1 : a.rank > b.rank ? -1 : b.id.localeCompare(a.id))) : automationsByRank(ledger);
   const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
   const allocsByOp = new Map<Id, Allocation[]>();
   for (const al of alive(ledger.allocations)) {
@@ -210,7 +210,7 @@ export function previewRules(ledger: Ledger, extra?: Rule): RuleDiff[] {
     if (arr) arr.push(al);
     else allocsByOp.set(al.operationId, [al]);
   }
-  const out: RuleDiff[] = [];
+  const out: AutomationDiff[] = [];
   for (const op of alive(ledger.operations)) {
     if (isLocked(op)) continue;
     const before = { state: op.state, oneOff: !!op.oneOff, allocation: allocsByOp.get(op.id) ?? [] };
@@ -226,9 +226,9 @@ export function previewRules(ledger: Ledger, extra?: Rule): RuleDiff[] {
  * sont réutilisés dans l'ordre pour ne pas faire enfler le journal de changements quand seule la
  * catégorie bouge.
  */
-export function applyRules(ledger: Ledger): Patch {
+export function applyAutomations(ledger: Ledger): Patch {
   const patch = emptyPatch();
-  for (const d of previewRules(ledger)) {
+  for (const d of previewAutomations(ledger)) {
     if (!d.changed) continue;
     const next: Operation = { ...d.operation, state: d.after.state };
     if (d.after.oneOff) next.oneOff = true;
@@ -259,7 +259,7 @@ export function applyRules(ledger: Ledger): Patch {
  * seuls ses effets restent. À la différence d'une règle, elle peut déverrouiller, et elle
  * verrouille par défaut — c'est un geste de l'utilisateur, donc de la vérité (D22).
  */
-export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: RuleAction): Patch {
+export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: AutomationAction): Patch {
   const patch = emptyPatch();
   const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
   const wanted = new Set(operationIds);
@@ -304,9 +304,9 @@ export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: Rule
  * Le filtre proposé peut sélectionner plus large que la sélection d'origine ; c'est voulu, et
  * c'est pourquoi l'aperçu reste obligatoire avant d'en faire une règle.
  */
-export function inferSelection(operations: Operation[]): RuleSelection {
+export function inferSelection(operations: Operation[]): AutomationSelection {
   if (operations.length === 0) return {};
-  const sel: RuleSelection = {};
+  const sel: AutomationSelection = {};
   const words = operations.map((o) => o.normalizedLabel.split(/\s+/).filter(Boolean));
   const common: string[] = [];
   for (let i = 0; i < (words[0]?.length ?? 0); i++) {
@@ -353,15 +353,15 @@ function escapeRegExp(s: string): string {
 // ---------------------------------------------------------------------------
 
 /** Règle déterministe correspondant à un flux : elle porte toute la classification, donc verrouille. */
-export function ruleFromFlow(flow: PlannedFlow, rank: string, id: Id = uuidv7()): Rule {
-  const selection: RuleSelection = { accountId: flow.accountId };
+export function automationFromFlow(flow: PlannedFlow, rank: string, id: Id = uuidv7()): Automation {
+  const selection: AutomationSelection = { accountId: flow.accountId };
   if (flow.labelPattern) selection.labelPattern = flow.labelPattern;
   if (!flow.variable) {
     const tol = Math.max(flow.amountTolerance?.abs ?? 0, Math.round((Math.abs(flow.amount) * (flow.amountTolerance?.pct ?? 0)) / 100));
     selection.amountMin = Math.min(flow.amount - tol, flow.amount + tol);
     selection.amountMax = Math.max(flow.amount - tol, flow.amount + tol);
   }
-  const action: RuleAction = { state: 'lock' };
+  const action: AutomationAction = { state: 'lock' };
   if (flow.categoryId) action.categoryId = flow.categoryId;
   if (flow.envelopeId) action.envelopeId = flow.envelopeId;
   return {
@@ -376,8 +376,8 @@ export function ruleFromFlow(flow: PlannedFlow, rank: string, id: Id = uuidv7())
   };
 }
 
-export interface FlowRulesPatch {
-  rules: Rule[];
+export interface FlowAutomationsPatch {
+  automations: Automation[];
 }
 
 /**
@@ -386,28 +386,28 @@ export interface FlowRulesPatch {
  * pas réécrites, puisqu'aucune règle nouvelle ne les sélectionne. C'est ce qui rend l'historique
  * rejouable dans l'ordre chronologique plutôt que réinterprété à l'aune du budget d'aujourd'hui.
  */
-export function syncFlowRules(ledger: Ledger, asOf: string): FlowRulesPatch {
-  const out: FlowRulesPatch = { rules: [] };
-  const existing = new Map<Id, Rule>();
-  for (const r of alive(ledger.rules)) if (r.flowId && !r.validTo) existing.set(r.flowId, r);
+export function syncFlowAutomations(ledger: Ledger, asOf: string): FlowAutomationsPatch {
+  const out: FlowAutomationsPatch = { automations: [] };
+  const existing = new Map<Id, Automation>();
+  for (const r of alive(ledger.automations)) if (r.flowId && !r.validTo) existing.set(r.flowId, r);
   let rank = topRank(ledger);
   for (const flow of alive(ledger.plannedFlows)) {
     const current = existing.get(flow.id);
     if (!flow.makesRule) {
-      if (current) out.rules.push({ ...current, validTo: asOf });
+      if (current) out.automations.push({ ...current, validTo: asOf });
       continue;
     }
-    const wanted = ruleFromFlow(flow, current?.rank ?? rank);
+    const wanted = automationFromFlow(flow, current?.rank ?? rank);
     if (!current) {
-      out.rules.push(wanted);
+      out.automations.push(wanted);
       rank = rankBetween(rank, undefined);
       continue;
     }
     const same = JSON.stringify({ ...wanted, id: '', rank: '' }) === JSON.stringify({ ...current, id: '', rank: '' });
     if (same) continue;
     // Le flux a changé : on archive la règle en cours et on en crée une qui vaut à partir d'ici.
-    out.rules.push({ ...current, validTo: asOf });
-    out.rules.push({ ...ruleFromFlow(flow, rank), validFrom: flow.activeFrom && flow.activeFrom > asOf ? flow.activeFrom : asOf });
+    out.automations.push({ ...current, validTo: asOf });
+    out.automations.push({ ...automationFromFlow(flow, rank), validFrom: flow.activeFrom && flow.activeFrom > asOf ? flow.activeFrom : asOf });
     rank = rankBetween(rank, undefined);
   }
   return out;

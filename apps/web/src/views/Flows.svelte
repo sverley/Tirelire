@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel } from '../lib/format';
-  import { alive, nextOccurrence, syncFlowRules, todayISO, type PlannedFlow, type PlannedFlowKind } from '@tirelire/core';
+  import { alive, nextOccurrence, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
   let form = $state({
@@ -105,8 +105,8 @@
       ...(form.activeTo ? { activeTo: form.activeTo } : {}),
     };
     app.upsert('plannedFlows', row);
-    // D24 : modifier un flux archive sa règle et en crée une nouvelle, sans réécrire le passé.
-    for (const rule of syncFlowRules(app.ledger, todayISO()).rules) app.store.upsert('rules', rule);
+    // D24 : modifier un flux archive son automatisme et en crée une nouvelle, sans réécrire le passé.
+    for (const rule of syncFlowAutomations(app.ledger, todayISO()).automations) app.store.upsert('automations', rule);
     app.reload();
     editing = undefined;
   }
@@ -172,7 +172,7 @@
       <label class="f">Actif à partir du <input type="date" bind:value={form.activeFrom} /></label>
       <label class="f">Actif jusqu'au <input type="date" bind:value={form.activeTo} /></label>
       <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (rapprochement à confirmer)</label>
-      <label class="f check"><input type="checkbox" bind:checked={form.makesRule} /> Classer automatiquement les opérations de ce flux (crée une règle qui verrouille)</label>
+      <label class="f check"><input type="checkbox" bind:checked={form.makesRule} /> Classer automatiquement les opérations de ce flux (crée un automatisme qui verrouille)</label>
     </div>
     {#if error}<div class="err">{error}</div>{/if}
     <div class="actions" style="margin:0">
@@ -188,7 +188,7 @@
     {#each g.flows as f (f.id)}
       <div class="row">
         <div class="label">
-          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · règle' : ''}
+          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · automatisme' : ''}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</span>
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>

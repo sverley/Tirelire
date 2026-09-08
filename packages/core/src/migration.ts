@@ -4,9 +4,9 @@
  * dans le journal de changements ; elle est idempotente et déterministe (mêmes identifiants sur
  * tous les appareils) pour que deux migrations indépendantes convergent à la fusion.
  */
-import type { Allocation, Envelope, Need, NeedKind, Operation, OperationState, Periodicity, Rollover, Rule } from './model.js';
+import type { Allocation, Automation, Envelope, Need, NeedKind, Operation, OperationState, Periodicity, Rollover } from './model.js';
 import { MODEL_VERSION } from './schema.js';
-import { rankBetween } from './rules.js';
+import { rankBetween } from './automations.js';
 import type { LedgerStore } from './store.js';
 
 export interface MigrationReport {
@@ -22,6 +22,7 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   if (from < 2) steps.push({ version: 2, written: migrateTo2(store) });
   if (from < 3) steps.push({ version: 3, written: migrateTo3(store) });
   if (from < 4) steps.push({ version: 4, written: migrateTo4(store) });
+  if (from < 5) steps.push({ version: 5, written: migrateTo5(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
@@ -46,7 +47,8 @@ function migrateTo2(store: LedgerStore): number {
     const envelope: Envelope = {
       id,
       name: raw['name'] as string,
-      placementAccountId: (raw['placementAccountId'] as string | undefined) ?? accountId ?? '',
+      // D38 : le compte d'hébergement devient une répartition à une seule part, qui prend tout.
+      placement: accountId ? [{ accountId, share: { kind: 'variable' as const } }] : [],
       openingBalance: (raw['openingBalance'] as number | undefined) ?? 0,
       openingDate: raw['openingDate'] as string,
       ...(raw['rollover'] ? { rollover: raw['rollover'] as Rollover } : kind === 'budget' ? { rollover: { mode: 'none' } as Rollover } : {}),
@@ -111,7 +113,8 @@ function migrateTo3(store: LedgerStore): number {
 }
 
 /**
- * 3 → 4 (D23, D31) : une règle « motif → catégorie » devient sélection + action + rang.
+ * 3 → 4 (D23, D31, D39) : une règle « motif → catégorie » devient un automatisme : sélection,
+ * action et rang, dans la table `automations`.
  *
  * L'ancienne priorité était un entier croissant appliqué en premier ; le rang est une clé
  * triable appliquée en dernier, donc l'ordre s'inverse. Les anciennes règles ne touchaient que
@@ -120,12 +123,12 @@ function migrateTo3(store: LedgerStore): number {
  */
 function migrateTo4(store: LedgerStore): number {
   let written = 0;
-  const rows = store.readRawTable('rules').filter((r) => r['pattern'] !== undefined && !r['selection']);
+  const rows = store.readRawTable('automations').filter((r) => r['pattern'] !== undefined && !r['selection']);
   // Priorité croissante = appliquée d'abord ; rang décroissant = appliqué en dernier.
   rows.sort((a, b) => ((a['priority'] as number) ?? 0) - ((b['priority'] as number) ?? 0));
   let rank = rankBetween(undefined, undefined);
   for (const raw of [...rows].reverse()) {
-    const rule: Rule = {
+    const rule: Automation = {
       id: raw['id'] as string,
       selection: { labelPattern: raw['pattern'] as string },
       action: {
@@ -136,9 +139,26 @@ function migrateTo4(store: LedgerStore): number {
       rank,
       ...(raw['deletedAt'] ? { deletedAt: raw['deletedAt'] as string } : {}),
     };
-    store.upsert('rules', rule);
+    store.upsert('automations', rule);
     written++;
     rank = rankBetween(rank, undefined);
+  }
+  return written;
+}
+
+/**
+ * 4 → 5 (D39) : une règle devient un automatisme, et change de table. L'ancienne table reste
+ * déclarée (D30) pour qu'un appareil non migré puisse continuer d'y écrire sans faire échouer la
+ * fusion ; ses lignes sont recopiées ici, à l'identique.
+ */
+function migrateTo5(store: LedgerStore): number {
+  let written = 0;
+  const existing = new Set(store.readRawTable('automations').map((r) => r['id'] as string));
+  for (const raw of store.readLegacyTable('rules')) {
+    const id = raw['id'] as string;
+    if (!raw['selection'] || existing.has(id)) continue;
+    store.upsert('automations', raw as unknown as Automation);
+    written++;
   }
   return written;
 }

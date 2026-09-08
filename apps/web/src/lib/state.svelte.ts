@@ -128,7 +128,7 @@ class AppState {
     for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
     for (const o of l.operations) s.upsert('operations', o);
     for (const a of l.allocations) s.upsert('allocations', a);
-    for (const r of l.rules) s.upsert('rules', r);
+    for (const r of l.automations) s.upsert('automations', r);
     for (const p of l.importProfiles) s.upsert('importProfiles', p);
     for (const d of l.devices) s.upsert('devices', d);
     s.setSetting('pivotCushion', l.settings.pivotCushion);

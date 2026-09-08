@@ -316,7 +316,7 @@
     <div class="row"><div class="label">Virements vers des enveloppes reconnus</div><div class="num">{report.envelopeTransfers}</div></div>
     <div class="row"><div class="label">Flux prévus rapprochés automatiquement</div><div class="num">{report.autoMatched}</div></div>
     <div class="row"><div class="label">Rapprochements de flux à confirmer</div><div class="num">{report.proposals.length}</div></div>
-    <div class="row"><div class="label">Classées par une règle</div><div class="num">{report.ruled}</div></div>
+    <div class="row"><div class="label">Classées par un automatisme</div><div class="num">{report.ruled}</div></div>
   </div>
   <div class="actions">
     <button class="btn primary" onclick={() => app.switchTab('operations')}>Trier les opérations</button>

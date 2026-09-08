@@ -16,6 +16,7 @@ import {
   applyMatch,
   applyPatchToLedger,
   type Operation,
+  wantedComponents,
 } from '../src/index.js';
 
 const asOf = '2026-09-06';
@@ -229,7 +230,7 @@ describe('besoins multiples dans une enveloppe (D28)', () => {
   it('le solde est attribué dans l’ordre des priorités ; le plancher de l’échéance passe avant le courant', () => {
     const l = exampleLedger();
     // Une seule enveloppe « Charges » : taxe foncière (échéance, priorité 10) + courant 100/mois (priorité 20).
-    l.envelopes.push({ id: 'env-charges', name: 'Charges', placementAccountId: 'acc-livret', openingBalance: euros(500), openingDate: '2026-08-27' });
+    l.envelopes.push({ id: 'env-charges', name: 'Charges', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(500), openingDate: '2026-08-27' });
     l.needs.push(
       { id: 'need-charges-tf', envelopeId: 'env-charges', kind: 'dueDate', name: 'Taxe foncière', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
       { id: 'need-charges-courant', envelopeId: 'env-charges', kind: 'recurring', name: 'Courant', amount: euros(100), priority: 20 },
@@ -299,5 +300,57 @@ describe('virement permanent à ventilation prévue (D21)', () => {
     const total = patch.allocations.reduce((s, a) => s + (a.share.kind === 'fixed' ? a.share.amount : 0), 0);
     expect(total).toBe(moindre);
     expect(patch.allocations.length).toBeLessThanOrEqual(flow.plannedAllocation!.length);
+  });
+});
+
+describe('placement réparti sur plusieurs comptes (D37)', () => {
+  it('« tant sur le livret, le reste sur le pivot » se résout sur le solde du moment', () => {
+    const l = exampleLedger();
+    const e = l.envelopes.find((x) => x.id === 'env-precaution')!;
+    e.placement = [
+      { accountId: 'acc-livret', share: { kind: 'fixed', amount: euros(2000) } },
+      { accountId: 'acc-pivot', share: { kind: 'variable' } },
+    ];
+    const idx = indexLedger(l);
+    const wanted = wantedComponents(e, idx, '2026-09-06');
+    const total = envelopeBalance(e, idx, '2026-09-06');
+    expect(wanted.get('acc-livret')).toBe(euros(2000));
+    expect(wanted.get('acc-pivot')).toBe(total - euros(2000));
+  });
+
+  it('un pourcentage se calcule sur le solde, et la part « reste » absorbe le change', () => {
+    const l = exampleLedger();
+    const e = l.envelopes.find((x) => x.id === 'env-precaution')!;
+    e.placement = [
+      { accountId: 'acc-livret', share: { kind: 'percent', pct: 70 } },
+      { accountId: 'acc-pivot', share: { kind: 'variable' } },
+    ];
+    const idx = indexLedger(l);
+    const total = envelopeBalance(e, idx, '2026-09-06');
+    const wanted = wantedComponents(e, idx, '2026-09-06');
+    expect(wanted.get('acc-livret')).toBe(Math.round((total * 70) / 100));
+    expect([...wanted.values()].reduce((s, v) => s + v, 0)).toBe(total);
+  });
+
+  it('le plan apparie l’excédent d’un compte au manque d’un autre', () => {
+    const l = exampleLedger();
+    const e = l.envelopes.find((x) => x.id === 'env-precaution')!;
+    e.placement = [
+      { accountId: 'acc-livret', share: { kind: 'fixed', amount: euros(1000) } },
+      { accountId: 'acc-pivot', share: { kind: 'variable' } },
+    ];
+    const plan = computePlan(l, '2026-09-06');
+    const g = plan.gaps.filter((x) => x.envelopeId === e.id);
+    // Trop sur le livret, pas assez sur le pivot : un seul mouvement, du livret vers le pivot.
+    expect(g.length).toBe(1);
+    expect(g[0]!.fromAccountId).toBe('acc-livret');
+    expect(g[0]!.toAccountId).toBe('acc-pivot');
+    expect(g[0]!.amount).toBeGreaterThan(0);
+  });
+
+  it('sans placement déclaré, aucun écart : l’argent est bien là où il est', () => {
+    const l = exampleLedger();
+    for (const e of l.envelopes) e.placement = [];
+    expect(computePlan(l, '2026-09-06').gaps).toEqual([]);
   });
 });

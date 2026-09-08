@@ -10,10 +10,13 @@
     addDays,
     type Allocation,
     type Category,
+    applyAutomations,
     applyBulkAction,
     editAllocations,
+    selects,
+    type AutomationSelection,
     inferSelection,
-    previewRules,
+    previewAutomations,
     suggestPattern,
     topRank,
     unlock,
@@ -22,14 +25,19 @@
     type MatchProposal,
     type Operation,
     type OperationState,
-    type Rule,
+    type Automation,
   } from '@tirelire/core';
 
   type Filter = 'untreated' | 'all' | 'reconciled' | 'locked' | 'transfer';
   let filter = $state<Filter>('untreated');
-  let accountFilter = $state('');
   let periodOnly = $state(false);
-  let search = $state('');
+
+  /**
+   * Recherche = sélection d'un automatisme (D36, D39) : ces champs sont exactement ceux d'une
+   * `AutomationSelection`, et partent tels quels dans l'automatisme qu'on enregistre.
+   */
+  let sel = $state({ labelPattern: '', regex: false, accountId: '', amountMin: '', amountMax: '', dateFrom: '', dateTo: '' });
+  let searchOpen = $state(true);
   let editingId = $state<string | undefined>(undefined);
 
   // Formulaire de ventilation : chaque ligne porte une part (D27).
@@ -48,7 +56,8 @@
   let bulkEnvelope = $state('');
   let bulkState = $state<'lock' | 'reconcile' | 'none' | 'unlock'>('lock');
   let bulkOneOff = $state<'' | 'yes' | 'no'>('');
-  let bulkRulePattern = $state('');
+  let automationName = $state('');
+  let saved = $state('');
 
   const accounts = $derived(alive(app.ledger.accounts));
   const envelopes = $derived(alive(app.ledger.envelopes));
@@ -69,15 +78,33 @@
     for (const p of proposeMatches(app.ledger, addDays(period.start, -400), addDays(period.end, 40))) m.set(p.operationId, p);
     return m;
   });
-  const operations = $derived(
+  /** Les champs de recherche, convertis en sélection pour le cœur. Vide = critère absent. */
+  const selection = $derived.by<AutomationSelection>(() => {
+    const out: AutomationSelection = {};
+    const pattern = sel.labelPattern.trim();
+    // Sans la case « expression régulière », on cherche le texte littéral : les caractères
+    // spéciaux sont échappés pour que « CAFÉ (2) » ne soit pas lu comme un motif.
+    if (pattern) out.labelPattern = sel.regex ? pattern : pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (sel.accountId) out.accountId = sel.accountId;
+    const min = inputToCents(sel.amountMin);
+    const max = inputToCents(sel.amountMax);
+    if (min !== undefined) out.amountMin = min;
+    if (max !== undefined) out.amountMax = max;
+    if (sel.dateFrom) out.dateFrom = sel.dateFrom;
+    if (sel.dateTo) out.dateTo = sel.dateTo;
+    return out;
+  });
+
+  /** Ce que la recherche retourne : les critères d'un automatisme, plus ceux de consultation. */
+  const matching = $derived(
     alive(app.ledger.operations)
+      .filter((o) => selects(selection, o))
       .filter((o) => (filter === 'all' ? true : filter === 'transfer' ? !!o.transferAccountId : o.state === filter))
-      .filter((o) => !accountFilter || o.accountId === accountFilter)
       .filter((o) => !periodOnly || (o.date >= period.start && o.date <= period.end))
-      .filter((o) => !search || (o.label + ' ' + (o.details ?? '')).toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Math.abs(b.amount) - Math.abs(a.amount)))
-      .slice(0, 300),
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Math.abs(b.amount) - Math.abs(a.amount))),
   );
+  const operations = $derived(matching.slice(0, 300));
+  const selectionActive = $derived(Object.keys(selection).length > 0);
   const untreatedCount = $derived(alive(app.ledger.operations).filter((o) => o.state === 'untreated').length);
 
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
@@ -173,7 +200,7 @@
     }
     if (makeRule && rulePattern.trim()) {
       const first = drafted[0];
-      const rule: Rule = {
+      const rule: Automation = {
         id: app.newId(),
         selection: { labelPattern: rulePattern.trim() },
         action: {
@@ -183,7 +210,7 @@
         },
         rank: topRank(app.ledger),
       };
-      app.store.upsert('rules', rule);
+      app.store.upsert('automations', rule);
     }
     app.reload();
     editingId = undefined;
@@ -197,15 +224,18 @@
   }
 
   function selectAllVisible() {
-    selected = new Set(operations.map((o) => o.id));
+    selected = new Set(matching.map((o) => o.id));
   }
+
+  /** Cibles de l'action : les lignes cochées, sinon tout ce que la recherche retourne. */
+  const targets = $derived(selected.size ? [...selected] : matching.map((o) => o.id));
 
   function clearSelection() {
     selected = new Set();
     bulkOpen = false;
   }
 
-  /** Action de l'aperçu et de l'application : les mêmes champs qu'une règle, plus Déverrouiller. */
+  /** Action de l'aperçu et de l'application : les mêmes champs qu'un automatisme, plus Déverrouiller. */
   function bulkActionValue() {
     return {
       ...(bulkCategory ? { categoryId: bulkCategory } : {}),
@@ -218,8 +248,7 @@
   /** Aperçu obligatoire (D26) : ce que l'action changerait, avant de l'appliquer. */
   const bulkPreview = $derived.by(() => {
     if (!bulkOpen) return [];
-    const ids = [...selected];
-    const patch = applyBulkAction(app.ledger, ids, bulkActionValue());
+    const patch = applyBulkAction(app.ledger, targets, bulkActionValue());
     return patch.operations.map((next) => {
       const before = app.ledger.operations.find((o) => o.id === next.id)!;
       return { label: before.label, from: stateLabel(before.state), to: stateLabel(next.state) };
@@ -227,29 +256,52 @@
   });
 
   function applyBulk() {
-    app.applyPatch(applyBulkAction(app.ledger, [...selected], bulkActionValue()));
+    const n = targets.length;
+    if (n > 20 && !confirm(`Appliquer à ${n} opérations ?`)) return;
+    app.applyPatch(applyBulkAction(app.ledger, targets, bulkActionValue()));
+    saved = `${n} opération(s) modifiée(s).`;
     clearSelection();
   }
 
-  /** Chemin inverse (D26) : la sélection propose un filtre, donc une règle. */
-  function ruleFromSelection() {
-    const ops = app.ledger.operations.filter((o) => selected.has(o.id));
-    const selection = inferSelection(ops);
-    bulkRulePattern = selection.labelPattern ?? '';
-    const rule: Rule = {
+  /**
+   * Enregistrer la recherche et ses actions comme automatisme (D39) : la sélection part telle
+   * quelle, sans inférence — c'est ce que l'utilisateur vient d'écrire.
+   */
+  function saveAutomation() {
+    if (!selectionActive) {
+      error = 'Renseigne au moins un critère de recherche avant d’enregistrer.';
+      return;
+    }
+    const automation: Automation = {
       id: app.newId(),
       selection,
-      action: {
-        state: 'reconcile',
-        ...(bulkCategory ? { categoryId: bulkCategory } : {}),
-        ...(bulkEnvelope ? { envelopeId: bulkEnvelope } : {}),
-      },
+      action: bulkActionValue(),
       rank: topRank(app.ledger),
+      ...(automationName.trim() ? { name: automationName.trim() } : {}),
     };
-    const touched = previewRules(app.ledger, rule).filter((d) => d.changed).length;
-    if (!confirm(`Créer une règle « ${selection.labelPattern ?? 'tout'} » ? Elle toucherait ${touched} opération(s).`)) return;
-    app.upsert('rules', rule);
-    clearSelection();
+    const touched = previewAutomations(app.ledger, automation).filter((d) => d.changed).length;
+    app.upsert('automations', automation);
+    // Un automatisme s'applique dès qu'il existe : il n'attend pas le prochain import.
+    app.applyPatch(applyAutomations(app.ledger));
+    saved = `Automatisme enregistré · ${touched} opération(s) reprises.`;
+    automationName = '';
+    bulkOpen = false;
+  }
+
+  /** Chemin inverse (D26) : à partir des lignes cochées, remplir les champs de recherche. */
+  function guessFilter() {
+    const ops = app.ledger.operations.filter((o) => selected.has(o.id));
+    const guess = inferSelection(ops);
+    sel.labelPattern = guess.labelPattern ?? '';
+    sel.regex = true;
+    sel.accountId = guess.accountId ?? '';
+    sel.amountMin = guess.amountMin !== undefined ? centsToInput(guess.amountMin) : '';
+    sel.amountMax = guess.amountMax !== undefined ? centsToInput(guess.amountMax) : '';
+    searchOpen = true;
+  }
+
+  function resetSearch() {
+    sel = { labelPattern: '', regex: false, accountId: '', amountMin: '', amountMax: '', dateFrom: '', dateTo: '' };
   }
 
   function acceptMatch(op: Operation) {
@@ -265,7 +317,7 @@
     app.upsert('operations', { ...op, state: 'locked', transferAccountId: accountId });
   }
 
-  /** Déverrouiller : l'opération repart aux règles, sans rien perdre (D22). */
+  /** Déverrouiller : l'opération repart aux automatismes, sans rien perdre (D22). */
   function unlockOp(op: Operation) {
     app.upsert('operations', unlock(op));
   }
@@ -291,33 +343,66 @@
 
 <h1>Opérations {#if untreatedCount}<span class="pill catchUp">{untreatedCount} non traitées</span>{/if}</h1>
 
-<div class="actions" style="margin-top:8px">
-  <select bind:value={filter} class="btn">
-    <option value="untreated">Non traitées</option>
-    <option value="all">Toutes</option>
-    <option value="reconciled">Rapprochées</option>
-    <option value="locked">Verrouillées</option>
-    <option value="transfer">Virements internes</option>
-  </select>
-  <select bind:value={accountFilter} class="btn">
-    <option value="">Tous les comptes</option>
-    {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
-  </select>
-  <label class="btn" style="display:flex;gap:6px;align-items:center"><input type="checkbox" bind:checked={periodOnly} /> {period.label}</label>
-  <input class="btn" placeholder="Rechercher…" bind:value={search} style="flex:1;min-width:120px" />
-</div>
-
-<div class="actions" style="margin-top:0">
-  <button class="btn small" onclick={selectAllVisible}>Tout sélectionner ({operations.length})</button>
-  {#if selected.size}
-    <button class="btn small" onclick={clearSelection}>Désélectionner</button>
-    <button class="btn small primary" onclick={() => (bulkOpen = !bulkOpen)}>Action sur {selected.size} opération(s)</button>
+<!-- Recherche = sélection d'un automatisme (D36, D39) : ces champs partent tels quels. -->
+<div class="card" style="margin-top:8px">
+  <div class="row">
+    <button class="label" style="text-align:left;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit" onclick={() => (searchOpen = !searchOpen)}>
+      <strong>Recherche</strong>
+      <span class="sub">{selectionActive ? `${matching.length} opération(s) trouvée(s)` : 'aucun critère'}</span>
+    </button>
+    <span class="num">{searchOpen ? '▾' : '▸'}</span>
+  </div>
+  {#if searchOpen}
+    <div class="grid">
+      <label class="f">Libellé contient
+        <input bind:value={sel.labelPattern} placeholder="SUPERMARCHE" />
+      </label>
+      <label class="f check"><input type="checkbox" bind:checked={sel.regex} /> Expression régulière</label>
+      <label class="f">Compte
+        <select bind:value={sel.accountId}>
+          <option value="">Tous</option>
+          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+        </select>
+      </label>
+      <label class="f">Montant de <input bind:value={sel.amountMin} inputmode="decimal" placeholder="-100,00" /></label>
+      <label class="f">à <input bind:value={sel.amountMax} inputmode="decimal" placeholder="-10,00" /></label>
+      <label class="f">Date du <input type="date" bind:value={sel.dateFrom} /></label>
+      <label class="f">au <input type="date" bind:value={sel.dateTo} /></label>
+    </div>
+    <div class="actions" style="margin:6px 0 0">
+      <button class="btn small" onclick={resetSearch}>Effacer</button>
+      {#if selected.size}<button class="btn small" onclick={guessFilter}>Deviner d’après la sélection</button>{/if}
+    </div>
+    <div class="sub" style="margin-top:6px">Affichage seulement, jamais enregistré dans un automatisme :</div>
+    <div class="actions" style="margin:4px 0 0">
+      <select bind:value={filter} class="btn">
+        <option value="untreated">Non traitées</option>
+        <option value="all">Toutes</option>
+        <option value="reconciled">Rapprochées</option>
+        <option value="locked">Verrouillées</option>
+        <option value="transfer">Virements internes</option>
+      </select>
+      <label class="btn" style="display:flex;gap:6px;align-items:center"><input type="checkbox" bind:checked={periodOnly} /> {period.label}</label>
+    </div>
   {/if}
 </div>
 
-{#if bulkOpen && selected.size}
+<div class="actions" style="margin-top:0">
+  <button class="btn small primary" onclick={() => (bulkOpen = !bulkOpen)}>
+    {bulkOpen ? 'Masquer les actions' : `Actions sur ${selected.size || matching.length} opération(s)`}
+  </button>
+  <button class="btn small" onclick={selectAllVisible}>Tout cocher ({matching.length})</button>
+  {#if selected.size}<button class="btn small" onclick={clearSelection}>Décocher</button>{/if}
+</div>
+
+{#if saved}<div class="card ok"><div class="sub">{saved}</div></div>{/if}
+
+{#if bulkOpen}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); applyBulk(); }}>
-    <h3 style="margin-top:0">Action groupée</h3>
+    <h3 style="margin-top:0">Actions à appliquer</h3>
+    <p class="sub" style="margin-top:0">
+      {selected.size ? `${selected.size} opération(s) cochée(s)` : `les ${matching.length} opération(s) trouvée(s)`}
+    </p>
     <div class="grid">
       <label class="f">Catégorie
         <select bind:value={bulkCategory}>
@@ -354,11 +439,15 @@
       {/each}
       {#if bulkPreview.length > 8}<div class="sub">…et {bulkPreview.length - 8} autre(s).</div>{/if}
     </div>
+    <label class="f">Nom de l’automatisme (facultatif) <input bind:value={automationName} placeholder="Courses du supermarché" /></label>
     <div class="actions" style="margin:0">
-      <button class="btn primary" type="submit">Appliquer</button>
-      <button class="btn" type="button" onclick={ruleFromSelection}>En faire une règle</button>
-      <button class="btn" type="button" onclick={clearSelection}>Annuler</button>
+      <button class="btn primary" type="submit">Appliquer maintenant</button>
+      <button class="btn primary" type="button" onclick={saveAutomation} disabled={!selectionActive}>Enregistrer l’automatisme</button>
+      <button class="btn" type="button" onclick={() => (bulkOpen = false)}>Fermer</button>
     </div>
+    {#if !selectionActive}
+      <p class="sub">Pour enregistrer un automatisme, renseigne au moins un critère de recherche : c’est lui qui dira à quelles opérations futures ces actions s’appliquent.</p>
+    {/if}
   </form>
 {/if}
 
@@ -404,7 +493,7 @@
               <label class="f">Enveloppe
                 <select bind:value={l.envelopeId}>
                   <option value="">— (non affecté)</option>
-                  {#each envelopes as e}<option value={e.id}>{e.name} ({accountName(e.placementAccountId)})</option>{/each}
+                  {#each envelopes as e}<option value={e.id}>{e.name}</option>{/each}
                 </select>
               </label>
               <label class="f">Part
@@ -431,7 +520,7 @@
             <label class="f">Nouvelle catégorie (si absente) <input bind:value={newCategory} /></label>
             <label class="f check"><input type="checkbox" bind:checked={oneOff} /> Dépense ponctuelle (hors moyennes de budget)</label>
           </div>
-          <label class="f check"><input type="checkbox" bind:checked={makeRule} /> Créer une règle pour les prochaines opérations semblables</label>
+          <label class="f check"><input type="checkbox" bind:checked={makeRule} /> Créer un automatisme pour les prochaines opérations semblables</label>
           {#if makeRule}<label class="f">Motif (regex, insensible à la casse) <input bind:value={rulePattern} /></label>{/if}
           {#if error}<div class="err">{error}</div>{/if}
           <div class="actions" style="margin:0">

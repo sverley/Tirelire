@@ -2,21 +2,21 @@ import { describe, expect, it } from 'vitest';
 import {
   applyBulkAction,
   applyPatchToLedger,
-  applyRules,
+  applyAutomations,
   euros,
   exampleLedger,
   inferSelection,
   outcomeFor,
-  previewRules,
+  previewAutomations,
   rankBetween,
-  ruleFromFlow,
-  rulesByRank,
+  automationFromFlow,
+  automationsByRank,
   selects,
-  syncFlowRules,
+  syncFlowAutomations,
   topRank,
   type Ledger,
   type Operation,
-  type Rule,
+  type Automation,
 } from '../src/index.js';
 
 function op(id: string, label: string, amount: number, extra: Partial<Operation> = {}): Operation {
@@ -39,7 +39,7 @@ function withOps(...ops: Operation[]): Ledger {
   return l;
 }
 
-const rule = (r: Partial<Rule> & Pick<Rule, 'id' | 'rank'>): Rule => ({ selection: {}, action: {}, ...r });
+const rule = (r: Partial<Automation> & Pick<Automation, 'id' | 'rank'>): Automation => ({ selection: {}, action: {}, ...r });
 
 describe('rangs triables (D31)', () => {
   it('insère toujours une clé entre deux voisines, même serrées', () => {
@@ -59,8 +59,8 @@ describe('rangs triables (D31)', () => {
 
   it('les règles s’appliquent du rang le plus élevé au rang 1', () => {
     const l = withOps();
-    l.rules.push(rule({ id: 'r-bas', rank: 'a' }), rule({ id: 'r-haut', rank: 'z' }));
-    expect(rulesByRank(l).map((r) => r.id)).toEqual(['r-haut', 'r-bas']);
+    l.automations.push(rule({ id: 'r-bas', rank: 'a' }), rule({ id: 'r-haut', rank: 'z' }));
+    expect(automationsByRank(l).map((r) => r.id)).toEqual(['r-haut', 'r-bas']);
     expect(topRank(l) > 'z').toBe(true);
   });
 });
@@ -106,30 +106,30 @@ describe('moteur de règles (D23)', () => {
 
   it('le rejeu est idempotent et une règle retirée défait ce qu’elle avait posé', () => {
     let l = withOps(op('o1', 'SUPERMARCHE', euros(-40)));
-    l.rules.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
-    l = applyPatchToLedger(l, applyRules(l));
+    l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
+    l = applyPatchToLedger(l, applyAutomations(l));
     expect(l.operations.find((o) => o.id === 'o1')!.state).toBe('reconciled');
     expect(l.allocations.filter((a) => a.operationId === 'o1').length).toBe(1);
     // Deuxième passage : rien ne bouge.
-    expect(applyRules(l).operations.length).toBe(0);
+    expect(applyAutomations(l).operations.length).toBe(0);
     // Règle retirée : l'opération revient à rien.
-    l.rules = [];
-    l = applyPatchToLedger(l, applyRules(l));
+    l.automations = [];
+    l = applyPatchToLedger(l, applyAutomations(l));
     expect(l.operations.find((o) => o.id === 'o1')!.state).toBe('untreated');
     expect(l.allocations.filter((a) => a.operationId === 'o1').length).toBe(0);
   });
 
   it('une opération verrouillée est hors d’atteinte', () => {
     const l = withOps(op('o1', 'SUPERMARCHE', euros(-40), { state: 'locked' }));
-    l.rules.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
-    expect(applyRules(l).operations.length).toBe(0);
-    expect(previewRules(l).some((d) => d.operation.id === 'o1')).toBe(false);
+    l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
+    expect(applyAutomations(l).operations.length).toBe(0);
+    expect(previewAutomations(l).some((d) => d.operation.id === 'o1')).toBe(false);
   });
 
   it('ce que l’import a établi survit au passage des règles (D33)', () => {
     const l = withOps(op('o1', 'VIR LIVRET', euros(-100), { transferAccountId: 'acc-livret' }));
     l.allocations.push({ id: 'al1', operationId: 'o1', envelopeId: 'env-vacances', share: { kind: 'variable' } });
-    const patch = applyRules(l);
+    const patch = applyAutomations(l);
     // La ventilation posée par l'appariement survit ; seul l'état suit (le virement est rapproché).
     expect(patch.removedAllocations).toEqual([]);
     // La ligne est réécrite à l'identique (même identifiant), pas remplacée.
@@ -140,18 +140,18 @@ describe('moteur de règles (D23)', () => {
   it('l’aperçu montre l’avant et l’après sans rien écrire', () => {
     const l = withOps(op('o1', 'SUPERMARCHE', euros(-40)));
     const essai = rule({ id: 'essai', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } });
-    const diffs = previewRules(l, essai).filter((d) => d.changed);
+    const diffs = previewAutomations(l, essai).filter((d) => d.changed);
     expect(diffs.length).toBe(1);
     expect(diffs[0]!.before.allocation).toEqual([]);
     expect(diffs[0]!.after.allocation[0]!.categoryId).toBe('cat-alim');
     // Rien n'a été enregistré : la règle d'essai n'est pas dans le grand livre.
-    expect(l.rules.find((r) => r.id === 'essai')).toBeUndefined();
+    expect(l.automations.find((r) => r.id === 'essai')).toBeUndefined();
   });
 
   it('la catégorie apporte son enveloppe par défaut (D32)', () => {
     const l = withOps(op('o1', 'SUPERMARCHE', euros(-40)));
-    l.rules.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
-    const patch = applyRules(l);
+    l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
+    const patch = applyAutomations(l);
     expect(patch.allocations[0]!.envelopeId).toBe('env-alim');
   });
 });
@@ -167,9 +167,9 @@ describe('actions groupées (D26)', () => {
 
   it('ne laisse que ses effets : rien n’est enregistré qui puisse se rejouer', () => {
     let l = withOps(op('o1', 'A', euros(-10)));
-    const rulesBefore = l.rules.length;
+    const rulesBefore = l.automations.length;
     l = applyPatchToLedger(l, applyBulkAction(l, ['o1'], { oneOff: true }));
-    expect(l.rules.length).toBe(rulesBefore);
+    expect(l.automations.length).toBe(rulesBefore);
     expect(l.operations.find((o) => o.id === 'o1')!.oneOff).toBe(true);
   });
 
@@ -186,23 +186,23 @@ describe('règles engendrées par les flux (D24)', () => {
     const l = withOps();
     const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
     flow.makesRule = true;
-    const patch = syncFlowRules(l, '2026-09-07');
-    expect(patch.rules.length).toBe(1);
-    expect(patch.rules[0]!.action.state).toBe('lock');
-    expect(patch.rules[0]!.flowId).toBe('flow-credit');
+    const patch = syncFlowAutomations(l, '2026-09-07');
+    expect(patch.automations.length).toBe(1);
+    expect(patch.automations[0]!.action.state).toBe('lock');
+    expect(patch.automations[0]!.flowId).toBe('flow-credit');
   });
 
   it('modifier le flux archive la règle et en crée une nouvelle, sans réécrire le passé', () => {
     let l = withOps();
     const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
     flow.makesRule = true;
-    l.rules.push(...syncFlowRules(l, '2026-09-07').rules);
-    const first = l.rules[l.rules.length - 1]!;
+    l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
+    const first = l.automations[l.automations.length - 1]!;
 
     flow.amount = euros(-1000);
-    const patch = syncFlowRules(l, '2026-10-07');
-    const archived = patch.rules.find((r) => r.id === first.id)!;
-    const created = patch.rules.find((r) => r.id !== first.id)!;
+    const patch = syncFlowAutomations(l, '2026-10-07');
+    const archived = patch.automations.find((r) => r.id === first.id)!;
+    const created = patch.automations.find((r) => r.id !== first.id)!;
     expect(archived.validTo).toBe('2026-10-07');
     expect(created.validFrom).toBe('2026-10-07');
 
@@ -215,7 +215,7 @@ describe('règles engendrées par les flux (D24)', () => {
   it('un flux à montant variable ne contraint pas le montant', () => {
     const l = withOps();
     const flow = { ...l.plannedFlows[0]!, variable: true, labelPattern: 'SALAIRE' };
-    const r = ruleFromFlow(flow, 'm');
+    const r = automationFromFlow(flow, 'm');
     expect(r.selection.amountMin).toBeUndefined();
     expect(r.selection.labelPattern).toBe('SALAIRE');
   });
@@ -224,10 +224,10 @@ describe('règles engendrées par les flux (D24)', () => {
     const l = withOps();
     const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
     flow.makesRule = true;
-    l.rules.push(...syncFlowRules(l, '2026-09-07').rules);
+    l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
     flow.makesRule = false;
-    const patch = syncFlowRules(l, '2026-10-07');
-    expect(patch.rules[0]!.validTo).toBe('2026-10-07');
-    expect(patch.rules[0]!.deletedAt).toBeUndefined();
+    const patch = syncFlowAutomations(l, '2026-10-07');
+    expect(patch.automations[0]!.validTo).toBe('2026-10-07');
+    expect(patch.automations[0]!.deletedAt).toBeUndefined();
   });
 });

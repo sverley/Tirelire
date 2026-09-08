@@ -39,7 +39,8 @@ Décisions ajoutées en cours de route, à lire avant de toucher au modèle : **
 libération), **D30** (colonnes dépréciées et version de modèle), **D31** (rang = clé triable),
 **D32** (enveloppe par défaut d'une catégorie), **D33** (le moteur part de ce que l'import a
 établi), **D34** (la migration verrouille ce que rien ne reproduit), **D36** (le filtre de
-recherche est la sélection d'une règle).
+recherche est la sélection d'un automatisme), **D38** (le placement voulu est une répartition),
+**D39** (une règle s'appelle un automatisme, et se crée depuis la recherche).
 
 ## Ce qui reste
 
@@ -58,7 +59,7 @@ Restent aussi :
    `feature/connecteur-banque` (Enable Banking), `feature/assistant-configuration`
    (**obsolète** : elle crée des enveloppes typées, à refaire plutôt qu'à rebaser),
    `etude/apprentissage-classification`, `etude/synchronisation-bancaire`. La première porte
-   un « D18 » qui entre en collision avec celui de `main` : à renuméroter à partir de D37.
+   un « D18 » qui entre en collision avec celui de `main` : à renuméroter à partir de D39.
    (`feature/serveur-web` a été rebasée, renumérotée D35 et fusionnée le 7 septembre.)
 4. **Export Linxo** de Simon, à ne jamais versionner, pour figer un profil d'import.
 5. Chantiers suivants : compactage du journal de changements ; import du second compte (les

@@ -98,7 +98,7 @@ describe('dépôt SQLite', () => {
 
   it('requête SQL libre', async () => {
     const s = await seeded('A');
-    const rows = s.query(`SELECT name FROM envelopes WHERE placement_account_id = ? ORDER BY name`, ['acc-livret']);
+    const rows = s.query(`SELECT name FROM envelopes WHERE placement LIKE ? ORDER BY name`, ['%acc-livret%']);
     expect(rows.map((r) => r['name'])).toEqual(['Assurance auto', 'Taxe foncière', 'Vacances', 'Épargne de précaution']);
   });
 });
@@ -206,7 +206,7 @@ describe('migration du modèle (D30)', () => {
 
     const l = store.load();
     const env = l.envelopes.find((e) => e.id === 'env_tf')!;
-    expect(env.placementAccountId).toBe('acc_livret');
+    expect(env.placement).toEqual([{ accountId: 'acc_livret', share: { kind: 'variable' } }]);
     expect('kind' in env).toBe(false);
     const need = l.needs.find((n) => n.envelopeId === 'env_tf')!;
     expect(need.kind).toBe('dueDate');

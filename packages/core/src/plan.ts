@@ -6,6 +6,9 @@
 import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow } from './model.js';
 import { alive, needName } from './model.js';
 import {
+  homeAccount,
+  placementGaps,
+  dotationAccount,
   envelopeBalance,
   envelopeComponents,
   indexLedger,
@@ -176,7 +179,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
         envelopeName: e.name,
         name: needName(n, e),
         kind: n.kind,
-        accountId: e.placementAccountId,
+        accountId: homeAccount(e) ?? dotationAccount(e, idx),
         priority: n.priority,
         balance: snap.balanceBefore,
         held: s.held,
@@ -187,7 +190,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
         funded: 0,
         ...(s.dueDate ? { dueDate: s.dueDate } : {}),
         ...(s.target !== undefined ? { target: s.target } : {}),
-        virtual: pivot !== undefined && e.placementAccountId === pivot.id,
+        virtual: pivot !== undefined && homeAccount(e) === pivot.id,
         status: 'ok',
       });
     }
@@ -227,13 +230,22 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   const threshold = ledger.settings.transferThreshold ?? 0;
   const gaps: PlacementGap[] = [];
   for (const e of idx.envelopesById.values()) {
-    for (const [accountId, amount] of envelopeComponents(e, idx, asOf)) {
-      if (accountId === e.placementAccountId) continue;
-      // Une composante qui dort sur un tiers relève du règlement (D04), pas d'un écart.
-      const acc = idx.accountsById.get(accountId);
-      if (acc?.kind === 'third') continue;
-      const status: PlacementGap['status'] = Math.abs(amount) >= threshold ? 'todo' : 'watch';
-      gaps.push({ envelopeId: e.id, envelopeName: e.name, fromAccountId: accountId, toAccountId: e.placementAccountId, amount, status });
+    // Un excédent sur un compte doit rejoindre un compte où il manque (D38) : on apparie les deux.
+    const excess = placementGaps(e, idx, asOf).filter((g) => idx.accountsById.get(g.accountId)?.kind !== 'third');
+    const surplus = excess.filter((g) => g.amount > 0).sort((a, b) => b.amount - a.amount);
+    const missing = excess.filter((g) => g.amount < 0).sort((a, b) => a.amount - b.amount);
+    let mi = 0;
+    for (const from of surplus) {
+      let left = from.amount;
+      while (left > 0 && mi < missing.length) {
+        const to = missing[mi]!;
+        const amount = Math.min(left, -to.amount);
+        const status: PlacementGap['status'] = amount >= threshold ? 'todo' : 'watch';
+        gaps.push({ envelopeId: e.id, envelopeName: e.name, fromAccountId: from.accountId, toAccountId: to.accountId, amount, status });
+        left -= amount;
+        to.amount += amount;
+        if (to.amount === 0) mi++;
+      }
     }
   }
 

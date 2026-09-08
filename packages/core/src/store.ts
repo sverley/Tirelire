@@ -102,6 +102,14 @@ export class LedgerStore {
     return this.readTable(TABLES[key]!, true);
   }
 
+  /**
+   * Lecture d'une table héritée, absente du grand livre mais toujours déclarée (D30) : sert aux
+   * migrations qui déplacent des lignes d'une table vers une autre.
+   */
+  readLegacyTable(name: keyof typeof TABLES): Row[] {
+    return this.readTable(TABLES[name]!, true);
+  }
+
   /** Version du modèle enregistrée dans ce dépôt (0 pour un dépôt antérieur à D30). */
   get modelVersion(): number {
     return Number(this.getMeta('model_version') ?? 0);
