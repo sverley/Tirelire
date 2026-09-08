@@ -116,6 +116,8 @@ form.edit { background: var(--surface-2); border-radius: 10px; padding: 12px 14p
  * vers le bas, au lieu de s'afficher en haut de la section, loin de ce qu'on vient de toucher.
  * Le liseré et les coins carrés du haut disent à quelle ligne il appartient.
  */
+/* Le panneau nomme ce qu'il modifie : l'adjacence le suggère, elle ne le dit pas (D52). */
+form.edit .titre-panneau { margin: 0; font-weight: 600; font-size: 15px; }
 form.edit.attached { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; border-left: 3px solid var(--accent); scroll-margin-top: 64px; scroll-margin-bottom: 76px; }
 .card.editing { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .row.editing { border-bottom: 0; }

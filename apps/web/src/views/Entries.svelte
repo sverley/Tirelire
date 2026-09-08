@@ -7,6 +7,8 @@
   type Nature = 'expense' | 'income' | 'transfer';
 
   let showForm = $state(false);
+  /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titre = $state('');
   let editingId = $state<string | undefined>(undefined);
   let form = $state({
     accountId: '',
@@ -41,6 +43,7 @@
     const third = accounts.find((a) => a.tracksSettlement);
     form = { accountId: third?.id ?? accounts[0]?.id ?? '', date: app.asOf, label: '', nature: 'expense', amount: '', categoryId: '', newCategory: '', tirelireId: '', transferAccountId: '' };
     editingId = undefined;
+    titre = 'Saisir une opération';
     showForm = true;
     error = '';
   }
@@ -59,6 +62,7 @@
       transferAccountId: op.transferAccountId ?? '',
     };
     editingId = op.id;
+    titre = `Modifier l'opération — ${op.label}`;
     showForm = true;
     error = '';
   }
@@ -136,6 +140,7 @@
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
+    <p class="titre-panneau">{titre}</p>
     <div class="grid">
       <label class="f">Compte
         <select bind:value={form.accountId}>

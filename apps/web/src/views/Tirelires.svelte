@@ -30,6 +30,8 @@
 
   // Tirelire : nom, placement voulu (D20), solde initial, report (D05/D29).
   let editing = $state<Tirelire | undefined>(undefined);
+  /** Ce qu'annoncent les panneaux : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titre = $state('');
   type PlacementForm = { accountId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
   let form = $state({
     name: '',
@@ -43,6 +45,7 @@
 
   // Besoin : un ou plusieurs par tirelire (D28).
   let editingNeed = $state<{ need: Need; isNew: boolean } | undefined>(undefined);
+  let needTitre = $state('');
   let needForm = $state({
     name: '',
     kind: 'recurring' as NeedKind,
@@ -126,6 +129,7 @@
       rollover: 'unlimited',
       rolloverMonths: '3',
     };
+    titre = 'Ajouter une tirelire';
     error = '';
   }
 
@@ -143,6 +147,7 @@
       rollover: e.rollover?.mode ?? 'unlimited',
       rolloverMonths: String(e.rollover?.mode === 'capped' ? e.rollover.months : 3),
     };
+    titre = `Modifier la tirelire — ${e.name}`;
     error = '';
   }
 
@@ -187,6 +192,7 @@
   function startNewNeed(e: Tirelire) {
     editingNeed = { need: { id: app.newId(), tirelireId: e.id, kind: 'recurring', priority: DEFAULT_PRIORITY.recurring }, isNew: true };
     needForm = { name: '', kind: 'recurring', amount: '', intervalMonths: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring), activeFrom: '', activeTo: '' };
+    needTitre = `Ajouter un besoin — ${e.name}`;
     needError = '';
   }
 
@@ -203,6 +209,10 @@
       activeFrom: n.activeFrom ?? '',
       activeTo: n.activeTo ?? '',
     };
+    // Une tirelire peut porter plusieurs besoins (D28) : le panneau nomme les deux.
+    const tirelire = tirelires.find((t) => t.id === n.tirelireId);
+    const lequel = n.name && n.name !== tirelire?.name ? ` « ${n.name} »` : '';
+    needTitre = `Modifier le besoin${lequel} — ${tirelire?.name ?? '?'}`;
     needError = '';
   }
 
@@ -220,6 +230,7 @@
     const copie: Need = { ...reste, id: app.newId(), activeFrom: suivante.start };
     app.upsert('needs', copie);
     startEditNeed(copie);
+    needTitre = needTitre.replace('Modifier le besoin', 'Réviser le besoin');
   }
 
   function onNeedKindChange() {
@@ -312,6 +323,7 @@
 
 {#snippet editeurTirelire()}
   <form class="edit attached" use:revealed onsubmit={save}>
+    <p class="titre-panneau">{titre}</p>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Charges" /></label>
       <div class="f" style="grid-column:1/-1">
@@ -364,7 +376,7 @@
 
 {#snippet editeurBesoin()}
   <form class="edit attached" use:revealed onsubmit={saveNeed}>
-    <h2 style="margin-top:0">Besoin</h2>
+    <p class="titre-panneau">{needTitre}</p>
     <div class="grid">
       <label class="f">Type
         <select bind:value={needForm.kind} onchange={onNeedKindChange}>

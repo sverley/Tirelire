@@ -4,6 +4,8 @@
   import { alive, findCategoryByName, type Category, type CategoryNature } from '@tirelire/core';
 
   let editing = $state<Category | undefined>(undefined);
+  /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titre = $state('');
   let form = $state({ name: '', nature: 'expense' as CategoryNature, parentId: '', tirelireId: '' });
   let error = $state('');
 
@@ -44,12 +46,14 @@
   function startNew(nature: CategoryNature) {
     editing = { id: app.newId(), name: '', nature };
     form = { name: '', nature, parentId: '', tirelireId: '' };
+    titre = `Ajouter une catégorie de ${nature === 'expense' ? 'dépense' : 'revenu'}`;
     error = '';
   }
 
   function startEdit(c: Category) {
     editing = c;
     form = { name: c.name, nature: c.nature, parentId: c.parentId ?? '', tirelireId: c.tirelireId ?? '' };
+    titre = `Modifier la catégorie — ${c.name}`;
     error = '';
   }
 
@@ -93,6 +97,7 @@
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
+    <p class="titre-panneau">{titre}</p>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Santé" /></label>
       <label class="f">Nature
