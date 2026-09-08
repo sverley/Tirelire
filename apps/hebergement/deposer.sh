@@ -13,6 +13,20 @@ set -euo pipefail
 : "${HOTE:?adresse du serveur manquante}"
 : "${UTILISATEUR:?utilisateur manquant}"
 : "${MOTDEPASSE:?mot de passe manquant}"
+# L'adresse est acceptée telle qu'on la copie de l'hébergeur : un schéma (« ftp://… »), un
+# utilisateur en tête ou un chemin en queue sont retirés, seul le nom d'hôte (et son port) sert.
+HOTE_BRUT="$HOTE"
+HOTE="${HOTE#*://}"
+HOTE="${HOTE##*@}"
+HOTE="${HOTE%%/*}"
+if [ "$HOTE" != "$HOTE_BRUT" ]; then
+  echo "Adresse du serveur ramenée à « $HOTE »."
+fi
+if [ -z "$HOTE" ]; then
+  echo "Adresse du serveur vide après nettoyage de « $HOTE_BRUT »." >&2
+  exit 1
+fi
+
 SOURCE="${SOURCE:-apps/hebergement/dist}"
 DOSSIER="${DOSSIER:-www}"
 PROTOCOLE="${PROTOCOLE:-ftps}"

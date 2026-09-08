@@ -54,7 +54,7 @@ d'autre : l'archive reste téléchargeable.
 
 | Secret | Valeur | Où la trouver |
 |---|---|---|
-| `OVH_FTP_HOST` | `ftp.clusterXXX.hosting.ovh.net` | espace client OVHcloud → Hébergements → *FTP - SSH* |
+| `OVH_FTP_HOST` | `ftp.clusterXXX.hosting.ovh.net` (un `ftp://` ou un chemin collé par mégarde sont retirés) | espace client OVHcloud → Hébergements → *FTP - SSH* |
 | `OVH_FTP_USER` | l'utilisateur FTP (souvent le nom de l'hébergement) | même onglet |
 | `OVH_FTP_PASSWORD` | son mot de passe | à (re)définir depuis le même onglet |
 

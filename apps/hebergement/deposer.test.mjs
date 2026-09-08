@@ -104,6 +104,12 @@ test('dépôt FTP : le site monte, les données du serveur restent', { skip: rai
       assert.ok(existsSync(path.join(distant, 'www/index.html')));
     });
 
+    await t.test('adresse copiée avec un schéma ou un chemin : nettoyée', () => {
+      const journal = deposer(source, distant, { HOTE: `ftp://127.0.0.1:${PORT}/www` });
+      assert.match(journal, /ramenée à « 127\.0\.0\.1:2121 »/);
+      assert.ok(existsSync(path.join(distant, 'www/index.html')));
+    });
+
     await t.test('source qui n’est pas un site assemblé : refus', () => {
       const r = spawnSync('bash', [path.join(ici, 'deposer.sh')], {
         env: { ...process.env, HOTE: '127.0.0.1', UTILISATEUR: 'x', MOTDEPASSE: 'y', SOURCE: base },
