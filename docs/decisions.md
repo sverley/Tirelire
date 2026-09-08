@@ -766,3 +766,32 @@ que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parco
 `LEDGER_KEYS`, et un test garde cette liste alignée sur le grand livre. Ajouter une table au modèle
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.
+
+## D52 · 2026-09-08 · Une période à venir suppose exécuté le plan des périodes précédentes
+
+Précise D20 et D29. Le plan a maintenant deux dates : `asOf`, la période qu'on regarde, et
+`today`, la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf`, donc
+tout appelant à deux arguments garde le comportement d'avant ; l'interface passe la date du jour).
+
+Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un virement des mois passés
+n'a pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est
+la raison d'être du « complément exceptionnel » de D21. Au-delà, il n'y a plus de relevé à lire,
+et le plan **suppose exécutés les virements qu'il a lui-même proposés** pour les périodes
+précédentes (`plannedComponents`) : ce qui a été doté avant la période affichée est à son
+placement voulu, seule la dotation de la période attend encore sur le compte de dotation.
+
+Conséquence, et invariant tenu par les tests : pour une période donnée, ce qu'on vire vers un
+compte d'accueil vaut exactement ce que les tirelires placées là demandent pour cette période,
+moins le non affecté qu'on en rapatrie. Sans cela, le bloc « Virements à faire » recalculait
+l'écart depuis la position réelle du jour — dotations des périodes antérieures comprises,
+puisque rien ne les avait virées — pendant que le bloc « Tirelires » simulait période par
+période. Les deux se contredisaient dès la période suivante et l'écart grossissait de période en
+période (sur l'exemple : 700 € demandés contre 1 400 € virés en octobre, 550 € contre 1 950 € en
+novembre, où une tirelire « en avance » ne demandait plus rien mais faisait toujours virer 300 €).
+
+Même raison pour ce qui se lit sur le réel — non affecté du compte principal, soldes à régler
+des comptes tiers, surplus des comptes d'accueil : sur une période à venir, ils se lisent à la
+dernière date connue, pas à une date inventée. L'alerte « le non affecté est négatif » ne se
+déclenche donc plus sur une position simulée, où elle finissait par apparaître à toutes les
+périodes lointaines. Projeter le solde du compte principal demanderait de dérouler revenus et
+charges période après période : ce n'est pas ce que le plan fait, et il ne le prétend plus.

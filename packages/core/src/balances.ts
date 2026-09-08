@@ -405,7 +405,14 @@ export function tirelireBalance(e: Tirelire, idx: LedgerIndex, asOf: ISODate): C
  * position voulue est la position réelle : l'argent est bien là où il est.
  */
 export function wantedComponents(e: Tirelire, idx: LedgerIndex, asOf: ISODate): Components {
-  const real = tirelireComponents(e, idx, asOf);
+  return resolvePlacement(e, tirelireComponents(e, idx, asOf));
+}
+
+/**
+ * Répartition voulue d'une position donnée. Séparée de `wantedComponents` pour servir aussi bien
+ * à la position réelle qu'à la position simulée d'une période à venir (D52).
+ */
+function resolvePlacement(e: Tirelire, real: Components): Components {
   if (e.placement.length === 0) return real;
   const total = [...real.values()].reduce((s, v) => s + v, 0);
   const out: Components = new Map();
@@ -435,12 +442,39 @@ export function wantedComponents(e: Tirelire, idx: LedgerIndex, asOf: ISODate): 
 }
 
 /**
- * Écarts de placement (D20, D38) : par compte, ce qui s'y trouve de trop (positif) ou y manque
- * (négatif) au regard du placement voulu.
+ * Position d'une tirelire telle que le plan de la période contenant `asOf` doit la lire (D52).
+ *
+ * Jusqu'à `today`, c'est la position réelle : si un virement des mois passés n'a pas été fait,
+ * l'argent est encore sur le compte de dotation et le plan doit le réclamer. Au-delà, il n'y a
+ * plus de vérité bancaire à lire : le plan suppose exécutés les virements qu'il a lui-même
+ * proposés pour les périodes précédentes. Tout ce qui a été doté avant la période affichée est
+ * donc à son placement voulu, et seule la dotation de la période attend encore sur le compte de
+ * dotation — ce qui fait du virement proposé exactement ce que la période demande.
  */
-export function placementGaps(e: Tirelire, idx: LedgerIndex, asOf: ISODate): ComponentEffect[] {
+export function plannedComponents(e: Tirelire, idx: LedgerIndex, asOf: ISODate, today: ISODate): Components {
   const real = tirelireComponents(e, idx, asOf);
-  const wanted = wantedComponents(e, idx, asOf);
+  if (budgetPeriodContaining(asOf, idx.startDay).start <= today) return real;
+  const snap = periodSnapshot(e, idx, asOf);
+  if (!snap) return real;
+  // Position d'avant la dotation de la période : c'est elle que les virements des périodes
+  // précédentes ont eu le temps de mettre en place.
+  const before: Components = new Map(real);
+  add(before, dotationAccount(e, idx), -snap.dotation);
+  for (const [k, v] of before) if (v === 0) before.delete(k);
+  const out = resolvePlacement(e, before);
+  add(out, dotationAccount(e, idx), snap.dotation);
+  for (const [k, v] of out) if (v === 0) out.delete(k);
+  return out;
+}
+
+/**
+ * Écarts de placement (D20, D38) : par compte, ce qui s'y trouve de trop (positif) ou y manque
+ * (négatif) au regard du placement voulu. `today` dit jusqu'où les soldes sont connus ; au-delà,
+ * la position est celle que le plan simule (D52).
+ */
+export function placementGaps(e: Tirelire, idx: LedgerIndex, asOf: ISODate, today: ISODate = asOf): ComponentEffect[] {
+  const real = plannedComponents(e, idx, asOf, today);
+  const wanted = resolvePlacement(e, real);
   const out: ComponentEffect[] = [];
   for (const accountId of new Set([...real.keys(), ...wanted.keys()])) {
     const amount = (real.get(accountId) ?? 0) - (wanted.get(accountId) ?? 0);
