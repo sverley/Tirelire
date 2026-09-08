@@ -8,6 +8,7 @@ import {
   exampleLedger,
   todayISO,
   uuidv7,
+  LEDGER_KEYS,
   type Ledger,
   type LedgerStore,
   type Patch,
@@ -119,19 +120,27 @@ class AppState {
     this.asOf = '2026-09-06';
   }
 
+  /**
+   * Remplace le dépôt par un grand livre complet (l'exemple, un jeu de démonstration).
+   *
+   * Les tables sont parcourues depuis `LEDGER_KEYS`, jamais énumérées à la main : la liste écrite
+   * à la main avait oublié les besoins (D28), et charger l'exemple donnait des tirelires vides,
+   * donc un plan sans une seule ligne. Une table ajoutée au modèle est reprise ici d'office.
+   *
+   * Les réglages suivent le même principe, à une exception près : `siteId` désigne *cet* appareil
+   * dans le journal de changements (D08) et n'appartient pas au grand livre recopié.
+   */
   async replaceWith(l: Ledger): Promise<void> {
     await this.eraseAll();
     const s = this.store;
-    for (const a of l.accounts) s.upsert('accounts', a);
-    for (const e of l.tirelires) s.upsert('tirelires', e);
-    for (const c of l.categories) s.upsert('categories', c);
-    for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
-    for (const o of l.operations) s.upsert('operations', o);
-    for (const a of l.allocations) s.upsert('allocations', a);
-    for (const r of l.automations) s.upsert('automations', r);
-    for (const p of l.importProfiles) s.upsert('importProfiles', p);
-    for (const d of l.devices) s.upsert('devices', d);
-    s.setSetting('principalCushion', l.settings.principalCushion);
+    const copyTable = <K extends (typeof LEDGER_KEYS)[number]>(key: K) => {
+      for (const row of l[key]) s.upsert(key, row);
+    };
+    for (const key of LEDGER_KEYS) copyTable(key);
+    for (const key of Object.keys(l.settings) as Array<keyof Settings>) {
+      if (key === 'siteId') continue;
+      s.setSetting(key, l.settings[key]);
+    }
     this.reload();
   }
 
