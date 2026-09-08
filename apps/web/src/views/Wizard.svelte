@@ -156,7 +156,8 @@
     const envelope: Envelope = {
       id: envelopeId,
       name: envForm.name.trim(),
-      placementAccountId: envForm.placementAccountId,
+      // D38 : le compte choisi devient une répartition à une part, qui prend tout.
+      placement: envForm.placementAccountId ? [{ accountId: envForm.placementAccountId, share: { kind: 'variable' as const } }] : [],
       openingBalance,
       openingDate: envForm.openingDate,
       rollover: envForm.rollover === 'capped' ? { mode: 'capped', months: Math.max(1, Number(envForm.rolloverMonths) || 1) } : { mode: envForm.rollover },
@@ -207,7 +208,7 @@
     const envelope: Envelope = {
       id: envelopeId,
       name: goalForm.name.trim(),
-      placementAccountId: goalForm.placementAccountId,
+      placement: goalForm.placementAccountId ? [{ accountId: goalForm.placementAccountId, share: { kind: 'variable' as const } }] : [],
       openingBalance,
       openingDate: goalForm.openingDate,
       rollover: { mode: 'unlimited' },
@@ -408,7 +409,7 @@
       <div class="row">
         <div class="label">
           <strong>{e.name}</strong>
-          <span class="sub">placement : {accounts.find((a) => a.id === e.placementAccountId)?.name ?? '?'} · {ROLLOVER_LABELS[e.rollover?.mode ?? 'unlimited'].toLowerCase()}</span>
+          <span class="sub">placement : {accounts.find((a) => a.id === e.placement[0]?.accountId)?.name ?? 'libre'} · {ROLLOVER_LABELS[e.rollover?.mode ?? 'unlimited'].toLowerCase()}</span>
         </div>
         <div class="num {bal < 0 ? 'neg' : ''}">{money(bal)}</div>
       </div>
