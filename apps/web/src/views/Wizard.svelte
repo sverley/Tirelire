@@ -21,6 +21,7 @@
     nextDueDate,
     DEFAULT_PRIORITY,
     type Account,
+    type AccountKind,
     type Cents,
     type Tirelire,
     type Need,
@@ -292,7 +293,9 @@
   }
 
   // --- Comptes complémentaires (facultatif) et placement des réserves ---
-  let acc = $state({ name: '', kind: 'courant' as 'courant' | 'epargne', balance: '0,00' });
+  /** Natures proposées, hors compte principal. Typée : un genre renommé casse la compilation. */
+  const NATURES: Array<Exclude<AccountKind, 'principal'>> = ['courant', 'epargne'];
+  let acc = $state({ name: '', kind: 'courant' as Exclude<AccountKind, 'principal'>, balance: '0,00' });
   let accError = $state('');
   function addAccount() {
     if (!acc.name.trim()) return void (accError = 'Donne un nom à ce compte.');
@@ -767,8 +770,7 @@
       <label class="f">Nom du compte <input bind:value={acc.name} placeholder="Livret A" /></label>
       <label class="f">Type
         <select bind:value={acc.kind}>
-          <option value="holding">Épargne (il héberge des réserves)</option>
-          <option value="third">Suivi à la main (pas de relevé importé)</option>
+          {#each NATURES as k}<option value={k}>{ACCOUNT_KINDS[k]}</option>{/each}
         </select>
       </label>
       <label class="f">Solde actuel <input bind:value={acc.balance} inputmode="decimal" /></label>

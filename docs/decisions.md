@@ -532,3 +532,16 @@ Corrige aussi une scorie de D42 : le renommage automatique avait laissé un iden
 `tirelliresById_TMP`, mal orthographié et jamais rétabli. Il devient `tireliresById`. Le typage ne
 pouvait pas le voir — il était cohérent partout — ce qui rappelle qu'un renommage mécanique demande
 une relecture, pas seulement une compilation.
+
+**Correctif (8 septembre) — un remplacement muet.** Le passage à D45 a d'abord échoué en silence : le
+`sed` de renommage ne visait que les apostrophes simples, si bien que les valeurs HTML
+`<option value="holding">` et `value="third"` de l'assistant y ont survécu, et le remplacement de
+texte censé les corriger n'a rien trouvé — sans rien signaler. Le typage ne pouvait pas le voir : une
+valeur d'`<option>` est une chaîne comme une autre. L'écran restait donc en français d'avant et, plus
+grave, écrivait des genres périmés.
+
+Deux garde-fous en découlent. Le select de l'assistant est **engendré** à partir d'une liste typée
+(`Array<Exclude<AccountKind, 'principal'>>`), comme le faisait déjà l'écran Comptes : renommer un
+genre casse désormais la compilation. Et la lecture d'un compte **traduit les anciens genres**
+(`pivot`, `holding`, `third`), comme D41 le faisait déjà pour le seul `pivot` — sauf en lecture
+brute, sinon les migrations ne verraient plus la valeur qu'elles doivent interpréter.

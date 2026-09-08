@@ -242,6 +242,12 @@ describe('migration du modèle (D30)', () => {
     // Le pair resté en arrière réécrit l'ancienne valeur : elle doit rester lisible.
     store.query(`UPDATE accounts SET kind = 'pivot' WHERE id = 'acc_p'`);
     expect(store.load().accounts[0]!.kind).toBe('principal');
+
+    // Même tolérance pour les genres de D45, qu'ils viennent d'un pair ou d'une ligne non migrée.
+    store.query(`UPDATE accounts SET kind = 'holding' WHERE id = 'acc_p'`);
+    expect(store.load().accounts[0]!.kind).toBe('epargne');
+    store.query(`UPDATE accounts SET kind = 'third' WHERE id = 'acc_p'`);
+    expect(store.load().accounts[0]!.kind).toBe('courant');
   });
 
   it("6 → 7 (D44) : le jour de paie du compte devient le début de période du foyer", async () => {

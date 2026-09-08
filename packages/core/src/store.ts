@@ -434,9 +434,15 @@ function fromRow(t: TableDef, raw: Row, includeDeprecated = false): Row {
         out[col.prop] = v;
     }
   }
-  // D41 : « pivot » reste accepté comme synonyme de « principal », pour qu'un appareil non migré
-  // qui réécrit l'ancienne valeur ne rende pas le compte principal méconnaissable.
-  if (t.name === 'accounts' && out['kind'] === 'pivot') out['kind'] = 'principal';
+  // Les anciens genres de compte restent lisibles (D41, D45) : un appareil non migré peut réécrire
+  // l'ancienne valeur, et rien ne garantit que toutes les lignes soient passées par la migration.
+  // Jamais en lecture brute : les migrations doivent voir la valeur telle qu'elle est écrite,
+  // sans quoi `migrateTo8` ne saurait plus distinguer un ancien « third » d'un compte courant.
+  if (t.name === 'accounts' && !includeDeprecated) {
+    const anciens: Record<string, string> = { pivot: 'principal', holding: 'epargne', third: 'courant' };
+    const remplacant = anciens[out['kind'] as string];
+    if (remplacant) out['kind'] = remplacant;
+  }
   return out;
 }
 
