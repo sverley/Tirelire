@@ -545,3 +545,31 @@ Deux garde-fous en découlent. Le select de l'assistant est **engendré** à par
 genre casse désormais la compilation. Et la lecture d'un compte **traduit les anciens genres**
 (`pivot`, `holding`, `third`), comme D41 le faisait déjà pour le seul `pivot` — sauf en lecture
 brute, sinon les migrations ne verraient plus la valeur qu'elles doivent interpréter.
+
+## D46 · 2026-09-08 · Des lignes déjà là, pas des pastilles à cliquer
+
+D43 offrait les propositions sous forme de pastilles qui remplissaient un formulaire vide : il fallait
+en toucher une, relire le formulaire, valider, recommencer. Un geste par ligne, pour un budget qui en
+compte vingt.
+
+Les raccourcis restent, mais **ils créent la ligne** au lieu de remplir un formulaire à valider. Et
+sur un projet vierge, l'assistant les **applique tous d'entrée** : les lignes existent déjà à
+l'arrivée sur l'étape, on corrige ce qui ne va pas et on supprime ce qui ne concerne pas le foyer.
+C'est le mouvement naturel — reconnaître et retrancher — plutôt que se souvenir et saisir.
+
+L'interface, elle, ne change pas d'un projet à l'autre : les raccourcis sont toujours offerts, et
+chacun disparaît dès qu'une ligne du même nom existe. Sur un projet vierge ils sont donc tous
+consommés d'emblée et la rangée est vide ; à la réouverture de l'assistant sur un budget existant,
+il ne reste que ceux qui manquent — de quoi ajouter un oubli sans repartir de zéro. L'application
+automatique n'a lieu qu'une fois par étape et par session : sans cette mémoire, tout supprimer les
+ferait repousser au retour sur l'étape. Et elle ne concerne qu'un projet vierge au sens de D43, donc
+un budget existant n'est jamais garni tout seul.
+
+Chaque liste reçoit un **en-tête de colonnes** et un sous-titre ; les charges fixes n'en avaient
+aucun, ce qui les faisait paraître étrangères aux revenus juste au-dessus. En-têtes et lignes
+partagent la même grille CSS, faute de quoi ils se désalignent au premier changement de largeur.
+Sous 640 px la grille se replie et l'en-tête s'efface, les champs portant alors leur propre libellé.
+
+L'écran des comptes suit la même forme : une ligne par compte au lieu d'une carte à quatre champs
+étiquetés, le type devenant un menu modifiable sur la ligne. Cinq comptes tenaient sur deux écrans ;
+ils tiennent dans un tiers.
