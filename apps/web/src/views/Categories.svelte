@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
+  import { revealed } from '../lib/actions';
   import { alive, findCategoryByName, type Category, type CategoryNature } from '@tirelire/core';
 
   let editing = $state<Category | undefined>(undefined);
@@ -90,8 +91,8 @@
   opérations qui la portent viennent alors alimenter ce budget dans le bilan.
 </p>
 
-{#if editing}
-  <form class="edit" onsubmit={save}>
+{#snippet editeur()}
+  <form class="edit attached" use:revealed onsubmit={save}>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Santé" /></label>
       <label class="f">Nature
@@ -121,7 +122,7 @@
       <button class="btn" type="button" onclick={() => (editing = undefined)}>Annuler</button>
     </div>
   </form>
-{/if}
+{/snippet}
 
 {#each [{ nature: 'expense', title: 'Dépenses' }, { nature: 'income', title: 'Revenus' }] as g (g.nature)}
   {@const { roots, children } = byNature(g.nature as CategoryNature)}
@@ -129,12 +130,16 @@
   <div class="actions">
     <button class="btn small" onclick={() => startNew(g.nature as CategoryNature)}>Ajouter une catégorie de {g.title.toLowerCase()}</button>
   </div>
+  <!-- Une catégorie qu'on crée n'a pas encore de ligne : son formulaire suit le bouton, dans sa section. -->
+  {#if editing && !categories.some((c) => c.id === editing?.id) && form.nature === g.nature}
+    {@render editeur()}
+  {/if}
   {#if roots.length === 0}
     <div class="muted">Aucune catégorie de {g.title.toLowerCase()} pour l'instant.</div>
   {/if}
   <div class="card" style="padding:0">
     {#each roots as c (c.id)}
-      <div class="row">
+      <div class="row" class:editing={editing?.id === c.id}>
         <div class="label">
           <strong>{c.name}</strong>
           {#if c.tirelireId}<span class="sub">budget {tirelireName(c.tirelireId)}</span>{/if}
@@ -144,8 +149,11 @@
           <button class="btn small danger" onclick={() => remove(c)}>Supprimer</button>
         </div>
       </div>
+      {#if editing?.id === c.id}
+        {@render editeur()}
+      {/if}
       {#each children(c.id) as sub (sub.id)}
-        <div class="row" style="padding-left:24px">
+        <div class="row" class:editing={editing?.id === sub.id} style="padding-left:24px">
           <div class="label">
             {sub.name}
             {#if sub.tirelireId}<span class="sub">budget {tirelireName(sub.tirelireId)}</span>{/if}
@@ -155,6 +163,9 @@
             <button class="btn small danger" onclick={() => remove(sub)}>Supprimer</button>
           </div>
         </div>
+        {#if editing?.id === sub.id}
+          {@render editeur()}
+        {/if}
       {/each}
     {/each}
   </div>
