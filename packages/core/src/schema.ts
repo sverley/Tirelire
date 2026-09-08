@@ -156,6 +156,7 @@ export const TABLES: Record<string, TableDef> = {
       c('categoryId'),
       cAs('tirelireId', 'envelope_id'),
       c('share', 'json'),
+      c('replenishment'), // D49
       c('deletedAt'),
       // Modèle D01–D18 (migration 2 → 3) :
       old('amount', 'integer'),

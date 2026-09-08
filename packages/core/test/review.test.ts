@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { euros, exampleLedger, lastPeriods, reviewCategories, reviewProvisions, type Ledger, type Operation, type Allocation } from '../src/index.js';
+import { euros, exampleLedger, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, type Ledger, type Operation, type Allocation } from '../src/index.js';
 
 function withHistory(): Ledger {
   const l = exampleLedger();
@@ -54,5 +54,60 @@ describe('bilan des provisions', () => {
     expect(tf.provisioned).toBe(euros(1200));
     expect(tf.paid).toBe(euros(1260));
     expect(tf.variance).toBe(euros(60));
+  });
+});
+
+/**
+ * Un renflouement (D49) est ce que le plan sert à éviter : s'il faut ramener de l'argent, c'est que
+ * la dotation était trop basse. Il doit donc sortir des moyennes — sinon il masque le problème
+ * qu'il révèle — et être compté à part pour proposer un réajustement.
+ */
+describe('renflouements (D49)', () => {
+  function avecRenflouement(): Ledger {
+    const l = withHistory();
+    // Cadeau de 300 € versé dans la tirelire des courses, un mois où elle était à sec.
+    const cadeau: Operation = {
+      id: 'op-cadeau', accountId: 'acc-principal', origin: 'manual', date: '2026-07-20',
+      label: 'VIREMENT MAMIE', normalizedLabel: 'VIREMENT MAMIE', amount: euros(300), state: 'reconciled',
+    };
+    const al: Allocation = {
+      id: 'al-cadeau', operationId: cadeau.id, tirelireId: 'env-alim',
+      share: { kind: 'fixed', amount: euros(300) }, replenishment: 'external',
+    };
+    l.operations.push(cadeau);
+    l.allocations.push(al);
+    return l;
+  }
+
+  it("ne laisse pas un cadeau fausser les moyennes du bilan", () => {
+    const periods = lastPeriods(withHistory(), '2026-08-31', 6);
+    const sans = reviewCategories(withHistory(), periods).find((r) => r.categoryId === 'cat-alim')!;
+    const avec = reviewCategories(avecRenflouement(), periods).find((r) => r.categoryId === 'cat-alim')!;
+    // Les 300 € entrés n'appartiennent pas au train de vie : la lecture doit être identique.
+    expect(avec.avg6).toBe(sans.avg6);
+    expect(avec.totalSpent).toBe(sans.totalSpent);
+  });
+
+  it('compte ce qui a été ramené, et distingue le dehors du dedans', () => {
+    const periods = lastPeriods(avecRenflouement(), '2026-08-31', 6);
+    const r = reviewReplenishments(avecRenflouement(), periods).find((x) => x.tirelireId === 'env-alim')!;
+    expect(r.count).toBe(1);
+    expect(r.total).toBe(euros(300));
+    expect(r.fromOutside).toBe(euros(300));
+    expect(r.fromInside).toBe(0);
+  });
+
+  it('propose de relever la dotation de ce qu\'il a fallu ramener, sans rien appliquer', () => {
+    const periods = lastPeriods(avecRenflouement(), '2026-08-31', 6);
+    const r = reviewReplenishments(avecRenflouement(), periods).find((x) => x.tirelireId === 'env-alim')!;
+    // 300 € ramenés sur six périodes : la dotation manquait d'environ 50 € par période.
+    expect(r.suggested).toBe(euros(50));
+    // La dotation elle-même n'a pas bougé : la correction reste une décision du foyer.
+    expect(r.cruise).toBeGreaterThan(0);
+  });
+
+  it("n'invente pas de renflouement là où il n'y en a pas", () => {
+    const periods = lastPeriods(withHistory(), '2026-08-31', 6);
+    expect(reviewReplenishments(withHistory(), periods)).toEqual([]);
   });
 });

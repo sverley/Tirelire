@@ -123,6 +123,9 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
     if (!p) continue;
     const pi = periods.indexOf(p);
     for (const al of idx.allocationsByOperation.get(op.id) ?? []) {
+      // Un renflouement (D49) fausserait les moyennes : un cadeau gonflerait le revenu moyen, un
+      // virement interne compterait deux fois. Il est compté ailleurs, par `reviewReplenishments`.
+      if (al.replenishment) continue;
       const targets: CategoryReview[] = [];
       if (al.categoryId) {
         const c = categories.find((x) => x.id === al.categoryId);
@@ -196,4 +199,62 @@ export function reviewProvisions(ledger: Ledger, from: ISODate, asOf: ISODate): 
     }
   }
   return out.sort((a, b) => (a.dueDate < b.dueDate ? 1 : -1));
+}
+
+export interface ReplenishmentReview {
+  tirelireId: Id;
+  name: string;
+  /** Nombre de renflouements sur la fenêtre observée. */
+  count: number;
+  /** Total ramené, positif. */
+  total: Cents;
+  /** Part venue de l'extérieur (cadeau, remboursement, vente). */
+  fromOutside: Cents;
+  /** Part reprise ailleurs dans le patrimoine : la répartition était mauvaise. */
+  fromInside: Cents;
+  /** Dotation actuelle par période, si la tirelire en a une. */
+  cruise: Cents;
+  /**
+   * Ce qu'il aurait fallu doter en plus par période pour ne pas avoir à renflouer. Une *proposition*
+   * de lecture, jamais appliquée d'office : un renflouement peut être un accident isolé qu'il ne
+   * faut surtout pas inscrire dans le budget permanent (D49).
+   */
+  suggested: Cents;
+}
+
+/**
+ * Renflouements par tirelire sur `periods` (D49). Le renflouement est la mesure la plus directe
+ * d'une dotation sous-évaluée : ce qu'on a dû ramener, réparti sur la fenêtre observée, dit de
+ * combien la dotation manquait.
+ */
+export function reviewReplenishments(ledger: Ledger, periods: Period[]): ReplenishmentReview[] {
+  if (periods.length === 0) return [];
+  const idx = indexLedger(ledger);
+  const debut = periods[0]!.start;
+  const fin = periods[periods.length - 1]!.end;
+  const parTirelire = new Map<Id, ReplenishmentReview>();
+
+  for (const op of idx.operationsById.values()) {
+    if (op.date < debut || op.date > fin) continue;
+    for (const al of idx.allocationsByOperation.get(op.id) ?? []) {
+      if (!al.replenishment || !al.tirelireId) continue;
+      const e = idx.tireliresById.get(al.tirelireId);
+      if (!e) continue;
+      const montant = allocationAmount(al, idx);
+      if (montant <= 0) continue; // seul ce qui entre dans la tirelire renfloue
+      let r = parTirelire.get(e.id);
+      if (!r) {
+        const cruise = (idx.needsByTirelire.get(e.id) ?? []).reduce((s, n) => s + needCruise(n), 0);
+        r = { tirelireId: e.id, name: e.name, count: 0, total: 0, fromOutside: 0, fromInside: 0, cruise, suggested: 0 };
+        parTirelire.set(e.id, r);
+      }
+      r.count++;
+      r.total += montant;
+      if (al.replenishment === 'external') r.fromOutside += montant;
+      else r.fromInside += montant;
+    }
+  }
+
+  for (const r of parTirelire.values()) r.suggested = Math.ceil(r.total / periods.length);
+  return [...parTirelire.values()].sort((a, b) => b.total - a.total);
 }

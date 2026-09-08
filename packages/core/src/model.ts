@@ -338,12 +338,29 @@ export type Share =
  * interne, aussi son opposé sur le compte de contrepartie, ce qui déplace une composante sans
  * changer le solde.
  */
+/**
+ * Origine d'un renflouement (D49). Un renflouement est par définition ce que le plan sert à éviter :
+ * si tout est correctement provisionné, l'argent n'a pas besoin d'être ramené. Le distinguer sert
+ * donc moins à le ranger qu'à le compter — c'est la mesure directe d'une dotation sous-évaluée.
+ *
+ * - `internal` : l'argent était déjà chez nous et change de tirelire ou de compte. À somme nulle
+ *   sur le patrimoine : la répartition était mauvaise.
+ * - `external` : un cadeau, un remboursement, une vente. Le foyer a été sauvé du dehors ; le budget
+ *   permanent ne peut pas compter dessus.
+ */
+export type ReplenishmentKind = 'internal' | 'external';
+
 export interface Allocation {
   id: Id;
   operationId: Id;
   categoryId?: Id;
   tirelireId?: Id;
   share: Share;
+  /**
+   * Cette ligne renfloue la tirelire au lieu de la faire vivre normalement (D49). Exclue des
+   * moyennes du bilan, et comptée à part pour proposer un réajustement de la dotation.
+   */
+  replenishment?: ReplenishmentKind;
   deletedAt?: string;
 }
 
