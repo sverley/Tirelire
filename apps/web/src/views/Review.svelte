@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation } from '@tirelire/core';
+  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, budgetPeriodContaining, minDate, needActive, needCruise, nextPeriod, automationsByRank, automationLabel, type CategoryReview, type Automation, type Need } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -21,21 +21,36 @@
   /**
    * Adopter une cible : la suggestion porte sur la dotation par période, donc sur les besoins
    * récurrents de la tirelire (D28). S'il y en a plusieurs, on ajuste celui qui pèse le plus.
+   *
+   * Deux règles héritées de D50. On ne calibre que sur un besoin **en vigueur** à la date de
+   * lecture : un budget clos l'an dernier n'est plus la cible d'aujourd'hui. Et on ne change pas
+   * son montant en place — cela recalculerait les dotations des périodes déjà écoulées au montant
+   * d'aujourd'hui, et le Bilan comparerait le passé à une cible qui n'était pas la sienne. On clôt
+   * donc l'ancien besoin la veille de la période courante, et on en ouvre un nouveau.
    */
   function adopt(r: CategoryReview) {
     if (!r.tirelireId || r.suggestion === undefined) return;
     const e = tirelires.find((x) => x.id === r.tirelireId);
     if (!e) return;
     const recurring = alive(app.ledger.needs)
-      .filter((n) => n.tirelireId === e.id && n.kind === 'recurring')
+      .filter((n) => n.tirelireId === e.id && n.kind === 'recurring' && needActive(n, app.asOf))
       .sort((a, b) => needCruise(b) - needCruise(a));
     const need = recurring[0];
     if (!need) return;
     const others = recurring.slice(1).reduce((s, n) => s + needCruise(n), 0);
     const interval = need.periodicity ? monthsOf(need.periodicity) : 1;
     const amount = Math.max(0, r.suggestion - others) * interval;
-    if (!confirm(`Passer « ${need.name ?? e.name} » à ${money(amount)} ${interval === 1 ? 'par période' : `tous les ${interval} mois`} ?`)) return;
-    app.upsert('needs', { ...need, amount });
+    const rythme = interval === 1 ? 'par période' : `tous les ${interval} mois`;
+    const startDay = app.ledger.settings.periodStartDay;
+    const courante = budgetPeriodContaining(app.asOf, startDay);
+    const suivante = nextPeriod(courante, startDay);
+    if (!confirm(`Réviser « ${need.name ?? e.name} » à ${money(amount)} ${rythme} à partir du ${shortDate(suivante.start)} ?`)) return;
+    // Même coupure que le bouton « Réviser » de l'écran Tirelires (D51) : à la frontière de
+    // période, parce qu'une dotation est un tout (D29) et qu'on ne redote pas une période entamée.
+    app.upsert('needs', { ...need, activeTo: need.activeTo ? minDate(need.activeTo, courante.end) : courante.end });
+    const { activeTo: _fin, ...reste } = need;
+    const suivant: Need = { ...reste, id: app.newId(), amount, activeFrom: suivante.start };
+    app.upsert('needs', suivant);
   }
 
   function gap(r: CategoryReview): number | undefined {

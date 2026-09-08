@@ -4,6 +4,7 @@
  */
 import {
   computePlan,
+  diffDays,
   emptyLedger,
   exampleLedger,
   LEDGER_KEYS,
@@ -31,6 +32,28 @@ class AppState {
   private opened: OpenedStore | undefined;
 
   plan: Plan = $derived(computePlan(this.ledger, this.asOf));
+
+  /** Date de la dernière opération connue, tous comptes confondus (undefined sans opération). */
+  lastOperationDate: string | undefined = $derived.by(() => {
+    let last: string | undefined;
+    for (const o of this.ledger.operations) if (!o.deletedAt && (last === undefined || o.date > last)) last = o.date;
+    return last;
+  });
+
+  /**
+   * Jours entre la dernière opération connue et la date de lecture. Au-delà de quelques jours,
+   * les soldes et le plan supposent qu'il ne s'est rien passé depuis le dernier relevé importé :
+   * l'interface doit le dire, sans quoi on lit un plan optimiste sans le savoir.
+   */
+  staleDays: number = $derived(this.lastOperationDate ? diffDays(this.lastOperationDate, this.asOf) : 0);
+
+  /** La date de lecture est-elle le jour même ? Sinon, toute l'application lit une autre date. */
+  readingToday: boolean = $derived(this.asOf === todayISO());
+
+  /** Revenir à aujourd'hui après avoir consulté une autre date. */
+  backToToday(): void {
+    this.asOf = todayISO();
+  }
 
   get store(): LedgerStore {
     if (!this.opened) throw new Error('Dépôt non ouvert');
@@ -120,6 +143,16 @@ class AppState {
     this.asOf = '2026-09-06';
   }
 
+  /**
+   * Remplace le dépôt par un grand livre complet (l'exemple, un jeu de démonstration).
+   *
+   * Les tables sont parcourues depuis `LEDGER_KEYS`, jamais énumérées à la main : la liste écrite
+   * à la main avait oublié les besoins (D28), et charger l'exemple donnait des tirelires vides,
+   * donc un plan sans une seule ligne. Une table ajoutée au modèle est reprise ici d'office.
+   *
+   * Les réglages suivent le même principe, à une exception près : `siteId` désigne *cet* appareil
+   * dans le journal de changements (D08) et n'appartient pas au grand livre recopié.
+   */
   async replaceWith(l: Ledger): Promise<void> {
     await this.eraseAll();
     const s = this.store;
@@ -127,10 +160,12 @@ class AppState {
     // oublié `needs`, si bien que charger l'exemple donnait des tirelires sans aucun besoin — donc
     // un plan vide. Ajouter une table au modèle ne peut plus laisser cette fonction en arrière.
     for (const key of LEDGER_KEYS) for (const row of l[key]) s.upsert(key, row as never);
-    // Les réglages du foyer, sauf `siteId` qui appartient à l'appareil et non aux données.
-    s.setSetting('periodStartDay', l.settings.periodStartDay);
-    s.setSetting('principalCushion', l.settings.principalCushion);
-    s.setSetting('transferThreshold', l.settings.transferThreshold);
+    // Les réglages suivent la même règle, pour la même raison : on les parcourt au lieu de les
+    // citer un par un. Seul `siteId` reste dehors — il désigne cet appareil, pas les données (D08).
+    for (const key of Object.keys(l.settings) as Array<keyof Settings>) {
+      if (key === 'siteId') continue;
+      s.setSetting(key, l.settings[key]);
+    }
     this.reload();
   }
 

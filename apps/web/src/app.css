@@ -96,6 +96,14 @@ main { max-width: 860px; margin: 0 auto; padding: 16px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 
 form.edit { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; margin: 10px 0 16px; display: grid; gap: 10px; }
+/*
+ * Édition sur place : le panneau s'ouvre juste sous la ligne qu'il modifie et pousse la suite
+ * vers le bas, au lieu de s'afficher en haut de la section, loin de ce qu'on vient de toucher.
+ * Le liseré et les coins carrés du haut disent à quelle ligne il appartient.
+ */
+form.edit.attached { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; border-left: 3px solid var(--accent); scroll-margin-top: 64px; scroll-margin-bottom: 76px; }
+.card.editing { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.row.editing { border-bottom: 0; }
 form.edit .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 label.f { display: grid; gap: 3px; font-size: 13px; color: var(--ink-2); }
 label.f input, label.f select { padding: 7px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); width: 100%; }
