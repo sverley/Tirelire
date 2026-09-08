@@ -26,11 +26,16 @@ export interface Periodicity {
 // ---------------------------------------------------------------------------
 
 /**
- * - `principal`   : le compte réel par lequel tout transite (relevé importé).
- * - `holding` : compte d'accueil réel (livret, PEL…) qui héberge des tirelires.
- * - `third`   : compte tiers, non importé, saisi à la main ; porte un solde à régler avec le compte principal.
+ * Nature du compte, et rien d'autre (D45) : la façon dont les opérations y entrent — import d'un
+ * relevé ou saisie à la main — n'en fait pas partie. Tout compte peut être importé dès lors que
+ * l'import sait attribuer chaque ligne à un compte (par son numéro, D18, ou par le compte choisi
+ * pour le fichier entier).
+ *
+ * - `principal` : le compte par lequel tout transite ; il n'y en a qu'un.
+ * - `courant`   : un autre compte courant (compte joint, compte d'un membre du foyer).
+ * - `epargne`   : livret, PEL, assurance-vie… il héberge des tirelires.
  */
-export type AccountKind = 'principal' | 'holding' | 'third';
+export type AccountKind = 'principal' | 'courant' | 'epargne';
 
 export type SettlementDirection = 'both' | 'toThird' | 'fromThird';
 
@@ -43,9 +48,16 @@ export interface Account {
   accountNumber?: string;
   openingBalance: Cents;
   openingDate: ISODate;
-  /** Comptes tiers : en dessous de ce montant, on ne propose pas de virement de règlement. */
+  /**
+   * Suivre un **solde à régler** avec le compte principal (D04, D45). Utile quand les dépenses
+   * faites depuis ce compte sont réellement à la charge du foyer : elles créent une dette d'un
+   * compte envers l'autre, que le plan propose de solder. Indépendant de la nature du compte et de
+   * la façon dont ses opérations y sont entrées.
+   */
+  tracksSettlement?: boolean;
+  /** En dessous de ce montant, on ne propose pas de virement de règlement. */
   settlementThreshold?: Cents;
-  /** Comptes tiers : sens autorisé des virements de règlement. */
+  /** Sens autorisé des virements de règlement. */
   settlementDirection?: SettlementDirection;
   deletedAt?: string;
 }

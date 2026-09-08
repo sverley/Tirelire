@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
-  import { money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
+  import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
   import { periodsAround, missingFlows, addDays, alive, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
 
   const plan = $derived(app.plan);
@@ -92,7 +92,7 @@
       <div class="row">
         <div class="label">
           <strong>{t.accountName}</strong>
-          <span class="sub">{t.accountKind === 'third' ? 'compte tiers' : "compte d'accueil"}{t.label ? ' · libellé : ' : ''}{#if t.label}<span class="num">{t.label}</span>{/if}</span>
+          <span class="sub">{ACCOUNT_KINDS[t.accountKind]}{t.label ? ' · libellé : ' : ''}{#if t.label}<span class="num">{t.label}</span>{/if}</span>
         </div>
         <div class="{moneyClass(-t.net)}" style="font-size:18px">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
       </div>

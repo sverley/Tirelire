@@ -79,7 +79,7 @@ export function distributeTransfer(ledger: Ledger, accountId: Id, amount: Cents,
   const idx = indexLedger(ledger);
   const principal = idx.principal;
   const lines: Array<{ tirelireId: Id; name: string; priority: number; dueDate: string; floor: Cents; requested: Cents; funded: Cents }> = [];
-  for (const e of idx.tirelliresById_TMP.values()) {
+  for (const e of idx.tireliresById.values()) {
     // Tirelires qui veulent de l'argent sur ce compte (D38).
     if (!e.placement.some((p) => p.accountId === accountId)) continue;
     const comps = tirelireComponents(e, idx, asOf);
@@ -299,7 +299,7 @@ export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): Miss
   for (const f of flows) {
     // Un flux ne peut manquer que sur un compte importé.
     const acc = ledger.accounts.find((a) => a.id === f.accountId);
-    if (!acc || acc.kind === 'third') continue;
+    if (!acc || acc.tracksSettlement) continue;
     for (const d of occurrencesBetween(f.periodicity, from, asOf)) {
       if (f.activeFrom && d < f.activeFrom) continue;
       if (f.activeTo && d > f.activeTo) continue;

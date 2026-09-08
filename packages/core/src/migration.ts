@@ -25,6 +25,7 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   if (from < 5) steps.push({ version: 5, written: migrateTo5(store) });
   if (from < 6) steps.push({ version: 6, written: migrateTo6(store) });
   if (from < 7) steps.push({ version: 7, written: migrateTo7(store) });
+  if (from < 8) steps.push({ version: 8, written: migrateTo8(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
@@ -204,4 +205,26 @@ function migrateTo7(store: LedgerStore): number {
     return 1;
   }
   return 0;
+}
+
+/**
+ * 7 → 8 (D45) : le genre d'un compte ne dit plus comment ses opérations y entrent. `third`
+ * — « compte tiers, saisi à la main » — mélangeait la nature du compte et le fait qu'on suive un
+ * solde à régler avec lui. Il devient `courant` plus le drapeau `tracksSettlement`, qui porte seul
+ * ce comportement ; `holding` devient `epargne`, qui dit la même chose plus clairement.
+ */
+function migrateTo8(store: LedgerStore): number {
+  let written = 0;
+  for (const raw of store.readRawTable('accounts')) {
+    const kind = raw['kind'];
+    if (kind !== 'third' && kind !== 'holding') continue;
+    const compte = raw as unknown as Account;
+    store.upsert('accounts', {
+      ...compte,
+      kind: kind === 'third' ? 'courant' : 'epargne',
+      ...(kind === 'third' ? { tracksSettlement: true } : {}),
+    });
+    written++;
+  }
+  return written;
 }

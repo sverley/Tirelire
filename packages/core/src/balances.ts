@@ -66,7 +66,7 @@ export interface PeriodSnapshot {
 
 export interface LedgerIndex {
   accountsById: Map<Id, Account>;
-  tirelliresById_TMP: Map<Id, Tirelire>;
+  tireliresById: Map<Id, Tirelire>;
   needsByTirelire: Map<Id, Need[]>;
   operationsById: Map<Id, Operation>;
   allocationsByOperation: Map<Id, Allocation[]>;
@@ -82,10 +82,10 @@ export interface LedgerIndex {
 
 export function indexLedger(ledger: Ledger): LedgerIndex {
   const accountsById = new Map(alive(ledger.accounts).map((a) => [a.id, a]));
-  const tirelliresById_TMP = new Map(alive(ledger.tirelires).map((e) => [e.id, e]));
+  const tireliresById = new Map(alive(ledger.tirelires).map((e) => [e.id, e]));
   const needsByTirelire = new Map<Id, Need[]>();
   for (const n of alive(ledger.needs)) {
-    if (!tirelliresById_TMP.has(n.tirelireId)) continue;
+    if (!tireliresById.has(n.tirelireId)) continue;
     const arr = needsByTirelire.get(n.tirelireId);
     if (arr) arr.push(n);
     else needsByTirelire.set(n.tirelireId, [n]);
@@ -102,7 +102,7 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
   const principal = [...accountsById.values()].find((a) => a.kind === 'principal');
   const idx: LedgerIndex = {
     accountsById,
-    tirelliresById_TMP,
+    tireliresById,
     needsByTirelire,
     operationsById,
     allocationsByOperation,
@@ -119,7 +119,7 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
   for (const [opId, allocs] of allocationsByOperation) {
     const op = operationsById.get(opId)!;
     for (const al of allocs) {
-      const env = al.tirelireId ? tirelliresById_TMP.get(al.tirelireId) : undefined;
+      const env = al.tirelireId ? tireliresById.get(al.tirelireId) : undefined;
       if (!env) continue;
       const effects = allocationEffects(op, al, idx);
       const entry: TirelireEntry = { operation: op, allocation: al, effects, effect: effects.reduce((s, x) => s + x.amount, 0) };
@@ -452,7 +452,7 @@ export function accountBalance(a: Account, ledger: Ledger, asOf: ISODate): Cents
 /** Composantes portées par un compte, toutes tirelires confondues. */
 export function componentsOnAccount(a: Account, idx: LedgerIndex, asOf: ISODate): Cents {
   let s = 0;
-  for (const e of idx.tirelliresById_TMP.values()) s += tirelireComponents(e, idx, asOf).get(a.id) ?? 0;
+  for (const e of idx.tireliresById.values()) s += tirelireComponents(e, idx, asOf).get(a.id) ?? 0;
   return s;
 }
 
@@ -488,7 +488,7 @@ export function settlementBalance(third: Account, ledger: Ledger, idx: LedgerInd
     if (!isOnThird && !isTransferToThird) continue;
     if (isOnThird && op.transferAccountId) continue;
     const placedHere = (idx.allocationsByOperation.get(op.id) ?? []).reduce((s, al) => {
-      const env = al.tirelireId ? idx.tirelliresById_TMP.get(al.tirelireId) : undefined;
+      const env = al.tirelireId ? idx.tireliresById.get(al.tirelireId) : undefined;
       return env && homeAccount(env) === third.id ? s + allocationAmount(al, idx) : s;
     }, 0);
     const outside = op.amount - placedHere;

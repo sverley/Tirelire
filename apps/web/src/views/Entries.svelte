@@ -34,7 +34,7 @@
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
 
   function startNew() {
-    const third = accounts.find((a) => a.kind === 'third');
+    const third = accounts.find((a) => a.tracksSettlement);
     form = { accountId: third?.id ?? accounts[0]?.id ?? '', date: app.asOf, label: '', nature: 'expense', amount: '', categoryId: '', newCategory: '', tirelireId: '', transferAccountId: '' };
     editingId = undefined;
     showForm = true;
@@ -135,7 +135,7 @@
     <div class="grid">
       <label class="f">Compte
         <select bind:value={form.accountId}>
-          {#each accounts as a}<option value={a.id}>{a.name}{a.kind === 'third' ? ' (tiers)' : ''}</option>{/each}
+          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
         </select>
       </label>
       <label class="f">Nature

@@ -11,11 +11,12 @@ export function exampleLedger(): Ledger {
 
   l.accounts.push(
     { id: 'acc-principal', name: 'Compte courant', kind: 'principal', openingBalance: euros(2340), openingDate: '2026-08-27' },
-    { id: 'acc-livret', name: 'Livret A', kind: 'holding', openingBalance: euros(4815), openingDate: '2026-08-27' },
+    { id: 'acc-livret', name: 'Livret A', kind: 'epargne', openingBalance: euros(4815), openingDate: '2026-08-27' },
     {
       id: 'acc-enfants',
       name: 'Carte enfants',
-      kind: 'third',
+      kind: 'courant',
+      tracksSettlement: true,
       openingBalance: 0,
       openingDate: '2026-08-27',
       settlementThreshold: euros(10),
@@ -24,7 +25,8 @@ export function exampleLedger(): Ledger {
     {
       id: 'acc-marie',
       name: 'Compte de Marie',
-      kind: 'third',
+      kind: 'courant',
+      tracksSettlement: true,
       openingBalance: 0,
       openingDate: '2026-08-27',
       settlementThreshold: euros(10),

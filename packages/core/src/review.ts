@@ -184,7 +184,7 @@ export function reviewProvisions(ledger: Ledger, from: ISODate, asOf: ISODate): 
   const idx = indexLedger(ledger);
   const out: ProvisionReview[] = [];
   for (const n of alive(ledger.needs).filter((x): x is Need & { periodicity: NonNullable<Need['periodicity']> } => x.kind === 'dueDate' && !!x.periodicity)) {
-    const e = idx.tirelliresById_TMP.get(n.tirelireId);
+    const e = idx.tireliresById.get(n.tirelireId);
     if (!e) continue;
     const target = n.amount ?? 0;
     for (const due of occurrencesBetween(n.periodicity, from, asOf)) {

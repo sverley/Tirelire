@@ -240,7 +240,7 @@
           <label class="f">{k}
             <select bind:value={profile.accountMap[k]}>
               <option value="">— ignorer</option>
-              {#each accounts.filter((a) => a.kind !== 'third') as a}<option value={a.id}>{a.name}</option>{/each}
+              {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
           {#if profile.accountMap[k] && needsRemember(profile.accountMap[k], k)}
@@ -255,7 +255,7 @@
       <label class="f">Compte cible
         <select bind:value={profile.accountId}>
           <option value={undefined}>—</option>
-          {#each accounts.filter((a) => a.kind !== 'third') as a}<option value={a.id}>{a.name}</option>{/each}
+          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
         </select>
       </label>
     {/if}

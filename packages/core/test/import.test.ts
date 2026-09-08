@@ -144,14 +144,14 @@ describe('rapprochement', () => {
     const l2 = applyPatchToLedger(l, patch);
     const idx = indexLedger(l2);
     // 100 € vers le livret : le plancher de la taxe foncière (rattrapage 150) passe avant tout ; le solde ne bouge pas.
-    const tf = tirelireComponents(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06');
+    const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, '2026-09-06');
     expect(tf.get('acc-livret')).toBe(euros(1000));
     expect(tf.get('acc-principal')).toBe(euros(50));
-    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
+    expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
     // 200 € vers la carte enfants : dotation déplacée là (aucune dépense saisie dans ce test)
-    const enfants = tirelireComponents(idx.tirelliresById_TMP.get('env-enfants')!, idx, '2026-09-06');
+    const enfants = tirelireComponents(idx.tireliresById.get('env-enfants')!, idx, '2026-09-06');
     expect(enfants.get('acc-enfants')).toBe(euros(200));
-    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-enfants')!, idx, '2026-09-06')).toBe(euros(200));
+    expect(tirelireBalance(idx.tireliresById.get('env-enfants')!, idx, '2026-09-06')).toBe(euros(200));
     const op = l2.operations.find((o) => o.normalizedLabel.includes('LIVRET A'))!;
     expect(op.state).toBe('reconciled');
     expect(op.transferAccountId).toBeDefined();
@@ -192,7 +192,7 @@ describe('rapprochement', () => {
     expect(patch.allocations[0]!.tirelireId).toBe('env-alim');
     const l2 = applyPatchToLedger(l, patch);
     const idx = indexLedger(l2);
-    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-alim')!, idx, '2026-09-06')).toBe(euros(900 - 170.8));
+    expect(tirelireBalance(idx.tireliresById.get('env-alim')!, idx, '2026-09-06')).toBe(euros(900 - 170.8));
     expect(suggestPattern(l.operations.find((o) => o.normalizedLabel.includes('EAU'))!)).toBe('EAU.*VILLAGE');
   });
 
@@ -239,16 +239,16 @@ describe('rapprochement', () => {
     let l2 = applyPatchToLedger(l, patch);
     l2 = applyPatchToLedger(l2, matchTirelireTransfers(l2));
     const idx = indexLedger(l2);
-    const tf = tirelireComponents(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06');
+    const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, '2026-09-06');
     expect(tf.get('acc-livret')).toBe(euros(1000));
-    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
+    expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
   });
 });
 
 describe('correspondance des comptes par numéro', () => {
   const principal: Account = { id: 'acc-principal', name: 'Principal', kind: 'principal', openingBalance: 0, openingDate: '2026-01-01', accountNumber: 'FR76 1234 5678 9012 3456 7890 123' };
-  const livret: Account = { id: 'acc-livret', name: 'Livret', kind: 'holding', openingBalance: 0, openingDate: '2026-01-01', accountNumber: '00012345678' };
-  const sansNumero: Account = { id: 'acc-autre', name: 'Autre', kind: 'holding', openingBalance: 0, openingDate: '2026-01-01' };
+  const livret: Account = { id: 'acc-livret', name: 'Livret', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01', accountNumber: '00012345678' };
+  const sansNumero: Account = { id: 'acc-autre', name: 'Autre', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01' };
   const accounts = [principal, livret, sansNumero];
 
   it('normalise en retirant espaces et ponctuation, insensible à la casse', () => {

@@ -24,9 +24,9 @@ export function inputToCents(s: string): Cents | undefined {
 }
 
 export const ACCOUNT_KINDS: Record<AccountKind, string> = {
-  principal: 'Principal (relevé importé)',
-  holding: "Compte d'accueil (livret, PEL…)",
-  third: 'Compte tiers (saisie manuelle)',
+  principal: 'Compte principal',
+  courant: 'Compte courant',
+  epargne: 'Épargne',
 };
 
 export const NEED_KINDS: Record<NeedKind, string> = {

@@ -167,7 +167,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
 
   // Une ligne par besoin, d'après l'instantané de la période (dotations D29).
   const lines: PlanLine[] = [];
-  for (const e of idx.tirelliresById_TMP.values()) {
+  for (const e of idx.tireliresById.values()) {
     const snap = periodSnapshot(e, idx, asOf);
     if (!snap) continue;
     const needs = idx.needsByTirelire.get(e.id) ?? [];
@@ -229,9 +229,9 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   // Écarts de placement (D20), tous comptes, sauf les tiers (le règlement les couvre).
   const threshold = ledger.settings.transferThreshold ?? 0;
   const gaps: PlacementGap[] = [];
-  for (const e of idx.tirelliresById_TMP.values()) {
+  for (const e of idx.tireliresById.values()) {
     // Un excédent sur un compte doit rejoindre un compte où il manque (D38) : on apparie les deux.
-    const excess = placementGaps(e, idx, asOf).filter((g) => idx.accountsById.get(g.accountId)?.kind !== 'third');
+    const excess = placementGaps(e, idx, asOf).filter((g) => !idx.accountsById.get(g.accountId)?.tracksSettlement);
     const surplus = excess.filter((g) => g.amount > 0).sort((a, b) => b.amount - a.amount);
     const missing = excess.filter((g) => g.amount < 0).sort((a, b) => a.amount - b.amount);
     let mi = 0;
@@ -254,7 +254,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   for (const a of idx.accountsById.values()) {
     if (principal && a.id === principal.id) continue;
     const orders: StandingOrder[] = [];
-    for (const e of idx.tirelliresById_TMP.values()) {
+    for (const e of idx.tireliresById.values()) {
       const gapsHere = gaps.filter(
         (g) =>
           g.tirelireId === e.id &&
@@ -280,7 +280,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
     const exceptional = orders.reduce((s, o) => s + o.exceptional, 0);
     let settlement = 0;
     let surplus = 0;
-    if (a.kind === 'third') {
+    if (a.tracksSettlement) {
       const owes = settlementBalance(a, ledger, idx, asOf);
       const thr = a.settlementThreshold ?? 0;
       const dir = a.settlementDirection ?? 'both';
@@ -294,7 +294,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
             accountId: a.id,
           });
       }
-    } else if (a.kind === 'holding') {
+    } else if (a.kind === 'epargne') {
       surplus = unallocated(a, ledger, idx, asOf);
     }
     const net = standing + exceptional + settlement - surplus;
@@ -438,7 +438,7 @@ export function transferLabel(accountName: string): string {
 /** Solde d'une tirelire et sa position, pour l'interface. */
 export function tirelirePosition(ledger: Ledger, tirelireId: Id, asOf: ISODate): { balance: Cents; components: Array<{ accountId: Id; amount: Cents }> } | undefined {
   const idx = indexLedger(ledger);
-  const e = idx.tirelliresById_TMP.get(tirelireId);
+  const e = idx.tireliresById.get(tirelireId);
   if (!e) return undefined;
   return {
     balance: tirelireBalance(e, idx, asOf),
