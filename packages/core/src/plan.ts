@@ -18,7 +18,7 @@ import {
   unallocated,
   type LedgerIndex,
 } from './balances.js';
-import { occurrencesBetween, payPeriodContaining, previousPeriod, type Period } from './periods.js';
+import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays } from './dates.js';
 
 export interface PlanFlowLine {
@@ -154,8 +154,8 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   const idx = indexLedger(ledger);
   const warnings: PlanWarning[] = [];
   const principal = idx.principal;
-  const payDay = idx.payDay;
-  const period = payPeriodContaining(asOf, payDay);
+  const startDay = idx.startDay;
+  const period = budgetPeriodContaining(asOf, startDay);
   if (!principal) warnings.push({ code: 'noPrincipal', message: 'Aucun compte principal défini.' });
 
   const flows = alive(ledger.plannedFlows).filter((f) => isActive(f, period));
@@ -412,13 +412,13 @@ export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, princip
 /** Fenêtre de périodes autour de `asOf`, utile pour naviguer dans l'interface. */
 export function periodsAround(ledger: Ledger, asOf: ISODate, before: number, after: number): Period[] {
   const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
-  const payDay = principal?.payDay ?? 1;
+  const startDay = ledger.settings.periodStartDay;
   const out: Period[] = [];
-  let p = payPeriodContaining(asOf, payDay);
-  for (let i = 0; i < before; i++) p = previousPeriod(p, payDay);
+  let p = budgetPeriodContaining(asOf, startDay);
+  for (let i = 0; i < before; i++) p = previousPeriod(p, startDay);
   for (let i = 0; i < before + 1 + after; i++) {
     out.push(p);
-    p = payPeriodContaining(addDays(p.end, 1), payDay);
+    p = budgetPeriodContaining(addDays(p.end, 1), startDay);
   }
   return out;
 }

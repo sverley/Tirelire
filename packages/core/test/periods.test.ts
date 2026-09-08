@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMonths, nextOccurrence, occurrencesBetween, payPeriodContaining, periodsUntil, previousOccurrence, nextPeriod } from '../src/index.js';
+import { addMonths, nextOccurrence, occurrencesBetween, budgetPeriodContaining, periodsUntil, previousOccurrence, nextPeriod } from '../src/index.js';
 
 describe('dates', () => {
   it('borne le jour en ajoutant des mois', () => {
@@ -12,7 +12,7 @@ describe('dates', () => {
 
 describe('périodes de paie', () => {
   it('jour de paie 28 : du 28 au 27, nommée d’après le mois du milieu', () => {
-    const p = payPeriodContaining('2026-09-06', 28);
+    const p = budgetPeriodContaining('2026-09-06', 28);
     expect(p.start).toBe('2026-08-28');
     expect(p.end).toBe('2026-09-27');
     expect(p.label).toBe('septembre 2026');
@@ -20,21 +20,21 @@ describe('périodes de paie', () => {
   });
 
   it('le jour de paie lui-même ouvre la période', () => {
-    const p = payPeriodContaining('2026-09-28', 28);
+    const p = budgetPeriodContaining('2026-09-28', 28);
     expect(p.start).toBe('2026-09-28');
     expect(p.end).toBe('2026-10-27');
     expect(p.label).toBe('octobre 2026');
   });
 
   it('jour de paie 1 : mois calendaire', () => {
-    const p = payPeriodContaining('2026-02-14', 1);
+    const p = budgetPeriodContaining('2026-02-14', 1);
     expect(p.start).toBe('2026-02-01');
     expect(p.end).toBe('2026-02-28');
     expect(p.label).toBe('février 2026');
   });
 
   it('jour de paie 31 : borné aux mois courts', () => {
-    const p = payPeriodContaining('2026-05-10', 31);
+    const p = budgetPeriodContaining('2026-05-10', 31);
     expect(p.start).toBe('2026-04-30');
     expect(p.end).toBe('2026-05-30');
     const n = nextPeriod(p, 31);
@@ -43,7 +43,7 @@ describe('périodes de paie', () => {
   });
 
   it('compte les périodes jusqu’à une échéance', () => {
-    const p = payPeriodContaining('2026-09-06', 28);
+    const p = budgetPeriodContaining('2026-09-06', 28);
     expect(periodsUntil(p, '2026-09-20', 28)).toBe(1);
     expect(periodsUntil(p, '2026-10-15', 28)).toBe(2);
     expect(periodsUntil(p, '2027-03-05', 28)).toBe(7);

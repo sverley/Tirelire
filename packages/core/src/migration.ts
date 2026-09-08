@@ -24,6 +24,7 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   if (from < 4) steps.push({ version: 4, written: migrateTo4(store) });
   if (from < 5) steps.push({ version: 5, written: migrateTo5(store) });
   if (from < 6) steps.push({ version: 6, written: migrateTo6(store) });
+  if (from < 7) steps.push({ version: 7, written: migrateTo7(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
@@ -185,4 +186,22 @@ function migrateTo6(store: LedgerStore): number {
     written++;
   }
   return written;
+}
+
+/**
+ * 6 → 7 (D44) : le jour de paie quittait `Account.payDay`, où il n'avait rien à faire — un compte
+ * vit avec ou sans paie. Il devient le réglage `periodStartDay` : le jour où commence la période
+ * budgétaire, choisi par le foyer. La valeur du compte principal est reprise telle quelle pour que
+ * les périodes ne se décalent pas ; la colonne reste déclarée et dépréciée (D30).
+ */
+function migrateTo7(store: LedgerStore): number {
+  if (store.readSettings().periodStartDay !== DEFAULT_SETTINGS.periodStartDay) return 0;
+  for (const raw of store.readRawTable('accounts')) {
+    if (raw['kind'] !== 'principal' && raw['kind'] !== 'pivot') continue;
+    const jour = raw['payDay'];
+    if (typeof jour !== 'number' || jour < 1 || jour > 31) continue;
+    store.setSetting('periodStartDay', jour);
+    return 1;
+  }
+  return 0;
 }

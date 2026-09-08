@@ -15,7 +15,7 @@
     parseDate,
     todayISO,
     daysInMonth,
-    payPeriodContaining,
+    budgetPeriodContaining,
     needName,
     budgetSuggestions,
     nextDueDate,
@@ -85,7 +85,7 @@
    * démarre qu'à la première période entièrement postérieure à l'ouverture ; ouvrir « aujourd'hui »
    * priverait donc le budget de sa toute première période.
    */
-  const periodStart = () => payPeriodContaining(app.asOf, Number(payDay) || 1).start;
+  const periodStart = () => budgetPeriodContaining(app.asOf, Number(payDay) || 1).start;
   const perPeriod = (amount: Cents, months: number) => divideCents(amount, Math.max(1, months));
 
   /**
@@ -100,7 +100,6 @@
       kind: 'principal',
       openingBalance: 0,
       openingDate: periodStart(),
-      payDay: Number(payDay) || 1,
     };
     app.upsert('accounts', row);
     return row.id;
@@ -109,6 +108,9 @@
   function goStep(s: Step) {
     step = s;
   }
+  $effect(() => {
+    if (step === 'accounts') ensureMainAccount();
+  });
   function next() {
     if (stepIndex < STEPS.length - 1) goStep(STEPS[stepIndex + 1]!.id);
   }
@@ -116,25 +118,19 @@
     if (stepIndex > 0) goStep(STEPS[stepIndex - 1]!.id);
   }
 
-  // --- Jour de paie : définit la période budgétaire (D02) ---
+  // --- Début de la période budgétaire : un choix du foyer, pas un champ de compte (D44) ---
   // Valeur initiale volontairement figée : le champ est ensuite piloté par la saisie.
-  let payDay = $state(untrack(() => String(principal?.payDay ?? 1)));
-  let mainBalance = $state(untrack(() => (principal ? (principal.openingBalance / 100).toFixed(2).replace('.', ',') : '')));
+  let payDay = $state(untrack(() => String(app.ledger.settings.periodStartDay)));
   function savePayDay() {
     const d = Math.min(31, Math.max(1, Number(payDay) || 1));
     payDay = String(d);
-    const id = ensureMainAccount();
-    const a = alive(app.ledger.accounts).find((x) => x.id === id);
-    if (a && a.payDay !== d) app.upsert('accounts', { ...a, payDay: d });
+    if (app.ledger.settings.periodStartDay !== d) app.setSetting('periodStartDay', d);
   }
-  function saveMainBalance() {
-    const c = inputToCents(mainBalance);
-    if (c === undefined) return;
-    const id = ensureMainAccount();
-    const a = alive(app.ledger.accounts).find((x) => x.id === id);
-    // La date d'ouverture n'est pas retouchée : elle cale les soldes d'un compte déjà importé.
-    if (a && a.openingBalance !== c) app.upsert('accounts', { ...a, openingBalance: c });
-  }
+  /** Jour du plus gros revenu déclaré : ce que l'assistant propose comme début de période. */
+  const jourDuRevenu = $derived.by(() => {
+    const principal = [...incomes].sort((a, b) => b.amount - a.amount)[0];
+    return principal ? parseDate(principal.periodicity.anchorDate).d : undefined;
+  });
 
   // --- Revenus ---
   let inc = $state({ name: '', amount: '', months: 1, day: '1', accountId: '' });
@@ -420,6 +416,20 @@
     if (t) app.upsert('tirelires', { ...t, rollover: { mode: keep ? 'unlimited' : 'none' } });
   }
 
+  /** Modification d'un compte, champ par champ, enregistrée à la volée. */
+  function editAccount(a: Account, champ: 'name' | 'bank' | 'accountNumber', v: string) {
+    const valeur = v.trim();
+    if (valeur === (a[champ] ?? '')) return;
+    ensureMainAccount();
+    app.upsert('accounts', { ...a, [champ]: valeur || undefined });
+  }
+  /** La date d'ouverture n'est jamais retouchée : elle cale les soldes d'un compte déjà importé. */
+  function editAccountBalance(a: Account, v: string) {
+    const c = inputToCents(v);
+    if (c === undefined || c === a.openingBalance) return;
+    app.upsert('accounts', { ...a, openingBalance: c });
+  }
+
   function removeFlow(f: PlannedFlow) {
     app.remove('plannedFlows', f.id);
   }
@@ -443,7 +453,7 @@
   {/each}
 </div>
 
-{#if step !== 'intro'}
+{#if step !== 'intro' && step !== 'accounts'}
   <div class="stats">
     <div class="stat"><div class="v num pos">{money(totals.incomes)}</div><div class="k">Revenus par période</div></div>
     <div class="stat"><div class="v num">{money(-totals.fixedCharges)}</div><div class="k">Charges fixes</div></div>
@@ -476,15 +486,8 @@
 {:else if step === 'income'}
   <h2>Qu'est-ce qui rentre, et quand ?</h2>
   <p class="muted small">
-    Le jour de paie découpe le budget : une période va d'une paie à la veille de la suivante, plutôt
-    que du 1<sup>er</sup> au 31. C'est ce qui permet de savoir si l'argent tient jusqu'à la prochaine rentrée.
+    Déclarez ce qui rentre, avec la date à laquelle ça tombe. Le montant se saisit en positif.
   </p>
-  <form class="edit" onsubmit={(e) => { e.preventDefault(); savePayDay(); saveMainBalance(); }}>
-    <div class="grid">
-      <label class="f">Jour de paie <input type="number" min="1" max="31" bind:value={payDay} onchange={savePayDay} /></label>
-      <label class="f">Ce qu'il y a sur le compte aujourd'hui <input bind:value={mainBalance} inputmode="decimal" placeholder="1 250,00" onchange={saveMainBalance} /></label>
-    </div>
-  </form>
 
   <h3>Rentrées d'argent</h3>
   {#each incomes as f (f.id)}
@@ -529,6 +532,30 @@
     {#if incError}<div class="err">{incError}</div>{/if}
     <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
   </form>
+
+  <h3>Découpage du budget</h3>
+  <p class="muted small">
+    Une période budgétaire n'est pas forcément le mois calendaire. Beaucoup de foyers la font
+    commencer au jour de leur paie, pour savoir si l'argent tient jusqu'à la prochaine.
+  </p>
+  <div class="propositions">
+    {#if jourDuRevenu !== undefined && Number(payDay) !== jourDuRevenu}
+      <button class="prop" onclick={() => { payDay = String(jourDuRevenu); savePayDay(); }}>
+        <span class="n">Commencer au jour de ma paie</span><span class="v num">le {jourDuRevenu}</span>
+      </button>
+    {/if}
+    {#if Number(payDay) !== 1}
+      <button class="prop" onclick={() => { payDay = '1'; savePayDay(); }}>
+        <span class="n">Suivre le mois calendaire</span><span class="v num">le 1er</span>
+      </button>
+    {/if}
+  </div>
+  <form class="edit" onsubmit={(e) => { e.preventDefault(); savePayDay(); }}>
+    <div class="grid">
+      <label class="f">La période commence le (jour) <input type="number" min="1" max="31" bind:value={payDay} onchange={savePayDay} /></label>
+    </div>
+  </form>
+
 {:else if step === 'fixed'}
   <h2>Qu'est-ce qui part tout seul, au même montant ?</h2>
   <p class="muted small">
@@ -703,37 +730,52 @@
     <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
   </form>
 {:else if step === 'accounts'}
-  <h2>Avez-vous d'autres comptes ? <span class="pill">facultatif</span></h2>
+  <h2>Vos comptes en banque</h2>
   <p class="muted small">
-    Vous avez toujours un compte principal, celui par lequel tout transite : il est déjà là, rien à
-    faire. Ajoutez ici vos autres comptes — un livret, un compte joint — et vous pourrez dire, aux
-    étapes suivantes, sur lequel tombe chaque revenu et chaque prélèvement. Vous pouvez aussi passer :
-    tout sera alors réputé sur le compte principal, et un compte s'ajoute à tout moment.
+    Uniquement des comptes bancaires réels — ceux dont vous recevez un relevé. Le compte principal
+    est celui par lequel tout transite ; les autres sont facultatifs.
   </p>
+
+  {#if principal}
+    <p class="eyebrow" style="margin:14px 0 6px">Compte principal</p>
+    <div class="card accent compte">
+      <label class="f">Nom du compte <input value={principal.name} onchange={(e) => editAccount(principal, 'name', e.currentTarget.value)} /></label>
+      <label class="f">Banque <input value={principal.bank ?? ''} placeholder="Crédit Mutuel" onchange={(e) => editAccount(principal, 'bank', e.currentTarget.value)} /></label>
+      <label class="f">Numéro de compte ou IBAN <input value={principal.accountNumber ?? ''} placeholder="FR76 …" onchange={(e) => editAccount(principal, 'accountNumber', e.currentTarget.value)} /></label>
+      <label class="f">Solde actuel <input value={centsToInput(principal.openingBalance)} inputmode="decimal" onchange={(e) => editAccountBalance(principal, e.currentTarget.value)} /></label>
+    </div>
+  {/if}
+
+  {#if otherAccounts.length}
+    <p class="eyebrow" style="margin:14px 0 6px">Autres comptes</p>
+  {/if}
   {#each otherAccounts as a (a.id)}
-    <div class="card">
-      <div class="row">
-        <div class="label">
-          <strong>{a.name}</strong> <span class="pill">{a.kind === 'holding' ? 'épargne' : 'compte tiers'}</span>
-          <span class="sub">solde de départ {money(a.openingBalance)}</span>
-        </div>
-        <button class="btn small danger" onclick={() => app.remove('accounts', a.id)}>×</button>
+    <div class="card compte">
+      <label class="f">Nom du compte <input value={a.name} onchange={(e) => editAccount(a, 'name', e.currentTarget.value)} /></label>
+      <label class="f">Banque <input value={a.bank ?? ''} onchange={(e) => editAccount(a, 'bank', e.currentTarget.value)} /></label>
+      <label class="f">Numéro de compte ou IBAN <input value={a.accountNumber ?? ''} onchange={(e) => editAccount(a, 'accountNumber', e.currentTarget.value)} /></label>
+      <label class="f">Solde actuel <input value={centsToInput(a.openingBalance)} inputmode="decimal" onchange={(e) => editAccountBalance(a, e.currentTarget.value)} /></label>
+      <div class="actions" style="margin:0; grid-column:1/-1">
+        <span class="pill">{a.kind === 'holding' ? 'épargne' : 'suivi à la main'}</span>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn small danger" onclick={() => app.remove('accounts', a.id)}>Retirer</button>
       </div>
     </div>
   {/each}
+
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addAccount(); }}>
     <div class="grid">
-      <label class="f">Nom <input bind:value={acc.name} placeholder="Livret A" /></label>
+      <label class="f">Nom du compte <input bind:value={acc.name} placeholder="Livret A" /></label>
       <label class="f">Type
         <select bind:value={acc.kind}>
-          <option value="holding">Compte d'épargne (il héberge des réserves)</option>
-          <option value="third">Compte tiers (suivi à la main)</option>
+          <option value="holding">Épargne (il héberge des réserves)</option>
+          <option value="third">Suivi à la main (pas de relevé importé)</option>
         </select>
       </label>
       <label class="f">Solde actuel <input bind:value={acc.balance} inputmode="decimal" /></label>
     </div>
     {#if accError}<div class="err">{accError}</div>{/if}
-    <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
+    <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter un compte</button></div>
   </form>
 
 {:else if step === 'summary'}

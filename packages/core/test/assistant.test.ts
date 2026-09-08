@@ -28,8 +28,8 @@ function budgetDeLAssistant(): Ledger {
     kind: 'principal',
     openingBalance: euros(1500),
     openingDate: periodStart,
-    payDay,
   });
+  l.settings.periodStartDay = payDay;
   // Revenu ancré sur la dernière occurrence passée du jour de paie.
   l.plannedFlows.push({
     id: 'salaire',

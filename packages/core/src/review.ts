@@ -5,7 +5,7 @@
 import type { Cents, Tirelire, Id, ISODate, Ledger, Need } from './model.js';
 import { alive, needName } from './model.js';
 import { allocationAmount, tirelireBalance, indexLedger, needCruise } from './balances.js';
-import { occurrencesBetween, payPeriodContaining, previousPeriod, type Period } from './periods.js';
+import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, diffDays } from './dates.js';
 
 export interface PeriodSpend {
@@ -52,12 +52,12 @@ export function recurringPerPeriod(ledger: Ledger, e: Tirelire): Cents | undefin
 
 /** Les N périodes de paie jusqu'à celle qui contient `asOf` (incluse), de la plus ancienne à la plus récente. */
 export function lastPeriods(ledger: Ledger, asOf: ISODate, n: number): Period[] {
-  const payDay = alive(ledger.accounts).find((a) => a.kind === 'principal')?.payDay ?? 1;
+  const startDay = ledger.settings.periodStartDay;
   const out: Period[] = [];
-  let p = payPeriodContaining(asOf, payDay);
+  let p = budgetPeriodContaining(asOf, startDay);
   for (let i = 0; i < n; i++) {
     out.unshift(p);
-    p = previousPeriod(p, payDay);
+    p = previousPeriod(p, startDay);
   }
   return out;
 }

@@ -44,6 +44,13 @@
     input.value = '';
   }
 
+  let startDay = $state(String(app.ledger.settings.periodStartDay));
+  function saveStartDay() {
+    const d = Math.min(31, Math.max(1, Number(startDay) || 1));
+    startDay = String(d);
+    if (app.ledger.settings.periodStartDay !== d) app.setSetting('periodStartDay', d);
+  }
+
   let cushion = $state(centsToInput(app.ledger.settings.principalCushion));
   let msg = $state('');
 
@@ -93,6 +100,19 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Réglages</h1>
+
+<h2>Début de la période budgétaire</h2>
+<div class="card">
+  <p class="small muted">
+    Jour du mois où commence une période. Beaucoup de foyers le calent sur leur paie, pour savoir si
+    l'argent tient jusqu'à la prochaine ; <strong>1</strong> redonne le mois calendaire. C'est un
+    choix d'analyse, indépendant de la date réelle de vos revenus, qui reste portée par chaque flux.
+  </p>
+  <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+    <label class="f">Jour <input type="number" min="1" max="31" bind:value={startDay} /></label>
+    <button class="btn" onclick={saveStartDay}>Enregistrer</button>
+  </div>
+</div>
 
 <h2>Coussin du compte principal</h2>
 <div class="card">

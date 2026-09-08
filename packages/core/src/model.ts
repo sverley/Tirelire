@@ -43,8 +43,6 @@ export interface Account {
   accountNumber?: string;
   openingBalance: Cents;
   openingDate: ISODate;
-  /** Jour de paie (1-31), seulement pour le compte principal : début de la période budgétaire. */
-  payDay?: number;
   /** Comptes tiers : en dessous de ce montant, on ne propose pas de virement de règlement. */
   settlementThreshold?: Cents;
   /** Comptes tiers : sens autorisé des virements de règlement. */
@@ -376,6 +374,12 @@ export interface Automation {
 // ---------------------------------------------------------------------------
 
 export interface Settings {
+  /**
+   * Jour du mois où commence la période budgétaire (1-31), D44. C'est un choix du foyer, pas une
+   * propriété d'un compte : un compte vit avec ou sans paie. L'assistant propose de le caler sur le
+   * jour du principal revenu, mais rien n'y oblige — `1` redonne le mois calendaire.
+   */
+  periodStartDay: number;
   /** Coussin minimum à laisser en non affecté sur le compte principal. */
   principalCushion: Cents;
   /** En dessous de ce montant, un écart de placement (D20) est « à surveiller » plutôt qu'« à faire ». */
@@ -385,6 +389,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  periodStartDay: 1,
   principalCushion: 0,
   transferThreshold: 1000,
   siteId: 'local',

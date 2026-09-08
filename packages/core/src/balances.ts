@@ -15,7 +15,7 @@
  */
 import type { Account, Allocation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation } from './model.js';
 import { alive } from './model.js';
-import { nextOccurrence, payPeriodContaining, periodsUntil, nextPeriod, type Period } from './periods.js';
+import { nextOccurrence, budgetPeriodContaining, periodsUntil, nextPeriod, type Period } from './periods.js';
 import { divideCents } from './money.js';
 import { addDays } from './dates.js';
 
@@ -73,7 +73,7 @@ export interface LedgerIndex {
   /** Écritures vivantes par tirelire, effets déjà calculés, triées par date. */
   entriesByTirelire: Map<Id, TirelireEntry[]>;
   principal: Account | undefined;
-  payDay: number;
+  startDay: number;
   /** Mémo des chronologies par tirelire (dotations et libérations), étendues à la demande. */
   timelines: Map<Id, PeriodSnapshot[]>;
   /** Montant résolu de chaque ligne de ventilation (D27), part variable comprise. */
@@ -108,7 +108,7 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
     allocationsByOperation,
     entriesByTirelire: new Map(),
     principal,
-    payDay: principal?.payDay ?? 1,
+    startDay: ledger.settings.periodStartDay,
     timelines: new Map(),
     amountsByAllocation: new Map(),
   };
@@ -252,7 +252,7 @@ function reserveOf(needs: Need[]): Cents {
  * pour la période `p`. Un déficit pèse sur le premier besoin récurrent si la tirelire reporte,
  * sinon sur le premier besoin.
  */
-export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Period, payDay: number): NeedSnapshot[] {
+export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Period, startDay: number): NeedSnapshot[] {
   let remaining = balance;
   const out: NeedSnapshot[] = [];
   for (const n of needs) {
@@ -264,7 +264,7 @@ export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Per
         const dueDate = nextOccurrence(per, p.start);
         const held = Math.min(Math.max(remaining, 0), target);
         remaining -= held;
-        const k = Math.max(1, periodsUntil(p, dueDate, payDay));
+        const k = Math.max(1, periodsUntil(p, dueDate, startDay));
         const catchUp = Math.max(0, Math.ceil(Math.max(0, target - held) / k));
         // Entièrement provisionné : rien à ajouter avant l'échéance.
         const requested = held >= target ? 0 : Math.max(cruise, catchUp);
@@ -324,28 +324,28 @@ export function tirelireTimeline(e: Tirelire, idx: LedgerIndex, until: ISODate):
     tl = [];
     idx.timelines.set(e.id, tl);
   }
-  const target = payPeriodContaining(until, idx.payDay);
+  const target = budgetPeriodContaining(until, idx.startDay);
   let p: Period;
-  if (tl.length) p = nextPeriod(tl[tl.length - 1]!.period, idx.payDay);
+  if (tl.length) p = nextPeriod(tl[tl.length - 1]!.period, idx.startDay);
   else {
-    p = payPeriodContaining(e.openingDate, idx.payDay);
-    if (p.start < e.openingDate) p = nextPeriod(p, idx.payDay);
+    p = budgetPeriodContaining(e.openingDate, idx.startDay);
+    if (p.start < e.openingDate) p = nextPeriod(p, idx.startDay);
   }
   while (p.start <= target.start) {
     const prior = tl.reduce((s, x) => s + x.dotation - x.release, 0);
     const balanceBefore = e.openingBalance + prior + entriesEffect(e, idx, e.openingDate, addDays(p.start, -1));
-    const snaps = needSnapshots(e, needs, balanceBefore, p, idx.payDay);
+    const snaps = needSnapshots(e, needs, balanceBefore, p, idx.startDay);
     const dotation = snaps.reduce((s, x) => s + x.requested, 0);
     const balanceEnd = balanceBefore + dotation + entriesEffect(e, idx, p.start, p.end);
     tl.push({ period: p, balanceBefore, needs: snaps, dotation, release: releaseOf(e, needs, balanceEnd) });
-    p = nextPeriod(p, idx.payDay);
+    p = nextPeriod(p, idx.startDay);
   }
   return tl;
 }
 
 /** Instantané de la période contenant `asOf` (undefined si la tirelire n'est pas encore ouverte). */
 export function periodSnapshot(e: Tirelire, idx: LedgerIndex, asOf: ISODate): PeriodSnapshot | undefined {
-  const p = payPeriodContaining(asOf, idx.payDay);
+  const p = budgetPeriodContaining(asOf, idx.startDay);
   return tirelireTimeline(e, idx, asOf).find((s) => s.period.start === p.start);
 }
 

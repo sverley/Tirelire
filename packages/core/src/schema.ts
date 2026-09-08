@@ -44,7 +44,7 @@ const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop
 const oldAs = (prop: string, col: string, type: ColumnType = 'text'): ColumnDef => ({ ...cAs(prop, col, type), deprecated: true });
 
 /** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
-export const MODEL_VERSION = 6;
+export const MODEL_VERSION = 7;
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {
@@ -57,7 +57,7 @@ export const TABLES: Record<string, TableDef> = {
       c('accountNumber'),
       c('openingBalance', 'integer'),
       c('openingDate'),
-      c('payDay', 'integer'),
+      old('payDay', 'integer'), // D44 : remplacé par le réglage periodStartDay
       c('settlementThreshold', 'integer'),
       c('settlementDirection'),
       c('deletedAt'),
