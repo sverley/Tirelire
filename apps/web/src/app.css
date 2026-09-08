@@ -114,3 +114,18 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .warnings { display: grid; gap: 6px; margin-bottom: 12px; }
 .warnings div { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 14px; }
 .orders { margin: 6px 0 0 12px; padding-left: 8px; border-left: 2px solid var(--line); }
+
+/* Assistant : propositions cliquables et lignes modifiables en place (D43). */
+.propositions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.prop { display: inline-flex; align-items: baseline; gap: 6px; border: 1px dashed var(--line-strong); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--ink-2); cursor: pointer; font-family: inherit; }
+.prop:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.prop .v { font-size: 12px; color: var(--muted); }
+.card.ligne, .ligne { display: flex; align-items: center; gap: 6px; }
+.ligne input { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; }
+.ligne .nom { flex: 1 1 40%; }
+.ligne .mt { flex: 0 1 96px; font-family: var(--mono); text-align: right; }
+.ligne .jour { flex: 0 0 62px; font-family: var(--mono); }
+.ligne .date { flex: 0 1 140px; font-family: var(--mono); }
+.ligne .garde { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; }
+.ligne .garde input { min-width: auto; }
+.ligne .cpt { flex: 0 1 120px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; }

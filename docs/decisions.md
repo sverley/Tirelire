@@ -444,3 +444,34 @@ retoucher les entrées antérieures : le vocabulaire y a été remplacé partout
 *contenu* d'une décision, et aucun contenu n'a changé — laisser deux vocabulaires cohabiter aurait
 rendu le journal illisible, ce qu'aucune décision ne gagne. Le détail des mots remplacés se lit dans
 le commit de renommage.
+
+## D43 · 2026-09-08 · L'assistant propose, et ce qu'il propose vient de l'exemple
+
+D40 a remplacé les écrans de configuration par des questions, mais laissait devant chaque question un
+formulaire vide. « Qu'est-ce qui ne tombe pas tous les mois ? » est une bonne question à laquelle on
+ne répond bien qu'en voyant des réponses : on reconnaît sa taxe foncière dans une liste, on ne la
+retrouve pas de mémoire devant un champ vide.
+
+Chaque étape offre donc des **propositions** : touchez-en une, elle remplit le formulaire, que vous
+corrigez avant d'ajouter. Rien n'est ajouté d'office, et ce qui a été ajouté reste **modifiable sur
+place** — nom, montant, jour, date d'échéance, compte, report — sans passer par un écran d'édition.
+
+Ces propositions n'ont **aucun contenu propre** : elles sont une lecture du jeu d'exemple
+(`suggestions.ts` dérive `example.ts`, et `test/suggestions.test.ts` échoue si une proposition
+apparaît ailleurs). Étoffer l'exemple — ce que le lot 8 prévoit déjà — enrichit l'assistant du même
+geste, et les deux ne peuvent pas diverger. En contrepartie l'exemple porte une seconde
+responsabilité : ses libellés sont lus par quelqu'un qui découvre l'application, et ses montants sont
+les ordres de grandeur qu'on lui propose.
+
+**Rouvrir l'assistant ne doit rien casser.** Les propositions ne s'offrent que sur un projet vierge —
+aucune tirelire, aucun besoin, aucun flux, aucun compte en plus du principal. Les opérations ne
+comptent pas : un relevé peut avoir été importé avant que le budget existe. L'état est figé à
+l'ouverture de l'assistant, sinon la première ligne ajoutée ferait disparaître les propositions
+suivantes. Dans le même esprit, la saisie du solde ne retouche pas la date d'ouverture du compte, qui
+cale les soldes d'un compte déjà importé.
+
+**Les comptes passent en tête du parcours**, juste après le principe. Ils restent facultatifs — tout
+est réputé sur le compte principal si l'on passe l'étape — mais les déclarer d'abord permet ensuite
+d'attribuer chaque revenu et chaque prélèvement au bon compte, ce qui était impossible quand
+l'étape venait en dernier. La question du placement des réserves, elle, ne peut pas se poser avant
+qu'il existe des réserves : elle a migré à l'inverse, vers le résumé.
