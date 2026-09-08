@@ -834,3 +834,42 @@ disent aussi le manque : « aucune tirelire ne la provisionne », « aucun flux 
 
 Au passage, trois restes du renommage de D42 (« l'tirelire ») dans deux libellés d'interface et un
 titre de test.
+## D54 · 2026-09-08 · Un nombre garde sa police, pas son insécabilité
+
+La classe `.num` de l'interface faisait deux choses à la fois : donner aux chiffres la police à
+chasse fixe et les tabular figures, et **interdire le retour à la ligne**. Le second rôle était
+inutile et nuisible.
+
+Inutile, parce qu'un montant est déjà insécable par sa seule écriture : `formatCents` sépare les
+milliers par une espace fine insécable (U+202F) et pose une espace insécable (U+00A0) devant le
+symbole. « 1 200,00 € » ne se coupe jamais tout seul, `white-space` ou non.
+
+Nuisible, parce que `.num` n'habille pas que des montants isolés. Elle habille aussi des lignes
+composées — « retenu 900,00 € · croisière 100,00 € · demandé 150,00 € » — que `.row .label .sub`
+passe en `display: block` ; des libellés de virement (« TIRELIRE COMPTE DE MARIE ») ; des
+identifiants d'appareil. Chacun devenait une boîte insécable plus large que l'écran. Le débordement
+d'une boîte en `overflow: visible` remonte jusqu'à la zone défilable du document : sur un écran de
+375 px, l'écran Plan de l'exemple mesurait 462 px. La barre d'onglets, en `position: fixed`, prend
+sur mobile la largeur du bloc conteneur ainsi élargi ; ses cinq onglets s'étalaient sur 462 px et le
+cinquième, « Plus », sortait de la fenêtre — toute la Configuration hors d'atteinte du doigt.
+
+Désormais : `.num` ne porte que la police et les chiffres alignés, plus `overflow-wrap: anywhere`
+pour qu'un identifiant sans espace se coupe au lieu de dépasser. Ce dernier point fait aussi tomber
+la largeur minimale d'une colonne de nombres à un caractère : elle se laisse comprimer au lieu de
+pousser la page.
+
+Deux règles de ligne complètent l'affaire. `.row .label` reçoit la même coupure — sans elle, un mot
+un peu long (« foncière ») dépassait de sa boîte comprimée et se superposait au montant voisin. Et
+sa base flex passe de 0 à 50 % : avec une base nulle, un nombre composé (« 100,00 € + 50,00 € ce
+mois ») prenait toute la largeur disponible et laissait littéralement 0 px au libellé.
+
+Le tableau (`td.n`, `th.n`) garde son `white-space: nowrap` : il vit dans `.tbl`, qui défile
+horizontalement pour lui seul et ne déborde donc sur personne.
+
+**Garde** : `apps/web/test/mise-en-page.test.ts` construit le site, le sert, charge l'exemple dans
+un vrai navigateur à 320 et 375 px et vérifie que `scrollWidth` ne dépasse pas `clientWidth`,
+qu'aucun libellé ne recouvre le montant de sa ligne, et qu'aucun onglet ne sort de la fenêtre.
+Le harnais est `puppeteer-core` sur un Chrome déjà installé plutôt que Playwright, qui télécharge
+son propre navigateur : il n'y en avait pas moyen dans la session où le défaut a été corrigé. Le
+test s'abstient faute de navigateur, sauf si `TIRELIRE_NAV_STRICT` est posé — ce que fait la CI,
+pour qu'une garde muette ne passe pas pour une garde verte.

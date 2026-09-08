@@ -29,7 +29,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # La garde de mise en page mobile (D54) a besoin d'un navigateur ; les images GitHub en
+      # fournissent un. `TIRELIRE_NAV_STRICT` fait échouer le test s'il n'en trouve pas, plutôt
+      # que de le laisser s'abstenir en silence et passer pour vert.
       - run: pnpm test
+        env:
+          TIRELIRE_NAV_STRICT: '1'
       - run: pnpm build
       - name: Archiver le site (à déposer tel quel sur un serveur privé)
         uses: actions/upload-artifact@v4

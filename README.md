@@ -21,7 +21,7 @@ Nom de code. Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](d
 
 ```sh
 pnpm install
-pnpm test          # tests du cœur (vitest)
+pnpm test          # tests du cœur (vitest) + garde de mise en page mobile si un Chrome est installé
 pnpm dev           # interface sur http://localhost:5173 (accessible sur le réseau local)
 pnpm build         # apps/web/dist : fichiers statiques à servir sur un serveur privé
 pnpm --filter @tirelire/hebergement assembler   # apps/hebergement/dist : site + relais PHP pour hébergement mutualisé

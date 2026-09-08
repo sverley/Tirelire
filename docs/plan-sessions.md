@@ -102,10 +102,14 @@ comptes (D38) et deux ou trois automatismes dans l'exemple.
 
 ---
 
-## Lot 9 · Tests d'interface Playwright dans la CI
+## Lot 9 · Tests d'interface dans la CI — **harnais posé le 8 septembre (D54)**
 
 À faire avant d'ajouter des fonctionnalités neuves : c'est l'absence de ces tests qui a permis à
 l'écart de passer inaperçu jusqu'à l'installation sur le téléphone.
+
+Le harnais existe (`apps/web/test/`, vitest + `puppeteer-core` sur un Chrome déjà installé, site
+construit puis servi par `vite preview`) ; il ne porte pour l'instant que la garde de mise en page
+mobile. Restent les scénarios ci-dessous.
 
 - Scénarios : import d'un CSV inventé ; filtre → action groupée → règle → rejeu ; création d'une
   tirelire à deux besoins et lecture du plan ; ouverture d'un dépôt écrit sous un modèle ancien
