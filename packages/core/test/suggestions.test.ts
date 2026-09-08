@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alive, budgetSuggestions, exampleLedger, nextDueDate } from '../src/index.js';
+import { alive, budgetSuggestions, exampleLedger, nextDueDate, stepOf } from '../src/index.js';
 
 /**
  * Les propositions de l'assistant (D43) n'ont pas de contenu propre : elles sont une lecture du jeu
@@ -39,13 +39,13 @@ describe("propositions de l'assistant (D43)", () => {
     const flux = alive(l.plannedFlows).find((f) => f.name === 'Salaire')!;
     // Le montant est proposé en positif : le signe appartient au genre du flux, pas à la saisie.
     expect(salaire.amount).toBe(Math.abs(flux.amount));
-    expect(salaire.intervalMonths).toBe(flux.periodicity.intervalMonths);
+    expect({ interval: salaire.interval, unit: salaire.unit }).toEqual(stepOf(flux.periodicity));
 
     const credit = s.charges.find((x) => x.name === 'Crédit immobilier')!;
     expect(credit.amount).toBeGreaterThan(0);
 
     const tf = s.periodic.find((x) => x.name === 'Taxe foncière')!;
-    expect(tf.intervalMonths).toBe(12);
+    expect({ interval: tf.interval, unit: tf.unit }).toEqual({ interval: 12, unit: 'month' });
     expect({ month: tf.month, day: tf.day }).toEqual({ month: 10, day: 15 });
   });
 

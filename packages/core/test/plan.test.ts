@@ -232,7 +232,7 @@ describe('besoins multiples dans une tirelire (D28)', () => {
     // Une seule tirelire « Charges » : taxe foncière (échéance, priorité 10) + courant 100/mois (priorité 20).
     l.tirelires.push({ id: 'env-charges', name: 'Charges', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(500), openingDate: '2026-08-27' });
     l.needs.push(
-      { id: 'need-charges-tf', tirelireId: 'env-charges', kind: 'dueDate', name: 'Taxe foncière', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
+      { id: 'need-charges-tf', tirelireId: 'env-charges', kind: 'dueDate', name: 'Taxe foncière', amount: euros(1200), periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' }, priority: 10 },
       { id: 'need-charges-courant', tirelireId: 'env-charges', kind: 'recurring', name: 'Courant', amount: euros(100), priority: 20 },
     );
     const plan = computePlan(l, asOf);

@@ -14,7 +14,8 @@
  * la somme des composantes qu'il porte plus son non affecté fait son solde bancaire.
  */
 import type { Account, Allocation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation } from './model.js';
-import { alive } from './model.js';
+import {
+  monthsOf, alive } from './model.js';
 import { nextOccurrence, budgetPeriodContaining, periodsUntil, nextPeriod, type Period } from './periods.js';
 import { divideCents } from './money.js';
 import { addDays } from './dates.js';
@@ -234,9 +235,9 @@ export function dotationAccount(e: Tirelire, idx: LedgerIndex): Id {
 export function needCruise(n: Need): Cents {
   switch (n.kind) {
     case 'recurring':
-      return divideCents(n.amount ?? 0, n.periodicity?.intervalMonths ?? 1);
+      return divideCents(n.amount ?? 0, n.periodicity ? monthsOf(n.periodicity) : 1);
     case 'dueDate':
-      return divideCents(n.amount ?? 0, n.periodicity?.intervalMonths ?? 12);
+      return divideCents(n.amount ?? 0, n.periodicity ? monthsOf(n.periodicity) : 12);
     case 'goal':
       return n.monthlyAmount ?? 0;
   }
@@ -260,7 +261,7 @@ export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Per
     switch (n.kind) {
       case 'dueDate': {
         const target = n.amount ?? 0;
-        const per = n.periodicity ?? { intervalMonths: 12, anchorDate: p.start };
+        const per = n.periodicity ?? { interval: 12, unit: 'month' as const, anchorDate: p.start };
         const dueDate = nextOccurrence(per, p.start);
         const held = Math.min(Math.max(remaining, 0), target);
         remaining -= held;

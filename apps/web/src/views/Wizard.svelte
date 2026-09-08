@@ -7,7 +7,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { app } from '../lib/state.svelte';
-  import { ACCOUNT_KINDS, money, shortDate, centsToInput, inputToCents } from '../lib/format';
+  import { ACCOUNT_KINDS, UNITS, money, shortDate, centsToInput, inputToCents } from '../lib/format';
   import {
     alive,
     divideCents,
@@ -17,10 +17,12 @@
     daysInMonth,
     budgetPeriodContaining,
     needName,
+    stepOf,
     budgetSuggestions,
     nextDueDate,
     DEFAULT_PRIORITY,
     type Account,
+    type PeriodUnit,
     type AccountKind,
     type Cents,
     type Tirelire,
@@ -43,15 +45,6 @@
 
   let step = $state<Step>('intro');
   const stepIndex = $derived(STEPS.findIndex((s) => s.id === step));
-
-  /** Intervalles proposés, en mois. */
-  const INTERVALS = [
-    { months: 1, label: 'Tous les mois' },
-    { months: 2, label: 'Tous les 2 mois' },
-    { months: 3, label: 'Tous les 3 mois' },
-    { months: 6, label: 'Tous les 6 mois' },
-    { months: 12, label: 'Une fois par an' },
-  ];
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -135,16 +128,16 @@
   });
 
   // --- Revenus ---
-  let inc = $state({ name: '', amount: '', months: 1, day: '1', accountId: '' });
+  let inc = $state({ name: '', amount: '', interval: 1, unit: 'month' as PeriodUnit, day: '1', accountId: '' });
   let incError = $state('');
-  function creerRevenu(nom: string, montant: number, mois: number, jour: number, compte?: string) {
+  function creerRevenu(nom: string, montant: number, interval: number, unit: PeriodUnit, jour: number, compte?: string) {
     const row: PlannedFlow = {
       id: app.newId(),
       name: nom,
       kind: 'income',
       amount: montant,
       accountId: compte || ensureMainAccount(),
-      periodicity: { intervalMonths: mois, anchorDate: lastDayOnOrBefore(jour) },
+      periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
       dateWindowDays: 5,
     };
     app.upsert('plannedFlows', row);
@@ -153,22 +146,22 @@
     const amount = inputToCents(inc.amount);
     if (!inc.name.trim()) return void (incError = 'Donne un nom à cette rentrée d’argent.');
     if (amount === undefined || amount <= 0) return void (incError = 'Indique un montant, en positif.');
-    creerRevenu(inc.name.trim(), amount, inc.months, Number(inc.day) || 1, inc.accountId);
-    inc = { name: '', amount: '', months: inc.months, day: inc.day, accountId: inc.accountId };
+    creerRevenu(inc.name.trim(), amount, inc.interval, inc.unit, Number(inc.day) || 1, inc.accountId);
+    inc = { ...inc, name: '', amount: '' };
     incError = '';
   }
 
   // --- Charges fixes : montant fixe, tous les mois, sans réserve à constituer ---
-  let fix = $state({ name: '', amount: '', months: 1, day: '5', accountId: '' });
+  let fix = $state({ name: '', amount: '', interval: 1, unit: 'month' as PeriodUnit, day: '5', accountId: '' });
   let fixError = $state('');
-  function creerCharge(nom: string, montant: number, mois: number, jour: number, compte?: string) {
+  function creerCharge(nom: string, montant: number, interval: number, unit: PeriodUnit, jour: number, compte?: string) {
     const row: PlannedFlow = {
       id: app.newId(),
       name: nom,
       kind: 'fixedCharge',
       amount: -montant,
       accountId: compte || ensureMainAccount(),
-      periodicity: { intervalMonths: mois, anchorDate: lastDayOnOrBefore(jour) },
+      periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
       dateWindowDays: 5,
     };
     app.upsert('plannedFlows', row);
@@ -177,8 +170,8 @@
     const amount = inputToCents(fix.amount);
     if (!fix.name.trim()) return void (fixError = 'Donne un nom à cette charge.');
     if (amount === undefined || amount <= 0) return void (fixError = 'Indique un montant, en positif.');
-    creerCharge(fix.name.trim(), amount, fix.months, Number(fix.day) || 1, fix.accountId);
-    fix = { name: '', amount: '', months: fix.months, day: fix.day, accountId: fix.accountId };
+    creerCharge(fix.name.trim(), amount, fix.interval, fix.unit, Number(fix.day) || 1, fix.accountId);
+    fix = { ...fix, name: '', amount: '' };
     fixError = '';
   }
 
@@ -200,7 +193,7 @@
       tirelireId,
       kind: 'recurring',
       amount: montant,
-      periodicity: { intervalMonths: 1, anchorDate: periodStart() },
+      periodicity: { interval: 1, unit: 'month' as const, anchorDate: periodStart() },
       priority: DEFAULT_PRIORITY.recurring,
     } satisfies Need);
   }
@@ -234,7 +227,7 @@
       tirelireId,
       kind: 'dueDate',
       amount: montant,
-      periodicity: { intervalMonths: mois, anchorDate: echeance },
+      periodicity: { interval: mois, unit: 'month' as const, anchorDate: echeance },
       priority: DEFAULT_PRIORITY.dueDate,
     } satisfies Need);
     if (avecFlux) {
@@ -245,7 +238,7 @@
         amount: -montant,
         accountId: compte || ensureMainAccount(),
         tirelireId,
-        periodicity: { intervalMonths: mois, anchorDate: echeance },
+        periodicity: { interval: mois, unit: 'month' as const, anchorDate: echeance },
         dateWindowDays: 7,
       } satisfies PlannedFlow);
     }
@@ -353,13 +346,13 @@
 
   // Ce que fait un clic sur un raccourci : créer la ligne, directement.
   const appliquerRevenu = (p: (typeof propositions.incomes)[number]) =>
-    creerRevenu(p.name, p.amount, p.intervalMonths, p.day);
+    creerRevenu(p.name, p.amount, p.interval, p.unit, p.day);
   const appliquerCharge = (p: (typeof propositions.charges)[number]) =>
-    creerCharge(p.name, p.amount, p.intervalMonths, p.day);
+    creerCharge(p.name, p.amount, p.interval, p.unit, p.day);
   const appliquerCourant = (p: (typeof propositions.everyday)[number]) =>
     creerCourant(p.name, p.amount, p.keep);
   const appliquerPeriodique = (p: (typeof propositions.periodic)[number]) =>
-    creerPeriodique(p.name, p.amount, p.intervalMonths, nextDueDate(p.month, p.day, app.asOf));
+    creerPeriodique(p.name, p.amount, p.interval, nextDueDate(p.month, p.day, app.asOf));
   const appliquerEpargne = (p: (typeof propositions.savings)[number]) =>
     creerEpargne(p.name, p.monthly, p.target);
 
@@ -389,6 +382,15 @@
     if (c === undefined) return;
     const signe = f.kind === 'income' ? Math.abs(c) : -Math.abs(c);
     if (signe !== f.amount) app.upsert('plannedFlows', { ...f, amount: signe });
+  }
+  function editFlowStep(f: PlannedFlow, champ: 'interval' | 'unit', v: string) {
+    const actuel = stepOf(f.periodicity);
+    const suivant =
+      champ === 'interval'
+        ? { ...actuel, interval: Math.max(1, Number(v) || 1) }
+        : { ...actuel, unit: v as PeriodUnit };
+    if (suivant.interval === actuel.interval && suivant.unit === actuel.unit) return;
+    app.upsert('plannedFlows', { ...f, periodicity: { ...suivant, anchorDate: f.periodicity.anchorDate } });
   }
   function editFlowAccount(f: PlannedFlow, v: string) {
     if (v && v !== f.accountId) app.upsert('plannedFlows', { ...f, accountId: v });
@@ -502,12 +504,16 @@
   </p>
 
   <h3>Rentrées d'argent</h3>
-  <div class="tete tete-flux" class:avec-compte={accounts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span>{#if accounts.length > 1}<span>Compte</span>{/if}<span></span></div>
+  <div class="tete tete-flux" class:avec-compte={accounts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if accounts.length > 1}<span>Compte</span>{/if}<span></span></div>
   {#each incomes as f (f.id)}
     <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
       <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
+      <input class="jour" type="number" min="1" value={stepOf(f.periodicity).interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
+      <select class="unite" value={stepOf(f.periodicity).unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
+        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{stepOf(f.periodicity).interval > 1 ? l.pluriel : l.un}</option>{/each}
+      </select>
       {#if accounts.length > 1}
         <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
           {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
@@ -530,8 +536,11 @@
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={inc.name} placeholder="Salaire" /></label>
       <label class="f">Combien ? <input bind:value={inc.amount} inputmode="decimal" placeholder="2 400,00" /></label>
-      <label class="f">À quelle fréquence ?
-        <select bind:value={inc.months}>{#each INTERVALS as i}<option value={i.months}>{i.label}</option>{/each}</select>
+      <label class="f">Tous les <input type="number" min="1" bind:value={inc.interval} /></label>
+      <label class="f">Unité
+        <select bind:value={inc.unit}>
+          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{inc.interval > 1 ? l.pluriel : l.un}</option>{/each}
+        </select>
       </label>
       <label class="f">Vers le (jour) <input type="number" min="1" max="31" bind:value={inc.day} /></label>
         {#if accounts.length > 1}
@@ -576,12 +585,16 @@
     réserve — il suffit que le plan sache que cet argent est déjà engagé.
   </p>
   <h3>Charges fixes</h3>
-  <div class="tete tete-flux" class:avec-compte={accounts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span>{#if accounts.length > 1}<span>Compte</span>{/if}<span></span></div>
+  <div class="tete tete-flux" class:avec-compte={accounts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if accounts.length > 1}<span>Compte</span>{/if}<span></span></div>
   {#each fixedCharges as f (f.id)}
     <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
       <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
+      <input class="jour" type="number" min="1" value={stepOf(f.periodicity).interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
+      <select class="unite" value={stepOf(f.periodicity).unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
+        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{stepOf(f.periodicity).interval > 1 ? l.pluriel : l.un}</option>{/each}
+      </select>
       {#if accounts.length > 1}
         <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
           {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
@@ -604,8 +617,11 @@
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={fix.name} placeholder="Loyer" /></label>
       <label class="f">Combien ? <input bind:value={fix.amount} inputmode="decimal" placeholder="750,00" /></label>
-      <label class="f">À quelle fréquence ?
-        <select bind:value={fix.months}>{#each INTERVALS as i}<option value={i.months}>{i.label}</option>{/each}</select>
+      <label class="f">Tous les <input type="number" min="1" bind:value={fix.interval} /></label>
+      <label class="f">Unité
+        <select bind:value={fix.unit}>
+          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{fix.interval > 1 ? l.pluriel : l.un}</option>{/each}
+        </select>
       </label>
       <label class="f">Vers le (jour) <input type="number" min="1" max="31" bind:value={fix.day} /></label>
         {#if accounts.length > 1}
@@ -691,9 +707,7 @@
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={per.name} placeholder="Assurance auto" /></label>
       <label class="f">Montant de la facture <input bind:value={per.amount} inputmode="decimal" placeholder="1 200,00" /></label>
-      <label class="f">Elle revient
-        <select bind:value={per.months}>{#each INTERVALS.filter((i) => i.months > 1) as i}<option value={i.months}>{i.label}</option>{/each}</select>
-      </label>
+      <label class="f">Elle revient tous les <input type="number" min="1" bind:value={per.months} /> mois</label>
       <label class="f">Prochaine échéance <input type="date" bind:value={per.dueDate} /></label>
         {#if accounts.length > 1}
           <label class="f">Sur quel compte ?

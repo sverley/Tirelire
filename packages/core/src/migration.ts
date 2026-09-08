@@ -26,6 +26,7 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   if (from < 6) steps.push({ version: 6, written: migrateTo6(store) });
   if (from < 7) steps.push({ version: 7, written: migrateTo7(store) });
   if (from < 8) steps.push({ version: 8, written: migrateTo8(store) });
+  if (from < 9) steps.push({ version: 9, written: migrateTo9(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
@@ -225,6 +226,29 @@ function migrateTo8(store: LedgerStore): number {
       ...(kind === 'third' ? { tracksSettlement: true } : {}),
     });
     written++;
+  }
+  return written;
+}
+
+/**
+ * 8 → 9 (D47) : un rythme ne se comptait qu'en mois, ce qui interdisait les revenus hebdomadaires
+ * ou toutes les deux semaines. `intervalMonths` devient `interval` + `unit`. La forme d'origine
+ * reste lue (`stepOf`) pour qu'un rythme écrit par un appareil non migré garde son sens.
+ */
+function migrateTo9(store: LedgerStore): number {
+  let written = 0;
+  for (const table of ['needs', 'plannedFlows'] as const) {
+    for (const raw of store.readRawTable(table)) {
+      const per = raw['periodicity'] as Periodicity | undefined;
+      if (!per || per.interval !== undefined || per.intervalMonths === undefined) continue;
+      const ligne = raw as unknown as { id: string };
+      store.upsert(table, {
+        ...(raw as object),
+        periodicity: { interval: per.intervalMonths, unit: 'month', anchorDate: per.anchorDate },
+      } as never);
+      void ligne;
+      written++;
+    }
   }
   return written;
 }

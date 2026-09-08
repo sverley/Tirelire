@@ -1,4 +1,4 @@
-import { formatCents, parseCents, parseDate, MONTHS_FR, type Cents, type NeedKind, type AccountKind, type PlannedFlowKind } from '@tirelire/core';
+import { formatCents, parseCents, parseDate, stepOf, MONTHS_FR, type Cents, type NeedKind, type AccountKind, type PlannedFlowKind, type PeriodUnit, type Periodicity } from '@tirelire/core';
 
 export const money = (c: Cents, sign = false) => formatCents(c, { sign });
 
@@ -63,10 +63,21 @@ export const STATUS_LABELS: Record<string, string> = {
   unfunded: 'non financé',
 };
 
-export function periodicityLabel(p: { intervalMonths: number; anchorDate: string } | undefined): string {
-  if (!p) return '';
+export const UNITS: Record<PeriodUnit, { un: string; pluriel: string }> = {
+  day: { un: 'jour', pluriel: 'jours' },
+  week: { un: 'semaine', pluriel: 'semaines' },
+  month: { un: 'mois', pluriel: 'mois' },
+  year: { un: 'an', pluriel: 'ans' },
+};
+
+export function periodicityLabel(p: Periodicity | undefined): string {
+  if (!p) return '—';
   const when = shortDate(p.anchorDate);
-  if (p.intervalMonths === 1) return `chaque mois (dès le ${when})`;
-  if (p.intervalMonths === 12) return `chaque année le ${when.slice(0, -5)}`;
-  return `tous les ${p.intervalMonths} mois (dès le ${when})`;
+  const { interval, unit } = stepOf(p);
+  if (interval === 1) {
+    if (unit === 'month') return `chaque mois (dès le ${when})`;
+    if (unit === 'year') return `chaque année le ${when.slice(0, -5)}`;
+    return `chaque ${UNITS[unit].un} (dès le ${when})`;
+  }
+  return `tous les ${interval} ${UNITS[unit].pluriel} (dès le ${when})`;
 }

@@ -196,7 +196,7 @@ describe('migration du modèle (D30)', () => {
       ['envelopes', 'env_tf', 'opening_balance', 0],
       ['envelopes', 'env_tf', 'opening_date', '2026-01-01'],
       ['envelopes', 'env_tf', 'target', 120000],
-      ['envelopes', 'env_tf', 'periodicity', { intervalMonths: 12, anchorDate: '2026-10-15' }],
+      ['envelopes', 'env_tf', 'periodicity', { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' }],
       ['envelopes', 'env_tf', 'priority', 10],
     ]);
 
@@ -298,7 +298,7 @@ describe('migration du modèle (D30)', () => {
       ['envelopes', 'env_courses', 'opening_balance', 0],
       ['envelopes', 'env_courses', 'opening_date', '2026-01-01'],
       ['envelopes', 'env_courses', 'target', 60000],
-      ['envelopes', 'env_courses', 'periodicity', { intervalMonths: 1, anchorDate: '2026-01-01' }],
+      ['envelopes', 'env_courses', 'periodicity', { interval: 1, unit: 'month' as const, anchorDate: '2026-01-01' }],
       ['envelopes', 'env_courses', 'priority', 20],
     ]);
 

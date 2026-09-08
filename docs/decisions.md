@@ -573,3 +573,27 @@ Sous 640 px la grille se replie et l'en-tête s'efface, les champs portant alors
 L'écran des comptes suit la même forme : une ligne par compte au lieu d'une carte à quatre champs
 étiquetés, le type devenant un menu modifiable sur la ligne. Cinq comptes tenaient sur deux écrans ;
 ils tiennent dans un tiers.
+
+## D47 · 2026-09-08 · Un rythme se compte dans l'unité qui lui convient
+
+`Periodicity` ne connaissait que `intervalMonths`. Le mois va bien à un loyer ou à une taxe, mais
+il ne sait pas dire « toutes les deux semaines » — or beaucoup de revenus tombent ainsi, et aucune
+combinaison de mois entiers ne l'approche : quatorze jours ne sont pas un demi-mois, et l'écart
+dérive de plusieurs jours en un an.
+
+Le rythme devient donc `{ interval, unit, anchorDate }` avec `unit` parmi jour, semaine, mois et
+année. `nextOccurrence` traite les deux familles séparément : jours et semaines par un quotient de
+jours, puisque leur pas est de longueur fixe ; mois et années par le calendrier, en repartant
+toujours de l'ancrage pour ne pas dériver quand un mois est plus court (31 → 30 → 30…).
+
+Le lissage, lui, a besoin d'un équivalent en mois (`monthsOf`), forcément approché pour les jours
+et les semaines. L'approximation est acceptable là où elle sert — répartir une dotation sur des
+périodes — et n'est jamais employée pour dater une occurrence, qui reste du calendrier exact.
+
+Dans l'interface, revenus et charges portent « tous les [N] [unité] », modifiable sur la ligne comme
+le reste. Les tirelires gardent le mois : un besoin s'exprime naturellement par période budgétaire,
+et rien ne demandait autre chose.
+
+`intervalMonths` reste lu mais n'est plus jamais écrit (`stepOf`) ; la migration 8 → 9 convertit
+besoins et flux. Un rythme envoyé par un appareil non migré garde donc son sens, ce qu'un test
+vérifie.

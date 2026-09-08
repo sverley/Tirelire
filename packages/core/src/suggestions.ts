@@ -16,19 +16,21 @@
  */
 import { parseDate } from './dates.js';
 import { exampleLedger } from './example.js';
-import { alive, type Cents } from './model.js';
+import { alive, stepOf, type Cents, type PeriodUnit } from './model.js';
 
 export interface IncomeSuggestion {
   name: string;
   amount: Cents;
-  intervalMonths: number;
+  interval: number;
+  unit: PeriodUnit;
   day: number;
 }
 
 export interface ChargeSuggestion {
   name: string;
   amount: Cents;
-  intervalMonths: number;
+  interval: number;
+  unit: PeriodUnit;
   day: number;
 }
 
@@ -42,7 +44,8 @@ export interface EverydaySuggestion {
 export interface PeriodicSuggestion {
   name: string;
   amount: Cents;
-  intervalMonths: number;
+  interval: number;
+  unit: PeriodUnit;
   /** Mois et jour de l'échéance ; l'année est celle de la prochaine occurrence. */
   month: number;
   day: number;
@@ -75,7 +78,7 @@ export function budgetSuggestions(): BudgetSuggestions {
     .map((f) => ({
       name: f.name,
       amount: Math.abs(f.amount),
-      intervalMonths: f.periodicity.intervalMonths,
+      ...stepOf(f.periodicity),
       day: parseDate(f.periodicity.anchorDate).d,
     }));
 
@@ -84,7 +87,7 @@ export function budgetSuggestions(): BudgetSuggestions {
     .map((f) => ({
       name: f.name,
       amount: Math.abs(f.amount),
-      intervalMonths: f.periodicity.intervalMonths,
+      ...stepOf(f.periodicity),
       day: parseDate(f.periodicity.anchorDate).d,
     }));
 
@@ -103,7 +106,7 @@ export function budgetSuggestions(): BudgetSuggestions {
       return {
         name: nameOf(n.tirelireId),
         amount: n.amount ?? 0,
-        intervalMonths: n.periodicity?.intervalMonths ?? 12,
+        ...(n.periodicity ? stepOf(n.periodicity) : { interval: 12, unit: 'month' as const }),
         month: m,
         day: d,
       };

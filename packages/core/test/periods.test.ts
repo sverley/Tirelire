@@ -52,9 +52,9 @@ describe('périodes de paie', () => {
 });
 
 describe('périodicités', () => {
-  const annual = { intervalMonths: 12, anchorDate: '2026-10-15' };
-  const quarterly = { intervalMonths: 3, anchorDate: '2026-01-05' };
-  const monthly31 = { intervalMonths: 1, anchorDate: '2026-01-31' };
+  const annual = { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' };
+  const quarterly = { interval: 3, unit: 'month' as const, anchorDate: '2026-01-05' };
+  const monthly31 = { interval: 1, unit: 'month' as const, anchorDate: '2026-01-31' };
 
   it('prochaine occurrence', () => {
     expect(nextOccurrence(annual, '2026-09-06')).toBe('2026-10-15');
@@ -76,5 +76,39 @@ describe('périodicités', () => {
     expect(previousOccurrence(annual, '2026-10-15')).toBeUndefined();
     expect(previousOccurrence(annual, '2027-01-01')).toBe('2026-10-15');
     expect(previousOccurrence(quarterly, '2026-09-06')).toBe('2026-07-05');
+  });
+});
+
+describe('rythmes en jours, semaines et années (D47)', () => {
+  it('compte les semaines en jours exacts, sans passer par les mois', () => {
+    const toutesLesDeuxSemaines = { interval: 2, unit: 'week' as const, anchorDate: '2026-09-04' };
+    expect(nextOccurrence(toutesLesDeuxSemaines, '2026-09-04')).toBe('2026-09-04');
+    expect(nextOccurrence(toutesLesDeuxSemaines, '2026-09-05')).toBe('2026-09-18');
+    expect(occurrencesBetween(toutesLesDeuxSemaines, '2026-09-01', '2026-10-31')).toEqual([
+      '2026-09-04',
+      '2026-09-18',
+      '2026-10-02',
+      '2026-10-16',
+      '2026-10-30',
+    ]);
+  });
+
+  it('ne dérive pas sur une paie hebdomadaire au fil des mois', () => {
+    const chaqueVendredi = { interval: 1, unit: 'week' as const, anchorDate: '2026-01-02' };
+    // Le 2 janvier 2026 est un vendredi ; un an plus tard on doit encore tomber un vendredi.
+    const un = occurrencesBetween(chaqueVendredi, '2026-12-25', '2027-01-01');
+    for (const d of un) expect(new Date(d + 'T00:00:00Z').getUTCDay()).toBe(5);
+  });
+
+  it("traite l'année comme douze mois, en gardant le quantième", () => {
+    const annuel = { interval: 1, unit: 'year' as const, anchorDate: '2026-10-15' };
+    expect(nextOccurrence(annuel, '2026-10-16')).toBe('2027-10-15');
+    expect(nextOccurrence(annuel, '2029-01-01')).toBe('2029-10-15');
+  });
+
+  it('lit encore un rythme écrit sous la forme ancienne', () => {
+    // Ce qu'un appareil non migré peut nous envoyer (D30, D47).
+    const ancien = { intervalMonths: 3, anchorDate: '2026-01-31' } as never;
+    expect(nextOccurrence(ancien, '2026-02-01')).toBe('2026-04-30');
   });
 });

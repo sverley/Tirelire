@@ -44,7 +44,7 @@ const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop
 const oldAs = (prop: string, col: string, type: ColumnType = 'text'): ColumnDef => ({ ...cAs(prop, col, type), deprecated: true });
 
 /** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
-export const MODEL_VERSION = 8;
+export const MODEL_VERSION = 9;
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {

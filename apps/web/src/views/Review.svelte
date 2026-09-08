@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, lastPeriods, reviewCategories, reviewProvisions, addMonths, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation } from '@tirelire/core';
+  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, addMonths, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -31,7 +31,7 @@
     const need = recurring[0];
     if (!need) return;
     const others = recurring.slice(1).reduce((s, n) => s + needCruise(n), 0);
-    const interval = need.periodicity?.intervalMonths ?? 1;
+    const interval = need.periodicity ? monthsOf(need.periodicity) : 1;
     const amount = Math.max(0, r.suggestion - others) * interval;
     if (!confirm(`Passer « ${need.name ?? e.name} » à ${money(amount)} ${interval === 1 ? 'par période' : `tous les ${interval} mois`} ?`)) return;
     app.upsert('needs', { ...need, amount });
