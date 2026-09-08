@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
+  import { revealed } from '../lib/actions';
   import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel, UNITS } from '../lib/format';
   import { alive, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
 
@@ -128,8 +129,8 @@
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
 </div>
 
-{#if editing}
-  <form class="edit" onsubmit={save}>
+{#snippet editeur()}
+  <form class="edit attached" use:revealed onsubmit={save}>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Salaire" /></label>
       <label class="f">Type
@@ -187,13 +188,18 @@
       <button class="btn" type="button" onclick={() => (editing = undefined)}>Annuler</button>
     </div>
   </form>
+{/snippet}
+
+<!-- Un flux qu'on crée n'a pas encore de ligne : son formulaire suit le bouton qui l'ouvre. -->
+{#if editing && !flows.some((f) => f.id === editing?.id)}
+  {@render editeur()}
 {/if}
 
 {#each groups as g (g.kind)}
   <h2>{FLOW_KINDS[g.kind]}s</h2>
   <div class="card">
     {#each g.flows as f (f.id)}
-      <div class="row">
+      <div class="row" class:editing={editing?.id === f.id}>
         <div class="label">
           <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · automatisme' : ''}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</span>
@@ -204,6 +210,9 @@
           <button class="btn small danger" onclick={() => remove(f)}>Supprimer</button>
         </div>
       </div>
+      {#if editing?.id === f.id}
+        {@render editeur()}
+      {/if}
     {/each}
   </div>
 {/each}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
+  import { revealed } from '../lib/actions';
   import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
   import { alive, normalizeLabel, findCategoryByName, type Allocation, type Category, type Operation } from '@tirelire/core';
 
@@ -130,8 +131,8 @@
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Saisir une opération</button>
 </div>
 
-{#if showForm}
-  <form class="edit" onsubmit={save}>
+{#snippet editeur()}
+  <form class="edit attached" use:revealed onsubmit={save}>
     <div class="grid">
       <label class="f">Compte
         <select bind:value={form.accountId}>
@@ -176,12 +177,17 @@
       <button class="btn" type="button" onclick={() => (showForm = false)}>Annuler</button>
     </div>
   </form>
+{/snippet}
+
+<!-- Une saisie neuve n'a pas encore de ligne : son formulaire suit le bouton qui l'ouvre. -->
+{#if showForm && !editingId}
+  {@render editeur()}
 {/if}
 
 <div class="card">
   {#each operations as op (op.id)}
     {@const al = allocByOp.get(op.id)}
-    <div class="row">
+    <div class="row" class:editing={showForm && editingId === op.id}>
       <div class="label">
         <strong>{op.label}</strong>
         <span class="sub">
@@ -197,6 +203,9 @@
         <button class="btn small danger" onclick={() => remove(op)}>×</button>
       </div>
     </div>
+    {#if showForm && editingId === op.id}
+      {@render editeur()}
+    {/if}
   {:else}
     <div class="muted">Aucune opération saisie.</div>
   {/each}

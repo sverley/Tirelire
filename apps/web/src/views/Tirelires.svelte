@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
+  import { revealed } from '../lib/actions';
   import { money, shortDate, centsToInput, inputToCents, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS, periodicityLabel } from '../lib/format';
   import {
     alive,
@@ -258,8 +259,8 @@
 </div>
 {#if accounts.length === 0}<div class="empty">Crée d'abord un compte.</div>{/if}
 
-{#if editing}
-  <form class="edit" onsubmit={save}>
+{#snippet editeurTirelire()}
+  <form class="edit attached" use:revealed onsubmit={save}>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Charges" /></label>
       <div class="f" style="grid-column:1/-1">
@@ -308,10 +309,10 @@
       <button class="btn" type="button" onclick={() => (editing = undefined)}>Annuler</button>
     </div>
   </form>
-{/if}
+{/snippet}
 
-{#if editingNeed}
-  <form class="edit" onsubmit={saveNeed}>
+{#snippet editeurBesoin()}
+  <form class="edit attached" use:revealed onsubmit={saveNeed}>
     <h2 style="margin-top:0">Besoin</h2>
     <div class="grid">
       <label class="f">Type
@@ -354,6 +355,11 @@
       <button class="btn" type="button" onclick={() => (editingNeed = undefined)}>Annuler</button>
     </div>
   </form>
+{/snippet}
+
+<!-- Une tirelire qu'on crée n'a pas encore de carte : son formulaire suit le bouton qui l'ouvre. -->
+{#if editing && !tirelires.some((e) => e.id === editing?.id)}
+  {@render editeurTirelire()}
 {/if}
 
 {#each byPlacement as g (g.account.id)}
@@ -361,7 +367,7 @@
   {#each g.tirelires as e (e.id)}
     {@const bal = tirelireBalance(e, idx, app.asOf)}
     {@const pos = positionOf(e)}
-    <div class="card">
+    <div class="card" class:editing={editing?.id === e.id}>
       <div class="row">
         <div class="label">
           <strong>{e.name}</strong>
@@ -384,6 +390,9 @@
             <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
           </div>
         </div>
+        {#if editingNeed && !editingNeed.isNew && editingNeed.need.id === n.id}
+          {@render editeurBesoin()}
+        {/if}
       {/each}
       {#if activeNeedsOf(e).length === 0}
         <div class="sub" style="padding-left:8px">Aucun besoin en vigueur : cette tirelire ne demande rien au plan.</div>
@@ -400,6 +409,9 @@
               <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
             </div>
           </div>
+          {#if editingNeed && !editingNeed.isNew && editingNeed.need.id === n.id}
+            {@render editeurBesoin()}
+          {/if}
         {/each}
       {:else if closedNeedsOf(e).length}
         <div class="sub" style="padding-left:8px">{closedNeedsOf(e).length} besoin(s) hors vigueur au {shortDate(app.asOf)}, masqué(s).</div>
@@ -409,13 +421,22 @@
         <button class="btn small" onclick={() => startEdit(e)}>Modifier</button>
         <button class="btn small danger" onclick={() => remove(e)}>Supprimer</button>
       </div>
+      {#if editingNeed?.isNew && editingNeed.need.tirelireId === e.id}
+        {@render editeurBesoin()}
+      {/if}
     </div>
+    {#if editing?.id === e.id}
+      {@render editeurTirelire()}
+    {/if}
   {/each}
 {/each}
 {#if orphans.length}
   <h2>Sans compte de placement</h2>
   {#each orphans as e (e.id)}
-    <div class="card warn"><div class="row"><div class="label">{e.name}<span class="sub">aucun placement voulu : aucun écart ne sera proposé</span></div><button class="btn small" onclick={() => startEdit(e)}>Placer</button></div></div>
+    <div class="card warn" class:editing={editing?.id === e.id}><div class="row"><div class="label">{e.name}<span class="sub">aucun placement voulu : aucun écart ne sera proposé</span></div><button class="btn small" onclick={() => startEdit(e)}>Placer</button></div></div>
+    {#if editing?.id === e.id}
+      {@render editeurTirelire()}
+    {/if}
   {/each}
 {/if}
 {#if tirelires.length === 0 && accounts.length > 0}
