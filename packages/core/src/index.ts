@@ -12,6 +12,7 @@ export * from './migration.js';
 export * from './edit.js';
 export * from './automations.js';
 export * from './example.js';
+export * from './suggestions.js';
 export * from './csv.js';
 export * from './importer.js';
 export * from './matching.js';
