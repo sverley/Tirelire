@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
-  import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel, UNITS } from '../lib/format';
+  import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
   import { alive, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
@@ -199,10 +199,13 @@
   <h2>{FLOW_KINDS[g.kind]}s</h2>
   <div class="card">
     {#each g.flows as f (f.id)}
-      <div class="row" class:editing={editing?.id === f.id}>
+      {@const badge = validityBadge(f, app.asOf)}
+      {@const validite = validityLabel(f)}
+      <div class="row {badge ? 'dormant' : ''}" class:editing={editing?.id === f.id}>
         <div class="label">
           <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · automatisme' : ''}
-          <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</span>
+          {#if badge}<span class="pill dim">{badge}</span>{/if}
+          <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}{validite ? ` · ${validite}` : ''}</span>
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>
         <div>

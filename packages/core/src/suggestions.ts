@@ -14,9 +14,9 @@
  * Rien n'est imposé : une proposition remplit le formulaire, que l'utilisateur corrige avant
  * d'ajouter.
  */
-import { parseDate } from './dates.js';
+import { parseDate, todayISO } from './dates.js';
 import { exampleLedger } from './example.js';
-import { alive, stepOf, type Cents, type PeriodUnit } from './model.js';
+import { activeAt, alive, stepOf, type Cents, type ISODate, type PeriodUnit } from './model.js';
 
 export interface IncomeSuggestion {
   name: string;
@@ -65,13 +65,22 @@ export interface BudgetSuggestions {
   savings: SavingsSuggestion[];
 }
 
-/** Propositions à offrir dans l'assistant, l'exemple d'abord puis quelques cas fréquents. */
-export function budgetSuggestions(): BudgetSuggestions {
+/**
+ * Propositions à offrir dans l'assistant, lues dans le jeu d'exemple.
+ *
+ * L'exemple porte plusieurs versions d'un même budget (D50, D51) : « Alimentation » y figure à 900
+ * puis à 950 €. Seule celle **en vigueur à `asOf`** est proposée, sinon l'assistant offrirait deux
+ * lignes de même nom et l'on ne saurait pas laquelle prendre. C'est aussi ce qu'on veut dire : on
+ * propose le budget d'aujourd'hui, et les dates de validité servent à le faire changer ensuite.
+ */
+export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions {
   const l = exampleLedger();
-  const flows = alive(l.plannedFlows);
-  const needs = alive(l.needs);
-  const nameOf = (tirelireId: string | undefined) =>
-    alive(l.tirelires).find((t) => t.id === tirelireId)?.name ?? '';
+  const flows = alive(l.plannedFlows).filter((f) => activeAt(f, asOf));
+  const needs = alive(l.needs).filter((n) => activeAt(n, asOf));
+  // Le nom du besoin s'il en porte un — une tirelire peut en porter plusieurs (D28), et « Cours de
+  // piano » se reconnaît mieux que « Enfants et loisirs » répété deux fois.
+  const nameOf = (n: { name?: string; tirelireId?: string }) =>
+    n.name ?? alive(l.tirelires).find((t) => t.id === n.tirelireId)?.name ?? '';
 
   const incomes: IncomeSuggestion[] = flows
     .filter((f) => f.kind === 'income')
@@ -94,7 +103,7 @@ export function budgetSuggestions(): BudgetSuggestions {
   const everyday: EverydaySuggestion[] = needs
     .filter((n) => n.kind === 'recurring')
     .map((n) => ({
-      name: nameOf(n.tirelireId),
+      name: nameOf(n),
       amount: n.amount ?? 0,
       keep: alive(l.tirelires).find((t) => t.id === n.tirelireId)?.rollover?.mode !== 'none',
     }));
@@ -104,7 +113,7 @@ export function budgetSuggestions(): BudgetSuggestions {
     .map((n) => {
       const { m, d } = parseDate(n.periodicity?.anchorDate ?? '2027-01-01');
       return {
-        name: nameOf(n.tirelireId),
+        name: nameOf(n),
         amount: n.amount ?? 0,
         ...(n.periodicity ? stepOf(n.periodicity) : { interval: 12, unit: 'month' as const }),
         month: m,
@@ -115,7 +124,7 @@ export function budgetSuggestions(): BudgetSuggestions {
   const savings: SavingsSuggestion[] = needs
     .filter((n) => n.kind === 'goal')
     .map((n) => ({
-      name: nameOf(n.tirelireId),
+      name: nameOf(n),
       monthly: n.monthlyAmount ?? 0,
       ...(n.amount !== undefined ? { target: n.amount } : {}),
     }));

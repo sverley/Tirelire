@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
-import { changeHash, computePlan, exampleLedger, GENESIS_HASH, LedgerStore, MODEL_VERSION, euros, migrateModel, normalizeLabel, operationKey, uuidv7 } from '../src/index.js';
+import { changeHash, computePlan, emptyLedger, exampleLedger, GENESIS_HASH, LEDGER_KEYS, LedgerStore, MODEL_VERSION, euros, migrateModel, normalizeLabel, operationKey, uuidv7 } from '../src/index.js';
 
 const SQL = await initSqlJs();
 
@@ -44,6 +44,16 @@ async function seeded(site: string) {
 }
 
 describe('dépôt SQLite', () => {
+  it('LEDGER_KEYS couvre toutes les tables du grand livre', () => {
+    // Écrire un grand livre table par table, à la main, se paie : la fonction qui charge l'exemple
+    // dans l'application avait oublié `needs`, donc chargeait des tirelires sans aucun besoin. Tout
+    // ce qui parcourt les tables passe désormais par cette liste, et ce test la garde complète.
+    const tables = Object.entries(emptyLedger())
+      .filter(([, v]) => Array.isArray(v))
+      .map(([k]) => k);
+    expect([...LEDGER_KEYS].sort()).toEqual(tables.sort());
+  });
+
   it('écrit, relit, et le plan est identique à celui calculé en mémoire', async () => {
     const s = await seeded('A');
     const loaded = s.load();

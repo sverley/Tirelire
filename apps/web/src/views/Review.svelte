@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addDays, addMonths, budgetPeriodContaining, needActive, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation, type Need } from '@tirelire/core';
+  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, budgetPeriodContaining, minDate, needActive, needCruise, nextPeriod, automationsByRank, automationLabel, type CategoryReview, type Automation, type Need } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -41,19 +41,15 @@
     const interval = need.periodicity ? monthsOf(need.periodicity) : 1;
     const amount = Math.max(0, r.suggestion - others) * interval;
     const rythme = interval === 1 ? 'par période' : `tous les ${interval} mois`;
-    const period = budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay);
-    // Un besoin ouvert dans la période courante n'a pas de passé à protéger : on le corrige.
-    const surPlace = need.activeFrom !== undefined && need.activeFrom >= period.start;
-    const question = surPlace
-      ? `Passer « ${need.name ?? e.name} » à ${money(amount)} ${rythme} ?`
-      : `Clore « ${need.name ?? e.name} » au ${shortDate(addDays(period.start, -1))} et l'ouvrir à ${money(amount)} ${rythme} à partir du ${shortDate(period.start)} ?`;
-    if (!confirm(question)) return;
-    if (surPlace) {
-      app.upsert('needs', { ...need, amount });
-      return;
-    }
-    const suivant: Need = { ...need, id: app.newId(), amount, activeFrom: period.start };
-    app.upsert('needs', { ...need, activeTo: addDays(period.start, -1) });
+    const startDay = app.ledger.settings.periodStartDay;
+    const courante = budgetPeriodContaining(app.asOf, startDay);
+    const suivante = nextPeriod(courante, startDay);
+    if (!confirm(`Réviser « ${need.name ?? e.name} » à ${money(amount)} ${rythme} à partir du ${shortDate(suivante.start)} ?`)) return;
+    // Même coupure que le bouton « Réviser » de l'écran Tirelires (D51) : à la frontière de
+    // période, parce qu'une dotation est un tout (D29) et qu'on ne redote pas une période entamée.
+    app.upsert('needs', { ...need, activeTo: need.activeTo ? minDate(need.activeTo, courante.end) : courante.end });
+    const { activeTo: _fin, ...reste } = need;
+    const suivant: Need = { ...reste, id: app.newId(), amount, activeFrom: suivante.start };
     app.upsert('needs', suivant);
   }
 

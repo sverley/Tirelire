@@ -92,6 +92,14 @@ une règle d'un cran change le résultat quand deux règles se disputent une op�
 
 **Fait quand** : charger l'exemple suffit à voir, sans rien créer, ce que D19 à D28 ont changé.
 
+**Avancement (8 septembre, D51)** : le jeu d'exemple porte désormais des changements datés (une
+révision faite, deux à venir, un besoin qui apparaît, une charge qui s'arrête) et une tirelire à deux
+besoins ; les dates de validité s'exposent dans les écrans Tirelires et Flux, avec le geste
+« Réviser ». Restent de ce lot : le seuil de virement et le coussin dans Réglages, la distinction
+« à faire » / « à surveiller » dans le Plan, la répartition réelle par compte toujours affichée, les
+parts d'une ventilation dans la liste des opérations, une tirelire au placement réparti sur deux
+comptes (D38) et deux ou trois automatismes dans l'exemple.
+
 ---
 
 ## Lot 9 · Tests d'interface Playwright dans la CI
