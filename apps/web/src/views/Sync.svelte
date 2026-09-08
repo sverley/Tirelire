@@ -209,8 +209,8 @@
 <h2>Cet appareil</h2>
 <div class="card">
   <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <label class="f">Nom de l'appareil <input bind:value={deviceName} placeholder="Téléphone de Simon" /></label>
-    <label class="f">Utilisé par <input bind:value={userName} placeholder="Simon" /></label>
+    <label class="f">Nom de l'appareil <input bind:value={deviceName} placeholder="Téléphone" /></label>
+    <label class="f">Utilisé par <input bind:value={userName} placeholder="Prénom" /></label>
   </div>
   <div class="actions" style="margin-bottom:0"><button class="btn" onclick={saveDevice}>Enregistrer</button></div>
   {#if devices.length}

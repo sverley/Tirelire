@@ -139,7 +139,7 @@
 <div class="card">
   <p class="small muted">En attendant la synchronisation directe : exporte un paquet de changements ici, importe-le sur l'autre appareil, et inversement. Chaque appareil retient ce qu'il a déjà reçu de chaque autre ; les paquets peuvent se recouvrir sans risque.</p>
   <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
-    <label class="f">Nom de cet appareil <input bind:value={deviceName} placeholder="Téléphone de Simon" /></label>
+    <label class="f">Nom de cet appareil <input bind:value={deviceName} placeholder="Téléphone" /></label>
     <button class="btn" onclick={saveDeviceName}>Enregistrer</button>
   </div>
   <div class="actions">
