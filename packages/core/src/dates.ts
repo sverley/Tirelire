@@ -92,3 +92,10 @@ export const MONTHS_FR = [
   'novembre',
   'décembre',
 ] as const;
+
+/** Avance `iso` de `n` unités (n peut être négatif). */
+export function addUnits(iso: ISODate, n: number, unit: 'day' | 'week' | 'month' | 'year'): ISODate {
+  if (unit === 'day') return addDays(iso, n);
+  if (unit === 'week') return addDays(iso, n * 7);
+  return addMonths(iso, unit === 'year' ? n * 12 : n);
+}

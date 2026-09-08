@@ -37,7 +37,7 @@ function budgetDeLAssistant(): Ledger {
     kind: 'income',
     amount: euros(2400),
     accountId: 'principal',
-    periodicity: { intervalMonths: 1, anchorDate: periodStart },
+    periodicity: { interval: 1, unit: 'month' as const, anchorDate: periodStart },
     dateWindowDays: 5,
   });
   l.plannedFlows.push({
@@ -46,7 +46,7 @@ function budgetDeLAssistant(): Ledger {
     kind: 'fixedCharge',
     amount: euros(-750),
     accountId: 'principal',
-    periodicity: { intervalMonths: 1, anchorDate: '2026-09-05' },
+    periodicity: { interval: 1, unit: 'month' as const, anchorDate: '2026-09-05' },
     dateWindowDays: 5,
   });
   // Budget courant : tirelire ouverte au début de la période en cours.
@@ -56,7 +56,7 @@ function budgetDeLAssistant(): Ledger {
     tirelireId: 'courses',
     kind: 'recurring',
     amount: euros(500),
-    periodicity: { intervalMonths: 1, anchorDate: periodStart },
+    periodicity: { interval: 1, unit: 'month' as const, anchorDate: periodStart },
     priority: DEFAULT_PRIORITY.recurring,
   });
   // Dépense annuelle : réserve lissée sur les périodes qui restent avant l'échéance.
@@ -66,7 +66,7 @@ function budgetDeLAssistant(): Ledger {
     tirelireId: 'assurance',
     kind: 'dueDate',
     amount: euros(1200),
-    periodicity: { intervalMonths: 12, anchorDate: '2027-01-15' },
+    periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2027-01-15' },
     priority: DEFAULT_PRIORITY.dueDate,
   });
   return l;

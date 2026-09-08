@@ -401,7 +401,7 @@ export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, princip
     amount: -transfer.standing,
     accountId: principalId,
     counterpartAccountId: transfer.accountId,
-    periodicity: { intervalMonths: 1, anchorDate: plan.period.start },
+    periodicity: { interval: 1, unit: 'month' as const, anchorDate: plan.period.start },
     dateWindowDays: 5,
     labelPattern: transfer.label,
     amountTolerance: { pct: 20 },

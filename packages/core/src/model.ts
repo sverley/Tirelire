@@ -16,9 +16,39 @@ export type ISODate = string;
 export type Id = string;
 
 /** Périodicité générique : tous les `intervalMonths` mois à partir de `anchorDate`. */
+/** Unité d'un rythme. Le mois reste la plus courante ; la semaine sert aux revenus non mensuels. */
+export type PeriodUnit = 'day' | 'week' | 'month' | 'year';
+
 export interface Periodicity {
-  intervalMonths: number;
+  /** Nombre d'unités entre deux occurrences (D47). */
+  interval: number;
+  unit: PeriodUnit;
   anchorDate: ISODate;
+  /**
+   * Ancienne forme, lue mais plus jamais écrite (D30, D47). La migration 8 → 9 la convertit ; ce
+   * champ n'existe que pour qu'un rythme écrit par un appareil non migré reste interprétable.
+   */
+  intervalMonths?: number;
+}
+
+/** Rythme effectif, quelle que soit la forme dans laquelle il a été écrit. */
+export function stepOf(p: Periodicity): { interval: number; unit: PeriodUnit } {
+  if (p.interval && p.unit) return { interval: p.interval, unit: p.unit };
+  return { interval: p.intervalMonths ?? 1, unit: 'month' };
+}
+
+/**
+ * Équivalent en mois d'un rythme, pour les calculs de lissage. Approché pour les jours et les
+ * semaines — un mois ne fait pas un nombre entier de semaines — ce qui suffit à répartir une
+ * dotation, jamais à dater une occurrence (`nextOccurrence` fait, lui, du calendrier exact).
+ */
+export function monthsOf(p: Periodicity): number {
+  const { interval, unit } = stepOf(p);
+  const JOURS_PAR_MOIS = 365.2425 / 12;
+  if (unit === 'day') return interval / JOURS_PAR_MOIS;
+  if (unit === 'week') return (interval * 7) / JOURS_PAR_MOIS;
+  if (unit === 'year') return interval * 12;
+  return interval;
 }
 
 // ---------------------------------------------------------------------------

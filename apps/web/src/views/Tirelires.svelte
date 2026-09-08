@@ -12,6 +12,7 @@
     type Tirelire,
     type Need,
     type NeedKind,
+    stepOf,
   } from '@tirelire/core';
 
   // Tirelire : nom, placement voulu (D20), solde initial, report (D05/D29).
@@ -148,7 +149,7 @@
       name: n.name ?? '',
       kind: n.kind,
       amount: centsToInput(n.amount),
-      intervalMonths: String(n.periodicity?.intervalMonths ?? (n.kind === 'dueDate' ? 12 : 1)),
+      intervalMonths: String(n.periodicity ? stepOf(n.periodicity).interval : n.kind === 'dueDate' ? 12 : 1),
       anchorDate: n.periodicity?.anchorDate ?? app.asOf,
       monthlyAmount: centsToInput(n.monthlyAmount),
       priority: String(n.priority),
@@ -177,11 +178,11 @@
     if (needForm.kind === 'dueDate') {
       if (amount === undefined) return void (needError = 'Montant de l’échéance invalide.');
       row.amount = amount;
-      row.periodicity = { intervalMonths: interval, anchorDate: needForm.anchorDate };
+      row.periodicity = { interval, unit: 'month', anchorDate: needForm.anchorDate };
     } else if (needForm.kind === 'recurring') {
       if (amount === undefined) return void (needError = 'Montant par période invalide.');
       row.amount = amount;
-      row.periodicity = { intervalMonths: interval, anchorDate: needForm.anchorDate };
+      row.periodicity = { interval, unit: 'month', anchorDate: needForm.anchorDate };
     } else {
       if (monthly === undefined) return void (needError = 'Mensualité invalide.');
       row.monthlyAmount = monthly;
@@ -199,7 +200,7 @@
     if (n.kind === 'dueDate')
       return `${money(n.amount ?? 0)} ${periodicityLabel(n.periodicity)} · prochaine ${n.periodicity ? shortDate(nextOccurrence(n.periodicity, app.asOf)) : '?'}`;
     if (n.kind === 'goal') return `${money(n.monthlyAmount ?? 0)} par période${n.amount !== undefined ? ` · cible ${money(n.amount)}` : ''}`;
-    const per = n.periodicity?.intervalMonths === 12 ? 'par an' : n.periodicity && n.periodicity.intervalMonths > 1 ? `tous les ${n.periodicity.intervalMonths} mois` : 'par période';
+    const per = n.periodicity && stepOf(n.periodicity).interval === 12 ? 'par an' : n.periodicity && stepOf(n.periodicity).interval > 1 ? `tous les ${stepOf(n.periodicity).interval} mois` : 'par période';
     return `${money(n.amount ?? 0)} ${per} · dotation ${money(needCruise(n))}`;
   }
 

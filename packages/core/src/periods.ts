@@ -1,9 +1,9 @@
 /**
- * Périodes budgétaires (de paie à paie) et occurrences d'une périodicité
- * « tous les N mois à partir d'une date ».
+ * Périodes budgétaires (d'une paie à la suivante) et occurrences d'une périodicité
+ * « tous les N jours, semaines, mois ou années à partir d'une date » (D47).
  */
-import type { ISODate, Periodicity } from './model.js';
-import { addDays, addMonths, dateInMonth, daysInMonth, parseDate, MONTHS_FR, formatDate } from './dates.js';
+import { stepOf, type ISODate, type Periodicity } from './model.js';
+import { addDays, addMonths, addUnits, dateInMonth, daysInMonth, diffDays, parseDate, MONTHS_FR, formatDate } from './dates.js';
 
 export interface Period {
   /** Premier jour inclus. */
@@ -81,16 +81,25 @@ export function periodsUntil(from: Period, date: ISODate, startDay: number): num
 
 /** Première occurrence de `p` à une date ≥ `from`. */
 export function nextOccurrence(p: Periodicity, from: ISODate): ISODate {
-  if (p.intervalMonths < 1) throw new Error('intervalMonths doit être ≥ 1');
+  const { interval, unit } = stepOf(p);
+  if (interval < 1) throw new Error('interval doit être ≥ 1');
   if (p.anchorDate >= from) return p.anchorDate;
+
+  // Jours et semaines : un pas de longueur fixe, donc un simple quotient de jours.
+  if (unit === 'day' || unit === 'week') {
+    const pas = unit === 'week' ? interval * 7 : interval;
+    return addDays(p.anchorDate, Math.ceil(diffDays(p.anchorDate, from) / pas) * pas);
+  }
+
+  // Mois et années : on repart toujours de l'ancrage pour ne pas dériver (31 → 30 → 30…).
+  const pas = unit === 'year' ? interval * 12 : interval;
   const a = parseDate(p.anchorDate);
   const f = parseDate(from);
-  const monthsApart = (f.y - a.y) * 12 + (f.m - a.m);
-  let k = Math.floor(monthsApart / p.intervalMonths);
-  let candidate = addMonths(p.anchorDate, k * p.intervalMonths);
+  let k = Math.floor(((f.y - a.y) * 12 + (f.m - a.m)) / pas);
+  let candidate = addMonths(p.anchorDate, k * pas);
   while (candidate < from) {
     k++;
-    candidate = addMonths(p.anchorDate, k * p.intervalMonths);
+    candidate = addMonths(p.anchorDate, k * pas);
   }
   return candidate;
 }
@@ -110,6 +119,7 @@ export function occurrencesBetween(p: Periodicity, start: ISODate, end: ISODate)
 /** Dernière occurrence strictement avant `date` (ou undefined). */
 export function previousOccurrence(p: Periodicity, date: ISODate): ISODate | undefined {
   const next = nextOccurrence(p, date);
-  const prev = nextOccurrence(p, addMonths(next, -p.intervalMonths));
+  const { interval, unit } = stepOf(p);
+  const prev = nextOccurrence(p, addUnits(next, -interval, unit));
   return prev < date ? prev : undefined;
 }

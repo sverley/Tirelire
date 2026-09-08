@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
-  import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel } from '../lib/format';
-  import { alive, nextOccurrence, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind } from '@tirelire/core';
+  import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel, UNITS } from '../lib/format';
+  import { alive, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
   let form = $state({
@@ -12,7 +12,8 @@
     tirelireId: '',
     categoryId: '',
     counterpartAccountId: '',
-    intervalMonths: '1',
+    interval: '1',
+    unit: 'month' as PeriodUnit,
     anchorDate: app.asOf,
     dateWindowDays: '3',
     toleranceAbs: '',
@@ -37,8 +38,8 @@
 
   function startNew() {
     const principal = accounts.find((a) => a.kind === 'principal');
-    editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: principal?.id ?? '', periodicity: { intervalMonths: 1, anchorDate: app.asOf }, dateWindowDays: 3 };
-    form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', intervalMonths: '1', anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesRule: false, activeFrom: '', activeTo: '' };
+    editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: principal?.id ?? '', periodicity: { interval: 1, unit: 'month' as const, anchorDate: app.asOf }, dateWindowDays: 3 };
+    form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', interval: '1', unit: 'month' as PeriodUnit, anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesRule: false, activeFrom: '', activeTo: '' };
     error = '';
   }
 
@@ -52,7 +53,8 @@
       tirelireId: f.tirelireId ?? '',
       categoryId: f.categoryId ?? '',
       counterpartAccountId: f.counterpartAccountId ?? '',
-      intervalMonths: String(f.periodicity.intervalMonths),
+      interval: String(stepOf(f.periodicity).interval),
+      unit: stepOf(f.periodicity).unit,
       anchorDate: f.periodicity.anchorDate,
       dateWindowDays: String(f.dateWindowDays),
       toleranceAbs: centsToInput(f.amountTolerance?.abs),
@@ -90,7 +92,7 @@
       kind: form.kind,
       amount: form.kind === 'income' ? abs : -abs,
       accountId: form.accountId,
-      periodicity: { intervalMonths: Math.max(1, Number(form.intervalMonths) || 1), anchorDate: form.anchorDate },
+      periodicity: { interval: Math.max(1, Number(form.interval) || 1), unit: form.unit, anchorDate: form.anchorDate },
       dateWindowDays: Math.max(0, Number(form.dateWindowDays) || 0),
       ...(form.tirelireId && form.kind === 'dueDate' ? { tirelireId: form.tirelireId } : {}),
       ...(form.categoryId ? { categoryId: form.categoryId } : {}),
@@ -163,7 +165,12 @@
           {#each categories as c}<option value={c.id}>{c.name}</option>{/each}
         </select>
       </label>
-      <label class="f">Tous les (mois) <input type="number" min="1" bind:value={form.intervalMonths} /></label>
+      <label class="f">Tous les <input type="number" min="1" bind:value={form.interval} /></label>
+      <label class="f">Unité
+        <select bind:value={form.unit}>
+          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{l.pluriel}</option>{/each}
+        </select>
+      </label>
       <label class="f">Première date <input type="date" bind:value={form.anchorDate} /></label>
       <label class="f">Fenêtre de rapprochement (± jours) <input type="number" min="0" bind:value={form.dateWindowDays} /></label>
       <label class="f">Tolérance de montant (€) <input bind:value={form.toleranceAbs} inputmode="decimal" /></label>

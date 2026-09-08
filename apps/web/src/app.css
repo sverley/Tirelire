@@ -126,7 +126,7 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .ligne .garde input { width: auto; min-width: auto; }
 .ligne .btn.danger { padding: 4px 9px; line-height: 1.1; }
 
-.tete-flux, .ligne-flux { grid-template-columns: minmax(0, 1fr) 96px 56px var(--col-compte, 0px) 32px; }
+.tete-flux, .ligne-flux { grid-template-columns: minmax(0, 1fr) 96px 52px 52px 84px var(--col-compte, 0px) 32px; }
 .tete-courant, .ligne-courant { grid-template-columns: minmax(0, 1fr) 96px 74px 32px; }
 .tete-echeance, .ligne-echeance { grid-template-columns: minmax(0, 1fr) 96px 140px 32px; }
 .tete-epargne, .ligne-epargne { grid-template-columns: minmax(0, 1fr) 96px 96px 32px; }
@@ -142,6 +142,7 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 @media (max-width: 640px) {
   .tete { display: none; }
   .ligne, .ligne-compte { grid-template-columns: minmax(0, 1fr) 96px 32px; }
+  .ligne-flux > .unite { grid-column: 1 / -1; }
   .ligne-compte > select, .ligne-flux > select { grid-column: 1 / -1; }
   .ligne-echeance > .date, .ligne-compte > input:nth-child(2), .ligne-compte > input:nth-child(3) { grid-column: 1 / -1; }
 }

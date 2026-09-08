@@ -46,11 +46,11 @@ export function exampleLedger(): Ledger {
     { id: 'env-sante', name: 'Santé', placement: [{ accountId: 'acc-principal', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
   );
 
-  const monthlyNeed = (anchor: string) => ({ intervalMonths: 1, anchorDate: anchor });
+  const monthlyNeed = (anchor: string) => ({ interval: 1, unit: 'month' as const, anchorDate: anchor });
   l.needs.push(
-    { id: 'need-tf', tirelireId: 'env-tf', kind: 'dueDate', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
-    { id: 'need-auto', tirelireId: 'env-auto', kind: 'dueDate', amount: euros(600), periodicity: { intervalMonths: 12, anchorDate: '2027-03-05' }, priority: 10 },
-    { id: 'need-vac', tirelireId: 'env-vac', kind: 'dueDate', amount: euros(2400), periodicity: { intervalMonths: 12, anchorDate: '2027-07-01' }, priority: 10 },
+    { id: 'need-tf', tirelireId: 'env-tf', kind: 'dueDate', amount: euros(1200), periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' }, priority: 10 },
+    { id: 'need-auto', tirelireId: 'env-auto', kind: 'dueDate', amount: euros(600), periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2027-03-05' }, priority: 10 },
+    { id: 'need-vac', tirelireId: 'env-vac', kind: 'dueDate', amount: euros(2400), periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2027-07-01' }, priority: 10 },
     { id: 'need-precaution', tirelireId: 'env-precaution', kind: 'goal', amount: euros(6000), monthlyAmount: euros(300), priority: 30 },
     { id: 'need-alim', tirelireId: 'env-alim', kind: 'recurring', amount: euros(900), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
     { id: 'need-essence', tirelireId: 'env-essence', kind: 'recurring', amount: euros(200), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
@@ -72,7 +72,7 @@ export function exampleLedger(): Ledger {
     { id: 'cat-transfert', name: 'Virement interne', nature: 'expense' },
   );
 
-  const monthly = (anchor: string) => ({ intervalMonths: 1, anchorDate: anchor });
+  const monthly = (anchor: string) => ({ interval: 1, unit: 'month' as const, anchorDate: anchor });
   l.plannedFlows.push(
     {
       id: 'flow-salaire',
@@ -159,7 +159,7 @@ export function exampleLedger(): Ledger {
       amount: euros(-1200),
       accountId: 'acc-principal',
       tirelireId: 'env-tf',
-      periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' },
+      periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' },
       dateWindowDays: 5,
       labelPattern: 'DGFIP|TAXE FONC',
     },
