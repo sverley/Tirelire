@@ -475,3 +475,11 @@ est réputé sur le compte principal si l'on passe l'étape — mais les déclar
 d'attribuer chaque revenu et chaque prélèvement au bon compte, ce qui était impossible quand
 l'étape venait en dernier. La question du placement des réserves, elle, ne peut pas se poser avant
 qu'il existe des réserves : elle a migré à l'inverse, vers le résumé.
+
+**Complément (8 septembre) — l'étape Comptes.** Elle expliquait longuement ce qu'elle allait faire au
+lieu de le montrer. Trois corrections : le texte tient en deux phrases et dit ce que l'étape attend —
+des **comptes bancaires réels**, ceux dont on reçoit un relevé, et non des catégories de budget ; le
+**compte principal y apparaît**, matérialisé à l'arrivée sur l'étape plutôt que créé au premier
+enregistrement, avec ses champs modifiables sur place (nom, banque, numéro ou IBAN, solde actuel), ce
+qui rend inutile la question du solde posée plus loin ; et le bandeau de totaux du budget — revenus,
+charges, reste à vivre — disparaît de cette étape, qui ne parle pas du budget.

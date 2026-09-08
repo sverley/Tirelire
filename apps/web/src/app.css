@@ -129,3 +129,4 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .ligne .garde { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; }
 .ligne .garde input { min-width: auto; }
 .ligne .cpt { flex: 0 1 120px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; }
+.card.compte { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
