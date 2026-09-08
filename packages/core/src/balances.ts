@@ -240,12 +240,15 @@ export function needCruise(n: Need): Cents {
       return divideCents(n.amount ?? 0, n.periodicity ? monthsOf(n.periodicity) : 12);
     case 'goal':
       return n.monthlyAmount ?? 0;
+    case 'payout':
+      // Montant déclaré pour la périodicité (l'année, en général), réparti sur les périodes.
+      return divideCents(n.amount ?? 0, n.periodicity ? monthsOf(n.periodicity) : 12);
   }
 }
 
 /** Réserve des besoins non récurrents : ce que la libération de fin de période ne touche pas. */
 function reserveOf(needs: Need[]): Cents {
-  return needs.reduce((s, n) => (n.kind === 'recurring' ? s : s + (n.amount ?? 0)), 0);
+  return needs.reduce((s, n) => (n.kind === 'recurring' || n.kind === 'payout' ? s : s + (n.amount ?? 0)), 0);
 }
 
 /**
@@ -279,6 +282,14 @@ export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Per
         const reached = target !== undefined && held >= target;
         const requested = reached ? 0 : target !== undefined ? Math.min(cruise, target - held) : cruise;
         out.push({ needId: n.id, held, cruise, catchUp: requested, requested, floor: 0, ...(target !== undefined ? { target } : {}) });
+        break;
+      }
+      case 'payout': {
+        // On ne verse que ce que la tirelire porte : une saison décevante réduit le versement.
+        const held = Math.max(remaining, 0);
+        remaining -= held;
+        const verse = Math.min(cruise, held);
+        out.push({ needId: n.id, held, cruise, catchUp: 0, requested: -verse || 0, floor: 0, target: n.amount ?? 0 });
         break;
       }
       case 'recurring': {

@@ -146,3 +146,4 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
   .ligne-compte > select, .ligne-flux > select { grid-column: 1 / -1; }
   .ligne-echeance > .date, .ligne-compte > input:nth-child(2), .ligne-compte > input:nth-child(3) { grid-column: 1 / -1; }
 }
+.ligne > .suite { grid-column: 1 / -1; margin: 2px 0 0; }

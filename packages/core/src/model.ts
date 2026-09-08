@@ -139,7 +139,13 @@ export interface Tirelire {
  * Les priorités et planchers de D06 se posent sur les besoins ; le solde de la tirelire leur est
  * attribué dans l'ordre des priorités (D29).
  */
-export type NeedKind = 'recurring' | 'dueDate' | 'goal';
+/**
+ * `payout` (D48) est une tirelire à l'envers : au lieu de réclamer une dotation, elle en verse une
+ * au budget. Sert aux revenus concentrés sur quelques mois — une saison touristique, une récolte —
+ * dont on veut vivre toute l'année. Le montant se déclare pour la périodicité (typiquement l'année)
+ * et se répartit sur les périodes ; la tirelire se vide d'autant.
+ */
+export type NeedKind = 'recurring' | 'dueDate' | 'goal' | 'payout';
 
 export interface Need {
   id: Id;
@@ -160,6 +166,8 @@ export interface Need {
 
 /** Priorités par défaut ; les échéances passent avant, les objectifs après. */
 export const DEFAULT_PRIORITY: Record<NeedKind, number> = {
+  // Le versement passe avant tout : il fournit les fonds que les autres se partagent.
+  payout: 0,
   dueDate: 10,
   recurring: 20,
   goal: 30,
