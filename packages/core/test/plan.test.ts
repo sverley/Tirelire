@@ -47,7 +47,7 @@ describe('positions et soldes (D19, D29)', () => {
     expect(tirelireBalance(idx.tireliresById.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
   });
 
-  it('une dépense consomme l’tirelire là où elle sort, même si l’argent dort ailleurs', () => {
+  it('une dépense consomme la tirelire là où elle sort, même si l’argent dort ailleurs', () => {
     // Santé, placée sur le compte principal : dotation 100 sur le compte principal, dentiste 80 payé par Marie.
     const c = tirelireComponents(idx.tireliresById.get('env-sante')!, idx, asOf);
     expect(c.get('acc-principal')).toBe(euros(100));

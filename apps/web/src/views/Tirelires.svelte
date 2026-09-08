@@ -11,6 +11,7 @@
     tirelireBalance,
     tirelireComponents,
     indexLedger,
+    dueDateFlowForNeed,
     needCruise,
     nextOccurrence,
     DEFAULT_PRIORITY,
@@ -144,7 +145,7 @@
   }
 
   function remove(e: Tirelire) {
-    if (!confirm(`Supprimer l’tirelire « ${e.name} » et ses besoins ?`)) return;
+    if (!confirm(`Supprimer la tirelire « ${e.name} » et ses besoins ?`)) return;
     for (const n of needsOf(e)) app.remove('needs', n.id);
     app.remove('tirelires', e.id);
   }
@@ -233,6 +234,17 @@
 
   function removeNeed(n: Need) {
     if (confirm('Supprimer ce besoin ?')) app.remove('needs', n.id);
+  }
+
+  /**
+   * L'autre face d'une échéance : le flux qui la paiera le jour venu. Le dire ici évite d'avoir à
+   * deviner, depuis l'écran Tirelires, si la provision qu'on regarde correspond bien au
+   * prélèvement attendu — et signale l'échéance provisionnée que rien ne viendra payer.
+   */
+  function paidByText(n: Need): string {
+    if (n.kind !== 'dueDate') return '';
+    const f = dueDateFlowForNeed(n, app.ledger.plannedFlows, app.asOf);
+    return f ? `payée par le flux « ${f.name} »` : 'aucun flux ne paie cette échéance';
   }
 
   function describeNeed(n: Need): string {
@@ -385,12 +397,14 @@
       </div>
       {#each needsOf(e) as n (n.id)}
         {@const badge = validityBadge(n, app.asOf)}
+        {@const paidBy = paidByText(n)}
         <div class="row {badge ? 'dormant' : ''}" style="padding-left:8px">
           <div class="label">
             <span class="pill">{NEED_KINDS_SHORT[n.kind]}</span>
             {#if badge}<span class="pill dim">{badge}</span>{/if}
             {n.name ?? e.name}
             <span class="sub">{describeNeed(n)} · priorité {n.priority}</span>
+            {#if paidBy}<span class="sub">{paidBy}</span>{/if}
           </div>
           <div class="actions" style="margin:0">
             {#if activeAt(n, app.asOf)}
