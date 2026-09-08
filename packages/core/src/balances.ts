@@ -15,7 +15,7 @@
  */
 import type { Account, Allocation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation } from './model.js';
 import {
-  monthsOf, alive } from './model.js';
+  monthsOf, alive, needActive } from './model.js';
 import { nextOccurrence, budgetPeriodContaining, periodsUntil, nextPeriod, type Period } from './periods.js';
 import { divideCents } from './money.js';
 import { addDays } from './dates.js';
@@ -346,10 +346,13 @@ export function tirelireTimeline(e: Tirelire, idx: LedgerIndex, until: ISODate):
   while (p.start <= target.start) {
     const prior = tl.reduce((s, x) => s + x.dotation - x.release, 0);
     const balanceBefore = e.openingBalance + prior + entriesEffect(e, idx, e.openingDate, addDays(p.start, -1));
-    const snaps = needSnapshots(e, needs, balanceBefore, p, idx.startDay);
+    // Seuls les besoins en vigueur le premier jour de la période sont dotés (D50) : un budget
+    // clos en juin ne réclame plus rien en juillet, et un budget ouvert en juin ne rétroagit pas.
+    const actifs = needs.filter((n) => needActive(n, p.start));
+    const snaps = needSnapshots(e, actifs, balanceBefore, p, idx.startDay);
     const dotation = snaps.reduce((s, x) => s + x.requested, 0);
     const balanceEnd = balanceBefore + dotation + entriesEffect(e, idx, p.start, p.end);
-    tl.push({ period: p, balanceBefore, needs: snaps, dotation, release: releaseOf(e, needs, balanceEnd) });
+    tl.push({ period: p, balanceBefore, needs: snaps, dotation, release: releaseOf(e, actifs, balanceEnd) });
     p = nextPeriod(p, idx.startDay);
   }
   return tl;

@@ -95,6 +95,8 @@ export const TABLES: Record<string, TableDef> = {
       c('periodicity', 'json'),
       c('monthlyAmount', 'integer'),
       c('priority', 'integer'),
+      c('activeFrom'), // D50
+      c('activeTo'),
       c('deletedAt'),
     ],
   },

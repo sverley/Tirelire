@@ -161,7 +161,27 @@ export interface Need {
   monthlyAmount?: Cents;
   /** Ordre de financement : plus petit = servi en premier. */
   priority: number;
+  /**
+   * Période de validité du besoin (D50). Un budget change au fil de la vie (D25) : la provision
+   * pour charges passe de 535 à 512 €, un enfant commence le piano, un crédit se termine. Modifier
+   * le montant en place réécrirait le passé — les dotations des périodes déjà écoulées seraient
+   * recalculées au montant d'aujourd'hui, et le Bilan comparerait des périodes à une cible qui
+   * n'était pas la leur. On clôt donc l'ancien besoin et on en ouvre un nouveau, comme un flux le
+   * fait déjà avec `activeFrom` / `activeTo`.
+   *
+   * Un besoin s'applique à une période s'il est en vigueur **le premier jour** de celle-ci, jour où
+   * la dotation est acquise (D29) ; les bornes sont incluses.
+   */
+  activeFrom?: ISODate;
+  activeTo?: ISODate;
   deletedAt?: string;
+}
+
+/** Le besoin est-il en vigueur à cette date ? Bornes incluses (D50). */
+export function needActive(n: Need, date: ISODate): boolean {
+  if (n.activeFrom && date < n.activeFrom) return false;
+  if (n.activeTo && date > n.activeTo) return false;
+  return true;
 }
 
 /** Priorités par défaut ; les échéances passent avant, les objectifs après. */

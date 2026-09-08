@@ -668,3 +668,38 @@ ligne qu'en D06 et D29.
 Reste à voir sur des données réelles si la distinction interne/externe mérite des traitements
 différents dans le calibrage ; elle est enregistrée dès maintenant pour que l'historique existe le
 jour où l'on tranchera.
+
+## D50 · 2026-09-08 · Un besoin a une période de validité
+
+Un flux prévu sait déjà se dater (`activeFrom` / `activeTo`, D23, D24) ; un besoin, non. Or c'est le
+besoin qui porte le budget, et un budget change au fil de la vie — c'est exactement ce que D25
+constatait en abandonnant l'année budgétaire. Une provision pour charges se réajuste d'un montant à
+l'autre au fil des régularisations ; un salaire change ; un enfant commence le piano et une ligne
+apparaît en cours d'année ; un crédit se termine et sa ligne disparaît. Une reprise de données sur
+plusieurs années en fait apparaître une poignée de versions successives, et il faut savoir les
+distinguer.
+
+Modifier le montant en place serait une **réécriture du passé**. D29 rend les dotations calculées et
+jamais stockées : `tirelireTimeline` rejoue toutes les périodes depuis l'ouverture de la tirelire, si
+bien qu'un montant changé aujourd'hui redoterait janvier de l'an dernier au montant d'aujourd'hui.
+Les soldes de tirelires, les écarts de placement et les cibles du Bilan seraient tous recalculés
+contre un budget qui n'était pas celui de la période. Une comparaison entre deux périodes n'aurait
+plus de sens, ce que D25 demandait précisément d'éviter.
+
+`Need.activeFrom` et `Need.activeTo` s'ajoutent donc, de même sens que sur un flux, bornes incluses.
+Changer un budget, c'est **clore l'ancien besoin et en ouvrir un nouveau**, jamais éditer le montant.
+
+Un besoin s'applique à une période s'il est en vigueur **le premier jour** de celle-ci — le jour où
+la dotation est acquise (D29). Une seule date, pas un chevauchement au prorata : une dotation est un
+tout, et un budget qui changerait en cours de période attend la suivante.
+
+Conséquences dans le cœur : `tirelireTimeline` ne dote que les besoins actifs et ne calcule la
+libération que sur eux ; la croisière qui borne la part permanente d'un virement (D21) ne compte que
+les actifs ; `recurringPerPeriod` prend une date, sans quoi un budget clos l'an dernier servirait
+encore de cible ; `reviewProvisions` restreint les échéances à la fenêtre de validité du besoin.
+Aucune migration : un besoin sans dates est en vigueur depuis toujours, ce qui est le cas de tous
+ceux déjà écrits.
+
+Ce que cela ne couvre pas encore : l'interface n'expose pas ces dates, et l'assistant crée toujours
+des besoins sans bornes. Tant que ce n'est pas fait, seule une reprise de données peut versionner un
+budget — ce qui suffit au premier import, pas à l'usage courant.

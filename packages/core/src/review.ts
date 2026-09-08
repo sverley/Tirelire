@@ -3,7 +3,7 @@
  * suggestions de cibles, provisions provisionné vs payé.
  */
 import type { Cents, Tirelire, Id, ISODate, Ledger, Need } from './model.js';
-import { alive, needName } from './model.js';
+import { alive, needActive, needName } from './model.js';
 import { allocationAmount, tirelireBalance, indexLedger, needCruise } from './balances.js';
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, diffDays } from './dates.js';
@@ -43,9 +43,13 @@ export interface CategoryReview {
   totalSpent: Cents;
 }
 
-/** Dotation récurrente d'une tirelire par période (somme des croisières de ses besoins récurrents), undefined sans besoin récurrent. */
-export function recurringPerPeriod(ledger: Ledger, e: Tirelire): Cents | undefined {
-  const needs = alive(ledger.needs).filter((n) => n.tirelireId === e.id && n.kind === 'recurring');
+/**
+ * Dotation récurrente d'une tirelire par période (somme des croisières de ses besoins récurrents),
+ * undefined sans besoin récurrent. `asOf` choisit la version du budget en vigueur (D50) : sans
+ * cela, un budget clos l'an dernier servirait encore de cible aujourd'hui.
+ */
+export function recurringPerPeriod(ledger: Ledger, e: Tirelire, asOf?: ISODate): Cents | undefined {
+  const needs = alive(ledger.needs).filter((n) => n.tirelireId === e.id && n.kind === 'recurring' && (asOf === undefined || needActive(n, asOf)));
   if (needs.length === 0) return undefined;
   return needs.reduce((s, n) => s + needCruise(n), 0);
 }
@@ -101,7 +105,7 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
   // Toutes les catégories et tirelires à besoin récurrent apparaissent, même sans dépense.
   const budgetOf = new Map<Id, Cents>();
   for (const e of tirelires) {
-    const t = recurringPerPeriod(ledger, e);
+    const t = recurringPerPeriod(ledger, e, periods[periods.length - 1]!.start);
     if (t !== undefined) budgetOf.set(e.id, t);
   }
   for (const c of categories) {
@@ -190,7 +194,9 @@ export function reviewProvisions(ledger: Ledger, from: ISODate, asOf: ISODate): 
     const e = idx.tireliresById.get(n.tirelireId);
     if (!e) continue;
     const target = n.amount ?? 0;
-    for (const due of occurrencesBetween(n.periodicity, from, asOf)) {
+    const debut = n.activeFrom && n.activeFrom > from ? n.activeFrom : from;
+    const fin = n.activeTo && n.activeTo < asOf ? n.activeTo : asOf;
+    for (const due of occurrencesBetween(n.periodicity, debut, fin)) {
       const before = tirelireBalance(e, idx, addDays(due, -1));
       const entries = (idx.entriesByTirelire.get(e.id) ?? []).filter(({ operation, effect }) => effect < 0 && Math.abs(diffDays(operation.date, due)) <= 15);
       const paid = entries.reduce((s, x) => s - x.effect, 0);
@@ -244,7 +250,7 @@ export function reviewReplenishments(ledger: Ledger, periods: Period[]): Repleni
       if (montant <= 0) continue; // seul ce qui entre dans la tirelire renfloue
       let r = parTirelire.get(e.id);
       if (!r) {
-        const cruise = (idx.needsByTirelire.get(e.id) ?? []).reduce((s, n) => s + needCruise(n), 0);
+        const cruise = (idx.needsByTirelire.get(e.id) ?? []).filter((n) => needActive(n, fin)).reduce((s, n) => s + needCruise(n), 0);
         r = { tirelireId: e.id, name: e.name, count: 0, total: 0, fromOutside: 0, fromInside: 0, cruise, suggested: 0 };
         parTirelire.set(e.id, r);
       }

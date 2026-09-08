@@ -4,7 +4,7 @@
  * virements ramènent chaque tirelire à son placement voulu (D20, D21).
  */
 import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow } from './model.js';
-import { alive, needName } from './model.js';
+import { alive, needActive, needName } from './model.js';
 import {
   homeAccount,
   placementGaps,
@@ -287,7 +287,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
       // Positif = principal → compte.
       const amount = gapsHere.reduce((s, g) => s + (g.toAccountId === a.id ? g.amount : -g.amount), 0);
       if (amount === 0) continue;
-      const cruise = (idx.needsByTirelire.get(e.id) ?? []).reduce((s, n) => s + needCruise(n), 0);
+      const cruise = (idx.needsByTirelire.get(e.id) ?? []).filter((n) => needActive(n, asOf)).reduce((s, n) => s + needCruise(n), 0);
       const standing = amount > 0 ? Math.min(amount, cruise) : 0;
       orders.push({
         tirelireId: e.id,
