@@ -703,3 +703,66 @@ ceux déjà écrits.
 Ce que cela ne couvre pas encore : l'interface n'expose pas ces dates, et l'assistant crée toujours
 des besoins sans bornes. Tant que ce n'est pas fait, seule une reprise de données peut versionner un
 budget — ce qui suffit au premier import, pas à l'usage courant.
+
+## D51 · 2026-09-08 · Les dates de validité se voient, et l'exemple les porte
+
+D50 a donné aux besoins une période de validité, et se terminait en constatant ce qui manquait :
+« l'interface n'expose pas ces dates », si bien que seule une reprise de données pouvait versionner
+un budget. Une décision qui ne se voit pas dans l'interface n'est pas livrée. Cette entrée finit le
+travail sur trois plans.
+
+**L'écran Tirelires expose les dates et offre le geste.** Le formulaire d'un besoin porte
+« en vigueur à partir du » et « jusqu'au », la description dit la période, et un besoin hors de sa
+validité s'affiche en retrait avec une pastille — *clos* ou *à venir* — au lieu de se confondre avec
+le budget du jour. Les besoins en vigueur remontent en tête de la tirelire.
+
+Surtout, un bouton **Réviser** fait le geste de D50 en une fois : il clôt le besoin à la fin de la
+période en cours, en ouvre une copie au début de la suivante, et ouvre l'éditeur sur celle-ci. La
+coupure tombe à la frontière de période parce qu'une dotation est un tout (D29) ; laisser saisir la
+date à la main invitait à couper au milieu, ce que le moteur arrondit ensuite sans le dire. Éditer
+un montant en place reste possible — c'est le bon geste quand on corrige une faute de frappe — mais
+ce n'est plus le geste offert.
+
+**L'écran Flux dit la même chose des siens.** Les deux champs y existaient depuis D23 sans que la
+liste montre jamais leur effet : un crédit terminé s'y lisait comme un crédit en cours.
+
+**Le jeu d'exemple porte des changements datés.** Il n'en avait aucun : on ne pouvait donc ni voir
+ni tester ce que produit un budget qui change, sinon en fabriquant des données à la main. Il en
+porte maintenant six, choisis pour couvrir les quatre formes que prend un changement — une révision
+déjà faite, une révision à venir, une ligne qui apparaît, une ligne qui s'arrête :
+
+- *Divers et sorties* passé de 300 à 250 € au 28 août : la version close se lit encore et ne dote
+  plus rien ;
+- *Alimentation* de 900 à 950 € à partir de la période de novembre ;
+- *Cours de piano*, besoin qui apparaît en novembre sur une tirelire qui n'en portait qu'un (D28) ;
+- *Salaire* de 3 400 à 3 550 € à la paie de novembre (flux clos, successeur daté) ;
+- *Crédit immobilier* dont la dernière échéance tombe le 5 décembre ;
+- *Épargne de précaution* qui reprend la mensualité libérée, 300 → 800 €, à partir de janvier.
+
+Tous sont placés **hors de la période en cours** : le plan du 6 septembre reste celui de l'analyse,
+au centime près, et les tests qui l'encodent n'ont pas bougé. C'est en avançant de période en
+période qu'on les voit prendre effet — ce que l'écran Plan permet déjà (deux périodes en arrière,
+trois en avant). `test/exemple-dates.test.ts` fige ce qu'on doit voir à chaque période, et échoue
+aussi bien si l'un de ces changements disparaît que s'il déborde sur la période en cours.
+
+**Les propositions de l'assistant prennent une date.** L'exemple étant leur seule source (D43), il
+porte désormais deux « Alimentation » et deux « Salaire » ; `budgetSuggestions(asOf)` ne retient que
+la version en vigueur, sinon l'assistant offrirait deux lignes de même nom sans dire laquelle
+prendre. Elles reprennent aussi le nom du besoin quand il en porte un, la tirelire ne suffisant plus
+à les distinguer dès qu'elle en porte deux.
+
+**Deux défauts trouvés en chemin, corrigés ici.**
+
+`syncFlowAutomations` (D24) ne savait pas reconnaître la règle en cours d'un flux **daté** : elle
+cherchait une règle sans `validTo`, or un flux qui porte `activeTo` en pose une dès la création.
+Chaque passage créait donc une règle de plus au lieu de remplacer la précédente, et l'archivage
+n'avait jamais lieu. Une règle est désormais en cours tant que sa fin de validité n'est que celle du
+flux lui-même. Aucun test ne pouvait le voir : aucun flux de l'exemple n'était daté.
+
+`replaceWith`, côté interface, écrivait les tables une par une et avait **oublié `needs`** ainsi que
+`periodStartDay`. Charger l'exemple donnait donc des tirelires sans aucun besoin et un mois
+calendaire à la place du 28 — le plan s'affichait vide, ce qui ne se voyait dans aucun test parce
+que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parcourt maintenant
+`LEDGER_KEYS`, et un test garde cette liste alignée sur le grand livre. Ajouter une table au modèle
+ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
+(tests d'interface) est censé attraper, et qu'il attrapera mieux.

@@ -7,9 +7,9 @@ import {
   diffDays,
   emptyLedger,
   exampleLedger,
+  LEDGER_KEYS,
   todayISO,
   uuidv7,
-  LEDGER_KEYS,
   type Ledger,
   type LedgerStore,
   type Patch,
@@ -156,10 +156,12 @@ class AppState {
   async replaceWith(l: Ledger): Promise<void> {
     await this.eraseAll();
     const s = this.store;
-    const copyTable = <K extends (typeof LEDGER_KEYS)[number]>(key: K) => {
-      for (const row of l[key]) s.upsert(key, row);
-    };
-    for (const key of LEDGER_KEYS) copyTable(key);
+    // Boucle sur `LEDGER_KEYS` plutôt qu'une table après l'autre : la liste écrite à la main avait
+    // oublié `needs`, si bien que charger l'exemple donnait des tirelires sans aucun besoin — donc
+    // un plan vide. Ajouter une table au modèle ne peut plus laisser cette fonction en arrière.
+    for (const key of LEDGER_KEYS) for (const row of l[key]) s.upsert(key, row as never);
+    // Les réglages suivent la même règle, pour la même raison : on les parcourt au lieu de les
+    // citer un par un. Seul `siteId` reste dehors — il désigne cet appareil, pas les données (D08).
     for (const key of Object.keys(l.settings) as Array<keyof Settings>) {
       if (key === 'siteId') continue;
       s.setSetting(key, l.settings[key]);

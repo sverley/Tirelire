@@ -389,7 +389,17 @@ export interface FlowAutomationsPatch {
 export function syncFlowAutomations(ledger: Ledger, asOf: string): FlowAutomationsPatch {
   const out: FlowAutomationsPatch = { automations: [] };
   const existing = new Map<Id, Automation>();
-  for (const r of alive(ledger.automations)) if (r.flowId && !r.validTo) existing.set(r.flowId, r);
+  const flowsById = new Map(alive(ledger.plannedFlows).map((f) => [f.id, f]));
+  for (const r of alive(ledger.automations)) {
+    if (!r.flowId) continue;
+    // Une règle est « en cours » tant que sa fin de validité n'est que celle du flux lui-même : un
+    // flux daté (`activeTo`) en pose une dès la création. Une règle **archivée**, elle, porte une
+    // fin posée à la date d'archivage, qui n'est pas celle du flux. Sans cette distinction, un flux
+    // daté n'avait jamais de règle en cours : chaque passage en créait une de plus au lieu de
+    // remplacer la précédente.
+    if (r.validTo && r.validTo !== flowsById.get(r.flowId)?.activeTo) continue;
+    existing.set(r.flowId, r);
+  }
   let rank = topRank(ledger);
   for (const flow of alive(ledger.plannedFlows)) {
     const current = existing.get(flow.id);

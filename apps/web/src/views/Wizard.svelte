@@ -336,7 +336,9 @@
 
   // --- Propositions (D43) : elles remplissent le formulaire, elles n'ajoutent rien d'office ---
   // Les raccourcis sont toujours offerts : l'interface ne change pas d'un projet à l'autre (D46).
-  const propositions = budgetSuggestions();
+  // La date compte : l'exemple porte plusieurs versions d'un même budget (D51), et l'on ne propose
+  // que celle en vigueur. Figée à l'ouverture, comme le reste de l'état de l'assistant (D43).
+  const propositions = budgetSuggestions(app.asOf);
   /** Un raccourci déjà repris disparaît : on ne propose pas ce qui existe déjà. */
   const dejaPris = (nom: string) => flows.some((f) => f.name === nom) || tirelires.some((t) => t.name === nom);
   const restantsRevenus = $derived(propositions.incomes.filter((x) => !dejaPris(x.name)));

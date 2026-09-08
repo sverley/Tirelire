@@ -1,6 +1,12 @@
 /**
  * Jeu de données d'exemple : celui de l'analyse (§2 et §4), daté du 6 septembre 2026.
- * Sert aux tests et au bouton « charger l'exemple » de l'interface.
+ * Sert aux tests, au bouton « charger l'exemple » de l'interface, et aux propositions de
+ * l'assistant, qui n'ont pas d'autre source (D43).
+ *
+ * Il porte aussi des **changements datés** (D51) : une révision déjà appliquée, deux à venir, un
+ * besoin qui apparaît et une charge qui s'arrête. Tous sont placés hors de la période en cours,
+ * si bien que le plan du 6 septembre est celui de l'analyse, inchangé ; c'est en avançant de
+ * période en période qu'on les voit prendre effet.
  */
 import type { Ledger } from './model.js';
 import { emptyLedger } from './model.js';
@@ -51,12 +57,51 @@ export function exampleLedger(): Ledger {
     { id: 'need-tf', tirelireId: 'env-tf', kind: 'dueDate', amount: euros(1200), periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' }, priority: 10 },
     { id: 'need-auto', tirelireId: 'env-auto', kind: 'dueDate', amount: euros(600), periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2027-03-05' }, priority: 10 },
     { id: 'need-vac', tirelireId: 'env-vac', kind: 'dueDate', amount: euros(2400), periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2027-07-01' }, priority: 10 },
-    { id: 'need-precaution', tirelireId: 'env-precaution', kind: 'goal', amount: euros(6000), monthlyAmount: euros(300), priority: 30 },
-    { id: 'need-alim', tirelireId: 'env-alim', kind: 'recurring', amount: euros(900), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
     { id: 'need-essence', tirelireId: 'env-essence', kind: 'recurring', amount: euros(200), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
-    { id: 'need-divers', tirelireId: 'env-divers', kind: 'recurring', amount: euros(250), periodicity: monthlyNeed('2026-08-28'), priority: 40 },
     { id: 'need-enfants', tirelireId: 'env-enfants', kind: 'recurring', amount: euros(200), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
     { id: 'need-sante', tirelireId: 'env-sante', kind: 'recurring', amount: euros(100), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
+  );
+
+  // ------------------------------------------------------------------------
+  // Budgets datés (D50, D51) : trois révisions et une apparition, placées de part et d'autre de la
+  // période en cours pour qu'on puisse les regarder venir depuis le plan. Les périodes commencent
+  // le 28 : septembre = 28/08 → 27/09, octobre = 28/09 → 27/10, novembre = 28/10 → 27/11,
+  // décembre = 28/11 → 27/12, janvier = 28/12 → 27/01. Rien de tout cela ne touche la période en
+  // cours : à la date de l'exemple, une seule version de chaque budget est en vigueur.
+  // ------------------------------------------------------------------------
+
+  // Révision déjà faite : « Divers et sorties » était à 300 € et a été ramené à 250 € au 28 août.
+  // La version close reste lisible dans l'écran Tirelires et ne dote plus rien.
+  l.needs.push(
+    { id: 'need-divers-avant', tirelireId: 'env-divers', kind: 'recurring', amount: euros(300), periodicity: monthlyNeed('2026-01-28'), priority: 40, activeTo: '2026-08-27' },
+    { id: 'need-divers', tirelireId: 'env-divers', kind: 'recurring', amount: euros(250), periodicity: monthlyNeed('2026-08-28'), priority: 40, activeFrom: '2026-08-28' },
+  );
+
+  // Révision à venir : l'alimentation passe de 900 à 950 € à partir de la période de novembre.
+  // Septembre et octobre restent dotés à 900 — c'est tout l'objet de D50.
+  l.needs.push(
+    { id: 'need-alim', tirelireId: 'env-alim', kind: 'recurring', amount: euros(900), periodicity: monthlyNeed('2026-08-28'), priority: 20, activeTo: '2026-10-27' },
+    { id: 'need-alim-apres', tirelireId: 'env-alim', kind: 'recurring', amount: euros(950), periodicity: monthlyNeed('2026-10-28'), priority: 20, activeFrom: '2026-10-28' },
+  );
+
+  // Besoin qui apparaît en cours d'année : un enfant commence le piano en novembre. Deuxième besoin
+  // sur une tirelire qui en portait un seul (D28), et ligne de plan qui n'existe pas avant.
+  l.needs.push({
+    id: 'need-piano',
+    tirelireId: 'env-enfants',
+    kind: 'recurring',
+    name: 'Cours de piano',
+    amount: euros(45),
+    periodicity: monthlyNeed('2026-10-28'),
+    priority: 20,
+    activeFrom: '2026-10-28',
+  });
+
+  // Le crédit immobilier se termine le 5 décembre (voir `flow-credit`) : l'épargne de précaution
+  // reprend la mensualité libérée à partir de janvier, avec une cible relevée.
+  l.needs.push(
+    { id: 'need-precaution', tirelireId: 'env-precaution', kind: 'goal', amount: euros(6000), monthlyAmount: euros(300), priority: 30, activeTo: '2026-12-27' },
+    { id: 'need-precaution-apres', tirelireId: 'env-precaution', kind: 'goal', amount: euros(12000), monthlyAmount: euros(800), priority: 30, activeFrom: '2026-12-28' },
   );
 
   l.categories.push(
@@ -86,6 +131,23 @@ export function exampleLedger(): Ledger {
       amountTolerance: { pct: 10 },
       labelPattern: 'VIR(EMENT)? .*SALAIRE',
       variable: true,
+      // Augmentation à la paie de novembre : le flux est clos et `flow-salaire-apres` prend la
+      // suite (D23). Les revenus de septembre et d'octobre gardent le montant qui était le leur.
+      activeTo: '2026-10-27',
+    },
+    {
+      id: 'flow-salaire-apres',
+      name: 'Salaire',
+      kind: 'income',
+      amount: euros(3550),
+      accountId: 'acc-principal',
+      categoryId: 'cat-salaire',
+      periodicity: monthly('2026-10-28'),
+      dateWindowDays: 3,
+      amountTolerance: { pct: 10 },
+      labelPattern: 'VIR(EMENT)? .*SALAIRE',
+      variable: true,
+      activeFrom: '2026-10-28',
     },
     {
       id: 'flow-loyer',
@@ -119,6 +181,9 @@ export function exampleLedger(): Ledger {
       periodicity: monthly('2026-09-05'),
       dateWindowDays: 3,
       labelPattern: 'ECHEANCE PRET',
+      // Dernière échéance le 5 décembre : à partir de janvier, 950 € cessent de partir. C'est le
+      // changement le plus spectaculaire du jeu d'exemple, et il ne demande qu'une date.
+      activeTo: '2026-12-05',
     },
     {
       id: 'flow-assur-hab',
