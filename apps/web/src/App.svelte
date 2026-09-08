@@ -13,6 +13,7 @@
   import Import from './views/Import.svelte';
   import More from './views/More.svelte';
   import Review from './views/Review.svelte';
+  import Wizard from './views/Wizard.svelte';
   import Sync from './views/Sync.svelte';
 
   const tabs: Array<{ id: View; label: string; ico: string; group: View[] }> = [
@@ -20,7 +21,7 @@
     { id: 'operations', label: 'Opérations', ico: '☰', group: ['operations'] },
     { id: 'import', label: 'Import', ico: '⇩', group: ['import'] },
     { id: 'review', label: 'Bilan', ico: '◔', group: ['review'] },
-    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'envelopes', 'categories', 'flows', 'entries', 'settings', 'sync'] },
+    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'envelopes', 'categories', 'flows', 'entries', 'settings', 'sync', 'wizard'] },
   ];
 
   // Geste « retour » Android : revient à l'écran précédent au lieu de quitter l'appli
@@ -64,6 +65,8 @@
     <Review />
   {:else if app.view === 'more'}
     <More />
+  {:else if app.view === 'wizard'}
+    <Wizard />
   {:else if app.view === 'accounts'}
     <Accounts />
   {:else if app.view === 'envelopes'}

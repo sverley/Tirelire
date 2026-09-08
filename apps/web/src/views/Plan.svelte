@@ -41,9 +41,10 @@
 {#if !hasData}
   <div class="card accent">
     <h2 style="margin-top:0">Bienvenue dans Tirelire</h2>
-    <p>Commence par créer ton compte pivot, tes enveloppes et tes flux prévus — ou charge l'exemple de l'analyse pour voir le plan tout de suite.</p>
+    <p>L'assistant de configuration t'accompagne pour créer ton compte pivot, tes enveloppes et tes flux prévus — ou charge l'exemple de l'analyse pour voir le plan tout de suite.</p>
     <div class="actions">
-      <button class="btn primary" onclick={() => app.loadExample()}>Charger l'exemple</button>
+      <button class="btn primary" onclick={() => app.go('wizard')}>Assistant de configuration</button>
+      <button class="btn" onclick={() => app.loadExample()}>Charger l'exemple</button>
       <button class="btn" onclick={() => app.go('accounts')}>Créer mes comptes</button>
       <button class="btn" onclick={() => app.go('settings')}>Importer une sauvegarde</button>
     </div>

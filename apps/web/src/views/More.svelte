@@ -12,6 +12,18 @@
 </script>
 
 <h1>Configuration</h1>
+
+<div class="card accent">
+  <div class="row">
+    <div class="label">
+      <strong>Assistant de configuration</strong>
+      <span class="sub">Construire pas à pas : pivot, enveloppes, objectifs d'épargne, revenus, charges</span>
+    </div>
+    <button class="btn primary" onclick={() => app.go('wizard')}>Lancer</button>
+  </div>
+</div>
+
+<p class="muted small">Ou modifie directement une partie :</p>
 <div class="card" style="padding:0">
   {#each items as it (it.id)}
     <button class="row" style="width:100%;border:0;background:none;text-align:left;cursor:pointer;color:inherit;font:inherit;padding:12px 16px" onclick={() => app.go(it.id)}>
