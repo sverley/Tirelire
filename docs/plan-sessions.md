@@ -108,12 +108,17 @@ l'écart de passer inaperçu jusqu'à l'installation sur le téléphone.
 
 ---
 
-## Lot 10 · Onboarding guidé
+## Lot 10 · Onboarding guidé — **fait le 8 septembre (D40)**
 
-Créer pivot, enveloppes, besoins et flux à partir d'un premier import, en s'appuyant sur
-l'inférence de filtre (D26) pour proposer des règles à partir des opérations récurrentes
-détectées. La branche `feature/assistant-configuration` est **obsolète** (elle crée des enveloppes
-typées) : la refaire sur le modèle actuel plutôt que la rebaser.
+Livré : l'assistant construit un budget à partir de questions simples (revenus et jour de paie,
+charges fixes, budgets courants, dépenses non mensuelles, épargne), en déduit enveloppes, besoins et
+flux, et n'impose aucun compte — le compte principal est créé en silence, les autres sont proposés en
+fin de parcours avec le placement des réserves. La branche `feature/assistant-configuration` est
+abandonnée (elle créait des enveloppes typées) ; l'assistant a été refait sur le modèle actuel.
+
+Reste à faire sur ce chantier : partir d'un **premier import** plutôt que d'une page blanche —
+proposer charges fixes et budgets à partir des opérations récurrentes détectées, en s'appuyant sur
+l'inférence de sélection (D26).
 
 ---
 

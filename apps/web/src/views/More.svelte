@@ -16,8 +16,8 @@
 <div class="card accent">
   <div class="row">
     <div class="label">
-      <strong>Assistant de configuration</strong>
-      <span class="sub">Construire pas à pas : pivot, enveloppes, objectifs d'épargne, revenus, charges</span>
+      <strong>Construire mon budget</strong>
+      <span class="sub">Quelques questions simples, et Tirelire en déduit vos enveloppes et vos flux</span>
     </div>
     <button class="btn primary" onclick={() => app.go('wizard')}>Lancer</button>
   </div>

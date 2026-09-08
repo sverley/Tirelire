@@ -371,3 +371,33 @@ d'automatisme, mais un seul écran. On cherche avec les champs d'une sélection,
 actions à appliquer à ce que la recherche retourne, on applique tout de suite si on veut, et
 « Enregistrer » transforme le couple recherche + actions en automatisme. Créer un automatisme
 n'est donc jamais un geste à part : c'est garder une recherche qu'on vient de faire.
+
+## D40 · 2026-09-08 · L'assistant construit un budget, il ne configure pas des objets
+
+Le premier assistant reprenait les écrans de configuration étape par étape : créer un compte, puis
+une enveloppe, puis un besoin. Il demandait donc de connaître le modèle avant de pouvoir s'en
+servir — exactement ce qu'un nouvel arrivant ne sait pas.
+
+L'assistant pose désormais des questions de budget, et en déduit les objets. « Qu'est-ce qui rentre,
+et quand ? » écrit le jour de paie et des flux de revenu ; « qu'est-ce qui part tout seul au même
+montant ? » écrit des charges fixes ; « sur quoi voulez-vous vous tenir à un montant ? » écrit une
+enveloppe et un besoin récurrent ; « qu'est-ce qui ne tombe pas tous les mois ? » — le cœur du
+sujet — écrit une enveloppe, un besoin à échéance et le flux attendu à la date, en montrant tout de
+suite le montant à mettre de côté par période. Les mots « enveloppe », « besoin » et « flux » ne
+sont jamais demandés à l'utilisateur, seulement expliqués.
+
+Le **compte principal est créé en silence** à la première réponse : il existe toujours, le faire
+saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
+un budget entier tient sans eux (une enveloppe sans placement déclaré ne produit aucun écart, D38).
+S'ils existent, l'assistant demande seulement où chaque réserve devrait dormir, ce qui remplit le
+placement de D38 sans exposer les parts.
+
+L'assistant ne remplace pas les écrans de configuration : il amène à un budget qui se lit dans le
+plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (besoins multiples
+sur une enveloppe, priorités, ventilations, catégories).
+
+Deux ancrages sont imposés par le moteur et figés par `test/assistant.test.ts` : une enveloppe est
+ouverte au **début de la période en cours** (`envelopeTimeline` ne démarre qu'à la première période
+entièrement postérieure à l'ouverture) et un flux est ancré sur sa **dernière occurrence déjà
+passée** (`nextOccurrence` ne remonte jamais avant l'ancrage). Sans cela, un budget tout juste saisi
+s'affiche vide, ce qui était le cas de la première version.
