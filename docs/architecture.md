@@ -10,7 +10,7 @@ Tirelire/
 │   ├── src/periods.ts      périodes de paie, périodicités
 │   ├── src/money.ts        centimes : parsing et formatage français
 │   ├── src/ids.ts          uuidv7, normalizeLabel, operationKey
-│   ├── src/balances.ts     positions reconstruites (composantes par compte, besoins, dotations, non affecté, solde à régler)
+│   ├── src/balances.ts     positions reconstruites (composantes par compte, besoins, dotations, position simulée d'une période à venir, non affecté, solde à régler)
 │   ├── src/plan.ts         plan de période : croisière / rattrapage, priorités, virements
 │   ├── src/csv.ts          décodage et parseur CSV
 │   ├── src/importer.ts     profils d'import, lecture des lignes, clés, doublons
@@ -66,13 +66,18 @@ Montants en centimes entiers signés (négatif = débit). Dates `AAAA-MM-JJ`. Su
 
 ## Calcul du plan (`computePlan`)
 
+0. Deux dates (D52) : `asOf`, la période regardée, et `today`, jusqu'où les soldes sont connus.
+   Au-delà de `today`, le plan cesse de lire le réel et suppose exécutés les virements qu'il a
+   proposés pour les périodes précédentes.
 1. Période contenant `asOf` ; revenus et charges fixes = occurrences des flux dans la période.
 2. Par besoin (D28) : part du solde de la tirelire qui lui revient (ordre des priorités), croisière,
    rattrapage, dotation = max, plancher = rattrapage d'une échéance.
 3. Lecture du financement (D06) : planchers par priorité, puis dotations, dans la limite de
    revenus − charges fixes. Une dotation reste acquise même non couverte ; le plan le dit.
 4. Écarts de placement (D20) : composantes hors du compte de placement, marquées « à faire »
-   au-dessus du seuil, « à surveiller » en dessous.
+   au-dessus du seuil, « à surveiller » en dessous. Sur une période à venir, la position est celle
+   que le plan simule (`plannedComponents`, D52), sans quoi il redemanderait à chaque période ce
+   qu'il a déjà demandé aux précédentes.
 5. Virements : un par couple de comptes (D21), détaillé par tirelire, plus règlements des tiers
    et surplus des comptes d'accueil.
 6. Marge = revenus − charges fixes − financé ; avertissements (coussin, réductions, règlements bloqués).
@@ -106,7 +111,7 @@ WebRTC, relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/heberg
 
 ## Vérification
 
-- `pnpm test` : 102 tests vitest sur le cœur (périodes, plan, positions et invariants, besoins,
+- `pnpm test` : 152 tests vitest sur le cœur (périodes, plan, positions et invariants, besoins,
   report, dépôt, migrations, fusion, import, rapprochement, règles, ventilation à parts, bilan, sync).
 - `pnpm typecheck`, `pnpm build`.
 - Scénarios navigateur joués avec Playwright pendant le développement (exemple → import CSV → tri → bilan ; synchronisation WebRTC et relais entre deux contextes).

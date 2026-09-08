@@ -124,6 +124,10 @@ export interface PlanWarning {
 export interface Plan {
   period: Period;
   asOf: ISODate;
+  /** Date jusqu'à laquelle les soldes bancaires sont connus (D52). */
+  today: ISODate;
+  /** Vrai quand la période affichée commence après `today` : les positions sont simulées (D52). */
+  simulated: boolean;
   incomes: PlanFlowLine[];
   fixedCharges: PlanFlowLine[];
   lines: PlanLine[];
@@ -150,13 +154,23 @@ const KIND_ORDER: Record<NeedKind, number> = { payout: -1, dueDate: 0, recurring
 
 /**
  * Calcule le plan de la période contenant `asOf`, avec les positions à `asOf`.
+ *
+ * `today` est la date jusqu'à laquelle les soldes bancaires sont connus (D52) ; par défaut `asOf`,
+ * c'est-à-dire « tout est connu jusqu'à la date de calcul ». En regardant une période à venir,
+ * l'interface passe la date du jour : au-delà, le plan cesse de lire le réel et suppose exécutés
+ * les virements qu'il a proposés pour les périodes précédentes, sans quoi il redemanderait à
+ * chaque période tout ce qu'il a déjà demandé aux précédentes.
  */
-export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
+export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf): Plan {
   const idx = indexLedger(ledger);
   const warnings: PlanWarning[] = [];
   const principal = idx.principal;
   const startDay = idx.startDay;
   const period = budgetPeriodContaining(asOf, startDay);
+  const simulated = period.start > today;
+  // Au-delà d'aujourd'hui, aucun relevé ne dit ce que les comptes portent : ce qui se lit sur le
+  // réel (non affecté, soldes à régler) se lit à la dernière date connue, pas à une date inventée.
+  const known = simulated ? today : asOf;
   if (!principal) warnings.push({ code: 'noPrincipal', message: 'Aucun compte principal défini.' });
 
   const flows = alive(ledger.plannedFlows).filter((f) => isActive(f, period));
@@ -254,7 +268,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   const gaps: PlacementGap[] = [];
   for (const e of idx.tireliresById.values()) {
     // Un excédent sur un compte doit rejoindre un compte où il manque (D38) : on apparie les deux.
-    const excess = placementGaps(e, idx, asOf).filter((g) => !idx.accountsById.get(g.accountId)?.tracksSettlement);
+    const excess = placementGaps(e, idx, asOf, today).filter((g) => !idx.accountsById.get(g.accountId)?.tracksSettlement);
     const surplus = excess.filter((g) => g.amount > 0).sort((a, b) => b.amount - a.amount);
     const missing = excess.filter((g) => g.amount < 0).sort((a, b) => a.amount - b.amount);
     let mi = 0;
@@ -304,7 +318,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
     let settlement = 0;
     let surplus = 0;
     if (a.tracksSettlement) {
-      const owes = settlementBalance(a, ledger, idx, asOf);
+      const owes = settlementBalance(a, ledger, idx, known);
       const thr = a.settlementThreshold ?? 0;
       const dir = a.settlementDirection ?? 'both';
       if (Math.abs(owes) > thr) {
@@ -318,7 +332,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
           });
       }
     } else if (a.kind === 'epargne') {
-      surplus = unallocated(a, ledger, idx, asOf);
+      surplus = unallocated(a, ledger, idx, known);
     }
     const net = standing + exceptional + settlement - surplus;
     if (orders.length === 0 && settlement === 0 && surplus === 0) continue;
@@ -337,8 +351,8 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   }
   transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
 
-  const principalUnallocated = principal ? unallocated(principal, ledger, idx, asOf) : 0;
-  if (principal && principalUnallocated < 0)
+  const principalUnallocated = principal ? unallocated(principal, ledger, idx, known) : 0;
+  if (principal && principalUnallocated < 0 && !simulated)
     warnings.push({
       code: 'principalOverdrawn',
       message: 'Les dotations dépassent ce que le compte principal contient : le non affecté est négatif.',
@@ -348,6 +362,8 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   return {
     period,
     asOf,
+    today: known,
+    simulated,
     incomes,
     fixedCharges,
     lines,
