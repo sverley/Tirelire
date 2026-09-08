@@ -45,9 +45,10 @@ qu'avec le serveur intégré de PHP.
 
 ## Mises à jour et dépôt automatique
 
-À chaque push sur `main`, la CI assemble le site, joint `tirelire-hebergement.zip` à la release
-`latest`, puis le **dépose par FTP** si les secrets sont renseignés. Sans secrets, le job le dit
-dans son résumé et ne fait rien d'autre : l'archive reste téléchargeable.
+À chaque push sur `main`, la CI assemble le site, le **dépose par FTP** si les secrets sont
+renseignés, et joint `tirelire-hebergement.zip` à la release `latest` (par le job de publication,
+qui attend aussi l'APK). Sans secrets, le job de dépôt le dit dans son résumé et ne fait rien
+d'autre : l'archive reste téléchargeable.
 
 ### Secrets à créer (Paramètres du dépôt → Secrets and variables → Actions → *Secrets*)
 
