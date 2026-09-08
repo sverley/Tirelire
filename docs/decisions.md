@@ -766,3 +766,32 @@ que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parco
 `LEDGER_KEYS`, et un test garde cette liste alignée sur le grand livre. Ajouter une table au modèle
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.
+
+## D52 · 2026-09-08 · Une échéance montre sa provision, et l'exemple garde ses besoins
+
+Reprise du signalement « le jeu d'exemple ne contient aucun besoin » (8 septembre). Le défaut
+principal n'existe plus : depuis D50 et D51, `example.ts` porte treize besoins, chacune des neuf
+tirelires en a au moins un, et le plan de la période en cours demande 2 350 € pour 630 € de marge.
+Rien n'était à corriger de ce côté. Restaient les deux points que le même signalement soulevait
+en second, et qui tenaient toujours.
+
+**La garde manquait.** Aucun test ne disait que l'exemple doit *démontrer* l'application ; ceux qui
+existent vérifient le moteur, ligne par ligne et chiffre par chiffre, et passeraient tous si les
+besoins disparaissaient à nouveau. `test/exemple-complet.test.ts` fige donc les propriétés que
+l'exemple doit garder quoi qu'on retouche à ses montants : une tirelire ne reste pas muette, le plan
+de la période en cours a des lignes et un total réservé non nul, les trois genres de besoin sont
+représentés dont deux échéances, aucune tirelire en déficit n'est laissée sans rattrapage, et la
+marge reste inférieure au demandé — au-delà, l'ordre de financement de D06 ne se voit plus.
+
+**Le rattachement ne se voyait pas.** Une échéance a deux faces : le besoin qui la provisionne, sur
+une tirelire, et le flux qui la paie le jour venu, sur un compte. Le modèle les relie depuis
+toujours (`PlannedFlow.tirelireId`), mais l'écran Flux taisait la tirelire et l'écran Tirelires
+ignorait le flux, si bien qu'une échéance sans provision se lisait comme une échéance provisionnée.
+`needForDueDateFlow` et `dueDateFlowForNeed` font les deux lectures dans le cœur — par la tirelire,
+sans identifiant supplémentaire, en retenant la version en vigueur à la date lue puisqu'une tirelire
+porte plusieurs besoins (D28) et plusieurs versions du même (D50). Les deux écrans les affichent, et
+disent aussi le manque : « aucune tirelire ne la provisionne », « aucun flux ne paie cette
+échéance ».
+
+Au passage, trois restes du renommage de D42 (« l'tirelire ») dans deux libellés d'interface et un
+titre de test.

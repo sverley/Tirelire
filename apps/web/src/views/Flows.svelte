@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
-  import { alive, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
+  import { alive, needForDueDateFlow, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
   let form = $state({
@@ -35,6 +35,20 @@
       .map((k) => ({ kind: k, flows: flows.filter((f) => f.kind === k).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)) }))
       .filter((g) => g.flows.length > 0),
   );
+
+  /**
+   * Une échéance est payée le jour venu par ce flux, mais provisionnée d'avance par une tirelire.
+   * La liste le dit maintenant, et signale les deux cas où la provision manque : pas de tirelire
+   * désignée, ou une tirelire qui ne porte aucun besoin d'échéance.
+   */
+  function provisionText(f: PlannedFlow): string {
+    if (f.kind !== 'dueDate') return '';
+    const nom = tirelires.find((e) => e.id === f.tirelireId)?.name;
+    if (!nom) return '⚠ aucune tirelire ne la provisionne';
+    return needForDueDateFlow(f, app.ledger.needs, app.asOf)
+      ? `provisionnée par « ${nom} »`
+      : `⚠ « ${nom} » ne porte aucun besoin d’échéance`;
+  }
 
   function startNew() {
     const principal = accounts.find((a) => a.kind === 'principal');
@@ -75,7 +89,7 @@
     const abs = inputToCents(form.amount);
     if (abs === undefined || abs < 0) return void (error = 'Montant invalide (saisis-le en positif, le sens dépend du type).');
     if (!form.accountId) return void (error = 'Choisis le compte.');
-    if (form.kind === 'dueDate' && !form.tirelireId) return void (error = 'Choisis l’tirelire qui paie l’échéance.');
+    if (form.kind === 'dueDate' && !form.tirelireId) return void (error = 'Choisis la tirelire qui paie l’échéance.');
     if (form.kind === 'transfer' && !form.counterpartAccountId) return void (error = 'Choisis le compte de contrepartie.');
     if (form.labelPattern.trim()) {
       try {
@@ -195,11 +209,13 @@
     {#each g.flows as f (f.id)}
       {@const badge = validityBadge(f, app.asOf)}
       {@const validite = validityLabel(f)}
+      {@const provision = provisionText(f)}
       <div class="row {badge ? 'dormant' : ''}">
         <div class="label">
           <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · automatisme' : ''}
           {#if badge}<span class="pill dim">{badge}</span>{/if}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}{validite ? ` · ${validite}` : ''}</span>
+          {#if provision}<span class="sub">{provision}</span>{/if}
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>
         <div>

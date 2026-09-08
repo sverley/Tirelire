@@ -208,6 +208,31 @@ export function needName(n: Need, e: Tirelire | undefined): string {
   return n.name ?? e?.name ?? '';
 }
 
+/**
+ * Une échéance a deux faces : le **besoin** qui la provisionne, porté par une tirelire, et le
+ * **flux** qui la paiera le jour venu, porté par un compte. Le lien existe déjà dans le modèle —
+ * un flux d'échéance désigne sa tirelire (`PlannedFlow.tirelireId`) — mais rien ne le rendait
+ * lisible : l'écran Flux taisait la tirelire, l'écran Tirelires ignorait le flux, et une échéance
+ * sans provision se lisait comme une échéance provisionnée.
+ *
+ * Le rattachement passe par la tirelire, jamais par un identifiant de plus : une tirelire porte
+ * plusieurs besoins (D28) et plusieurs versions datées du même (D50). On retient donc, parmi les
+ * besoins d'échéance de la tirelire, celui qui est en vigueur à la date lue ; à défaut le premier,
+ * pour que l'interface montre quelque chose plutôt que rien.
+ */
+export function needForDueDateFlow(flow: PlannedFlow, needs: Need[], date: ISODate): Need | undefined {
+  if (flow.kind !== 'dueDate' || !flow.tirelireId) return undefined;
+  const candidats = alive(needs).filter((n) => n.tirelireId === flow.tirelireId && n.kind === 'dueDate');
+  return candidats.find((n) => activeAt(n, date)) ?? candidats[0];
+}
+
+/** L'autre sens : le flux qui paiera ce besoin d'échéance, s'il en existe un. */
+export function dueDateFlowForNeed(need: Need, flows: PlannedFlow[], date: ISODate): PlannedFlow | undefined {
+  if (need.kind !== 'dueDate') return undefined;
+  const candidats = alive(flows).filter((f) => f.kind === 'dueDate' && f.tirelireId === need.tirelireId);
+  return candidats.find((f) => activeAt(f, date)) ?? candidats[0];
+}
+
 // ---------------------------------------------------------------------------
 // Catégories
 // ---------------------------------------------------------------------------
