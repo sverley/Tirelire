@@ -25,6 +25,7 @@ Cloud Web et les VPS) ; le relais est donc réécrit en PHP, sans dépendance.
 | `relais.test.mjs` | vérifie le relais PHP avec le serveur intégré de PHP (sauté si `php` est absent) |
 | `deposer.sh` | dépôt du site par FTPS ou SFTP (`lftp`), utilisé par la CI et à la main |
 | `deposer.test.mjs` | vérifie le dépôt contre un vrai serveur FTP local (sauté si `lftp` ou `pyftpdlib` manquent) |
+| `verifier.sh` | vérifie un site en ligne (accueil, relais, protections) et publie son diagnostic |
 
 ## Installer
 
@@ -88,9 +89,17 @@ pointerait vers des ressources pas encore montées. Sont **toujours** exclus, à
 nettoyage : `donnees/*.jsonl` (les paquets de synchronisation des appareils) et
 `relais.config.php` (la configuration locale du relais).
 
-Si `TIRELIRE_SITE_URL` est renseignée, la CI vérifie ensuite en ligne : la page d'accueil
-répond, `/r/<salon>` répond `200` (donc la réécriture `.htaccess` fonctionne), un salon invalide
-est refusé (`400`) et le dossier `donnees/` n'est pas servi.
+La CI vérifie ensuite le site en ligne avec `apps/hebergement/verifier.sh` : la page d'accueil
+répond et parle bien de Tirelire, `/r/<salon>` répond `200` en JSON (donc la réécriture
+`.htaccess` fonctionne et PHP s'exécute), un salon invalide est refusé (`400`), le dossier
+`donnees/` n'est pas servi, et `http://` redirige vers `https://`. Toutes les vérifications sont
+jouées, jamais interrompues à la première : en cas d'échec, le diagnostic complet (codes HTTP,
+types de contenu, début des réponses) est publié en commentaire du commit, lisible depuis un
+téléphone. Le même script se lance à la main :
+
+```sh
+ADRESSE_SITE=https://tirelire.sim-dev.eu bash apps/hebergement/verifier.sh
+```
 
 L'entrée manuelle du workflow (onglet Actions → *Lancer le workflow*) propose `essai-a-blanc`,
 qui liste ce qui serait transféré sans rien envoyer, et `ignorer`, qui saute le dépôt.

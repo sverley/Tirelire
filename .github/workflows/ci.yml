@@ -165,21 +165,28 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -f body="$(cat "$RUNNER_TEMP/commentaire.md")" > /dev/null
 
       - name: Vérifier le site en ligne
+        id: verification
         if: steps.pret.outputs.pret == 'oui' && inputs.deploiement != 'essai-a-blanc' && env.ADRESSE_SITE != ''
         run: |
-          base="${ADRESSE_SITE%/}"
-          echo "Page d'accueil…"
-          curl -fsS --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/index.html" "$base/"
-          grep -qi 'tirelire' "$RUNNER_TEMP/index.html"
-          echo "Relais (réécriture .htaccess)…"
-          code=$(curl -s -o "$RUNNER_TEMP/relais.json" -w '%{http_code}' "$base/r/verification-ci-0000?site=ci&after=0")
-          [ "$code" = "200" ] || { echo "Le relais répond $code"; cat "$RUNNER_TEMP/relais.json"; exit 1; }
-          grep -q '"records"' "$RUNNER_TEMP/relais.json"
-          echo "Salon invalide refusé…"
-          [ "$(curl -s -o /dev/null -w '%{http_code}' "$base/r/x")" = "400" ]
-          echo "Données non servies…"
-          [ "$(curl -s -o /dev/null -w '%{http_code}' "$base/donnees/")" != "200" ]
-          echo "Tout est en place."
+          set -o pipefail
+          bash apps/hebergement/verifier.sh 2>&1 | tee "$RUNNER_TEMP/verification.log"
+
+      - name: En cas d'échec, publier le diagnostic en commentaire du commit
+        if: failure() && steps.verification.conclusion == 'failure'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # L'adresse du site n'est pas un secret : le diagnostic se lit tel quel, y compris
+          # depuis un téléphone, dans les commentaires du commit.
+          {
+            echo "Le site a été déposé, mais ne répond pas comme attendu (run $GITHUB_RUN_NUMBER) :"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/verification.log"
+            echo '```'
+          } > "$RUNNER_TEMP/diagnostic.md"
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -f body=@"$RUNNER_TEMP/diagnostic.md"
 
       - name: Résumé
         if: steps.pret.outputs.pret == 'oui'
