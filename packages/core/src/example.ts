@@ -7,10 +7,10 @@ import { emptyLedger } from './model.js';
 import { euros } from './money.js';
 
 export function exampleLedger(): Ledger {
-  const l = emptyLedger({ pivotCushion: euros(600) });
+  const l = emptyLedger({ principalCushion: euros(600) });
 
   l.accounts.push(
-    { id: 'acc-pivot', name: 'Compte courant', kind: 'pivot', openingBalance: euros(2340), openingDate: '2026-08-27', payDay: 28 },
+    { id: 'acc-principal', name: 'Compte courant', kind: 'principal', openingBalance: euros(2340), openingDate: '2026-08-27', payDay: 28 },
     { id: 'acc-livret', name: 'Livret A', kind: 'holding', openingBalance: euros(4815), openingDate: '2026-08-27' },
     {
       id: 'acc-enfants',
@@ -32,38 +32,38 @@ export function exampleLedger(): Ledger {
     },
   );
 
-  l.envelopes.push(
+  l.tirelires.push(
     { id: 'env-tf', name: 'Taxe foncière', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(900), openingDate: '2026-08-27' },
     { id: 'env-auto', name: 'Assurance auto', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(300), openingDate: '2026-08-27' },
     { id: 'env-vac', name: 'Vacances', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(400), openingDate: '2026-08-27' },
     { id: 'env-precaution', name: 'Épargne de précaution', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(3200), openingDate: '2026-08-27' },
-    { id: 'env-alim', name: 'Alimentation', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
-    { id: 'env-essence', name: 'Essence', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
-    { id: 'env-divers', name: 'Divers et sorties', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-alim', name: 'Alimentation', placement: [{ accountId: 'acc-principal', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-essence', name: 'Essence', placement: [{ accountId: 'acc-principal', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-divers', name: 'Divers et sorties', placement: [{ accountId: 'acc-principal', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
     { id: 'env-enfants', name: 'Enfants et loisirs', placement: [{ accountId: 'acc-enfants', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'unlimited' } },
-    { id: 'env-sante', name: 'Santé', placement: [{ accountId: 'acc-pivot', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
+    { id: 'env-sante', name: 'Santé', placement: [{ accountId: 'acc-principal', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28', rollover: { mode: 'none' } },
   );
 
   const monthlyNeed = (anchor: string) => ({ intervalMonths: 1, anchorDate: anchor });
   l.needs.push(
-    { id: 'need-tf', envelopeId: 'env-tf', kind: 'dueDate', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
-    { id: 'need-auto', envelopeId: 'env-auto', kind: 'dueDate', amount: euros(600), periodicity: { intervalMonths: 12, anchorDate: '2027-03-05' }, priority: 10 },
-    { id: 'need-vac', envelopeId: 'env-vac', kind: 'dueDate', amount: euros(2400), periodicity: { intervalMonths: 12, anchorDate: '2027-07-01' }, priority: 10 },
-    { id: 'need-precaution', envelopeId: 'env-precaution', kind: 'goal', amount: euros(6000), monthlyAmount: euros(300), priority: 30 },
-    { id: 'need-alim', envelopeId: 'env-alim', kind: 'recurring', amount: euros(900), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
-    { id: 'need-essence', envelopeId: 'env-essence', kind: 'recurring', amount: euros(200), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
-    { id: 'need-divers', envelopeId: 'env-divers', kind: 'recurring', amount: euros(250), periodicity: monthlyNeed('2026-08-28'), priority: 40 },
-    { id: 'need-enfants', envelopeId: 'env-enfants', kind: 'recurring', amount: euros(200), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
-    { id: 'need-sante', envelopeId: 'env-sante', kind: 'recurring', amount: euros(100), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
+    { id: 'need-tf', tirelireId: 'env-tf', kind: 'dueDate', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
+    { id: 'need-auto', tirelireId: 'env-auto', kind: 'dueDate', amount: euros(600), periodicity: { intervalMonths: 12, anchorDate: '2027-03-05' }, priority: 10 },
+    { id: 'need-vac', tirelireId: 'env-vac', kind: 'dueDate', amount: euros(2400), periodicity: { intervalMonths: 12, anchorDate: '2027-07-01' }, priority: 10 },
+    { id: 'need-precaution', tirelireId: 'env-precaution', kind: 'goal', amount: euros(6000), monthlyAmount: euros(300), priority: 30 },
+    { id: 'need-alim', tirelireId: 'env-alim', kind: 'recurring', amount: euros(900), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
+    { id: 'need-essence', tirelireId: 'env-essence', kind: 'recurring', amount: euros(200), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
+    { id: 'need-divers', tirelireId: 'env-divers', kind: 'recurring', amount: euros(250), periodicity: monthlyNeed('2026-08-28'), priority: 40 },
+    { id: 'need-enfants', tirelireId: 'env-enfants', kind: 'recurring', amount: euros(200), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
+    { id: 'need-sante', tirelireId: 'env-sante', kind: 'recurring', amount: euros(100), periodicity: monthlyNeed('2026-08-28'), priority: 20 },
   );
 
   l.categories.push(
     { id: 'cat-salaire', name: 'Salaire', nature: 'income' },
     { id: 'cat-loyer', name: 'Loyer perçu', nature: 'income' },
     { id: 'cat-alloc', name: 'Allocations', nature: 'income' },
-    { id: 'cat-alim', name: 'Alimentation', nature: 'expense', envelopeId: 'env-alim' },
-    { id: 'cat-sante', name: 'Santé', nature: 'expense', envelopeId: 'env-sante' },
-    { id: 'cat-enfants', name: 'Enfants', nature: 'expense', envelopeId: 'env-enfants' },
+    { id: 'cat-alim', name: 'Alimentation', nature: 'expense', tirelireId: 'env-alim' },
+    { id: 'cat-sante', name: 'Santé', nature: 'expense', tirelireId: 'env-sante' },
+    { id: 'cat-enfants', name: 'Enfants', nature: 'expense', tirelireId: 'env-enfants' },
     { id: 'cat-logement', name: 'Logement', nature: 'expense' },
     { id: 'cat-assurance', name: 'Assurances', nature: 'expense' },
     { id: 'cat-abos', name: 'Abonnements', nature: 'expense' },
@@ -77,7 +77,7 @@ export function exampleLedger(): Ledger {
       name: 'Salaire',
       kind: 'income',
       amount: euros(3400),
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       categoryId: 'cat-salaire',
       periodicity: monthly('2026-08-28'),
       dateWindowDays: 3,
@@ -90,7 +90,7 @@ export function exampleLedger(): Ledger {
       name: 'Loyer locatif',
       kind: 'income',
       amount: euros(700),
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       categoryId: 'cat-loyer',
       periodicity: monthly('2026-09-05'),
       dateWindowDays: 5,
@@ -101,7 +101,7 @@ export function exampleLedger(): Ledger {
       name: 'Allocations',
       kind: 'income',
       amount: euros(100),
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       categoryId: 'cat-alloc',
       periodicity: monthly('2026-09-05'),
       dateWindowDays: 5,
@@ -112,7 +112,7 @@ export function exampleLedger(): Ledger {
       name: 'Crédit immobilier',
       kind: 'fixedCharge',
       amount: euros(-950),
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       categoryId: 'cat-logement',
       periodicity: monthly('2026-09-05'),
       dateWindowDays: 3,
@@ -123,7 +123,7 @@ export function exampleLedger(): Ledger {
       name: 'Assurance habitation',
       kind: 'fixedCharge',
       amount: euros(-45),
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       categoryId: 'cat-assurance',
       periodicity: monthly('2026-09-10'),
       dateWindowDays: 3,
@@ -133,7 +133,7 @@ export function exampleLedger(): Ledger {
       name: 'Internet et mobiles',
       kind: 'fixedCharge',
       amount: euros(-75),
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       categoryId: 'cat-abos',
       periodicity: monthly('2026-09-12'),
       dateWindowDays: 3,
@@ -143,7 +143,7 @@ export function exampleLedger(): Ledger {
       name: 'Électricité',
       kind: 'fixedCharge',
       amount: euros(-150),
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       categoryId: 'cat-logement',
       periodicity: monthly('2026-09-15'),
       dateWindowDays: 4,
@@ -155,19 +155,19 @@ export function exampleLedger(): Ledger {
       name: 'Taxe foncière (prélèvement)',
       kind: 'dueDate',
       amount: euros(-1200),
-      accountId: 'acc-pivot',
-      envelopeId: 'env-tf',
+      accountId: 'acc-principal',
+      tirelireId: 'env-tf',
       periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' },
       dateWindowDays: 5,
       labelPattern: 'DGFIP|TAXE FONC',
     },
   );
 
-  // Le salaire d'août est arrivé sur le pivot ; puis les opérations manuelles des comptes tiers (§10).
+  // Le salaire d'août est arrivé sur le compte principal ; puis les opérations manuelles des comptes tiers (§10).
   l.operations.push(
     {
       id: 'op-salaire-08',
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       origin: 'manual',
       date: '2026-08-28',
       label: 'VIR SALAIRE AOUT',
@@ -198,7 +198,7 @@ export function exampleLedger(): Ledger {
     },
     {
       id: 'op-vir-enfants',
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       origin: 'manual',
       date: '2026-08-28',
       label: 'VIR PERM TIRELIRE CARTE ENFANTS',
@@ -230,11 +230,11 @@ export function exampleLedger(): Ledger {
   );
   l.allocations.push(
     { id: 'al-salaire-08', operationId: 'op-salaire-08', categoryId: 'cat-salaire', share: { kind: 'fixed', amount: euros(3400) } },
-    { id: 'al-dentiste', operationId: 'op-dentiste', categoryId: 'cat-sante', envelopeId: 'env-sante', share: { kind: 'fixed', amount: euros(-80) } },
+    { id: 'al-dentiste', operationId: 'op-dentiste', categoryId: 'cat-sante', tirelireId: 'env-sante', share: { kind: 'fixed', amount: euros(-80) } },
     { id: 'al-caf-marie', operationId: 'op-caf-marie', categoryId: 'cat-alloc', share: { kind: 'fixed', amount: euros(100) } },
-    { id: 'al-vir-enfants', operationId: 'op-vir-enfants', categoryId: 'cat-transfert', envelopeId: 'env-enfants', share: { kind: 'fixed', amount: euros(-200) } },
-    { id: 'al-enfants-1', operationId: 'op-enfants-1', categoryId: 'cat-enfants', envelopeId: 'env-enfants', share: { kind: 'fixed', amount: euros(-146) } },
-    { id: 'al-enfants-2', operationId: 'op-enfants-2', categoryId: 'cat-enfants', envelopeId: 'env-enfants', share: { kind: 'fixed', amount: euros(-90) } },
+    { id: 'al-vir-enfants', operationId: 'op-vir-enfants', categoryId: 'cat-transfert', tirelireId: 'env-enfants', share: { kind: 'fixed', amount: euros(-200) } },
+    { id: 'al-enfants-1', operationId: 'op-enfants-1', categoryId: 'cat-enfants', tirelireId: 'env-enfants', share: { kind: 'fixed', amount: euros(-146) } },
+    { id: 'al-enfants-2', operationId: 'op-enfants-2', categoryId: 'cat-enfants', tirelireId: 'env-enfants', share: { kind: 'fixed', amount: euros(-90) } },
   );
 
   return l;

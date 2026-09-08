@@ -1,6 +1,6 @@
 # Tirelire
 
-Comptes de la famille : des enveloppes réparties sur les comptes réels, portant leurs besoins
+Comptes de la famille : des tirelires réparties sur les comptes réels, portant leurs besoins
 (charges récurrentes, échéances, objectifs), un plan de virements mensuels, des comptes tiers
 saisis à la main, l'import des relevés et un moteur de règles pour les classer.
 
@@ -32,7 +32,7 @@ données de l'analyse pour voir le plan tout de suite.
 
 ## Lots
 
-- **A · Plan** (fait) : comptes, enveloppes, flux prévus, saisie manuelle, plan de période.
+- **A · Plan** (fait) : comptes, tirelires, flux prévus, saisie manuelle, plan de période.
 - **B · Import et rapprochement** (fait) : profils d'import CSV/Excel (banque multi-comptes, Linxo,
   générique), déduplication, doublons probables, virements internes, rapprochement des flux prévus
   avec propositions, ventilation, flux attendus non reçus.

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { computePlan, emptyLedger, euros, DEFAULT_PRIORITY, type Ledger } from '../src/index.js';
 
 /**
- * L'assistant de configuration (D40) écrit des enveloppes, des besoins et des flux à partir de
+ * L'assistant de configuration (D40) écrit des tirelires, des besoins et des flux à partir de
  * réponses simples. Deux choix d'ancrage sont indispensables pour que le budget se voie dès la
  * période en cours, et rien dans le cœur ne les imposait :
  *
- *  - une enveloppe ouverte « aujourd'hui » ne compte qu'à partir de la période *suivante*
- *    (`envelopeTimeline` démarre à la première période entièrement postérieure à l'ouverture),
+ *  - une tirelire ouverte « aujourd'hui » ne compte qu'à partir de la période *suivante*
+ *    (`tirelireTimeline` démarre à la première période entièrement postérieure à l'ouverture),
  *    donc l'assistant l'ouvre au début de la période en cours ;
  *  - `nextOccurrence` ne remonte jamais avant l'ancrage, donc un flux ancré sur une date à venir
  *    n'a aucune occurrence dans la période en cours : l'assistant l'ancre sur la dernière
@@ -25,7 +25,7 @@ function budgetDeLAssistant(): Ledger {
   l.accounts.push({
     id: 'principal',
     name: 'Compte principal',
-    kind: 'pivot',
+    kind: 'principal',
     openingBalance: euros(1500),
     openingDate: periodStart,
     payDay,
@@ -49,21 +49,21 @@ function budgetDeLAssistant(): Ledger {
     periodicity: { intervalMonths: 1, anchorDate: '2026-09-05' },
     dateWindowDays: 5,
   });
-  // Budget courant : enveloppe ouverte au début de la période en cours.
-  l.envelopes.push({ id: 'courses', name: 'Courses', placement: [], openingBalance: 0, openingDate: periodStart, rollover: { mode: 'none' } });
+  // Budget courant : tirelire ouverte au début de la période en cours.
+  l.tirelires.push({ id: 'courses', name: 'Courses', placement: [], openingBalance: 0, openingDate: periodStart, rollover: { mode: 'none' } });
   l.needs.push({
     id: 'n-courses',
-    envelopeId: 'courses',
+    tirelireId: 'courses',
     kind: 'recurring',
     amount: euros(500),
     periodicity: { intervalMonths: 1, anchorDate: periodStart },
     priority: DEFAULT_PRIORITY.recurring,
   });
   // Dépense annuelle : réserve lissée sur les périodes qui restent avant l'échéance.
-  l.envelopes.push({ id: 'assurance', name: 'Assurance auto', placement: [], openingBalance: 0, openingDate: periodStart, rollover: { mode: 'unlimited' } });
+  l.tirelires.push({ id: 'assurance', name: 'Assurance auto', placement: [], openingBalance: 0, openingDate: periodStart, rollover: { mode: 'unlimited' } });
   l.needs.push({
     id: 'n-assurance',
-    envelopeId: 'assurance',
+    tirelireId: 'assurance',
     kind: 'dueDate',
     amount: euros(1200),
     periodicity: { intervalMonths: 12, anchorDate: '2027-01-15' },
@@ -82,7 +82,7 @@ describe("budget construit par l'assistant (D40)", () => {
     expect(plan.totals.fixedCharges).toBe(euros(750));
     expect(plan.warnings.map((w) => w.code)).not.toContain('noIncome');
 
-    // Les deux enveloppes produisent une ligne dès cette période.
+    // Les deux tirelires produisent une ligne dès cette période.
     expect(plan.lines.map((l) => l.needId).sort()).toEqual(['n-assurance', 'n-courses']);
   });
 
@@ -105,6 +105,6 @@ describe("budget construit par l'assistant (D40)", () => {
 
   it("n'annonce pas de découvert quand le solde du compte a été renseigné", () => {
     const plan = computePlan(budgetDeLAssistant(), asOf);
-    expect(plan.warnings.map((w) => w.code)).not.toContain('pivotOverdrawn');
+    expect(plan.warnings.map((w) => w.code)).not.toContain('principalOverdrawn');
   });
 });

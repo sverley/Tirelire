@@ -3,14 +3,14 @@
   import { alive, findCategoryByName, type Category, type CategoryNature } from '@tirelire/core';
 
   let editing = $state<Category | undefined>(undefined);
-  let form = $state({ name: '', nature: 'expense' as CategoryNature, parentId: '', envelopeId: '' });
+  let form = $state({ name: '', nature: 'expense' as CategoryNature, parentId: '', tirelireId: '' });
   let error = $state('');
 
   const categories = $derived(alive(app.ledger.categories));
-  const envelopes = $derived(alive(app.ledger.envelopes));
-  const budgetEnvelopes = $derived(envelopes);
+  const tirelires = $derived(alive(app.ledger.tirelires));
+  const budgetTirelires = $derived(tirelires);
   const byId = $derived(new Map(categories.map((c) => [c.id, c])));
-  const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
+  const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
 
   /** Une catégorie et elle-même (pour exclure ses descendants des parents possibles). */
   function descendantsOf(id: string): Set<string> {
@@ -42,20 +42,20 @@
 
   function startNew(nature: CategoryNature) {
     editing = { id: app.newId(), name: '', nature };
-    form = { name: '', nature, parentId: '', envelopeId: '' };
+    form = { name: '', nature, parentId: '', tirelireId: '' };
     error = '';
   }
 
   function startEdit(c: Category) {
     editing = c;
-    form = { name: c.name, nature: c.nature, parentId: c.parentId ?? '', envelopeId: c.envelopeId ?? '' };
+    form = { name: c.name, nature: c.nature, parentId: c.parentId ?? '', tirelireId: c.tirelireId ?? '' };
     error = '';
   }
 
   function onNatureChange() {
-    // Le parent et l'enveloppe budget dépendent de la nature ; on les réinitialise si le choix ne tient plus.
+    // Le parent et la tirelire budget dépendent de la nature ; on les réinitialise si le choix ne tient plus.
     if (!parentChoices.some((c) => c.id === form.parentId)) form.parentId = '';
-    if (form.nature !== 'expense') form.envelopeId = '';
+    if (form.nature !== 'expense') form.tirelireId = '';
   }
 
   function save(e: Event) {
@@ -70,7 +70,7 @@
       name,
       nature: form.nature,
       ...(form.parentId ? { parentId: form.parentId } : {}),
-      ...(form.nature === 'expense' && form.envelopeId ? { envelopeId: form.envelopeId } : {}),
+      ...(form.nature === 'expense' && form.tirelireId ? { tirelireId: form.tirelireId } : {}),
     };
     app.upsert('categories', row);
     editing = undefined;
@@ -86,7 +86,7 @@
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Catégories</h1>
 <p class="muted small">
-  Classent les opérations, indépendamment des enveloppes. Une catégorie de dépense peut être liée à un budget : les
+  Classent les opérations, indépendamment des tirelires. Une catégorie de dépense peut être liée à un budget : les
   opérations qui la portent viennent alors alimenter ce budget dans le bilan.
 </p>
 
@@ -108,9 +108,9 @@
       </label>
       {#if form.nature === 'expense'}
         <label class="f">Budget consommé (facultatif)
-          <select bind:value={form.envelopeId}>
+          <select bind:value={form.tirelireId}>
             <option value="">— (simple suivi, pas de budget)</option>
-            {#each budgetEnvelopes as e}<option value={e.id}>{e.name}</option>{/each}
+            {#each budgetTirelires as e}<option value={e.id}>{e.name}</option>{/each}
           </select>
         </label>
       {/if}
@@ -137,7 +137,7 @@
       <div class="row">
         <div class="label">
           <strong>{c.name}</strong>
-          {#if c.envelopeId}<span class="sub">budget {envelopeName(c.envelopeId)}</span>{/if}
+          {#if c.tirelireId}<span class="sub">budget {tirelireName(c.tirelireId)}</span>{/if}
         </div>
         <div>
           <button class="btn small" onclick={() => startEdit(c)}>Modifier</button>
@@ -148,7 +148,7 @@
         <div class="row" style="padding-left:24px">
           <div class="label">
             {sub.name}
-            {#if sub.envelopeId}<span class="sub">budget {envelopeName(sub.envelopeId)}</span>{/if}
+            {#if sub.tirelireId}<span class="sub">budget {tirelireName(sub.tirelireId)}</span>{/if}
           </div>
           <div>
             <button class="btn small" onclick={() => startEdit(sub)}>Modifier</button>

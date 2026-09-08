@@ -3,8 +3,8 @@ import {
   accountBalance,
   computePlan,
   componentsOnAccount,
-  envelopeBalance,
-  envelopeComponents,
+  tirelireBalance,
+  tirelireComponents,
   euros,
   exampleLedger,
   indexLedger,
@@ -31,36 +31,36 @@ describe('positions et soldes (D19, D29)', () => {
   const ledger = exampleLedger();
   const idx = indexLedger(ledger);
 
-  it('une enveloppe est répartie sur plusieurs comptes ; sa dotation attend sur le pivot', () => {
-    // Taxe foncière : 900 sur le livret, dotation de septembre (rattrapage 150) sur le pivot.
-    const tf = envelopeComponents(idx.envelopesById.get('env-tf')!, idx, asOf);
+  it('une tirelire est répartie sur plusieurs comptes ; sa dotation attend sur le compte principal', () => {
+    // Taxe foncière : 900 sur le livret, dotation de septembre (rattrapage 150) sur le compte principal.
+    const tf = tirelireComponents(idx.tirelliresById_TMP.get('env-tf')!, idx, asOf);
     expect(tf.get('acc-livret')).toBe(euros(900));
-    expect(tf.get('acc-pivot')).toBe(euros(150));
-    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, asOf)).toBe(euros(1050));
+    expect(tf.get('acc-principal')).toBe(euros(150));
+    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-tf')!, idx, asOf)).toBe(euros(1050));
   });
 
   it('un virement interne déplace une composante sans changer le solde', () => {
-    // Enfants : dotation 200 sur le pivot, virée le jour même sur la carte enfants, puis 236 dépensés là.
-    const c = envelopeComponents(idx.envelopesById.get('env-enfants')!, idx, asOf);
-    expect(c.get('acc-pivot') ?? 0).toBe(0);
+    // Enfants : dotation 200 sur le compte principal, virée le jour même sur la carte enfants, puis 236 dépensés là.
+    const c = tirelireComponents(idx.tirelliresById_TMP.get('env-enfants')!, idx, asOf);
+    expect(c.get('acc-principal') ?? 0).toBe(0);
     expect(c.get('acc-enfants')).toBe(euros(-36));
-    expect(envelopeBalance(idx.envelopesById.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
+    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
   });
 
-  it('une dépense consomme l’enveloppe là où elle sort, même si l’argent dort ailleurs', () => {
-    // Santé, placée sur le pivot : dotation 100 sur le pivot, dentiste 80 payé par Marie.
-    const c = envelopeComponents(idx.envelopesById.get('env-sante')!, idx, asOf);
-    expect(c.get('acc-pivot')).toBe(euros(100));
+  it('une dépense consomme l’tirelire là où elle sort, même si l’argent dort ailleurs', () => {
+    // Santé, placée sur le compte principal : dotation 100 sur le compte principal, dentiste 80 payé par Marie.
+    const c = tirelireComponents(idx.tirelliresById_TMP.get('env-sante')!, idx, asOf);
+    expect(c.get('acc-principal')).toBe(euros(100));
     expect(c.get('acc-marie')).toBe(euros(-80));
-    expect(envelopeBalance(idx.envelopesById.get('env-sante')!, idx, asOf)).toBe(euros(20));
+    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-sante')!, idx, asOf)).toBe(euros(20));
   });
 
   it('solde à régler avec les comptes tiers', () => {
     const marie = idx.accountsById.get('acc-marie')!;
     const enfants = idx.accountsById.get('acc-enfants')!;
-    // dentiste 80 payé par Marie (le pivot lui doit 80) − allocations 100 reçues chez elle
+    // dentiste 80 payé par Marie (le compte principal lui doit 80) − allocations 100 reçues chez elle
     expect(settlementBalance(marie, ledger, idx, asOf)).toBe(euros(-20));
-    // la dotation de 200 € alimente l'enveloppe placée là : pas une dette
+    // la dotation de 200 € alimente la tirelire placée là : pas une dette
     expect(settlementBalance(enfants, ledger, idx, asOf)).toBe(0);
   });
 
@@ -68,18 +68,18 @@ describe('positions et soldes (D19, D29)', () => {
     for (const a of idx.accountsById.values()) {
       expect(componentsOnAccount(a, idx, asOf) + unallocated(a, ledger, idx, asOf)).toBe(accountBalance(a, ledger, asOf));
     }
-    // Pivot : 2340 + 3400 − 200 (virement enfants) − dotations (150 + 50 + 200 + 300 + 900 + 200 + 250 + 200 + 100) + 200 (virement)
-    const pivot = idx.accountsById.get('acc-pivot')!;
-    expect(unallocated(pivot, ledger, idx, asOf)).toBe(euros(2340 + 3400 - 200 - 2350 + 200));
+    // Principal : 2340 + 3400 − 200 (virement enfants) − dotations (150 + 50 + 200 + 300 + 900 + 200 + 250 + 200 + 100) + 200 (virement)
+    const principal = idx.accountsById.get('acc-principal')!;
+    expect(unallocated(principal, ledger, idx, asOf)).toBe(euros(2340 + 3400 - 200 - 2350 + 200));
     const livret = idx.accountsById.get('acc-livret')!;
     expect(unallocated(livret, ledger, idx, asOf)).toBe(euros(15));
   });
 
   it('premier invariant : le solde est la somme des composantes', () => {
-    for (const e of idx.envelopesById.values()) {
+    for (const e of idx.tirelliresById_TMP.values()) {
       let sum = 0;
-      for (const v of envelopeComponents(e, idx, asOf).values()) sum += v;
-      expect(envelopeBalance(e, idx, asOf)).toBe(sum);
+      for (const v of tirelireComponents(e, idx, asOf).values()) sum += v;
+      expect(tirelireBalance(e, idx, asOf)).toBe(sum);
     }
   });
 });
@@ -88,14 +88,14 @@ describe('report (D05, D29)', () => {
   it('remise à zéro : l’excédent est libéré en fin de période, un déficit est effacé', () => {
     const l = exampleLedger();
     const idx = indexLedger(l);
-    const alim = idx.envelopesById.get('env-alim')!;
+    const alim = idx.tirelliresById_TMP.get('env-alim')!;
     // Septembre : dotation 900, rien dépensé. Le 27 septembre au soir, 900 ; le 28, libération puis nouvelle dotation.
-    expect(envelopeBalance(alim, idx, '2026-09-27')).toBe(euros(900));
-    expect(envelopeBalance(alim, idx, '2026-09-28')).toBe(euros(900));
-    expect(envelopeComponents(alim, idx, '2026-09-28').get('acc-pivot')).toBe(euros(900));
-    const pivot = idx.accountsById.get('acc-pivot')!;
-    // Le pivot ne porte plus que la nouvelle dotation pour cette enveloppe (ni 1 800 ni moins).
-    expect(componentsOnAccount(pivot, idx, '2026-09-28')).toBeGreaterThan(0);
+    expect(tirelireBalance(alim, idx, '2026-09-27')).toBe(euros(900));
+    expect(tirelireBalance(alim, idx, '2026-09-28')).toBe(euros(900));
+    expect(tirelireComponents(alim, idx, '2026-09-28').get('acc-principal')).toBe(euros(900));
+    const principal = idx.accountsById.get('acc-principal')!;
+    // Le compte principal ne porte plus que la nouvelle dotation pour cette tirelire (ni 1 800 ni moins).
+    expect(componentsOnAccount(principal, idx, '2026-09-28')).toBeGreaterThan(0);
   });
 
   it('report illimité : le déficit d’une période se rattrape à la suivante', () => {
@@ -143,7 +143,7 @@ describe('plan de période (exemple de l’analyse)', () => {
 
   it('échéance entièrement provisionnée : dotation nulle', () => {
     const l = exampleLedger();
-    l.envelopes.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
+    l.tirelires.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
     expect(line(computePlan(l, asOf), 'need-tf').requested).toBe(0);
   });
 
@@ -158,15 +158,15 @@ describe('plan de période (exemple de l’analyse)', () => {
     expect(enfants.virtual).toBe(false);
   });
 
-  it('besoins récurrents sur le pivot : réservés, pas virés', () => {
+  it('besoins récurrents sur le compte principal : réservés, pas virés', () => {
     const alim = line(plan, 'need-alim');
     expect(alim.virtual).toBe(true);
     expect(alim.requested).toBe(euros(900));
   });
 
-  it('écarts de placement (D20) : les dotations du livret attendent sur le pivot', () => {
+  it('écarts de placement (D20) : les dotations du livret attendent sur le compte principal', () => {
     const toLivret = plan.gaps.filter((g) => g.toAccountId === 'acc-livret');
-    expect(toLivret.map((g) => [g.envelopeId, g.amount])).toEqual(
+    expect(toLivret.map((g) => [g.tirelireId, g.amount])).toEqual(
       expect.arrayContaining([
         ['env-tf', euros(150)],
         ['env-auto', euros(50)],
@@ -179,12 +179,12 @@ describe('plan de période (exemple de l’analyse)', () => {
     expect(plan.gaps.some((g) => g.fromAccountId === 'acc-marie')).toBe(false);
   });
 
-  it('virements par compte : un ordre par couple de comptes, détaillé par enveloppe (D21)', () => {
+  it('virements par compte : un ordre par couple de comptes, détaillé par tirelire (D21)', () => {
     const livret = plan.transfers.find((t) => t.accountId === 'acc-livret')!;
     expect(livret.label).toBe('TIRELIRE LIVRET A');
     expect(livret.standing).toBe(euros(100 + 50 + 200 + 300));
     expect(livret.exceptional).toBe(euros(50));
-    expect(livret.orders.map((o) => o.envelopeName)).toContain('Taxe foncière');
+    expect(livret.orders.map((o) => o.tirelireName)).toContain('Taxe foncière');
     expect(livret.surplus).toBe(euros(15));
     expect(livret.net).toBe(euros(650 + 50 - 15));
 
@@ -202,7 +202,7 @@ describe('plan de période (exemple de l’analyse)', () => {
     expect(funded).toBe(plan.totals.requested);
     expect(plan.totals.margin).toBe(euros(4200) - plan.totals.fixedCharges - funded);
     expect(plan.warnings.map((w) => w.code)).not.toContain('negativeMargin');
-    expect(plan.warnings.map((w) => w.code)).not.toContain('pivotOverdrawn');
+    expect(plan.warnings.map((w) => w.code)).not.toContain('principalOverdrawn');
   });
 });
 
@@ -221,19 +221,19 @@ describe('marge négative : lecture par priorité (D06)', () => {
     // L'épargne (30) est réduite ou coupée avant les budgets (20).
     expect(line(plan, 'need-precaution').funded).toBeLessThan(euros(300));
     expect(plan.totals.margin).toBeGreaterThanOrEqual(0);
-    // La dotation, elle, est acquise (D29) : le plan le dit par le non affecté du pivot.
+    // La dotation, elle, est acquise (D29) : le plan le dit par le non affecté du compte principal.
     expect(plan.totals.requested).toBe(euros(2350));
   });
 });
 
-describe('besoins multiples dans une enveloppe (D28)', () => {
+describe('besoins multiples dans une tirelire (D28)', () => {
   it('le solde est attribué dans l’ordre des priorités ; le plancher de l’échéance passe avant le courant', () => {
     const l = exampleLedger();
-    // Une seule enveloppe « Charges » : taxe foncière (échéance, priorité 10) + courant 100/mois (priorité 20).
-    l.envelopes.push({ id: 'env-charges', name: 'Charges', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(500), openingDate: '2026-08-27' });
+    // Une seule tirelire « Charges » : taxe foncière (échéance, priorité 10) + courant 100/mois (priorité 20).
+    l.tirelires.push({ id: 'env-charges', name: 'Charges', placement: [{ accountId: 'acc-livret', share: { kind: 'variable' } }], openingBalance: euros(500), openingDate: '2026-08-27' });
     l.needs.push(
-      { id: 'need-charges-tf', envelopeId: 'env-charges', kind: 'dueDate', name: 'Taxe foncière', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
-      { id: 'need-charges-courant', envelopeId: 'env-charges', kind: 'recurring', name: 'Courant', amount: euros(100), priority: 20 },
+      { id: 'need-charges-tf', tirelireId: 'env-charges', kind: 'dueDate', name: 'Taxe foncière', amount: euros(1200), periodicity: { intervalMonths: 12, anchorDate: '2026-10-15' }, priority: 10 },
+      { id: 'need-charges-courant', tirelireId: 'env-charges', kind: 'recurring', name: 'Courant', amount: euros(100), priority: 20 },
     );
     const plan = computePlan(l, asOf);
     const tf = line(plan, 'need-charges-tf');
@@ -244,7 +244,7 @@ describe('besoins multiples dans une enveloppe (D28)', () => {
     expect(courant.held).toBe(0);
     expect(courant.requested).toBe(euros(100));
     expect(tf.name).toBe('Taxe foncière');
-    expect(tf.envelopeName).toBe('Charges');
+    expect(tf.tirelireName).toBe('Charges');
   });
 });
 
@@ -261,7 +261,7 @@ describe('virement permanent à ventilation prévue (D21)', () => {
     const l = exampleLedger();
     const plan = computePlan(l, '2026-09-06');
     const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
-    const flow = standingTransferFlow(plan, t, 'acc-pivot', 'flow-vir')!;
+    const flow = standingTransferFlow(plan, t, 'acc-principal', 'flow-vir')!;
     expect(flow.kind).toBe('transfer');
     expect(flow.counterpartAccountId).toBe(t.accountId);
     expect(flow.labelPattern).toBe(t.label);
@@ -274,12 +274,12 @@ describe('virement permanent à ventilation prévue (D21)', () => {
     let l = exampleLedger();
     const plan = computePlan(l, '2026-09-06');
     const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
-    const flow = standingTransferFlow(plan, t, 'acc-pivot', 'flow-vir')!;
+    const flow = standingTransferFlow(plan, t, 'acc-principal', 'flow-vir')!;
     l.plannedFlows.push(flow);
 
     const virement = (id: string, amount: number): Operation => ({
       id,
-      accountId: 'acc-pivot',
+      accountId: 'acc-principal',
       origin: 'imported',
       date: '2026-09-28',
       label: flow.labelPattern!,
@@ -291,7 +291,7 @@ describe('virement permanent à ventilation prévue (D21)', () => {
     // Montant exact : on retrouve la ventilation prévue.
     l.operations.push(virement('op-vir-exact', flow.amount));
     let patch = applyMatch(l, { operationId: 'op-vir-exact', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
-    expect(patch.allocations.map((a) => a.envelopeId)).toEqual(flow.plannedAllocation!.map((a) => a.envelopeId));
+    expect(patch.allocations.map((a) => a.tirelireId)).toEqual(flow.plannedAllocation!.map((a) => a.tirelireId));
 
     // Montant moindre : les planchers passent d'abord, on ne saupoudre pas au prorata.
     const moindre = Math.round(flow.amount / 2);
@@ -304,29 +304,29 @@ describe('virement permanent à ventilation prévue (D21)', () => {
 });
 
 describe('placement réparti sur plusieurs comptes (D37)', () => {
-  it('« tant sur le livret, le reste sur le pivot » se résout sur le solde du moment', () => {
+  it('« tant sur le livret, le reste sur le compte principal » se résout sur le solde du moment', () => {
     const l = exampleLedger();
-    const e = l.envelopes.find((x) => x.id === 'env-precaution')!;
+    const e = l.tirelires.find((x) => x.id === 'env-precaution')!;
     e.placement = [
       { accountId: 'acc-livret', share: { kind: 'fixed', amount: euros(2000) } },
-      { accountId: 'acc-pivot', share: { kind: 'variable' } },
+      { accountId: 'acc-principal', share: { kind: 'variable' } },
     ];
     const idx = indexLedger(l);
     const wanted = wantedComponents(e, idx, '2026-09-06');
-    const total = envelopeBalance(e, idx, '2026-09-06');
+    const total = tirelireBalance(e, idx, '2026-09-06');
     expect(wanted.get('acc-livret')).toBe(euros(2000));
-    expect(wanted.get('acc-pivot')).toBe(total - euros(2000));
+    expect(wanted.get('acc-principal')).toBe(total - euros(2000));
   });
 
   it('un pourcentage se calcule sur le solde, et la part « reste » absorbe le change', () => {
     const l = exampleLedger();
-    const e = l.envelopes.find((x) => x.id === 'env-precaution')!;
+    const e = l.tirelires.find((x) => x.id === 'env-precaution')!;
     e.placement = [
       { accountId: 'acc-livret', share: { kind: 'percent', pct: 70 } },
-      { accountId: 'acc-pivot', share: { kind: 'variable' } },
+      { accountId: 'acc-principal', share: { kind: 'variable' } },
     ];
     const idx = indexLedger(l);
-    const total = envelopeBalance(e, idx, '2026-09-06');
+    const total = tirelireBalance(e, idx, '2026-09-06');
     const wanted = wantedComponents(e, idx, '2026-09-06');
     expect(wanted.get('acc-livret')).toBe(Math.round((total * 70) / 100));
     expect([...wanted.values()].reduce((s, v) => s + v, 0)).toBe(total);
@@ -334,23 +334,23 @@ describe('placement réparti sur plusieurs comptes (D37)', () => {
 
   it('le plan apparie l’excédent d’un compte au manque d’un autre', () => {
     const l = exampleLedger();
-    const e = l.envelopes.find((x) => x.id === 'env-precaution')!;
+    const e = l.tirelires.find((x) => x.id === 'env-precaution')!;
     e.placement = [
       { accountId: 'acc-livret', share: { kind: 'fixed', amount: euros(1000) } },
-      { accountId: 'acc-pivot', share: { kind: 'variable' } },
+      { accountId: 'acc-principal', share: { kind: 'variable' } },
     ];
     const plan = computePlan(l, '2026-09-06');
-    const g = plan.gaps.filter((x) => x.envelopeId === e.id);
-    // Trop sur le livret, pas assez sur le pivot : un seul mouvement, du livret vers le pivot.
+    const g = plan.gaps.filter((x) => x.tirelireId === e.id);
+    // Trop sur le livret, pas assez sur le compte principal : un seul mouvement, du livret vers le compte principal.
     expect(g.length).toBe(1);
     expect(g[0]!.fromAccountId).toBe('acc-livret');
-    expect(g[0]!.toAccountId).toBe('acc-pivot');
+    expect(g[0]!.toAccountId).toBe('acc-principal');
     expect(g[0]!.amount).toBeGreaterThan(0);
   });
 
   it('sans placement déclaré, aucun écart : l’argent est bien là où il est', () => {
     const l = exampleLedger();
-    for (const e of l.envelopes) e.placement = [];
+    for (const e of l.tirelires) e.placement = [];
     expect(computePlan(l, '2026-09-06').gaps).toEqual([]);
   });
 });

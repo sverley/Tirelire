@@ -1,7 +1,7 @@
 <!--
   Assistant de configuration (D40) : construire un budget en répondant à des questions simples,
   pas en remplissant les écrans de configuration. Chaque réponse crée les objets du modèle
-  (enveloppes, besoins, flux prévus) sans que l'utilisateur ait à connaître ces mots.
+  (tirelires, besoins, flux prévus) sans que l'utilisateur ait à connaître ces mots.
   Le compte principal est créé en silence ; les autres comptes sont proposés, jamais imposés.
 -->
 <script lang="ts">
@@ -20,7 +20,7 @@
     DEFAULT_PRIORITY,
     type Account,
     type Cents,
-    type Envelope,
+    type Tirelire,
     type Need,
     type PlannedFlow,
   } from '@tirelire/core';
@@ -51,14 +51,14 @@
   ];
 
   const accounts = $derived(alive(app.ledger.accounts));
-  const envelopes = $derived(alive(app.ledger.envelopes));
+  const tirelires = $derived(alive(app.ledger.tirelires));
   const needs = $derived(alive(app.ledger.needs));
   const flows = $derived(alive(app.ledger.plannedFlows));
-  const pivot = $derived(accounts.find((a) => a.kind === 'pivot'));
-  const otherAccounts = $derived(accounts.filter((a) => a.kind !== 'pivot'));
+  const principal = $derived(accounts.find((a) => a.kind === 'principal'));
+  const otherAccounts = $derived(accounts.filter((a) => a.kind !== 'principal'));
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
   const fixedCharges = $derived(flows.filter((f) => f.kind === 'fixedCharge'));
-  const envelopeById = (id: string) => envelopes.find((e) => e.id === id);
+  const tirelireById = (id: string) => tirelires.find((e) => e.id === id);
   const needsOfKind = (k: Need['kind']) => needs.filter((n) => n.kind === k);
   const everydayNeeds = $derived(needsOfKind('recurring'));
   const periodicNeeds = $derived(needsOfKind('dueDate'));
@@ -79,7 +79,7 @@
     return m === 1 ? clamp(y - 1, 12) : clamp(y, m - 1);
   }
   /**
-   * Date d'ouverture d'une enveloppe : le début de la période en cours. La chronologie ne
+   * Date d'ouverture d'une tirelire : le début de la période en cours. La chronologie ne
    * démarre qu'à la première période entièrement postérieure à l'ouverture ; ouvrir « aujourd'hui »
    * priverait donc le budget de sa toute première période.
    */
@@ -91,11 +91,11 @@
    * plutôt que de faire remplir un formulaire de compte pour commencer un budget.
    */
   function ensureMainAccount(): string {
-    if (pivot) return pivot.id;
+    if (principal) return principal.id;
     const row: Account = {
       id: app.newId(),
       name: 'Compte principal',
-      kind: 'pivot',
+      kind: 'principal',
       openingBalance: 0,
       openingDate: todayISO(),
       payDay: Number(payDay) || 1,
@@ -116,8 +116,8 @@
 
   // --- Jour de paie : définit la période budgétaire (D02) ---
   // Valeur initiale volontairement figée : le champ est ensuite piloté par la saisie.
-  let payDay = $state(untrack(() => String(pivot?.payDay ?? 1)));
-  let mainBalance = $state(untrack(() => (pivot ? (pivot.openingBalance / 100).toFixed(2).replace('.', ',') : '')));
+  let payDay = $state(untrack(() => String(principal?.payDay ?? 1)));
+  let mainBalance = $state(untrack(() => (principal ? (principal.openingBalance / 100).toFixed(2).replace('.', ',') : '')));
   function savePayDay() {
     const d = Math.min(31, Math.max(1, Number(payDay) || 1));
     payDay = String(d);
@@ -177,16 +177,16 @@
     fixError = '';
   }
 
-  // --- Budgets courants : une enveloppe + un besoin récurrent ---
+  // --- Budgets courants : une tirelire + un besoin récurrent ---
   let day = $state({ name: '', amount: '', keep: false });
   let dayError = $state('');
   function addEveryday() {
     const amount = inputToCents(day.amount);
     if (!day.name.trim()) return void (dayError = 'Donne un nom à ce budget.');
     if (amount === undefined || amount <= 0) return void (dayError = 'Indique un montant par période.');
-    const envelopeId = app.newId();
-    const envelope: Envelope = {
-      id: envelopeId,
+    const tirelireId = app.newId();
+    const tirelire: Tirelire = {
+      id: tirelireId,
       name: day.name.trim(),
       placement: [],
       openingBalance: 0,
@@ -195,19 +195,19 @@
     };
     const need: Need = {
       id: app.newId(),
-      envelopeId,
+      tirelireId,
       kind: 'recurring',
       amount,
       periodicity: { intervalMonths: 1, anchorDate: periodStart() },
       priority: DEFAULT_PRIORITY.recurring,
     };
-    app.upsert('envelopes', envelope);
+    app.upsert('tirelires', tirelire);
     app.upsert('needs', need);
     day = { name: '', amount: '', keep: day.keep };
     dayError = '';
   }
 
-  // --- Dépenses qui ne tombent pas tous les mois : enveloppe + besoin à échéance + flux ---
+  // --- Dépenses qui ne tombent pas tous les mois : tirelire + besoin à échéance + flux ---
   let per = $state({ name: '', amount: '', months: 12, dueDate: '', withFlow: true });
   let perError = $state('');
   const perPreview = $derived.by(() => {
@@ -219,9 +219,9 @@
     if (!per.name.trim()) return void (perError = 'Donne un nom à cette dépense.');
     if (amount === undefined || amount <= 0) return void (perError = 'Indique le montant de la facture.');
     if (!per.dueDate) return void (perError = 'Indique la date de la prochaine échéance.');
-    const envelopeId = app.newId();
-    const envelope: Envelope = {
-      id: envelopeId,
+    const tirelireId = app.newId();
+    const tirelire: Tirelire = {
+      id: tirelireId,
       name: per.name.trim(),
       placement: [],
       openingBalance: 0,
@@ -230,13 +230,13 @@
     };
     const need: Need = {
       id: app.newId(),
-      envelopeId,
+      tirelireId,
       kind: 'dueDate',
       amount,
       periodicity: { intervalMonths: per.months, anchorDate: per.dueDate },
       priority: DEFAULT_PRIORITY.dueDate,
     };
-    app.upsert('envelopes', envelope);
+    app.upsert('tirelires', tirelire);
     app.upsert('needs', need);
     if (per.withFlow) {
       const flow: PlannedFlow = {
@@ -245,7 +245,7 @@
         kind: 'dueDate',
         amount: -amount,
         accountId: ensureMainAccount(),
-        envelopeId,
+        tirelireId,
         periodicity: { intervalMonths: per.months, anchorDate: per.dueDate },
         dateWindowDays: 7,
       };
@@ -255,7 +255,7 @@
     perError = '';
   }
 
-  // --- Épargne : enveloppe + besoin objectif ---
+  // --- Épargne : tirelire + besoin objectif ---
   let sav = $state({ name: '', monthly: '', target: '' });
   let savError = $state('');
   const savPreview = $derived.by(() => {
@@ -269,9 +269,9 @@
     if (!sav.name.trim()) return void (savError = 'Donne un nom à cet objectif.');
     if (monthly === undefined || monthly <= 0) return void (savError = 'Indique combien mettre de côté par période.');
     const target = inputToCents(sav.target);
-    const envelopeId = app.newId();
-    const envelope: Envelope = {
-      id: envelopeId,
+    const tirelireId = app.newId();
+    const tirelire: Tirelire = {
+      id: tirelireId,
       name: sav.name.trim(),
       placement: [],
       openingBalance: 0,
@@ -280,13 +280,13 @@
     };
     const need: Need = {
       id: app.newId(),
-      envelopeId,
+      tirelireId,
       kind: 'goal',
       monthlyAmount: monthly,
       priority: DEFAULT_PRIORITY.goal,
       ...(target !== undefined && target > 0 ? { amount: target } : {}),
     };
-    app.upsert('envelopes', envelope);
+    app.upsert('tirelires', tirelire);
     app.upsert('needs', need);
     sav = { name: '', monthly: '', target: '' };
     savError = '';
@@ -312,24 +312,24 @@
     acc = { name: '', kind: 'holding', balance: '0,00' };
     accError = '';
   }
-  /** Placement voulu d'une enveloppe (D38) : tout sur un compte, ou rien de déclaré. */
-  function setPlacement(e: Envelope, accountId: string) {
+  /** Placement voulu d'une tirelire (D38) : tout sur un compte, ou rien de déclaré. */
+  function setPlacement(e: Tirelire, accountId: string) {
     const placement = accountId ? [{ accountId, share: { kind: 'variable' as const } }] : [];
-    app.upsert('envelopes', { ...e, placement });
+    app.upsert('tirelires', { ...e, placement });
   }
-  const reserveEnvelopes = $derived(
-    envelopes.filter((e) => needs.some((n) => n.envelopeId === e.id && n.kind !== 'recurring')),
+  const reserveTirelires = $derived(
+    tirelires.filter((e) => needs.some((n) => n.tirelireId === e.id && n.kind !== 'recurring')),
   );
 
   function removeFlow(f: PlannedFlow) {
     app.remove('plannedFlows', f.id);
   }
-  /** Retire un besoin et l'enveloppe qui le portait si elle n'en a plus d'autre. */
+  /** Retire un besoin et la tirelire qui le portait si elle n'en a plus d'autre. */
   function removeNeed(n: Need) {
-    const others = needs.filter((x) => x.envelopeId === n.envelopeId && x.id !== n.id);
-    for (const f of flows.filter((f) => f.envelopeId === n.envelopeId)) app.remove('plannedFlows', f.id);
+    const others = needs.filter((x) => x.tirelireId === n.tirelireId && x.id !== n.id);
+    for (const f of flows.filter((f) => f.tirelireId === n.tirelireId)) app.remove('plannedFlows', f.id);
     app.remove('needs', n.id);
-    if (others.length === 0) app.remove('envelopes', n.envelopeId);
+    if (others.length === 0) app.remove('tirelires', n.tirelireId);
   }
 </script>
 
@@ -361,9 +361,9 @@
       où elles arrivent, le compte pique du nez — alors que la dépense était prévisible.
     </p>
     <p>
-      Une <strong>enveloppe</strong> est une réserve pour une de ces dépenses. Vous mettez un peu de côté
+      Une <strong>tirelire</strong> est une réserve pour une de ces dépenses. Vous mettez un peu de côté
       à chaque paie, et l'argent est là le jour venu. Tirelire calcule combien : une facture de 1 200 €
-      par an, c'est 100 € par mois. L'argent ne bouge pas de votre compte — l'enveloppe dit seulement
+      par an, c'est 100 € par mois. L'argent ne bouge pas de votre compte — la tirelire dit seulement
       quelle part est déjà réservée, et ce qui reste vraiment disponible.
     </p>
     <p class="muted small">
@@ -446,14 +446,14 @@
   <h2>Sur quoi voulez-vous vous tenir à un montant ?</h2>
   <p class="muted small">
     Courses, essence, restaurants : le montant varie, mais vous voulez vous fixer une limite par
-    période et voir ce qu'il en reste. C'est une enveloppe qui se remplit à chaque paie.
+    période et voir ce qu'il en reste. C'est une tirelire qui se remplit à chaque paie.
   </p>
   {#each everydayNeeds as n (n.id)}
     <div class="card">
       <div class="row">
         <div class="label">
-          <strong>{needName(n, envelopeById(n.envelopeId))}</strong>
-          <span class="sub">{envelopeById(n.envelopeId)?.rollover?.mode === 'unlimited' ? 'ce qui reste est reporté' : 'repart à zéro chaque période'}</span>
+          <strong>{needName(n, tirelireById(n.tirelireId))}</strong>
+          <span class="sub">{tirelireById(n.tirelireId)?.rollover?.mode === 'unlimited' ? 'ce qui reste est reporté' : 'repart à zéro chaque période'}</span>
         </div>
         <div class="num">{money(n.amount ?? 0)}</div>
         <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
@@ -472,14 +472,14 @@
 {:else if step === 'periodic'}
   <h2>Qu'est-ce qui ne tombe pas tous les mois ?</h2>
   <p class="muted small">
-    C'est ici que les enveloppes servent vraiment. Donnez le montant de la facture et sa date : Tirelire
+    C'est ici que les tirelires servent vraiment. Donnez le montant de la facture et sa date : Tirelire
     répartit la somme sur les paies qui restent d'ici là, et vous n'aurez pas de mauvaise surprise.
   </p>
   {#each periodicNeeds as n (n.id)}
     <div class="card">
       <div class="row">
         <div class="label">
-          <strong>{needName(n, envelopeById(n.envelopeId))}</strong>
+          <strong>{needName(n, tirelireById(n.tirelireId))}</strong>
           <span class="sub">
             {money(n.amount ?? 0)} le {shortDate(n.periodicity?.anchorDate ?? todayISO())} ·
             {money(perPeriod(n.amount ?? 0, n.periodicity?.intervalMonths ?? 12))} à mettre de côté par mois
@@ -517,7 +517,7 @@
     <div class="card">
       <div class="row">
         <div class="label">
-          <strong>{needName(n, envelopeById(n.envelopeId))}</strong>
+          <strong>{needName(n, tirelireById(n.tirelireId))}</strong>
           <span class="sub">{money(n.monthlyAmount ?? 0)} par période{n.amount ? ` · cible ${money(n.amount)}` : ''}</span>
         </div>
         <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
@@ -569,10 +569,10 @@
     <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
   </form>
 
-  {#if otherAccounts.length && reserveEnvelopes.length}
+  {#if otherAccounts.length && reserveTirelires.length}
     <h3>Où doit dormir chaque réserve ?</h3>
     <p class="muted small">Laissez sur le compte principal si vous ne savez pas : ça se change à tout moment.</p>
-    {#each reserveEnvelopes as e (e.id)}
+    {#each reserveTirelires as e (e.id)}
       <div class="card">
         <div class="row">
           <div class="label"><strong>{e.name}</strong></div>
@@ -616,7 +616,7 @@
   <p class="muted small">
     Le Plan détaille période par période ce qu'il faut mettre de côté et les virements à faire.
     Dans Configuration, vous pouvez affiner ce que l'assistant a créé : plusieurs besoins sur une même
-    enveloppe, priorités de financement, ventilation des dépenses par catégorie. L'import d'un relevé
+    tirelire, priorités de financement, ventilation des dépenses par catégorie. L'import d'un relevé
     rapprochera ensuite vos opérations réelles de ce budget.
   </p>
   <div class="actions">

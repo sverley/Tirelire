@@ -33,13 +33,13 @@ async function seeded(site: string) {
   const s = await open(site);
   const l = exampleLedger();
   for (const a of l.accounts) s.upsert('accounts', a);
-  for (const e of l.envelopes) s.upsert('envelopes', e);
+  for (const e of l.tirelires) s.upsert('tirelires', e);
   for (const n of l.needs) s.upsert('needs', n);
   for (const c of l.categories) s.upsert('categories', c);
   for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
   for (const o of l.operations) s.upsert('operations', o);
   for (const a of l.allocations) s.upsert('allocations', a);
-  s.setSetting('pivotCushion', l.settings.pivotCushion);
+  s.setSetting('principalCushion', l.settings.principalCushion);
   return s;
 }
 
@@ -51,7 +51,7 @@ describe('dépôt SQLite', () => {
     const fromStore = computePlan(loaded, '2026-09-06');
     expect(fromStore.totals).toEqual(fromMemory.totals);
     expect(fromStore.transfers).toEqual(fromMemory.transfers);
-    expect(loaded.settings.pivotCushion).toBe(exampleLedger().settings.pivotCushion);
+    expect(loaded.settings.principalCushion).toBe(exampleLedger().settings.principalCushion);
     expect(loaded.settings.siteId).toBe('A');
   });
 
@@ -59,7 +59,7 @@ describe('dépôt SQLite', () => {
     const s = await seeded('A');
     const bytes = s.export();
     const again = await open('A', bytes);
-    expect(again.load().envelopes.length).toBe(exampleLedger().envelopes.length);
+    expect(again.load().tirelires.length).toBe(exampleLedger().tirelires.length);
     expect(again.lastSeq).toBe(s.lastSeq);
   });
 
@@ -80,10 +80,10 @@ describe('dépôt SQLite', () => {
 
   it('suppression logique', async () => {
     const s = await seeded('A');
-    s.remove('envelopes', 'env-divers');
+    s.remove('tirelires', 'env-divers');
     const l = s.load();
-    expect(l.envelopes.find((e) => e.id === 'env-divers')?.deletedAt).toBeTruthy();
-    expect(computePlan(l, '2026-09-06').lines.map((x) => x.envelopeId)).not.toContain('env-divers');
+    expect(l.tirelires.find((e) => e.id === 'env-divers')?.deletedAt).toBeTruthy();
+    expect(computePlan(l, '2026-09-06').lines.map((x) => x.tirelireId)).not.toContain('env-divers');
   });
 
   it('chaîne d’empreintes vérifiable', async () => {
@@ -121,16 +121,16 @@ describe('fusion entre deux appareils', () => {
     const seqA = a.lastSeq;
     const seqB = b.lastSeq;
 
-    const envA = a.load().envelopes.find((e) => e.id === 'env-tf')!;
-    a.upsert('envelopes', { ...envA, openingBalance: euros(950) });
-    const envB = b.load().envelopes.find((e) => e.id === 'env-tf')!;
-    b.upsert('envelopes', { ...envB, name: 'Taxe foncière 2026' });
+    const envA = a.load().tirelires.find((e) => e.id === 'env-tf')!;
+    a.upsert('tirelires', { ...envA, openingBalance: euros(950) });
+    const envB = b.load().tirelires.find((e) => e.id === 'env-tf')!;
+    b.upsert('tirelires', { ...envB, name: 'Taxe foncière 2026' });
 
     b.applyRemote(a.changesSince(seqA));
     a.applyRemote(b.changesSince(seqB));
 
-    const finalA = a.load().envelopes.find((e) => e.id === 'env-tf')!;
-    const finalB = b.load().envelopes.find((e) => e.id === 'env-tf')!;
+    const finalA = a.load().tirelires.find((e) => e.id === 'env-tf')!;
+    const finalB = b.load().tirelires.find((e) => e.id === 'env-tf')!;
     expect(finalA).toEqual(finalB);
     expect(finalA.openingBalance).toBe(euros(950));
     expect(finalA.name).toBe('Taxe foncière 2026');
@@ -188,7 +188,7 @@ describe('identifiants', () => {
 });
 
 describe('migration du modèle (D30)', () => {
-  it('1 → 2 : une enveloppe typée devient une enveloppe placée plus un besoin (D19, D28)', async () => {
+  it('1 → 2 : une tirelire typée devient une tirelire placée plus un besoin (D19, D28)', async () => {
     const store = await storeAtModel1([
       ['envelopes', 'env_tf', 'name', 'Taxe foncière'],
       ['envelopes', 'env_tf', 'kind', 'provision'],
@@ -205,21 +205,50 @@ describe('migration du modèle (D30)', () => {
     expect(store.modelVersion).toBe(MODEL_VERSION);
 
     const l = store.load();
-    const env = l.envelopes.find((e) => e.id === 'env_tf')!;
+    const env = l.tirelires.find((e) => e.id === 'env_tf')!;
     expect(env.placement).toEqual([{ accountId: 'acc_livret', share: { kind: 'variable' } }]);
     expect('kind' in env).toBe(false);
-    const need = l.needs.find((n) => n.envelopeId === 'env_tf')!;
+    const need = l.needs.find((n) => n.tirelireId === 'env_tf')!;
     expect(need.kind).toBe('dueDate');
     expect(need.amount).toBe(120000);
     expect(need.priority).toBe(10);
     expect(need.periodicity?.anchorDate).toBe('2026-10-15');
   });
 
+  it("5 → 6 (D41) : un compte « pivot » devient le compte principal, et le coussin suit", async () => {
+    const store = await storeAtModel1([
+      ['accounts', 'acc_p', 'name', 'Compte courant'],
+      ['accounts', 'acc_p', 'kind', 'pivot'],
+      ['accounts', 'acc_p', 'opening_balance', 150000],
+      ['accounts', 'acc_p', 'opening_date', '2026-01-01'],
+      ['accounts', 'acc_p', 'pay_day', 28],
+    ]);
+    store.setSetting('pivotCushion' as never, 60000 as never);
+
+    migrateModel(store);
+    const l = store.load();
+    expect(l.accounts[0]!.kind).toBe('principal');
+    expect(l.settings.principalCushion).toBe(60000);
+  });
+
+  it("5 → 6 (D41) : « pivot » réécrit par un pair non migré reste compris", async () => {
+    const store = await storeAtModel1([
+      ['accounts', 'acc_p', 'name', 'Compte courant'],
+      ['accounts', 'acc_p', 'kind', 'pivot'],
+      ['accounts', 'acc_p', 'opening_balance', 0],
+      ['accounts', 'acc_p', 'opening_date', '2026-01-01'],
+    ]);
+    migrateModel(store);
+    // Le pair resté en arrière réécrit l'ancienne valeur : elle doit rester lisible.
+    store.query(`UPDATE accounts SET kind = 'pivot' WHERE id = 'acc_p'`);
+    expect(store.load().accounts[0]!.kind).toBe('principal');
+  });
+
   it('la migration est idempotente et journalisée', async () => {
     const store = await storeAtModel1([
       ['envelopes', 'env_courses', 'name', 'Courses'],
       ['envelopes', 'env_courses', 'kind', 'budget'],
-      ['envelopes', 'env_courses', 'account_id', 'acc_pivot'],
+      ['envelopes', 'env_courses', 'account_id', 'acc_principal'],
       ['envelopes', 'env_courses', 'opening_balance', 0],
       ['envelopes', 'env_courses', 'opening_date', '2026-01-01'],
       ['envelopes', 'env_courses', 'target', 60000],
@@ -236,7 +265,7 @@ describe('migration du modèle (D30)', () => {
     expect(store.changesSince(0, 'mig').length).toBe(before);
     expect(store.load().needs).toEqual(after.needs);
     // Le report d'un budget sans report explicite reste « libéré » (D05).
-    expect(after.envelopes[0]!.rollover).toEqual({ mode: 'none' });
+    expect(after.tirelires[0]!.rollover).toEqual({ mode: 'none' });
     // Les écritures de migration sont dans le journal, donc synchronisables.
     expect(store.changesSince(0, 'mig').some((c) => c.tbl === 'needs')).toBe(true);
   });

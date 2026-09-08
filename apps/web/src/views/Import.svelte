@@ -179,7 +179,7 @@
 {#if step === 'file'}
   <p class="muted small">CSV ou Excel exporté de la banque ou de Linxo. Le fichier est lu sur cet appareil et n'est envoyé nulle part. Un profil (colonnes, formats, correspondance des comptes) est mémorisé par type de fichier.</p>
   {#if accounts.length === 0}
-    <div class="empty">Crée d'abord ton compte pivot.</div>
+    <div class="empty">Crée d'abord ton compte principal.</div>
   {:else}
     <label class="btn primary">Choisir un fichier… <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv" onchange={onFile} hidden /></label>
     {#if busy}<p class="muted">Lecture…</p>{/if}
@@ -313,7 +313,7 @@
     <h2 style="margin-top:0">Import terminé</h2>
     <div class="row"><div class="label">Opérations importées</div><div class="num">{report.inserted}</div></div>
     <div class="row"><div class="label">Virements internes appariés</div><div class="num">{report.transfersPaired}</div></div>
-    <div class="row"><div class="label">Virements vers des enveloppes reconnus</div><div class="num">{report.envelopeTransfers}</div></div>
+    <div class="row"><div class="label">Virements vers des tirelires reconnus</div><div class="num">{report.tirelireTransfers}</div></div>
     <div class="row"><div class="label">Flux prévus rapprochés automatiquement</div><div class="num">{report.autoMatched}</div></div>
     <div class="row"><div class="label">Rapprochements de flux à confirmer</div><div class="num">{report.proposals.length}</div></div>
     <div class="row"><div class="label">Classées par un automatisme</div><div class="num">{report.ruled}</div></div>

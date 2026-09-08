@@ -22,7 +22,7 @@ import {
 function op(id: string, label: string, amount: number, extra: Partial<Operation> = {}): Operation {
   return {
     id,
-    accountId: 'acc-pivot',
+    accountId: 'acc-principal',
     origin: 'imported',
     date: '2026-09-03',
     label,
@@ -128,12 +128,12 @@ describe('moteur de règles (D23)', () => {
 
   it('ce que l’import a établi survit au passage des règles (D33)', () => {
     const l = withOps(op('o1', 'VIR LIVRET', euros(-100), { transferAccountId: 'acc-livret' }));
-    l.allocations.push({ id: 'al1', operationId: 'o1', envelopeId: 'env-vacances', share: { kind: 'variable' } });
+    l.allocations.push({ id: 'al1', operationId: 'o1', tirelireId: 'env-vacances', share: { kind: 'variable' } });
     const patch = applyAutomations(l);
     // La ventilation posée par l'appariement survit ; seul l'état suit (le virement est rapproché).
     expect(patch.removedAllocations).toEqual([]);
     // La ligne est réécrite à l'identique (même identifiant), pas remplacée.
-    expect(patch.allocations.map((a) => [a.id, a.envelopeId])).toEqual([['al1', 'env-vacances']]);
+    expect(patch.allocations.map((a) => [a.id, a.tirelireId])).toEqual([['al1', 'env-vacances']]);
     expect(patch.operations[0]!.state).toBe('reconciled');
   });
 
@@ -148,11 +148,11 @@ describe('moteur de règles (D23)', () => {
     expect(l.automations.find((r) => r.id === 'essai')).toBeUndefined();
   });
 
-  it('la catégorie apporte son enveloppe par défaut (D32)', () => {
+  it('la catégorie apporte son tirelire par défaut (D32)', () => {
     const l = withOps(op('o1', 'SUPERMARCHE', euros(-40)));
     l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
     const patch = applyAutomations(l);
-    expect(patch.allocations[0]!.envelopeId).toBe('env-alim');
+    expect(patch.allocations[0]!.tirelireId).toBe('env-alim');
   });
 });
 
@@ -176,7 +176,7 @@ describe('actions groupées (D26)', () => {
   it('une sélection manuelle propose un filtre qui la reproduit', () => {
     const sel = inferSelection([op('o1', 'SUPERMARCHE CASINO PARIS', euros(-40)), op('o2', 'SUPERMARCHE CASINO LYON', euros(-60))]);
     expect(sel.labelPattern).toBe('SUPERMARCHE.*CASINO');
-    expect(sel.accountId).toBe('acc-pivot');
+    expect(sel.accountId).toBe('acc-principal');
     expect(selects(sel, op('o3', 'SUPERMARCHE CASINO NICE', euros(-50)))).toBe(true);
   });
 });

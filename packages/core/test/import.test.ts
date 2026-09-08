@@ -4,14 +4,14 @@ import {
   bankMultiAccountProfile,
   decodeBytes,
   detectDelimiter,
-  envelopeBalance,
-  envelopeComponents,
+  tirelireBalance,
+  tirelireComponents,
   euros,
   exampleLedger,
   guessColumns,
   indexLedger,
   matchAccountByNumber,
-  matchEnvelopeTransfers,
+  matchTirelireTransfers,
   missingFlows,
   newProfileFromRows,
   normalizeAccountNumber,
@@ -53,7 +53,7 @@ function ledgerWithBank(): { ledger: Ledger; profile: ReturnType<typeof bankMult
   ledger.operations = [];
   ledger.allocations = [];
   const profile = bankMultiAccountProfile('prof-bank');
-  profile.accountMap = { '00011111111': 'acc-pivot' };
+  profile.accountMap = { '00011111111': 'acc-principal' };
   return { ledger, profile };
 }
 
@@ -139,19 +139,19 @@ describe('rapprochement', () => {
 
   it('virements « TIRELIRE <COMPTE> » reconnus par compte et répartis par l’ordre de financement (D21)', () => {
     const l = imported();
-    const patch = matchEnvelopeTransfers(l);
+    const patch = matchTirelireTransfers(l);
     expect(patch.operations.length).toBe(2);
     const l2 = applyPatchToLedger(l, patch);
     const idx = indexLedger(l2);
     // 100 € vers le livret : le plancher de la taxe foncière (rattrapage 150) passe avant tout ; le solde ne bouge pas.
-    const tf = envelopeComponents(idx.envelopesById.get('env-tf')!, idx, '2026-09-06');
+    const tf = tirelireComponents(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06');
     expect(tf.get('acc-livret')).toBe(euros(1000));
-    expect(tf.get('acc-pivot')).toBe(euros(50));
-    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
+    expect(tf.get('acc-principal')).toBe(euros(50));
+    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
     // 200 € vers la carte enfants : dotation déplacée là (aucune dépense saisie dans ce test)
-    const enfants = envelopeComponents(idx.envelopesById.get('env-enfants')!, idx, '2026-09-06');
+    const enfants = tirelireComponents(idx.tirelliresById_TMP.get('env-enfants')!, idx, '2026-09-06');
     expect(enfants.get('acc-enfants')).toBe(euros(200));
-    expect(envelopeBalance(idx.envelopesById.get('env-enfants')!, idx, '2026-09-06')).toBe(euros(200));
+    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-enfants')!, idx, '2026-09-06')).toBe(euros(200));
     const op = l2.operations.find((o) => o.normalizedLabel.includes('LIVRET A'))!;
     expect(op.state).toBe('reconciled');
     expect(op.transferAccountId).toBeDefined();
@@ -184,15 +184,15 @@ describe('rapprochement', () => {
     expect(proposeMatches(l2, '2026-08-01', '2026-09-30').some((p) => p.flowId === 'flow-credit')).toBe(false);
   });
 
-  it('règles : motif → catégorie et enveloppe du budget', () => {
+  it('règles : motif → catégorie et tirelire du budget', () => {
     const l = imported();
     l.automations.push({ id: 'r1', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' }, rank: 'm' });
     const patch = applyAutomations(l);
     expect(patch.operations.length).toBe(2);
-    expect(patch.allocations[0]!.envelopeId).toBe('env-alim');
+    expect(patch.allocations[0]!.tirelireId).toBe('env-alim');
     const l2 = applyPatchToLedger(l, patch);
     const idx = indexLedger(l2);
-    expect(envelopeBalance(idx.envelopesById.get('env-alim')!, idx, '2026-09-06')).toBe(euros(900 - 170.8));
+    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-alim')!, idx, '2026-09-06')).toBe(euros(900 - 170.8));
     expect(suggestPattern(l.operations.find((o) => o.normalizedLabel.includes('EAU'))!)).toBe('EAU.*VILLAGE');
   });
 
@@ -200,7 +200,7 @@ describe('rapprochement', () => {
     let l = imported();
     l.automations.push({ id: 'r1', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' }, rank: 'm' });
     const report = runPipeline(l, '2026-08-01', '2026-09-30', (p: Patch) => (l = applyPatchToLedger(l, p)));
-    expect(report.envelopeTransfers).toBe(2);
+    expect(report.tirelireTransfers).toBe(2);
     expect(report.autoMatched).toBe(2);
     expect(report.ruled).toBe(2);
     expect(report.proposals.map((p) => p.flowId)).toEqual(['flow-salaire']);
@@ -211,13 +211,13 @@ describe('rapprochement', () => {
     const missing = missingFlows(l, '2026-08-01', '2026-09-20');
     expect(missing.map((m) => m.flowId)).toContain('flow-loyer');
     expect(missing.map((m) => m.flowId)).not.toContain('flow-credit');
-    // Non affecté du pivot : solde bancaire − composantes portées, dotations non encore virées comprises
-    // (taxe foncière 150 − 100 virés, assurance auto 50, vacances 200, précaution 300, budgets du pivot).
+    // Non affecté du compte principal : solde bancaire − composantes portées, dotations non encore virées comprises
+    // (taxe foncière 150 − 100 virés, assurance auto 50, vacances 200, précaution 300, budgets du compte principal).
     const idx = indexLedger(l);
-    const pivot = idx.accountsById.get('acc-pivot')!;
+    const principal = idx.accountsById.get('acc-principal')!;
     const bank = 2340 + 3400 - 100 - 200 - 950 + 100 - 170.8 - 76;
     const reserved = 50 + 50 + 200 + 300 + (900 - 170.8) + 200 + 250 + 100;
-    expect(unallocated(pivot, l, idx, '2026-09-20')).toBe(euros(bank - reserved));
+    expect(unallocated(principal, l, idx, '2026-09-20')).toBe(euros(bank - reserved));
   });
 
   it('virements internes appariés entre deux comptes importés', () => {
@@ -235,28 +235,28 @@ describe('rapprochement', () => {
     const patch = pairInternalTransfers(l);
     expect(patch.operations.length).toBe(2);
     expect(patch.operations.every((o) => o.state === 'reconciled' && o.transferAccountId)).toBe(true);
-    // Puis le virement est ventilé côté pivot, sans double compte côté livret.
+    // Puis le virement est ventilé côté principal, sans double compte côté livret.
     let l2 = applyPatchToLedger(l, patch);
-    l2 = applyPatchToLedger(l2, matchEnvelopeTransfers(l2));
+    l2 = applyPatchToLedger(l2, matchTirelireTransfers(l2));
     const idx = indexLedger(l2);
-    const tf = envelopeComponents(idx.envelopesById.get('env-tf')!, idx, '2026-09-06');
+    const tf = tirelireComponents(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06');
     expect(tf.get('acc-livret')).toBe(euros(1000));
-    expect(envelopeBalance(idx.envelopesById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
+    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
   });
 });
 
 describe('correspondance des comptes par numéro', () => {
-  const pivot: Account = { id: 'acc-pivot', name: 'Pivot', kind: 'pivot', openingBalance: 0, openingDate: '2026-01-01', accountNumber: 'FR76 1234 5678 9012 3456 7890 123' };
+  const principal: Account = { id: 'acc-principal', name: 'Principal', kind: 'principal', openingBalance: 0, openingDate: '2026-01-01', accountNumber: 'FR76 1234 5678 9012 3456 7890 123' };
   const livret: Account = { id: 'acc-livret', name: 'Livret', kind: 'holding', openingBalance: 0, openingDate: '2026-01-01', accountNumber: '00012345678' };
   const sansNumero: Account = { id: 'acc-autre', name: 'Autre', kind: 'holding', openingBalance: 0, openingDate: '2026-01-01' };
-  const accounts = [pivot, livret, sansNumero];
+  const accounts = [principal, livret, sansNumero];
 
   it('normalise en retirant espaces et ponctuation, insensible à la casse', () => {
     expect(normalizeAccountNumber('fr76 1234-5678.9012')).toBe('FR76123456789012');
   });
 
   it('retrouve un compte par IBAN malgré les espaces', () => {
-    expect(matchAccountByNumber(accounts, 'FR7612345678901234567890123')?.id).toBe('acc-pivot');
+    expect(matchAccountByNumber(accounts, 'FR7612345678901234567890123')?.id).toBe('acc-principal');
   });
 
   it('retrouve un compte quand seuls les derniers chiffres sont fournis', () => {

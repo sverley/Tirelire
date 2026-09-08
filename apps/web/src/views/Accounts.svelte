@@ -19,10 +19,10 @@
 
   const accounts = $derived(alive(app.ledger.accounts));
   const idx = $derived(indexLedger(app.ledger));
-  const hasPivot = $derived(accounts.some((a) => a.kind === 'pivot'));
+  const hasPivot = $derived(accounts.some((a) => a.kind === 'principal'));
 
   function startNew() {
-    editing = { id: app.newId(), name: '', kind: hasPivot ? 'holding' : 'pivot', openingBalance: 0, openingDate: app.asOf };
+    editing = { id: app.newId(), name: '', kind: hasPivot ? 'holding' : 'principal', openingBalance: 0, openingDate: app.asOf };
     form = { name: '', kind: editing.kind, bank: '', accountNumber: '', openingBalance: '0,00', openingDate: app.asOf, payDay: '1', settlementThreshold: '10,00', settlementDirection: 'both' };
     error = '';
   }
@@ -49,8 +49,8 @@
     const openingBalance = inputToCents(form.openingBalance);
     if (!form.name.trim()) return void (error = 'Le nom est obligatoire.');
     if (openingBalance === undefined) return void (error = 'Solde initial invalide.');
-    if (form.kind === 'pivot' && accounts.some((a) => a.kind === 'pivot' && a.id !== editing!.id))
-      return void (error = 'Il ne peut y avoir qu’un seul compte pivot.');
+    if (form.kind === 'principal' && accounts.some((a) => a.kind === 'principal' && a.id !== editing!.id))
+      return void (error = 'Il ne peut y avoir qu’un seul compte principal.');
     const payDay = Number(form.payDay);
     const row: Account = {
       id: editing.id,
@@ -60,7 +60,7 @@
       openingDate: form.openingDate,
       ...(form.bank.trim() ? { bank: form.bank.trim() } : {}),
       ...(form.accountNumber.trim() ? { accountNumber: form.accountNumber.trim() } : {}),
-      ...(form.kind === 'pivot' ? { payDay: Math.min(31, Math.max(1, payDay || 1)) } : {}),
+      ...(form.kind === 'principal' ? { payDay: Math.min(31, Math.max(1, payDay || 1)) } : {}),
       ...(form.kind === 'third'
         ? { settlementThreshold: inputToCents(form.settlementThreshold) ?? 0, settlementDirection: form.settlementDirection }
         : {}),
@@ -76,7 +76,7 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Comptes</h1>
-<p class="muted small">Le pivot est le compte réel par lequel tout transite. Les comptes d'accueil hébergent des enveloppes ; les comptes tiers ne sont pas importés, on y saisit à la main ce qui concerne le plan.</p>
+<p class="muted small">Le compte principal est le compte réel par lequel tout transite. Les comptes d'accueil hébergent des tirelires ; les comptes tiers ne sont pas importés, on y saisit à la main ce qui concerne le plan.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew}>Ajouter un compte</button>
@@ -95,7 +95,7 @@
       <label class="f">Numéro de compte ou IBAN (facultatif) <input bind:value={form.accountNumber} placeholder="FR76 1234 5678 90…" /></label>
       <label class="f">Solde initial <input bind:value={form.openingBalance} inputmode="decimal" /></label>
       <label class="f">Date du solde initial <input type="date" bind:value={form.openingDate} /></label>
-      {#if form.kind === 'pivot'}
+      {#if form.kind === 'principal'}
         <label class="f">Jour de paie (début de période) <input type="number" min="1" max="31" bind:value={form.payDay} /></label>
       {/if}
       {#if form.kind === 'third'}
@@ -103,8 +103,8 @@
         <label class="f">Sens autorisé
           <select bind:value={form.settlementDirection}>
             <option value="both">Dans les deux sens</option>
-            <option value="toThird">Pivot → ce compte seulement</option>
-            <option value="fromThird">Ce compte → pivot seulement</option>
+            <option value="toThird">Principal → ce compte seulement</option>
+            <option value="fromThird">Ce compte → principal seulement</option>
           </select>
         </label>
       {/if}
@@ -118,11 +118,11 @@
 {/if}
 
 {#each accounts as a (a.id)}
-  <div class="card" class:accent={a.kind === 'pivot'}>
+  <div class="card" class:accent={a.kind === 'principal'}>
     <div class="row">
       <div class="label">
-        <strong>{a.name}</strong> <span class="pill">{a.kind === 'pivot' ? 'pivot' : a.kind === 'holding' ? 'accueil' : 'tiers'}</span>
-        <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.kind === 'pivot' ? ` · paie le ${a.payDay ?? 1}` : ''}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
+        <strong>{a.name}</strong> <span class="pill">{a.kind === 'principal' ? 'principal' : a.kind === 'holding' ? 'accueil' : 'tiers'}</span>
+        <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.kind === 'principal' ? ` · paie le ${a.payDay ?? 1}` : ''}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
       </div>
       <div>
         <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>
@@ -132,14 +132,14 @@
     {#if a.kind === 'third'}
       {@const owes = settlementBalance(a, app.ledger, idx, app.asOf)}
       <div class="row">
-        <div class="label">{owes >= 0 ? 'Le pivot lui doit' : 'Il doit au pivot'}</div>
+        <div class="label">{owes >= 0 ? 'Le compte principal lui doit' : 'Il doit au compte principal'}</div>
         <div class="num">{money(Math.abs(owes))}</div>
       </div>
     {:else}
       <div class="row"><div class="label">Solde reconstruit au {shortDate(app.asOf)}</div><div class="num">{money(accountBalance(a, app.ledger, app.asOf))}</div></div>
-      <div class="row"><div class="label">Non affecté (solde − enveloppes hébergées)</div><div class="{moneyClass(unallocated(a, app.ledger, idx, app.asOf))}">{money(unallocated(a, app.ledger, idx, app.asOf))}</div></div>
+      <div class="row"><div class="label">Non affecté (solde − tirelires hébergées)</div><div class="{moneyClass(unallocated(a, app.ledger, idx, app.asOf))}">{money(unallocated(a, app.ledger, idx, app.asOf))}</div></div>
     {/if}
   </div>
 {:else}
-  <div class="empty">Aucun compte. Commence par le pivot.</div>
+  <div class="empty">Aucun compte. Commence par le compte principal.</div>
 {/each}

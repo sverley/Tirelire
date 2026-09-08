@@ -1,6 +1,6 @@
 /**
  * Après import : virements internes, rapprochement de flux prévus, virements vers
- * les enveloppes (par libellé), règles de catégorisation, flux attendus non reçus.
+ * les tirelires (par libellé), règles de catégorisation, flux attendus non reçus.
  *
  * Toutes les fonctions sont pures : elles reçoivent le grand livre et rendent
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
@@ -10,7 +10,7 @@ import { alive, isLocked } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
 import { fundByPriority, transferLabel } from './plan.js';
-import { envelopeComponents, indexLedger, periodSnapshot } from './balances.js';
+import { tirelireComponents, indexLedger, periodSnapshot } from './balances.js';
 import { uuidv7, normalizeLabel } from './ids.js';
 import { applyAutomations } from './automations.js';
 
@@ -70,44 +70,44 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
 // ---------------------------------------------------------------------------
 
 /**
- * Répartit un virement constaté du pivot vers `accountId` entre les enveloppes placées sur ce
+ * Répartit un virement constaté du compte principal vers `accountId` entre les tirelires placées sur ce
  * compte, par l'ordre de financement de D06 : les planchers (rattrapages d'échéances) d'abord,
- * puis les écarts de placement par priorité ; le reste, s'il y en a, va à la première enveloppe.
- * Rend, par enveloppe, la part (positive) à ventiler.
+ * puis les écarts de placement par priorité ; le reste, s'il y en a, va à la première tirelire.
+ * Rend, par tirelire, la part (positive) à ventiler.
  */
-export function distributeTransfer(ledger: Ledger, accountId: Id, amount: Cents, asOf: ISODate): Array<{ envelopeId: Id; amount: Cents }> {
+export function distributeTransfer(ledger: Ledger, accountId: Id, amount: Cents, asOf: ISODate): Array<{ tirelireId: Id; amount: Cents }> {
   const idx = indexLedger(ledger);
-  const pivot = idx.pivot;
-  const lines: Array<{ envelopeId: Id; name: string; priority: number; dueDate: string; floor: Cents; requested: Cents; funded: Cents }> = [];
-  for (const e of idx.envelopesById.values()) {
-    // Enveloppes qui veulent de l'argent sur ce compte (D38).
+  const principal = idx.principal;
+  const lines: Array<{ tirelireId: Id; name: string; priority: number; dueDate: string; floor: Cents; requested: Cents; funded: Cents }> = [];
+  for (const e of idx.tirelliresById_TMP.values()) {
+    // Tirelires qui veulent de l'argent sur ce compte (D38).
     if (!e.placement.some((p) => p.accountId === accountId)) continue;
-    const comps = envelopeComponents(e, idx, asOf);
-    const gap = pivot ? (comps.get(pivot.id) ?? 0) : 0;
+    const comps = tirelireComponents(e, idx, asOf);
+    const gap = principal ? (comps.get(principal.id) ?? 0) : 0;
     if (gap <= 0) continue;
     const snap = periodSnapshot(e, idx, asOf);
     const floor = Math.min(gap, snap?.needs.reduce((s, n) => s + n.floor, 0) ?? 0);
-    const priority = Math.min(...(idx.needsByEnvelope.get(e.id) ?? []).map((n) => n.priority), 1000);
+    const priority = Math.min(...(idx.needsByTirelire.get(e.id) ?? []).map((n) => n.priority), 1000);
     const dueDate = (snap?.needs.map((n) => n.dueDate).filter((d): d is string => !!d).sort()[0]) ?? '9999-12-31';
-    lines.push({ envelopeId: e.id, name: e.name, priority, dueDate, floor, requested: gap, funded: 0 });
+    lines.push({ tirelireId: e.id, name: e.name, priority, dueDate, floor, requested: gap, funded: 0 });
   }
   // À priorité égale, l'échéance la plus proche d'abord.
   lines.sort((a, b) => a.priority - b.priority || a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, 'fr'));
   const rest = fundByPriority(lines, Math.abs(amount));
-  const out = lines.filter((l) => l.funded > 0).map((l) => ({ envelopeId: l.envelopeId, amount: l.funded }));
+  const out = lines.filter((l) => l.funded > 0).map((l) => ({ tirelireId: l.tirelireId, amount: l.funded }));
   if (rest > 0) {
     if (out.length > 0) out[0]!.amount += rest;
-    else if (lines.length > 0) out.push({ envelopeId: lines[0]!.envelopeId, amount: rest });
+    else if (lines.length > 0) out.push({ tirelireId: lines[0]!.tirelireId, amount: rest });
   }
   return out;
 }
 
 /**
  * Une opération importée dont le libellé contient le libellé de virement d'un autre compte suivi
- * est un virement interne vers ce compte ; son montant est ventilé sur les enveloppes qui y sont
- * placées (`distributeTransfer`). Sans enveloppe placée là, le virement est reconnu sans ventilation.
+ * est un virement interne vers ce compte ; son montant est ventilé sur les tirelires qui y sont
+ * placées (`distributeTransfer`). Sans tirelire placée là, le virement est reconnu sans ventilation.
  */
-export function matchEnvelopeTransfers(ledger: Ledger): Patch {
+export function matchTirelireTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
   const accounts = alive(ledger.accounts).map((a) => ({ a, label: transferLabel(a.name).replace(/^TIRELIRE /, '') }));
   const transferCategory = alive(ledger.categories).find((c) => /^virement/i.test(c.name));
@@ -127,7 +127,7 @@ export function matchEnvelopeTransfers(ledger: Ledger): Patch {
       patch.allocations.push({
         id: uuidv7(),
         operationId: op.id,
-        envelopeId: part.envelopeId,
+        tirelireId: part.tirelireId,
         share: { kind: 'fixed', amount: -part.amount },
         ...(transferCategory ? { categoryId: transferCategory.id } : {}),
       });
@@ -240,10 +240,10 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
     const exact = op.amount === f.amount;
     const category = f.categoryId;
     const lines = exact
-      ? f.plannedAllocation.map((l) => ({ envelopeId: l.envelopeId, share: l.share }))
+      ? f.plannedAllocation.map((l) => ({ tirelireId: l.tirelireId, share: l.share }))
       : target
         ? distributeTransfer(ledger, target, op.amount, op.date).map((part) => ({
-            envelopeId: part.envelopeId,
+            tirelireId: part.tirelireId,
             share: { kind: 'fixed' as const, amount: op.amount < 0 ? -part.amount : part.amount },
           }))
         : [];
@@ -251,21 +251,21 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
       patch.allocations.push({
         id: uuidv7(),
         operationId: op.id,
-        envelopeId: line.envelopeId,
+        tirelireId: line.tirelireId,
         share: line.share,
         ...(category ? { categoryId: category } : {}),
       });
     }
     return patch;
   }
-  if (existing.length === 0 && (f.categoryId || f.envelopeId)) {
+  if (existing.length === 0 && (f.categoryId || f.tirelireId)) {
     patch.allocations.push({
       id: uuidv7(),
       operationId: op.id,
       // Part variable : la ventilation d'un flux à montant variable reste rejouable (D27).
       share: { kind: 'variable' },
       ...(f.categoryId ? { categoryId: f.categoryId } : {}),
-      ...(f.envelopeId ? { envelopeId: f.envelopeId } : {}),
+      ...(f.tirelireId ? { tirelireId: f.tirelireId } : {}),
     });
   }
   return patch;
@@ -318,7 +318,7 @@ export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): Miss
 
 export interface PipelineReport {
   transfersPaired: number;
-  envelopeTransfers: number;
+  tirelireTransfers: number;
   autoMatched: number;
   proposals: MatchProposal[];
   ruled: number;
@@ -333,7 +333,7 @@ export function runPipeline(ledger: Ledger, from: ISODate, to: ISODate, apply: (
   let l = ledger;
   const t = pairInternalTransfers(l);
   l = apply(t);
-  const e = matchEnvelopeTransfers(l);
+  const e = matchTirelireTransfers(l);
   l = apply(e);
   const proposals = proposeMatches(l, from, to);
   let autoMatched = 0;
@@ -345,7 +345,7 @@ export function runPipeline(ledger: Ledger, from: ISODate, to: ISODate, apply: (
   l = apply(r);
   return {
     transfersPaired: t.operations.length / 2,
-    envelopeTransfers: e.operations.length,
+    tirelireTransfers: e.operations.length,
     autoMatched,
     proposals: proposals.filter((p) => !p.auto),
     ruled: r.operations.length,

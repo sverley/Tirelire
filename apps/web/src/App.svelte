@@ -4,7 +4,7 @@
   import { isNative } from './lib/platform';
   import Plan from './views/Plan.svelte';
   import Accounts from './views/Accounts.svelte';
-  import Envelopes from './views/Envelopes.svelte';
+  import Tirelires from './views/Tirelires.svelte';
   import Categories from './views/Categories.svelte';
   import Flows from './views/Flows.svelte';
   import Entries from './views/Entries.svelte';
@@ -21,7 +21,7 @@
     { id: 'operations', label: 'Opérations', ico: '☰', group: ['operations'] },
     { id: 'import', label: 'Import', ico: '⇩', group: ['import'] },
     { id: 'review', label: 'Bilan', ico: '◔', group: ['review'] },
-    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'envelopes', 'categories', 'flows', 'entries', 'settings', 'sync', 'wizard'] },
+    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'tirelires', 'categories', 'flows', 'entries', 'settings', 'sync', 'wizard'] },
   ];
 
   // Geste « retour » Android : revient à l'écran précédent au lieu de quitter l'appli
@@ -69,8 +69,8 @@
     <Wizard />
   {:else if app.view === 'accounts'}
     <Accounts />
-  {:else if app.view === 'envelopes'}
-    <Envelopes />
+  {:else if app.view === 'tirelires'}
+    <Tirelires />
   {:else if app.view === 'categories'}
     <Categories />
   {:else if app.view === 'flows'}

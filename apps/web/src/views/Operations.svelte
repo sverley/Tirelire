@@ -41,7 +41,7 @@
   let editingId = $state<string | undefined>(undefined);
 
   // Formulaire de ventilation : chaque ligne porte une part (D27).
-  type LineForm = { id?: string; categoryId: string; envelopeId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
+  type LineForm = { id?: string; categoryId: string; tirelireId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
   let lines = $state<LineForm[]>([]);
   let newCategory = $state('');
   let oneOff = $state(false);
@@ -53,17 +53,17 @@
   let selected = $state<Set<string>>(new Set());
   let bulkOpen = $state(false);
   let bulkCategory = $state('');
-  let bulkEnvelope = $state('');
+  let bulkTirelire = $state('');
   let bulkState = $state<'lock' | 'reconcile' | 'none' | 'unlock'>('lock');
   let bulkOneOff = $state<'' | 'yes' | 'no'>('');
   let automationName = $state('');
   let saved = $state('');
 
   const accounts = $derived(alive(app.ledger.accounts));
-  const envelopes = $derived(alive(app.ledger.envelopes));
+  const tirelires = $derived(alive(app.ledger.tirelires));
   const categories = $derived(alive(app.ledger.categories).sort((a, b) => a.name.localeCompare(b.name, 'fr')));
   const flows = $derived(alive(app.ledger.plannedFlows));
-  const period = $derived(payPeriodContaining(app.asOf, accounts.find((a) => a.kind === 'pivot')?.payDay ?? 1));
+  const period = $derived(payPeriodContaining(app.asOf, accounts.find((a) => a.kind === 'principal')?.payDay ?? 1));
   const allocByOp = $derived.by(() => {
     const m = new Map<string, Allocation[]>();
     for (const a of alive(app.ledger.allocations)) {
@@ -108,7 +108,7 @@
   const untreatedCount = $derived(alive(app.ledger.operations).filter((o) => o.state === 'untreated').length);
 
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
-  const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
+  const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
   const flowName = (id: string | undefined) => flows.find((f) => f.id === id)?.name;
 
@@ -124,12 +124,12 @@
       ? existing.map((a) => ({
           id: a.id,
           categoryId: a.categoryId ?? '',
-          envelopeId: a.envelopeId ?? '',
+          tirelireId: a.tirelireId ?? '',
           kind: a.share.kind,
           value: a.share.kind === 'fixed' ? centsToInput(a.share.amount) : a.share.kind === 'percent' ? String(a.share.pct) : '',
         }))
       // Toute opération a par défaut une ligne unique variable, qui prend l'intégralité du montant.
-      : [{ categoryId: '', envelopeId: '', kind: 'variable' as const, value: '' }];
+      : [{ categoryId: '', tirelireId: '', kind: 'variable' as const, value: '' }];
     newCategory = '';
     oneOff = !!op.oneOff;
     makeRule = false;
@@ -142,8 +142,8 @@
     const hasVariable = lines.some((l) => l.kind === 'variable');
     lines.push(
       hasVariable
-        ? { categoryId: '', envelopeId: '', kind: 'fixed', value: centsToInput(rest(op)) }
-        : { categoryId: '', envelopeId: '', kind: 'variable', value: '' },
+        ? { categoryId: '', tirelireId: '', kind: 'fixed', value: centsToInput(rest(op)) }
+        : { categoryId: '', tirelireId: '', kind: 'variable', value: '' },
     );
   }
 
@@ -152,7 +152,7 @@
     return lines.map((l) => ({
       ...(l.id ? { id: l.id } : {}),
       ...(l.categoryId ? { categoryId: l.categoryId } : {}),
-      ...(l.envelopeId ? { envelopeId: l.envelopeId } : {}),
+      ...(l.tirelireId ? { tirelireId: l.tirelireId } : {}),
       share:
         l.kind === 'fixed'
           ? ({ kind: 'fixed', amount: inputToCents(l.value) ?? 0 } as const)
@@ -176,7 +176,7 @@
 
   function onCategory(i: number) {
     const c = categories.find((x) => x.id === lines[i]!.categoryId);
-    if (c?.envelopeId && !lines[i]!.envelopeId) lines[i]!.envelopeId = c.envelopeId;
+    if (c?.tirelireId && !lines[i]!.tirelireId) lines[i]!.tirelireId = c.tirelireId;
   }
 
   function save(op: Operation) {
@@ -206,7 +206,7 @@
         action: {
           state: 'reconcile',
           ...(first?.categoryId ? { categoryId: first.categoryId } : {}),
-          ...(first?.envelopeId ? { envelopeId: first.envelopeId } : {}),
+          ...(first?.tirelireId ? { tirelireId: first.tirelireId } : {}),
         },
         rank: topRank(app.ledger),
       };
@@ -239,7 +239,7 @@
   function bulkActionValue() {
     return {
       ...(bulkCategory ? { categoryId: bulkCategory } : {}),
-      ...(bulkEnvelope ? { envelopeId: bulkEnvelope } : {}),
+      ...(bulkTirelire ? { tirelireId: bulkTirelire } : {}),
       ...(bulkOneOff ? { oneOff: bulkOneOff === 'yes' } : {}),
       state: bulkState,
     };
@@ -410,10 +410,10 @@
           {#each categories as c}<option value={c.id}>{c.name}</option>{/each}
         </select>
       </label>
-      <label class="f">Enveloppe
-        <select bind:value={bulkEnvelope}>
+      <label class="f">Tirelire
+        <select bind:value={bulkTirelire}>
           <option value="">— (ne pas toucher)</option>
-          {#each envelopes as e}<option value={e.id}>{e.name}</option>{/each}
+          {#each tirelires as e}<option value={e.id}>{e.name}</option>{/each}
         </select>
       </label>
       <label class="f">État
@@ -464,7 +464,7 @@
           {#if op.oneOff} · ponctuelle{/if}
           {#if op.plannedFlowId} · {flowName(op.plannedFlowId)}{/if}
           {#if op.transferAccountId} · → {accountName(op.transferAccountId)}{/if}
-          {#if allocs.length} · {allocs.map((a) => [categoryName(a.categoryId), envelopeName(a.envelopeId)].filter(Boolean).join(' / ')).join(' + ')}{/if}
+          {#if allocs.length} · {allocs.map((a) => [categoryName(a.categoryId), tirelireName(a.tirelireId)].filter(Boolean).join(' / ')).join(' + ')}{/if}
           {#if op.suggestedCategory && !allocs.length} · banque : {op.suggestedCategory}{/if}
         </span>
         {#if prop && op.state !== 'locked'}
@@ -490,10 +490,10 @@
                   {#each categories as c}<option value={c.id}>{c.name}</option>{/each}
                 </select>
               </label>
-              <label class="f">Enveloppe
-                <select bind:value={l.envelopeId}>
+              <label class="f">Tirelire
+                <select bind:value={l.tirelireId}>
                   <option value="">— (non affecté)</option>
-                  {#each envelopes as e}<option value={e.id}>{e.name}</option>{/each}
+                  {#each tirelires as e}<option value={e.id}>{e.name}</option>{/each}
                 </select>
               </label>
               <label class="f">Part

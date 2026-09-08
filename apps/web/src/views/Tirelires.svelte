@@ -3,19 +3,19 @@
   import { money, shortDate, centsToInput, inputToCents, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS, periodicityLabel } from '../lib/format';
   import {
     alive,
-    envelopeBalance,
-    envelopeComponents,
+    tirelireBalance,
+    tirelireComponents,
     indexLedger,
     needCruise,
     nextOccurrence,
     DEFAULT_PRIORITY,
-    type Envelope,
+    type Tirelire,
     type Need,
     type NeedKind,
   } from '@tirelire/core';
 
-  // Enveloppe : nom, placement voulu (D20), solde initial, report (D05/D29).
-  let editing = $state<Envelope | undefined>(undefined);
+  // Tirelire : nom, placement voulu (D20), solde initial, report (D05/D29).
+  let editing = $state<Tirelire | undefined>(undefined);
   type PlacementForm = { accountId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
   let form = $state({
     name: '',
@@ -27,7 +27,7 @@
   });
   let error = $state('');
 
-  // Besoin : un ou plusieurs par enveloppe (D28).
+  // Besoin : un ou plusieurs par tirelire (D28).
   let editingNeed = $state<{ need: Need; isNew: boolean } | undefined>(undefined);
   let needForm = $state({
     name: '',
@@ -41,21 +41,21 @@
   let needError = $state('');
 
   const accounts = $derived(alive(app.ledger.accounts));
-  const envelopes = $derived(alive(app.ledger.envelopes));
+  const tirelires = $derived(alive(app.ledger.tirelires));
   const needs = $derived(alive(app.ledger.needs));
   const idx = $derived(indexLedger(app.ledger));
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? '?';
-  const needsOf = (e: Envelope) => needs.filter((n) => n.envelopeId === e.id).sort((a, b) => a.priority - b.priority);
+  const needsOf = (e: Tirelire) => needs.filter((n) => n.tirelireId === e.id).sort((a, b) => a.priority - b.priority);
 
   // Regroupement d'affichage : par premier compte de placement (D38), ou « sans placement ».
   const byPlacement = $derived(
     accounts
-      .map((a) => ({ account: a, envelopes: envelopes.filter((e) => e.placement[0]?.accountId === a.id) }))
-      .filter((g) => g.envelopes.length > 0),
+      .map((a) => ({ account: a, tirelires: tirelires.filter((e) => e.placement[0]?.accountId === a.id) }))
+      .filter((g) => g.tirelires.length > 0),
   );
-  const orphans = $derived(envelopes.filter((e) => e.placement.length === 0 || !accounts.some((a) => a.id === e.placement[0]?.accountId)));
+  const orphans = $derived(tirelires.filter((e) => e.placement.length === 0 || !accounts.some((a) => a.id === e.placement[0]?.accountId)));
 
-  function placementText(e: Envelope): string {
+  function placementText(e: Tirelire): string {
     if (e.placement.length === 0) return 'placement libre';
     return e.placement
       .map((p) => {
@@ -68,11 +68,11 @@
   }
 
   function startNew() {
-    const pivot = accounts.find((a) => a.kind === 'pivot');
+    const principal = accounts.find((a) => a.kind === 'principal');
     editing = { id: app.newId(), name: '', placement: [], openingBalance: 0, openingDate: app.asOf };
     form = {
       name: '',
-      placement: pivot ? [{ accountId: pivot.id, kind: 'variable' as const, value: '' }] : [],
+      placement: principal ? [{ accountId: principal.id, kind: 'variable' as const, value: '' }] : [],
       openingBalance: '0,00',
       openingDate: app.asOf,
       rollover: 'unlimited',
@@ -81,7 +81,7 @@
     error = '';
   }
 
-  function startEdit(e: Envelope) {
+  function startEdit(e: Tirelire) {
     editing = e;
     form = {
       name: e.name,
@@ -107,7 +107,7 @@
     if (form.placement.some((p) => !p.accountId)) return void (error = 'Chaque ligne de placement vise un compte.');
     const openingBalance = inputToCents(form.openingBalance);
     if (openingBalance === undefined) return void (error = 'Solde initial invalide.');
-    const row: Envelope = {
+    const row: Tirelire = {
       id: editing.id,
       name: form.name.trim(),
       placement: form.placement.map((p) => ({
@@ -126,18 +126,18 @@
           ? { mode: 'capped', months: Math.max(1, Number(form.rolloverMonths) || 1) }
           : { mode: form.rollover },
     };
-    app.upsert('envelopes', row);
+    app.upsert('tirelires', row);
     editing = undefined;
   }
 
-  function remove(e: Envelope) {
-    if (!confirm(`Supprimer l’enveloppe « ${e.name} » et ses besoins ?`)) return;
+  function remove(e: Tirelire) {
+    if (!confirm(`Supprimer l’tirelire « ${e.name} » et ses besoins ?`)) return;
     for (const n of needsOf(e)) app.remove('needs', n.id);
-    app.remove('envelopes', e.id);
+    app.remove('tirelires', e.id);
   }
 
-  function startNewNeed(e: Envelope) {
-    editingNeed = { need: { id: app.newId(), envelopeId: e.id, kind: 'recurring', priority: DEFAULT_PRIORITY.recurring }, isNew: true };
+  function startNewNeed(e: Tirelire) {
+    editingNeed = { need: { id: app.newId(), tirelireId: e.id, kind: 'recurring', priority: DEFAULT_PRIORITY.recurring }, isNew: true };
     needForm = { name: '', kind: 'recurring', amount: '', intervalMonths: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring) };
     needError = '';
   }
@@ -169,7 +169,7 @@
     const interval = Math.max(1, Number(needForm.intervalMonths) || 1);
     const row: Need = {
       id: editingNeed.need.id,
-      envelopeId: editingNeed.need.envelopeId,
+      tirelireId: editingNeed.need.tirelireId,
       kind: needForm.kind,
       priority: Number(needForm.priority) || DEFAULT_PRIORITY[needForm.kind],
     };
@@ -204,19 +204,19 @@
   }
 
   /** Position réelle : où l'argent se trouve vraiment, comparé au placement voulu (D19, D20). */
-  function positionOf(e: Envelope): Array<{ accountId: string; amount: number }> {
-    return [...envelopeComponents(e, idx, app.asOf)]
+  function positionOf(e: Tirelire): Array<{ accountId: string; amount: number }> {
+    return [...tirelireComponents(e, idx, app.asOf)]
       .filter(([, amount]) => amount !== 0)
       .map(([accountId, amount]) => ({ accountId, amount }));
   }
 </script>
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
-<h1>Enveloppes</h1>
-<p class="muted small">Une enveloppe est un pot à solde unique, réparti sur les comptes où son argent se trouve vraiment. Elle déclare où il devrait dormir, et porte un ou plusieurs besoins : échéance, récurrent, objectif.</p>
+<h1>Tirelires</h1>
+<p class="muted small">Une tirelire est un pot à solde unique, réparti sur les comptes où son argent se trouve vraiment. Elle déclare où il devrait dormir, et porte un ou plusieurs besoins : échéance, récurrent, objectif.</p>
 
 <div class="actions">
-  <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter une enveloppe</button>
+  <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter une tirelire</button>
 </div>
 {#if accounts.length === 0}<div class="empty">Crée d'abord un compte.</div>{/if}
 
@@ -306,8 +306,8 @@
 
 {#each byPlacement as g (g.account.id)}
   <h2>{g.account.name}</h2>
-  {#each g.envelopes as e (e.id)}
-    {@const bal = envelopeBalance(e, idx, app.asOf)}
+  {#each g.tirelires as e (e.id)}
+    {@const bal = tirelireBalance(e, idx, app.asOf)}
     {@const pos = positionOf(e)}
     <div class="card">
       <div class="row">
@@ -334,7 +334,7 @@
         </div>
       {/each}
       {#if needsOf(e).length === 0}
-        <div class="sub" style="padding-left:8px">Aucun besoin : cette enveloppe ne demande rien au plan.</div>
+        <div class="sub" style="padding-left:8px">Aucun besoin : cette tirelire ne demande rien au plan.</div>
       {/if}
       <div class="actions" style="margin:6px 0 0">
         <button class="btn small" onclick={() => startNewNeed(e)}>Ajouter un besoin</button>
@@ -350,6 +350,6 @@
     <div class="card warn"><div class="row"><div class="label">{e.name}<span class="sub">aucun placement voulu : aucun écart ne sera proposé</span></div><button class="btn small" onclick={() => startEdit(e)}>Placer</button></div></div>
   {/each}
 {/if}
-{#if envelopes.length === 0 && accounts.length > 0}
-  <div class="empty">Aucune enveloppe pour l'instant.</div>
+{#if tirelires.length === 0 && accounts.length > 0}
+  <div class="empty">Aucune tirelire pour l'instant.</div>
 {/if}

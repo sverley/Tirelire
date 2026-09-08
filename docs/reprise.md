@@ -19,8 +19,8 @@ faire ensuite, dans quel ordre, et à quoi on reconnaît qu'un lot est fini** : 
 L'alignement du code sur les décisions D19 à D28 est **fait** sur `main`, en cinq commits (lots 0
 à 4), avec 102 tests verts, typecheck et build OK. Ce qui a changé :
 
-- **Enveloppes** : plus de compte hôte ni de type. Une enveloppe est un pot à solde unique réparti
-  sur les comptes (`envelopeComponents`, composantes négatives comprises), qui déclare un placement
+- **Tirelires** : plus de compte hôte ni de type. Une tirelire est un pot à solde unique réparti
+  sur les comptes (`tirelireComponents`, composantes négatives comprises), qui déclare un placement
   voulu et porte des besoins (`needs` : récurrent, échéance, objectif) avec leurs priorités. Les
   deux invariants de D19 sont testés.
 - **Opérations** : trois états (non traitée, rapprochée, verrouillée), « ponctuelle » devenue un
@@ -37,7 +37,7 @@ L'alignement du code sur les décisions D19 à D28 est **fait** sur `main`, en c
 
 Décisions ajoutées en cours de route, à lire avant de toucher au modèle : **D29** (report par
 libération), **D30** (colonnes dépréciées et version de modèle), **D31** (rang = clé triable),
-**D32** (enveloppe par défaut d'une catégorie), **D33** (le moteur part de ce que l'import a
+**D32** (tirelire par défaut d'une catégorie), **D33** (le moteur part de ce que l'import a
 établi), **D34** (la migration verrouille ce que rien ne reproduit), **D36** (le filtre de
 recherche est la sélection d'un automatisme), **D38** (le placement voulu est une répartition),
 **D39** (une règle s'appelle un automatisme, et se crée depuis la recherche).
@@ -53,11 +53,11 @@ suite en lots 6 à 11, à prendre dans l'ordre : le lot 6 (filtrer, agir, régle
 
 Restent aussi :
 
-1. **Rejouer les scénarios navigateur** : l'interface a beaucoup bougé (Enveloppes, Plan,
+1. **Rejouer les scénarios navigateur** : l'interface a beaucoup bougé (Tirelires, Plan,
    Opérations, Flux, Bilan) et n'a aucun test automatisé — c'est le lot 9.
 2. **Branches non fusionnées**, toutes en retard sur `main` et à décider avec Simon :
    `feature/connecteur-banque` (Enable Banking), `feature/assistant-configuration`
-   (**obsolète** : elle crée des enveloppes typées, à refaire plutôt qu'à rebaser),
+   (**obsolète** : elle crée des tirelires typées, à refaire plutôt qu'à rebaser),
    `etude/apprentissage-classification`, `etude/synchronisation-bancaire`. La première porte
    un « D18 » qui entre en collision avec celui de `main` : à renuméroter à partir de D39.
    (`feature/serveur-web` a été rebasée, renumérotée D35 et fusionnée le 7 septembre.)

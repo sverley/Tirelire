@@ -17,9 +17,9 @@
   const transferLines = $derived(plan.lines.filter((l) => !l.virtual));
   const netOut = $derived(plan.transfers.reduce((s, t) => s + t.net, 0));
   const missing = $derived(missingFlows(app.ledger, addDays(plan.period.start, -60), app.asOf));
-  // Écarts qui n'impliquent pas le pivot : ils ne sont dans aucun virement pivot ↔ compte.
-  const pivotId = $derived(app.ledger.accounts.find((a) => a.kind === 'pivot' && !a.deletedAt)?.id);
-  const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== pivotId && g.toAccountId !== pivotId));
+  // Écarts qui n'impliquent pas le compte principal : ils ne sont dans aucun virement principal ↔ compte.
+  const principalId = $derived(app.ledger.accounts.find((a) => a.kind === 'principal' && !a.deletedAt)?.id);
+  const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== principalId && g.toAccountId !== principalId));
   const transferFlows = $derived(alive(app.ledger.plannedFlows).filter((f) => f.kind === 'transfer'));
   const flowFor = (t: PlanTransfer) => transferFlows.find((f) => f.counterpartAccountId === t.accountId);
 
@@ -28,9 +28,9 @@
    * reconnue par montant et libellé, et sa ventilation proposée.
    */
   function saveStandingOrder(t: PlanTransfer) {
-    if (!pivotId) return;
+    if (!principalId) return;
     const existing = flowFor(t);
-    const flow = standingTransferFlow(plan, t, pivotId, existing?.id ?? app.newId());
+    const flow = standingTransferFlow(plan, t, principalId, existing?.id ?? app.newId());
     if (!flow) return;
     if (!confirm(`${existing ? 'Mettre à jour' : 'Enregistrer'} le virement permanent vers « ${t.accountName} » (${money(t.standing)}) ?`)) return;
     app.upsert('plannedFlows', flow);
@@ -83,9 +83,9 @@
     </div>
   {/if}
 
-  <h2>Virements à faire depuis le pivot</h2>
+  <h2>Virements à faire depuis le compte principal</h2>
   {#if plan.transfers.length === 0}
-    <div class="empty">Aucun virement : toutes les enveloppes sont sur le pivot.</div>
+    <div class="empty">Aucun virement : toutes les tirelires sont sur le compte principal.</div>
   {/if}
   {#each plan.transfers as t (t.accountId)}
     <div class="card">
@@ -98,10 +98,10 @@
       </div>
       {#if t.orders.length}
         <div class="orders">
-          {#each t.orders as o (o.envelopeId)}
+          {#each t.orders as o (o.tirelireId)}
             <div class="row">
               <div class="label">
-                {o.envelopeName}
+                {o.tirelireName}
                 <span class="sub">{o.status === 'watch' ? 'petit écart, à surveiller' : 'à faire'}</span>
               </div>
               <div class="num">
@@ -128,28 +128,28 @@
       {/if}
       {#if t.settlement !== 0}
         <div class="row">
-          <div class="label">{t.settlement > 0 ? `Règlement : le pivot doit à ${t.accountName}` : `Règlement : ${t.accountName} doit au pivot`}</div>
+          <div class="label">{t.settlement > 0 ? `Règlement : le compte principal doit à ${t.accountName}` : `Règlement : ${t.accountName} doit au compte principal`}</div>
           <div class="num">{money(Math.abs(t.settlement))}</div>
         </div>
       {/if}
       {#if t.surplus !== 0}
         <div class="row">
-          <div class="label">{t.surplus > 0 ? 'Non affecté sur ce compte, à rapatrier' : 'Enveloppes non couvertes par le solde'}</div>
+          <div class="label">{t.surplus > 0 ? 'Non affecté sur ce compte, à rapatrier' : 'Tirelires non couvertes par le solde'}</div>
           <div class="num">{money(Math.abs(t.surplus))}</div>
         </div>
       {/if}
     </div>
   {/each}
   {#if plan.transfers.length > 1}
-    <div class="row total"><div class="label">Total net à sortir du pivot</div><div class="num">{money(netOut)}</div></div>
+    <div class="row total"><div class="label">Total net à sortir du compte principal</div><div class="num">{money(netOut)}</div></div>
   {/if}
   {#if otherGaps.length}
     <h2>Écarts entre deux comptes</h2>
     <div class="card">
-      {#each otherGaps as g (g.envelopeId + g.fromAccountId)}
+      {#each otherGaps as g (g.tirelireId + g.fromAccountId)}
         <div class="row">
           <div class="label">
-            {g.envelopeName}
+            {g.tirelireName}
             <span class="sub">{accountsById.get(g.fromAccountId)?.name ?? '?'} → {accountsById.get(g.toAccountId)?.name ?? '?'} · {g.status === 'watch' ? 'à surveiller' : 'à faire'}</span>
           </div>
           <div class="num">{money(g.amount)}</div>
@@ -158,12 +158,12 @@
     </div>
   {/if}
 
-  <h2>Enveloppes</h2>
+  <h2>Tirelires</h2>
   <div class="card">
     {#each [...transferLines, ...virtualLines] as l (l.needId)}
       <div class="row">
         <div class="label">
-          <strong>{l.name}</strong>{#if l.name !== l.envelopeName}<span class="sub"> dans {l.envelopeName}</span>{/if} <span class="pill {l.status}">{STATUS_LABELS[l.status]}</span>
+          <strong>{l.name}</strong>{#if l.name !== l.tirelireName}<span class="sub"> dans {l.tirelireName}</span>{/if} <span class="pill {l.status}">{STATUS_LABELS[l.status]}</span>
           <span class="sub">
             {NEED_KINDS_SHORT[l.kind]} · {accountsById.get(l.accountId)?.name ?? '?'}{l.virtual ? ' (réservé sur place)' : ''}{l.dueDate ? ` · échéance ${shortDate(l.dueDate)}` : ''}{l.target !== undefined && l.kind !== 'recurring' ? ` · cible ${money(l.target)}` : ''}
           </span>
@@ -203,5 +203,5 @@
     <div class="row total"><div class="label">Total</div><div class="num">{money(-plan.totals.fixedCharges)}</div></div>
   </div>
 
-  <p class="muted small">Non affecté sur le pivot au {shortDate(plan.asOf)} : <span class="num">{money(plan.totals.pivotUnallocated)}</span>.</p>
+  <p class="muted small">Non affecté sur le compte principal au {shortDate(plan.asOf)} : <span class="num">{money(plan.totals.principalUnallocated)}</span>.</p>
 {/if}

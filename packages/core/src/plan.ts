@@ -1,7 +1,7 @@
 /**
- * Plan de période : à partir des revenus, charges fixes, besoins et positions des enveloppes,
+ * Plan de période : à partir des revenus, charges fixes, besoins et positions des tirelires,
  * dire ce que la période dote (D29), ce que les revenus couvrent (D06, lecture), et quels
- * virements ramènent chaque enveloppe à son placement voulu (D20, D21).
+ * virements ramènent chaque tirelire à son placement voulu (D20, D21).
  */
 import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow } from './model.js';
 import { alive, needName } from './model.js';
@@ -9,8 +9,8 @@ import {
   homeAccount,
   placementGaps,
   dotationAccount,
-  envelopeBalance,
-  envelopeComponents,
+  tirelireBalance,
+  tirelireComponents,
   indexLedger,
   needCruise,
   periodSnapshot,
@@ -37,14 +37,14 @@ export type LineStatus = 'ok' | 'ahead' | 'catchUp' | 'reduced' | 'unfunded';
 /** Une ligne par besoin (D28). */
 export interface PlanLine {
   needId: Id;
-  envelopeId: Id;
-  envelopeName: string;
+  tirelireId: Id;
+  tirelireName: string;
   name: string;
   kind: NeedKind;
-  /** Compte de placement de l'enveloppe. */
+  /** Compte de placement de la tirelire. */
   accountId: Id;
   priority: number;
-  /** Solde de l'enveloppe au début de la période, avant dotation. */
+  /** Solde de la tirelire au début de la période, avant dotation. */
   balance: Cents;
   /** Part de ce solde attribuée à ce besoin. */
   held: Cents;
@@ -60,15 +60,15 @@ export interface PlanLine {
   funded: Cents;
   dueDate?: ISODate;
   target?: Cents;
-  /** Enveloppe placée sur le pivot : la dotation y reste, aucun virement. */
+  /** Tirelire placée sur le compte principal : la dotation y reste, aucun virement. */
   virtual: boolean;
   status: LineStatus;
 }
 
-/** Écart de placement d'une enveloppe (D20) : ce qui dort ailleurs qu'au placement voulu. */
+/** Écart de placement d'une tirelire (D20) : ce qui dort ailleurs qu'au placement voulu. */
 export interface PlacementGap {
-  envelopeId: Id;
-  envelopeName: string;
+  tirelireId: Id;
+  tirelireName: string;
   /** Compte où la composante se trouve. */
   fromAccountId: Id;
   /** Compte de placement voulu. */
@@ -79,15 +79,15 @@ export interface PlacementGap {
   status: 'todo' | 'watch';
 }
 
-/** Ligne d'un virement par compte : part de l'écart qui concerne une enveloppe. */
+/** Ligne d'un virement par compte : part de l'écart qui concerne une tirelire. */
 export interface StandingOrder {
-  envelopeId: Id;
-  envelopeName: string;
-  /** Part permanente (jusqu'à la croisière des besoins de l'enveloppe). */
+  tirelireId: Id;
+  tirelireName: string;
+  /** Part permanente (jusqu'à la croisière des besoins de la tirelire). */
   standing: Cents;
   /** Complément exceptionnel ce mois-ci (rattrapage, écart ancien). */
   exceptional: Cents;
-  /** Montant total signé : positif = pivot → compte. */
+  /** Montant total signé : positif = principal → compte. */
   amount: Cents;
   status: 'todo' | 'watch';
 }
@@ -98,24 +98,24 @@ export interface PlanTransfer {
   accountKind: Account['kind'];
   /** Libellé suggéré pour le virement permanent (D21 : un par couple de comptes). */
   label: string;
-  /** Détail par enveloppe. */
+  /** Détail par tirelire. */
   orders: StandingOrder[];
   /** Somme des parts permanentes. */
   standing: Cents;
   /** Somme des compléments exceptionnels. */
   exceptional: Cents;
-  /** Compte tiers : règlement de la dette. Positif = pivot → tiers, négatif = tiers → pivot. */
+  /** Compte tiers : règlement de la dette. Positif = principal → tiers, négatif = tiers → principal. */
   settlement: Cents;
-  /** Compte d'accueil : argent du compte qui n'appartient à aucune enveloppe. Positif = à rapatrier vers le pivot. */
+  /** Compte d'accueil : argent du compte qui n'appartient à aucune tirelire. Positif = à rapatrier vers le compte principal. */
   surplus: Cents;
-  /** Total net à virer ce mois-ci depuis le pivot (négatif = vers le pivot). */
+  /** Total net à virer ce mois-ci depuis le compte principal (négatif = vers le compte principal). */
   net: Cents;
 }
 
 export interface PlanWarning {
-  code: 'noPivot' | 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'pivotOverdrawn';
+  code: 'noPrincipal' | 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'principalOverdrawn';
   message: string;
-  envelopeId?: Id;
+  tirelireId?: Id;
   needId?: Id;
   accountId?: Id;
 }
@@ -126,7 +126,7 @@ export interface Plan {
   incomes: PlanFlowLine[];
   fixedCharges: PlanFlowLine[];
   lines: PlanLine[];
-  /** Écarts de placement, y compris entre deux comptes hors pivot. */
+  /** Écarts de placement, y compris entre deux comptes hors principal. */
   gaps: PlacementGap[];
   transfers: PlanTransfer[];
   totals: {
@@ -139,8 +139,8 @@ export interface Plan {
     /** revenus − charges fixes − financé. */
     margin: Cents;
     cushion: Cents;
-    /** Non affecté du pivot à la date de calcul, dotations comprises. */
-    pivotUnallocated: Cents;
+    /** Non affecté du compte principal à la date de calcul, dotations comprises. */
+    principalUnallocated: Cents;
   };
   warnings: PlanWarning[];
 }
@@ -153,10 +153,10 @@ const KIND_ORDER: Record<NeedKind, number> = { dueDate: 0, recurring: 1, goal: 2
 export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   const idx = indexLedger(ledger);
   const warnings: PlanWarning[] = [];
-  const pivot = idx.pivot;
+  const principal = idx.principal;
   const payDay = idx.payDay;
   const period = payPeriodContaining(asOf, payDay);
-  if (!pivot) warnings.push({ code: 'noPivot', message: 'Aucun compte pivot défini.' });
+  if (!principal) warnings.push({ code: 'noPrincipal', message: 'Aucun compte principal défini.' });
 
   const flows = alive(ledger.plannedFlows).filter((f) => isActive(f, period));
   const incomes = flowLines(flows.filter((f) => f.kind === 'income'), period);
@@ -167,16 +167,16 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
 
   // Une ligne par besoin, d'après l'instantané de la période (dotations D29).
   const lines: PlanLine[] = [];
-  for (const e of idx.envelopesById.values()) {
+  for (const e of idx.tirelliresById_TMP.values()) {
     const snap = periodSnapshot(e, idx, asOf);
     if (!snap) continue;
-    const needs = idx.needsByEnvelope.get(e.id) ?? [];
+    const needs = idx.needsByTirelire.get(e.id) ?? [];
     for (const s of snap.needs) {
       const n = needs.find((x) => x.id === s.needId)!;
       lines.push({
         needId: n.id,
-        envelopeId: e.id,
-        envelopeName: e.name,
+        tirelireId: e.id,
+        tirelireName: e.name,
         name: needName(n, e),
         kind: n.kind,
         accountId: homeAccount(e) ?? dotationAccount(e, idx),
@@ -190,7 +190,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
         funded: 0,
         ...(s.dueDate ? { dueDate: s.dueDate } : {}),
         ...(s.target !== undefined ? { target: s.target } : {}),
-        virtual: pivot !== undefined && homeAccount(e) === pivot.id,
+        virtual: principal !== undefined && homeAccount(e) === principal.id,
         status: 'ok',
       });
     }
@@ -209,27 +209,27 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
     else if (l.catchUp < l.cruise && l.kind === 'dueDate') l.status = 'ahead';
     else l.status = 'ok';
     if (l.status === 'unfunded')
-      warnings.push({ code: 'unfunded', message: `« ${l.name} » n'est pas couverte par les revenus ce mois-ci.`, envelopeId: l.envelopeId, needId: l.needId });
+      warnings.push({ code: 'unfunded', message: `« ${l.name} » n'est pas couverte par les revenus ce mois-ci.`, tirelireId: l.tirelireId, needId: l.needId });
     else if (l.status === 'reduced')
-      warnings.push({ code: 'reduced', message: `« ${l.name} » n'est couverte qu'en partie par les revenus.`, envelopeId: l.envelopeId, needId: l.needId });
+      warnings.push({ code: 'reduced', message: `« ${l.name} » n'est couverte qu'en partie par les revenus.`, tirelireId: l.tirelireId, needId: l.needId });
   }
 
   const totalRequested = lines.reduce((s, l) => s + l.requested, 0);
   const totalFunded = lines.reduce((s, l) => s + l.funded, 0);
   const margin = totalIncomes - totalFixed - totalFunded;
-  const cushion = ledger.settings.pivotCushion;
+  const cushion = ledger.settings.principalCushion;
   if (totalIncomes - totalFixed - totalRequested < 0)
     warnings.push({
       code: 'negativeMargin',
       message: 'Les revenus ne couvrent pas toutes les dotations ; des lignes sont signalées selon leur priorité.',
     });
   else if (margin < cushion)
-    warnings.push({ code: 'belowCushion', message: 'La marge est inférieure au coussin minimum du pivot.' });
+    warnings.push({ code: 'belowCushion', message: 'La marge est inférieure au coussin minimum du compte principal.' });
 
   // Écarts de placement (D20), tous comptes, sauf les tiers (le règlement les couvre).
   const threshold = ledger.settings.transferThreshold ?? 0;
   const gaps: PlacementGap[] = [];
-  for (const e of idx.envelopesById.values()) {
+  for (const e of idx.tirelliresById_TMP.values()) {
     // Un excédent sur un compte doit rejoindre un compte où il manque (D38) : on apparie les deux.
     const excess = placementGaps(e, idx, asOf).filter((g) => idx.accountsById.get(g.accountId)?.kind !== 'third');
     const surplus = excess.filter((g) => g.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -241,7 +241,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
         const to = missing[mi]!;
         const amount = Math.min(left, -to.amount);
         const status: PlacementGap['status'] = amount >= threshold ? 'todo' : 'watch';
-        gaps.push({ envelopeId: e.id, envelopeName: e.name, fromAccountId: from.accountId, toAccountId: to.accountId, amount, status });
+        gaps.push({ tirelireId: e.id, tirelireName: e.name, fromAccountId: from.accountId, toAccountId: to.accountId, amount, status });
         left -= amount;
         to.amount += amount;
         if (to.amount === 0) mi++;
@@ -249,26 +249,26 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
     }
   }
 
-  // Virements par compte (vue pivot ↔ compte), règlements des tiers, surplus des comptes d'accueil.
+  // Virements par compte (vue principal ↔ compte), règlements des tiers, surplus des comptes d'accueil.
   const transfers: PlanTransfer[] = [];
   for (const a of idx.accountsById.values()) {
-    if (pivot && a.id === pivot.id) continue;
+    if (principal && a.id === principal.id) continue;
     const orders: StandingOrder[] = [];
-    for (const e of idx.envelopesById.values()) {
+    for (const e of idx.tirelliresById_TMP.values()) {
       const gapsHere = gaps.filter(
         (g) =>
-          g.envelopeId === e.id &&
-          ((g.toAccountId === a.id && (!pivot || g.fromAccountId === pivot.id)) || (g.fromAccountId === a.id && (!pivot || g.toAccountId === pivot.id))),
+          g.tirelireId === e.id &&
+          ((g.toAccountId === a.id && (!principal || g.fromAccountId === principal.id)) || (g.fromAccountId === a.id && (!principal || g.toAccountId === principal.id))),
       );
       if (gapsHere.length === 0) continue;
-      // Positif = pivot → compte.
+      // Positif = principal → compte.
       const amount = gapsHere.reduce((s, g) => s + (g.toAccountId === a.id ? g.amount : -g.amount), 0);
       if (amount === 0) continue;
-      const cruise = (idx.needsByEnvelope.get(e.id) ?? []).reduce((s, n) => s + needCruise(n), 0);
+      const cruise = (idx.needsByTirelire.get(e.id) ?? []).reduce((s, n) => s + needCruise(n), 0);
       const standing = amount > 0 ? Math.min(amount, cruise) : 0;
       orders.push({
-        envelopeId: e.id,
-        envelopeName: e.name,
+        tirelireId: e.id,
+        tirelireName: e.name,
         standing,
         exceptional: amount - standing,
         amount,
@@ -314,12 +314,12 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
   }
   transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
 
-  const pivotUnallocated = pivot ? unallocated(pivot, ledger, idx, asOf) : 0;
-  if (pivot && pivotUnallocated < 0)
+  const principalUnallocated = principal ? unallocated(principal, ledger, idx, asOf) : 0;
+  if (principal && principalUnallocated < 0)
     warnings.push({
-      code: 'pivotOverdrawn',
-      message: 'Les dotations dépassent ce que le pivot contient : le non affecté est négatif.',
-      accountId: pivot.id,
+      code: 'principalOverdrawn',
+      message: 'Les dotations dépassent ce que le compte principal contient : le non affecté est négatif.',
+      accountId: principal.id,
     });
 
   return {
@@ -337,7 +337,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
       funded: totalFunded,
       margin,
       cushion,
-      pivotUnallocated,
+      principalUnallocated,
     },
     warnings,
   };
@@ -346,7 +346,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
 /**
  * Ordre de financement de D06 : les planchers par priorité, puis le demandé par priorité,
  * jusqu'à épuisement de `available`. Écrit `funded` sur chaque ligne ; rend le reste.
- * Sert aussi à répartir un virement constaté entre enveloppes (D21).
+ * Sert aussi à répartir un virement constaté entre tirelires (D21).
  */
 export function fundByPriority<T extends { floor: Cents; requested: Cents; funded: Cents }>(lines: T[], available: Cents): Cents {
   for (const l of lines) {
@@ -389,17 +389,17 @@ function flowLines(flows: PlannedFlow[], p: Period): PlanFlowLine[] {
  * Le montant retenu est la part permanente, pas le total : le complément exceptionnel de ce
  * mois-ci n'a pas vocation à devenir un ordre permanent.
  */
-export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, pivotId: Id, id: Id): PlannedFlow | undefined {
+export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, principalId: Id, id: Id): PlannedFlow | undefined {
   if (transfer.standing <= 0) return undefined;
   const allocation = transfer.orders
     .filter((o) => o.standing > 0)
-    .map((o) => ({ envelopeId: o.envelopeId, share: { kind: 'fixed' as const, amount: -o.standing } }));
+    .map((o) => ({ tirelireId: o.tirelireId, share: { kind: 'fixed' as const, amount: -o.standing } }));
   return {
     id,
     name: `Virement ${transfer.accountName}`,
     kind: 'transfer',
     amount: -transfer.standing,
-    accountId: pivotId,
+    accountId: principalId,
     counterpartAccountId: transfer.accountId,
     periodicity: { intervalMonths: 1, anchorDate: plan.period.start },
     dateWindowDays: 5,
@@ -411,8 +411,8 @@ export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, pivotId
 
 /** Fenêtre de périodes autour de `asOf`, utile pour naviguer dans l'interface. */
 export function periodsAround(ledger: Ledger, asOf: ISODate, before: number, after: number): Period[] {
-  const pivot = alive(ledger.accounts).find((a) => a.kind === 'pivot');
-  const payDay = pivot?.payDay ?? 1;
+  const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
+  const payDay = principal?.payDay ?? 1;
   const out: Period[] = [];
   let p = payPeriodContaining(asOf, payDay);
   for (let i = 0; i < before; i++) p = previousPeriod(p, payDay);
@@ -435,14 +435,14 @@ export function transferLabel(accountName: string): string {
   return `TIRELIRE ${base}`.slice(0, 35);
 }
 
-/** Solde d'une enveloppe et sa position, pour l'interface. */
-export function envelopePosition(ledger: Ledger, envelopeId: Id, asOf: ISODate): { balance: Cents; components: Array<{ accountId: Id; amount: Cents }> } | undefined {
+/** Solde d'une tirelire et sa position, pour l'interface. */
+export function tirelirePosition(ledger: Ledger, tirelireId: Id, asOf: ISODate): { balance: Cents; components: Array<{ accountId: Id; amount: Cents }> } | undefined {
   const idx = indexLedger(ledger);
-  const e = idx.envelopesById.get(envelopeId);
+  const e = idx.tirelliresById_TMP.get(tirelireId);
   if (!e) return undefined;
   return {
-    balance: envelopeBalance(e, idx, asOf),
-    components: [...envelopeComponents(e, idx, asOf)].map(([accountId, amount]) => ({ accountId, amount })),
+    balance: tirelireBalance(e, idx, asOf),
+    components: [...tirelireComponents(e, idx, asOf)].map(([accountId, amount]) => ({ accountId, amount })),
   };
 }
 
