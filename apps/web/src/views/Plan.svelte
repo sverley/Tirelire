@@ -1,16 +1,29 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
-  import { periodsAround, missingFlows, addDays, alive, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
+  import { computePlan, periodsAround, missingFlows, addDays, alive, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
 
-  const plan = $derived(app.plan);
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
   const hasData = $derived(app.ledger.accounts.some((a) => !a.deletedAt));
 
+  /*
+   * Deux dates, à ne pas confondre (D52). La **date de lecture** (`app.asOf`) dit jusqu'où les
+   * soldes sont connus ; elle appartient à toute l'application et l'en-tête la montre. La
+   * **période regardée** n'est qu'un curseur de cet écran : la parcourir ne doit pas faire croire
+   * aux autres écrans qu'on lit à une autre date. Le curseur se remet en place tout seul quand la
+   * date de lecture le fait sortir de la fenêtre affichée.
+   */
+  let choisie = $state<Period | undefined>(undefined);
+  const periode = $derived(
+    (choisie && periods.find((p) => p.key === choisie!.key)) ?? periods.find((p) => p.start <= app.asOf && p.end >= app.asOf) ?? periods[0]!,
+  );
+  // Dans la période où l'on lit, on lit à la date de lecture ; ailleurs, au premier jour.
+  const periodeAsOf = $derived(periode.start <= app.asOf && periode.end >= app.asOf ? app.asOf : periode.start);
+  const plan = $derived(computePlan(app.ledger, periodeAsOf, app.asOf));
+
   function goTo(p: Period) {
-    // Se placer au début de la période, sauf pour la période courante réelle (aujourd'hui).
-    app.asOf = p.start;
+    choisie = p;
   }
 
   const virtualLines = $derived(plan.lines.filter((l) => l.virtual));

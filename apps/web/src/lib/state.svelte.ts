@@ -23,9 +23,8 @@ export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accou
 
 class AppState {
   ledger = $state<Ledger>(emptyLedger());
+  /** Date de lecture : jusqu'où les soldes sont connus (D52). Tous les écrans la suivent. */
   asOf = $state<string>(todayISO());
-  /** Date jusqu'à laquelle les soldes sont connus (D52) : au-delà, le plan simule sa propre exécution. */
-  today = $state<string>(todayISO());
   view = $state<View>('plan');
   /** Vues traversées pour revenir en arrière (geste Android, chevron) sans quitter l'appli. */
   history = $state<View[]>([]);
@@ -33,7 +32,7 @@ class AppState {
   error = $state<string | undefined>(undefined);
   private opened: OpenedStore | undefined;
 
-  plan: Plan = $derived(computePlan(this.ledger, this.asOf, this.today));
+  plan: Plan = $derived(computePlan(this.ledger, this.asOf));
 
   /** Date de la dernière opération connue, tous comptes confondus (undefined sans opération). */
   lastOperationDate: string | undefined = $derived.by(() => {
