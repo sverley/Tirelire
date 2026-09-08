@@ -635,3 +635,36 @@ anticiper, si on y tient, par un flux de revenu annuel `variable` sur le compte 
 donc un quantième pour un rythme mensuel, et la date entière sinon — l'ancrage étant la première
 occurrence, tout le reste s'en déduit — avec un rappel de la prochaine occurrence, qu'une date
 d'ancrage seule ne donne pas.
+
+## D49 · 2026-09-08 · Un renflouement est un symptôme, pas un mouvement à ranger
+
+Ramener de l'argent dans une tirelire est **par définition ce que le plan sert à éviter** : si tout
+est correctement provisionné, l'argent n'a pas besoin d'être ramené. Un renflouement dit donc quelque
+chose — la dotation était sous-évaluée, ou la dépense n'était pas prévue du tout. Le traiter comme un
+simple virement à classer perdrait cette information ; le compter la rend exploitable.
+
+Ce n'est ni un revenu ni un besoin : rien de nouveau côté flux. C'est une **qualification portée par
+la ventilation** (`Allocation.replenishment`), qui distingue deux origines, parce qu'elles ne disent
+pas la même chose : `internal`, l'argent était déjà chez nous et change de tirelire — la répartition
+était mauvaise, le patrimoine est inchangé ; `external`, un cadeau, un remboursement, une vente — le
+foyer a été sauvé du dehors, et le budget permanent ne peut pas compter dessus.
+
+Deux usages en découlent.
+
+**Le bilan les écarte de ses moyennes.** Sans cela un cadeau de 300 € gonflerait le revenu moyen et
+un virement interne compterait deux fois, si bien que le renflouement masquerait le problème qu'il
+révèle. Un test compare les moyennes avec et sans : elles doivent être identiques.
+
+**Le bilan s'en sert pour proposer un réajustement.** Ce qu'il a fallu ramener, réparti sur la
+fenêtre observée, mesure directement ce qui manquait à la dotation — plus directement qu'aucun autre
+signal, puisque c'est le montant que la réalité a réclamé. `reviewReplenishments` le donne, et
+l'écran Bilan l'affiche à côté de la dotation actuelle.
+
+**Rien n'est corrigé d'office.** Un renflouement peut être un accident isolé qu'il ne faut surtout
+pas inscrire dans le budget permanent ; distinguer l'accident du manque durable demande de savoir ce
+qui s'est passé, ce que l'application ignore. Elle compte et propose, le foyer décide — c'est la même
+ligne qu'en D06 et D29.
+
+Reste à voir sur des données réelles si la distinction interne/externe mérite des traitements
+différents dans le calibrage ; elle est enregistrée dès maintenant pour que l'historique existe le
+jour où l'on tranchera.

@@ -9,7 +9,7 @@
  * validées ici plutôt que dans l'interface, pour que l'invariant tienne aussi quand une règle ou
  * une action groupée écrit une ventilation.
  */
-import type { Allocation, Id, Operation, Share } from './model.js';
+import type { Allocation, Id, Operation, ReplenishmentKind, Share } from './model.js';
 import { alive } from './model.js';
 import type { Ledger } from './model.js';
 import { emptyPatch, type Patch } from './matching.js';
@@ -21,6 +21,8 @@ export interface AllocationDraft {
   categoryId?: Id;
   tirelireId?: Id;
   share: Share;
+  /** Cette ligne renfloue la tirelire (D49). */
+  replenishment?: ReplenishmentKind;
 }
 
 export class EditError extends Error {}
@@ -88,6 +90,7 @@ export function editAllocations(
       share: d.share,
       ...(d.categoryId ? { categoryId: d.categoryId } : {}),
       ...(d.tirelireId ? { tirelireId: d.tirelireId } : {}),
+      ...(d.replenishment ? { replenishment: d.replenishment } : {}),
     };
     keep.add(al.id);
     patch.allocations.push(al);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, addMonths, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation } from '@tirelire/core';
+  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -10,6 +10,7 @@
   const periods = $derived(lastPeriods(app.ledger, app.asOf, horizon));
   const rows = $derived(reviewCategories(app.ledger, periods).filter((r) => showIncome || r.nature === 'expense'));
   const provisions = $derived(reviewProvisions(app.ledger, addMonths(app.asOf, -24), app.asOf));
+  const renflouements = $derived(reviewReplenishments(app.ledger, periods));
   const rules = $derived(automationsByRank(app.ledger));
   const categories = $derived(alive(app.ledger.categories));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -108,6 +109,37 @@
       <div class="muted" style="padding:16px">Aucune dépense classée sur ces périodes.</div>
     {/each}
   </div>
+
+  {#if renflouements.length}
+    <h2>Renflouements</h2>
+    <p class="muted small">
+      Ramener de l'argent dans une tirelire est ce que le plan sert à éviter : si c'est arrivé, la
+      dotation était trop basse ou la dépense n'était pas prévue. Ces montants sont tenus à l'écart
+      des moyennes ci-dessus. À vous de juger si c'était un accident isolé ou un manque durable.
+    </p>
+    <div class="card">
+      {#each renflouements as r (r.tirelireId)}
+        <div class="row">
+          <div class="label">
+            {r.name}
+            <span class="sub">
+              {r.count} fois sur {periods.length} périodes ·
+              {r.fromOutside ? `${money(r.fromOutside)} du dehors` : ''}{r.fromOutside && r.fromInside ? ' · ' : ''}{r.fromInside ? `${money(r.fromInside)} repris ailleurs` : ''}
+              {#if r.cruise}· dotation actuelle {money(r.cruise)}{/if}
+            </span>
+          </div>
+          <div class="num neg">{money(r.total)}</div>
+        </div>
+        {#if r.suggested > 0}
+          <div class="row">
+            <div class="label small muted" style="padding-left:8px">
+              Pour ne plus avoir à renflouer, il aurait fallu doter {money(r.suggested)} de plus par période.
+            </div>
+          </div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
 
   {#if provisions.length}
     <h2>Provisions : prévu vs payé</h2>

@@ -41,7 +41,7 @@
   let editingId = $state<string | undefined>(undefined);
 
   // Formulaire de ventilation : chaque ligne porte une part (D27).
-  type LineForm = { id?: string; categoryId: string; tirelireId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
+  type LineForm = { id?: string; categoryId: string; tirelireId: string; kind: 'fixed' | 'percent' | 'variable'; value: string; replenishment: '' | 'internal' | 'external' };
   let lines = $state<LineForm[]>([]);
   let newCategory = $state('');
   let oneOff = $state(false);
@@ -127,9 +127,10 @@
           tirelireId: a.tirelireId ?? '',
           kind: a.share.kind,
           value: a.share.kind === 'fixed' ? centsToInput(a.share.amount) : a.share.kind === 'percent' ? String(a.share.pct) : '',
+          replenishment: a.replenishment ?? '',
         }))
       // Toute opération a par défaut une ligne unique variable, qui prend l'intégralité du montant.
-      : [{ categoryId: '', tirelireId: '', kind: 'variable' as const, value: '' }];
+      : [{ categoryId: '', tirelireId: '', kind: 'variable' as const, value: '', replenishment: '' as const }];
     newCategory = '';
     oneOff = !!op.oneOff;
     makeRule = false;
@@ -142,8 +143,8 @@
     const hasVariable = lines.some((l) => l.kind === 'variable');
     lines.push(
       hasVariable
-        ? { categoryId: '', tirelireId: '', kind: 'fixed', value: centsToInput(rest(op)) }
-        : { categoryId: '', tirelireId: '', kind: 'variable', value: '' },
+        ? { categoryId: '', tirelireId: '', kind: 'fixed', value: centsToInput(rest(op)), replenishment: '' }
+        : { categoryId: '', tirelireId: '', kind: 'variable', value: '', replenishment: '' },
     );
   }
 
@@ -153,6 +154,7 @@
       ...(l.id ? { id: l.id } : {}),
       ...(l.categoryId ? { categoryId: l.categoryId } : {}),
       ...(l.tirelireId ? { tirelireId: l.tirelireId } : {}),
+      ...(l.replenishment ? { replenishment: l.replenishment } : {}),
       share:
         l.kind === 'fixed'
           ? ({ kind: 'fixed', amount: inputToCents(l.value) ?? 0 } as const)
@@ -496,6 +498,15 @@
                   {#each tirelires as e}<option value={e.id}>{e.name}</option>{/each}
                 </select>
               </label>
+              {#if l.tirelireId}
+                <label class="f">Renflouement
+                  <select bind:value={l.replenishment}>
+                    <option value="">Non (mouvement normal)</option>
+                    <option value="internal">Repris ailleurs chez nous</option>
+                    <option value="external">Venu du dehors (cadeau, remboursement)</option>
+                  </select>
+                </label>
+              {/if}
               <label class="f">Part
                 <select bind:value={l.kind}>
                   <option value="variable">Le reste</option>
