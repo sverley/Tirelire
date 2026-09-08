@@ -132,26 +132,35 @@ jobs:
 
       - name: En cas d'échec, publier la fin du journal en commentaire du commit
         if: failure() && steps.pret.outputs.pret == 'oui'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # L'utilisateur et l'adresse du serveur sont masqués : un commentaire de commit est
-          # lisible par tous ceux qui voient le dépôt.
-          {
-            echo "Le dépôt sur l'hébergement a échoué (run ${GITHUB_RUN_NUMBER}). Fin du journal :"
-            echo
-            echo '```'
-            tail -n 60 "$RUNNER_TEMP/depot.log" \
-              | sed -e "s/$UTILISATEUR/«utilisateur»/g" -e "s/$HOTE/«serveur»/g"
-            echo '```'
-            if grep -qi 'certificate' "$RUNNER_TEMP/depot.log"; then
-              echo
-              echo "Le certificat du serveur FTP n'est pas accepté. Si l'hébergeur présente un"
-              echo "certificat qui ne correspond pas au nom du serveur, mettre la variable"
-              echo "\`TIRELIRE_FTP_VERIFIER_CERTIFICAT\` à \`non\`, ou passer en \`sftp\`."
-            fi
-          } > "$RUNNER_TEMP/commentaire.md"
-          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -F body=@"$RUNNER_TEMP/commentaire.md" > /dev/null
+          # L'utilisateur et l'adresse du serveur sont masqués : un commentaire de commit se lit
+          # partout où le dépôt se lit. La redaction passe par python pour ne dépendre d'aucun
+          # caractère particulier dans les secrets.
+          python3 - <<'PY' > "$RUNNER_TEMP/commentaire.md"
+          import os
+          chemin = os.path.join(os.environ["RUNNER_TEMP"], "depot.log")
+          journal = open(chemin, encoding="utf-8", errors="replace").read() if os.path.exists(chemin) else "(journal absent)"
+          for secret, remplacement in (("UTILISATEUR", "«utilisateur»"), ("HOTE", "«serveur»"), ("MOTDEPASSE", "«mot de passe»")):
+              valeur = os.environ.get(secret)
+              if valeur:
+                  journal = journal.replace(valeur, remplacement)
+          lignes = journal.splitlines()[-60:]
+          print(f"Le dépôt sur l'hébergement a échoué (run {os.environ['GITHUB_RUN_NUMBER']}). Fin du journal :")
+          print()
+          print("```")
+          print("\n".join(lignes))
+          print("```")
+          if "certificate" in journal.lower():
+              print()
+              print("Le certificat du serveur FTP n'est pas accepté. Si l'hébergeur présente un certificat")
+              print("qui ne correspond pas au nom du serveur, mettre la variable")
+              print("`TIRELIRE_FTP_VERIFIER_CERTIFICAT` à `non`, ou passer en `sftp`.")
+          PY
+          cat "$RUNNER_TEMP/commentaire.md"
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -f body="$(cat "$RUNNER_TEMP/commentaire.md")" > /dev/null
 
       - name: Vérifier le site en ligne
         if: steps.pret.outputs.pret == 'oui' && inputs.deploiement != 'essai-a-blanc' && env.ADRESSE_SITE != ''
