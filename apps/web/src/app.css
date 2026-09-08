@@ -115,6 +115,12 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .warnings div { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 14px; }
 .orders { margin: 6px 0 0 12px; padding-left: 8px; border-left: 2px solid var(--line); }
 
+/* Assistant : raccourcis d'ajout en un geste (D43, D46). */
+.propositions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.prop { display: inline-flex; align-items: baseline; gap: 6px; border: 1px dashed var(--line-strong); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--ink-2); cursor: pointer; font-family: inherit; }
+.prop:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.prop .v { font-size: 12px; color: var(--muted); }
+
 /* Assistant : lignes modifiables et en-têtes de colonnes qui partagent la même grille (D46). */
 .tete { display: grid; gap: 6px; padding: 0 8px 4px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .tete .d { text-align: right; }
