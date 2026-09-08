@@ -341,29 +341,42 @@
   );
 
   // --- Propositions (D43) : elles remplissent le formulaire, elles n'ajoutent rien d'office ---
-  const propositions = projetVierge
-    ? budgetSuggestions()
-    : { incomes: [], charges: [], everyday: [], periodic: [], savings: [] };
-  /** Une proposition déjà reprise disparaît de la liste : on ne propose pas ce qui est fait. */
-  const dejaPris = (nom: string) =>
-    flows.some((f) => f.name === nom) || tirelires.some((t) => t.name === nom);
-  const cents = (c: number) => (c / 100).toFixed(2).replace('.', ',');
+  // Les raccourcis sont toujours offerts : l'interface ne change pas d'un projet à l'autre (D46).
+  const propositions = budgetSuggestions();
+  /** Un raccourci déjà repris disparaît : on ne propose pas ce qui existe déjà. */
+  const dejaPris = (nom: string) => flows.some((f) => f.name === nom) || tirelires.some((t) => t.name === nom);
+  const restantsRevenus = $derived(propositions.incomes.filter((x) => !dejaPris(x.name)));
+  const restantsCharges = $derived(propositions.charges.filter((x) => !dejaPris(x.name)));
+  const restantsCourants = $derived(propositions.everyday.filter((x) => !dejaPris(x.name)));
+  const restantsPeriodiques = $derived(propositions.periodic.filter((x) => !dejaPris(x.name)));
+  const restantsEpargnes = $derived(propositions.savings.filter((x) => !dejaPris(x.name)));
+
+  // Ce que fait un clic sur un raccourci : créer la ligne, directement.
+  const appliquerRevenu = (p: (typeof propositions.incomes)[number]) =>
+    creerRevenu(p.name, p.amount, p.intervalMonths, p.day);
+  const appliquerCharge = (p: (typeof propositions.charges)[number]) =>
+    creerCharge(p.name, p.amount, p.intervalMonths, p.day);
+  const appliquerCourant = (p: (typeof propositions.everyday)[number]) =>
+    creerCourant(p.name, p.amount, p.keep);
+  const appliquerPeriodique = (p: (typeof propositions.periodic)[number]) =>
+    creerPeriodique(p.name, p.amount, p.intervalMonths, nextDueDate(p.month, p.day, app.asOf));
+  const appliquerEpargne = (p: (typeof propositions.savings)[number]) =>
+    creerEpargne(p.name, p.monthly, p.target);
 
   /**
-   * Étapes déjà garnies. Semer à l'entrée de l'étape, une seule fois : sans cette mémoire,
-   * supprimer toutes les lignes les ferait repousser au retour sur l'étape.
+   * Projet vierge : on applique tous les raccourcis de l'étape, exactement comme si l'utilisateur
+   * les avait touchés un par un — il n'a plus qu'à corriger et retrancher. Une seule fois par
+   * étape : sans cette mémoire, tout supprimer les ferait repousser au retour sur l'étape.
    */
   const semees = new Set<Step>();
   function semer(etape: Step) {
     if (!projetVierge || semees.has(etape)) return;
     semees.add(etape);
-    if (etape === 'income') for (const p of propositions.incomes) creerRevenu(p.name, p.amount, p.intervalMonths, p.day);
-    if (etape === 'fixed') for (const p of propositions.charges) creerCharge(p.name, p.amount, p.intervalMonths, p.day);
-    if (etape === 'everyday') for (const p of propositions.everyday) creerCourant(p.name, p.amount, p.keep);
-    if (etape === 'periodic')
-      for (const p of propositions.periodic)
-        creerPeriodique(p.name, p.amount, p.intervalMonths, nextDueDate(p.month, p.day, app.asOf));
-    if (etape === 'savings') for (const p of propositions.savings) creerEpargne(p.name, p.monthly, p.target);
+    if (etape === 'income') restantsRevenus.forEach(appliquerRevenu);
+    if (etape === 'fixed') restantsCharges.forEach(appliquerCharge);
+    if (etape === 'everyday') restantsCourants.forEach(appliquerCourant);
+    if (etape === 'periodic') restantsPeriodiques.forEach(appliquerPeriodique);
+    if (etape === 'savings') restantsEpargnes.forEach(appliquerEpargne);
   }
 
   // --- Édition en place de ce qui a été ajouté ---
@@ -503,6 +516,16 @@
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
     </div>
   {/each}
+  {#if restantsRevenus.length}
+    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+    <div class="propositions">
+      {#each restantsRevenus as p (p.name)}
+        <button class="prop" onclick={() => appliquerRevenu(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addIncome(); }}>
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={inc.name} placeholder="Salaire" /></label>
@@ -567,6 +590,16 @@
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
     </div>
   {/each}
+  {#if restantsCharges.length}
+    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+    <div class="propositions">
+      {#each restantsCharges as p (p.name)}
+        <button class="prop" onclick={() => appliquerCharge(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addFixed(); }}>
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={fix.name} placeholder="Loyer" /></label>
@@ -604,6 +637,16 @@
       <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
     </div>
   {/each}
+  {#if restantsCourants.length}
+    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+    <div class="propositions">
+      {#each restantsCourants as p (p.name)}
+        <button class="prop" onclick={() => appliquerCourant(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addEveryday(); }}>
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={day.name} placeholder="Courses" /></label>
@@ -634,6 +677,16 @@
       </p>
     </div>
   {/each}
+  {#if restantsPeriodiques.length}
+    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+    <div class="propositions">
+      {#each restantsPeriodiques as p (p.name)}
+        <button class="prop" onclick={() => appliquerPeriodique(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addPeriodic(); }}>
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={per.name} placeholder="Assurance auto" /></label>
@@ -675,6 +728,16 @@
       <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
     </div>
   {/each}
+  {#if restantsEpargnes.length}
+    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+    <div class="propositions">
+      {#each restantsEpargnes as p (p.name)}
+        <button class="prop" onclick={() => appliquerEpargne(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(p.monthly)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addSavings(); }}>
     <div class="grid">
       <label class="f">Quoi ? <input bind:value={sav.name} placeholder="Vacances" /></label>

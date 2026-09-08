@@ -552,11 +552,18 @@ D43 offrait les propositions sous forme de pastilles qui remplissaient un formul
 en toucher une, relire le formulaire, valider, recommencer. Un geste par ligne, pour un budget qui en
 compte vingt.
 
-Sur un projet vierge, **les lignes proposées existent déjà** à l'arrivée sur l'étape : on corrige ce
-qui ne va pas, on supprime ce qui ne concerne pas le foyer. C'est le mouvement naturel — reconnaître
-et retrancher — plutôt que se souvenir et saisir. Le semis n'a lieu qu'une fois par étape, mémorisé
-pour la session : sans cela, supprimer toutes les lignes les ferait repousser au retour sur l'étape.
-Les conditions de D43 sont inchangées — rien n'est semé si le projet contient déjà quelque chose.
+Les raccourcis restent, mais **ils créent la ligne** au lieu de remplir un formulaire à valider. Et
+sur un projet vierge, l'assistant les **applique tous d'entrée** : les lignes existent déjà à
+l'arrivée sur l'étape, on corrige ce qui ne va pas et on supprime ce qui ne concerne pas le foyer.
+C'est le mouvement naturel — reconnaître et retrancher — plutôt que se souvenir et saisir.
+
+L'interface, elle, ne change pas d'un projet à l'autre : les raccourcis sont toujours offerts, et
+chacun disparaît dès qu'une ligne du même nom existe. Sur un projet vierge ils sont donc tous
+consommés d'emblée et la rangée est vide ; à la réouverture de l'assistant sur un budget existant,
+il ne reste que ceux qui manquent — de quoi ajouter un oubli sans repartir de zéro. L'application
+automatique n'a lieu qu'une fois par étape et par session : sans cette mémoire, tout supprimer les
+ferait repousser au retour sur l'étape. Et elle ne concerne qu'un projet vierge au sens de D43, donc
+un budget existant n'est jamais garni tout seul.
 
 Chaque liste reçoit un **en-tête de colonnes** et un sous-titre ; les charges fixes n'en avaient
 aucun, ce qui les faisait paraître étrangères aux revenus juste au-dessus. En-têtes et lignes
