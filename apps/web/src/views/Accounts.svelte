@@ -6,11 +6,12 @@
   let editing = $state<Account | undefined>(undefined);
   let form = $state({
     name: '',
-    kind: 'holding' as AccountKind,
+    kind: 'epargne' as AccountKind,
     bank: '',
     accountNumber: '',
     openingBalance: '',
     openingDate: app.asOf,
+    tracksSettlement: false,
     settlementThreshold: '10,00',
     settlementDirection: 'both' as SettlementDirection,
   });
@@ -21,8 +22,8 @@
   const hasPivot = $derived(accounts.some((a) => a.kind === 'principal'));
 
   function startNew() {
-    editing = { id: app.newId(), name: '', kind: hasPivot ? 'holding' : 'principal', openingBalance: 0, openingDate: app.asOf };
-    form = { name: '', kind: editing.kind, bank: '', accountNumber: '', openingBalance: '0,00', openingDate: app.asOf, settlementThreshold: '10,00', settlementDirection: 'both' };
+    editing = { id: app.newId(), name: '', kind: hasPivot ? 'epargne' : 'principal', openingBalance: 0, openingDate: app.asOf };
+    form = { name: '', kind: editing.kind, bank: '', accountNumber: '', openingBalance: '0,00', openingDate: app.asOf, tracksSettlement: false, settlementThreshold: '10,00', settlementDirection: 'both' };
     error = '';
   }
 
@@ -35,6 +36,7 @@
       accountNumber: a.accountNumber ?? '',
       openingBalance: centsToInput(a.openingBalance),
       openingDate: a.openingDate,
+      tracksSettlement: !!a.tracksSettlement,
       settlementThreshold: centsToInput(a.settlementThreshold ?? 1000),
       settlementDirection: a.settlementDirection ?? 'both',
     };
@@ -57,8 +59,12 @@
       openingDate: form.openingDate,
       ...(form.bank.trim() ? { bank: form.bank.trim() } : {}),
       ...(form.accountNumber.trim() ? { accountNumber: form.accountNumber.trim() } : {}),
-      ...(form.kind === 'third'
-        ? { settlementThreshold: inputToCents(form.settlementThreshold) ?? 0, settlementDirection: form.settlementDirection }
+      ...(form.tracksSettlement
+        ? {
+            tracksSettlement: true,
+            settlementThreshold: inputToCents(form.settlementThreshold) ?? 0,
+            settlementDirection: form.settlementDirection,
+          }
         : {}),
     };
     app.upsert('accounts', row);
@@ -91,7 +97,13 @@
       <label class="f">Numéro de compte ou IBAN (facultatif) <input bind:value={form.accountNumber} placeholder="FR76 1234 5678 90…" /></label>
       <label class="f">Solde initial <input bind:value={form.openingBalance} inputmode="decimal" /></label>
       <label class="f">Date du solde initial <input type="date" bind:value={form.openingDate} /></label>
-      {#if form.kind === 'third'}
+      {#if form.kind !== 'principal'}
+        <label class="f check" style="grid-column:1/-1">
+          <input type="checkbox" bind:checked={form.tracksSettlement} />
+          Suivre un solde à régler avec le compte principal
+        </label>
+      {/if}
+      {#if form.tracksSettlement}
         <label class="f">Seuil de règlement <input bind:value={form.settlementThreshold} inputmode="decimal" /></label>
         <label class="f">Sens autorisé
           <select bind:value={form.settlementDirection}>
@@ -114,7 +126,7 @@
   <div class="card" class:accent={a.kind === 'principal'}>
     <div class="row">
       <div class="label">
-        <strong>{a.name}</strong> <span class="pill">{a.kind === 'principal' ? 'principal' : a.kind === 'holding' ? 'accueil' : 'tiers'}</span>
+        <strong>{a.name}</strong> <span class="pill">{a.kind === 'principal' ? 'principal' : a.kind === 'epargne' ? 'accueil' : 'tiers'}</span>
         <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
       </div>
       <div>
@@ -122,7 +134,7 @@
         <button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>
       </div>
     </div>
-    {#if a.kind === 'third'}
+    {#if a.kind === 'courant'}
       {@const owes = settlementBalance(a, app.ledger, idx, app.asOf)}
       <div class="row">
         <div class="label">{owes >= 0 ? 'Le compte principal lui doit' : 'Il doit au compte principal'}</div>

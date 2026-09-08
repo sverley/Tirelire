@@ -33,26 +33,26 @@ describe('positions et soldes (D19, D29)', () => {
 
   it('une tirelire est répartie sur plusieurs comptes ; sa dotation attend sur le compte principal', () => {
     // Taxe foncière : 900 sur le livret, dotation de septembre (rattrapage 150) sur le compte principal.
-    const tf = tirelireComponents(idx.tirelliresById_TMP.get('env-tf')!, idx, asOf);
+    const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, asOf);
     expect(tf.get('acc-livret')).toBe(euros(900));
     expect(tf.get('acc-principal')).toBe(euros(150));
-    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-tf')!, idx, asOf)).toBe(euros(1050));
+    expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, asOf)).toBe(euros(1050));
   });
 
   it('un virement interne déplace une composante sans changer le solde', () => {
     // Enfants : dotation 200 sur le compte principal, virée le jour même sur la carte enfants, puis 236 dépensés là.
-    const c = tirelireComponents(idx.tirelliresById_TMP.get('env-enfants')!, idx, asOf);
+    const c = tirelireComponents(idx.tireliresById.get('env-enfants')!, idx, asOf);
     expect(c.get('acc-principal') ?? 0).toBe(0);
     expect(c.get('acc-enfants')).toBe(euros(-36));
-    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
+    expect(tirelireBalance(idx.tireliresById.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
   });
 
   it('une dépense consomme l’tirelire là où elle sort, même si l’argent dort ailleurs', () => {
     // Santé, placée sur le compte principal : dotation 100 sur le compte principal, dentiste 80 payé par Marie.
-    const c = tirelireComponents(idx.tirelliresById_TMP.get('env-sante')!, idx, asOf);
+    const c = tirelireComponents(idx.tireliresById.get('env-sante')!, idx, asOf);
     expect(c.get('acc-principal')).toBe(euros(100));
     expect(c.get('acc-marie')).toBe(euros(-80));
-    expect(tirelireBalance(idx.tirelliresById_TMP.get('env-sante')!, idx, asOf)).toBe(euros(20));
+    expect(tirelireBalance(idx.tireliresById.get('env-sante')!, idx, asOf)).toBe(euros(20));
   });
 
   it('solde à régler avec les comptes tiers', () => {
@@ -76,7 +76,7 @@ describe('positions et soldes (D19, D29)', () => {
   });
 
   it('premier invariant : le solde est la somme des composantes', () => {
-    for (const e of idx.tirelliresById_TMP.values()) {
+    for (const e of idx.tireliresById.values()) {
       let sum = 0;
       for (const v of tirelireComponents(e, idx, asOf).values()) sum += v;
       expect(tirelireBalance(e, idx, asOf)).toBe(sum);
@@ -88,7 +88,7 @@ describe('report (D05, D29)', () => {
   it('remise à zéro : l’excédent est libéré en fin de période, un déficit est effacé', () => {
     const l = exampleLedger();
     const idx = indexLedger(l);
-    const alim = idx.tirelliresById_TMP.get('env-alim')!;
+    const alim = idx.tireliresById.get('env-alim')!;
     // Septembre : dotation 900, rien dépensé. Le 27 septembre au soir, 900 ; le 28, libération puis nouvelle dotation.
     expect(tirelireBalance(alim, idx, '2026-09-27')).toBe(euros(900));
     expect(tirelireBalance(alim, idx, '2026-09-28')).toBe(euros(900));
@@ -260,7 +260,7 @@ describe('virement permanent à ventilation prévue (D21)', () => {
   it('un flux par couple de comptes, ventilation calculée d’avance', () => {
     const l = exampleLedger();
     const plan = computePlan(l, '2026-09-06');
-    const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
+    const t = plan.transfers.find((x) => x.accountKind === 'epargne')!;
     const flow = standingTransferFlow(plan, t, 'acc-principal', 'flow-vir')!;
     expect(flow.kind).toBe('transfer');
     expect(flow.counterpartAccountId).toBe(t.accountId);
@@ -273,7 +273,7 @@ describe('virement permanent à ventilation prévue (D21)', () => {
   it('au montant prévu, la ventilation prévue s’applique ; sinon l’ordre de financement rejoue', () => {
     let l = exampleLedger();
     const plan = computePlan(l, '2026-09-06');
-    const t = plan.transfers.find((x) => x.accountKind === 'holding')!;
+    const t = plan.transfers.find((x) => x.accountKind === 'epargne')!;
     const flow = standingTransferFlow(plan, t, 'acc-principal', 'flow-vir')!;
     l.plannedFlows.push(flow);
 

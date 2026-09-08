@@ -7,7 +7,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { app } from '../lib/state.svelte';
-  import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
+  import { ACCOUNT_KINDS, money, shortDate, centsToInput, inputToCents } from '../lib/format';
   import {
     alive,
     divideCents,
@@ -292,7 +292,7 @@
   }
 
   // --- Comptes complémentaires (facultatif) et placement des réserves ---
-  let acc = $state({ name: '', kind: 'holding' as 'holding' | 'third', balance: '0,00' });
+  let acc = $state({ name: '', kind: 'courant' as 'courant' | 'epargne', balance: '0,00' });
   let accError = $state('');
   function addAccount() {
     if (!acc.name.trim()) return void (accError = 'Donne un nom à ce compte.');
@@ -305,10 +305,9 @@
       kind: acc.kind,
       openingBalance,
       openingDate: todayISO(),
-      ...(acc.kind === 'third' ? { settlementThreshold: 1000, settlementDirection: 'both' as const } : {}),
     };
     app.upsert('accounts', row);
-    acc = { name: '', kind: 'holding', balance: '0,00' };
+    acc = { name: '', kind: 'courant', balance: '0,00' };
     accError = '';
   }
   /** Placement voulu d'une tirelire (D38) : tout sur un compte, ou rien de déclaré. */
@@ -756,7 +755,7 @@
       <label class="f">Numéro de compte ou IBAN <input value={a.accountNumber ?? ''} onchange={(e) => editAccount(a, 'accountNumber', e.currentTarget.value)} /></label>
       <label class="f">Solde actuel <input value={centsToInput(a.openingBalance)} inputmode="decimal" onchange={(e) => editAccountBalance(a, e.currentTarget.value)} /></label>
       <div class="actions" style="margin:0; grid-column:1/-1">
-        <span class="pill">{a.kind === 'holding' ? 'épargne' : 'suivi à la main'}</span>
+        <span class="pill">{ACCOUNT_KINDS[a.kind]}</span>
         <span class="spacer" style="flex:1"></span>
         <button class="btn small danger" onclick={() => app.remove('accounts', a.id)}>Retirer</button>
       </div>

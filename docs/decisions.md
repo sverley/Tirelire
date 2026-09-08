@@ -508,3 +508,27 @@ périodes ne se décalent pas au premier lancement.
 
 Remplace la partie de D02 qui situait le jour de paie sur le compte ; tout le reste de D02 — la
 période de paie à paie, son nom pris au mois de son milieu, le lissage du rattrapage — est inchangé.
+
+## D45 · 2026-09-08 · Le genre d'un compte dit sa nature, pas comment on le remplit
+
+`AccountKind` mélangeait deux choses : ce qu'est le compte, et la façon dont ses opérations y
+entrent. `third` — « compte tiers, saisi à la main » — refusait de fait l'import à un compte, alors
+que rien ne l'empêche : l'import sait déjà attribuer chaque ligne à un compte, soit par son numéro
+(D18) soit par le compte choisi pour le fichier entier, et les deux existaient déjà dans l'écran
+d'import, qui écartait pourtant ces comptes de ses listes.
+
+Les genres deviennent donc `principal`, `courant` et `epargne` — trois natures de compte bancaire
+réel. Ce qui relevait du comportement passe dans un drapeau indépendant, `tracksSettlement` : suivre
+un solde à régler avec le compte principal (D04). Un compte joint peut ainsi être importé *et* porter
+un solde à régler, ou l'un sans l'autre — combinaisons qu'un genre unique interdisait.
+
+Dans l'interface, le choix du type se réduit à deux options sans texte d'aide (« Compte courant »,
+« Épargne ») ; le suivi d'un solde à régler devient une case à cocher dans l'écran Comptes, avec ses
+réglages de seuil et de sens. L'import ne filtre plus aucun compte.
+
+Migration 7 → 8 : `third` devient `courant` avec `tracksSettlement`, `holding` devient `epargne`.
+
+Corrige aussi une scorie de D42 : le renommage automatique avait laissé un identifiant de travail,
+`tirelliresById_TMP`, mal orthographié et jamais rétabli. Il devient `tireliresById`. Le typage ne
+pouvait pas le voir — il était cohérent partout — ce qui rappelle qu'un renommage mécanique demande
+une relecture, pas seulement une compilation.

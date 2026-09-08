@@ -260,6 +260,30 @@ describe('migration du modèle (D30)', () => {
     expect((store.load().accounts[0] as unknown as Record<string, unknown>)['payDay']).toBeUndefined();
   });
 
+  it("7 → 8 (D45) : un compte « tiers » devient un compte courant à solde à régler suivi", async () => {
+    const store = await storeAtModel1([
+      ['accounts', 'acc_t', 'name', 'Carte enfants'],
+      ['accounts', 'acc_t', 'kind', 'third'],
+      ['accounts', 'acc_t', 'opening_balance', 0],
+      ['accounts', 'acc_t', 'opening_date', '2026-01-01'],
+      ['accounts', 'acc_l', 'name', 'Livret A'],
+      ['accounts', 'acc_l', 'kind', 'holding'],
+      ['accounts', 'acc_l', 'opening_balance', 100000],
+      ['accounts', 'acc_l', 'opening_date', '2026-01-01'],
+    ]);
+
+    migrateModel(store);
+    const comptes = store.load().accounts;
+    const tiers = comptes.find((a) => a.id === 'acc_t')!;
+    // La nature et le comportement se séparent : le compte est courant, et son solde reste suivi.
+    expect(tiers.kind).toBe('courant');
+    expect(tiers.tracksSettlement).toBe(true);
+    // Un compte d'accueil n'a jamais eu de solde à régler : il ne doit pas en gagner un.
+    const livret = comptes.find((a) => a.id === 'acc_l')!;
+    expect(livret.kind).toBe('epargne');
+    expect(livret.tracksSettlement).toBeUndefined();
+  });
+
   it('la migration est idempotente et journalisée', async () => {
     const store = await storeAtModel1([
       ['envelopes', 'env_courses', 'name', 'Courses'],
