@@ -17,6 +17,7 @@
     daysInMonth,
     budgetPeriodContaining,
     needName,
+    nextOccurrence,
     stepOf,
     budgetSuggestions,
     nextDueDate,
@@ -383,6 +384,10 @@
     const signe = f.kind === 'income' ? Math.abs(c) : -Math.abs(c);
     if (signe !== f.amount) app.upsert('plannedFlows', { ...f, amount: signe });
   }
+  /** Rythme non mensuel : l'ancrage porte la date entière, dont toutes les occurrences découlent. */
+  function editFlowDate(f: PlannedFlow, v: string) {
+    if (v && v !== f.periodicity.anchorDate) app.upsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate: v } });
+  }
   function editFlowStep(f: PlannedFlow, champ: 'interval' | 'unit', v: string) {
     const actuel = stepOf(f.periodicity);
     const suivant =
@@ -509,7 +514,11 @@
     <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
-      <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
+      {#if stepOf(f.periodicity).unit === 'month' && stepOf(f.periodicity).interval === 1}
+        <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
+      {:else}
+        <input class="date" type="date" value={f.periodicity.anchorDate} onchange={(e) => editFlowDate(f, e.currentTarget.value)} title="Première échéance ; les suivantes en découlent" />
+      {/if}
       <input class="jour" type="number" min="1" value={stepOf(f.periodicity).interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
       <select class="unite" value={stepOf(f.periodicity).unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
         {#each Object.entries(UNITS) as [u, l]}<option value={u}>{stepOf(f.periodicity).interval > 1 ? l.pluriel : l.un}</option>{/each}
@@ -520,6 +529,9 @@
         </select>
       {/if}
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
+      {#if stepOf(f.periodicity).unit !== 'month' || stepOf(f.periodicity).interval !== 1}
+        <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
+      {/if}
     </div>
   {/each}
   {#if restantsRevenus.length}
@@ -590,7 +602,11 @@
     <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
-      <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
+      {#if stepOf(f.periodicity).unit === 'month' && stepOf(f.periodicity).interval === 1}
+        <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
+      {:else}
+        <input class="date" type="date" value={f.periodicity.anchorDate} onchange={(e) => editFlowDate(f, e.currentTarget.value)} title="Première échéance ; les suivantes en découlent" />
+      {/if}
       <input class="jour" type="number" min="1" value={stepOf(f.periodicity).interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
       <select class="unite" value={stepOf(f.periodicity).unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
         {#each Object.entries(UNITS) as [u, l]}<option value={u}>{stepOf(f.periodicity).interval > 1 ? l.pluriel : l.un}</option>{/each}
@@ -601,6 +617,9 @@
         </select>
       {/if}
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
+      {#if stepOf(f.periodicity).unit !== 'month' || stepOf(f.periodicity).interval !== 1}
+        <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
+      {/if}
     </div>
   {/each}
   {#if restantsCharges.length}

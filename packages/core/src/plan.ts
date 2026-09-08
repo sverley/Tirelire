@@ -113,7 +113,8 @@ export interface PlanTransfer {
 }
 
 export interface PlanWarning {
-  code: 'noPrincipal' | 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'principalOverdrawn';
+  code: 'noPrincipal' | 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'principalOverdrawn'
+    | 'payoutShort';
   message: string;
   tirelireId?: Id;
   needId?: Id;
@@ -145,7 +146,7 @@ export interface Plan {
   warnings: PlanWarning[];
 }
 
-const KIND_ORDER: Record<NeedKind, number> = { dueDate: 0, recurring: 1, goal: 2 };
+const KIND_ORDER: Record<NeedKind, number> = { payout: -1, dueDate: 0, recurring: 1, goal: 2 };
 
 /**
  * Calcule le plan de la période contenant `asOf`, avec les positions à `asOf`.
@@ -199,9 +200,31 @@ export function computePlan(ledger: Ledger, asOf: ISODate): Plan {
     (a, b) => a.priority - b.priority || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name, 'fr'),
   );
 
-  // Lecture D06 : ce que les revenus couvrent, planchers d'abord, puis le reste par priorité.
-  fundByPriority(lines, totalIncomes - totalFixed);
+  /*
+   * Les versements (D48) ne se disputent pas les revenus : ils en apportent. Une tirelire de
+   * saison verse ce qu'elle porte, ce qui augmente d'autant ce que les autres besoins peuvent se
+   * partager. `fundByPriority` écrête à zéro et ne saurait pas traiter une demande négative.
+   */
+  const payouts = lines.filter((l) => l.kind === 'payout');
+  for (const l of payouts) l.funded = l.requested;
+  const apport = -payouts.reduce((s, l) => s + l.requested, 0);
+  fundByPriority(
+    lines.filter((l) => l.kind !== 'payout'),
+    totalIncomes - totalFixed + apport,
+  );
   for (const l of lines) {
+    if (l.kind === 'payout') {
+      // Le versement est « réduit » quand la tirelire n'a plus de quoi tenir le rythme annoncé.
+      l.status = -l.requested < l.cruise ? 'reduced' : 'ok';
+      if (l.status === 'reduced')
+        warnings.push({
+          code: 'payoutShort',
+          message: `« ${l.name} » ne verse plus le montant prévu : la réserve s'épuise.`,
+          tirelireId: l.tirelireId,
+          needId: l.needId,
+        });
+      continue;
+    }
     if (l.requested === 0) l.status = 'ahead';
     else if (l.funded === 0) l.status = 'unfunded';
     else if (l.funded < l.requested) l.status = 'reduced';

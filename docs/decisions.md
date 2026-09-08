@@ -597,3 +597,41 @@ et rien ne demandait autre chose.
 `intervalMonths` reste lu mais n'est plus jamais écrit (`stepOf`) ; la migration 8 → 9 convertit
 besoins et flux. Un rythme envoyé par un appareil non migré garde donc son sens, ce qu'un test
 vérifie.
+
+## D48 · 2026-09-08 · Une tirelire peut verser au budget au lieu de le consommer
+
+Certains revenus tombent par à-coups sur trois ou quatre mois puis cessent — une saison touristique,
+une récolte — alors que le foyer, lui, dépense toute l'année. Les prévoir comme des flux datés est
+sans espoir : ni la date ni le montant de chaque encaissement ne sont connus. Et sans rien, le plan
+annonce une marge énorme en août puis un déficit dix mois durant, pour un foyer qui va très bien.
+
+C'est une tirelire à l'envers. L'argent arrive et s'affecte à une tirelire de saison, dont le solde
+gonfle ; un besoin de genre **`payout`** en verse ensuite une part au budget à chaque période. Le
+montant se déclare pour la périodicité — l'année, en général, parce que c'est ainsi qu'on raisonne
+sur une saison — et se répartit sur les périodes.
+
+Trois choix, pris pour éviter des pièges :
+
+- Un **genre de besoin distinct**, pas un montant négatif sur un besoin ordinaire. Le négatif
+  traverserait mal l'ordre de financement et le rattrapage, et rendrait tous les calculs ambigus.
+- Le versement **apporte des fonds au lieu d'en demander** : `fundByPriority` écrête à zéro et ne
+  saurait pas traiter une demande négative, donc les versements sont réglés à part et leur total
+  s'ajoute à ce que les autres besoins se partagent. D'où leur priorité par défaut à `0`.
+- Une réserve épuisée **avertit sans creuser** : on ne verse jamais plus que la tirelire ne porte,
+  et le plan signale (`payoutShort`) que le rythme annoncé n'est plus tenu. Réduire le train de vie
+  ou puiser ailleurs reste une décision du foyer, pas de l'application.
+
+Le reste vient sans travail : le virement depuis un livret se propose déjà par l'écart de placement
+(D20, D38), et le Bilan sait comparer une dotation à la réalité observée, donc le calibrage annuel
+du versement se lit là où se lit déjà celui des provisions.
+
+Les **intérêts d'un compte d'épargne ne relèvent pas de ce mécanisme**, malgré la ressemblance : ils
+restent sur le compte au lieu d'alimenter le budget, et un livret ne s'épuise pas — l'avertissement
+d'épuisement n'aurait aucun sens. Ce sont des opérations qu'on affecte à leur arrivée, et qu'on peut
+anticiper, si on y tient, par un flux de revenu annuel `variable` sur le compte d'épargne.
+
+**Ancrage des rythmes non mensuels.** Le quantième affiché sur une ligne suffisait tant que tout
+était mensuel ; il ne dit pas dans quel mois tombe un revenu annuel ni un semestriel. La ligne montre
+donc un quantième pour un rythme mensuel, et la date entière sinon — l'ancrage étant la première
+occurrence, tout le reste s'en déduit — avec un rappel de la prochaine occurrence, qu'une date
+d'ancrage seule ne donne pas.

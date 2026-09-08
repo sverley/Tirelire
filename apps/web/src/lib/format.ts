@@ -33,6 +33,7 @@ export const NEED_KINDS: Record<NeedKind, string> = {
   dueDate: 'Échéance (montant à une date)',
   recurring: 'Récurrent (tant par période)',
   goal: "Objectif (montant sans date)",
+  payout: 'Versement (une réserve qui alimente le budget)',
 };
 
 /** Nom court pour la pastille d'une ligne de plan. */
@@ -40,6 +41,7 @@ export const NEED_KINDS_SHORT: Record<NeedKind, string> = {
   dueDate: 'échéance',
   recurring: 'courant',
   goal: 'objectif',
+  payout: 'versement',
 };
 
 export const ROLLOVER_LABELS: Record<'none' | 'unlimited' | 'capped', string> = {

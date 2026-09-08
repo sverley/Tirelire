@@ -108,3 +108,66 @@ describe("budget construit par l'assistant (D40)", () => {
     expect(plan.warnings.map((w) => w.code)).not.toContain('principalOverdrawn');
   });
 });
+
+/**
+ * Revenus concentrés sur une saison, dont on veut vivre toute l'année (D48). La tirelire encaisse
+ * l'été et verse chaque période ; le reste à vivre doit être le même en février qu'en août.
+ */
+describe('tirelire de saison (D48)', () => {
+  function saison(soldeSaison: number): Ledger {
+    const l = emptyLedger();
+    l.settings.periodStartDay = 1;
+    l.accounts.push({ id: 'principal', name: 'Compte principal', kind: 'principal', openingBalance: euros(500), openingDate: '2026-01-01' });
+    l.tirelires.push({ id: 'saison', name: 'Location saisonnière', placement: [], openingBalance: euros(soldeSaison), openingDate: '2026-01-01', rollover: { mode: 'unlimited' } });
+    l.needs.push({
+      id: 'n-saison',
+      tirelireId: 'saison',
+      kind: 'payout',
+      amount: euros(12000), // ce que la saison rapporte sur l'année
+      periodicity: { interval: 1, unit: 'year', anchorDate: '2026-01-01' },
+      priority: DEFAULT_PRIORITY.payout,
+    });
+    l.plannedFlows.push({
+      id: 'loyer', name: 'Loyer', kind: 'fixedCharge', amount: euros(-800), accountId: 'principal',
+      periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-05' }, dateWindowDays: 5,
+    });
+    return l;
+  }
+
+  it('verse chaque période le douzième de ce que la saison rapporte', () => {
+    const plan = computePlan(saison(12000), '2026-02-10');
+    const ligne = plan.lines.find((l) => l.needId === 'n-saison')!;
+    // 12 000 € sur l'année, soit 1 000 € versés par période — comptés en négatif : la tirelire donne.
+    expect(ligne.requested).toBe(euros(-1000));
+    expect(ligne.funded).toBe(euros(-1000));
+    expect(ligne.status).toBe('ok');
+  });
+
+  it('fait remonter le reste à vivre du montant versé', () => {
+    const plan = computePlan(saison(12000), '2026-02-10');
+    // Aucun revenu prévu ce mois-là, 800 € de loyer : sans le versement la marge serait de −800 €.
+    expect(plan.totals.incomes).toBe(0);
+    expect(plan.totals.margin).toBe(euros(200));
+  });
+
+  it('ne verse que ce que la tirelire porte quand la saison a été mauvaise', () => {
+    // 300 € en caisse là où le rythme annoncé demanderait 1 000 € : on verse les 300 €.
+    const plan = computePlan(saison(300), '2026-01-10');
+    const ligne = plan.lines.find((l) => l.needId === 'n-saison')!;
+    expect(ligne.requested).toBe(euros(-300));
+    expect(ligne.cruise).toBe(euros(1000));
+    expect(ligne.status).toBe('reduced');
+    expect(plan.warnings.map((w) => w.code)).toContain('payoutShort');
+  });
+
+  it("prévient quand la réserve est épuisée, au lieu de creuser un solde négatif", () => {
+    // Le mois suivant, les 300 € ont été versés : il ne reste rien à verser.
+    const plan = computePlan(saison(300), '2026-02-10');
+    const ligne = plan.lines.find((l) => l.needId === 'n-saison')!;
+    expect(ligne.requested).toBe(0);
+    expect(ligne.status).toBe('reduced');
+    expect(plan.warnings.map((w) => w.code)).toContain('payoutShort');
+    // Et la marge retombe au niveau qu'elle aurait sans la saison.
+    expect(plan.totals.margin).toBe(euros(-800));
+  });
+});

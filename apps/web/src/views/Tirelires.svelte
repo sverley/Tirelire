@@ -159,7 +159,7 @@
 
   function onNeedKindChange() {
     needForm.priority = String(DEFAULT_PRIORITY[needForm.kind]);
-    needForm.intervalMonths = needForm.kind === 'dueDate' ? '12' : '1';
+    needForm.intervalMonths = needForm.kind === 'dueDate' || needForm.kind === 'payout' ? '12' : '1';
   }
 
   function saveNeed(ev: Event) {
@@ -181,6 +181,11 @@
       row.periodicity = { interval, unit: 'month', anchorDate: needForm.anchorDate };
     } else if (needForm.kind === 'recurring') {
       if (amount === undefined) return void (needError = 'Montant par période invalide.');
+      row.amount = amount;
+      row.periodicity = { interval, unit: 'month', anchorDate: needForm.anchorDate };
+    } else if (needForm.kind === 'payout') {
+      // Ce que la réserve rapporte sur la périodicité (l'année, en général) et qu'elle reversera.
+      if (amount === undefined) return void (needError = 'Montant à reverser invalide.');
       row.amount = amount;
       row.periodicity = { interval, unit: 'month', anchorDate: needForm.anchorDate };
     } else {
@@ -290,6 +295,14 @@
       {:else if needForm.kind === 'recurring'}
         <label class="f">Montant <input bind:value={needForm.amount} inputmode="decimal" placeholder="900,00" /></label>
         <label class="f">Par période de (mois) <input type="number" min="1" bind:value={needForm.intervalMonths} /></label>
+        <label class="f">Depuis le <input type="date" bind:value={needForm.anchorDate} /></label>
+      {:else if needForm.kind === 'payout'}
+        <p class="muted small" style="grid-column:1/-1;margin:0">
+          Une réserve qui alimente le budget au lieu de le consommer : les revenus d'une saison,
+          encaissés en quelques mois, reversés régulièrement le reste de l'année.
+        </p>
+        <label class="f">Montant à reverser <input bind:value={needForm.amount} inputmode="decimal" placeholder="12 000,00" /></label>
+        <label class="f">Réparti sur (mois) <input type="number" min="1" bind:value={needForm.intervalMonths} /></label>
         <label class="f">Depuis le <input type="date" bind:value={needForm.anchorDate} /></label>
       {:else}
         <label class="f">Mensualité <input bind:value={needForm.monthlyAmount} inputmode="decimal" placeholder="300,00" /></label>
