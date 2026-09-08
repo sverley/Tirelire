@@ -771,7 +771,8 @@ ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre 
 
 Précise D20 et D29. Le plan a maintenant deux dates : `asOf`, la période qu'on regarde, et
 `today`, la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf`, donc
-tout appelant à deux arguments garde le comportement d'avant ; l'interface passe la date du jour).
+tout appelant à deux arguments garde le comportement d'avant ; l'interface y passe sa **date de
+lecture**).
 
 Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un virement des mois passés
 n'a pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est
@@ -788,6 +789,15 @@ puisque rien ne les avait virées — pendant que le bloc « Tirelires » simula
 période. Les deux se contredisaient dès la période suivante et l'écart grossissait de période en
 période (sur l'exemple : 700 € demandés contre 1 400 € virés en octobre, 550 € contre 1 950 € en
 novembre, où une tirelire « en avance » ne demandait plus rien mais faisait toujours virer 300 €).
+
+Côté interface, les deux dates cessent d'être la même variable. `app.asOf` est la date de lecture :
+elle appartient à toute l'application, l'en-tête la montre, et c'est elle qui dit jusqu'où les
+soldes sont connus. La période regardée n'est plus qu'un curseur de l'écran Plan : la parcourir ne
+déplace plus la date de lecture de tous les écrans — ce qui, depuis que `main` prévient quand on ne
+lit pas au jour même, affichait « lecture à une autre date » au moindre clic sur une période — et
+la période où l'on lit s'affiche à la date de lecture plutôt qu'à son premier jour. Le jeu
+d'exemple, daté de septembre 2026, se lit donc à sa date : ses périodes suivantes restent des
+périodes à venir quelle que soit la date du jour.
 
 Même raison pour ce qui se lit sur le réel — non affecté du compte principal, soldes à régler
 des comptes tiers, surplus des comptes d'accueil : sur une période à venir, ils se lisent à la

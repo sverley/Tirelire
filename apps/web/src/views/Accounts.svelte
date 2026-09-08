@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
+  import { revealed } from '../lib/actions';
   import { money, moneyClass, shortDate, centsToInput, inputToCents, ACCOUNT_KINDS } from '../lib/format';
   import { accountBalance, indexLedger, settlementBalance, unallocated, alive, type Account, type AccountKind, type SettlementDirection } from '@tirelire/core';
 
@@ -84,8 +85,8 @@
   <button class="btn primary" onclick={startNew}>Ajouter un compte</button>
 </div>
 
-{#if editing}
-  <form class="edit" onsubmit={save}>
+{#snippet editeur()}
+  <form class="edit attached" use:revealed onsubmit={save}>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Compte courant" /></label>
       <label class="f">Type
@@ -120,10 +121,15 @@
       <button class="btn" type="button" onclick={() => (editing = undefined)}>Annuler</button>
     </div>
   </form>
+{/snippet}
+
+<!-- Un compte qu'on crée n'a pas encore de ligne : son formulaire suit le bouton qui l'ouvre. -->
+{#if editing && !accounts.some((a) => a.id === editing?.id)}
+  {@render editeur()}
 {/if}
 
 {#each accounts as a (a.id)}
-  <div class="card" class:accent={a.kind === 'principal'}>
+  <div class="card" class:accent={a.kind === 'principal'} class:editing={editing?.id === a.id}>
     <div class="row">
       <div class="label">
         <strong>{a.name}</strong> <span class="pill">{a.kind === 'principal' ? 'principal' : a.kind === 'epargne' ? 'accueil' : 'tiers'}</span>
@@ -145,6 +151,9 @@
       <div class="row"><div class="label">Non affecté (solde − tirelires hébergées)</div><div class="{moneyClass(unallocated(a, app.ledger, idx, app.asOf))}">{money(unallocated(a, app.ledger, idx, app.asOf))}</div></div>
     {/if}
   </div>
+  {#if editing?.id === a.id}
+    {@render editeur()}
+  {/if}
 {:else}
   <div class="empty">Aucun compte. Commence par le compte principal.</div>
 {/each}
