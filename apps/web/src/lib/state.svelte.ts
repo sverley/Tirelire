@@ -4,6 +4,7 @@
  */
 import {
   computePlan,
+  diffDays,
   emptyLedger,
   exampleLedger,
   todayISO,
@@ -31,6 +32,28 @@ class AppState {
   private opened: OpenedStore | undefined;
 
   plan: Plan = $derived(computePlan(this.ledger, this.asOf));
+
+  /** Date de la dernière opération connue, tous comptes confondus (undefined sans opération). */
+  lastOperationDate: string | undefined = $derived.by(() => {
+    let last: string | undefined;
+    for (const o of this.ledger.operations) if (!o.deletedAt && (last === undefined || o.date > last)) last = o.date;
+    return last;
+  });
+
+  /**
+   * Jours entre la dernière opération connue et la date de lecture. Au-delà de quelques jours,
+   * les soldes et le plan supposent qu'il ne s'est rien passé depuis le dernier relevé importé :
+   * l'interface doit le dire, sans quoi on lit un plan optimiste sans le savoir.
+   */
+  staleDays: number = $derived(this.lastOperationDate ? diffDays(this.lastOperationDate, this.asOf) : 0);
+
+  /** La date de lecture est-elle le jour même ? Sinon, toute l'application lit une autre date. */
+  readingToday: boolean = $derived(this.asOf === todayISO());
+
+  /** Revenir à aujourd'hui après avoir consulté une autre date. */
+  backToToday(): void {
+    this.asOf = todayISO();
+  }
 
   get store(): LedgerStore {
     if (!this.opened) throw new Error('Dépôt non ouvert');

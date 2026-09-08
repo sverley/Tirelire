@@ -1,7 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { app, type View } from './lib/state.svelte';
+  import { shortDate } from './lib/format';
   import { isNative } from './lib/platform';
+
+  /**
+   * Au-delà de cet écart entre la dernière opération connue et la date de lecture, l'application
+   * prévient : le plan et les soldes reposent alors sur un historique qui s'arrête loin derrière.
+   */
+  const JOURS_AVANT_ALERTE = 15;
   import Plan from './views/Plan.svelte';
   import Accounts from './views/Accounts.svelte';
   import Tirelires from './views/Tirelires.svelte';
@@ -55,32 +62,59 @@
     <div class="card warn">Impossible d'ouvrir la base : {app.error}</div>
   {:else if !app.ready}
     <p class="muted">Ouverture de la base…</p>
-  {:else if app.view === 'plan'}
-    <Plan />
-  {:else if app.view === 'operations'}
-    <Operations />
-  {:else if app.view === 'import'}
-    <Import />
-  {:else if app.view === 'review'}
-    <Review />
-  {:else if app.view === 'more'}
-    <More />
-  {:else if app.view === 'wizard'}
-    <Wizard />
-  {:else if app.view === 'accounts'}
-    <Accounts />
-  {:else if app.view === 'tirelires'}
-    <Tirelires />
-  {:else if app.view === 'categories'}
-    <Categories />
-  {:else if app.view === 'flows'}
-    <Flows />
-  {:else if app.view === 'entries'}
-    <Entries />
-  {:else if app.view === 'sync'}
-    <Sync />
   {:else}
-    <Settings />
+    {#if app.staleDays > JOURS_AVANT_ALERTE && app.lastOperationDate}
+      <div class="card warn">
+        <div class="row">
+          <div class="label">
+            <strong>Dernière opération connue le {shortDate(app.lastOperationDate)}</strong>
+            <span class="sub">
+              Il y a {app.staleDays} jours. Les soldes et le plan au {shortDate(app.asOf)} supposent
+              qu'il ne s'est rien passé depuis : importe un relevé, ou lis à cette date.
+            </span>
+          </div>
+        </div>
+        <div class="actions" style="margin:6px 0 0">
+          <button class="btn small primary" onclick={() => app.switchTab('import')}>Importer un relevé</button>
+          <button class="btn small" onclick={() => (app.asOf = app.lastOperationDate!)}>Lire au {shortDate(app.lastOperationDate)}</button>
+        </div>
+      </div>
+    {/if}
+    {#if !app.readingToday}
+      <div class="card">
+        <div class="row">
+          <div class="label sub">Lecture au {shortDate(app.asOf)}, pas aujourd'hui : tous les écrans suivent cette date.</div>
+          <button class="btn small" onclick={() => app.backToToday()}>Revenir à aujourd'hui</button>
+        </div>
+      </div>
+    {/if}
+    {#if app.view === 'plan'}
+      <Plan />
+    {:else if app.view === 'operations'}
+      <Operations />
+    {:else if app.view === 'import'}
+      <Import />
+    {:else if app.view === 'review'}
+      <Review />
+    {:else if app.view === 'more'}
+      <More />
+    {:else if app.view === 'wizard'}
+      <Wizard />
+    {:else if app.view === 'accounts'}
+      <Accounts />
+    {:else if app.view === 'tirelires'}
+      <Tirelires />
+    {:else if app.view === 'categories'}
+      <Categories />
+    {:else if app.view === 'flows'}
+      <Flows />
+    {:else if app.view === 'entries'}
+      <Entries />
+    {:else if app.view === 'sync'}
+      <Sync />
+    {:else}
+      <Settings />
+    {/if}
   {/if}
 </main>
 
