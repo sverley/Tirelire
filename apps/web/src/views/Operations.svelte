@@ -103,9 +103,24 @@
       .filter((o) => !periodOnly || (o.date >= period.start && o.date <= period.end))
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Math.abs(b.amount) - Math.abs(a.amount))),
   );
-  const operations = $derived(matching.slice(0, 300));
+  /**
+   * La liste se coupait à 300 lignes sans le dire : après l'import de plusieurs années, on voyait
+   * les 300 plus récentes et rien n'indiquait que le reste existait. On affiche par tranches, on
+   * annonce combien il en reste, et le compteur de recherche rappelle toujours le total connu.
+   */
+  const PAGE = 300;
+  let shown = $state(PAGE);
+  const operations = $derived(matching.slice(0, shown));
   const selectionActive = $derived(Object.keys(selection).length > 0);
+  const totalOps = $derived(alive(app.ledger.operations).length);
   const untreatedCount = $derived(alive(app.ledger.operations).filter((o) => o.state === 'untreated').length);
+  // Changer de critère repart de la première tranche : sinon on hérite du « voir plus » d'avant.
+  $effect(() => {
+    void selection;
+    void filter;
+    void periodOnly;
+    shown = PAGE;
+  });
 
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
   const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
@@ -350,7 +365,7 @@
   <div class="row">
     <button class="label" style="text-align:left;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit" onclick={() => (searchOpen = !searchOpen)}>
       <strong>Recherche</strong>
-      <span class="sub">{selectionActive ? `${matching.length} opération(s) trouvée(s)` : 'aucun critère'}</span>
+      <span class="sub">{matching.length} opération(s) sur {totalOps} connues{selectionActive ? '' : ' · aucun critère de recherche'}</span>
     </button>
     <span class="num">{searchOpen ? '▾' : '▸'}</span>
   </div>
@@ -549,6 +564,17 @@
       {/if}
     </div>
   {:else}
-    <div class="muted">Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}</div>
+    <div class="muted">
+      Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}
+      {#if totalOps > 0 && matching.length === 0}
+        <span class="sub">Le dépôt contient {totalOps} opération(s) : élargis la recherche ou passe le filtre d'affichage sur « Toutes ».</span>
+      {/if}
+    </div>
   {/each}
+  {#if matching.length > operations.length}
+    <div class="row">
+      <div class="label sub">{operations.length} affichée(s) sur {matching.length}</div>
+      <button class="btn small" onclick={() => (shown += PAGE)}>Afficher {Math.min(PAGE, matching.length - operations.length)} de plus</button>
+    </div>
+  {/if}
 </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
+  import { revealed } from '../lib/actions';
   import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
   import { alive, needForDueDateFlow, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
 
@@ -142,8 +143,8 @@
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
 </div>
 
-{#if editing}
-  <form class="edit" onsubmit={save}>
+{#snippet editeur()}
+  <form class="edit attached" use:revealed onsubmit={save}>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Salaire" /></label>
       <label class="f">Type
@@ -201,6 +202,11 @@
       <button class="btn" type="button" onclick={() => (editing = undefined)}>Annuler</button>
     </div>
   </form>
+{/snippet}
+
+<!-- Un flux qu'on crée n'a pas encore de ligne : son formulaire suit le bouton qui l'ouvre. -->
+{#if editing && !flows.some((f) => f.id === editing?.id)}
+  {@render editeur()}
 {/if}
 
 {#each groups as g (g.kind)}
@@ -210,7 +216,7 @@
       {@const badge = validityBadge(f, app.asOf)}
       {@const validite = validityLabel(f)}
       {@const provision = provisionText(f)}
-      <div class="row {badge ? 'dormant' : ''}">
+      <div class="row {badge ? 'dormant' : ''}" class:editing={editing?.id === f.id}>
         <div class="label">
           <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · automatisme' : ''}
           {#if badge}<span class="pill dim">{badge}</span>{/if}
@@ -223,6 +229,9 @@
           <button class="btn small danger" onclick={() => remove(f)}>Supprimer</button>
         </div>
       </div>
+      {#if editing?.id === f.id}
+        {@render editeur()}
+      {/if}
     {/each}
   </div>
 {/each}

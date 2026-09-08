@@ -54,7 +54,11 @@
       <button class="btn small" class:primary={p.key === plan.period.key} onclick={() => goTo(p)}>{p.label}</button>
     {/each}
   </div>
-  <p class="muted small">Période du {shortDate(plan.period.start)} au {shortDate(plan.period.end)}, soldes au {shortDate(plan.asOf)}.</p>
+  <p class="muted small">
+    Période du {shortDate(plan.period.start)} au {shortDate(plan.period.end)}, {plan.simulated
+      ? `période à venir : soldes projetés depuis le ${shortDate(plan.today)}, les virements des périodes précédentes étant supposés faits`
+      : `soldes au ${shortDate(plan.asOf)}`}.
+  </p>
 
   <div class="stats">
     <div class="stat"><div class="v">{money(plan.totals.incomes)}</div><div class="k">Revenus prévus</div></div>
@@ -203,5 +207,5 @@
     <div class="row total"><div class="label">Total</div><div class="num">{money(-plan.totals.fixedCharges)}</div></div>
   </div>
 
-  <p class="muted small">Non affecté sur le compte principal au {shortDate(plan.asOf)} : <span class="num">{money(plan.totals.principalUnallocated)}</span>.</p>
+  <p class="muted small">Non affecté sur le compte principal au {shortDate(plan.today)} : <span class="num">{money(plan.totals.principalUnallocated)}</span>.</p>
 {/if}
