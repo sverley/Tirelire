@@ -122,27 +122,15 @@ l'inférence de sélection (D26).
 
 ---
 
-## Lot 11 · Renflouer une tirelire depuis un compte ou un apport extérieur
+## Lot 11 · Renflouer une tirelire — **fait le 8 septembre (D49)**
 
-Le versement de D48 fait couler une tirelire vers le budget. Le mouvement inverse manque : remettre
-de l'argent dans une tirelire sans que ça vienne d'une dotation ordinaire.
+Livré : `Allocation.replenishment` (`internal` / `external`), les renflouements écartés des moyennes
+du bilan, `reviewReplenishments` qui les compte par tirelire et propose le relèvement de dotation
+correspondant, l'affichage dans l'écran Bilan et le marquage dans la ventilation.
 
-Deux cas, qui ne sont pas le même problème :
-
-- **L'argent existe déjà chez nous** et change seulement de tirelire ou de compte : vider une
-  réserve devenue inutile dans celle qui est à sec, ou puiser dans l'épargne pour couvrir une
-  échéance. C'est une réaffectation interne, à somme nulle sur le patrimoine ; le plan ne doit pas
-  la lire comme un revenu. La ventilation (D10) sait déjà décrire deux lignes de sens opposés — il
-  manque surtout le geste dans l'interface, et une trace de la raison du mouvement.
-- **L'argent vient de l'extérieur** — un cadeau, un remboursement, une vente. C'est une opération
-  réelle qui entre sur un compte et s'affecte à une tirelire. Cela fonctionne déjà par la
-  ventilation ; ce qui manque est le confort : reconnaître qu'un encaissement exceptionnel n'est pas
-  un revenu récurrent, et ne pas le laisser fausser le calibrage du Bilan ni les moyennes.
-
-À trancher au moment de le faire : est-ce qu'un renflouement est une simple opération bien ventilée
-(rien à ajouter au modèle, tout est dans l'interface et les règles), ou mérite-t-il d'être nommé pour
-que le Bilan sache l'écarter de ses moyennes. Commencer par le cas réel de Simon plutôt que par le
-modèle.
+Reste ouvert, à trancher sur des données réelles : faut-il traiter `internal` et `external`
+différemment dans le calibrage ? La distinction est enregistrée depuis maintenant pour que
+l'historique existe le jour où l'on décidera.
 
 ## Lot 12 · Dette et branches
 
