@@ -115,18 +115,33 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .warnings div { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 14px; }
 .orders { margin: 6px 0 0 12px; padding-left: 8px; border-left: 2px solid var(--line); }
 
-/* Assistant : propositions cliquables et lignes modifiables en place (D43). */
-.propositions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.prop { display: inline-flex; align-items: baseline; gap: 6px; border: 1px dashed var(--line-strong); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--ink-2); cursor: pointer; font-family: inherit; }
-.prop:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
-.prop .v { font-size: 12px; color: var(--muted); }
-.card.ligne, .ligne { display: flex; align-items: center; gap: 6px; }
-.ligne input { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; }
-.ligne .nom { flex: 1 1 40%; }
-.ligne .mt { flex: 0 1 96px; font-family: var(--mono); text-align: right; }
-.ligne .jour { flex: 0 0 62px; font-family: var(--mono); }
-.ligne .date { flex: 0 1 140px; font-family: var(--mono); }
-.ligne .garde { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; }
-.ligne .garde input { min-width: auto; }
-.ligne .cpt { flex: 0 1 120px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; }
-.card.compte { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+/* Assistant : lignes modifiables et en-têtes de colonnes qui partagent la même grille (D46). */
+.tete { display: grid; gap: 6px; padding: 0 8px 4px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.tete .d { text-align: right; }
+.ligne { display: grid; gap: 6px; align-items: center; }
+.card.ligne { padding: 8px; margin-bottom: 6px; }
+.ligne input, .ligne select { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; width: 100%; font-family: inherit; font-size: 14px; }
+.ligne .mt { font-family: var(--mono); text-align: right; }
+.ligne .garde { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; font-size: 12px; }
+.ligne .garde input { width: auto; min-width: auto; }
+.ligne .btn.danger { padding: 4px 9px; line-height: 1.1; }
+
+.tete-flux, .ligne-flux { grid-template-columns: minmax(0, 1fr) 96px 56px var(--col-compte, 0px) 32px; }
+.tete-courant, .ligne-courant { grid-template-columns: minmax(0, 1fr) 96px 74px 32px; }
+.tete-echeance, .ligne-echeance { grid-template-columns: minmax(0, 1fr) 96px 140px 32px; }
+.tete-epargne, .ligne-epargne { grid-template-columns: minmax(0, 1fr) 96px 96px 32px; }
+.tete-compte, .ligne-compte { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr) 96px 116px 32px; }
+.avec-compte { --col-compte: 110px; }
+
+.ligne-compte { display: grid; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 6px; }
+.ligne-compte.principal { border-left: 3px solid var(--accent); }
+.ligne-compte input, .ligne-compte select { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--bg); color: var(--ink); min-width: 0; width: 100%; font-family: inherit; font-size: 14px; }
+.ligne-compte .mt { font-family: var(--mono); text-align: right; }
+
+/* Sous 640 px, la grille en colonnes ne tient plus : les champs s'empilent et l'en-tête s'efface. */
+@media (max-width: 640px) {
+  .tete { display: none; }
+  .ligne, .ligne-compte { grid-template-columns: minmax(0, 1fr) 96px 32px; }
+  .ligne-compte > select, .ligne-flux > select { grid-column: 1 / -1; }
+  .ligne-echeance > .date, .ligne-compte > input:nth-child(2), .ligne-compte > input:nth-child(3) { grid-column: 1 / -1; }
+}

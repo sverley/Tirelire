@@ -545,3 +545,24 @@ Deux garde-fous en découlent. Le select de l'assistant est **engendré** à par
 genre casse désormais la compilation. Et la lecture d'un compte **traduit les anciens genres**
 (`pivot`, `holding`, `third`), comme D41 le faisait déjà pour le seul `pivot` — sauf en lecture
 brute, sinon les migrations ne verraient plus la valeur qu'elles doivent interpréter.
+
+## D46 · 2026-09-08 · Des lignes déjà là, pas des pastilles à cliquer
+
+D43 offrait les propositions sous forme de pastilles qui remplissaient un formulaire vide : il fallait
+en toucher une, relire le formulaire, valider, recommencer. Un geste par ligne, pour un budget qui en
+compte vingt.
+
+Sur un projet vierge, **les lignes proposées existent déjà** à l'arrivée sur l'étape : on corrige ce
+qui ne va pas, on supprime ce qui ne concerne pas le foyer. C'est le mouvement naturel — reconnaître
+et retrancher — plutôt que se souvenir et saisir. Le semis n'a lieu qu'une fois par étape, mémorisé
+pour la session : sans cela, supprimer toutes les lignes les ferait repousser au retour sur l'étape.
+Les conditions de D43 sont inchangées — rien n'est semé si le projet contient déjà quelque chose.
+
+Chaque liste reçoit un **en-tête de colonnes** et un sous-titre ; les charges fixes n'en avaient
+aucun, ce qui les faisait paraître étrangères aux revenus juste au-dessus. En-têtes et lignes
+partagent la même grille CSS, faute de quoi ils se désalignent au premier changement de largeur.
+Sous 640 px la grille se replie et l'en-tête s'efface, les champs portant alors leur propre libellé.
+
+L'écran des comptes suit la même forme : une ligne par compte au lieu d'une carte à quatre champs
+étiquetés, le type devenant un menu modifiable sur la ligne. Cinq comptes tenaient sur deux écrans ;
+ils tiennent dans un tiers.
