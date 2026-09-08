@@ -7,6 +7,7 @@
     tirelireComponents,
     indexLedger,
     needCruise,
+    needActive,
     nextOccurrence,
     DEFAULT_PRIORITY,
     type Tirelire,
@@ -38,8 +39,13 @@
     anchorDate: app.asOf,
     monthlyAmount: '',
     priority: '20',
+    // Période de validité (D50) : un budget qui change se clôt et se rouvre, il ne s'écrase pas.
+    activeFrom: '',
+    activeTo: '',
   });
   let needError = $state('');
+  /** Les besoins hors vigueur à la date de lecture restent consultables, mais repliés (D50). */
+  let showClosed = $state(false);
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -47,6 +53,19 @@
   const idx = $derived(indexLedger(app.ledger));
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? '?';
   const needsOf = (e: Tirelire) => needs.filter((n) => n.tirelireId === e.id).sort((a, b) => a.priority - b.priority);
+  /** Ce que le plan retient à la date de lecture : les besoins en vigueur ce jour-là (D50). */
+  const activeNeedsOf = (e: Tirelire) => needsOf(e).filter((n) => needActive(n, app.asOf));
+  /** Les autres : clos avant la date de lecture, ou pas encore ouverts. */
+  const closedNeedsOf = (e: Tirelire) => needsOf(e).filter((n) => !needActive(n, app.asOf));
+  const closedCount = $derived(needs.filter((n) => !needActive(n, app.asOf)).length);
+
+  /** Période de validité en clair, vide quand le besoin vaut depuis toujours et pour toujours. */
+  function validityText(n: Need): string {
+    if (n.activeFrom && n.activeTo) return `en vigueur du ${shortDate(n.activeFrom)} au ${shortDate(n.activeTo)}`;
+    if (n.activeFrom) return `depuis le ${shortDate(n.activeFrom)}`;
+    if (n.activeTo) return `jusqu’au ${shortDate(n.activeTo)}`;
+    return '';
+  }
 
   // Regroupement d'affichage : par premier compte de placement (D38), ou « sans placement ».
   const byPlacement = $derived(
@@ -132,14 +151,14 @@
   }
 
   function remove(e: Tirelire) {
-    if (!confirm(`Supprimer l’tirelire « ${e.name} » et ses besoins ?`)) return;
+    if (!confirm(`Supprimer la tirelire « ${e.name} » et ses besoins ?`)) return;
     for (const n of needsOf(e)) app.remove('needs', n.id);
     app.remove('tirelires', e.id);
   }
 
   function startNewNeed(e: Tirelire) {
     editingNeed = { need: { id: app.newId(), tirelireId: e.id, kind: 'recurring', priority: DEFAULT_PRIORITY.recurring }, isNew: true };
-    needForm = { name: '', kind: 'recurring', amount: '', intervalMonths: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring) };
+    needForm = { name: '', kind: 'recurring', amount: '', intervalMonths: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring), activeFrom: '', activeTo: '' };
     needError = '';
   }
 
@@ -153,6 +172,8 @@
       anchorDate: n.periodicity?.anchorDate ?? app.asOf,
       monthlyAmount: centsToInput(n.monthlyAmount),
       priority: String(n.priority),
+      activeFrom: n.activeFrom ?? '',
+      activeTo: n.activeTo ?? '',
     };
     needError = '';
   }
@@ -168,12 +189,18 @@
     const amount = inputToCents(needForm.amount);
     const monthly = inputToCents(needForm.monthlyAmount);
     const interval = Math.max(1, Number(needForm.intervalMonths) || 1);
+    if (needForm.activeFrom && needForm.activeTo && needForm.activeTo < needForm.activeFrom)
+      return void (needError = 'La fin de validité précède le début : le besoin ne vaudrait jamais.');
     const row: Need = {
       id: editingNeed.need.id,
       tirelireId: editingNeed.need.tirelireId,
       kind: needForm.kind,
       priority: Number(needForm.priority) || DEFAULT_PRIORITY[needForm.kind],
     };
+    // La période de validité se saisit, et surtout se conserve : la reconstruire sans ces deux
+    // champs rouvrait un besoin clos à chaque modification, et réécrivait le passé (D50).
+    if (needForm.activeFrom) row.activeFrom = needForm.activeFrom;
+    if (needForm.activeTo) row.activeTo = needForm.activeTo;
     if (needForm.name.trim()) row.name = needForm.name.trim();
     if (needForm.kind === 'dueDate') {
       if (amount === undefined) return void (needError = 'Montant de l’échéance invalide.');
@@ -223,6 +250,11 @@
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter une tirelire</button>
+  {#if closedCount}
+    <label class="btn" style="display:flex;gap:6px;align-items:center">
+      <input type="checkbox" bind:checked={showClosed} /> Besoins hors vigueur ({closedCount})
+    </label>
+  {/if}
 </div>
 {#if accounts.length === 0}<div class="empty">Crée d'abord un compte.</div>{/if}
 
@@ -309,6 +341,12 @@
         <label class="f">Cible (facultatif) <input bind:value={needForm.amount} inputmode="decimal" /></label>
       {/if}
       <label class="f">Priorité (petit = servi d'abord) <input type="number" min="0" bind:value={needForm.priority} /></label>
+      <label class="f">En vigueur à partir du (facultatif) <input type="date" bind:value={needForm.activeFrom} /></label>
+      <label class="f">Clos le (facultatif) <input type="date" bind:value={needForm.activeTo} /></label>
+      <p class="muted small" style="grid-column:1/-1;margin:0">
+        Un budget qui change ne s'écrase pas : on clôt l'ancien besoin la veille et on en ouvre un
+        nouveau, sinon les périodes déjà écoulées seraient recalculées au montant d'aujourd'hui (D50).
+      </p>
     </div>
     {#if needError}<div class="err">{needError}</div>{/if}
     <div class="actions" style="margin:0">
@@ -335,11 +373,11 @@
         </div>
         <div class="num {bal < 0 ? 'neg' : ''}" style="font-size:18px">{money(bal)}</div>
       </div>
-      {#each needsOf(e) as n (n.id)}
+      {#each activeNeedsOf(e) as n (n.id)}
         <div class="row" style="padding-left:8px">
           <div class="label">
             <span class="pill">{NEED_KINDS_SHORT[n.kind]}</span> {n.name ?? e.name}
-            <span class="sub">{describeNeed(n)} · priorité {n.priority}</span>
+            <span class="sub">{describeNeed(n)} · priorité {n.priority}{validityText(n) ? ` · ${validityText(n)}` : ''}</span>
           </div>
           <div class="actions" style="margin:0">
             <button class="btn small" onclick={() => startEditNeed(n)}>Modifier</button>
@@ -347,8 +385,24 @@
           </div>
         </div>
       {/each}
-      {#if needsOf(e).length === 0}
-        <div class="sub" style="padding-left:8px">Aucun besoin : cette tirelire ne demande rien au plan.</div>
+      {#if activeNeedsOf(e).length === 0}
+        <div class="sub" style="padding-left:8px">Aucun besoin en vigueur : cette tirelire ne demande rien au plan.</div>
+      {/if}
+      {#if showClosed}
+        {#each closedNeedsOf(e) as n (n.id)}
+          <div class="row muted" style="padding-left:8px">
+            <div class="label">
+              <span class="pill">{NEED_KINDS_SHORT[n.kind]}</span> {n.name ?? e.name}
+              <span class="sub">hors vigueur — {validityText(n)} · {describeNeed(n)}</span>
+            </div>
+            <div class="actions" style="margin:0">
+              <button class="btn small" onclick={() => startEditNeed(n)}>Modifier</button>
+              <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
+            </div>
+          </div>
+        {/each}
+      {:else if closedNeedsOf(e).length}
+        <div class="sub" style="padding-left:8px">{closedNeedsOf(e).length} besoin(s) hors vigueur au {shortDate(app.asOf)}, masqué(s).</div>
       {/if}
       <div class="actions" style="margin:6px 0 0">
         <button class="btn small" onclick={() => startNewNeed(e)}>Ajouter un besoin</button>

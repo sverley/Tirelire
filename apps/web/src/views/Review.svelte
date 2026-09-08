@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate } from '../lib/format';
-  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation } from '@tirelire/core';
+  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addDays, addMonths, budgetPeriodContaining, needActive, needCruise, automationsByRank, automationLabel, type CategoryReview, type Automation, type Need } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -21,21 +21,40 @@
   /**
    * Adopter une cible : la suggestion porte sur la dotation par période, donc sur les besoins
    * récurrents de la tirelire (D28). S'il y en a plusieurs, on ajuste celui qui pèse le plus.
+   *
+   * Deux règles héritées de D50. On ne calibre que sur un besoin **en vigueur** à la date de
+   * lecture : un budget clos l'an dernier n'est plus la cible d'aujourd'hui. Et on ne change pas
+   * son montant en place — cela recalculerait les dotations des périodes déjà écoulées au montant
+   * d'aujourd'hui, et le Bilan comparerait le passé à une cible qui n'était pas la sienne. On clôt
+   * donc l'ancien besoin la veille de la période courante, et on en ouvre un nouveau.
    */
   function adopt(r: CategoryReview) {
     if (!r.tirelireId || r.suggestion === undefined) return;
     const e = tirelires.find((x) => x.id === r.tirelireId);
     if (!e) return;
     const recurring = alive(app.ledger.needs)
-      .filter((n) => n.tirelireId === e.id && n.kind === 'recurring')
+      .filter((n) => n.tirelireId === e.id && n.kind === 'recurring' && needActive(n, app.asOf))
       .sort((a, b) => needCruise(b) - needCruise(a));
     const need = recurring[0];
     if (!need) return;
     const others = recurring.slice(1).reduce((s, n) => s + needCruise(n), 0);
     const interval = need.periodicity ? monthsOf(need.periodicity) : 1;
     const amount = Math.max(0, r.suggestion - others) * interval;
-    if (!confirm(`Passer « ${need.name ?? e.name} » à ${money(amount)} ${interval === 1 ? 'par période' : `tous les ${interval} mois`} ?`)) return;
-    app.upsert('needs', { ...need, amount });
+    const rythme = interval === 1 ? 'par période' : `tous les ${interval} mois`;
+    const period = budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay);
+    // Un besoin ouvert dans la période courante n'a pas de passé à protéger : on le corrige.
+    const surPlace = need.activeFrom !== undefined && need.activeFrom >= period.start;
+    const question = surPlace
+      ? `Passer « ${need.name ?? e.name} » à ${money(amount)} ${rythme} ?`
+      : `Clore « ${need.name ?? e.name} » au ${shortDate(addDays(period.start, -1))} et l'ouvrir à ${money(amount)} ${rythme} à partir du ${shortDate(period.start)} ?`;
+    if (!confirm(question)) return;
+    if (surPlace) {
+      app.upsert('needs', { ...need, amount });
+      return;
+    }
+    const suivant: Need = { ...need, id: app.newId(), amount, activeFrom: period.start };
+    app.upsert('needs', { ...need, activeTo: addDays(period.start, -1) });
+    app.upsert('needs', suivant);
   }
 
   function gap(r: CategoryReview): number | undefined {
