@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "echo \"(pas de tests d'interface pour l'instant)\""
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
@@ -27,10 +28,12 @@
     "@tsconfig/svelte": "^5.0.4",
     "@types/qrcode": "^1.5.6",
     "@types/sql.js": "^1.4.9",
+    "jsdom": "^28.0.1",
     "svelte": "^5.57.0",
     "svelte-check": "^4.3.4",
     "typescript": "^5.7.3",
     "vite": "^7.3.0",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^3.2.7"
   }
 }

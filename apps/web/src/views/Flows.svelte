@@ -5,6 +5,8 @@
   import { alive, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
+  /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titre = $state('');
   let form = $state({
     name: '',
     kind: 'income' as PlannedFlowKind,
@@ -41,6 +43,7 @@
     const principal = accounts.find((a) => a.kind === 'principal');
     editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: principal?.id ?? '', periodicity: { interval: 1, unit: 'month' as const, anchorDate: app.asOf }, dateWindowDays: 3 };
     form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', interval: '1', unit: 'month' as PeriodUnit, anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesRule: false, activeFrom: '', activeTo: '' };
+    titre = 'Ajouter un flux';
     error = '';
   }
 
@@ -66,6 +69,7 @@
       activeFrom: f.activeFrom ?? '',
       activeTo: f.activeTo ?? '',
     };
+    titre = `Modifier le flux — ${f.name}`;
     error = '';
   }
 
@@ -131,6 +135,7 @@
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
+    <p class="titre-panneau">{titre}</p>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Salaire" /></label>
       <label class="f">Type

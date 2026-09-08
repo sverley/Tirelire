@@ -5,6 +5,8 @@
   import { accountBalance, indexLedger, settlementBalance, unallocated, alive, type Account, type AccountKind, type SettlementDirection } from '@tirelire/core';
 
   let editing = $state<Account | undefined>(undefined);
+  /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titre = $state('');
   let form = $state({
     name: '',
     kind: 'epargne' as AccountKind,
@@ -25,6 +27,7 @@
   function startNew() {
     editing = { id: app.newId(), name: '', kind: hasPivot ? 'epargne' : 'principal', openingBalance: 0, openingDate: app.asOf };
     form = { name: '', kind: editing.kind, bank: '', accountNumber: '', openingBalance: '0,00', openingDate: app.asOf, tracksSettlement: false, settlementThreshold: '10,00', settlementDirection: 'both' };
+    titre = 'Ajouter un compte';
     error = '';
   }
 
@@ -41,6 +44,7 @@
       settlementThreshold: centsToInput(a.settlementThreshold ?? 1000),
       settlementDirection: a.settlementDirection ?? 'both',
     };
+    titre = `Modifier le compte — ${a.name}`;
     error = '';
   }
 
@@ -87,6 +91,7 @@
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
+    <p class="titre-panneau">{titre}</p>
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Compte courant" /></label>
       <label class="f">Type

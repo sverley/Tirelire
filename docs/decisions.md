@@ -766,3 +766,51 @@ que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parco
 `LEDGER_KEYS`, et un test garde cette liste alignée sur le grand livre. Ajouter une table au modèle
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.
+
+## D52 · 2026-09-08 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
+
+D51 avait laissé passer, sur les cinq écrans de Configuration, un formulaire écrit **avant** la
+liste : il s'insérait en haut du document, quel que soit l'endroit d'où l'on venait de cliquer.
+Mesuré sur la version en ligne : liste des tirelires déroulée jusqu'en bas (`scrollY = 1102`),
+« Ajouter un besoin » sur la dernière tirelire ouvrait un panneau dont le
+`getBoundingClientRect().top` valait −1133 px, sans que la page défile. Rien ne bougeait à l'écran :
+le bouton passait pour mort. Le commit `00991be` a corrigé le placement en faisant de chaque
+formulaire un `{#snippet}` rendu au point d'usage, attaché à sa ligne et ramené dans le champ de
+vision par `revealed`. Cette entrée finit le travail sur les deux points qu'il laissait ouverts.
+
+**Le panneau nomme ce qu'il modifie.** L'adjacence le suggère, elle ne le dit pas — et le panneau
+des besoins affichait un simple `Besoin`, alors qu'une tirelire peut en porter plusieurs (D28) et
+qu'on peut ouvrir le panneau depuis trois boutons différents. Chaque formulaire porte donc une ligne
+de titre : « Ajouter un compte », « Modifier le compte — Carte enfants »,
+« Modifier le besoin « Cours de piano » — Enfants et loisirs », « Réviser le besoin — … ». Le titre
+est **figé à l'ouverture** plutôt que lu depuis le champ « Nom » du formulaire, sinon il suivrait la
+frappe et se déferait à mesure qu'on corrige le nom.
+
+**`apps/web` a un harnais de test.** Il n'en avait aucun ; le défaut a donc pu naître, être corrigé,
+et pourrait renaître sans que rien ne l'attrape. Vitest et jsdom y entrent, avec trois tests sur
+`revealed` (il amène le panneau au rendu suivant, en `block: 'nearest'` pour déplacer le moins
+possible, sans animation quand le mouvement est réduit) et quinze tests de structure qui figent, sur
+les cinq écrans, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
+il porte `attached` et `use:revealed`, il porte un titre figé. Vérifié en remettant le
+`Flows.svelte` d'avant la correction : les trois échouent.
+
+**Ce que ce harnais ne fait pas.** jsdom exécute le code d'un composant mais ne met rien en page :
+la garde est structurelle, jamais géométrique. Le rendu à 375 px, le débordement et la position
+réelle d'un panneau restent à vérifier dans un navigateur — c'est l'objet du lot 9 (Playwright), et
+la raison pour laquelle ce harnais garde le plugin Svelte alors qu'aucun composant n'est encore
+monté.
+
+**Deux voies écartées, et pourquoi.** La *feuille modale* — le formulaire en superposition, avec
+focus, Échap et retour exact au point de départ — traitait le même défaut plus rigoureusement, mais
+elle cache la liste pendant la saisie : on ne corrige plus un montant en voyant ceux d'à côté. Elle
+ajoutait aussi une couche dont le comportement avec le clavier virtuel d'Android n'était pas
+vérifiable dans la session. L'édition sur place étant déjà fusionnée et éprouvée sur le téléphone,
+la remplacer aurait coûté plus qu'elle ne rapportait. Le *focus automatique sur le premier champ*
+est écarté pour la même raison de terrain : sur un téléphone, il ouvre le clavier au moment même où
+`revealed` fait défiler, et les deux se battent pour la position de la page.
+
+**Ce qui reste ouvert.** Annuler ne ramène pas exactement d'où l'on est parti : le panneau
+disparaît, ce qui était en dessous remonte de sa hauteur, et sur le formulaire des flux — une
+vingtaine de champs — le décalage fait plusieurs écrans. Le corriger demande de mémoriser la
+position à l'ouverture et de la rendre à la fermeture ; à faire avec les tests d'interface du lot 9,
+qui pourront le vérifier.
