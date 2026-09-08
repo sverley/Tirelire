@@ -6,7 +6,7 @@
     applyMatch,
     findCategoryByName,
     proposeMatches,
-    payPeriodContaining,
+    budgetPeriodContaining,
     addDays,
     type Allocation,
     type Category,
@@ -63,7 +63,7 @@
   const tirelires = $derived(alive(app.ledger.tirelires));
   const categories = $derived(alive(app.ledger.categories).sort((a, b) => a.name.localeCompare(b.name, 'fr')));
   const flows = $derived(alive(app.ledger.plannedFlows));
-  const period = $derived(payPeriodContaining(app.asOf, accounts.find((a) => a.kind === 'principal')?.payDay ?? 1));
+  const period = $derived(budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay));
   const allocByOp = $derived.by(() => {
     const m = new Map<string, Allocation[]>();
     for (const a of alive(app.ledger.allocations)) {

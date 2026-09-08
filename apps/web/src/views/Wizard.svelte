@@ -15,7 +15,7 @@
     parseDate,
     todayISO,
     daysInMonth,
-    payPeriodContaining,
+    budgetPeriodContaining,
     needName,
     budgetSuggestions,
     nextDueDate,
@@ -85,7 +85,7 @@
    * démarre qu'à la première période entièrement postérieure à l'ouverture ; ouvrir « aujourd'hui »
    * priverait donc le budget de sa toute première période.
    */
-  const periodStart = () => payPeriodContaining(app.asOf, Number(payDay) || 1).start;
+  const periodStart = () => budgetPeriodContaining(app.asOf, Number(payDay) || 1).start;
   const perPeriod = (amount: Cents, months: number) => divideCents(amount, Math.max(1, months));
 
   /**
@@ -100,7 +100,6 @@
       kind: 'principal',
       openingBalance: 0,
       openingDate: periodStart(),
-      payDay: Number(payDay) || 1,
     };
     app.upsert('accounts', row);
     return row.id;
@@ -119,16 +118,19 @@
     if (stepIndex > 0) goStep(STEPS[stepIndex - 1]!.id);
   }
 
-  // --- Jour de paie : définit la période budgétaire (D02) ---
+  // --- Début de la période budgétaire : un choix du foyer, pas un champ de compte (D44) ---
   // Valeur initiale volontairement figée : le champ est ensuite piloté par la saisie.
-  let payDay = $state(untrack(() => String(principal?.payDay ?? 1)));
+  let payDay = $state(untrack(() => String(app.ledger.settings.periodStartDay)));
   function savePayDay() {
     const d = Math.min(31, Math.max(1, Number(payDay) || 1));
     payDay = String(d);
-    const id = ensureMainAccount();
-    const a = alive(app.ledger.accounts).find((x) => x.id === id);
-    if (a && a.payDay !== d) app.upsert('accounts', { ...a, payDay: d });
+    if (app.ledger.settings.periodStartDay !== d) app.setSetting('periodStartDay', d);
   }
+  /** Jour du plus gros revenu déclaré : ce que l'assistant propose comme début de période. */
+  const jourDuRevenu = $derived.by(() => {
+    const principal = [...incomes].sort((a, b) => b.amount - a.amount)[0];
+    return principal ? parseDate(principal.periodicity.anchorDate).d : undefined;
+  });
 
   // --- Revenus ---
   let inc = $state({ name: '', amount: '', months: 1, day: '1', accountId: '' });
@@ -484,14 +486,8 @@
 {:else if step === 'income'}
   <h2>Qu'est-ce qui rentre, et quand ?</h2>
   <p class="muted small">
-    Le jour de paie découpe le budget : une période va d'une paie à la veille de la suivante, plutôt
-    que du 1<sup>er</sup> au 31. C'est ce qui permet de savoir si l'argent tient jusqu'à la prochaine rentrée.
+    Déclarez ce qui rentre, avec la date à laquelle ça tombe. Le montant se saisit en positif.
   </p>
-  <form class="edit" onsubmit={(e) => { e.preventDefault(); savePayDay(); }}>
-    <div class="grid">
-      <label class="f">Jour de paie <input type="number" min="1" max="31" bind:value={payDay} onchange={savePayDay} /></label>
-    </div>
-  </form>
 
   <h3>Rentrées d'argent</h3>
   {#each incomes as f (f.id)}
@@ -536,6 +532,30 @@
     {#if incError}<div class="err">{incError}</div>{/if}
     <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
   </form>
+
+  <h3>Découpage du budget</h3>
+  <p class="muted small">
+    Une période budgétaire n'est pas forcément le mois calendaire. Beaucoup de foyers la font
+    commencer au jour de leur paie, pour savoir si l'argent tient jusqu'à la prochaine.
+  </p>
+  <div class="propositions">
+    {#if jourDuRevenu !== undefined && Number(payDay) !== jourDuRevenu}
+      <button class="prop" onclick={() => { payDay = String(jourDuRevenu); savePayDay(); }}>
+        <span class="n">Commencer au jour de ma paie</span><span class="v num">le {jourDuRevenu}</span>
+      </button>
+    {/if}
+    {#if Number(payDay) !== 1}
+      <button class="prop" onclick={() => { payDay = '1'; savePayDay(); }}>
+        <span class="n">Suivre le mois calendaire</span><span class="v num">le 1er</span>
+      </button>
+    {/if}
+  </div>
+  <form class="edit" onsubmit={(e) => { e.preventDefault(); savePayDay(); }}>
+    <div class="grid">
+      <label class="f">La période commence le (jour) <input type="number" min="1" max="31" bind:value={payDay} onchange={savePayDay} /></label>
+    </div>
+  </form>
+
 {:else if step === 'fixed'}
   <h2>Qu'est-ce qui part tout seul, au même montant ?</h2>
   <p class="muted small">

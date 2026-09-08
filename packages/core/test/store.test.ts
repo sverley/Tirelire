@@ -244,6 +244,22 @@ describe('migration du modèle (D30)', () => {
     expect(store.load().accounts[0]!.kind).toBe('principal');
   });
 
+  it("6 → 7 (D44) : le jour de paie du compte devient le début de période du foyer", async () => {
+    const store = await storeAtModel1([
+      ['accounts', 'acc_p', 'name', 'Compte courant'],
+      ['accounts', 'acc_p', 'kind', 'pivot'],
+      ['accounts', 'acc_p', 'opening_balance', 0],
+      ['accounts', 'acc_p', 'opening_date', '2026-01-01'],
+      ['accounts', 'acc_p', 'pay_day', 28],
+    ]);
+
+    migrateModel(store);
+    // Les périodes ne doivent pas se décaler : la valeur est reprise telle quelle.
+    expect(store.load().settings.periodStartDay).toBe(28);
+    // Le compte, lui, ne porte plus rien de tel.
+    expect((store.load().accounts[0] as unknown as Record<string, unknown>)['payDay']).toBeUndefined();
+  });
+
   it('la migration est idempotente et journalisée', async () => {
     const store = await storeAtModel1([
       ['envelopes', 'env_courses', 'name', 'Courses'],

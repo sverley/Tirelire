@@ -17,28 +17,28 @@ export interface Period {
 }
 
 /**
- * Période de paie contenant `date`, pour un jour de paie `payDay` (1-31).
- * `payDay = 1` redonne le mois calendaire.
+ * Période de paie contenant `date`, pour un jour de paie `startDay` (1-31).
+ * `startDay = 1` redonne le mois calendaire.
  *
  * Le mois de référence (libellé, clé) est le mois qui contient le milieu de la
  * période : une période du 28 août au 27 septembre s'appelle « septembre ».
  */
-export function payPeriodContaining(date: ISODate, payDay: number): Period {
+export function budgetPeriodContaining(date: ISODate, startDay: number): Period {
   const { y, m } = parseDate(date);
-  let start = dateInMonth(y, m, payDay);
+  let start = dateInMonth(y, m, startDay);
   if (start > date) {
     const prev = addMonths(formatDate({ y, m, d: 1 }), -1);
     const p = parseDate(prev);
-    start = dateInMonth(p.y, p.m, payDay);
+    start = dateInMonth(p.y, p.m, startDay);
   }
-  return periodFromStart(start, payDay);
+  return periodFromStart(start, startDay);
 }
 
-function periodFromStart(start: ISODate, payDay: number): Period {
+function periodFromStart(start: ISODate, startDay: number): Period {
   const s = parseDate(start);
   const nextMonth = addMonths(formatDate({ y: s.y, m: s.m, d: 1 }), 1);
   const n = parseDate(nextMonth);
-  const nextStart = dateInMonth(n.y, n.m, payDay);
+  const nextStart = dateInMonth(n.y, n.m, startDay);
   const end = addDays(nextStart, -1);
   const mid = addDays(start, Math.floor((daysInMonth(s.y, s.m) - 1) / 2));
   const ref = parseDate(mid);
@@ -51,24 +51,24 @@ function periodFromStart(start: ISODate, payDay: number): Period {
 }
 
 /** Période suivante / précédente. */
-export function nextPeriod(p: Period, payDay: number): Period {
-  return periodFromStart(addDays(p.end, 1), payDay);
+export function nextPeriod(p: Period, startDay: number): Period {
+  return periodFromStart(addDays(p.end, 1), startDay);
 }
 
-export function previousPeriod(p: Period, payDay: number): Period {
-  return payPeriodContaining(addDays(p.start, -1), payDay);
+export function previousPeriod(p: Period, startDay: number): Period {
+  return budgetPeriodContaining(addDays(p.start, -1), startDay);
 }
 
 /**
  * Nombre de périodes de `from` (incluse) jusqu'à celle qui contient `date` (incluse).
  * Vaut 1 si `date` est dans `from`, 0 si `date` est avant `from`.
  */
-export function periodsUntil(from: Period, date: ISODate, payDay: number): number {
+export function periodsUntil(from: Period, date: ISODate, startDay: number): number {
   if (date < from.start) return 0;
   let n = 1;
   let p = from;
   while (date > p.end) {
-    p = nextPeriod(p, payDay);
+    p = nextPeriod(p, startDay);
     n++;
     if (n > 1200) throw new Error('periodsUntil : boucle trop longue');
   }

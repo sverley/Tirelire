@@ -7,10 +7,10 @@ import { emptyLedger } from './model.js';
 import { euros } from './money.js';
 
 export function exampleLedger(): Ledger {
-  const l = emptyLedger({ principalCushion: euros(600) });
+  const l = emptyLedger({ principalCushion: euros(600), periodStartDay: 28 });
 
   l.accounts.push(
-    { id: 'acc-principal', name: 'Compte courant', kind: 'principal', openingBalance: euros(2340), openingDate: '2026-08-27', payDay: 28 },
+    { id: 'acc-principal', name: 'Compte courant', kind: 'principal', openingBalance: euros(2340), openingDate: '2026-08-27' },
     { id: 'acc-livret', name: 'Livret A', kind: 'holding', openingBalance: euros(4815), openingDate: '2026-08-27' },
     {
       id: 'acc-enfants',

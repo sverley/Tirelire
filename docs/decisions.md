@@ -483,3 +483,28 @@ des **comptes bancaires réels**, ceux dont on reçoit un relevé, et non des ca
 enregistrement, avec ses champs modifiables sur place (nom, banque, numéro ou IBAN, solde actuel), ce
 qui rend inutile la question du solde posée plus loin ; et le bandeau de totaux du budget — revenus,
 charges, reste à vivre — disparaît de cette étape, qui ne parle pas du budget.
+
+## D44 · 2026-09-08 · La date de paie appartient au flux ; le début de période est un choix
+
+D02 faisait porter un `payDay` au compte principal. C'était deux erreurs en une.
+
+D'abord, **un compte vit avec ou sans paie** : la date à laquelle un salaire tombe n'est pas une
+propriété du compte qui le reçoit, et un foyer sans salaire n'en a pas moins un compte. Cette date
+existe déjà, et au bon endroit : c'est l'ancrage de la périodicité du flux de revenu
+(`PlannedFlow.periodicity.anchorDate`). La faire vivre une seconde fois sur le compte, c'était
+inviter les deux à diverger.
+
+Ensuite, **le découpage du budget est un choix d'analyse**, pas une conséquence mécanique de la paie.
+On peut être payé le 28 et vouloir raisonner en mois calendaire, ou l'inverse. Le jour de début de
+période devient donc le réglage `settings.periodStartDay` (défaut `1`, qui redonne le mois
+calendaire), et l'écran Réglages l'expose avec sa raison d'être. L'assistant le **propose** à partir
+du jour du plus gros revenu déclaré — « commencer au jour de ma paie » ou « suivre le mois
+calendaire » — au lieu de le demander à froid avant que le moindre revenu existe.
+
+Le vocabulaire suit : `payPeriodContaining` devient `budgetPeriodContaining`, et le paramètre
+`payDay` devient `startDay` dans tout le cœur. La colonne `accounts.pay_day` reste déclarée et
+dépréciée (D30) ; la migration 6 → 7 reprend la valeur du compte principal telle quelle, pour que les
+périodes ne se décalent pas au premier lancement.
+
+Remplace la partie de D02 qui situait le jour de paie sur le compte ; tout le reste de D02 — la
+période de paie à paie, son nom pris au mois de son milieu, le lissage du rattrapage — est inchangé.
