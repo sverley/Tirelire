@@ -73,6 +73,12 @@ principal.
 | `TIRELIRE_FTP_NETTOYER` | `non` | `oui` supprime du serveur les fichiers absents du site (les anciens fragments restent utiles aux appareils pas encore rechargés) |
 | `TIRELIRE_SITE_URL` | — | adresse publique : la CI vérifie alors le site après dépôt |
 
+Le dossier visé (`TIRELIRE_FTP_DOSSIER`) doit être celui qu'un domaine sert vraiment. Chez
+OVHcloud, la racine FTP contient `www`, racine du domaine principal ; tout autre dossier n'est
+servi que s'il est déclaré comme racine d'un domaine ou sous-domaine dans l'onglet *Multisite* de
+l'hébergement. Un transfert peut donc réussir sans que le site soit visible : c'est ce que
+`TIRELIRE_SITE_URL` permet de détecter tout de suite.
+
 ### Ce que fait le dépôt
 
 `apps/hebergement/deposer.sh` (lancé par la CI, utilisable aussi à la main) transfère avec `lftp`

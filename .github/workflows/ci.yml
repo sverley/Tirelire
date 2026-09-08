@@ -189,7 +189,14 @@ jobs:
             echo "- Mode : ${{ inputs.deploiement == 'essai-a-blanc' && 'essai à blanc (rien transféré)' || 'transfert réel' }}"
             echo "- Anciens fichiers : $([ "$NETTOYER" = oui ] && echo supprimés || echo conservés)"
             echo "- Jamais touchés : \`donnees/*.jsonl\`, \`relais.config.php\`"
-            if [ -n "$ADRESSE_SITE" ]; then echo "- Vérifié en ligne : $ADRESSE_SITE"; fi
+            if [ -n "$ADRESSE_SITE" ]; then
+              echo "- Vérifié en ligne : $ADRESSE_SITE"
+            else
+              echo "- **Pas vérifié en ligne** : le transfert a réussi, mais rien n'a encore confirmé que"
+              echo "  l'hébergement sert bien le site. Renseigner la variable \`TIRELIRE_SITE_URL\`"
+              echo "  (adresse publique, sous-dossier compris) pour que la CI teste l'accueil, la"
+              echo "  réécriture \`/r/<salon>\` et la protection du dossier \`donnees/\` après chaque dépôt."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   android:
