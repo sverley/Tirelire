@@ -6,6 +6,7 @@ import {
   computePlan,
   emptyLedger,
   exampleLedger,
+  LEDGER_KEYS,
   todayISO,
   uuidv7,
   type Ledger,
@@ -122,16 +123,14 @@ class AppState {
   async replaceWith(l: Ledger): Promise<void> {
     await this.eraseAll();
     const s = this.store;
-    for (const a of l.accounts) s.upsert('accounts', a);
-    for (const e of l.tirelires) s.upsert('tirelires', e);
-    for (const c of l.categories) s.upsert('categories', c);
-    for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
-    for (const o of l.operations) s.upsert('operations', o);
-    for (const a of l.allocations) s.upsert('allocations', a);
-    for (const r of l.automations) s.upsert('automations', r);
-    for (const p of l.importProfiles) s.upsert('importProfiles', p);
-    for (const d of l.devices) s.upsert('devices', d);
+    // Boucle sur `LEDGER_KEYS` plutôt qu'une table après l'autre : la liste écrite à la main avait
+    // oublié `needs`, si bien que charger l'exemple donnait des tirelires sans aucun besoin — donc
+    // un plan vide. Ajouter une table au modèle ne peut plus laisser cette fonction en arrière.
+    for (const key of LEDGER_KEYS) for (const row of l[key]) s.upsert(key, row as never);
+    // Les réglages du foyer, sauf `siteId` qui appartient à l'appareil et non aux données.
+    s.setSetting('periodStartDay', l.settings.periodStartDay);
     s.setSetting('principalCushion', l.settings.principalCushion);
+    s.setSetting('transferThreshold', l.settings.transferThreshold);
     this.reload();
   }
 

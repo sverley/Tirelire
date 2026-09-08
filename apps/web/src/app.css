@@ -84,6 +84,9 @@ main { max-width: 860px; margin: 0 auto; padding: 16px; }
 .pill.catchUp { background: var(--warn-soft); color: var(--warn); }
 .pill.reduced, .pill.unfunded { background: var(--warn); color: #fff; }
 .pill.ahead { background: var(--surface-2); color: var(--good); }
+/* Ligne datée hors de sa période de validité (D50) : lisible, mais visiblement en retrait. */
+.row.dormant { opacity: 0.55; }
+.pill.dim { background: transparent; border: 1px dashed var(--line-strong); color: var(--muted); }
 
 .btn { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }

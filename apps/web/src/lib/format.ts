@@ -83,3 +83,21 @@ export function periodicityLabel(p: Periodicity | undefined): string {
   }
   return `tous les ${interval} ${UNITS[unit].pluriel} (dès le ${when})`;
 }
+
+/**
+ * Période de validité d'un besoin (D50) ou d'un flux (D23), en clair. Vide quand il n'y en a pas :
+ * la plupart des lignes n'ont pas de bornes, et l'écrire à chaque fois n'apprendrait rien.
+ */
+export function validityLabel(x: { activeFrom?: string; activeTo?: string }): string {
+  if (x.activeFrom && x.activeTo) return `en vigueur du ${shortDate(x.activeFrom)} au ${shortDate(x.activeTo)}`;
+  if (x.activeFrom) return `à partir du ${shortDate(x.activeFrom)}`;
+  if (x.activeTo) return `jusqu’au ${shortDate(x.activeTo)}`;
+  return '';
+}
+
+/** Pastille d'état d'une ligne datée, à la date de travail : rien si elle est en vigueur. */
+export function validityBadge(x: { activeFrom?: string; activeTo?: string }, asOf: string): string {
+  if (x.activeTo && asOf > x.activeTo) return 'clos';
+  if (x.activeFrom && asOf < x.activeFrom) return 'à venir';
+  return '';
+}

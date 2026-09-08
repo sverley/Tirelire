@@ -179,8 +179,18 @@ export interface Need {
 
 /** Le besoin est-il en vigueur à cette date ? Bornes incluses (D50). */
 export function needActive(n: Need, date: ISODate): boolean {
-  if (n.activeFrom && date < n.activeFrom) return false;
-  if (n.activeTo && date > n.activeTo) return false;
+  return activeAt(n, date);
+}
+
+/**
+ * Une entité est-elle en vigueur à cette date ? Bornes incluses. Besoins (D50) et flux (D23, D24)
+ * portent les mêmes deux dates et la même règle : les lire au même endroit évite qu'elles divergent.
+ * Le plan, lui, raisonne par période (`isActive`) et non par date : une occurrence peut tomber dans
+ * une période sans que le flux soit en vigueur toute la période.
+ */
+export function activeAt(x: { activeFrom?: ISODate; activeTo?: ISODate }, date: ISODate): boolean {
+  if (x.activeFrom && date < x.activeFrom) return false;
+  if (x.activeTo && date > x.activeTo) return false;
   return true;
 }
 
