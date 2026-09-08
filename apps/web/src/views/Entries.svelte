@@ -15,13 +15,13 @@
     amount: '',
     categoryId: '',
     newCategory: '',
-    envelopeId: '',
+    tirelireId: '',
     transferAccountId: '',
   });
   let error = $state('');
 
   const accounts = $derived(alive(app.ledger.accounts));
-  const envelopes = $derived(alive(app.ledger.envelopes));
+  const tirelires = $derived(alive(app.ledger.tirelires));
   const categories = $derived(alive(app.ledger.categories).sort((a, b) => a.name.localeCompare(b.name, 'fr')));
   const operations = $derived(
     alive(app.ledger.operations)
@@ -30,12 +30,12 @@
   );
   const allocByOp = $derived(new Map(alive(app.ledger.allocations).map((a) => [a.operationId, a])));
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
-  const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
+  const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
 
   function startNew() {
     const third = accounts.find((a) => a.kind === 'third');
-    form = { accountId: third?.id ?? accounts[0]?.id ?? '', date: app.asOf, label: '', nature: 'expense', amount: '', categoryId: '', newCategory: '', envelopeId: '', transferAccountId: '' };
+    form = { accountId: third?.id ?? accounts[0]?.id ?? '', date: app.asOf, label: '', nature: 'expense', amount: '', categoryId: '', newCategory: '', tirelireId: '', transferAccountId: '' };
     editingId = undefined;
     showForm = true;
     error = '';
@@ -51,7 +51,7 @@
       amount: centsToInput(Math.abs(op.amount)),
       categoryId: al?.categoryId ?? '',
       newCategory: '',
-      envelopeId: al?.envelopeId ?? '',
+      tirelireId: al?.tirelireId ?? '',
       transferAccountId: op.transferAccountId ?? '',
     };
     editingId = op.id;
@@ -60,9 +60,9 @@
   }
 
   function onCategoryPick() {
-    // Quand on choisit une catégorie liée à un budget, proposer l'enveloppe correspondante.
+    // Quand on choisit une catégorie liée à un budget, proposer la tirelire correspondante.
     const c = categories.find((x) => x.id === form.categoryId);
-    if (c?.envelopeId && !form.envelopeId) form.envelopeId = c.envelopeId;
+    if (c?.tirelireId && !form.tirelireId) form.tirelireId = c.tirelireId;
   }
 
   function save(e: Event) {
@@ -107,7 +107,7 @@
       // Une ligne unique variable prend l'intégralité du montant (D27).
       share: { kind: 'variable' },
       ...(categoryId ? { categoryId } : {}),
-      ...(form.envelopeId ? { envelopeId: form.envelopeId } : {}),
+      ...(form.tirelireId ? { tirelireId: form.tirelireId } : {}),
     };
     app.upsert('allocations', al);
     showForm = false;
@@ -124,7 +124,7 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Saisie</h1>
-<p class="muted small">Dépenses et revenus non importables (comptes tiers, espèces), et virements internes faits depuis le pivot. Une catégorie et une enveloppe par opération ; la ventilation en plusieurs lignes arrivera avec l'import.</p>
+<p class="muted small">Dépenses et revenus non importables (comptes tiers, espèces), et virements internes faits depuis le compte principal. Une catégorie et une tirelire par opération ; la ventilation en plusieurs lignes arrivera avec l'import.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Saisir une opération</button>
@@ -163,10 +163,10 @@
         </select>
       </label>
       <label class="f">ou nouvelle catégorie <input bind:value={form.newCategory} placeholder="Santé" /></label>
-      <label class="f">Enveloppe
-        <select bind:value={form.envelopeId}>
+      <label class="f">Tirelire
+        <select bind:value={form.tirelireId}>
           <option value="">— (non affecté)</option>
-          {#each envelopes as e}<option value={e.id}>{e.name}</option>{/each}
+          {#each tirelires as e}<option value={e.id}>{e.name}</option>{/each}
         </select>
       </label>
     </div>
@@ -186,8 +186,8 @@
         <strong>{op.label}</strong>
         <span class="sub">
           {shortDate(op.date)} · {accountName(op.accountId)}{op.transferAccountId ? ` → ${accountName(op.transferAccountId)}` : ''}
-          {#if al?.categoryId || al?.envelopeId}
-            · {[categoryName(al.categoryId), envelopeName(al.envelopeId) ? `enveloppe ${envelopeName(al.envelopeId)}` : undefined].filter(Boolean).join(' · ')}
+          {#if al?.categoryId || al?.tirelireId}
+            · {[categoryName(al.categoryId), tirelireName(al.tirelireId) ? `tirelire ${tirelireName(al.tirelireId)}` : undefined].filter(Boolean).join(' · ')}
           {/if}
         </span>
       </div>

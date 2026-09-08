@@ -133,6 +133,19 @@ export class LedgerStore {
     return s as unknown as Settings;
   }
 
+  /** Valeur brute d'un réglage sous son ancien nom : réservé aux migrations (D30, D41). */
+  readLegacySetting(key: string): unknown {
+    const stmt = this.db.prepare(`SELECT value FROM settings WHERE key = ?`);
+    try {
+      stmt.bind([key]);
+      if (!stmt.step()) return undefined;
+      const v = (stmt.getAsObject() as { value: string | null }).value;
+      return v === null ? undefined : JSON.parse(v);
+    } finally {
+      stmt.free();
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Écriture locale
   // -------------------------------------------------------------------------
@@ -421,6 +434,9 @@ function fromRow(t: TableDef, raw: Row, includeDeprecated = false): Row {
         out[col.prop] = v;
     }
   }
+  // D41 : « pivot » reste accepté comme synonyme de « principal », pour qu'un appareil non migré
+  // qui réécrit l'ancienne valeur ne rende pas le compte principal méconnaissable.
+  if (t.name === 'accounts' && out['kind'] === 'pivot') out['kind'] = 'principal';
   return out;
 }
 

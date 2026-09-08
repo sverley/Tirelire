@@ -4,7 +4,7 @@
  * dans le journal de changements ; elle est idempotente et déterministe (mêmes identifiants sur
  * tous les appareils) pour que deux migrations indépendantes convergent à la fusion.
  */
-import type { Allocation, Automation, Envelope, Need, NeedKind, Operation, OperationState, Periodicity, Rollover } from './model.js';
+import { DEFAULT_SETTINGS, type Account, type Allocation, type Automation, type Tirelire, type Need, type NeedKind, type Operation, type OperationState, type Periodicity, type Rollover } from './model.js';
 import { MODEL_VERSION } from './schema.js';
 import { rankBetween } from './automations.js';
 import type { LedgerStore } from './store.js';
@@ -23,28 +23,29 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   if (from < 3) steps.push({ version: 3, written: migrateTo3(store) });
   if (from < 4) steps.push({ version: 4, written: migrateTo4(store) });
   if (from < 5) steps.push({ version: 5, written: migrateTo5(store) });
+  if (from < 6) steps.push({ version: 6, written: migrateTo6(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
 
-/** Identifiant déterministe du besoin issu d'une enveloppe typée (D28). */
-export function migratedNeedId(envelopeId: string): string {
-  return `need_${envelopeId}`;
+/** Identifiant déterministe du besoin issu d'une tirelire typée (D28). */
+export function migratedNeedId(tirelireId: string): string {
+  return `need_${tirelireId}`;
 }
 
 /**
- * 1 → 2 (D19, D28) : `Envelope.accountId` devient `placementAccountId` ; `kind`, `target`,
+ * 1 → 2 (D19, D28) : `Tirelire.accountId` devient `placementAccountId` ; `kind`, `target`,
  * `periodicity`, `monthlyAmount`, `priority` deviennent un besoin.
  */
 function migrateTo2(store: LedgerStore): number {
   let written = 0;
   const existingNeeds = new Set(store.load().needs.map((n) => n.id));
-  for (const raw of store.readRawTable('envelopes')) {
+  for (const raw of store.readRawTable('tirelires')) {
     const id = raw['id'] as string;
     const kind = raw['kind'] as 'provision' | 'goal' | 'budget' | undefined;
     const accountId = raw['accountId'] as string | undefined;
     if (!kind && !accountId) continue;
-    const envelope: Envelope = {
+    const tirelire: Tirelire = {
       id,
       name: raw['name'] as string,
       // D38 : le compte d'hébergement devient une répartition à une seule part, qui prend tout.
@@ -54,7 +55,7 @@ function migrateTo2(store: LedgerStore): number {
       ...(raw['rollover'] ? { rollover: raw['rollover'] as Rollover } : kind === 'budget' ? { rollover: { mode: 'none' } as Rollover } : {}),
       ...(raw['deletedAt'] ? { deletedAt: raw['deletedAt'] as string } : {}),
     };
-    store.upsert('envelopes', envelope);
+    store.upsert('tirelires', tirelire);
     written++;
     if (!kind) continue;
     const needId = migratedNeedId(id);
@@ -64,13 +65,13 @@ function migrateTo2(store: LedgerStore): number {
     const periodicity = raw['periodicity'] as Periodicity | undefined;
     const need: Need = {
       id: needId,
-      envelopeId: id,
+      tirelireId: id,
       kind: needKind,
       priority: (raw['priority'] as number | undefined) ?? { dueDate: 10, recurring: 20, goal: 30 }[needKind],
       ...(target !== undefined ? { amount: target } : {}),
       ...(periodicity ? { periodicity } : {}),
       ...(kind === 'goal' && raw['monthlyAmount'] !== undefined ? { monthlyAmount: raw['monthlyAmount'] as number } : {}),
-      ...(envelope.deletedAt ? { deletedAt: envelope.deletedAt } : {}),
+      ...(tirelire.deletedAt ? { deletedAt: tirelire.deletedAt } : {}),
     };
     store.upsert('needs', need);
     written++;
@@ -133,7 +134,7 @@ function migrateTo4(store: LedgerStore): number {
       selection: { labelPattern: raw['pattern'] as string },
       action: {
         ...(raw['categoryId'] ? { categoryId: raw['categoryId'] as string } : {}),
-        ...(raw['envelopeId'] ? { envelopeId: raw['envelopeId'] as string } : {}),
+        ...(raw['tirelireId'] ? { tirelireId: raw['tirelireId'] as string } : {}),
         state: 'reconcile',
       },
       rank,
@@ -158,6 +159,29 @@ function migrateTo5(store: LedgerStore): number {
     const id = raw['id'] as string;
     if (!raw['selection'] || existing.has(id)) continue;
     store.upsert('automations', raw as unknown as Automation);
+    written++;
+  }
+  return written;
+}
+
+/**
+ * 5 → 6 (D41) : le « compte pivot » s'appelle le compte principal. Seules deux valeurs stockées
+ * portaient le mot — le genre du compte et la clé du coussin ; les noms de tables et de colonnes,
+ * eux, sont conservés tels quels (voir `cAs` dans `schema.ts`).
+ *
+ * La lecture accepte de toute façon `pivot` comme synonyme (`fromRow`), pour qu'un
+ * appareil resté en arrière n'annule pas la migration en réécrivant l'ancienne valeur.
+ */
+function migrateTo6(store: LedgerStore): number {
+  let written = 0;
+  for (const raw of store.readRawTable('accounts')) {
+    if (raw['kind'] !== 'pivot') continue;
+    store.upsert('accounts', { ...(raw as unknown as Account), kind: 'principal' });
+    written++;
+  }
+  const cushion = store.readLegacySetting('pivotCushion');
+  if (cushion !== undefined && store.readSettings().principalCushion === DEFAULT_SETTINGS.principalCushion) {
+    store.setSetting('principalCushion', cushion as number);
     written++;
   }
   return written;

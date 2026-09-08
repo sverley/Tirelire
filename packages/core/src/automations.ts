@@ -106,7 +106,7 @@ export interface Outcome {
   state: OperationState;
   oneOff: boolean;
   /** Ventilation résultante, sans identifiants : ils sont attribués à l'écriture. */
-  allocation: Array<{ categoryId?: Id; envelopeId?: Id; share: Share }>;
+  allocation: Array<{ categoryId?: Id; tirelireId?: Id; share: Share }>;
   /** Règles ayant écrit quelque chose, du rang le plus élevé au rang 1. */
   by: Id[];
 }
@@ -126,12 +126,12 @@ function stateAfter(current: OperationState, action: AutomationStateAction | und
 
 /** Ventilation à une seule ligne, celle que pose une action qui ne fixe qu'une catégorie. */
 function singleLine(action: AutomationAction, categories: Map<Id, Category>): Outcome['allocation'] {
-  const envelopeId = action.envelopeId ?? (action.categoryId ? categories.get(action.categoryId)?.envelopeId : undefined);
-  if (!action.categoryId && !envelopeId) return [];
+  const tirelireId = action.tirelireId ?? (action.categoryId ? categories.get(action.categoryId)?.tirelireId : undefined);
+  if (!action.categoryId && !tirelireId) return [];
   return [
     {
       ...(action.categoryId ? { categoryId: action.categoryId } : {}),
-      ...(envelopeId ? { envelopeId } : {}),
+      ...(tirelireId ? { tirelireId } : {}),
       share: { kind: 'variable' },
     },
   ];
@@ -152,7 +152,7 @@ export function outcomeFor(op: Operation, automations: Automation[], categories:
     state: fromImport ? 'reconciled' : 'untreated',
     oneOff: !!op.oneOff,
     allocation: fromImport
-      ? base.map((a) => ({ ...(a.categoryId ? { categoryId: a.categoryId } : {}), ...(a.envelopeId ? { envelopeId: a.envelopeId } : {}), share: a.share }))
+      ? base.map((a) => ({ ...(a.categoryId ? { categoryId: a.categoryId } : {}), ...(a.tirelireId ? { tirelireId: a.tirelireId } : {}), share: a.share }))
       : [],
     by: [],
   };
@@ -163,7 +163,7 @@ export function outcomeFor(op: Operation, automations: Automation[], categories:
     if (a.allocation) {
       out.allocation = a.allocation.map((l) => ({ ...l }));
       wrote = true;
-    } else if (a.categoryId || a.envelopeId) {
+    } else if (a.categoryId || a.tirelireId) {
       out.allocation = singleLine(a, categories);
       wrote = true;
     }
@@ -192,7 +192,7 @@ function sameAllocation(before: Allocation[], after: Outcome['allocation']): boo
   if (before.length !== after.length) return false;
   return before.every((b, i) => {
     const a = after[i]!;
-    return (b.categoryId ?? undefined) === a.categoryId && (b.envelopeId ?? undefined) === a.envelopeId && JSON.stringify(b.share) === JSON.stringify(a.share);
+    return (b.categoryId ?? undefined) === a.categoryId && (b.tirelireId ?? undefined) === a.tirelireId && JSON.stringify(b.share) === JSON.stringify(a.share);
   });
 }
 
@@ -242,7 +242,7 @@ export function applyAutomations(ledger: Ledger): Patch {
         operationId: d.operation.id,
         share: line.share,
         ...(line.categoryId ? { categoryId: line.categoryId } : {}),
-        ...(line.envelopeId ? { envelopeId: line.envelopeId } : {}),
+        ...(line.tirelireId ? { tirelireId: line.tirelireId } : {}),
       });
     }
     patch.removedAllocations!.push(...reuse.map((a) => a.id));
@@ -278,7 +278,7 @@ export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: Auto
       else delete next.oneOff;
     }
     patch.operations.push(next);
-    const lines = action.allocation ?? (action.categoryId || action.envelopeId ? singleLine(action, categories) : undefined);
+    const lines = action.allocation ?? (action.categoryId || action.tirelireId ? singleLine(action, categories) : undefined);
     if (!lines) continue;
     const reuse = [...(allocsByOp.get(op.id) ?? [])];
     for (const line of lines) {
@@ -288,7 +288,7 @@ export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: Auto
         operationId: op.id,
         share: line.share,
         ...(line.categoryId ? { categoryId: line.categoryId } : {}),
-        ...(line.envelopeId ? { envelopeId: line.envelopeId } : {}),
+        ...(line.tirelireId ? { tirelireId: line.tirelireId } : {}),
       });
     }
     patch.removedAllocations!.push(...reuse.map((a) => a.id));
@@ -363,7 +363,7 @@ export function automationFromFlow(flow: PlannedFlow, rank: string, id: Id = uui
   }
   const action: AutomationAction = { state: 'lock' };
   if (flow.categoryId) action.categoryId = flow.categoryId;
-  if (flow.envelopeId) action.envelopeId = flow.envelopeId;
+  if (flow.tirelireId) action.tirelireId = flow.tirelireId;
   return {
     id,
     name: flow.name,

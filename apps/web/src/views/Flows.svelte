@@ -9,7 +9,7 @@
     kind: 'income' as PlannedFlowKind,
     amount: '',
     accountId: '',
-    envelopeId: '',
+    tirelireId: '',
     categoryId: '',
     counterpartAccountId: '',
     intervalMonths: '1',
@@ -26,7 +26,7 @@
   let error = $state('');
 
   const accounts = $derived(alive(app.ledger.accounts));
-  const envelopes = $derived(alive(app.ledger.envelopes));
+  const tirelires = $derived(alive(app.ledger.tirelires));
   const categories = $derived(alive(app.ledger.categories));
   const flows = $derived(alive(app.ledger.plannedFlows));
   const groups = $derived(
@@ -36,9 +36,9 @@
   );
 
   function startNew() {
-    const pivot = accounts.find((a) => a.kind === 'pivot');
-    editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: pivot?.id ?? '', periodicity: { intervalMonths: 1, anchorDate: app.asOf }, dateWindowDays: 3 };
-    form = { ...form, name: '', kind: 'income', amount: '', accountId: pivot?.id ?? '', envelopeId: '', categoryId: '', counterpartAccountId: '', intervalMonths: '1', anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesRule: false, activeFrom: '', activeTo: '' };
+    const principal = accounts.find((a) => a.kind === 'principal');
+    editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: principal?.id ?? '', periodicity: { intervalMonths: 1, anchorDate: app.asOf }, dateWindowDays: 3 };
+    form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', intervalMonths: '1', anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesRule: false, activeFrom: '', activeTo: '' };
     error = '';
   }
 
@@ -49,7 +49,7 @@
       kind: f.kind,
       amount: centsToInput(Math.abs(f.amount)),
       accountId: f.accountId,
-      envelopeId: f.envelopeId ?? '',
+      tirelireId: f.tirelireId ?? '',
       categoryId: f.categoryId ?? '',
       counterpartAccountId: f.counterpartAccountId ?? '',
       intervalMonths: String(f.periodicity.intervalMonths),
@@ -73,7 +73,7 @@
     const abs = inputToCents(form.amount);
     if (abs === undefined || abs < 0) return void (error = 'Montant invalide (saisis-le en positif, le sens dépend du type).');
     if (!form.accountId) return void (error = 'Choisis le compte.');
-    if (form.kind === 'dueDate' && !form.envelopeId) return void (error = 'Choisis l’enveloppe qui paie l’échéance.');
+    if (form.kind === 'dueDate' && !form.tirelireId) return void (error = 'Choisis l’tirelire qui paie l’échéance.');
     if (form.kind === 'transfer' && !form.counterpartAccountId) return void (error = 'Choisis le compte de contrepartie.');
     if (form.labelPattern.trim()) {
       try {
@@ -92,7 +92,7 @@
       accountId: form.accountId,
       periodicity: { intervalMonths: Math.max(1, Number(form.intervalMonths) || 1), anchorDate: form.anchorDate },
       dateWindowDays: Math.max(0, Number(form.dateWindowDays) || 0),
-      ...(form.envelopeId && form.kind === 'dueDate' ? { envelopeId: form.envelopeId } : {}),
+      ...(form.tirelireId && form.kind === 'dueDate' ? { tirelireId: form.tirelireId } : {}),
       ...(form.categoryId ? { categoryId: form.categoryId } : {}),
       ...(form.counterpartAccountId && form.kind === 'transfer' ? { counterpartAccountId: form.counterpartAccountId } : {}),
       ...(tolAbs !== undefined || tolPct !== undefined
@@ -120,7 +120,7 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Flux prévus</h1>
-<p class="muted small">Revenus, charges fixes, échéances payées par une enveloppe. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au rapprochement de flux.</p>
+<p class="muted small">Revenus, charges fixes, échéances payées par une tirelire. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au rapprochement de flux.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
@@ -142,10 +142,10 @@
         </select>
       </label>
       {#if form.kind === 'dueDate'}
-        <label class="f">Enveloppe qui paie
-          <select bind:value={form.envelopeId}>
+        <label class="f">Tirelire qui paie
+          <select bind:value={form.tirelireId}>
             <option value="">—</option>
-            {#each envelopes as e}<option value={e.id}>{e.name}</option>{/each}
+            {#each tirelires as e}<option value={e.id}>{e.name}</option>{/each}
           </select>
         </label>
       {/if}

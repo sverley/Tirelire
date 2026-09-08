@@ -26,11 +26,11 @@ export interface Periodicity {
 // ---------------------------------------------------------------------------
 
 /**
- * - `pivot`   : le compte réel par lequel tout transite (relevé importé).
- * - `holding` : compte d'accueil réel (livret, PEL…) qui héberge des enveloppes.
- * - `third`   : compte tiers, non importé, saisi à la main ; porte un solde à régler avec le pivot.
+ * - `principal`   : le compte réel par lequel tout transite (relevé importé).
+ * - `holding` : compte d'accueil réel (livret, PEL…) qui héberge des tirelires.
+ * - `third`   : compte tiers, non importé, saisi à la main ; porte un solde à régler avec le compte principal.
  */
-export type AccountKind = 'pivot' | 'holding' | 'third';
+export type AccountKind = 'principal' | 'holding' | 'third';
 
 export type SettlementDirection = 'both' | 'toThird' | 'fromThird';
 
@@ -43,7 +43,7 @@ export interface Account {
   accountNumber?: string;
   openingBalance: Cents;
   openingDate: ISODate;
-  /** Jour de paie (1-31), seulement pour le pivot : début de la période budgétaire. */
+  /** Jour de paie (1-31), seulement pour le compte principal : début de la période budgétaire. */
   payDay?: number;
   /** Comptes tiers : en dessous de ce montant, on ne propose pas de virement de règlement. */
   settlementThreshold?: Cents;
@@ -53,21 +53,21 @@ export interface Account {
 }
 
 // ---------------------------------------------------------------------------
-// Enveloppes et besoins
+// Tirelires et besoins
 // ---------------------------------------------------------------------------
 
 export type Rollover = { mode: 'none' } | { mode: 'unlimited' } | { mode: 'capped'; months: number };
 
 /**
- * Une enveloppe est un pot à solde unique (D28), réparti sur plusieurs comptes (D19) : sa
+ * Une tirelire est un pot à solde unique (D28), réparti sur plusieurs comptes (D19) : sa
  * position réelle est un vecteur « compte → composante », reconstruit et jamais stocké
- * (`envelopeComponents`). Elle déclare où son argent devrait dormir (`placementAccountId`,
+ * (`tirelireComponents`). Elle déclare où son argent devrait dormir (`placementAccountId`,
  * D20) ; l'écart entre position et placement nourrit le plan. Le report (D05, D29) porte sur
- * l'enveloppe : en fin de période, l'excédent au-delà de la réserve des besoins non récurrents
+ * la tirelire : en fin de période, l'excédent au-delà de la réserve des besoins non récurrents
  * est libéré (`none`) ou plafonné (`capped`).
  */
 /**
- * Composante voulue du placement (D38) : la part du solde de l'enveloppe qui devrait se trouver
+ * Composante voulue du placement (D38) : la part du solde de la tirelire qui devrait se trouver
  * sur ce compte. `variable` désigne le reste ; il n'y en a qu'une.
  */
 export interface PlacementPart {
@@ -75,11 +75,11 @@ export interface PlacementPart {
   share: Share;
 }
 
-export interface Envelope {
+export interface Tirelire {
   id: Id;
   name: string;
   /**
-   * Où l'argent de l'enveloppe devrait dormir (D20, D38) : une répartition, pas un compte. Vide,
+   * Où l'argent de la tirelire devrait dormir (D20, D38) : une répartition, pas un compte. Vide,
    * elle ne produit aucun écart — l'argent est bien là où il est.
    */
   placement: PlacementPart[];
@@ -92,20 +92,20 @@ export interface Envelope {
 }
 
 /**
- * Un besoin de financement porté par une enveloppe (D28) :
+ * Un besoin de financement porté par une tirelire (D28) :
  * - `recurring` : `amount` par période (lissé sur `periodicity.intervalMonths` périodes, 1 par défaut) ;
  * - `dueDate`   : `amount` pour chaque échéance de `periodicity`, rattrapage lissé sur les périodes restantes ;
  * - `goal`      : `monthlyAmount` par période jusqu'à `amount` (cible facultative).
- * Les priorités et planchers de D06 se posent sur les besoins ; le solde de l'enveloppe leur est
+ * Les priorités et planchers de D06 se posent sur les besoins ; le solde de la tirelire leur est
  * attribué dans l'ordre des priorités (D29).
  */
 export type NeedKind = 'recurring' | 'dueDate' | 'goal';
 
 export interface Need {
   id: Id;
-  envelopeId: Id;
+  tirelireId: Id;
   kind: NeedKind;
-  /** Libellé facultatif (« Taxe foncière ») ; sinon le nom de l'enveloppe. */
+  /** Libellé facultatif (« Taxe foncière ») ; sinon le nom de la tirelire. */
   name?: string;
   /** recurring : montant par période ; dueDate : montant de l'échéance ; goal : cible facultative. */
   amount?: Cents;
@@ -126,7 +126,7 @@ export const DEFAULT_PRIORITY: Record<NeedKind, number> = {
 };
 
 /** Nom affiché d'un besoin. */
-export function needName(n: Need, e: Envelope | undefined): string {
+export function needName(n: Need, e: Tirelire | undefined): string {
   return n.name ?? e?.name ?? '';
 }
 
@@ -140,8 +140,8 @@ export interface Category {
   id: Id;
   name: string;
   parentId?: Id;
-  /** Enveloppe par défaut de la catégorie (D32) : proposée quand une règle ou une saisie n'en fixe pas. */
-  envelopeId?: Id;
+  /** Tirelire par défaut de la catégorie (D32) : proposée quand une règle ou une saisie n'en fixe pas. */
+  tirelireId?: Id;
   /** `income` pour les catégories de revenus. */
   nature: CategoryNature;
   deletedAt?: string;
@@ -173,8 +173,8 @@ export function findCategoryByName(categories: Category[], name: string, nature:
 
 /**
  * - `income`      : revenu attendu (salaire, loyer, aides).
- * - `fixedCharge` : prélèvement ou virement fixe payé depuis le compte, non couvert par une enveloppe.
- * - `dueDate`     : échéance payée depuis une enveloppe (l'enveloppe se vide à la date).
+ * - `fixedCharge` : prélèvement ou virement fixe payé depuis le compte, non couvert par une tirelire.
+ * - `dueDate`     : échéance payée depuis une tirelire (la tirelire se vide à la date).
  * - `transfer`    : virement interne attendu entre deux comptes suivis.
  */
 export type PlannedFlowKind = 'income' | 'fixedCharge' | 'dueDate' | 'transfer';
@@ -191,8 +191,8 @@ export interface PlannedFlow {
   /** Signé : positif = crédit sur `accountId`, négatif = débit. */
   amount: Cents;
   accountId: Id;
-  /** dueDate : enveloppe vidée ; transfer : compte de contrepartie via `counterpartAccountId`. */
-  envelopeId?: Id;
+  /** dueDate : tirelire vidée ; transfer : compte de contrepartie via `counterpartAccountId`. */
+  tirelireId?: Id;
   counterpartAccountId?: Id;
   categoryId?: Id;
   periodicity: Periodicity;
@@ -212,7 +212,7 @@ export interface PlannedFlow {
    * plan. Si le montant constaté diffère du prévu, elle est rejouée par l'ordre de financement de
    * D06 plutôt qu'appliquée telle quelle — un prorata saupoudrerait au lieu de servir les planchers.
    */
-  plannedAllocation?: Array<{ envelopeId: Id; share: Share }>;
+  plannedAllocation?: Array<{ tirelireId: Id; share: Share }>;
   deletedAt?: string;
 }
 
@@ -236,7 +236,7 @@ export const OPERATION_STATES: OperationState[] = ['untreated', 'reconciled', 'l
 
 /**
  * Une opération est ventilée en une ou plusieurs lignes (`Allocation`) à parts (D27), chacune
- * portant une catégorie et une enveloppe. Sans aucune ligne, elle vaut une ligne variable sans
+ * portant une catégorie et une tirelire. Sans aucune ligne, elle vaut une ligne variable sans
  * classement : tout son montant pèse sur le « non affecté » du compte.
  */
 export interface Operation {
@@ -286,7 +286,7 @@ export type Share =
  * Ligne de ventilation. Son montant résolu est une part du montant de l'opération, dans le même
  * signe (une dépense de 85 € ventilée en −60 alimentation et le reste en vêtements).
  *
- * Effet sur l'enveloppe (D19) : le montant sur le compte de l'opération ; pour un virement
+ * Effet sur la tirelire (D19) : le montant sur le compte de l'opération ; pour un virement
  * interne, aussi son opposé sur le compte de contrepartie, ce qui déplace une composante sans
  * changer le solde.
  */
@@ -294,7 +294,7 @@ export interface Allocation {
   id: Id;
   operationId: Id;
   categoryId?: Id;
-  envelopeId?: Id;
+  tirelireId?: Id;
   share: Share;
   deletedAt?: string;
 }
@@ -340,8 +340,8 @@ export type AutomationStateAction = 'lock' | 'reconcile' | 'none' | 'unlock';
  */
 export interface AutomationAction {
   categoryId?: Id;
-  envelopeId?: Id;
-  allocation?: Array<{ categoryId?: Id; envelopeId?: Id; share: Share }>;
+  tirelireId?: Id;
+  allocation?: Array<{ categoryId?: Id; tirelireId?: Id; share: Share }>;
   oneOff?: boolean;
   state?: AutomationStateAction;
 }
@@ -376,8 +376,8 @@ export interface Automation {
 // ---------------------------------------------------------------------------
 
 export interface Settings {
-  /** Coussin minimum à laisser en non affecté sur le pivot. */
-  pivotCushion: Cents;
+  /** Coussin minimum à laisser en non affecté sur le compte principal. */
+  principalCushion: Cents;
   /** En dessous de ce montant, un écart de placement (D20) est « à surveiller » plutôt qu'« à faire ». */
   transferThreshold: Cents;
   /** Identifiant de cet appareil (pour l'horloge logique et le journal). */
@@ -385,7 +385,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  pivotCushion: 0,
+  principalCushion: 0,
   transferThreshold: 1000,
   siteId: 'local',
 };
@@ -403,7 +403,7 @@ export interface Device {
 
 export interface Ledger {
   accounts: Account[];
-  envelopes: Envelope[];
+  tirelires: Tirelire[];
   needs: Need[];
   categories: Category[];
   plannedFlows: PlannedFlow[];
@@ -418,7 +418,7 @@ export interface Ledger {
 export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
   return {
     accounts: [],
-    envelopes: [],
+    tirelires: [],
     needs: [],
     categories: [],
     plannedFlows: [],

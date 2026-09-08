@@ -12,21 +12,21 @@
   const provisions = $derived(reviewProvisions(app.ledger, addMonths(app.asOf, -24), app.asOf));
   const rules = $derived(automationsByRank(app.ledger));
   const categories = $derived(alive(app.ledger.categories));
-  const envelopes = $derived(alive(app.ledger.envelopes));
+  const tirelires = $derived(alive(app.ledger.tirelires));
   const hasOps = $derived(app.ledger.operations.some((o) => !o.deletedAt));
 
-  const keyOf = (r: CategoryReview) => `${r.categoryId ?? ''}|${r.envelopeId ?? ''}`;
+  const keyOf = (r: CategoryReview) => `${r.categoryId ?? ''}|${r.tirelireId ?? ''}`;
 
   /**
    * Adopter une cible : la suggestion porte sur la dotation par période, donc sur les besoins
-   * récurrents de l'enveloppe (D28). S'il y en a plusieurs, on ajuste celui qui pèse le plus.
+   * récurrents de la tirelire (D28). S'il y en a plusieurs, on ajuste celui qui pèse le plus.
    */
   function adopt(r: CategoryReview) {
-    if (!r.envelopeId || r.suggestion === undefined) return;
-    const e = envelopes.find((x) => x.id === r.envelopeId);
+    if (!r.tirelireId || r.suggestion === undefined) return;
+    const e = tirelires.find((x) => x.id === r.tirelireId);
     if (!e) return;
     const recurring = alive(app.ledger.needs)
-      .filter((n) => n.envelopeId === e.id && n.kind === 'recurring')
+      .filter((n) => n.tirelireId === e.id && n.kind === 'recurring')
       .sort((a, b) => needCruise(b) - needCruise(a));
     const need = recurring[0];
     if (!need) return;
@@ -48,12 +48,12 @@
 
   /** Ce que l'automatisme pose, en clair. */
   function ruleEffect(rule: Automation): string {
-    const parts = [categoryName(rule.action.categoryId), envelopeName(rule.action.envelopeId) ? `enveloppe ${envelopeName(rule.action.envelopeId)}` : undefined].filter(Boolean);
+    const parts = [categoryName(rule.action.categoryId), tirelireName(rule.action.tirelireId) ? `tirelire ${tirelireName(rule.action.tirelireId)}` : undefined].filter(Boolean);
     const state = { lock: 'verrouille', reconcile: 'rapproche', none: 'ne change pas l’état', unlock: 'déverrouille' }[rule.action.state ?? 'none'];
     return [parts.join(' · ') || 'rien', state].join(' · ');
   }
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
-  const envelopeName = (id: string | undefined) => envelopes.find((e) => e.id === id)?.name;
+  const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
 </script>
 
 <h1>Bilan</h1>
@@ -96,7 +96,7 @@
               </tbody>
             </table>
           </div>
-          {#if r.suggestion !== undefined && r.envelopeId}
+          {#if r.suggestion !== undefined && r.tirelireId}
             <div class="actions" style="margin:8px 0 0">
               <span class="small">Cible suggérée (moyenne + 5 %, arrondie) : <strong class="num">{money(r.suggestion)}</strong></span>
               {#if r.suggestion !== r.target}<button class="btn small primary" onclick={() => adopt(r)}>Adopter</button>{/if}
@@ -112,7 +112,7 @@
   {#if provisions.length}
     <h2>Provisions : prévu vs payé</h2>
     <div class="card">
-      {#each provisions as p (p.envelopeId + p.dueDate)}
+      {#each provisions as p (p.tirelireId + p.dueDate)}
         <div class="row">
           <div class="label">{p.name}<span class="sub">échéance {shortDate(p.dueDate)} · provisionné {money(p.provisioned)} pour {money(p.target)}</span></div>
           <div class="num {p.variance > 0 ? 'neg' : ''}">{p.paid ? money(p.paid) : 'non payé'}{p.paid && p.variance !== 0 ? ` (${p.variance > 0 ? '+' : ''}${money(p.variance)})` : ''}</div>

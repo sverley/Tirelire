@@ -20,7 +20,7 @@ function withOperation(amount = euros(-100)): { ledger: Ledger; op: Operation } 
   const ledger = exampleLedger();
   const op: Operation = {
     id: 'op-test',
-    accountId: 'acc-pivot',
+    accountId: 'acc-principal',
     origin: 'imported',
     date: '2026-09-03',
     label: 'SUPERMARCHE',

@@ -19,7 +19,7 @@ import { uuidv7 } from './ids.js';
 export interface AllocationDraft {
   id?: Id;
   categoryId?: Id;
-  envelopeId?: Id;
+  tirelireId?: Id;
   share: Share;
 }
 
@@ -87,7 +87,7 @@ export function editAllocations(
       operationId,
       share: d.share,
       ...(d.categoryId ? { categoryId: d.categoryId } : {}),
-      ...(d.envelopeId ? { envelopeId: d.envelopeId } : {}),
+      ...(d.tirelireId ? { tirelireId: d.tirelireId } : {}),
     };
     keep.add(al.id);
     patch.allocations.push(al);

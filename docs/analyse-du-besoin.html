@@ -120,7 +120,7 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <header class="masthead">
   <p class="eyebrow">Projet · comptes de la famille · analyse avant code</p>
   <h1>Comptes Famille — analyse du besoin et audit des hypothèses</h1>
-  <p class="lede">Ce que tu décris est un système d'enveloppes budgétaires à deux niveaux (comptes bancaires réels, sous‑comptes comptables), piloté par un plan de virements mensuels et vérifié par rapprochement bancaire. Avant de coder, voici ce que j'ai compris, ce que la description suppose sans le dire, et ce que je propose.</p>
+  <p class="lede">Ce que tu décris est un système de tirelires budgétaires à deux niveaux (comptes bancaires réels, sous‑comptes comptables), piloté par un plan de virements mensuels et vérifié par rapprochement bancaire. Avant de coder, voici ce que j'ai compris, ce que la description suppose sans le dire, et ce que je propose.</p>
 </header>
 
 <nav class="toc">
@@ -144,23 +144,23 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <p>Tu veux un outil qui fasse trois choses, dans cet ordre : <strong>planifier</strong> (à partir des revenus, des charges périodiques, des objectifs d'épargne et des budgets, en déduire combien virer chaque mois vers chaque compte), <strong>tenir des soldes par objectif</strong> (chaque provision, chaque objectif d'épargne, chaque budget a son propre compteur, indépendamment du compte bancaire qui l'héberge), et <strong>vérifier</strong> (importer les relevés, reconnaître automatiquement les opérations prévues, classer le reste par catégorie et comparer au budget).</p>
 <p>Le vocabulaire que j'utiliserai dans la suite, pour qu'on parle de la même chose :</p>
 <dl class="gloss">
-  <dt>Compte pivot</dt><dd>Le compte bancaire réel par lequel transitent tous les flux : revenus en entrée, prélèvements, dépenses courantes et virements sortants.</dd>
-  <dt>Compte d'accueil</dt><dd>Tout autre compte réel (livret, compte secondaire, PEL, assurance‑vie…) qui reçoit des virements du pivot et héberge une ou plusieurs enveloppes.</dd>
-  <dt>Compte tiers</dt><dd>Compte réel dont on n'importe pas le relevé (compte secondaire, compte personnel d'un membre du foyer, espèces). Ses opérations utiles au plan sont saisies à la main et créent un solde à régler avec le pivot.</dd>
-  <dt>Enveloppe</dt><dd>Le sous‑compte purement comptable : une somme réservée à un usage précis, avec son propre solde. Une enveloppe vit sur un compte réel, mais un compte réel peut héberger plusieurs enveloppes.</dd>
-  <dt>Provision</dt><dd>Enveloppe qui accumule chaque mois pour payer une charge plurimensuelle ou annuelle (taxe foncière, assurance auto, vacances). Elle se vide à l'échéance et repart.</dd>
-  <dt>Objectif d'épargne</dt><dd>Enveloppe qui accumule sans échéance de vidage (ou avec une cible lointaine) : épargne de précaution, projet, retraite.</dd>
-  <dt>Budget</dt><dd>Enveloppe de dépense courante à horizon mensuel (alimentation, essence, sorties). La question de ce qu'on fait du reliquat en fin de mois est ouverte, voir l'audit.</dd>
-  <dt>Charge fixe</dt><dd>Prélèvement ou virement mensuel régulier de montant connu (loyer, crédit, abonnements). Ce n'est pas une enveloppe : c'est un flux prévu, directement sur le pivot.</dd>
+  <dt>Compte principal</dt><dd>Le compte bancaire réel par lequel transitent tous les flux : revenus en entrée, prélèvements, dépenses courantes et virements sortants.</dd>
+  <dt>Compte d'accueil</dt><dd>Tout autre compte réel (livret, compte secondaire, PEL, assurance‑vie…) qui reçoit des virements du compte principal et héberge une ou plusieurs tirelires.</dd>
+  <dt>Compte tiers</dt><dd>Compte réel dont on n'importe pas le relevé (compte secondaire, compte personnel d'un membre du foyer, espèces). Ses opérations utiles au plan sont saisies à la main et créent un solde à régler avec le compte principal.</dd>
+  <dt>Tirelire</dt><dd>Le sous‑compte purement comptable : une somme réservée à un usage précis, avec son propre solde. Une tirelire vit sur un compte réel, mais un compte réel peut héberger plusieurs tirelires.</dd>
+  <dt>Provision</dt><dd>Tirelire qui accumule chaque mois pour payer une charge plurimensuelle ou annuelle (taxe foncière, assurance auto, vacances). Elle se vide à l'échéance et repart.</dd>
+  <dt>Objectif d'épargne</dt><dd>Tirelire qui accumule sans échéance de vidage (ou avec une cible lointaine) : épargne de précaution, projet, retraite.</dd>
+  <dt>Budget</dt><dd>Tirelire de dépense courante à horizon mensuel (alimentation, essence, sorties). La question de ce qu'on fait du reliquat en fin de mois est ouverte, voir l'audit.</dd>
+  <dt>Charge fixe</dt><dd>Prélèvement ou virement mensuel régulier de montant connu (loyer, crédit, abonnements). Ce n'est pas une tirelire : c'est un flux prévu, directement sur le compte principal.</dd>
   <dt>Flux prévu</dt><dd>Toute opération attendue : salaire, loyer perçu, prélèvement, virement interne, échéance de provision. Décrit par un montant, une périodicité, une date, une tolérance.</dd>
   <dt>Opération</dt><dd>Une ligne de relevé bancaire importée. Elle est soit <em>pointée</em> sur un flux prévu, soit <em>catégorisée</em> comme dépense courante ou ponctuelle, soit reconnue comme <em>transfert interne</em>, soit en attente de tri.</dd>
 </dl>
 
 <h2 id="deux-niveaux">2. Le point structurant : deux niveaux de comptabilité</h2>
-<p>La phrase clé de ta description est « les provisions ou certains budgets sont placés sur d'autres comptes ». Elle impose de dissocier complètement <strong>où est l'argent</strong> (comptes réels, soldes bancaires) de <strong>à quoi il est réservé</strong> (enveloppes, soldes comptables). Tout le reste en découle.</p>
+<p>La phrase clé de ta description est « les provisions ou certains budgets sont placés sur d'autres comptes ». Elle impose de dissocier complètement <strong>où est l'argent</strong> (comptes réels, soldes bancaires) de <strong>à quoi il est réservé</strong> (tirelires, soldes comptables). Tout le reste en découle.</p>
 <div class="ledger">
   <div class="acct">
-    <div class="head"><span>Compte courant (pivot)</span><span>2 340,00 €</span></div>
+    <div class="head"><span>Compte courant (principal)</span><span>2 340,00 €</span></div>
     <div class="env"><span>Budget alimentation (septembre)</span><span>612,40 €</span></div>
     <div class="env"><span>Budget essence (septembre)</span><span>148,00 €</span></div>
     <div class="env"><span>Charges fixes à venir ce mois</span><span>1 220,00 €</span></div>
@@ -181,10 +181,10 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 </div>
 <p>Deux invariants doivent être garantis par l'application, sinon les chiffres dérivent en quelques mois :</p>
 <ul class="plain">
-  <li>Pour chaque compte réel, <strong>solde bancaire = somme des enveloppes hébergées + non affecté</strong>. Le « non affecté » est calculé, jamais saisi. S'il devient négatif, une enveloppe a été surestimée ou une opération manque.</li>
-  <li>Un virement interne pivot → livret <strong>ne change pas le total</strong> ; il déplace de l'argent d'un compte à l'autre et, comptablement, du « non affecté » du pivot vers les enveloppes du livret. Si tu importes les relevés des deux comptes, le même virement apparaît deux fois (débit d'un côté, crédit de l'autre) et ne doit être compté ni comme dépense ni comme revenu.</li>
+  <li>Pour chaque compte réel, <strong>solde bancaire = somme des tirelires hébergées + non affecté</strong>. Le « non affecté » est calculé, jamais saisi. S'il devient négatif, une tirelire a été surestimée ou une opération manque.</li>
+  <li>Un virement interne principal → livret <strong>ne change pas le total</strong> ; il déplace de l'argent d'un compte à l'autre et, comptablement, du « non affecté » du compte principal vers les tirelires du livret. Si tu importes les relevés des deux comptes, le même virement apparaît deux fois (débit d'un côté, crédit de l'autre) et ne doit être compté ni comme dépense ni comme revenu.</li>
 </ul>
-<div class="note"><p>Conséquence pratique : le solde d'une enveloppe n'est jamais lu dans la banque, il est <em>reconstruit</em> à partir d'un solde initial + les virements prévus pointés + les dépenses affectées − les échéances payées. Le solde bancaire sert de contrôle, pas de source.</p></div>
+<div class="note"><p>Conséquence pratique : le solde d'une tirelire n'est jamais lu dans la banque, il est <em>reconstruit</em> à partir d'un solde initial + les virements prévus pointés + les dépenses affectées − les échéances payées. Le solde bancaire sert de contrôle, pas de source.</p></div>
 
 <h2 id="audit">3. Audit des hypothèses implicites</h2>
 <p>Chaque entrée reprend une hypothèse que la description fait sans la formuler, ce qu'elle cache, et ce que je propose. Les entrées marquées <em>structurant</em> changent le modèle de données ; il faut les trancher avant d'écrire une ligne.</p>
@@ -200,22 +200,22 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <div class="h critical">
   <p class="tag">H2</p>
   <p class="claim">Une provision mensuelle = charge annuelle ÷ 12.</p>
-  <div class="row"><div class="lbl">Ce que ça cache</div><div>C'est vrai en régime de croisière seulement. Au démarrage (ou après un oubli), l'enveloppe est vide et l'échéance peut être proche. La taxe foncière de 1 200 € due le 15 octobre avec 900 € en caisse au 6 septembre demande 300 € ce mois‑ci, pas 100 €. À l'inverse, une charge dont le montant change (régularisation d'électricité, hausse d'assurance) invalide la mensualité.</div></div>
+  <div class="row"><div class="lbl">Ce que ça cache</div><div>C'est vrai en régime de croisière seulement. Au démarrage (ou après un oubli), la tirelire est vide et l'échéance peut être proche. La taxe foncière de 1 200 € due le 15 octobre avec 900 € en caisse au 6 septembre demande 300 € ce mois‑ci, pas 100 €. À l'inverse, une charge dont le montant change (régularisation d'électricité, hausse d'assurance) invalide la mensualité.</div></div>
   <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Chaque provision porte un <strong>montant d'échéance</strong>, une <strong>prochaine date d'échéance</strong> et un <strong>solde actuel</strong>. Mensualité = (montant − solde) ÷ mois restants avant l'échéance, plancher 0. En croisière, la formule redonne naturellement montant ÷ 12. L'app affiche les deux valeurs (croisière / rattrapage) pour que tu voies l'écart.</div></div>
 </div>
 
 <div class="h critical">
   <p class="tag">H3</p>
   <p class="claim">Les budgets sont remis à zéro chaque mois.</p>
-  <div class="row"><div class="lbl">Ce que ça cache</div><div>Deux philosophies existent. Budget strict : le non‑dépensé retourne au non‑affecté, le dépassement est absorbé par le non‑affecté. Budget cumulatif (enveloppe qui roule) : le reliquat reste dans l'enveloppe, le dépassement la met en négatif et se rattrape le mois suivant. Pour un budget « placé sur un autre compte » (carte enfants), seul le cumulatif est cohérent : l'argent est physiquement là.</div></div>
-  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Paramètre par budget : <strong>report</strong> (oui / non / plafonné à N mois). Par défaut, report pour les budgets hébergés hors pivot, pas de report pour ceux sur le pivot.</div></div>
+  <div class="row"><div class="lbl">Ce que ça cache</div><div>Deux philosophies existent. Budget strict : le non‑dépensé retourne au non‑affecté, le dépassement est absorbé par le non‑affecté. Budget cumulatif (tirelire qui roule) : le reliquat reste dans la tirelire, le dépassement la met en négatif et se rattrape le mois suivant. Pour un budget « placé sur un autre compte » (carte enfants), seul le cumulatif est cohérent : l'argent est physiquement là.</div></div>
+  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Paramètre par budget : <strong>report</strong> (oui / non / plafonné à N mois). Par défaut, report pour les budgets hébergés hors principal, pas de report pour ceux sur le compte principal.</div></div>
 </div>
 
 <div class="h critical">
   <p class="tag">H4</p>
-  <p class="claim">Il suffit d'importer le relevé du compte pivot.</p>
-  <div class="row"><div class="lbl">Ce que ça cache</div><div>Si un budget est placé sur un autre compte avec sa propre carte, les dépenses de ce budget ne sont pas sur le relevé du pivot. Le suivi de ce budget exige le relevé de ce compte. Et pour les livrets, sans leur relevé, l'app ne peut pas vérifier que le virement est bien arrivé ni que l'échéance a bien été payée depuis le bon compte.</div></div>
-  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Import multi‑comptes dès le départ, avec un profil d'import par banque (voir §5). Le pivot est obligatoire, les autres optionnels ; sans relevé, une enveloppe est suivie « en théorique » et signalée comme telle.</div></div>
+  <p class="claim">Il suffit d'importer le relevé du compte principal.</p>
+  <div class="row"><div class="lbl">Ce que ça cache</div><div>Si un budget est placé sur un autre compte avec sa propre carte, les dépenses de ce budget ne sont pas sur le relevé du compte principal. Le suivi de ce budget exige le relevé de ce compte. Et pour les livrets, sans leur relevé, l'app ne peut pas vérifier que le virement est bien arrivé ni que l'échéance a bien été payée depuis le bon compte.</div></div>
+  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Import multi‑comptes dès le départ, avec un profil d'import par banque (voir §5). Le compte principal est obligatoire, les autres optionnels ; sans relevé, une tirelire est suivie « en théorique » et signalée comme telle.</div></div>
 </div>
 
 <div class="h">
@@ -235,8 +235,8 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <div class="h">
   <p class="tag">H7</p>
   <p class="claim">Les dépenses ponctuelles sont une catégorie comme les autres.</p>
-  <div class="row"><div class="lbl">Ce que ça cache</div><div>Une dépense ponctuelle (réparation voiture, lave‑linge) doit être financée par quelque chose : le non‑affecté, une enveloppe « imprévus », ou une ponction sur l'épargne de précaution. Sans règle, elle apparaît en dépassement d'un budget et fausse la lecture « le budget est‑il bien construit ».</div></div>
-  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Statut « ponctuelle » sur une opération, avec choix de l'enveloppe qui la finance. Elle est exclue des moyennes de budget mais comptée dans le suivi de l'enveloppe qui la paie. Une enveloppe « imprévus » alimentée mensuellement est une provision comme une autre.</div></div>
+  <div class="row"><div class="lbl">Ce que ça cache</div><div>Une dépense ponctuelle (réparation voiture, lave‑linge) doit être financée par quelque chose : le non‑affecté, une tirelire « imprévus », ou une ponction sur l'épargne de précaution. Sans règle, elle apparaît en dépassement d'un budget et fausse la lecture « le budget est‑il bien construit ».</div></div>
+  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Statut « ponctuelle » sur une opération, avec choix de la tirelire qui la finance. Elle est exclue des moyennes de budget mais comptée dans le suivi de la tirelire qui la paie. Une tirelire « imprévus » alimentée mensuellement est une provision comme une autre.</div></div>
 </div>
 
 <div class="h">
@@ -285,13 +285,13 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
   <p class="tag">H14</p>
   <p class="claim">Une opération appartient à une seule catégorie.</p>
   <div class="row"><div class="lbl">Ce que ça cache</div><div>Un passage en grande surface mélange alimentation, vêtements et un cadeau. Un virement au livret alimente trois provisions à la fois (le virement de 350 € de l'exemple ci‑dessous).</div></div>
-  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Une opération peut être <strong>ventilée</strong> en plusieurs lignes d'affectation (montant + enveloppe/catégorie). C'est indispensable pour le virement groupé vers un compte d'accueil ; pour les courses, c'est un confort optionnel.</div></div>
+  <div class="row prop-row"><div class="lbl prop">Proposition</div><div>Une opération peut être <strong>ventilée</strong> en plusieurs lignes d'affectation (montant + tirelire/catégorie). C'est indispensable pour le virement groupé vers un compte d'accueil ; pour les courses, c'est un confort optionnel.</div></div>
 </div>
 
 </div>
 
 <h2 id="virements">4. Calcul des virements : exemple chiffré</h2>
-<p>Pour vérifier que la mécanique tient, voici un plan sur des chiffres inventés mais réalistes, calculé au 6 septembre 2026 avec les soldes d'enveloppes de la figure du §2.</p>
+<p>Pour vérifier que la mécanique tient, voici un plan sur des chiffres inventés mais réalistes, calculé au 6 septembre 2026 avec les soldes de tirelires de la figure du §2.</p>
 <div class="tbl">
 <table>
 <caption>Revenus prévisionnels de la période</caption>
@@ -309,27 +309,27 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <tr><td>Taxe foncière</td><td class="n">1 200 · 15 oct.</td><td class="n">900</td><td class="n">1</td><td class="n">100</td><td class="n">300</td></tr>
 <tr><td>Assurance auto</td><td class="n">600 · 5 mars</td><td class="n">300</td><td class="n">6</td><td class="n">50</td><td class="n">50</td></tr>
 <tr><td>Vacances</td><td class="n">2 400 · 1er juil.</td><td class="n">400</td><td class="n">10</td><td class="n">200</td><td class="n">200</td></tr>
-<tr class="total"><td colspan="4">Virement pivot → Livret A (provisions)</td><td class="n">350</td><td class="n">550</td></tr>
+<tr class="total"><td colspan="4">Virement principal → Livret A (provisions)</td><td class="n">350</td><td class="n">550</td></tr>
 </table>
 </div>
-<p>La taxe foncière montre pourquoi la formule « annuel ÷ 12 » ne suffit pas : en croisière, 100 €/mois ; mais l'enveloppe a pris du retard et il manque 300 € pour dans un mois. Le plan de septembre doit donc virer <span class="num">550 €</span> et non <span class="num">350 €</span>, puis revenir à 350 € en novembre.</p>
+<p>La taxe foncière montre pourquoi la formule « annuel ÷ 12 » ne suffit pas : en croisière, 100 €/mois ; mais la tirelire a pris du retard et il manque 300 € pour dans un mois. Le plan de septembre doit donc virer <span class="num">550 €</span> et non <span class="num">350 €</span>, puis revenir à 350 € en novembre.</p>
 <div class="tbl">
 <table>
 <caption>Plan de la période (septembre 2026)</caption>
 <tr><th>Ligne</th><th>Compte</th><th class="n">Montant</th></tr>
-<tr><td>Charges fixes prélevées (crédit, assurances, abonnements)</td><td>pivot</td><td class="n">1 220,00</td></tr>
-<tr><td>Virement provisions (rattrapage)</td><td>pivot → Livret A</td><td class="n">550,00</td></tr>
-<tr><td>Virement épargne de précaution</td><td>pivot → Livret A</td><td class="n">300,00</td></tr>
-<tr><td>Virement budget enfants / loisirs</td><td>pivot → secondaire</td><td class="n">200,00</td></tr>
-<tr><td>Budget alimentation</td><td>pivot</td><td class="n">900,00</td></tr>
-<tr><td>Budget essence</td><td>pivot</td><td class="n">200,00</td></tr>
-<tr><td>Budget divers / sorties</td><td>pivot</td><td class="n">250,00</td></tr>
+<tr><td>Charges fixes prélevées (crédit, assurances, abonnements)</td><td>principal</td><td class="n">1 220,00</td></tr>
+<tr><td>Virement provisions (rattrapage)</td><td>principal → Livret A</td><td class="n">550,00</td></tr>
+<tr><td>Virement épargne de précaution</td><td>principal → Livret A</td><td class="n">300,00</td></tr>
+<tr><td>Virement budget enfants / loisirs</td><td>principal → secondaire</td><td class="n">200,00</td></tr>
+<tr><td>Budget alimentation</td><td>principal</td><td class="n">900,00</td></tr>
+<tr><td>Budget essence</td><td>principal</td><td class="n">200,00</td></tr>
+<tr><td>Budget divers / sorties</td><td>principal</td><td class="n">250,00</td></tr>
 <tr class="total"><td>Total affecté</td><td></td><td class="n">3 620,00</td></tr>
 <tr class="total"><td>Marge non affectée (4 200 − 3 620)</td><td></td><td class="n">580,00</td></tr>
 </table>
 </div>
-<p>Ce que l'app produit à partir de là : <strong>deux virements permanents à mettre en place</strong> (850 € vers le Livret A en croisière, 200 € vers le compte secondaire) et <strong>un virement exceptionnel</strong> de 200 € ce mois‑ci pour le rattrapage. Le virement de 850 € vers le Livret A sera, au pointage, ventilé automatiquement en 100 + 50 + 200 + 500 sur les quatre enveloppes (H14). La marge de 580 € est le vrai indicateur de santé : positive, elle peut augmenter l'épargne ou servir de coussin ; négative, l'app applique l'ordre de priorité de H6 et dit quoi couper.</p>
-<div class="note"><p>Règle que je propose pour le « non affecté » du pivot : ne jamais le laisser à zéro. Un coussin d'un demi‑mois de charges fixes évite le découvert quand une échéance tombe deux jours avant le salaire. Il devient un paramètre : <em>coussin minimum du pivot</em>.</p></div>
+<p>Ce que l'app produit à partir de là : <strong>deux virements permanents à mettre en place</strong> (850 € vers le Livret A en croisière, 200 € vers le compte secondaire) et <strong>un virement exceptionnel</strong> de 200 € ce mois‑ci pour le rattrapage. Le virement de 850 € vers le Livret A sera, au pointage, ventilé automatiquement en 100 + 50 + 200 + 500 sur les quatre tirelires (H14). La marge de 580 € est le vrai indicateur de santé : positive, elle peut augmenter l'épargne ou servir de coussin ; négative, l'app applique l'ordre de priorité de H6 et dit quoi couper.</p>
+<div class="note"><p>Règle que je propose pour le « non affecté » du compte principal : ne jamais le laisser à zéro. Un coussin d'un demi‑mois de charges fixes évite le découvert quand une échéance tombe deux jours avant le salaire. Il devient un paramètre : <em>coussin minimum du compte principal</em>.</p></div>
 
 <h2 id="rapprochement">5. Import et rapprochement</h2>
 <p>Le traitement d'un fichier de relevé, dans l'ordre. Chaque étape ne touche que ce que la précédente a laissé.</p>
@@ -337,10 +337,10 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
   <li><strong>Lecture avec le profil d'import du compte</strong>Décodage, colonnes, dates, montants ; aperçu des 10 premières lignes avant validation la première fois.</li>
   <li><strong>Déduplication</strong>Calcul de la clé d'identité ; les opérations déjà connues sont ignorées, les nouvelles insérées « à traiter ».</li>
   <li><strong>Transferts internes</strong>Une opération débit sur un compte et un crédit du même montant à ± 2 jours sur un autre compte suivi sont appariées et marquées « transfert ». Elles ne sont ni dépense ni revenu.</li>
-  <li><strong>Pointage des flux prévus</strong>Pour chaque opération, recherche des flux attendus dont la fenêtre de date, la tolérance de montant et le motif de libellé correspondent. Score, affectation automatique au‑dessus du seuil, proposition en dessous. Le solde de l'enveloppe concernée est mis à jour.</li>
+  <li><strong>Pointage des flux prévus</strong>Pour chaque opération, recherche des flux attendus dont la fenêtre de date, la tolérance de montant et le motif de libellé correspondent. Score, affectation automatique au‑dessus du seuil, proposition en dessous. Le solde de la tirelire concernée est mis à jour.</li>
   <li><strong>Règles de catégorisation</strong>Pour le reste, règles « si le libellé contient X → catégorie Y » que tu crées au fil de l'eau (quand tu classes à la main, l'app propose de créer la règle). Ordre de priorité, arrêt à la première règle qui matche.</li>
-  <li><strong>File de tri manuel</strong>Ce qui reste, présenté par montant décroissant ; ventilation possible ; marquage « ponctuelle » avec choix de l'enveloppe qui finance.</li>
-  <li><strong>Contrôles</strong>Flux attendus dont la fenêtre est passée sans opération (« salaire non reçu », « virement Livret A non passé ») ; écart entre solde bancaire importé et somme des enveloppes ; budgets dépassés ; provisions en retard sur leur échéance.</li>
+  <li><strong>File de tri manuel</strong>Ce qui reste, présenté par montant décroissant ; ventilation possible ; marquage « ponctuelle » avec choix de la tirelire qui finance.</li>
+  <li><strong>Contrôles</strong>Flux attendus dont la fenêtre est passée sans opération (« salaire non reçu », « virement Livret A non passé ») ; écart entre solde bancaire importé et somme des tirelires ; budgets dépassés ; provisions en retard sur leur échéance.</li>
 </ol>
 
 <h2 id="modele">6. Modèle de données proposé</h2>
@@ -348,26 +348,26 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <div class="tbl">
 <table>
 <tr><th>Objet</th><th>Champs essentiels</th><th>Rôle</th></tr>
-<tr><td><strong>Compte</strong></td><td>nom, banque, type (pivot / accueil / tiers), solde initial et date, profil d'import (sauf tiers), seuil et sens de règlement (tiers)</td><td>Le réel bancaire.</td></tr>
-<tr><td><strong>Enveloppe</strong></td><td>nom, type (provision / objectif / budget), compte hôte, solde initial, cible, échéance, périodicité, report (oui/non/plafonné), priorité de financement</td><td>Le sous‑compte comptable ; porte son solde reconstruit.</td></tr>
-<tr><td><strong>Catégorie</strong></td><td>nom, parent, enveloppe budget associée (optionnel)</td><td>Classement des dépenses ; une catégorie sans budget est juste du suivi.</td></tr>
-<tr><td><strong>Flux prévu</strong></td><td>nom, sens, montant, compte, enveloppe ou catégorie cible, périodicité (intervalle + ancrage), fenêtre de dates, tolérance de montant, motif de libellé, actif de/à</td><td>Tout ce qu'on attend : revenus, charges fixes, virements internes, échéances de provisions.</td></tr>
+<tr><td><strong>Compte</strong></td><td>nom, banque, type (principal / accueil / tiers), solde initial et date, profil d'import (sauf tiers), seuil et sens de règlement (tiers)</td><td>Le réel bancaire.</td></tr>
+<tr><td><strong>Tirelire</strong></td><td>nom, type (provision / objectif / budget), compte hôte, solde initial, cible, échéance, périodicité, report (oui/non/plafonné), priorité de financement</td><td>Le sous‑compte comptable ; porte son solde reconstruit.</td></tr>
+<tr><td><strong>Catégorie</strong></td><td>nom, parent, tirelire budget associée (optionnel)</td><td>Classement des dépenses ; une catégorie sans budget est juste du suivi.</td></tr>
+<tr><td><strong>Flux prévu</strong></td><td>nom, sens, montant, compte, tirelire ou catégorie cible, périodicité (intervalle + ancrage), fenêtre de dates, tolérance de montant, motif de libellé, actif de/à</td><td>Tout ce qu'on attend : revenus, charges fixes, virements internes, échéances de provisions.</td></tr>
 <tr><td><strong>Opération</strong></td><td>compte, origine (importée / manuelle), date, libellé brut, libellé normalisé, montant, clé d'identité, statut (à traiter / pointée / catégorisée / transfert / ponctuelle), flux prévu pointé, transfert apparié</td><td>La ligne de relevé, ou une saisie manuelle sur un compte tiers.</td></tr>
-<tr><td><strong>Affectation</strong></td><td>opération, enveloppe ou catégorie, montant</td><td>La ventilation ; une opération simple a une seule affectation.</td></tr>
-<tr><td><strong>Règle</strong></td><td>motif, catégorie ou enveloppe cible, priorité</td><td>Catégorisation automatique apprise au fil de l'eau.</td></tr>
+<tr><td><strong>Affectation</strong></td><td>opération, tirelire ou catégorie, montant</td><td>La ventilation ; une opération simple a une seule affectation.</td></tr>
+<tr><td><strong>Règle</strong></td><td>motif, catégorie ou tirelire cible, priorité</td><td>Catégorisation automatique apprise au fil de l'eau.</td></tr>
 </table>
 </div>
-<p>Le <strong>plan de période</strong> (les virements à faire, la marge) n'est pas stocké : il est recalculé à la demande à partir des enveloppes et des flux prévus. On en garde seulement un instantané par période pour comparer « ce qu'on avait prévu » à « ce qui s'est passé ».</p>
+<p>Le <strong>plan de période</strong> (les virements à faire, la marge) n'est pas stocké : il est recalculé à la demande à partir des tirelires et des flux prévus. On en garde seulement un instantané par période pour comparer « ce qu'on avait prévu » à « ce qui s'est passé ».</p>
 
 <h2 id="existant">7. Faut‑il vraiment coder ?</h2>
-<p>Par honnêteté : une bonne partie de ce que tu décris existe déjà. <strong>Actual Budget</strong> (libre, auto‑hébergeable, en français) fait les enveloppes, le report, l'import CSV avec règles et dédoublonnage, les transferts internes, et une forme de planification des dépenses récurrentes. <strong>Firefly III</strong> couvre le multi‑comptes et les règles de catégorisation avec une approche plus comptable. <strong>YNAB</strong> est la référence payante de la méthode enveloppe.</p>
-<p>Ce qu'aucun ne fait proprement, et qui est le cœur de ton projet : <strong>déduire les virements permanents par compte réel</strong> à partir des enveloppes qui y sont hébergées, avec le rattrapage d'échéance, et <strong>vérifier au pointage que le virement groupé alimente bien chaque enveloppe</strong>. Ces outils supposent en général qu'une enveloppe n'a pas d'adresse physique.</p>
+<p>Par honnêteté : une bonne partie de ce que tu décris existe déjà. <strong>Actual Budget</strong> (libre, auto‑hébergeable, en français) fait les tirelires, le report, l'import CSV avec règles et dédoublonnage, les transferts internes, et une forme de planification des dépenses récurrentes. <strong>Firefly III</strong> couvre le multi‑comptes et les règles de catégorisation avec une approche plus comptable. <strong>YNAB</strong> est la référence payante de la méthode tirelire.</p>
+<p>Ce qu'aucun ne fait proprement, et qui est le cœur de ton projet : <strong>déduire les virements permanents par compte réel</strong> à partir des tirelires qui y sont hébergées, avec le rattrapage d'échéance, et <strong>vérifier au pointage que le virement groupé alimente bien chaque tirelire</strong>. Ces outils supposent en général qu'une tirelire n'a pas d'adresse physique.</p>
 <div class="note"><p>Deux voies raisonnables : coder l'outil complet (contrôle total, données chez toi, mais tout est à faire, y compris l'import bancaire qui est le plus ingrat) ; ou utiliser Actual Budget pour la tenue quotidienne et coder seulement le <em>calculateur de virements</em> par‑dessus ses données. Je pencherais pour la première si tu veux vraiment un outil à toi et durable, la seconde si tu veux un résultat utilisable dans le mois.</p></div>
 
 <h2 id="decisions">8. Décisions à prendre avant de coder</h2>
 <ol class="q">
   <li><strong>Période budgétaire</strong> : mois calendaire ou de paie à paie ? (H1)</li>
-  <li><strong>Comptes importés</strong> : pivot seul, ou tous les comptes qui hébergent des enveloppes ? Quelles banques, pour préparer les profils d'import ? (H4, H10)</li>
+  <li><strong>Comptes importés</strong> : principal seul, ou tous les comptes qui hébergent des tirelires ? Quelles banques, pour préparer les profils d'import ? (H4, H10)</li>
   <li><strong>Report des budgets</strong> : strict, cumulatif, ou au cas par cas ? (H3)</li>
   <li><strong>Ordre de priorité</strong> quand la marge est négative : l'épargne cède‑t‑elle avant les budgets confort ? (H6)</li>
   <li><strong>Utilisateurs</strong> : toi seul ou le foyer ; consultation depuis les téléphones ? (H12)</li>
@@ -380,8 +380,8 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <div class="tbl">
 <table>
 <tr><th>Lot</th><th>Contenu</th><th>Ce que tu peux faire à la fin</th></tr>
-<tr><td><strong>A · Plan</strong></td><td>Comptes, enveloppes, flux prévus, revenus ; calcul du plan de période avec croisière / rattrapage, marge, virements par compte.</td><td>Mettre en place tes virements permanents et connaître ta marge, sans importer quoi que ce soit.</td></tr>
-<tr><td><strong>B · Import et pointage</strong></td><td>Profils d'import, déduplication, transferts internes, pointage des flux prévus, ventilation, alertes « attendu non reçu », soldes d'enveloppes reconstruits.</td><td>Charger tes relevés chaque mois et savoir si le plan s'exécute.</td></tr>
+<tr><td><strong>A · Plan</strong></td><td>Comptes, tirelires, flux prévus, revenus ; calcul du plan de période avec croisière / rattrapage, marge, virements par compte.</td><td>Mettre en place tes virements permanents et connaître ta marge, sans importer quoi que ce soit.</td></tr>
+<tr><td><strong>B · Import et pointage</strong></td><td>Profils d'import, déduplication, transferts internes, pointage des flux prévus, ventilation, alertes « attendu non reçu », soldes de tirelires reconstruits.</td><td>Charger tes relevés chaque mois et savoir si le plan s'exécute.</td></tr>
 <tr><td><strong>C · Budgets et calibrage</strong></td><td>Catégories, règles de catégorisation, file de tri, budget vs réel par période, moyennes glissantes, suggestions de cibles.</td><td>Vérifier que les budgets sont bien construits et les ajuster.</td></tr>
 </table>
 </div>
@@ -390,42 +390,42 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <div class="tbl">
 <table>
 <tr><th>Point</th><th>Décision</th><th>Conséquence</th></tr>
-<tr><td>Période budgétaire</td><td><strong>De paie à paie</strong></td><td>Chaque compte pivot porte une « date de paie » ; la période courante va de cette date à la veille de la suivante. Un flux prévu dont la fenêtre chevauche deux périodes est rattaché à celle qui contient sa date d'ancrage.</td></tr>
-<tr><td>Relevés importés</td><td><strong>Compte pivot seulement</strong></td><td>Les enveloppes hébergées ailleurs sont tenues en théorique : un virement sortant pointé alimente l'enveloppe, une échéance prévue la vide à sa date, sans confirmation bancaire. Les dépenses faites depuis les autres comptes sont saisies à la main (voir « Comptes tiers » plus bas). L'import d'autres comptes reste possible plus tard sans changer le modèle.</td></tr>
-<tr><td>Report des budgets</td><td><strong>Au cas par cas</strong></td><td>Paramètre par budget ; défaut : report pour les budgets hors pivot, remise à zéro pour ceux sur le pivot.</td></tr>
+<tr><td>Période budgétaire</td><td><strong>De paie à paie</strong></td><td>Chaque compte principal porte une « date de paie » ; la période courante va de cette date à la veille de la suivante. Un flux prévu dont la fenêtre chevauche deux périodes est rattaché à celle qui contient sa date d'ancrage.</td></tr>
+<tr><td>Relevés importés</td><td><strong>Compte principal seulement</strong></td><td>Les tirelires hébergées ailleurs sont tenues en théorique : un virement sortant pointé alimente la tirelire, une échéance prévue la vide à sa date, sans confirmation bancaire. Les dépenses faites depuis les autres comptes sont saisies à la main (voir « Comptes tiers » plus bas). L'import d'autres comptes reste possible plus tard sans changer le modèle.</td></tr>
+<tr><td>Report des budgets</td><td><strong>Au cas par cas</strong></td><td>Paramètre par budget ; défaut : report pour les budgets hors principal, remise à zéro pour ceux sur le compte principal.</td></tr>
 <tr><td>Forme de l'outil</td><td><strong>Application JavaScript</strong>, portable sur Android et sur un serveur web privé</td><td>Voir la pile ci‑dessous.</td></tr>
 <tr><td>Période annuelle</td><td><strong>Dates configurables</strong></td><td>L'année budgétaire ne coïncide pas forcément avec l'année civile : elle démarre à une date de ton choix (ex. 1er septembre) et s'aligne sur la période de paie qui la contient. Les budgets annuels, les bilans et les compteurs « dépensé sur l'année » suivent cette année‑là. Les provisions gardent leur propre date d'ancrage (H11), indépendante.</td></tr>
 <tr><td>Interface</td><td><strong>Svelte</strong></td><td>Le cœur (modèle, calculs, pointage) reste en TypeScript pur, sans dépendance au framework.</td></tr>
 <tr><td>Sources d'import</td><td><strong>Linxo</strong> (historique de quinze ans) puis <strong>exports directs des banques</strong></td><td>Deux profils d'import au moins ; date de bascule par compte ; détecteur de doublons probables entre sources (§11.1).</td></tr>
 <tr><td>Synchronisation</td><td><strong>Prévue par l'architecture, réalisée plus tard</strong>, idéalement en pair‑à‑pair</td><td>Voir §11 : identifiants déterministes, journal de changements, transports interchangeables.</td></tr>
-<tr><td>Comptes tiers</td><td><strong>Dépenses non importables saisies à la main, réglées par virements ponctuels</strong></td><td>Voir la section « Comptes tiers et soldes à régler » ci‑dessous : elle lève la réserve faite sur l'import du pivot seul.</td></tr>
+<tr><td>Comptes tiers</td><td><strong>Dépenses non importables saisies à la main, réglées par virements ponctuels</strong></td><td>Voir la section « Comptes tiers et soldes à régler » ci‑dessous : elle lève la réserve faite sur l'import du compte principal seul.</td></tr>
 </table>
 </div>
 
 <h3>Comptes tiers et soldes à régler</h3>
-<p>Un <strong>compte tiers</strong> est un compte réel dont on n'importe pas le relevé : compte secondaire avec sa propre carte, compte personnel d'un membre du foyer, espèces, carte prépayée. On y saisit à la main les opérations qui concernent le plan familial : une dépense payée depuis ce compte pour une enveloppe financée par le pivot, ou un revenu du plan reçu sur ce compte. Chaque saisie est une opération comme les autres (catégorie, enveloppe, ventilation possible), simplement marquée « manuelle » au lieu d'« importée ».</p>
-<p>Le point important est que ces opérations créent une <strong>dette entre le compte tiers et le pivot</strong>. L'app tient, par compte tiers, un <strong>solde à régler</strong> :</p>
+<p>Un <strong>compte tiers</strong> est un compte réel dont on n'importe pas le relevé : compte secondaire avec sa propre carte, compte personnel d'un membre du foyer, espèces, carte prépayée. On y saisit à la main les opérations qui concernent le plan familial : une dépense payée depuis ce compte pour une tirelire financée par le compte principal, ou un revenu du plan reçu sur ce compte. Chaque saisie est une opération comme les autres (catégorie, tirelire, ventilation possible), simplement marquée « manuelle » au lieu d'« importée ».</p>
+<p>Le point important est que ces opérations créent une <strong>dette entre le compte tiers et le compte principal</strong>. L'app tient, par compte tiers, un <strong>solde à régler</strong> :</p>
 <ul class="plain">
-  <li>une dépense du plan payée depuis le compte tiers <em>augmente</em> ce que le pivot lui doit ;</li>
-  <li>un revenu du plan reçu sur le compte tiers <em>diminue</em> ce que le pivot lui doit (ou crée une dette du tiers vers le pivot) ;</li>
-  <li>un virement pivot → tiers pointé sur le relevé du pivot <em>diminue</em> la dette ; un virement tiers → pivot l'<em>augmente</em> ;</li>
-  <li>si le compte tiers héberge une enveloppe (budget « carte enfants »), l'alimentation mensuelle prévue et le solde de l'enveloppe entrent dans le même calcul : un budget en dépassement fait apparaître un complément à virer.</li>
+  <li>une dépense du plan payée depuis le compte tiers <em>augmente</em> ce que le compte principal lui doit ;</li>
+  <li>un revenu du plan reçu sur le compte tiers <em>diminue</em> ce que le compte principal lui doit (ou crée une dette du tiers vers le compte principal) ;</li>
+  <li>un virement principal → tiers pointé sur le relevé du compte principal <em>diminue</em> la dette ; un virement tiers → principal l'<em>augmente</em> ;</li>
+  <li>si le compte tiers héberge une tirelire (budget « carte enfants »), l'alimentation mensuelle prévue et le solde de la tirelire entrent dans le même calcul : un budget en dépassement fait apparaître un complément à virer.</li>
 </ul>
-<p>Le plan de période affiche alors, à côté des virements permanents, une ligne <strong>« virements ponctuels à prévoir »</strong> par compte tiers, avec le sens et le montant. Une fois le virement fait, il apparaît sur le relevé du pivot, se pointe comme un flux prévu à échéance unique, et le solde à régler revient à zéro.</p>
+<p>Le plan de période affiche alors, à côté des virements permanents, une ligne <strong>« virements ponctuels à prévoir »</strong> par compte tiers, avec le sens et le montant. Une fois le virement fait, il apparaît sur le relevé du compte principal, se pointe comme un flux prévu à échéance unique, et le solde à régler revient à zéro.</p>
 <div class="tbl">
 <table>
 <caption>Exemple · solde à régler au 6 septembre 2026</caption>
-<tr><th>Compte tiers</th><th>Mouvement saisi ou pointé</th><th class="n">Le pivot doit</th></tr>
-<tr><td rowspan="3">Compte de Marie</td><td>Dentiste payé depuis son compte (budget santé, financé par le pivot)</td><td class="n">+ 80,00</td></tr>
+<tr><th>Compte tiers</th><th>Mouvement saisi ou pointé</th><th class="n">Le compte principal doit</th></tr>
+<tr><td rowspan="3">Compte de Marie</td><td>Dentiste payé depuis son compte (budget santé, financé par le compte principal)</td><td class="n">+ 80,00</td></tr>
 <tr><td>Allocations du mois reçues sur son compte (revenu du plan)</td><td class="n">− 100,00</td></tr>
-<tr><td><strong>Virement ponctuel à prévoir : Marie → pivot</strong></td><td class="n"><strong>20,00</strong></td></tr>
+<tr><td><strong>Virement ponctuel à prévoir : Marie → principal</strong></td><td class="n"><strong>20,00</strong></td></tr>
 <tr><td rowspan="3">Carte enfants</td><td>Virement permanent de 200 € pointé (budget enfants, report activé)</td><td class="n">0,00</td></tr>
-<tr><td>Dépenses saisies : 236 € (solde d'enveloppe − 36 €)</td><td class="n">+ 36,00</td></tr>
-<tr><td><strong>Virement ponctuel à prévoir : pivot → carte enfants</strong></td><td class="n"><strong>36,00</strong></td></tr>
+<tr><td>Dépenses saisies : 236 € (solde de tirelire − 36 €)</td><td class="n">+ 36,00</td></tr>
+<tr><td><strong>Virement ponctuel à prévoir : principal → carte enfants</strong></td><td class="n"><strong>36,00</strong></td></tr>
 </table>
 </div>
-<p>Conséquences sur le modèle du §6 : le <strong>Compte</strong> gagne un type « tiers » (non importé) ; l'<strong>Opération</strong> gagne une origine (importée / manuelle) et, pour une opération manuelle sur un compte tiers, un effet sur le solde à régler ; le plan de période gagne une section « règlements avec les comptes tiers ». Le solde à régler n'est pas stocké : il est recalculé comme les soldes d'enveloppes. Cela dissout la limite notée pour « pivot seul » : les budgets placés sur un autre compte redeviennent suivables dépense par dépense, au prix d'une saisie manuelle, et si un jour tu importes le relevé de ce compte, il passe simplement de « tiers » à « importé » sans perdre l'historique.</p>
-<div class="note"><p>Deux réglages utiles : un <em>seuil de règlement</em> par compte tiers (ne proposer le virement qu'au‑delà de 20 €, par exemple, pour éviter des micro‑virements) et un <em>sens autorisé</em> (le compte espèces ne fait jamais de virement vers le pivot, on le réapprovisionne seulement).</p></div>
+<p>Conséquences sur le modèle du §6 : le <strong>Compte</strong> gagne un type « tiers » (non importé) ; l'<strong>Opération</strong> gagne une origine (importée / manuelle) et, pour une opération manuelle sur un compte tiers, un effet sur le solde à régler ; le plan de période gagne une section « règlements avec les comptes tiers ». Le solde à régler n'est pas stocké : il est recalculé comme les soldes de tirelires. Cela dissout la limite notée pour « principal seul » : les budgets placés sur un autre compte redeviennent suivables dépense par dépense, au prix d'une saisie manuelle, et si un jour tu importes le relevé de ce compte, il passe simplement de « tiers » à « importé » sans perdre l'historique.</p>
+<div class="note"><p>Deux réglages utiles : un <em>seuil de règlement</em> par compte tiers (ne proposer le virement qu'au‑delà de 20 €, par exemple, pour éviter des micro‑virements) et un <em>sens autorisé</em> (le compte espèces ne fait jamais de virement vers le compte principal, on le réapprovisionne seulement).</p></div>
 <h3>Pile technique proposée pour une appli JS portable</h3>
 <p>Le besoin « même code sur Android et sur un serveur privé » se satisfait le plus simplement avec une <strong>application web progressive (PWA)</strong> en TypeScript : un seul dépôt, installable sur l'écran d'accueil Android depuis le navigateur, servie telle quelle par n'importe quel serveur web privé (fichiers statiques). Si tu veux un vrai paquet Android sur le Play Store ou un accès au système de fichiers du téléphone, un emballage <strong>Capacitor</strong> reprend la même base sans réécriture.</p>
 <p>Les données restent sur l'appareil, dans une base <strong>SQLite compilée en WebAssembly</strong> (sql.js ou wa‑sqlite) persistée dans IndexedDB, ou directement dans IndexedDB via Dexie si on veut rester plus léger. SQLite a l'avantage d'un export en un seul fichier, lisible ailleurs, et d'un modèle relationnel qui colle aux sept objets du §6. Le serveur privé ne sert au départ que les fichiers de l'application ; une synchronisation entre appareils du foyer (H12) est un lot ultérieur, avec chiffrement côté client si les données transitent.</p>
@@ -439,7 +439,7 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <p><code>clé = hash(compte, date d'opération, montant, libellé normalisé, rang)</code></p>
 <p>où le libellé normalisé est mis en majuscules, débarrassé des espaces multiples, des numéros de carte et des dates incluses dans le libellé, et où le <em>rang</em> est la position parmi les opérations strictement identiques du même jour (0 pour la première, 1 pour la deuxième). Le rang suit l'ordre du fichier, qu'une banque donnée conserve d'un export à l'autre.</p>
 <p>Cette clé a deux fragilités connues, qu'il faut assumer plutôt que nier. Une opération vue « en attente » puis « comptabilisée » peut changer de date ou de libellé entre deux exports, ce qui donne deux clés pour une même réalité. Et la même opération vue depuis <strong>Linxo</strong> et depuis le <strong>CSV de la banque</strong> n'a pas le même libellé, Linxo réécrivant les intitulés. La réponse est la même dans les deux cas : un <strong>détecteur de doublons probables</strong> à l'import, qui rapproche une nouvelle clé d'une opération existante de même compte, même montant, date à ± 3 jours, et te la présente comme « probablement déjà connue » plutôt que de l'insérer en silence. Pour la transition Linxo → banque, on fixe par compte une <strong>date de bascule</strong> : Linxo fait foi avant, la banque après, et la fenêtre de recouvrement passe par le détecteur.</p>
-<p>Tout ce que <em>tu</em> crées (enveloppes, flux prévus, règles, catégories, opérations manuelles sur comptes tiers) n'a pas de source bancaire et reçoit un <strong>UUID v7</strong> : aléatoire, mais ordonné dans le temps, ce qui donne des index compacts et un tri chronologique gratuit. Les affectations, elles, sont identifiées par le couple (clé d'opération, enveloppe ou catégorie) : déterministe aussi, donc fusionnable.</p>
+<p>Tout ce que <em>tu</em> crées (tirelires, flux prévus, règles, catégories, opérations manuelles sur comptes tiers) n'a pas de source bancaire et reçoit un <strong>UUID v7</strong> : aléatoire, mais ordonné dans le temps, ce qui donne des index compacts et un tri chronologique gratuit. Les affectations, elles, sont identifiées par le couple (clé d'opération, tirelire ou catégorie) : déterministe aussi, donc fusionnable.</p>
 <div class="note"><p>Linxo mérite un traitement à part dans le lot B : ses exports regroupent plusieurs comptes dans un seul fichier (le profil d'import doit ventiler par colonne compte), et ils portent quinze ans de catégories déjà attribuées. On les importe comme <em>catégorie suggérée</em> et on en déduit les premières règles de classement, ce qui t'évite de recommencer le tri de zéro.</p></div>
 
 <h3>11.2 Quatre façons de stocker et de partager l'état</h3>
@@ -453,7 +453,7 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <tr><td><strong>D · Tables + journal de changements</strong> (hybride, recommandé)</td><td>Les tables classiques, comme en A. En plus, chaque écriture laisse une trace <em>(table, ligne, colonne, valeur, horloge, appareil)</em>.</td><td>Les traces depuis la dernière synchro avec chaque pair ; fusion colonne par colonne, la plus récente gagne.</td><td>Lecture et SQL comme en A ; fusion fine comme en B (deux champs différents modifiés en parallèle sont tous deux conservés) ; le journal n'est pas la vérité, c'est un artefact de transport, on peut le purger.</td><td>Deux écritures par modification (transparent si le dépôt s'en charge). L'horloge doit être une horloge logique hybride. La bibliothèque toute faite qui fait exactement cela dans SQLite (cr‑sqlite) est à évaluer ; sinon on l'écrit soi‑même, c'est une centaine de lignes.</td></tr>
 </table>
 </div>
-<p>Ce que l'option D change concrètement par rapport à ta réserve : <strong>la base reste une base</strong>. Tu ouvres le fichier SQLite, tu vois des tables d'opérations, d'enveloppes, d'affectations, tu fais tes requêtes. La table de changements est à côté, alimentée automatiquement par la couche de dépôt, et ne sert qu'à répondre à la question « qu'est‑ce qui a bougé ici depuis la dernière fois que j'ai parlé à tel appareil ». On peut la vider une fois tous les pairs à jour.</p>
+<p>Ce que l'option D change concrètement par rapport à ta réserve : <strong>la base reste une base</strong>. Tu ouvres le fichier SQLite, tu vois des tables d'opérations, de tirelires, d'affectations, tu fais tes requêtes. La table de changements est à côté, alimentée automatiquement par la couche de dépôt, et ne sert qu'à répondre à la question « qu'est‑ce qui a bougé ici depuis la dernière fois que j'ai parlé à tel appareil ». On peut la vider une fois tous les pairs à jour.</p>
 
 <p><strong>Et une blockchain ?</strong> Question examinée et écartée. Une blockchain résout un problème précis : mettre d'accord des participants qui ne se font pas confiance sur l'ordre d'un registre que personne ne doit pouvoir réécrire. Ici les participants sont deux ou trois appareils d'un même foyer qui se font confiance, les données doivent rester corrigeables (recatégoriser, ventiler, supprimer une saisie erronée) et privées, et le besoin de fond est de <em>fusionner</em> des modifications faites hors ligne, ce que le consensus d'une chaîne ne fait pas : il tranche, il ne fusionne pas. Une chaîne privée sans preuve de travail se réduit à un journal d'événements en ajout seul, c'est‑à‑dire l'option B avec une contrainte d'immuabilité en plus. Une seule idée mérite d'être reprise, sans le reste : <strong>chaîner les entrées du journal de changements par empreinte</strong> (chaque entrée porte l'empreinte de la précédente). Cela rend toute corruption ou toute divergence entre deux appareils détectable, et permet de trouver rapidement à partir de quel point deux journaux diffèrent. C'est une technique d'intégrité, pas une blockchain, et elle tient en quelques lignes dans l'option D.</p>
 
@@ -464,7 +464,7 @@ footer{margin-top:64px;padding-top:16px;border-top:1px solid var(--line);font-si
 <tr><th>Donnée</th><th>Identité</th><th>Règle de fusion</th></tr>
 <tr><td>Opérations importées</td><td>clé bancaire déterministe</td><td>Identiques partout : insertion si absente, jamais de conflit.</td></tr>
 <tr><td>Affectations, pointages, statuts</td><td>(clé d'opération, cible)</td><td>Dernière écriture gagne ; conflit réel seulement si deux personnes classent la même opération dans la même minute.</td></tr>
-<tr><td>Enveloppes, flux prévus, règles, catégories</td><td>UUID v7</td><td>Dernière écriture gagne <em>par champ</em> : l'un change le montant, l'autre la date, les deux survivent.</td></tr>
+<tr><td>Tirelires, flux prévus, règles, catégories</td><td>UUID v7</td><td>Dernière écriture gagne <em>par champ</em> : l'un change le montant, l'autre la date, les deux survivent.</td></tr>
 <tr><td>Opérations manuelles (comptes tiers)</td><td>UUID v7</td><td>Insertion ; modification par champ.</td></tr>
 <tr><td>Suppressions</td><td>—</td><td>Marqueur de suppression daté, jamais d'effacement physique tant qu'un pair peut ne pas l'avoir vu.</td></tr>
 <tr><td>Soldes, plan, soldes à régler</td><td>—</td><td>Jamais synchronisés : recalculés localement, donc identiques partout par construction.</td></tr>

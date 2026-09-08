@@ -24,7 +24,7 @@ export function inputToCents(s: string): Cents | undefined {
 }
 
 export const ACCOUNT_KINDS: Record<AccountKind, string> = {
-  pivot: 'Pivot (relevé importé)',
+  principal: 'Principal (relevé importé)',
   holding: "Compte d'accueil (livret, PEL…)",
   third: 'Compte tiers (saisie manuelle)',
 };
@@ -51,7 +51,7 @@ export const ROLLOVER_LABELS: Record<'none' | 'unlimited' | 'capped', string> = 
 export const FLOW_KINDS: Record<PlannedFlowKind, string> = {
   income: 'Revenu',
   fixedCharge: 'Charge fixe',
-  dueDate: "Échéance payée par une enveloppe",
+  dueDate: "Échéance payée par une tirelire",
   transfer: 'Virement interne attendu',
 };
 

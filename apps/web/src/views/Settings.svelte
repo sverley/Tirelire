@@ -44,17 +44,17 @@
     input.value = '';
   }
 
-  let cushion = $state(centsToInput(app.ledger.settings.pivotCushion));
+  let cushion = $state(centsToInput(app.ledger.settings.principalCushion));
   let msg = $state('');
 
   $effect(() => {
-    cushion = centsToInput(app.ledger.settings.pivotCushion);
+    cushion = centsToInput(app.ledger.settings.principalCushion);
   });
 
   function saveCushion() {
     const c = inputToCents(cushion);
     if (c === undefined) return void (msg = 'Montant invalide.');
-    app.setSetting('pivotCushion', c);
+    app.setSetting('principalCushion', c);
     msg = 'Coussin enregistré.';
   }
 
@@ -94,9 +94,9 @@
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Réglages</h1>
 
-<h2>Coussin du pivot</h2>
+<h2>Coussin du compte principal</h2>
 <div class="card">
-  <p class="small muted">Montant minimum à laisser en non affecté sur le pivot ; le plan avertit si la marge passe en dessous.</p>
+  <p class="small muted">Montant minimum à laisser en non affecté sur le compte principal ; le plan avertit si la marge passe en dessous.</p>
   <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
     <label class="f">Coussin <input bind:value={cushion} inputmode="decimal" /></label>
     <button class="btn" onclick={saveCushion}>Enregistrer</button>

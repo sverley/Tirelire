@@ -22,11 +22,11 @@ Les lots ci-dessous corrigent cela dans l'ordre de ce qui débloque le reste.
 Livré : la recherche porte les champs d'une sélection d'automatisme (libellé littéral ou expression
 régulière, compte, fourchette de montants, dates), le bloc d'actions est visible sans rien cocher
 et s'applique aux lignes cochées ou à tout le résultat, l'aperçu est permanent, et *Enregistrer
-l'automatisme* reprend la recherche telle quelle. Le placement voulu d'une enveloppe est devenu une
+l'automatisme* reprend la recherche telle quelle. Le placement voulu d'une tirelire est devenu une
 répartition (D38) et « règle » s'appelle « automatisme » (D39).
 
 Reste de ce lot, à faire : la ventilation à parts dans le bloc d'actions (aujourd'hui catégorie,
-enveloppe, ponctuelle et état seulement).
+tirelire, ponctuelle et état seulement).
 
 ## Lot 6 bis · Ancien contenu du lot 6, pour mémoire
 
@@ -39,7 +39,7 @@ la recherche en règle sans rien ressaisir.
 - À côté, séparés visuellement, les critères de consultation qui ne partent jamais dans une
   règle : état, période courante, tri.
 - Compteur permanent : « N opérations correspondent », mis à jour à la frappe.
-- Bloc d'action **toujours visible**, portant les champs de `RuleAction` : catégorie, enveloppe,
+- Bloc d'action **toujours visible**, portant les champs de `RuleAction` : catégorie, tirelire,
   ventilation à parts (au moins une ligne fixe plus le reste), ponctuelle, état — chaque champ
   pouvant rester à « ne pas toucher ».
 - Aperçu avant/après affiché en continu, pas dans une boîte de dialogue (`previewRules`,
@@ -50,7 +50,7 @@ la recherche en règle sans rien ressaisir.
   `inferSelection` remplit le panneau de filtre, que l'on corrige avant d'enregistrer.
 
 **Fait quand** : depuis une base importée, on peut taper « CASINO », voir le nombre d'opérations
-concernées, choisir catégorie et enveloppe, lire l'aperçu, appliquer aux résultats, puis créer
+concernées, choisir catégorie et tirelire, lire l'aperçu, appliquer aux résultats, puis créer
 l'automatisme correspondant sans ressaisir le filtre.
 
 ---
@@ -76,15 +76,15 @@ une règle d'un cran change le résultat quand deux règles se disputent une op�
 
 ## Lot 8 · Rendre visibles les décisions déjà prises
 
-- Réglages : seuil de virement (`transferThreshold`, D20) et coussin du pivot, avec une phrase
+- Réglages : seuil de virement (`transferThreshold`, D20) et coussin du compte principal, avec une phrase
   disant à quoi chacun sert.
 - Plan : distinguer nettement « à faire » et « à surveiller », montrer le libellé attendu du
   virement permanent et l'état du flux enregistré.
-- Enveloppes : rendre les besoins multiples évidents (ajouter un second besoin doit être un geste
+- Tirelires : rendre les besoins multiples évidents (ajouter un second besoin doit être un geste
   offert, pas découvert), priorité modifiable, et afficher la répartition réelle par compte même
   quand elle est conforme au placement voulu.
 - Opérations : montrer les parts d'une ventilation dans la liste, pas seulement dans l'éditeur.
-- **Jeu d'exemple étoffé** : une enveloppe portant deux besoins, une enveloppe au placement
+- **Jeu d'exemple étoffé** : une tirelire portant deux besoins, une tirelire au placement
   réparti sur deux comptes (D38), deux ou trois automatismes dont un issu d'un flux, une opération
   ventilée en parts, un compte tiers avec un solde à régler. Les chiffres sont à choisir avec soin :
   plusieurs tests encodent cet exemple, et chacun doit rester justifié par une décision. Sans
@@ -100,7 +100,7 @@ une règle d'un cran change le résultat quand deux règles se disputent une op�
 l'écart de passer inaperçu jusqu'à l'installation sur le téléphone.
 
 - Scénarios : import d'un CSV inventé ; filtre → action groupée → règle → rejeu ; création d'une
-  enveloppe à deux besoins et lecture du plan ; ouverture d'un dépôt écrit sous un modèle ancien
+  tirelire à deux besoins et lecture du plan ; ouverture d'un dépôt écrit sous un modèle ancien
   (migration) ; export puis réimport du fichier.
 - Intégrés au workflow, sur navigateur sans affichage, avec capture d'écran en cas d'échec.
 
@@ -108,12 +108,17 @@ l'écart de passer inaperçu jusqu'à l'installation sur le téléphone.
 
 ---
 
-## Lot 10 · Onboarding guidé
+## Lot 10 · Onboarding guidé — **fait le 8 septembre (D40)**
 
-Créer pivot, enveloppes, besoins et flux à partir d'un premier import, en s'appuyant sur
-l'inférence de filtre (D26) pour proposer des règles à partir des opérations récurrentes
-détectées. La branche `feature/assistant-configuration` est **obsolète** (elle crée des enveloppes
-typées) : la refaire sur le modèle actuel plutôt que la rebaser.
+Livré : l'assistant construit un budget à partir de questions simples (revenus et jour de paie,
+charges fixes, budgets courants, dépenses non mensuelles, épargne), en déduit tirelires, besoins et
+flux, et n'impose aucun compte — le compte principal est créé en silence, les autres sont proposés en
+fin de parcours avec le placement des réserves. La branche `feature/assistant-configuration` est
+abandonnée (elle créait des tirelires typées) ; l'assistant a été refait sur le modèle actuel.
+
+Reste à faire sur ce chantier : partir d'un **premier import** plutôt que d'une page blanche —
+proposer charges fixes et budgets à partir des opérations récurrentes détectées, en s'appuyant sur
+l'inférence de sélection (D26).
 
 ---
 

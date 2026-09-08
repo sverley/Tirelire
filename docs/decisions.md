@@ -5,14 +5,14 @@ ajouter une entrée qui la remplace plutôt que réécrire l'ancienne.
 
 ## D01 · 2026-09-06 · Deux niveaux de comptabilité
 
-Les **comptes** sont le réel bancaire (solde importé) ; les **enveloppes** sont des sous-comptes
+Les **comptes** sont le réel bancaire (solde importé) ; les **tirelires** sont des sous-comptes
 comptables hébergés sur un compte. Invariant : pour chaque compte, solde bancaire = somme des
-enveloppes hébergées + non affecté. Les soldes d'enveloppes ne sont jamais stockés, toujours
+tirelires hébergées + non affecté. Les soldes de tirelires ne sont jamais stockés, toujours
 reconstruits (`balances.ts`).
 
 ## D02 · 2026-09-06 · Période budgétaire de paie à paie
 
-Le pivot porte un `payDay` ; la période va de ce jour au jour précédent du mois suivant, nommée
+Le compte principal porte un `payDay` ; la période va de ce jour au jour précédent du mois suivant, nommée
 d'après le mois qui contient son milieu (28 août → 27 septembre = « septembre »). `payDay = 1`
 redonne le mois calendaire. Conséquence vérifiée par les tests : une échéance du 15 octobre a deux
 virements devant elle (28 août et 28 septembre), donc le rattrapage se lisse sur deux périodes.
@@ -22,23 +22,23 @@ virements devant elle (28 août et 28 septembre), donc le rattrapage se lisse su
 `settings.budgetYearStart = { month, day }`. Sert aux budgets annuels et aux bilans. Les provisions
 gardent leur propre ancrage (`periodicity.anchorDate`), indépendant.
 
-## D04 · 2026-09-06 · Relevé du pivot seul, comptes tiers saisis à la main
+## D04 · 2026-09-06 · Relevé du compte principal seul, comptes tiers saisis à la main
 
-Seul le pivot est importé au départ (les autres comptes peuvent l'être plus tard sans changer le
-modèle : un compte passe de `third` à `holding`/`pivot`). Un **compte tiers** est un compte réel
+Seul le compte principal est importé au départ (les autres comptes peuvent l'être plus tard sans changer le
+modèle : un compte passe de `third` à `holding`/`principal`). Un **compte tiers** est un compte réel
 non importé ; ses opérations utiles au plan sont saisies à la main et créent un **solde à régler**
-avec le pivot, présenté comme virement ponctuel dans le plan (`settlementBalance`). Réglages par
+avec le compte principal, présenté comme virement ponctuel dans le plan (`settlementBalance`). Réglages par
 compte tiers : seuil de règlement, sens autorisé.
 
 ## D05 · 2026-09-06 · Report des budgets au cas par cas
 
-`envelope.rollover` : `none` (remise à zéro), `unlimited`, `capped { months }`. Défaut proposé
-dans l'interface : remise à zéro sur le pivot, report ailleurs (l'argent y est physiquement).
-Un budget hébergé sur le pivot est « financé virtuellement » (réservation, pas de virement).
+`tirelire.rollover` : `none` (remise à zéro), `unlimited`, `capped { months }`. Défaut proposé
+dans l'interface : remise à zéro sur le compte principal, report ailleurs (l'argent y est physiquement).
+Un budget hébergé sur le compte principal est « financé virtuellement » (réservation, pas de virement).
 
 ## D06 · 2026-09-06 · Ordre de financement quand la marge est négative
 
-Chaque enveloppe a une `priority` (petit = financé d'abord ; défauts : provision 10, budget 20,
+Chaque tirelire a une `priority` (petit = financé d'abord ; défauts : provision 10, budget 20,
 objectif 30). Les planchers (rattrapage d'une provision) sont servis avant tout le reste, puis le
 demandé dans l'ordre des priorités. Le plan dit quelles lignes sont réduites ou non financées.
 
@@ -68,20 +68,20 @@ identifiant de transaction, un **détecteur de doublons probables** (même compt
 ±3 jours, libellé proche) compense les changements de libellé ou de date entre sources
 (Linxo ↔ banque, attente ↔ comptabilisé).
 
-## D10 · 2026-09-06 · Ventilation : lignes catégorie + enveloppe
+## D10 · 2026-09-06 · Ventilation : lignes catégorie + tirelire
 
 Une opération est ventilée en une ou plusieurs lignes (`Allocation`), chacune portant **une
-catégorie et une enveloppe** ; l'opération simple a une seule ligne. `allocation.amount` est
-une part du montant de l'opération, dans son signe. Effet sur l'enveloppe : le montant pour une
-dépense ou un revenu ; pour un virement interne, +montant côté compte hôte de l'enveloppe,
+catégorie et une tirelire** ; l'opération simple a une seule ligne. `allocation.amount` est
+une part du montant de l'opération, dans son signe. Effet sur la tirelire : le montant pour une
+dépense ou un revenu ; pour un virement interne, +montant côté compte hôte de la tirelire,
 −montant côté compte de départ (`allocationEffect`).
 
-## D11 · 2026-09-06 · Un virement permanent par enveloppe, libellé « TIRELIRE … »
+## D11 · 2026-09-06 · Un virement permanent par tirelire, libellé « TIRELIRE … »
 
-Le plan propose un ordre permanent par enveloppe hébergée hors pivot, avec un libellé dérivé du
-nom de l'enveloppe (`transferLabel`). À l'import, une opération dont le libellé contient ce
-libellé est reconnue comme virement vers cette enveloppe (`matchEnvelopeTransfers`). Un virement
-groupé reste possible : il se ventile à la main sur plusieurs enveloppes.
+Le plan propose un ordre permanent par tirelire hébergée hors principal, avec un libellé dérivé du
+nom de la tirelire (`transferLabel`). À l'import, une opération dont le libellé contient ce
+libellé est reconnue comme virement vers cette tirelire (`matchTirelireTransfers`). Un virement
+groupé reste possible : il se ventile à la main sur plusieurs tirelires.
 
 ## D12 · 2026-09-06 · Pointage prudent
 
@@ -127,23 +127,23 @@ y compris avec un profil nouvellement détecté, contrairement à `profile.accou
 que pour ce profil. Une case à cocher propose de mémoriser une nouvelle valeur sur le compte
 choisi ; décision explicite, jamais un écrasement silencieux.
 
-## D19 · 2026-09-07 · Enveloppe répartie sur plusieurs comptes
+## D19 · 2026-09-07 · Tirelire répartie sur plusieurs comptes
 
-Une enveloppe n'est plus hébergée par un compte : elle porte une **répartition par compte**,
+Une tirelire n'est plus hébergée par un compte : elle porte une **répartition par compte**,
 reconstruite depuis les ventilations, jamais stockée. Deux invariants au lieu d'un : la somme des
-composantes d'une enveloppe fait son solde ; la somme des composantes portées par un compte plus
+composantes d'une tirelire fait son solde ; la somme des composantes portées par un compte plus
 le non affecté fait le solde bancaire. Une composante peut être **négative** — une dépense consomme
-l'enveloppe là où elle sort, même si l'argent dort ailleurs (taxe foncière prélevée sur le pivot,
-provisionnée sur le livret). Un virement interne au sein d'une même enveloppe déplace une composante
+la tirelire là où elle sort, même si l'argent dort ailleurs (taxe foncière prélevée sur le compte principal,
+provisionnée sur le livret). Un virement interne au sein d'une même tirelire déplace une composante
 vers une autre sans changer le solde. Remplace l'hébergement de D01 et de D05 : `balances.ts` rend
-un vecteur, plus un scalaire, et `Envelope.accountId` disparaît au profit d'un placement voulu (D20).
+un vecteur, plus un scalaire, et `Tirelire.accountId` disparaît au profit d'un placement voulu (D20).
 
 ## D20 · 2026-09-07 · Placement voulu et écart
 
-Chaque enveloppe déclare **où son argent devrait dormir**. L'écart entre position réelle et position
+Chaque tirelire déclare **où son argent devrait dormir**. L'écart entre position réelle et position
 voulue produit des propositions de virement dans le plan : jamais une correction d'office, jamais un
 blocage. Laisser un écart est légitime — un revenu arrive, on provisionnera plus tard — donc le plan
-doit pouvoir présenter un écart comme « à surveiller » plutôt que « à faire ». Le pivot est un lieu
+doit pouvoir présenter un écart comme « à surveiller » plutôt que « à faire ». Le compte principal est un lieu
 de stockage comme un autre, à durée de séjour courte : aucune règle particulière ne lui est attachée.
 
 ## D21 · 2026-09-07 · Virement groupé à ventilation prévue
@@ -153,8 +153,8 @@ calculée d'avance et enregistrée comme flux attendu. À l'import, la ligne ban
 montant et libellé, et sa ventilation proposée. Si le montant constaté diffère du prévu — permanent
 posé il y a six mois, besoins qui ont bougé — la répartition rejoue l'ordre de financement de D06,
 planchers d'abord puis priorités, plutôt qu'un prorata qui saupoudrerait. L'écart retourne dans les
-positions d'enveloppes et se represente au tour suivant. Le libellé de D11 devient un libellé par
-couple de comptes, plus un libellé par enveloppe.
+positions de tirelires et se represente au tour suivant. Le libellé de D11 devient un libellé par
+couple de comptes, plus un libellé par tirelire.
 
 ## D22 · 2026-09-07 · Trois états d'une opération, la vérité est ce qui est verrouillé
 
@@ -169,7 +169,7 @@ de flux**, qui reste la mise en correspondance avec une échéance attendue et n
 ## D23 · 2026-09-07 · Règles : sélection, action, rang
 
 Une règle a une **sélection** (libellé, montant, compte, date, période de validité) et une **action**
-dont chaque champ est facultatif : catégorie, enveloppe, ventilation, état. L'état prend quatre
+dont chaque champ est facultatif : catégorie, tirelire, ventilation, état. L'état prend quatre
 valeurs — *Verrouiller*, *Rapprocher*, *Ne rien faire*, *Déverrouiller* — la dernière indisponible
 dans une règle. Défauts : *Rapprocher* pour une règle déterministe, *Ne rien faire* pour une règle
 contextuelle ou bayésienne, *Verrouiller* pour une règle issue d'un flux du budget et portant toute
@@ -213,38 +213,38 @@ opération a par défaut une ligne unique variable, qui prend donc l'intégralit
 des lignes la réduit d'autant, jusqu'à zéro, jamais en négatif. Une seule ligne variable par
 ventilation. La ventilation ne dépend que de l'opération : le rejeu reste déterministe même à montant
 inconnu d'avance, donc un flux à montant variable peut engendrer une règle verrouillante. Une
-ventilation qui dépendrait du contexte — solde d'une enveloppe, état du plan — sort de ce cadre :
+ventilation qui dépendrait du contexte — solde d'une tirelire, état du plan — sort de ce cadre :
 elle est une aide, et son résultat doit être figé sur l'opération au moment où il est produit.
-Remplace la ventilation de D10, dont « une catégorie et une enveloppe par ligne » reste valable.
+Remplace la ventilation de D10, dont « une catégorie et une tirelire par ligne » reste valable.
 
-## D28 · 2026-09-07 · Enveloppe sans type, besoins multiples
+## D28 · 2026-09-07 · Tirelire sans type, besoins multiples
 
-Une enveloppe est un pot à **solde unique** portant un ou plusieurs **besoins** : récurrent (tant par
+Une tirelire est un pot à **solde unique** portant un ou plusieurs **besoins** : récurrent (tant par
 période, avec le report de D05), à échéance (un montant pour une date, rattrapage lissé sur les
 virements restants), ou objectif (un montant sans date). Le besoin de financement de la période est
 leur somme. Les priorités et planchers de D06 portent désormais sur les besoins, pas sur les
-enveloppes : une même enveloppe « Charges » sert ainsi le plancher de la taxe foncière avant son
+tirelires : une même tirelire « Charges » sert ainsi le plancher de la taxe foncière avant son
 courant. Remplace la typologie provision / budget / objectif de D06, qui devient une typologie de
-besoins, et `Envelope.kind` disparaît. Le **regroupement d'enveloppes est écarté** : les totaux
+besoins, et `Tirelire.kind` disparaît. Le **regroupement de tirelires est écarté** : les totaux
 passent par l'arbre des catégories, et le seul apport propre d'un groupe — arbitrer une masse commune
-entre ses membres — s'obtient en fusionnant les enveloppes plutôt qu'en les coiffant.
+entre ses membres — s'obtient en fusionnant les tirelires plutôt qu'en les coiffant.
 
 ## D29 · 2026-09-07 · Dotation calculée, virements neutres, report par libération
 
 Précise D06, D19 et D20 et remplace la part de D05 sur le « financement virtuel ». Chaque besoin
 (D28) est **doté** au début de chaque période de ce qu'il demande — croisière ou rattrapage —
-sous forme de composante calculée sur le pivot (ou sur le compte de placement s'il n'y a pas de
-pivot), jamais stockée. Un virement interne ventilé sur une enveloppe **ne change pas son solde** :
+sous forme de composante calculée sur le compte principal (ou sur le compte de placement s'il n'y a pas de
+principal), jamais stockée. Un virement interne ventilé sur une tirelire **ne change pas son solde** :
 il déplace une composante d'un compte vers un autre ; le solde ne bouge que par les dotations, les
 revenus ventilés et les dépenses. Le financement par priorité de D06 devient une **lecture** : le
 plan dit ce que les revenus de la période couvrent et signale les lignes réduites ; la dotation,
-elle, est acquise, et le non affecté du pivot dit si l'argent y est. Le report reste une propriété
-de l'enveloppe (`rollover`) : en fin de période, pour `none` tout solde positif au-delà de la
+elle, est acquise, et le non affecté du compte principal dit si l'argent y est. Le report reste une propriété
+de la tirelire (`rollover`) : en fin de période, pour `none` tout solde positif au-delà de la
 réserve des besoins non récurrents (somme de leurs cibles) est **libéré** vers le non affecté du
 compte de placement ; pour `capped` c'est ce qui dépasse la réserve plus N croisières. Libération
 calculée, datée du dernier jour de la période, comptée comme composante négative. Les deux
 invariants de D19 tiennent puisque dotations et libérations sont des composantes comme les autres.
-Le solde d'une enveloppe s'attribue à ses besoins dans l'ordre des priorités (un besoin à échéance
+Le solde d'une tirelire s'attribue à ses besoins dans l'ordre des priorités (un besoin à échéance
 retient jusqu'à sa cible, un objectif jusqu'à la sienne, le récurrent prend le reste) ; un déficit
 pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin.
 
@@ -266,10 +266,10 @@ réordonnent en même temps ne produisent pas de doublons destructeurs, et une �
 l'identifiant. L'interface montre une liste ordonnée, rang 1 en tête, sans exposer la clé. Les
 règles s'appliquent de la fin de la liste vers le rang 1.
 
-## D32 · 2026-09-07 · Enveloppe par défaut d'une catégorie
+## D32 · 2026-09-07 · Tirelire par défaut d'une catégorie
 
-`Category.envelopeId` survit à D28 comme **enveloppe par défaut** : quand une règle ou une action
-pose une catégorie sans enveloppe, la ventilation prend l'enveloppe par défaut de la catégorie. Ce
+`Category.tirelireId` survit à D28 comme **tirelire par défaut** : quand une règle ou une action
+pose une catégorie sans tirelire, la ventilation prend la tirelire par défaut de la catégorie. Ce
 n'est qu'un raccourci de saisie, pas un lien comptable.
 
 ## D33 · 2026-09-07 · Le moteur de règles part de ce que l'import a établi
@@ -347,18 +347,18 @@ défaut : un appareil pas encore rechargé demande encore les fragments de la ve
 ## D38 · 2026-09-07 · Le placement voulu est une répartition, pas un compte
 
 Corrige une simplification faite au lot 1 : D20 avait été implémentée avec un compte de placement
-unique, ce qui contredit l'esprit de D19 — une enveloppe est répartie sur plusieurs comptes, donc
+unique, ce qui contredit l'esprit de D19 — une tirelire est répartie sur plusieurs comptes, donc
 elle doit pouvoir vouloir l'être.
 
 Le placement est une liste de composantes voulues, une par compte, chacune portant une **part** au
-sens de D27 : un montant fixe, un pourcentage du solde de l'enveloppe, ou le reste. Au plus une
+sens de D27 : un montant fixe, un pourcentage du solde de la tirelire, ou le reste. Au plus une
 composante « reste » ; en son absence, ce qui dépasse est réputé vouloir rester où il se trouve.
-« 1 200 € sur le livret, le reste sur le pivot » et « 70 % sur le livret, le reste sur le pivot »
+« 1 200 € sur le livret, le reste sur le compte principal » et « 70 % sur le livret, le reste sur le compte principal »
 s'écrivent donc de la même façon qu'une ventilation.
 
 Les mêmes règles qu'avant s'appliquent ensuite : l'écart entre position réelle et position voulue
 nourrit le plan, « à faire » au-dessus du seuil, « à surveiller » en dessous, jamais corrigé
-d'office. Une enveloppe sans placement déclaré ne produit aucun écart : elle est bien là où elle est.
+d'office. Une tirelire sans placement déclaré ne produit aucun écart : elle est bien là où elle est.
 
 ## D39 · 2026-09-07 · Une règle s'appelle un automatisme, et se crée depuis la recherche
 
@@ -371,3 +371,76 @@ d'automatisme, mais un seul écran. On cherche avec les champs d'une sélection,
 actions à appliquer à ce que la recherche retourne, on applique tout de suite si on veut, et
 « Enregistrer » transforme le couple recherche + actions en automatisme. Créer un automatisme
 n'est donc jamais un geste à part : c'est garder une recherche qu'on vient de faire.
+
+## D40 · 2026-09-08 · L'assistant construit un budget, il ne configure pas des objets
+
+Le premier assistant reprenait les écrans de configuration étape par étape : créer un compte, puis
+une tirelire, puis un besoin. Il demandait donc de connaître le modèle avant de pouvoir s'en
+servir — exactement ce qu'un nouvel arrivant ne sait pas.
+
+L'assistant pose désormais des questions de budget, et en déduit les objets. « Qu'est-ce qui rentre,
+et quand ? » écrit le jour de paie et des flux de revenu ; « qu'est-ce qui part tout seul au même
+montant ? » écrit des charges fixes ; « sur quoi voulez-vous vous tenir à un montant ? » écrit une
+tirelire et un besoin récurrent ; « qu'est-ce qui ne tombe pas tous les mois ? » — le cœur du
+sujet — écrit une tirelire, un besoin à échéance et le flux attendu à la date, en montrant tout de
+suite le montant à mettre de côté par période. Les mots « tirelire », « besoin » et « flux » ne
+sont jamais demandés à l'utilisateur, seulement expliqués.
+
+Le **compte principal est créé en silence** à la première réponse : il existe toujours, le faire
+saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
+un budget entier tient sans eux (une tirelire sans placement déclaré ne produit aucun écart, D38).
+S'ils existent, l'assistant demande seulement où chaque réserve devrait dormir, ce qui remplit le
+placement de D38 sans exposer les parts.
+
+L'assistant ne remplace pas les écrans de configuration : il amène à un budget qui se lit dans le
+plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (besoins multiples
+sur une tirelire, priorités, ventilations, catégories).
+
+Deux ancrages sont imposés par le moteur et figés par `test/assistant.test.ts` : une tirelire est
+ouverte au **début de la période en cours** (`tirelireTimeline` ne démarre qu'à la première période
+entièrement postérieure à l'ouverture) et un flux est ancré sur sa **dernière occurrence déjà
+passée** (`nextOccurrence` ne remonte jamais avant l'ancrage). Sans cela, un budget tout juste saisi
+s'affiche vide, ce qui était le cas de la première version.
+
+## D41 · 2026-09-08 · Le compte pivot s'appelle le compte principal
+
+« Pivot » décrivait un rôle dans un raisonnement comptable, pas un objet que quelqu'un possède.
+Personne n'a de compte pivot ; tout le monde a un compte principal. Renommage partout où un humain
+lit : interface, types, variables, commentaires, documentation (`AccountKind = 'principal'`,
+`principalCushion`, `principalUnallocated`, avertissements `noPrincipal` et `principalOverdrawn`).
+
+Le rôle ne change pas : c'est le compte par lequel tout transite, celui dont le relevé est importé,
+celui qui porte le jour de paie (D02) et qui reçoit les dotations (D29). D04 reste vraie, avec le
+mot corrigé.
+
+Deux valeurs stockées portaient le mot — le genre du compte et la clé du coussin. La migration
+5 → 6 les réécrit (`migrateTo6`), et la lecture accepte `pivot` comme synonyme de `principal`
+pour qu'un appareil resté en arrière, qui réécrirait l'ancienne valeur, ne rende pas le compte
+méconnaissable (D08, D30).
+
+## D42 · 2026-09-08 · Une enveloppe s'appelle une tirelire ; le stockage garde ses noms
+
+Le mot « enveloppe » venait de la méthode budgétaire dont l'application s'inspire ; il ne disait rien
+à qui découvrait l'écran, et l'application s'appelle déjà Tirelire (D13). Une tirelire, tout le monde
+voit ce que c'est : on y met de côté, on la casse le jour venu. Renommage dans l'interface, les types
+(`Tirelire`), les propriétés (`tirelireId`), les fonctions (`tirelireBalance`, `tirelireComponents`,
+`tirelireTimeline`) et la documentation.
+
+Ce que le mot désigne est inchangé : le pot à solde unique de D28, porteur de besoins, réparti sur
+des comptes (D19) avec un placement voulu (D38).
+
+En revanche **les noms de tables et de colonnes ne bougent pas** : la table reste `envelopes`, les
+colonnes restent `envelope_id`. Le journal de changements porte ces noms (D08) ; les renommer
+obligerait à déprécier et migrer chaque colonne (D30) et casserait la fusion avec un pair non migré,
+pour un gain nul puisque personne ne les lit. `schema.ts` sépare donc explicitement la propriété
+TypeScript du nom SQL (`cAs`), ce que le schéma permettait déjà sans que ce soit utilisé.
+
+La règle générale qui en découle : **le domaine se renomme librement, le stockage ne se renomme que
+s'il faut aussi changer la donnée.**
+
+**Sur la réécriture du journal.** D41 et D42 sont les seules décisions dont l'application a consisté à
+retoucher les entrées antérieures : le vocabulaire y a été remplacé partout, ainsi que dans
+`analyse-du-besoin.html`. La règle « ajouter une entrée plutôt que réécrire l'ancienne » porte sur le
+*contenu* d'une décision, et aucun contenu n'a changé — laisser deux vocabulaires cohabiter aurait
+rendu le journal illisible, ce qu'aucune décision ne gagne. Le détail des mots remplacés se lit dans
+le commit de renommage.

@@ -7,7 +7,7 @@ async function seeded(site: string) {
   const s = await LedgerStore.create({ sqlJs: SQL, siteId: site });
   const l = exampleLedger();
   for (const a of l.accounts) s.upsert('accounts', a);
-  for (const e of l.envelopes) s.upsert('envelopes', e);
+  for (const e of l.tirelires) s.upsert('tirelires', e);
   for (const n of l.needs) s.upsert('needs', n);
   for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
   return s;
@@ -29,14 +29,14 @@ describe('synchronisation', () => {
     // Modification de chaque côté, second échange : seul le delta circule.
     const need = b.load().needs.find((n) => n.id === 'need-tf')!;
     b.upsert('needs', { ...need, amount: euros(1300) });
-    const acc = a.load().accounts.find((x) => x.id === 'acc-pivot')!;
+    const acc = a.load().accounts.find((x) => x.id === 'acc-principal')!;
     a.upsert('accounts', { ...acc, name: 'Compte joint' });
     const [t2a, t2b] = memoryTransportPair();
     const [r2a, r2b] = await Promise.all([runSync(a, t2a), runSync(b, t2b)]);
     expect(r2a.sent).toBe(1);
     expect(r2b.sent).toBe(1);
     expect(a.load().needs.find((n) => n.id === 'need-tf')!.amount).toBe(euros(1300));
-    expect(b.load().accounts.find((x) => x.id === 'acc-pivot')!.name).toBe('Compte joint');
+    expect(b.load().accounts.find((x) => x.id === 'acc-principal')!.name).toBe('Compte joint');
   });
 
   it('trois appareils : C reçoit les changements de A relayés par B', async () => {
@@ -47,7 +47,7 @@ describe('synchronisation', () => {
     await Promise.all([runSync(a, x), runSync(b, y)]);
     [x, y] = memoryTransportPair();
     await Promise.all([runSync(b, x), runSync(c, y)]);
-    expect(c.load().envelopes.length).toBe(a.load().envelopes.length);
+    expect(c.load().tirelires.length).toBe(a.load().tirelires.length);
     // Et A n'a rien à recevoir de C que ses propres changements relayés (ignorés).
     [x, y] = memoryTransportPair();
     const [ra] = await Promise.all([runSync(a, x), runSync(c, y)]);

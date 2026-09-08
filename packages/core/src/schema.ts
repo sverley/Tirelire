@@ -29,11 +29,22 @@ const c = (prop: string, type: ColumnType = 'text'): ColumnDef => ({
   type,
 });
 
+/**
+ * Colonne dont le nom SQL diffère du nom de la propriété. Sert au renommage du domaine (D41) :
+ * « tirelire » côté modèle, `envelopes` / `envelope_id` côté stockage. Renommer une colonne
+ * obligerait à la déprécier et à migrer (D30), et casserait la fusion avec un pair non migré,
+ * pour un gain nul — le nom SQL n'est jamais lu par personne.
+ */
+const cAs = (prop: string, col: string, type: ColumnType = 'text'): ColumnDef => ({ prop, col, type });
+
 /** Colonne dépréciée (voir `ColumnDef.deprecated`). */
 const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop, type), deprecated: true });
 
+/** Colonne dépréciée dont le nom SQL diffère du nom de la propriété. */
+const oldAs = (prop: string, col: string, type: ColumnType = 'text'): ColumnDef => ({ ...cAs(prop, col, type), deprecated: true });
+
 /** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
-export const MODEL_VERSION = 5;
+export const MODEL_VERSION = 6;
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {
@@ -52,7 +63,8 @@ export const TABLES: Record<string, TableDef> = {
       c('deletedAt'),
     ],
   },
-  envelopes: {
+  tirelires: {
+    // Nom SQL historique conservé (D41) : le domaine dit « tirelire », le stockage garde `envelopes`.
     name: 'envelopes',
     columns: [
       c('id'),
@@ -75,7 +87,7 @@ export const TABLES: Record<string, TableDef> = {
     name: 'needs',
     columns: [
       c('id'),
-      c('envelopeId'),
+      cAs('tirelireId', 'envelope_id'),
       c('kind'),
       c('name'),
       c('amount', 'integer'),
@@ -87,7 +99,7 @@ export const TABLES: Record<string, TableDef> = {
   },
   categories: {
     name: 'categories',
-    columns: [c('id'), c('name'), c('parentId'), c('envelopeId'), c('nature'), c('deletedAt')],
+    columns: [c('id'), c('name'), c('parentId'), cAs('tirelireId', 'envelope_id'), c('nature'), c('deletedAt')],
   },
   plannedFlows: {
     name: 'planned_flows',
@@ -97,7 +109,7 @@ export const TABLES: Record<string, TableDef> = {
       c('kind'),
       c('amount', 'integer'),
       c('accountId'),
-      c('envelopeId'),
+      cAs('tirelireId', 'envelope_id'),
       c('counterpartAccountId'),
       c('categoryId'),
       c('periodicity', 'json'),
@@ -141,7 +153,7 @@ export const TABLES: Record<string, TableDef> = {
       c('id'),
       c('operationId'),
       c('categoryId'),
-      c('envelopeId'),
+      cAs('tirelireId', 'envelope_id'),
       c('share', 'json'),
       c('deletedAt'),
       // Modèle D01–D18 (migration 2 → 3) :
@@ -163,7 +175,7 @@ export const TABLES: Record<string, TableDef> = {
       // Modèle D01–D18 (migration 3 → 4) :
       old('pattern'),
       old('categoryId'),
-      old('envelopeId'),
+      oldAs('tirelireId', 'envelope_id'),
       old('priority', 'integer'),
     ],
   },
@@ -183,7 +195,7 @@ export const TABLES: Record<string, TableDef> = {
       c('deletedAt'),
       old('pattern'),
       old('categoryId'),
-      old('envelopeId'),
+      oldAs('tirelireId', 'envelope_id'),
       old('priority', 'integer'),
     ],
   },
@@ -216,7 +228,7 @@ export function liveColumns(t: TableDef): ColumnDef[] {
 }
 
 /** Clé de `Ledger` correspondant à chaque table. */
-export const LEDGER_KEYS = ['accounts', 'envelopes', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
+export const LEDGER_KEYS = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
 export type LedgerKey = (typeof LEDGER_KEYS)[number];
 
 export function createTableSQL(t: TableDef): string {

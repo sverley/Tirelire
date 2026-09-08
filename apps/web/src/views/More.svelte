@@ -1,8 +1,8 @@
 <script lang="ts">
   import { app, type View } from '../lib/state.svelte';
   const items: Array<{ id: View; label: string; desc: string }> = [
-    { id: 'accounts', label: 'Comptes', desc: 'Pivot, comptes d’accueil, comptes tiers' },
-    { id: 'envelopes', label: 'Enveloppes', desc: 'Provisions, objectifs d’épargne, budgets' },
+    { id: 'accounts', label: 'Comptes', desc: 'Principal, comptes d’accueil, comptes tiers' },
+    { id: 'tirelires', label: 'Tirelires', desc: 'Vos réserves et ce qu’elles doivent financer' },
     { id: 'categories', label: 'Catégories', desc: 'Classement des dépenses et revenus' },
     { id: 'flows', label: 'Flux prévus', desc: 'Revenus, charges fixes, échéances' },
     { id: 'entries', label: 'Saisie manuelle', desc: 'Dépenses des comptes tiers, virements faits' },
@@ -16,8 +16,8 @@
 <div class="card accent">
   <div class="row">
     <div class="label">
-      <strong>Assistant de configuration</strong>
-      <span class="sub">Construire pas à pas : pivot, enveloppes, objectifs d'épargne, revenus, charges</span>
+      <strong>Construire mon budget</strong>
+      <span class="sub">Quelques questions simples, et vos tirelires se créent toutes seules</span>
     </div>
     <button class="btn primary" onclick={() => app.go('wizard')}>Lancer</button>
   </div>
