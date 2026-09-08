@@ -71,7 +71,7 @@ principal.
 | `TIRELIRE_FTP_PROTOCOLE` | `ftps` | `ftps` (FTP chiffré, port 21) ou `sftp` (port 22) |
 | `TIRELIRE_FTP_VERIFIER_CERTIFICAT` | `oui` | passer à `non` seulement si le certificat du serveur FTP ne correspond pas à son nom |
 | `TIRELIRE_FTP_NETTOYER` | `non` | `oui` supprime du serveur les fichiers absents du site (les anciens fragments restent utiles aux appareils pas encore rechargés) |
-| `TIRELIRE_SITE_URL` | — | adresse publique : la CI vérifie alors le site après dépôt |
+| `TIRELIRE_SITE_URL` | `https://tirelire.sim-dev.eu` | adresse publique vérifiée après chaque dépôt ; à changer pour une autre installation |
 
 Le dossier visé (`TIRELIRE_FTP_DOSSIER`) doit être celui qu'un domaine sert vraiment. Chez
 OVHcloud, la racine FTP contient `www`, racine du domaine principal ; tout autre dossier n'est

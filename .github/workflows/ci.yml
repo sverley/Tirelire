@@ -79,7 +79,9 @@ jobs:
       PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
       VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
       NETTOYER: ${{ vars.TIRELIRE_FTP_NETTOYER || 'non' }}
-      ADRESSE_SITE: ${{ vars.TIRELIRE_SITE_URL }}
+      # Adresse publique du site, vérifiée après chaque dépôt. Une variable de dépôt
+      # TIRELIRE_SITE_URL remplace cette valeur (utile pour une autre installation).
+      ADRESSE_SITE: ${{ vars.TIRELIRE_SITE_URL || 'https://tirelire.sim-dev.eu' }}
     steps:
       - uses: actions/checkout@v4
       - name: Secrets présents ?
