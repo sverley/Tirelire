@@ -122,7 +122,29 @@ l'inférence de sélection (D26).
 
 ---
 
-## Lot 11 · Dette et branches
+## Lot 11 · Renflouer une tirelire depuis un compte ou un apport extérieur
+
+Le versement de D48 fait couler une tirelire vers le budget. Le mouvement inverse manque : remettre
+de l'argent dans une tirelire sans que ça vienne d'une dotation ordinaire.
+
+Deux cas, qui ne sont pas le même problème :
+
+- **L'argent existe déjà chez nous** et change seulement de tirelire ou de compte : vider une
+  réserve devenue inutile dans celle qui est à sec, ou puiser dans l'épargne pour couvrir une
+  échéance. C'est une réaffectation interne, à somme nulle sur le patrimoine ; le plan ne doit pas
+  la lire comme un revenu. La ventilation (D10) sait déjà décrire deux lignes de sens opposés — il
+  manque surtout le geste dans l'interface, et une trace de la raison du mouvement.
+- **L'argent vient de l'extérieur** — un cadeau, un remboursement, une vente. C'est une opération
+  réelle qui entre sur un compte et s'affecte à une tirelire. Cela fonctionne déjà par la
+  ventilation ; ce qui manque est le confort : reconnaître qu'un encaissement exceptionnel n'est pas
+  un revenu récurrent, et ne pas le laisser fausser le calibrage du Bilan ni les moyennes.
+
+À trancher au moment de le faire : est-ce qu'un renflouement est une simple opération bien ventilée
+(rien à ajouter au modèle, tout est dans l'interface et les règles), ou mérite-t-il d'être nommé pour
+que le Bilan sache l'écarter de ses moyennes. Commencer par le cas réel de Simon plutôt que par le
+modèle.
+
+## Lot 12 · Dette et branches
 
 - Décider avec Simon du sort de `feature/connecteur-banque` (Enable Banking) et des deux branches
   `etude/`. La première porte un « D18 » en collision avec celui de `main` : renuméroter à partir
