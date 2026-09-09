@@ -14,37 +14,8 @@
  * s'abstient, sauf si `TIRELIRE_NAV_STRICT` est posé — ce que fait l'intégration continue, pour
  * qu'une garde muette ne passe pas pour une garde verte.
  */
-import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { build, preview, type PreviewServer } from 'vite';
-import puppeteer, { type Browser, type Page } from 'puppeteer-core';
-
-const RACINE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-
-const EMPLACEMENTS = [
-  process.env.TIRELIRE_NAV,
-  process.env.CHROME_BIN,
-  process.env.CHROME_PATH,
-  process.env.PUPPETEER_EXECUTABLE_PATH,
-  '/usr/bin/google-chrome',
-  '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-  '/opt/google/chrome/chrome',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-];
-
-const navigateur = EMPLACEMENTS.find((c): c is string => !!c && existsSync(c));
-
-if (!navigateur && process.env.TIRELIRE_NAV_STRICT) {
-  throw new Error(
-    "Aucun Chrome ni Chromium trouvé pour les tests d'interface. Installer un navigateur ou " +
-      'indiquer son chemin dans TIRELIRE_NAV.',
-  );
-}
-if (!navigateur) console.warn("Aucun navigateur trouvé : garde de mise en page mobile non jouée.");
+import { navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from './harnais.js';
 
 /** Ce que le test mesure dans la page, exécuté dans le navigateur. */
 function mesurer() {
@@ -83,46 +54,19 @@ function mesurer() {
 }
 
 describe.skipIf(!navigateur)('mise en page mobile de l’écran Plan', () => {
-  let serveur: PreviewServer;
-  let url: string;
-  let chrome: Browser;
+  let site: Site;
 
   beforeAll(async () => {
-    // Le site est construit puis prévisualisé, et non servi par le serveur de développement :
-    // c'est le fichier réellement livré que la garde doit mesurer.
-    await build({ root: RACINE, logLevel: 'error' });
-    serveur = await preview({ root: RACINE, preview: { port: 0 }, logLevel: 'error' });
-    url = serveur.resolvedUrls?.local[0] ?? `http://localhost:${serveur.config.preview.port}/`;
-    chrome = await puppeteer.launch({
-      executablePath: navigateur!,
-      headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
-    });
-  });
+    site = await ouvrirLeSite();
+  }, 120_000);
 
   afterAll(async () => {
-    await chrome?.close();
-    await serveur?.close();
+    await site?.fermer();
   });
-
-  /** Ouvre l'application à la largeur demandée, charge l'exemple et attend que le plan soit garni. */
-  async function ouvrirLePlan(largeur: number): Promise<Page> {
-    const page = await chrome.newPage();
-    await page.setViewport({ width: largeur, height: 812, isMobile: true, hasTouch: true });
-    await page.goto(url, { waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => !document.body.textContent?.includes('Ouverture de la base'));
-    await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes("Charger l'exemple"));
-      b?.click();
-    });
-    // L'exemple porte des besoins : le titre « Tirelires » signe un plan effectivement calculé.
-    await page.waitForFunction(() => [...document.querySelectorAll('h2')].some((h) => h.textContent === 'Tirelires'));
-    return page;
-  }
 
   for (const largeur of [320, 375]) {
     it(`ne déborde pas et ne se chevauche pas à ${largeur} px`, async () => {
-      const page = await ouvrirLePlan(largeur);
+      const page = await ouvrirLExemple(site, largeur);
       const r = await page.evaluate(mesurer);
       await page.close();
 

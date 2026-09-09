@@ -144,7 +144,7 @@
           <strong>{c.name}</strong>
           {#if c.tirelireId}<span class="sub">budget {tirelireName(c.tirelireId)}</span>{/if}
         </div>
-        <div>
+        <div class="actions" style="margin:0">
           <button class="btn small" onclick={() => startEdit(c)}>Modifier</button>
           <button class="btn small danger" onclick={() => remove(c)}>Supprimer</button>
         </div>
@@ -158,7 +158,7 @@
             {sub.name}
             {#if sub.tirelireId}<span class="sub">budget {tirelireName(sub.tirelireId)}</span>{/if}
           </div>
-          <div>
+          <div class="actions" style="margin:0">
             <button class="btn small" onclick={() => startEdit(sub)}>Modifier</button>
             <button class="btn small danger" onclick={() => remove(sub)}>Supprimer</button>
           </div>

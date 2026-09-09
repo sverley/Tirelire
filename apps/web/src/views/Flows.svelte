@@ -224,7 +224,7 @@
           {#if provision}<span class="sub">{provision}</span>{/if}
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>
-        <div>
+        <div class="actions" style="margin:0">
           <button class="btn small" onclick={() => startEdit(f)}>Modifier</button>
           <button class="btn small danger" onclick={() => remove(f)}>Supprimer</button>
         </div>

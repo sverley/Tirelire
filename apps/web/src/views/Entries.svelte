@@ -198,7 +198,7 @@
         </span>
       </div>
       <div class="num {op.amount < 0 ? '' : 'pos'}">{money(op.amount)}</div>
-      <div>
+      <div class="actions" style="margin:0">
         <button class="btn small" onclick={() => startEdit(op)}>Modifier</button>
         <button class="btn small danger" onclick={() => remove(op)}>×</button>
       </div>
