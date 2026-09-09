@@ -15,7 +15,7 @@ import { exampleLedger } from '../src/example.js';
 import { computePlan } from '../src/plan.js';
 
 /**
- * D55 : l'état d'une ligne datée, et le filtre qui s'en sert. `activeAt` répondait par oui ou non,
+ * D56 : l'état d'une ligne datée, et le filtre qui s'en sert. `activeAt` répondait par oui ou non,
  * ce qui confond ce qui est fini et ce qui n'a pas commencé.
  */
 describe('état d’une ligne datée', () => {
@@ -115,7 +115,7 @@ describe('état d’une tirelire', () => {
  * L'exemple doit montrer le filtre sans qu'on saisisse quoi que ce soit : sans les trois états sur
  * les trois écrans, la fonction n'est visible nulle part au chargement.
  */
-describe('l’exemple porte les trois états (D55)', () => {
+describe('l’exemple porte les trois états (D56)', () => {
   const l = exampleLedger();
   const asOf = '2026-09-06';
   const compte = (états: ValidityState[], items: Array<{ activeFrom?: string; activeTo?: string }>) =>

@@ -41,7 +41,7 @@
   const hasPivot = $derived(accounts.some((a) => a.kind === 'principal'));
 
   // Un compte n'a pas de besoins : son état est celui de ses propres dates d'ouverture et de
-  // clôture (D55).
+  // clôture (D56).
   const états = $derived(countStates(accounts, (a) => validityState(a, app.asOf)));
   const visibles = $derived(accounts.filter((a) => stateShown(etatsVisibles, validityState(a, app.asOf))));
   const masqués = $derived(accounts.length - visibles.length);
@@ -195,7 +195,7 @@
         {#if validite}<span class="sub">{validite}</span>{/if}
         {#if retenues.length}<span class="sub">⚠ compte clos, encore désigné par : {retenues.join(', ')}</span>{/if}
       </div>
-      <div>
+      <div class="actions" style="margin:0">
         <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>
         <button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>
       </div>

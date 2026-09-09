@@ -111,7 +111,7 @@ export function validityLabel(x: { activeFrom?: string; activeTo?: string }): st
   return '';
 }
 
-/** Nom de chaque état, tel qu'il s'écrit sur son interrupteur (D55). */
+/** Nom de chaque état, tel qu'il s'écrit sur son interrupteur (D56). */
 export const STATE_LABELS: Record<ValidityState, string> = {
   active: 'En cours',
   upcoming: 'À venir',
@@ -125,7 +125,7 @@ export function validityBadge(x: { activeFrom?: string; activeTo?: string }, asO
 }
 
 /**
- * Comptes proposés dans un menu : ceux en vigueur, plus celui déjà choisi (D55). Un compte clos ne
+ * Comptes proposés dans un menu : ceux en vigueur, plus celui déjà choisi (D56). Un compte clos ne
  * doit plus recevoir de flux ni de placement neuf, mais il doit rester lisible là où il est déjà
  * désigné — sinon le menu s'ouvrirait vide sur une ligne existante et l'enregistrement suivant
  * effacerait le compte sans l'avoir dit.

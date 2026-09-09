@@ -1,5 +1,5 @@
 <!--
-  Filtre d'état des écrans de cartes (D55) : Comptes, Tirelires, Flux prévus.
+  Filtre d'état des écrans de cartes (D56) : Comptes, Tirelires, Flux prévus.
 
   Un interrupteur par état, indépendants les uns des autres : on clique pour montrer ou masquer.
   Par défaut, ce qui vit et ce qui vient sont allumés, ce qui est fini est éteint — la lecture

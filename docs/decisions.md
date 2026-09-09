@@ -874,7 +874,43 @@ son propre navigateur : il n'y en avait pas moyen dans la session où le défaut
 test s'abstient faute de navigateur, sauf si `TIRELIRE_NAV_STRICT` est posé — ce que fait la CI,
 pour qu'une garde muette ne passe pas pour une garde verte.
 
-## D55 · 2026-09-09 · Un écran de cartes se filtre par état
+## D55 · 2026-09-09 · Des seuils tactiles mesurés, pas relus
+
+Un audit d'ergonomie relit des feuilles de style et donne un avis. Ces quatre-là se mesurent, donc
+elles deviennent des gardes plutôt que des avis, dans le harnais posé par D54.
+
+**Les seuils.** Une cible tactile fait au moins 44 px de côté — Material en demande 48, Apple 44 ;
+on prend le moins-disant pour ne pas gonfler des listes déjà denses. Un bouton destructif se tient à
+12 px au moins de son voisin : le pouce qui rate « Modifier » ne doit pas supprimer. Aucun texte ne
+descend sous 12 px. Aucun texte courant ne descend sous 4,5:1 de contraste sur son fond effectif,
+3:1 pour le grand texte, comme le prévoit le critère AA de WCAG 2.1. Et un champ qu'on vient
+d'atteindre ne se retrouve pas sous une barre fixe : la garde le met au point, l'amène à l'écran
+comme le navigateur le ferait, puis demande à `elementFromPoint` ce qui occupe son centre.
+
+**Ce que les gardes ont trouvé.** Tous les boutons de liste faisaient 27 px de haut, le « × » de
+suppression 33 px de large, le chevron de retour 15 px. Le gris des sous-titres — celui qui porte
+« retenu · croisière · demandé », les dates, les libellés de compte — donnait 3,93:1 sur blanc. Les
+pastilles, les onglets et les en-têtes de tableau étaient en 11 px. Les pastilles « rattrapage » et
+« en avance » tombaient à 4,01:1 et 4,42:1 sur leur propre fond. Et deux champs du formulaire de
+tirelire, sur un écran réduit à 380 px de haut comme le fait un clavier logiciel, restaient sous la
+barre d'onglets après mise au point.
+
+**Ce qui change.** `--muted` passe à `#5f6b65` (5,6:1), `--warn` à `#9e4722`, `--good` à `#2c7549`.
+`.btn` reçoit 44 px de côté minimum, `.btn.small` le garde en restant plus étroit et plus petit de
+texte. Les pastilles, onglets et en-têtes passent en 12 px. Les groupes de boutons de fin de ligne
+prennent la classe `.actions`, dont l'écart passe de 8 à 12 px. `html` reçoit un
+`scroll-padding` haut et bas, pour que tout défilement programmé — mise au point d'un champ,
+ouverture d'un panneau d'édition — dépose sa cible entre les deux barres et non dessous ; le bas de
+page leur réserve 76 px au lieu de 64.
+
+**Ce que ces gardes ne mesurent pas**, faute de pouvoir le faire dans un navigateur de bureau : les
+marges du bord à bord Android, le vrai clavier logiciel, le rendu des polices système, le sélecteur
+de fichier. Cela reste à vérifier sur l'appareil.
+
+La plomberie commune — trouver un navigateur, construire et servir le site, ouvrir l'exemple — passe
+dans `apps/web/test/harnais.ts`, dont la garde de D54 se sert désormais aussi.
+
+## D56 · 2026-09-09 · Un écran de cartes se filtre par état
 
 Trois écrans de Configuration listent des cartes : Comptes, Tirelires, Flux prévus. Depuis D50 et
 D51, ces listes portent des lignes qui ne concernent pas le jour même — la version close d'un budget

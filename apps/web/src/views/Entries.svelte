@@ -31,7 +31,7 @@
   );
   const allocByOp = $derived(new Map(alive(app.ledger.allocations).map((a) => [a.operationId, a])));
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
-  /** Une saisie neuve ne vise pas un compte clos (D55) ; celui déjà choisi reste offert. */
+  /** Une saisie neuve ne vise pas un compte clos (D56) ; celui déjà choisi reste offert. */
   const comptesSaisie = $derived(openAccounts(accounts, app.asOf, form.accountId));
   const comptesContrepartie = $derived(openAccounts(accounts, app.asOf, form.transferAccountId).filter((a) => a.id !== form.accountId));
   const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
@@ -201,7 +201,7 @@
         </span>
       </div>
       <div class="num {op.amount < 0 ? '' : 'pos'}">{money(op.amount)}</div>
-      <div>
+      <div class="actions" style="margin:0">
         <button class="btn small" onclick={() => startEdit(op)}>Modifier</button>
         <button class="btn small danger" onclick={() => remove(op)}>×</button>
       </div>

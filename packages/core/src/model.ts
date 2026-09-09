@@ -90,7 +90,7 @@ export interface Account {
   /** Sens autorisé des virements de règlement. */
   settlementDirection?: SettlementDirection;
   /**
-   * Ouverture et clôture réelles du compte (D55), les mêmes deux dates que les flux (D23) et les
+   * Ouverture et clôture réelles du compte (D56), les mêmes deux dates que les flux (D23) et les
    * besoins (D50), lues par le même `activeAt`. À ne pas confondre avec `openingDate`, qui date le
    * solde initial : on peut commencer à suivre un compte ouvert depuis dix ans.
    *
@@ -194,7 +194,7 @@ export function needActive(n: Need, date: ISODate): boolean {
 
 /**
  * Une entité est-elle en vigueur à cette date ? Bornes incluses. Besoins (D50), flux (D23, D24) et
- * comptes (D55) portent les mêmes deux dates et la même règle : les lire au même endroit évite
+ * comptes (D56) portent les mêmes deux dates et la même règle : les lire au même endroit évite
  * qu'elles divergent.
  * Le plan, lui, raisonne par période (`isActive`) et non par date : une occurrence peut tomber dans
  * une période sans que le flux soit en vigueur toute la période.
@@ -204,7 +204,7 @@ export function activeAt(x: { activeFrom?: ISODate; activeTo?: ISODate }, date: 
 }
 
 /**
- * État d'une ligne datée à une date donnée (D55). `activeAt` répondait par oui ou non, ce qui
+ * État d'une ligne datée à une date donnée (D56). `activeAt` répondait par oui ou non, ce qui
  * suffit au calcul mais pas à l'affichage : « non » recouvre deux situations opposées, ce qui est
  * fini et ce qui n'a pas commencé. Les distinguer une fois ici évite que chaque écran refasse la
  * comparaison de dates à sa façon.
@@ -221,7 +221,7 @@ export function validityState(x: { activeFrom?: ISODate; activeTo?: ISODate }, d
 export const VALIDITY_STATES: readonly ValidityState[] = ['active', 'upcoming', 'closed'] as const;
 
 /**
- * Visibilité par état (D55) : un interrupteur par état, indépendants les uns des autres. Un choix
+ * Visibilité par état (D56) : un interrupteur par état, indépendants les uns des autres. Un choix
  * unique aurait obligé à passer par « tout » pour voir deux états sur trois, alors que la lecture
  * courante en demande justement deux — ce qui vit et ce qui vient.
  */

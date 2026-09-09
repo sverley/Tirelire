@@ -5,7 +5,7 @@
 ```
 Tirelire/
 ├── packages/core/          cœur TypeScript pur (aucune dépendance à l'interface)
-│   ├── src/model.ts        types du modèle, Ledger en mémoire, alive(), états de validité (D55)
+│   ├── src/model.ts        types du modèle, Ledger en mémoire, alive(), états de validité (D56)
 │   ├── src/dates.ts        dates civiles AAAA-MM-JJ sans fuseau
 │   ├── src/periods.ts      périodes de paie, périodicités
 │   ├── src/money.ts        centimes : parsing et formatage français
@@ -28,7 +28,7 @@ Tirelire/
 │   ├── src/lib/db.ts       ouverture du dépôt, persistance IndexedDB
 │   ├── src/lib/state.svelte.ts  état réactif (ledger, asOf, plan dérivé, vue)
 │   ├── src/lib/platform.ts     navigateur vs Android (enregistrer / partager un fichier)
-│   ├── src/lib/FiltreEtat.svelte  interrupteurs de visibilité par état des écrans de cartes (D55)
+│   ├── src/lib/FiltreEtat.svelte  interrupteurs de visibilité par état des écrans de cartes (D56)
 │   ├── src/views/*.svelte  Plan, Operations, Import, Review, More, Accounts, Tirelires, Flows, Entries, Settings
 │   └── android/            projet Capacitor (icônes, signature, versions par variables d'environnement)
 ├── apps/relay/             relais HTTP minimal (Node), paquets chiffrés
@@ -41,7 +41,7 @@ Tirelire/
 
 | Objet | Rôle | Identité |
 |---|---|---|
-| `Account` | compte réel : `principal`, `holding` (accueil), `third` (tiers, saisi à la main) ; ouverture et clôture datées (D55) | UUID v7 |
+| `Account` | compte réel : `principal`, `holding` (accueil), `third` (tiers, saisi à la main) ; ouverture et clôture datées (D56) | UUID v7 |
 | `Tirelire` | pot à solde unique, réparti sur les comptes ; déclare un placement voulu | UUID v7 |
 | `Need` | besoin porté par une tirelire : `recurring`, `dueDate`, `goal` ; priorité | UUID v7 |
 | `Category` | classement des dépenses / revenus ; peut consommer un budget | UUID v7 |
@@ -114,6 +114,7 @@ WebRTC, relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/heberg
 
 - `pnpm test` : 174 tests vitest sur le cœur (périodes, plan, positions et invariants, besoins,
   report, états et filtre, dépôt, migrations, fusion, import, rapprochement, règles, ventilation à parts,
-  bilan, sync), plus deux gardes de navigateur (mise en page mobile, filtre d'état).
+  bilan, sync), plus trois gardes de navigateur sur le harnais commun `apps/web/test/harnais.ts`
+  (mise en page mobile, ergonomie au doigt, filtre d'état).
 - `pnpm typecheck`, `pnpm build`.
 - Scénarios navigateur joués avec Playwright pendant le développement (exemple → import CSV → tri → bilan ; synchronisation WebRTC et relais entre deux contextes).

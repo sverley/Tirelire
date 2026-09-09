@@ -56,7 +56,7 @@
       .map((k) => ({ kind: k, flows: visibles.filter((f) => f.kind === k).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)) }))
       .filter((g) => g.flows.length > 0),
   );
-  /** Comptes offerts aux menus : les vivants, plus celui que la ligne désigne déjà (D55). */
+  /** Comptes offerts aux menus : les vivants, plus celui que la ligne désigne déjà (D56). */
   const comptesChoisis = $derived(openAccounts(accounts, app.asOf, form.accountId));
   const comptesContrepartie = $derived(openAccounts(accounts, app.asOf, form.counterpartAccountId).filter((a) => a.id !== form.accountId));
 
@@ -249,7 +249,7 @@
           {#if provision}<span class="sub">{provision}</span>{/if}
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>
-        <div>
+        <div class="actions" style="margin:0">
           <button class="btn small" onclick={() => startEdit(f)}>Modifier</button>
           <button class="btn small danger" onclick={() => remove(f)}>Supprimer</button>
         </div>

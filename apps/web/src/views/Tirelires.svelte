@@ -68,7 +68,7 @@
       .filter((n) => n.tirelireId === e.id)
       .sort((a, b) => rangValidite(a) - rangValidite(b) || a.priority - b.priority || (a.activeFrom ?? '').localeCompare(b.activeFrom ?? ''));
 
-  // Filtre d'état (D55). Une tirelire n'a pas de dates : elle est retenue si son propre état est
+  // Filtre d'état (D56). Une tirelire n'a pas de dates : elle est retenue si son propre état est
   // allumé, ou si l'un de ses besoins l'est — sans cette seconde branche, allumer « Clos » ne
   // montrerait rien, puisque le budget clos d'hier vit sur une tirelire bien en vigueur.
   let etatsVisibles = $state<StateVisibility>({ ...DEFAULT_VISIBILITY });
@@ -100,7 +100,7 @@
   const orphans = $derived(
     tirelires.filter((e) => (e.placement.length === 0 || !accounts.some((a) => a.id === e.placement[0]?.accountId)) && visible(e)),
   );
-  /** Comptes offerts au placement : les vivants, plus ceux que la tirelire désigne déjà (D55). */
+  /** Comptes offerts au placement : les vivants, plus ceux que la tirelire désigne déjà (D56). */
   const comptesPlacement = $derived(openAccounts(accounts, app.asOf, ...form.placement.map((p) => p.accountId)));
 
   function placementText(e: Tirelire): string {

@@ -400,7 +400,7 @@ export function tirelireBalance(e: Tirelire, idx: LedgerIndex, asOf: ISODate): C
 }
 
 /**
- * État d'une tirelire (D55). Elle ne porte pas de dates : ce sont ses besoins qui en ont (D50), et
+ * État d'une tirelire (D56). Elle ne porte pas de dates : ce sont ses besoins qui en ont (D50), et
  * son état se lit sur eux — en vigueur dès qu'un seul l'est, à venir si tous attendent, close si
  * tous sont finis.
  *
