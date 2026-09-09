@@ -1,7 +1,8 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
-  import { computePlan, periodsAround, missingFlows, addDays, alive, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
+  import { computePlan, periodsAround, missingFlows, addDays, type Period, type PlanTransfer } from '@tirelire/core';
+  import { fluxDuVirement, virementPermanent } from '../lib/virements';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -33,17 +34,15 @@
   // Écarts qui n'impliquent pas le compte principal : ils ne sont dans aucun virement principal ↔ compte.
   const principalId = $derived(app.ledger.accounts.find((a) => a.kind === 'principal' && !a.deletedAt)?.id);
   const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== principalId && g.toAccountId !== principalId));
-  const transferFlows = $derived(alive(app.ledger.plannedFlows).filter((f) => f.kind === 'transfer'));
-  const flowFor = (t: PlanTransfer) => transferFlows.find((f) => f.counterpartAccountId === t.accountId);
+  const flowFor = (t: PlanTransfer) => fluxDuVirement(app.ledger, t);
 
   /**
    * Enregistre le virement permanent comme flux attendu (D21) : à l'import, la ligne bancaire sera
    * reconnue par montant et libellé, et sa ventilation proposée.
    */
   function saveStandingOrder(t: PlanTransfer) {
-    if (!principalId) return;
     const existing = flowFor(t);
-    const flow = standingTransferFlow(plan, t, principalId, existing?.id ?? app.newId());
+    const flow = virementPermanent(app.ledger, plan, t, app.newId());
     if (!flow) return;
     if (!confirm(`${existing ? 'Mettre à jour' : 'Enregistrer'} le virement permanent vers « ${t.accountName} » (${money(t.standing)}) ?`)) return;
     app.upsert('plannedFlows', flow);

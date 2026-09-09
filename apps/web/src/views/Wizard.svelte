@@ -29,9 +29,11 @@
     type Tirelire,
     type Need,
     type PlannedFlow,
+    type PlanTransfer,
   } from '@tirelire/core';
+  import { fluxDuVirement, virementPermanent } from '../lib/virements';
 
-  type Step = 'intro' | 'income' | 'fixed' | 'everyday' | 'periodic' | 'savings' | 'accounts' | 'summary';
+  type Step = 'intro' | 'income' | 'fixed' | 'everyday' | 'periodic' | 'savings' | 'accounts' | 'summary' | 'orders';
 
   const STEPS: Array<{ id: Step; label: string }> = [
     { id: 'intro', label: 'Le principe' },
@@ -42,6 +44,7 @@
     { id: 'periodic', label: 'Pas tous les mois' },
     { id: 'savings', label: 'Épargne' },
     { id: 'summary', label: 'Résumé' },
+    { id: 'orders', label: 'Ordres permanents' },
   ];
 
   let step = $state<Step>('intro');
@@ -450,6 +453,51 @@
     if (c === undefined || c === a.openingBalance) return;
     app.upsert('accounts', { ...a, openingBalance: c });
   }
+
+  /*
+   * Dernière étape : ce qu'il faut aller faire à la banque (D58).
+   *
+   * Rien ne se saisit ici. Le plan a déjà rassemblé les écarts de placement allant dans le même
+   * sens entre deux comptes en un ordre permanent par couple de comptes (D21) ; l'étape ne fait que
+   * les montrer, avec le libellé exact et le geste qui enregistre le virement attendu.
+   */
+  /** Une réserve au moins dit où son argent doit dormir : sans cela, aucun écart, donc aucun ordre. */
+  const placementsDeclares = $derived(tirelires.some((e) => e.placement.length > 0));
+  /** Ordres à mettre en place : ceux qui ont une part permanente. */
+  const ordres = $derived(app.plan.transfers.filter((t) => t.standing > 0));
+  /** Virements sans part permanente : un règlement, un rapatriement — à faire une fois, pas un ordre. */
+  const ponctuels = $derived(app.plan.transfers.filter((t) => t.standing <= 0 && t.net !== 0));
+
+  /**
+   * Le libellé dans le presse-papiers : c'est lui, recopié à l'identique chez la banque, qui
+   * permettra de reconnaître le virement à l'import. Sans presse-papiers — contexte non sécurisé,
+   * navigateur ancien — on sélectionne le texte, qui reste copiable à la main.
+   */
+  let copié = $state<string | undefined>(undefined);
+  async function copierLibelle(t: PlanTransfer) {
+    try {
+      await navigator.clipboard.writeText(t.label);
+      copié = t.accountId;
+      setTimeout(() => {
+        if (copié === t.accountId) copié = undefined;
+      }, 3000);
+    } catch {
+      const el = document.getElementById(`libelle-${t.accountId}`);
+      if (!el) return;
+      const plage = document.createRange();
+      plage.selectNodeContents(el);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(plage);
+    }
+  }
+
+  /** Enregistre (ou remet à jour) le virement attendu. Jamais d'office : c'est l'appui qui décide. */
+  function enregistrerVirement(t: PlanTransfer) {
+    const flux = virementPermanent(app.ledger, app.plan, t, app.newId());
+    if (flux) app.upsert('plannedFlows', flux);
+  }
+  const dejaEnregistre = (t: PlanTransfer) => fluxDuVirement(app.ledger, t) !== undefined;
 
   function removeFlow(f: PlannedFlow) {
     app.remove('plannedFlows', f.id);
@@ -876,6 +924,123 @@
     {/each}
   {/if}
 
+{:else if step === 'orders'}
+  <h2>Vos ordres permanents</h2>
+  <p class="muted small">
+    Un virement groupé ne se saisit pas : il se calcule. Vous avez seulement dit où l'argent de chaque
+    réserve doit dormir ; Tirelire rassemble tout ce qui part dans le même sens vers un même compte en
+    <strong>un seul ordre permanent</strong>, à poser une fois chez votre banque.
+  </p>
+
+  {#if otherAccounts.length === 0}
+    <div class="empty">
+      Toutes vos réserves dorment sur le compte principal : rien à virer, rien à mettre en place.
+      L'argent ne bouge pas — le plan dit seulement quelle part est déjà réservée.
+    </div>
+    <div class="actions">
+      <button class="btn" onclick={() => goStep('accounts')}>Ajouter un compte d'épargne</button>
+    </div>
+  {:else if !placementsDeclares}
+    <div class="empty">
+      Aucune réserve ne dit encore sur quel compte son argent doit dormir : sans cela, il n'y a aucun
+      écart à combler, donc aucun ordre à poser.
+    </div>
+    <div class="actions">
+      <button class="btn" onclick={() => goStep('summary')}>Dire où doit dormir chaque réserve</button>
+    </div>
+  {:else if ordres.length === 0}
+    <div class="empty">
+      Vos réserves sont déjà là où elles doivent être : aucun ordre permanent à poser pour l'instant.
+      Le Plan vous le dira dès qu'un écart apparaîtra.
+    </div>
+  {:else}
+    {#each ordres as t (t.accountId)}
+      <div class="card">
+        <div class="row">
+          <div class="label">
+            <strong>Vers {t.accountName}</strong>
+            <span class="sub">{ACCOUNT_KINDS[t.accountKind]} · chaque mois, depuis le compte principal</span>
+          </div>
+          <div class="num" style="font-size:19px">{money(t.standing)}</div>
+        </div>
+
+        <div class="libelle">
+          <div class="txt">
+            <span class="eyebrow">Libellé à recopier</span>
+            <code id="libelle-{t.accountId}">{t.label}</code>
+          </div>
+          <button class="btn small" onclick={() => copierLibelle(t)}>{copié === t.accountId ? 'Copié' : 'Copier'}</button>
+        </div>
+        <p class="muted small" style="margin:6px 0 0">
+          Trente-cinq caractères au plus : c'est ce qu'un libellé bancaire accepte, et celui-ci est déjà
+          taillé à cette mesure. Recopié à l'identique, il suffira à reconnaître le virement à l'import.
+        </p>
+
+        <div class="orders">
+          {#each t.orders.filter((o) => o.standing > 0) as o (o.tirelireId)}
+            <div class="row"><div class="label">{o.tirelireName}</div><div class="num">{money(o.standing)}</div></div>
+          {/each}
+          <div class="row total"><div class="label">Montant de l'ordre permanent</div><div class="num">{money(t.standing)}</div></div>
+        </div>
+
+        {#if t.exceptional > 0 || t.surplus > 0}
+          <div class="orders">
+            {#if t.exceptional > 0}
+              <div class="row">
+                <div class="label">Rattrapage, cette fois seulement<span class="sub">à virer en plus, hors permanent</span></div>
+                <div class="num">{money(t.exceptional)}</div>
+              </div>
+            {/if}
+            {#if t.surplus > 0}
+              <div class="row">
+                <div class="label">Non affecté sur ce compte<span class="sub">à rapatrier quand vous voudrez</span></div>
+                <div class="num">← {money(t.surplus)}</div>
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        <div class="actions" style="margin:10px 0 0">
+          <button class="btn primary" onclick={() => enregistrerVirement(t)}>
+            {dejaEnregistre(t) ? 'Mettre à jour le virement attendu' : 'Enregistrer ce virement attendu'}
+          </button>
+        </div>
+        {#if dejaEnregistre(t)}
+          <p class="muted small" style="margin:6px 0 0">Enregistré : Tirelire attend maintenant cette ligne sur votre relevé.</p>
+        {/if}
+      </div>
+    {/each}
+
+    <div class="card accent">
+      <h3 style="margin-top:0">Ce que ce bouton enregistre</h3>
+      <p class="small" style="margin:0">
+        Le virement attendu, avec sa ventilation. À l'import de votre relevé, la ligne est reconnue par
+        son libellé et son montant, et la ventilation prévue s'applique si le montant correspond. Sinon
+        la répartition rejoue l'ordre de financement — les rattrapages d'abord, puis les priorités —, et
+        ce qui n'a pas pu être servi se represente au plan suivant.
+      </p>
+      <p class="muted small" style="margin:8px 0 0">
+        Rien ne s'enregistre tout seul : si vous préférez gérer vos virements à la main, laissez ces
+        boutons tranquilles, le plan continuera de vous dire quoi virer.
+      </p>
+    </div>
+  {/if}
+
+  {#if ponctuels.length}
+    <h3>Une fois, pas en permanent</h3>
+    <div class="card">
+      {#each ponctuels as t (t.accountId)}
+        <div class="row">
+          <div class="label">
+            {t.accountName}
+            <span class="sub">{t.settlement !== 0 ? 'règlement avec ce compte' : t.surplus > 0 ? 'argent non affecté à rapatrier' : 'écart à combler une fois'}</span>
+          </div>
+          <div class="num">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+
   <h3>Et maintenant</h3>
   <p class="muted small">
     Le Plan détaille période par période ce qu'il faut mettre de côté et les virements à faire.
@@ -890,9 +1055,9 @@
   </div>
 {/if}
 
-{#if step !== 'summary'}
+{#if step !== 'orders'}
   <div class="actions">
     {#if stepIndex > 0}<button class="btn" onclick={prev}>‹ Précédent</button>{/if}
-    <button class="btn primary" onclick={next}>{step === 'intro' ? 'Commencer' : 'Suivant'} ›</button>
+    <button class="btn primary" onclick={next}>{step === 'intro' ? 'Commencer' : step === 'summary' ? 'Mes virements' : 'Suivant'} ›</button>
   </div>
 {/if}

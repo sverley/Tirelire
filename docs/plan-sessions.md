@@ -100,6 +100,12 @@ besoins ; les dates de validité s'exposent dans les écrans Tirelires et Flux, 
 parts d'une ventilation dans la liste des opérations, une tirelire au placement réparti sur deux
 comptes (D38) et deux ou trois automatismes dans l'exemple.
 
+**Avancement (9 septembre, D58)** : l'assistant ne s'arrête plus sur le résumé du budget. Une
+dernière étape, « Vos ordres permanents », montre par compte cible le montant permanent, le libellé
+exact à recopier chez la banque, le détail des tirelires servies et le bouton qui enregistre le
+virement attendu — et explique qu'un virement groupé se calcule à partir des placements voulus au
+lieu de se saisir.
+
 ---
 
 ## Lot 9 · Tests d'interface dans la CI — **harnais posé le 8 septembre (D54), gardes tactiles le 9 (D55)**
