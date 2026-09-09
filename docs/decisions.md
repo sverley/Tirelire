@@ -909,3 +909,82 @@ de fichier. Cela reste à vérifier sur l'appareil.
 
 La plomberie commune — trouver un navigateur, construire et servir le site, ouvrir l'exemple — passe
 dans `apps/web/test/harnais.ts`, dont la garde de D54 se sert désormais aussi.
+
+## D56 · 2026-09-09 · Un écran de cartes se filtre par état
+
+Trois écrans de Configuration listent des cartes : Comptes, Tirelires, Flux prévus. Depuis D50 et
+D51, ces listes portent des lignes qui ne concernent pas le jour même — la version close d'un budget
+révisé, son successeur daté, un crédit qui s'arrête en décembre, un besoin qui apparaît en novembre.
+Elles se lisent en retrait, avec une pastille, mais elles occupent la place, et sur un téléphone la
+place est ce qui manque : neuf tirelires portant chacune deux ou trois besoins font défiler
+longtemps pour retrouver le budget d'aujourd'hui. Une liste qui grandit avec l'histoire du foyer ne
+peut pas rester une liste qu'on parcourt en entier.
+
+**L'état se calcule une fois, dans le cœur.** `activeAt` répondait par oui ou par non, ce qui suffit
+au plan mais pas à l'affichage : « non » recouvre deux situations opposées, ce qui est fini et ce qui
+n'a pas commencé. `validityState` rend donc `closed`, `active` ou `upcoming`, et `activeAt` s'écrit
+sur elle. `stateShown` et `countStates` complètent le nécessaire du filtre. La pastille de D51
+n'est plus un second calcul de dates dans l'interface : elle nomme l'état que le cœur a donné.
+
+**Les comptes reçoivent les deux mêmes dates que les flux et les besoins.** Sans elles, le filtre
+n'aurait rien à lire sur cet écran, et l'issue demandait les trois. Elles répondent surtout à un
+geste réel que le modèle ne savait pas rendre : fermer un livret. La seule manière de le faire
+sortir des listes était de le supprimer, ce qui emporte aussi son passé — or ses opérations tiennent
+les soldes et les bilans des périodes où il vivait. Clore n'est pas supprimer : un compte clos garde
+tout, il quitte seulement les listes et les menus du jour. `activeFrom` / `activeTo` ne se
+confondent pas avec `openingDate`, qui date le solde initial : on commence souvent à suivre un
+compte ouvert depuis dix ans.
+
+**Une tirelire n'a pas de dates ; son état se lit sur ses besoins** (`tirelireValidityState`) : en
+vigueur dès qu'un seul l'est, à venir si tous attendent, close si tous sont finis. Deux réserves,
+qui toutes deux protègent contre l'oubli d'argent. Une tirelire au solde non nul reste en vigueur
+quels que soient ses besoins — le dernier besoin s'éteint souvent avant que le pot soit vidé, et la
+ranger dans les closes ferait disparaître de l'écran de l'argent qui existe. Une tirelire sans aucun
+besoin reste en vigueur aussi : elle ne demande rien au plan, l'écran le dit déjà, mais rien ne
+permet de la dire terminée.
+
+**Un interrupteur par état, pas un choix unique, et le fini part rangé.** La lecture courante
+demande deux états sur trois — ce qui vit et ce qui vient — qu'un choix exclusif aurait obligé à
+atteindre par un « tout » ramenant aussi le passé. Chaque état a donc son bouton, indépendant des
+autres : `active` et `upcoming` allumés au départ, `closed` éteint.
+
+Masquer par défaut demandait de lever l'objection qui avait d'abord fait choisir « tout » : un écran
+qui cache sans le dire se lit comme un écran cassé, et D51 venait justement de rendre lisible la
+version close d'un budget révisé. La forme retenue y répond mieux qu'un défaut prudent — le bouton
+d'un état masqué **reste affiché, éteint, avec son compte**. « Clos 1 » se voit, dit qu'une ligne est
+rangée, et se rallume d'un doigt ; un menu déroulant sur « Tout » ne montrait rien de tel. La barre
+apparaît donc dès qu'elle sert : plusieurs états représentés, ou un état représenté qui est masqué.
+Sur un budget qui n'a rien de clos ni d'à venir, elle n'occupe aucune hauteur. Un état sans aucune
+ligne n'a pas de bouton, et quand tout se trouve masqué la liste le dit et compte ce qu'elle range.
+
+Les interrupteurs sont **propres à chaque écran** : ni réglage partagé, ni mémoire d'une visite à
+l'autre. Comptes, Tirelires et Flux ne se lisent pas dans le même but, et un réglage global aurait
+imposé à l'un ce que l'autre venait de demander.
+
+Sur l'écran Tirelires, le filtre agit aux deux niveaux : une tirelire est retenue si son propre état
+est allumé **ou** si l'un de ses besoins l'est, et seuls les besoins allumés s'affichent. Sans la
+seconde branche, allumer « Clos » ne montrerait rien — le budget clos d'hier vit sur une tirelire
+bien en vigueur. Quand le filtre vide une carte de ses besoins, la ligne le dit et compte ceux qu'il
+range.
+
+**Ce que la clôture d'un compte ne fait pas.** Le plan continue de calculer les écarts de placement
+à partir des placements déclarés : il n'a pas appris à lire les dates d'un compte, et une tirelire
+qui vise un compte clos produira donc encore un virement. Ajouter cette lecture au plan demanderait
+de décider ce que devient l'argent qui y dort, ce qui est une autre décision. En attendant, deux
+garde-fous d'interface : les menus ne proposent plus un compte clos — en gardant celui qu'une ligne
+existante désigne déjà, sans quoi le menu s'ouvrirait vide et l'enregistrement suivant effacerait le
+compte sans le dire — et la carte d'un compte clos affiche ce qui le retient encore : « compte clos,
+encore désigné par : Vacances, Assurance habitation ».
+
+**L'exemple porte le cas**, comme D51 l'a fait pour les dates de validité : un « Livret jeune »
+clos le 30 juin, vidé, jamais désigné, donc sans un centime d'effet sur le plan — un test le
+vérifie. Sans lui, l'écran Comptes de l'exemple n'aurait montré aucun filtre, et la fonction serait
+restée invisible au chargement.
+
+**Gardes.** `packages/core/test/etats.test.ts` fige les trois états et leurs bornes, les deux
+réserves de l'état d'une tirelire, et le fait que l'exemple porte les trois états sur les trois
+écrans. `apps/web/test/filtre-etat.test.ts` charge l'exemple dans un vrai navigateur à 375 px, va
+sur chacun des trois écrans et vérifie l'état de départ des interrupteurs, que le clos part rangé
+sans que son bouton disparaisse, et que chaque interrupteur montre ou masque ce qu'il annonce sans
+toucher aux autres — même harnais que la garde de mise en page (D54), et même abstention faute de
+Chrome, sauf en intégration continue.

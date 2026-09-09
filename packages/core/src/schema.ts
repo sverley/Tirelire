@@ -61,6 +61,8 @@ export const TABLES: Record<string, TableDef> = {
       c('tracksSettlement', 'boolean'),
       c('settlementThreshold', 'integer'),
       c('settlementDirection'),
+      c('activeFrom'), // D56
+      c('activeTo'),
       c('deletedAt'),
     ],
   },

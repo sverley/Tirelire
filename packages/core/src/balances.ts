@@ -13,9 +13,9 @@
  * Deux invariants : la somme des composantes d'une tirelire fait son solde ; pour un compte,
  * la somme des composantes qu'il porte plus son non affecté fait son solde bancaire.
  */
-import type { Account, Allocation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation } from './model.js';
+import type { Account, Allocation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation, ValidityState } from './model.js';
 import {
-  monthsOf, alive, needActive } from './model.js';
+  monthsOf, alive, needActive, validityState } from './model.js';
 import { nextOccurrence, budgetPeriodContaining, periodsUntil, nextPeriod, type Period } from './periods.js';
 import { divideCents } from './money.js';
 import { addDays } from './dates.js';
@@ -397,6 +397,27 @@ export function tirelireBalance(e: Tirelire, idx: LedgerIndex, asOf: ISODate): C
   let s = 0;
   for (const v of tirelireComponents(e, idx, asOf).values()) s += v;
   return s;
+}
+
+/**
+ * État d'une tirelire (D56). Elle ne porte pas de dates : ce sont ses besoins qui en ont (D50), et
+ * son état se lit sur eux — en vigueur dès qu'un seul l'est, à venir si tous attendent, close si
+ * tous sont finis.
+ *
+ * Deux réserves, qui toutes deux protègent contre l'oubli d'argent :
+ *  - une tirelire qui porte encore un solde reste en vigueur, quels que soient ses besoins. Le
+ *    dernier besoin d'une tirelire s'éteint souvent avant qu'elle soit vidée ; la ranger dans les
+ *    closes ferait disparaître de l'écran de l'argent qui existe.
+ *  - une tirelire sans aucun besoin est en vigueur : elle ne demande rien au plan (l'écran le dit
+ *    déjà), mais rien ne permet de la dire terminée.
+ */
+export function tirelireValidityState(e: Tirelire, idx: LedgerIndex, asOf: ISODate): ValidityState {
+  if (tirelireBalance(e, idx, asOf) !== 0) return 'active';
+  const needs = idx.needsByTirelire.get(e.id) ?? [];
+  if (needs.length === 0) return 'active';
+  const states = needs.map((n) => validityState(n, asOf));
+  if (states.includes('active')) return 'active';
+  return states.includes('upcoming') ? 'upcoming' : 'closed';
 }
 
 /**

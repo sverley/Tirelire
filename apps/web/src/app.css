@@ -99,6 +99,7 @@ main { max-width: 860px; margin: 0 auto; padding: 16px; }
 .pill.ahead { background: var(--surface-2); color: var(--good); }
 /* Ligne datée hors de sa période de validité (D50) : lisible, mais visiblement en retrait. */
 .row.dormant { opacity: 0.55; }
+.card.dormant { opacity: 0.7; }
 .pill.dim { background: transparent; border: 1px dashed var(--line-strong); color: var(--muted); }
 
 .btn { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; min-height: 44px; min-width: 44px; }
@@ -138,6 +139,15 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .wstep.done { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-soft); }
 .wstep.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .wstep:disabled { opacity: 0.4; cursor: default; }
+
+/* Filtre d'état des écrans de cartes (D56). Il se replie sur plusieurs lignes plutôt que de
+   déborder : sur un téléphone étroit, trois interrupteurs ne tiennent pas toujours côte à côte.
+   Éteint, un bouton prend le pointillé des lignes dormantes : ce qu'il porte est masqué. */
+.filtres { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 12px; }
+.filtre { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--line-strong); background: var(--surface); border-radius: 999px; padding: 5px 14px; font-size: 13px; font-family: inherit; color: var(--ink-2); cursor: pointer; min-height: 44px; min-width: 44px; }
+.filtre .n { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.filtre.actif { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); font-weight: 600; }
+.filtre.actif .n { color: var(--accent-ink); }
 
 .warnings { display: grid; gap: 6px; margin-bottom: 12px; }
 .warnings div { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 14px; }

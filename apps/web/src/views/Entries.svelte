@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
-  import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
+  import { money, shortDate, centsToInput, inputToCents, openAccounts } from '../lib/format';
   import { alive, normalizeLabel, findCategoryByName, type Allocation, type Category, type Operation } from '@tirelire/core';
 
   type Nature = 'expense' | 'income' | 'transfer';
@@ -31,6 +31,9 @@
   );
   const allocByOp = $derived(new Map(alive(app.ledger.allocations).map((a) => [a.operationId, a])));
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
+  /** Une saisie neuve ne vise pas un compte clos (D56) ; celui déjà choisi reste offert. */
+  const comptesSaisie = $derived(openAccounts(accounts, app.asOf, form.accountId));
+  const comptesContrepartie = $derived(openAccounts(accounts, app.asOf, form.transferAccountId).filter((a) => a.id !== form.accountId));
   const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
 
@@ -136,7 +139,7 @@
     <div class="grid">
       <label class="f">Compte
         <select bind:value={form.accountId}>
-          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+          {#each comptesSaisie as a}<option value={a.id}>{a.name}</option>{/each}
         </select>
       </label>
       <label class="f">Nature
@@ -153,7 +156,7 @@
         <label class="f">Vers le compte
           <select bind:value={form.transferAccountId}>
             <option value="">—</option>
-            {#each accounts.filter((a) => a.id !== form.accountId) as a}<option value={a.id}>{a.name}</option>{/each}
+            {#each comptesContrepartie as a}<option value={a.id}>{a.name}</option>{/each}
           </select>
         </label>
       {/if}
