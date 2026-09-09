@@ -1,39 +1,39 @@
 <!--
   Filtre d'état des écrans de cartes (D55) : Comptes, Tirelires, Flux prévus.
 
-  Il ne s'affiche que s'il sert à quelque chose — c'est-à-dire dès que deux états au moins sont
-  représentés. Sur un budget qui n'a rien de clos ni d'à venir, il n'y a rien à trier et la barre
-  n'occupe pas la hauteur d'écran d'un téléphone.
+  Un interrupteur par état, indépendants les uns des autres : on clique pour montrer ou masquer.
+  Par défaut, ce qui vit et ce qui vient sont allumés, ce qui est fini est éteint — la lecture
+  courante est celle du budget d'aujourd'hui, pas celle de son histoire.
 
-  Chaque choix porte son compte, et un choix vide ne s'affiche pas : le filtre annonce ainsi ce
-  qu'il cache, au lieu de laisser croire à un écran qui a perdu ses lignes.
+  Le bouton d'un état masqué reste affiché, éteint, avec son compte : ce que le filtre cache se
+  voit et se rallume d'un doigt. La barre n'apparaît que si elle sert à quelque chose — plusieurs
+  états représentés, ou un état représenté qui est masqué. Sur un budget qui n'a rien de clos ni
+  d'à venir, elle n'occupe aucune hauteur d'écran.
 -->
 <script lang="ts">
-  import { STATE_FILTER_LABELS } from './format';
-  import { STATE_FILTERS, type StateFilter } from '@tirelire/core';
+  import { STATE_LABELS } from './format';
+  import { VALIDITY_STATES, type StateVisibility, type ValidityState } from '@tirelire/core';
 
   let {
     value = $bindable(),
     counts,
     quoi,
-  }: { value: StateFilter; counts: Record<StateFilter, number>; quoi: string } = $props();
+  }: { value: StateVisibility; counts: Record<ValidityState, number>; quoi: string } = $props();
 
-  const états = $derived(STATE_FILTERS.filter((f) => f !== 'all' && counts[f] > 0));
-  const utile = $derived(états.length > 1);
-  const choix = $derived(STATE_FILTERS.filter((f) => f === 'all' || counts[f] > 0 || f === value));
-
-  // Un filtre qui ne garde plus rien (le dernier besoin clos vient d'être supprimé) revient à tout
-  // montrer de lui-même : mieux vaut un écran garni qu'un écran vide sans explication.
-  $effect(() => {
-    if (value !== 'all' && counts[value] === 0) value = 'all';
-  });
+  const présents = $derived(VALIDITY_STATES.filter((s) => counts[s] > 0));
+  const utile = $derived(présents.length > 1 || présents.some((s) => !value[s]));
 </script>
 
 {#if utile}
-  <div class="filtres" role="group" aria-label="Filtrer {quoi} par état">
-    {#each choix as f (f)}
-      <button class="filtre" class:actif={value === f} aria-pressed={value === f} onclick={() => (value = f)}>
-        {STATE_FILTER_LABELS[f]} <span class="n">{counts[f]}</span>
+  <div class="filtres" role="group" aria-label="Afficher ou masquer {quoi} par état">
+    {#each présents as s (s)}
+      <button
+        class="filtre"
+        class:actif={value[s]}
+        aria-pressed={value[s]}
+        onclick={() => (value = { ...value, [s]: !value[s] })}
+      >
+        {STATE_LABELS[s]} <span class="n">{counts[s]}</span>
       </button>
     {/each}
   </div>

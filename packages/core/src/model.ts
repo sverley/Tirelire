@@ -217,24 +217,30 @@ export function validityState(x: { activeFrom?: ISODate; activeTo?: ISODate }, d
   return 'active';
 }
 
-/** Choix offert par un filtre d'affichage : les trois états, ou tout. */
-export type StateFilter = 'all' | ValidityState;
+/** Ordre d'affichage : le présent d'abord, puis ce qui l'entoure. */
+export const VALIDITY_STATES: readonly ValidityState[] = ['active', 'upcoming', 'closed'] as const;
 
-/** Ordre d'affichage du filtre : le tout d'abord, puis du présent vers ce qui l'entoure. */
-export const STATE_FILTERS: readonly StateFilter[] = ['all', 'active', 'upcoming', 'closed'] as const;
+/**
+ * Visibilité par état (D55) : un interrupteur par état, indépendants les uns des autres. Un choix
+ * unique aurait obligé à passer par « tout » pour voir deux états sur trois, alors que la lecture
+ * courante en demande justement deux — ce qui vit et ce qui vient.
+ */
+export type StateVisibility = Record<ValidityState, boolean>;
 
-/** Ce filtre laisse-t-il passer cet état ? */
-export function matchesState(filter: StateFilter, state: ValidityState): boolean {
-  return filter === 'all' || filter === state;
+/** Ce qui vit et ce qui vient se lisent ; ce qui est fini est rangé, sans disparaître du filtre. */
+export const DEFAULT_VISIBILITY: StateVisibility = { active: true, upcoming: true, closed: false };
+
+/** Cet état est-il allumé ? */
+export function stateShown(visibility: StateVisibility, state: ValidityState): boolean {
+  return visibility[state];
 }
 
 /**
- * Combien d'éléments chaque choix du filtre laisserait voir. Le filtre s'en sert pour ne proposer
- * que ce qui existe et pour annoncer ce qu'il cache : un écran qui se vide sans rien dire se lit
- * comme un écran cassé.
+ * Combien d'éléments porte chaque état. Le filtre s'en sert pour ne proposer que ce qui existe et
+ * pour annoncer ce qu'il cache : un écran qui se vide sans rien dire se lit comme un écran cassé.
  */
-export function countStates<T>(items: readonly T[], stateOf: (x: T) => ValidityState): Record<StateFilter, number> {
-  const counts: Record<StateFilter, number> = { all: items.length, active: 0, upcoming: 0, closed: 0 };
+export function countStates<T>(items: readonly T[], stateOf: (x: T) => ValidityState): Record<ValidityState, number> {
+  const counts: Record<ValidityState, number> = { active: 0, upcoming: 0, closed: 0 };
   for (const item of items) counts[stateOf(item)]++;
   return counts;
 }

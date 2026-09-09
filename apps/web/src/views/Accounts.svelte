@@ -7,15 +7,16 @@
     accountBalance,
     countStates,
     indexLedger,
-    matchesState,
     settlementBalance,
+    stateShown,
     unallocated,
     alive,
     validityState,
+    DEFAULT_VISIBILITY,
     type Account,
     type AccountKind,
     type SettlementDirection,
-    type StateFilter,
+    type StateVisibility,
   } from '@tirelire/core';
 
   let editing = $state<Account | undefined>(undefined);
@@ -33,7 +34,7 @@
     activeTo: '',
   });
   let error = $state('');
-  let filtre = $state<StateFilter>('all');
+  let etatsVisibles = $state<StateVisibility>({ ...DEFAULT_VISIBILITY });
 
   const accounts = $derived(alive(app.ledger.accounts));
   const idx = $derived(indexLedger(app.ledger));
@@ -42,7 +43,8 @@
   // Un compte n'a pas de besoins : son état est celui de ses propres dates d'ouverture et de
   // clôture (D55).
   const états = $derived(countStates(accounts, (a) => validityState(a, app.asOf)));
-  const visibles = $derived(accounts.filter((a) => matchesState(filtre, validityState(a, app.asOf))));
+  const visibles = $derived(accounts.filter((a) => stateShown(etatsVisibles, validityState(a, app.asOf))));
+  const masqués = $derived(accounts.length - visibles.length);
 
   /**
    * Ce qui retient encore un compte clos : les tirelires qui veulent y dormir et les flux qui y
@@ -129,7 +131,7 @@
   <button class="btn primary" onclick={startNew}>Ajouter un compte</button>
 </div>
 
-<FiltreEtat bind:value={filtre} counts={états} quoi="les comptes" />
+<FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les comptes" />
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
@@ -213,5 +215,7 @@
     {@render editeur()}
   {/if}
 {:else}
-  <div class="empty">Aucun compte. Commence par le compte principal.</div>
+  <div class="empty">
+    {#if masqués > 0}Tout est masqué par le filtre : {masqués} compte(s) rangé(s).{:else}Aucun compte. Commence par le compte principal.{/if}
+  </div>
 {/each}

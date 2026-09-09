@@ -2,27 +2,29 @@
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
   import FiltreEtat from '../lib/FiltreEtat.svelte';
-  import { money, shortDate, centsToInput, inputToCents, openAccounts, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS, STATE_LABELS, periodicityLabel, validityLabel, validityBadge } from '../lib/format';
+  import { money, shortDate, centsToInput, inputToCents, openAccounts, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS, periodicityLabel, validityLabel, validityBadge } from '../lib/format';
   import {
     alive,
     activeAt,
     budgetPeriodContaining,
-    matchesState,
     minDate,
     nextPeriod,
     tirelireBalance,
     tirelireComponents,
     tirelireValidityState,
+    stateShown,
     indexLedger,
     dueDateFlowForNeed,
     needCruise,
     nextOccurrence,
     validityState,
     DEFAULT_PRIORITY,
+    DEFAULT_VISIBILITY,
     type Tirelire,
     type Need,
     type NeedKind,
-    type StateFilter,
+    type StateVisibility,
+    type ValidityState,
     stepOf,
   } from '@tirelire/core';
 
@@ -66,26 +68,28 @@
       .filter((n) => n.tirelireId === e.id)
       .sort((a, b) => rangValidite(a) - rangValidite(b) || a.priority - b.priority || (a.activeFrom ?? '').localeCompare(b.activeFrom ?? ''));
 
-  // Filtre d'état (D55). Une tirelire n'a pas de dates : elle est retenue si son propre état
-  // convient, ou si l'un de ses besoins convient — sans cette seconde branche, chercher ce qui est
-  // clos ne montrerait rien, puisque le budget clos d'hier vit sur une tirelire bien en vigueur.
-  let filtre = $state<StateFilter>('all');
-  const garde = (e: Tirelire, f: StateFilter) =>
-    matchesState(f, tirelireValidityState(e, idx, app.asOf)) || needsOf(e).some((n) => matchesState(f, validityState(n, app.asOf)));
-  const besoinsVisibles = (e: Tirelire) => needsOf(e).filter((n) => matchesState(filtre, validityState(n, app.asOf)));
-  const visible = (e: Tirelire) => garde(e, filtre);
+  // Filtre d'état (D55). Une tirelire n'a pas de dates : elle est retenue si son propre état est
+  // allumé, ou si l'un de ses besoins l'est — sans cette seconde branche, allumer « Clos » ne
+  // montrerait rien, puisque le budget clos d'hier vit sur une tirelire bien en vigueur.
+  let etatsVisibles = $state<StateVisibility>({ ...DEFAULT_VISIBILITY });
+  const porte = (e: Tirelire, s: ValidityState) =>
+    tirelireValidityState(e, idx, app.asOf) === s || needsOf(e).some((n) => validityState(n, app.asOf) === s);
+  const besoinsVisibles = (e: Tirelire) => needsOf(e).filter((n) => stateShown(etatsVisibles, validityState(n, app.asOf)));
+  const visible = (e: Tirelire) =>
+    stateShown(etatsVisibles, tirelireValidityState(e, idx, app.asOf)) || besoinsVisibles(e).length > 0;
+  // Le compte d'un interrupteur = les cartes qu'il fait apparaître à lui seul.
   const états = $derived({
-    all: tirelires.length,
-    active: tirelires.filter((e) => garde(e, 'active')).length,
-    upcoming: tirelires.filter((e) => garde(e, 'upcoming')).length,
-    closed: tirelires.filter((e) => garde(e, 'closed')).length,
-  } as Record<StateFilter, number>);
+    active: tirelires.filter((e) => porte(e, 'active')).length,
+    upcoming: tirelires.filter((e) => porte(e, 'upcoming')).length,
+    closed: tirelires.filter((e) => porte(e, 'closed')).length,
+  } as Record<ValidityState, number>);
+  const masquées = $derived(tirelires.length - tirelires.filter(visible).length);
 
   /** Ce qu'on écrit quand une tirelire n'affiche aucun besoin : le vide du filtre n'est pas le vide. */
   const sansBesoin = (e: Tirelire) =>
     needsOf(e).length === 0
       ? 'Aucun besoin : cette tirelire ne demande rien au plan.'
-      : `Aucun besoin dans l’état « ${STATE_LABELS[filtre === 'all' ? 'active' : filtre]} » ; elle en porte ${needsOf(e).length} en tout.`;
+      : `Ses ${needsOf(e).length} besoin(s) sont masqués par le filtre.`;
 
   // Regroupement d'affichage : par premier compte de placement (D38), ou « sans placement ».
   const byPlacement = $derived(
@@ -304,7 +308,7 @@
 </div>
 {#if accounts.length === 0}<div class="empty">Crée d'abord un compte.</div>{/if}
 
-<FiltreEtat bind:value={filtre} counts={états} quoi="les tirelires" />
+<FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les tirelires" />
 
 {#snippet editeurTirelire()}
   <form class="edit attached" use:revealed onsubmit={save}>
@@ -478,4 +482,6 @@
 {/if}
 {#if tirelires.length === 0 && accounts.length > 0}
   <div class="empty">Aucune tirelire pour l'instant.</div>
+{:else if tirelires.length > 0 && masquées === tirelires.length}
+  <div class="empty">Tout est masqué par le filtre : {masquées} tirelire(s) rangée(s).</div>
 {/if}

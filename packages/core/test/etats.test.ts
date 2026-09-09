@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { countStates, emptyLedger, matchesState, validityState, type Ledger, type StateFilter } from '../src/model.js';
+import {
+  countStates,
+  emptyLedger,
+  stateShown,
+  validityState,
+  DEFAULT_VISIBILITY,
+  VALIDITY_STATES,
+  type Ledger,
+  type ValidityState,
+} from '../src/model.js';
 import { euros } from '../src/money.js';
 import { indexLedger, tirelireBalance, tirelireValidityState } from '../src/balances.js';
 import { exampleLedger } from '../src/example.js';
@@ -22,16 +31,21 @@ describe('état d’une ligne datée', () => {
     expect(validityState({}, '2026-09-06')).toBe('active');
   });
 
-  it('le filtre « tout » laisse tout passer, les autres ne gardent que leur état', () => {
-    expect(matchesState('all', 'closed')).toBe(true);
-    expect(matchesState('closed', 'closed')).toBe(true);
-    expect(matchesState('closed', 'active')).toBe(false);
+  it('par défaut on lit ce qui vit et ce qui vient, pas ce qui est fini', () => {
+    expect(stateShown(DEFAULT_VISIBILITY, 'active')).toBe(true);
+    expect(stateShown(DEFAULT_VISIBILITY, 'upcoming')).toBe(true);
+    expect(stateShown(DEFAULT_VISIBILITY, 'closed')).toBe(false);
   });
 
-  it('les comptes du filtre disent ce que chaque choix laisserait voir', () => {
+  it('les interrupteurs sont indépendants : éteindre l’un laisse les autres', () => {
+    const éteint = { ...DEFAULT_VISIBILITY, active: false, closed: true };
+    expect(VALIDITY_STATES.filter((s) => stateShown(éteint, s))).toEqual(['upcoming', 'closed']);
+  });
+
+  it('les comptes des interrupteurs disent ce que chacun porte', () => {
     const lignes = [{ activeTo: '2026-01-01' }, {}, {}, { activeFrom: '2027-01-01' }];
     const comptes = countStates(lignes, (l) => validityState(l, '2026-09-06'));
-    expect(comptes).toEqual({ all: 4, active: 2, upcoming: 1, closed: 1 });
+    expect(comptes).toEqual({ active: 2, upcoming: 1, closed: 1 });
   });
 });
 
@@ -104,7 +118,7 @@ describe('état d’une tirelire', () => {
 describe('l’exemple porte les trois états (D55)', () => {
   const l = exampleLedger();
   const asOf = '2026-09-06';
-  const compte = (états: StateFilter[], items: Array<{ activeFrom?: string; activeTo?: string }>) =>
+  const compte = (états: ValidityState[], items: Array<{ activeFrom?: string; activeTo?: string }>) =>
     items.filter((x) => états.includes(validityState(x, asOf))).length;
 
   it('des besoins clos et des besoins à venir sur l’écran Tirelires', () => {

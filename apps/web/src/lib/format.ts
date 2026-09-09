@@ -13,7 +13,6 @@ import {
   type PlannedFlowKind,
   type PeriodUnit,
   type Periodicity,
-  type StateFilter,
   type ValidityState,
 } from '@tirelire/core';
 
@@ -112,14 +111,12 @@ export function validityLabel(x: { activeFrom?: string; activeTo?: string }): st
   return '';
 }
 
-/** Nom de chaque état, et du filtre qui les rassemble tous (D55). */
+/** Nom de chaque état, tel qu'il s'écrit sur son interrupteur (D55). */
 export const STATE_LABELS: Record<ValidityState, string> = {
   active: 'En cours',
   upcoming: 'À venir',
   closed: 'Clos',
 };
-
-export const STATE_FILTER_LABELS: Record<StateFilter, string> = { all: 'Tout', ...STATE_LABELS };
 
 /** Pastille d'état d'une ligne datée, à la date de travail : rien si elle est en vigueur. */
 export function validityBadge(x: { activeFrom?: string; activeTo?: string }, asOf: string): string {

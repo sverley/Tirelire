@@ -6,17 +6,18 @@
   import {
     alive,
     countStates,
-    matchesState,
     needForDueDateFlow,
     nextOccurrence,
     stepOf,
+    stateShown,
     syncFlowAutomations,
     todayISO,
     validityState,
+    DEFAULT_VISIBILITY,
     type PlannedFlow,
     type PlannedFlowKind,
     type PeriodUnit,
-    type StateFilter,
+    type StateVisibility,
   } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
@@ -41,14 +42,15 @@
     activeTo: '',
   });
   let error = $state('');
-  let filtre = $state<StateFilter>('all');
+  let etatsVisibles = $state<StateVisibility>({ ...DEFAULT_VISIBILITY });
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
   const categories = $derived(alive(app.ledger.categories));
   const flows = $derived(alive(app.ledger.plannedFlows));
   const états = $derived(countStates(flows, (f) => validityState(f, app.asOf)));
-  const visibles = $derived(flows.filter((f) => matchesState(filtre, validityState(f, app.asOf))));
+  const visibles = $derived(flows.filter((f) => stateShown(etatsVisibles, validityState(f, app.asOf))));
+  const masqués = $derived(flows.length - visibles.length);
   const groups = $derived(
     (['income', 'fixedCharge', 'dueDate', 'transfer'] as PlannedFlowKind[])
       .map((k) => ({ kind: k, flows: visibles.filter((f) => f.kind === k).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)) }))
@@ -164,7 +166,7 @@
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
 </div>
 
-<FiltreEtat bind:value={filtre} counts={états} quoi="les flux" />
+<FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les flux" />
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
@@ -260,4 +262,6 @@
 {/each}
 {#if flows.length === 0}
   <div class="empty">Aucun flux prévu. Commence par les revenus, puis les charges fixes.</div>
+{:else if visibles.length === 0}
+  <div class="empty">Tout est masqué par le filtre : {masqués} flux rangé(s).</div>
 {/if}

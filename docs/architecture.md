@@ -28,7 +28,7 @@ Tirelire/
 │   ├── src/lib/db.ts       ouverture du dépôt, persistance IndexedDB
 │   ├── src/lib/state.svelte.ts  état réactif (ledger, asOf, plan dérivé, vue)
 │   ├── src/lib/platform.ts     navigateur vs Android (enregistrer / partager un fichier)
-│   ├── src/lib/FiltreEtat.svelte  barre de filtre par état des écrans de cartes (D55)
+│   ├── src/lib/FiltreEtat.svelte  interrupteurs de visibilité par état des écrans de cartes (D55)
 │   ├── src/views/*.svelte  Plan, Operations, Import, Review, More, Accounts, Tirelires, Flows, Entries, Settings
 │   └── android/            projet Capacitor (icônes, signature, versions par variables d'environnement)
 ├── apps/relay/             relais HTTP minimal (Node), paquets chiffrés
@@ -112,7 +112,7 @@ WebRTC, relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/heberg
 
 ## Vérification
 
-- `pnpm test` : 173 tests vitest sur le cœur (périodes, plan, positions et invariants, besoins,
+- `pnpm test` : 174 tests vitest sur le cœur (périodes, plan, positions et invariants, besoins,
   report, états et filtre, dépôt, migrations, fusion, import, rapprochement, règles, ventilation à parts,
   bilan, sync), plus deux gardes de navigateur (mise en page mobile, filtre d'état).
 - `pnpm typecheck`, `pnpm build`.
