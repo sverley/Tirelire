@@ -102,14 +102,15 @@ comptes (D38) et deux ou trois automatismes dans l'exemple.
 
 ---
 
-## Lot 9 · Tests d'interface dans la CI — **harnais posé le 8 septembre (D54)**
+## Lot 9 · Tests d'interface dans la CI — **harnais posé le 8 septembre (D54), gardes tactiles le 9 (D55)**
 
 À faire avant d'ajouter des fonctionnalités neuves : c'est l'absence de ces tests qui a permis à
 l'écart de passer inaperçu jusqu'à l'installation sur le téléphone.
 
 Le harnais existe (`apps/web/test/`, vitest + `puppeteer-core` sur un Chrome déjà installé, site
-construit puis servi par `vite preview`) ; il ne porte pour l'instant que la garde de mise en page
-mobile. Restent les scénarios ci-dessous.
+construit puis servi par `vite preview`, plomberie commune dans `harnais.ts`). Il porte la garde de
+mise en page mobile (D54) et les quatre gardes tactiles — taille de cible, écart au destructif,
+taille de texte, contraste, champ masqué par une barre fixe (D55). Restent les scénarios ci-dessous.
 
 - Scénarios : import d'un CSV inventé ; filtre → action groupée → règle → rejeu ; création d'une
   tirelire à deux besoins et lecture du plan ; ouverture d'un dépôt écrit sous un modèle ancien
