@@ -1011,3 +1011,38 @@ Les deux doivent être distinguables dans le modèle comme à l'écran.
 Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé était figée au moment
 de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
 fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
+
+## D58 · 2026-09-09 · Le fichier est un état : pas de journal, une horloge par ligne
+
+Le journal de changements de D08 (`changes`, `cell_versions`, chaîne d'empreintes) ne servait qu'à
+la synchronisation, et il faisait grossir le fichier avec les gestes et non avec les données : une
+opération importée, quinze colonnes, pesait quinze entrées d'environ 300 octets — dix fois la
+donnée — et chaque reclassement en ajoutait sans que rien ne s'efface. À l'usage prévu (un import
+par mois, deux retouches du plan par an, une ou deux synchronisations par mois entre deux ou trois
+appareils, le calcul des écarts et des virements n'écrivant rien), cela faisait 15 à 20 Mo par an,
+réécrits en entier dans IndexedDB à chaque correction, pour environ 1 Mo de données.
+
+Le fichier SQLite est désormais un **état** : les tables, plus une colonne `hlc` par ligne
+(horloge logique hybride, qui porte l'appareil), `settings` compris. Fusion par ligne entière, la
+plus récente gagne, `deleted_at` inclus. Synchronisation par delta d'état : chaque appareil garde
+un vecteur d'horloges (le maximum vu par appareil) ; au `hello` les pairs échangent leurs vecteurs,
+chacun envoie les lignes plus récentes que le vecteur de l'autre, et le relais entre appareils qui
+ne se croisent pas est gratuit puisque l'état d'un pair contient ce qu'il a reçu des autres. Une
+ligne modifiée des deux côtés depuis la dernière synchronisation est signalée, pas tue. Le
+protocole et les transports de D16 restent ; seul le contenu des paquets change. Ce qu'on
+abandonne : l'historique des valeurs remplacées — un « annuler » futur passera par un journal
+séparé, régénérable pour le présent, qui ne touchera pas à ce format — et la preuve de chaîne,
+superflue pour un foyer sur relais chiffré. La granularité par cellule a été chiffrée et écartée :
+1,7 Ko de versions par opération pour des conflits que l'usage ne produit pas.
+
+Rupture sans migration, le produit n'ayant pas d'utilisateur : un fichier antérieur est refusé
+avec un message clair, `meta` porte un marqueur de format et une version, `MODEL_VERSION` repart
+à 1, `migration.ts` et les colonnes dépréciées disparaissent — le mécanisme D30 resservira après
+la première version publiée. La même passe renomme ce que le domaine avait renommé sans le
+stockage : `envelopes` → `tirelires`, `envelope_id` → `tirelire_id` (la réserve de D42 tombait
+dès que le nom SQL devenait une interface, issue #18), `makes_rule` → `makes_automation` (D39), et
+sépare les deux sens de `rank`. La clé d'une opération importée (D09) se raccourcit à `op_` + 16
+hexadécimaux. L'écriture par ligne entière autorise `NOT NULL` et `CHECK` ; les références et les
+autres invariants sont vérifiés par une fonction du cœur, qui sert aussi à l'ouverture d'un
+fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` pour pouvoir être
+fabriqué depuis l'extérieur.
