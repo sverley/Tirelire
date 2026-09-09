@@ -1,7 +1,9 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
-  import { computePlan, periodsAround, missingFlows, addDays, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
+  import { revealed } from '../lib/actions';
+  import { centsToInput, inputToCents } from '../lib/format';
+  import { computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, ORDER_STEP, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -33,21 +35,32 @@
   // Écarts qui n'impliquent pas le compte principal : ils ne sont dans aucun virement principal ↔ compte.
   const principalId = $derived(app.ledger.accounts.find((a) => a.kind === 'principal' && !a.deletedAt)?.id);
   const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== principalId && g.toAccountId !== principalId));
-  /**
-   * Enregistre un **fait** (D57, D58) : le montant que l'ordre permanent exécute chez la banque.
-   * L'application ne peut ni le connaître ni le changer là-bas ; elle en a besoin pour reconnaître
-   * la ligne à l'import. Ce que le budget demande, lui, se recalcule seul à chaque lecture du plan,
-   * et la ventilation du virement se rejouera au jour de l'opération.
+  /*
+   * Enregistrer un ordre permanent, c'est écrire un **fait** (D57, D58) : le montant que la banque
+   * exécute vraiment. L'application ne peut ni le connaître ni le changer là-bas, d'où la saisie —
+   * proposée à la dizaine au-dessus de ce que le budget demande, parce qu'un ordre se pose rond,
+   * puis corrigeable pour coller à ce qui a réellement été posé. Ce que le budget demande, lui, se
+   * recalcule seul, et la ventilation du virement se rejouera au jour de l'opération.
    */
-  function confirmerOrdre(t: PlanTransfer) {
+  let ordreEdite = $state<string | undefined>(undefined);
+  let montantOrdre = $state('');
+  let erreurOrdre = $state('');
+
+  function ouvrirOrdre(t: PlanTransfer) {
+    ordreEdite = t.accountId;
+    montantOrdre = centsToInput(roundOrderUp(t.standing));
+    erreurOrdre = '';
+  }
+
+  function enregistrerOrdre(e: Event, t: PlanTransfer) {
+    e.preventDefault();
     if (!principalId) return;
-    const flow = standingTransferFlow(plan, t, principalId, t.bankOrder?.flowId ?? app.newId());
+    const montant = inputToCents(montantOrdre);
+    if (montant === undefined || montant <= 0) return void (erreurOrdre = 'Montant invalide (le montant que vire ton ordre, en positif).');
+    const flow = standingTransferFlow(plan, t, principalId, t.bankOrder?.flowId ?? app.newId(), montant);
     if (!flow) return;
-    const question = t.bankOrder
-      ? `Ton ordre permanent vers « ${t.accountName} » est enregistré à ${money(t.bankOrder.amount)}. Confirmer qu'il est passé à ${money(t.standing)} ?`
-      : `Enregistrer l'ordre permanent vers « ${t.accountName} » à ${money(t.standing)} ?`;
-    if (!confirm(`${question}\n\nÀ confirmer une fois l'ordre posé ou modifié chez ta banque.`)) return;
     app.upsert('plannedFlows', flow);
+    ordreEdite = undefined;
   }
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
@@ -139,20 +152,38 @@
           <div class="row">
             <div class="label">Ordre permanent chez la banque
               <span class="sub">
-                {t.bankOrder.drift === 0
-                  ? 'au montant du budget'
-                  : t.standing === 0
-                    ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
-                    : `à passer à ${money(t.standing)} chez la banque, puis à confirmer ici`}
+                {t.standing === 0
+                  ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
+                  : t.bankOrder.drift === 0
+                    ? 'au montant du budget'
+                    : t.bankOrder.drift < 0 && t.bankOrder.drift >= -ORDER_STEP
+                      ? 'arrondi au-dessus du budget : il couvre ce qui est demandé'
+                      : `à passer à ${money(roundOrderUp(t.standing))} chez la banque, puis à confirmer ici`}
               </span>
             </div>
             <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
           </div>
         {/if}
-        {#if t.standing > 0 && t.bankOrder?.drift !== 0}
+        {#if t.standing > 0 && ordreEdite !== t.accountId}
           <div class="actions" style="margin:6px 0 0">
-            <button class="btn small" onclick={() => confirmerOrdre(t)}>{t.bankOrder ? 'Mon ordre est à jour' : 'Enregistrer mon ordre permanent'}</button>
+            <button class="btn small" onclick={() => ouvrirOrdre(t)}>{t.bankOrder ? 'Corriger mon ordre' : 'Enregistrer mon ordre permanent'}</button>
           </div>
+        {/if}
+        {#if ordreEdite === t.accountId}
+          <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
+            <p class="muted small" style="margin:0">
+              Le montant que <strong>ton ordre exécute chez ta banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
+              Proposé à la dizaine au-dessus de {money(t.standing)} ; corrige-le pour coller à ce que tu as réellement posé.
+            </p>
+            <div class="grid">
+              <label class="f">Montant de l’ordre permanent (€) <input bind:value={montantOrdre} inputmode="decimal" /></label>
+            </div>
+            {#if erreurOrdre}<div class="err">{erreurOrdre}</div>{/if}
+            <div class="actions" style="margin:0">
+              <button class="btn primary" type="submit">Enregistrer</button>
+              <button class="btn" type="button" onclick={() => (ordreEdite = undefined)}>Annuler</button>
+            </div>
+          </form>
         {/if}
       {/if}
       {#if t.exceptional > 0}

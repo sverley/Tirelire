@@ -6,6 +6,7 @@ import {
   exampleLedger,
   formatCents,
   isDerivedFlow,
+  roundOrderUp,
   standingOrderFlow,
   standingTransferFlow,
   type Ledger,
@@ -136,5 +137,27 @@ describe('deux montants distincts : ce que le budget veut, ce que la banque fait
     expect(t.standing).toBe(0);
     expect(t.bankOrder).toEqual({ flowId: 'flow-vide', amount: euros(300), drift: -euros(300) });
     expect(plan.warnings.find((w) => w.code === 'bankOrderDrift')?.message).toContain('supprimer');
+  });
+});
+
+describe('un ordre permanent se pose rond (D58)', () => {
+  it('le montant proposé est la dizaine d’euros au-dessus', () => {
+    expect(roundOrderUp(euros(683.5))).toBe(euros(690));
+    expect(roundOrderUp(euros(650))).toBe(euros(650));
+    expect(roundOrderUp(euros(0.01))).toBe(euros(10));
+  });
+
+  it('l’arrondi au-dessus ne se signale pas, un vrai écart si', () => {
+    const l = exampleLedger();
+    const demande = computePlan(l, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
+
+    // Ordre posé quelques euros au-dessus : il couvre ce que le budget demande, rien à corriger.
+    const arrondi = computePlan({ ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l, demande + euros(5))] }, asOf);
+    expect(arrondi.transfers.find((x) => x.accountId === 'acc-livret')!.bankOrder!.drift).toBe(-euros(5));
+    expect(arrondi.warnings.map((w) => w.code)).not.toContain('bankOrderDrift');
+
+    // Au-delà du pas d'arrondi, l'ordre vire nettement trop : là, on le dit.
+    const trop = computePlan({ ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l, demande + euros(15))] }, asOf);
+    expect(trop.warnings.map((w) => w.code)).toContain('bankOrderDrift');
   });
 });
