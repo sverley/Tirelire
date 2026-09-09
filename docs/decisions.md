@@ -988,3 +988,26 @@ sur chacun des trois écrans et vérifie l'état de départ des interrupteurs, q
 sans que son bouton disparaisse, et que chaque interrupteur montre ou masque ce qu'il annonce sans
 toucher aux autres — même harnais que la garde de mise en page (D54), et même abstention faute de
 Chrome, sauf en intégration continue.
+
+## D57 · 2026-09-09 · Deux sens de lecture, et le budget d'abord
+
+L'application est **d'abord une aide à la construction d'un budget**, et doit rester entièrement
+utile sans jamais importer un relevé. Le lien avec la banque vient ensuite, et sert à confronter le
+budget au réel. Les deux sens de lecture sont de premier rang, aucun n'est un mode dégradé :
+
+- **Sens descendant** — on décrit ce qu'on veut : des tirelires, leurs besoins, où leur argent doit
+  dormir. L'application en **déduit** les flux, les dotations et les virements. Rien de tout cela ne
+  se saisit à la main : ce sont des conséquences, recalculées quand le budget change.
+- **Sens ascendant** — on importe ses opérations et on reconstruit le budget après coup, par
+  analyse et constat : ce qu'on dépense vraiment, à quel rythme, sur quoi. L'application propose,
+  l'utilisateur arbitre — les propositions ne deviennent jamais des décisions toutes seules.
+
+Conséquence sur ce qui est stocké. Un flux **déclaré** (un salaire, un loyer, une échéance connue)
+est un fait : il appartient à l'utilisateur, rien ne le réécrit. Un flux **dérivé** du budget (un
+virement permanent et sa ventilation) est un calcul : il se recalcule à chaque changement du budget
+et l'application signale ce qui a bougé, plutôt que d'attendre qu'on pense à appuyer sur un bouton.
+Les deux doivent être distinguables dans le modèle comme à l'écran.
+
+Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé était figée au moment
+de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
+fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
