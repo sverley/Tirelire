@@ -159,6 +159,12 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .prop:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
 .prop .v { font-size: 12px; color: var(--muted); }
 
+/* Assistant, dernière étape (D58) : le libellé exact à recopier chez la banque. Il se lit caractère
+   par caractère — donc chasse fixe — et se copie d'un geste, donc un bouton de vraie taille. */
+.libelle { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 10px 0 0; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; }
+.libelle .txt { display: grid; gap: 2px; min-width: 0; }
+.libelle code { font-family: var(--mono); font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+
 /* Assistant : lignes modifiables et en-têtes de colonnes qui partagent la même grille (D46). */
 .tete { display: grid; gap: 6px; padding: 0 8px 4px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .tete .d { text-align: right; }

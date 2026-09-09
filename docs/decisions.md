@@ -1011,3 +1011,32 @@ Les deux doivent être distinguables dans le modèle comme à l'écran.
 Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé était figée au moment
 de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
 fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
+
+## D58 · 2026-09-09 · L'assistant se termine sur ce qu'il faut aller faire à la banque
+
+L'assistant s'arrêtait sur le résumé du budget : l'utilisateur savait ce qu'il devait mettre de
+côté, mais pas quoi virer, vers quel compte, ni sous quel libellé. Il lui manquait le seul geste
+qui ne se fait pas dans l'application.
+
+Une dernière étape, **« Vos ordres permanents »**, montre donc un bloc par compte cible : le
+montant *permanent* (jamais le total du mois, complément exceptionnel compris), le **libellé exact**
+tel qu'il sera tronqué à 35 caractères, offert à la copie d'un geste, le détail des tirelires que ce
+virement sert, et le bouton qui enregistre le virement attendu correspondant.
+
+Ce que l'étape enseigne autant qu'elle affiche : un virement groupé ne se saisit pas, il se calcule.
+On déclare seulement, tirelire par tirelire, où son argent doit dormir (D20, D38) ; le plan
+rassemble les écarts allant dans le même sens entre deux comptes en un ordre unique par couple de
+comptes (D21). L'étape dit aussi ce qui suivra : à l'import, la ligne est reconnue par libellé et
+montant, la ventilation prévue s'applique si le montant correspond, sinon la répartition rejoue
+l'ordre de financement de D06 — planchers d'abord, puis priorités — et l'écart se represente au plan
+suivant.
+
+Rien ne s'enregistre d'office : gérer ses virements à la main reste légitime, et le plan continue
+alors de dire quoi virer. Quand aucun placement n'est déclaré, l'étape le dit et renvoie à l'endroit
+où le déclarer plutôt que d'afficher une page vide.
+
+Le geste lui-même n'est écrit qu'une fois (`apps/web/src/lib/virements.ts`) : le Plan et l'assistant
+l'appellent, aucun n'en garde sa copie. Le cœur n'a rien de neuf — `computePlan` produisait déjà ces
+virements et `standingTransferFlow` le flux attendu ; ce qui manquait était de les amener là où l'on
+en a besoin. La suite est ouverte : D57 fera de ce bouton l'enregistrement d'un *fait bancaire*
+plutôt que le gel d'un calcul (voir l'issue #14), sans changer ce que l'étape montre.
