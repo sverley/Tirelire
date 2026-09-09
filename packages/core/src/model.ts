@@ -89,6 +89,16 @@ export interface Account {
   settlementThreshold?: Cents;
   /** Sens autorisé des virements de règlement. */
   settlementDirection?: SettlementDirection;
+  /**
+   * Ouverture et clôture réelles du compte (D55), les mêmes deux dates que les flux (D23) et les
+   * besoins (D50), lues par le même `activeAt`. À ne pas confondre avec `openingDate`, qui date le
+   * solde initial : on peut commencer à suivre un compte ouvert depuis dix ans.
+   *
+   * Clore n'est pas supprimer : un compte clos garde ses opérations, donc son passé dans les
+   * soldes et les bilans. Il sort seulement des listes et des menus du jour.
+   */
+  activeFrom?: ISODate;
+  activeTo?: ISODate;
   deletedAt?: string;
 }
 
@@ -183,15 +193,50 @@ export function needActive(n: Need, date: ISODate): boolean {
 }
 
 /**
- * Une entité est-elle en vigueur à cette date ? Bornes incluses. Besoins (D50) et flux (D23, D24)
- * portent les mêmes deux dates et la même règle : les lire au même endroit évite qu'elles divergent.
+ * Une entité est-elle en vigueur à cette date ? Bornes incluses. Besoins (D50), flux (D23, D24) et
+ * comptes (D55) portent les mêmes deux dates et la même règle : les lire au même endroit évite
+ * qu'elles divergent.
  * Le plan, lui, raisonne par période (`isActive`) et non par date : une occurrence peut tomber dans
  * une période sans que le flux soit en vigueur toute la période.
  */
 export function activeAt(x: { activeFrom?: ISODate; activeTo?: ISODate }, date: ISODate): boolean {
-  if (x.activeFrom && date < x.activeFrom) return false;
-  if (x.activeTo && date > x.activeTo) return false;
-  return true;
+  return validityState(x, date) === 'active';
+}
+
+/**
+ * État d'une ligne datée à une date donnée (D55). `activeAt` répondait par oui ou non, ce qui
+ * suffit au calcul mais pas à l'affichage : « non » recouvre deux situations opposées, ce qui est
+ * fini et ce qui n'a pas commencé. Les distinguer une fois ici évite que chaque écran refasse la
+ * comparaison de dates à sa façon.
+ */
+export type ValidityState = 'upcoming' | 'active' | 'closed';
+
+export function validityState(x: { activeFrom?: ISODate; activeTo?: ISODate }, date: ISODate): ValidityState {
+  if (x.activeTo && date > x.activeTo) return 'closed';
+  if (x.activeFrom && date < x.activeFrom) return 'upcoming';
+  return 'active';
+}
+
+/** Choix offert par un filtre d'affichage : les trois états, ou tout. */
+export type StateFilter = 'all' | ValidityState;
+
+/** Ordre d'affichage du filtre : le tout d'abord, puis du présent vers ce qui l'entoure. */
+export const STATE_FILTERS: readonly StateFilter[] = ['all', 'active', 'upcoming', 'closed'] as const;
+
+/** Ce filtre laisse-t-il passer cet état ? */
+export function matchesState(filter: StateFilter, state: ValidityState): boolean {
+  return filter === 'all' || filter === state;
+}
+
+/**
+ * Combien d'éléments chaque choix du filtre laisserait voir. Le filtre s'en sert pour ne proposer
+ * que ce qui existe et pour annoncer ce qu'il cache : un écran qui se vide sans rien dire se lit
+ * comme un écran cassé.
+ */
+export function countStates<T>(items: readonly T[], stateOf: (x: T) => ValidityState): Record<StateFilter, number> {
+  const counts: Record<StateFilter, number> = { all: items.length, active: 0, upcoming: 0, closed: 0 };
+  for (const item of items) counts[stateOf(item)]++;
+  return counts;
 }
 
 /** Priorités par défaut ; les échéances passent avant, les objectifs après. */

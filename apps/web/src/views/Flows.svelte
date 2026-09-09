@@ -1,8 +1,23 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
-  import { money, shortDate, centsToInput, inputToCents, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
-  import { alive, needForDueDateFlow, nextOccurrence, stepOf, syncFlowAutomations, todayISO, type PlannedFlow, type PlannedFlowKind, type PeriodUnit } from '@tirelire/core';
+  import FiltreEtat from '../lib/FiltreEtat.svelte';
+  import { money, shortDate, centsToInput, inputToCents, openAccounts, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
+  import {
+    alive,
+    countStates,
+    matchesState,
+    needForDueDateFlow,
+    nextOccurrence,
+    stepOf,
+    syncFlowAutomations,
+    todayISO,
+    validityState,
+    type PlannedFlow,
+    type PlannedFlowKind,
+    type PeriodUnit,
+    type StateFilter,
+  } from '@tirelire/core';
 
   let editing = $state<PlannedFlow | undefined>(undefined);
   let form = $state({
@@ -26,16 +41,22 @@
     activeTo: '',
   });
   let error = $state('');
+  let filtre = $state<StateFilter>('all');
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
   const categories = $derived(alive(app.ledger.categories));
   const flows = $derived(alive(app.ledger.plannedFlows));
+  const états = $derived(countStates(flows, (f) => validityState(f, app.asOf)));
+  const visibles = $derived(flows.filter((f) => matchesState(filtre, validityState(f, app.asOf))));
   const groups = $derived(
     (['income', 'fixedCharge', 'dueDate', 'transfer'] as PlannedFlowKind[])
-      .map((k) => ({ kind: k, flows: flows.filter((f) => f.kind === k).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)) }))
+      .map((k) => ({ kind: k, flows: visibles.filter((f) => f.kind === k).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)) }))
       .filter((g) => g.flows.length > 0),
   );
+  /** Comptes offerts aux menus : les vivants, plus celui que la ligne désigne déjà (D55). */
+  const comptesChoisis = $derived(openAccounts(accounts, app.asOf, form.accountId));
+  const comptesContrepartie = $derived(openAccounts(accounts, app.asOf, form.counterpartAccountId).filter((a) => a.id !== form.accountId));
 
   /**
    * Une échéance est payée le jour venu par ce flux, mais provisionnée d'avance par une tirelire.
@@ -143,6 +164,8 @@
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
 </div>
 
+<FiltreEtat bind:value={filtre} counts={états} quoi="les flux" />
+
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
     <div class="grid">
@@ -155,7 +178,7 @@
       <label class="f">Montant <input bind:value={form.amount} inputmode="decimal" placeholder="3 400,00" /></label>
       <label class="f">Compte
         <select bind:value={form.accountId}>
-          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+          {#each comptesChoisis as a}<option value={a.id}>{a.name}</option>{/each}
         </select>
       </label>
       {#if form.kind === 'dueDate'}
@@ -170,7 +193,7 @@
         <label class="f">Compte de contrepartie
           <select bind:value={form.counterpartAccountId}>
             <option value="">—</option>
-            {#each accounts.filter((a) => a.id !== form.accountId) as a}<option value={a.id}>{a.name}</option>{/each}
+            {#each comptesContrepartie as a}<option value={a.id}>{a.name}</option>{/each}
           </select>
         </label>
       {/if}

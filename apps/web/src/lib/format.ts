@@ -1,4 +1,21 @@
-import { formatCents, parseCents, parseDate, stepOf, MONTHS_FR, type Cents, type NeedKind, type AccountKind, type PlannedFlowKind, type PeriodUnit, type Periodicity } from '@tirelire/core';
+import {
+  activeAt,
+  formatCents,
+  parseCents,
+  parseDate,
+  stepOf,
+  validityState,
+  MONTHS_FR,
+  type Account,
+  type Cents,
+  type NeedKind,
+  type AccountKind,
+  type PlannedFlowKind,
+  type PeriodUnit,
+  type Periodicity,
+  type StateFilter,
+  type ValidityState,
+} from '@tirelire/core';
 
 export const money = (c: Cents, sign = false) => formatCents(c, { sign });
 
@@ -95,9 +112,27 @@ export function validityLabel(x: { activeFrom?: string; activeTo?: string }): st
   return '';
 }
 
+/** Nom de chaque état, et du filtre qui les rassemble tous (D55). */
+export const STATE_LABELS: Record<ValidityState, string> = {
+  active: 'En cours',
+  upcoming: 'À venir',
+  closed: 'Clos',
+};
+
+export const STATE_FILTER_LABELS: Record<StateFilter, string> = { all: 'Tout', ...STATE_LABELS };
+
 /** Pastille d'état d'une ligne datée, à la date de travail : rien si elle est en vigueur. */
 export function validityBadge(x: { activeFrom?: string; activeTo?: string }, asOf: string): string {
-  if (x.activeTo && asOf > x.activeTo) return 'clos';
-  if (x.activeFrom && asOf < x.activeFrom) return 'à venir';
-  return '';
+  const state = validityState(x, asOf);
+  return state === 'active' ? '' : STATE_LABELS[state].toLowerCase();
+}
+
+/**
+ * Comptes proposés dans un menu : ceux en vigueur, plus celui déjà choisi (D55). Un compte clos ne
+ * doit plus recevoir de flux ni de placement neuf, mais il doit rester lisible là où il est déjà
+ * désigné — sinon le menu s'ouvrirait vide sur une ligne existante et l'enregistrement suivant
+ * effacerait le compte sans l'avoir dit.
+ */
+export function openAccounts(accounts: Account[], asOf: string, ...selected: Array<string | undefined>): Account[] {
+  return accounts.filter((a) => activeAt(a, asOf) || selected.includes(a.id));
 }

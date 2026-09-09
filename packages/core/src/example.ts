@@ -38,6 +38,16 @@ export function exampleLedger(): Ledger {
       settlementThreshold: euros(10),
       settlementDirection: 'both',
     },
+    // Un compte clos (D55) : vidé et fermé avant la période en cours, il ne pèse donc rien sur le
+    // plan, mais il donne à l'écran Comptes le cas que le filtre d'état sert à ranger.
+    {
+      id: 'acc-livret-jeune',
+      name: 'Livret jeune',
+      kind: 'epargne',
+      openingBalance: 0,
+      openingDate: '2026-08-27',
+      activeTo: '2026-06-30',
+    },
   );
 
   l.tirelires.push(
