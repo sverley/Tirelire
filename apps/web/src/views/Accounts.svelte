@@ -135,7 +135,7 @@
         <strong>{a.name}</strong> <span class="pill">{a.kind === 'principal' ? 'principal' : a.kind === 'epargne' ? 'accueil' : 'tiers'}</span>
         <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
       </div>
-      <div>
+      <div class="actions" style="margin:0">
         <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>
         <button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>
       </div>

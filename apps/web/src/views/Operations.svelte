@@ -473,7 +473,10 @@
     {@const allocs = allocByOp.get(op.id) ?? []}
     {@const prop = proposals.get(op.id)}
     <div class="row" style="flex-wrap:wrap">
-      <input type="checkbox" checked={selected.has(op.id)} onchange={() => toggle(op.id)} style="margin-right:8px;align-self:flex-start" aria-label="Sélectionner" />
+      <!-- L'étiquette porte la cible : une case à cocher nue fait 13 px de côté, on la manque au doigt. -->
+      <label class="cocher" aria-label="Sélectionner l’opération {op.label}">
+        <input type="checkbox" checked={selected.has(op.id)} onchange={() => toggle(op.id)} />
+      </label>
       <button class="label" style="text-align:left;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit" onclick={() => (editingId === op.id ? (editingId = undefined) : startEdit(op))}>
         <strong>{op.label}</strong>
         <span class="sub">
