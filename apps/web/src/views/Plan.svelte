@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
-  import { computePlan, periodsAround, missingFlows, addDays, alive, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
+  import { computePlan, periodsAround, missingFlows, addDays, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -33,19 +33,20 @@
   // Écarts qui n'impliquent pas le compte principal : ils ne sont dans aucun virement principal ↔ compte.
   const principalId = $derived(app.ledger.accounts.find((a) => a.kind === 'principal' && !a.deletedAt)?.id);
   const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== principalId && g.toAccountId !== principalId));
-  const transferFlows = $derived(alive(app.ledger.plannedFlows).filter((f) => f.kind === 'transfer'));
-  const flowFor = (t: PlanTransfer) => transferFlows.find((f) => f.counterpartAccountId === t.accountId);
-
   /**
-   * Enregistre le virement permanent comme flux attendu (D21) : à l'import, la ligne bancaire sera
-   * reconnue par montant et libellé, et sa ventilation proposée.
+   * Enregistre un **fait** (D57, D58) : le montant que l'ordre permanent exécute chez la banque.
+   * L'application ne peut ni le connaître ni le changer là-bas ; elle en a besoin pour reconnaître
+   * la ligne à l'import. Ce que le budget demande, lui, se recalcule seul à chaque lecture du plan,
+   * et la ventilation du virement se rejouera au jour de l'opération.
    */
-  function saveStandingOrder(t: PlanTransfer) {
+  function confirmerOrdre(t: PlanTransfer) {
     if (!principalId) return;
-    const existing = flowFor(t);
-    const flow = standingTransferFlow(plan, t, principalId, existing?.id ?? app.newId());
+    const flow = standingTransferFlow(plan, t, principalId, t.bankOrder?.flowId ?? app.newId());
     if (!flow) return;
-    if (!confirm(`${existing ? 'Mettre à jour' : 'Enregistrer'} le virement permanent vers « ${t.accountName} » (${money(t.standing)}) ?`)) return;
+    const question = t.bankOrder
+      ? `Ton ordre permanent vers « ${t.accountName} » est enregistré à ${money(t.bankOrder.amount)}. Confirmer qu'il est passé à ${money(t.standing)} ?`
+      : `Enregistrer l'ordre permanent vers « ${t.accountName} » à ${money(t.standing)} ?`;
+    if (!confirm(`${question}\n\nÀ confirmer une fois l'ordre posé ou modifié chez ta banque.`)) return;
     app.upsert('plannedFlows', flow);
   }
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
@@ -129,14 +130,28 @@
           {/each}
         </div>
       {/if}
-      {#if t.standing > 0 || t.exceptional > 0}
+      {#if t.standing > 0 || t.exceptional > 0 || t.bankOrder}
         <div class="row">
-          <div class="label">Virement permanent (total){#if flowFor(t)}<span class="sub">enregistré comme flux attendu</span>{/if}</div>
+          <div class="label">Virement permanent<span class="sub">ce que le budget demande, recalculé</span></div>
           <div class="num">{money(t.standing)}</div>
         </div>
-        {#if t.standing > 0}
+        {#if t.bankOrder}
+          <div class="row">
+            <div class="label">Ordre permanent chez la banque
+              <span class="sub">
+                {t.bankOrder.drift === 0
+                  ? 'au montant du budget'
+                  : t.standing === 0
+                    ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
+                    : `à passer à ${money(t.standing)} chez la banque, puis à confirmer ici`}
+              </span>
+            </div>
+            <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
+          </div>
+        {/if}
+        {#if t.standing > 0 && t.bankOrder?.drift !== 0}
           <div class="actions" style="margin:6px 0 0">
-            <button class="btn small" onclick={() => saveStandingOrder(t)}>{flowFor(t) ? 'Mettre à jour le flux' : 'Enregistrer comme flux attendu'}</button>
+            <button class="btn small" onclick={() => confirmerOrdre(t)}>{t.bankOrder ? 'Mon ordre est à jour' : 'Enregistrer mon ordre permanent'}</button>
           </div>
         {/if}
       {/if}

@@ -233,27 +233,22 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
   patch.operations.push(next);
   const existing = allocationsOf(ledger, op.id);
-  // Virement permanent (D21) : la ventilation prévue vaut si le montant est celui qu'on attendait ;
-  // sinon on rejoue l'ordre de financement, planchers d'abord, sur le montant réellement viré.
-  if (f.kind === 'transfer' && f.plannedAllocation?.length && existing.length === 0) {
-    const target = f.counterpartAccountId ?? op.transferAccountId;
-    const exact = op.amount === f.amount;
-    const category = f.categoryId;
-    const lines = exact
-      ? f.plannedAllocation.map((l) => ({ tirelireId: l.tirelireId, share: l.share }))
-      : target
-        ? distributeTransfer(ledger, target, op.amount, op.date).map((part) => ({
-            tirelireId: part.tirelireId,
-            share: { kind: 'fixed' as const, amount: op.amount < 0 ? -part.amount : part.amount },
-          }))
-        : [];
-    for (const line of lines) {
+  /*
+   * Virement permanent (D21, D57) : sa ventilation ne se lit pas dans le flux, elle se **rejoue**
+   * par l'ordre de financement (D06) sur le montant réellement viré, au jour de l'opération. Une
+   * ventilation mémorisée redeviendrait fausse au premier changement de budget — et le pire cas
+   * était le montant resté identique, où l'ancienne photo s'appliquait sans que rien ne le dise.
+   */
+  const target = f.counterpartAccountId ?? op.transferAccountId;
+  const parts = f.kind === 'transfer' && existing.length === 0 && target ? distributeTransfer(ledger, target, op.amount, op.date) : [];
+  if (parts.length > 0) {
+    for (const part of parts) {
       patch.allocations.push({
         id: uuidv7(),
         operationId: op.id,
-        tirelireId: line.tirelireId,
-        share: line.share,
-        ...(category ? { categoryId: category } : {}),
+        tirelireId: part.tirelireId,
+        share: { kind: 'fixed', amount: op.amount < 0 ? -part.amount : part.amount },
+        ...(f.categoryId ? { categoryId: f.categoryId } : {}),
       });
     }
     return patch;

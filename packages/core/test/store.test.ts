@@ -300,6 +300,37 @@ describe('migration du modèle (D30)', () => {
     expect(livret.tracksSettlement).toBeUndefined();
   });
 
+  it('9 → 10 (D58) : un virement à ventilation figée devient un flux dérivé sans ventilation', async () => {
+    const store = await storeAtModel1([
+      ['planned_flows', 'flow_vir', 'name', 'Virement Livret A'],
+      ['planned_flows', 'flow_vir', 'kind', 'transfer'],
+      ['planned_flows', 'flow_vir', 'amount', -65000],
+      ['planned_flows', 'flow_vir', 'account_id', 'acc_principal'],
+      ['planned_flows', 'flow_vir', 'counterpart_account_id', 'acc_livret'],
+      ['planned_flows', 'flow_vir', 'periodicity', { interval: 1, unit: 'month' as const, anchorDate: '2026-08-28' }],
+      ['planned_flows', 'flow_vir', 'date_window_days', 5],
+      ['planned_flows', 'flow_vir', 'planned_allocation', [{ tirelireId: 'env_tf', share: { kind: 'fixed', amount: -30000 } }]],
+      // Un virement saisi à la main n'a jamais porté de ventilation : il reste un flux déclaré.
+      ['planned_flows', 'flow_main', 'name', 'Virement épargne'],
+      ['planned_flows', 'flow_main', 'kind', 'transfer'],
+      ['planned_flows', 'flow_main', 'amount', -10000],
+      ['planned_flows', 'flow_main', 'account_id', 'acc_principal'],
+      ['planned_flows', 'flow_main', 'counterpart_account_id', 'acc_livret'],
+      ['planned_flows', 'flow_main', 'periodicity', { interval: 1, unit: 'month' as const, anchorDate: '2026-08-28' }],
+      ['planned_flows', 'flow_main', 'date_window_days', 5],
+    ]);
+
+    migrateModel(store);
+    const flux = store.load().plannedFlows;
+    const derive = flux.find((f) => f.id === 'flow_vir')!;
+    expect(derive.origin).toBe('derived');
+    // La photo du plan ne se lit plus : la ventilation se rejoue à l'import (D06).
+    expect((derive as unknown as Record<string, unknown>)['plannedAllocation']).toBeUndefined();
+    // Le montant, lui, ne bouge pas : c'est ce que l'ordre exécute chez la banque.
+    expect(derive.amount).toBe(-65000);
+    expect(flux.find((f) => f.id === 'flow_main')!.origin).toBeUndefined();
+  });
+
   it('la migration est idempotente et journalisée', async () => {
     const store = await storeAtModel1([
       ['envelopes', 'env_courses', 'name', 'Courses'],

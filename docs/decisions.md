@@ -1011,3 +1011,41 @@ Les deux doivent être distinguables dans le modèle comme à l'écran.
 Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé était figée au moment
 de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
 fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
+
+## D58 · 2026-09-09 · Deux montants pour un virement permanent, un seul se stocke
+
+Applique D57 au virement permanent — le seul flux dérivé du budget, et le seul endroit où une photo
+du plan était enregistrée (D21, lot 4).
+
+Un ordre permanent porte deux montants de nature différente, et les confondre casse quelque chose
+dans les deux sens :
+
+- **Ce que le budget demande** est un calcul. Il ne se stocke pas — ce qui se recalcule ne se stocke
+  jamais — il se relit à chaque lecture du plan (`PlanTransfer.standing`). Rien n'est donc à mettre
+  à jour, et aucun bouton n'est à penser à appuyer : un besoin ajouté, une échéance passée, une
+  priorité changée se voient au tour suivant sans autre geste.
+- **Ce que l'ordre exécute chez la banque** est un fait du monde réel. L'application ne peut ni le
+  connaître ni le changer, et elle en a pourtant besoin — avec sa tolérance — pour reconnaître la
+  ligne à l'import. C'est le seul des deux qui s'enregistre : le `amount` d'un `PlannedFlow` dont
+  `origin` vaut `derived`.
+
+Faire suivre le montant enregistré au budget aurait cassé la reconnaissance dès le mois où le budget
+bouge, alors que l'ordre bancaire, lui, n'avait pas changé. Le bouton de l'écran Plan ne disparaît
+donc pas : il change de sens. Il figeait un calcul, il **enregistre un fait** — « mon ordre vers le
+Livret A est désormais à 700 € ». Le plan compare les deux : `PlanTransfer.bankOrder` porte le
+montant enregistré et l'écart, et l'avertissement `bankOrderDrift` dit lequel est à aller changer,
+et où. Un ordre que le budget ne demande plus est signalé plutôt que supprimé en douce : il continue
+de virer chez la banque tant que personne n'y a touché.
+
+`PlannedFlow.plannedAllocation` disparaît (colonne dépréciée, D30 ; migration 9 → 10 : les flux qui
+en portaient une deviennent dérivés, les autres restent déclarés — un virement saisi à la main est
+un flux déclaré comme un autre). `distributeTransfer` (`matching.ts`) devient le cas normal et non
+plus le cas de secours : à l'import, la répartition est celle de l'ordre de financement au jour de
+l'opération (D06), planchers d'abord. Le pire cas que cela corrige est le montant resté **identique**
+— l'ancienne photo s'appliquait alors telle quelle, sans que rien ne signale qu'elle ne
+correspondait plus au budget.
+
+Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque, et le
+jeu d'exemple ne porte pas d'ordre permanent enregistré — il se crée en un clic depuis le Plan, et
+les budgets datés de D51 le font diverger dès la période de novembre, ce qui suffit à voir le geste.
+

@@ -30,8 +30,10 @@ L'alignement du code sur les décisions D19 à D28 est **fait** sur `main`, en c
   rang le plus élevé au rang 1 sur les opérations non verrouillées, aperçu avant/après, actions
   groupées avec déverrouillage, inférence de filtre depuis une sélection, règles engendrées par
   les flux et archivées par période de validité.
-- **Virements** : un permanent par couple de comptes, enregistrable comme flux attendu avec sa
-  ventilation prévue ; à montant différent, la répartition rejoue l'ordre de financement.
+- **Virements** : un permanent par couple de comptes ; le flux enregistré est **dérivé** (D57) et
+  ne porte que le fait bancaire — libellé, montant de l'ordre, tolérance. La ventilation se rejoue
+  toujours par l'ordre de financement au jour de l'opération, et le plan signale l'écart entre ce
+  que l'ordre exécute et ce que le budget demande (D58).
 - **Migrations** (`migration.ts`) : versions 1 → 4, écrites par `upsert` donc propagées par le
   journal, idempotentes, testées sur un journal écrit au modèle 1. Lancées à l'ouverture du dépôt.
 

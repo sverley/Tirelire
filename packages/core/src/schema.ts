@@ -44,7 +44,7 @@ const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop
 const oldAs = (prop: string, col: string, type: ColumnType = 'text'): ColumnDef => ({ ...cAs(prop, col, type), deprecated: true });
 
 /** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
-export const MODEL_VERSION = 9;
+export const MODEL_VERSION = 10;
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {
@@ -125,7 +125,8 @@ export const TABLES: Record<string, TableDef> = {
       c('activeFrom'),
       c('activeTo'),
       c('makesRule', 'boolean'),
-      c('plannedAllocation', 'json'),
+      c('origin'), // D57 : flux déclaré ou dérivé du budget
+      old('plannedAllocation', 'json'), // D58 : la ventilation d'un virement ne se stocke plus
       c('deletedAt'),
     ],
   },
