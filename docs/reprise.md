@@ -9,7 +9,7 @@ comptes de famille en TypeScript — cœur pur dans `packages/core`, PWA Svelte 
 emballage Android Capacitor dans `apps/web/android`, relais de synchronisation dans `apps/relay`.
 Langue de travail : français, y compris code, commentaires, commits et interface.
 
-Avant toute chose, lis dans cet ordre : `README.md`, `docs/decisions.md` (**D01 à D34**),
+Avant toute chose, lis dans cet ordre : `README.md`, `docs/invariants.md`, `docs/decisions.md` (**D01 à D34**),
 `docs/architecture.md`, puis `docs/analyse-du-besoin.html` si tu as besoin du raisonnement
 d'origine. `CLAUDE.md` à la racine résume les conventions. **`docs/plan-sessions.md` dit quoi
 faire ensuite, dans quel ordre, et à quoi on reconnaît qu'un lot est fini** : commence par là.

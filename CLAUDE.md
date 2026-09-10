@@ -1,6 +1,9 @@
 # Tirelire — conventions pour les sessions d'assistant
 
 - Langue : français partout (code, commentaires, commits, interface, docs).
+- Lire `docs/invariants.md` avant tout : ce que le produit doit rester. Une décision se prend au
+  regard des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
+  une décision.
 - Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro ; toute
   décision nouvelle y est ajoutée, datée, sans réécrire les anciennes.
 - Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
@@ -12,3 +15,16 @@
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build` (les hooks le font).
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
 - Simon lit surtout sur téléphone : réponses courtes, en prose, une question à la fois.
+
+## Méthode de travail
+
+- **L'issue définit le besoin, la PR définit la solution.**
+- **Audit d'une PR.** Partir de l'issue. Si le besoin n'est pas clair ou appelle des questions, les
+  poser et les consigner dans l'issue. Une fois le besoin explicite, éditer l'issue au début du
+  travail pour la marquer en cours avec sa branche (titre préfixé `[audit en cours · <branche>]`),
+  puis écrire les harnais qui contrôlent le résultat dans la branche de la PR associée. **En audit,
+  ne jamais toucher au code** : seulement la documentation et les harnais.
+- **Codage d'une PR.** Les questions de développement et les décisions techniques se consignent en
+  commentaires dans la discussion de la PR.
+- **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
+  répertoire de travail (voir #22).
