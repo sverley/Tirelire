@@ -6,6 +6,10 @@
   let editing = $state<Category | undefined>(undefined);
   /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
   let titre = $state('');
+  /** Seul un panneau de création suit la nature ; « Modifier la catégorie — … » ne bouge pas. */
+  let enCréation = $state(false);
+  const titreCréation = (nature: CategoryNature) =>
+    `Ajouter une catégorie de ${nature === 'expense' ? 'dépense' : 'revenu'}`;
   let form = $state({ name: '', nature: 'expense' as CategoryNature, parentId: '', tirelireId: '' });
   let error = $state('');
 
@@ -46,13 +50,15 @@
   function startNew(nature: CategoryNature) {
     editing = { id: app.newId(), name: '', nature };
     form = { name: '', nature, parentId: '', tirelireId: '' };
-    titre = `Ajouter une catégorie de ${nature === 'expense' ? 'dépense' : 'revenu'}`;
+    enCréation = true;
+    titre = titreCréation(nature);
     error = '';
   }
 
   function startEdit(c: Category) {
     editing = c;
     form = { name: c.name, nature: c.nature, parentId: c.parentId ?? '', tirelireId: c.tirelireId ?? '' };
+    enCréation = false;
     titre = `Modifier la catégorie — ${c.name}`;
     error = '';
   }
@@ -61,6 +67,7 @@
     // Le parent et la tirelire budget dépendent de la nature ; on les réinitialise si le choix ne tient plus.
     if (!parentChoices.some((c) => c.id === form.parentId)) form.parentId = '';
     if (form.nature !== 'expense') form.tirelireId = '';
+    if (enCréation) titre = titreCréation(form.nature);
   }
 
   function save(e: Event) {
