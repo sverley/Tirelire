@@ -264,4 +264,12 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
     expect(alertes).toHaveLength(1);
     expect(alertes[0]).toContain(euros(demandé + 500));
   });
+
+  // Arbitrage du 10 septembre, suite : « simple pour le plus grand nombre, souple pour les
+  // exigeants ». À rendre concrètes quand l'écran existe (les libellés ne sont pas encore choisis).
+  it.todo('sans rien toucher, la carte montre une seule ligne de virement permanent et un seul ordre à poser');
+  it.todo('depuis « Détail », diviser le virement ne demande pas de quitter la carte, et Annuler revient à la somme');
+  it.todo('depuis « Détail », regrouper des tirelires en plusieurs ordres : chaque ordre affiche sa demande, son fait bancaire et son écart');
+  it.todo('à 375 px, un compte divisé en quatre ordres reste lisible sans débordement');
+  it.todo('à l’écran Flux, chaque ordre d’un compte divisé est un flux dérivé distinct, non modifiable à la main');
 });

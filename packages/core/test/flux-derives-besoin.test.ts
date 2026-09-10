@@ -488,3 +488,29 @@ describe('#14 · arbitrage : l’ordre voulu est la somme des dotations mensuell
     for (const jour of ['2026-09-29', '2026-10-15', '2026-10-27']) expect(montantComparé(après, compte, jour), jour).toBe(euros(200));
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// 8. Arbitrage du 10 septembre, suite : le « Détail » divise le virement, « simple pour le plus
+//    grand nombre, souple pour les exigeants ».
+//
+//    Gardes à écrire dès que la forme du modèle existe : les écrire maintenant obligerait à
+//    inventer des noms que le développement choisira. Elles restent listées ici pour qu'aucune ne
+//    soit oubliée ; `vitest` les affiche comme « todo ».
+// ---------------------------------------------------------------------------------------------
+
+describe('#14 · arbitrage : diviser le virement, simple par défaut, souple sur demande', () => {
+  // Simple
+  it.todo('sans aucun réglage, un compte a un seul ordre voulu : la somme des dotations de ses tirelires');
+  it.todo('un budget qui n’a jamais été divisé se comporte exactement comme aujourd’hui (aucune migration de sens)');
+  // Souple
+  it.todo('les tirelires d’un compte se répartissent librement en plusieurs ordres, chacune dans un seul ordre, aucune oubliée');
+  it.todo('ce que le budget demande pour chaque ordre est la somme des dotations de ses tirelires, et le total des ordres vaut la somme du compte');
+  it.todo('un ordre par tirelire est un cas particulier du regroupement, pas un mode à part');
+  it.todo('revenir à un seul ordre regroupe tout, sans perdre les faits bancaires enregistrés');
+  // Ce que chaque ordre doit tenir, comme l'ordre unique aujourd'hui (D57)
+  it.todo('chaque ordre enregistre son propre fait bancaire et se compare à sa propre demande ; l’écart d’un ordre ne masque pas celui d’un autre');
+  it.todo('chaque ordre a un libellé distinct, et chaque ligne bancaire est reconnue par l’ordre qui la vire');
+  it.todo('la ligne d’un ordre se ventile par l’ordre de financement parmi ses seules tirelires, recalculé au jour de l’opération');
+  it.todo('le regroupement est un choix de l’utilisateur (fait déclaré) ; les montants des groupes restent des calculs jamais stockés');
+  it.todo('une tirelire ajoutée sur le compte après la division est rattachée à un ordre, et le plan dit lequel est à modifier');
+});
