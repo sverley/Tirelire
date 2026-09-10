@@ -9,6 +9,12 @@
  * - le fait enregistré survit au rechargement ;
  * - un flux **dérivé** se reconnaît à l'écran Flux et ne s'y modifie pas à la main.
  *
+ * Arbitrage de Simon (10 septembre, PR #19) : le virement permanent s'affiche comme **une somme**,
+ * celle des dotations mensuelles des tirelires placées sur le compte, avec un bouton « Détail » qui
+ * montre la part de chaque tirelire et permet de diviser le virement en plusieurs. Les tirelires du
+ * Livret A et leurs dotations viennent de l'exemple (Taxe foncière 100 €, Assurance auto 50 €,
+ * Vacances 200 €, Épargne de précaution 300 €).
+ *
  * Les montants ne sont pas figés : ce que le budget demande est relu à l'écran avant chaque geste.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -122,6 +128,35 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
     expect(c.boutons).toContain('Corriger mon ordre');
     const [alerte] = await alertesÀlÉcran(page);
     expect(alerte).toContain(COMPTE);
+  });
+
+  it('le virement s’affiche comme une somme ; « Détail » montre la dotation de chaque tirelire', async () => {
+    const TIRELIRES = ['Taxe foncière', 'Assurance auto', 'Vacances', 'Épargne de précaution'];
+    const lignesTirelires = () =>
+      page.evaluate((noms: string[]) => {
+        const c = [...document.querySelectorAll('.card')].find((x) => x.querySelector(':scope > .row strong')?.textContent?.trim() === 'Livret A');
+        if (!c) return [];
+        return [...c.querySelectorAll('.row')]
+          .filter((r) => (r as HTMLElement).offsetParent !== null)
+          .map((r) => ({ label: r.querySelector('.label')?.firstChild?.textContent?.trim() ?? '', num: r.querySelector('.num')?.textContent?.trim() ?? '' }))
+          .filter((l) => noms.includes(l.label));
+      }, TIRELIRES);
+
+    expect(await lignesTirelires(), 'la carte détaille déjà les tirelires au lieu d’afficher une somme').toEqual([]);
+    const boutons = (await carte(page)).boutons;
+    const détail = boutons.find((b) => /^détail/i.test(b));
+    expect(détail, `pas de bouton « Détail » dans la carte (boutons : ${boutons.join(', ')})`).toBeTruthy();
+    await cliquerDansCarte(page, détail!);
+
+    const lignes = await lignesTirelires();
+    expect(lignes.map((l) => l.label).sort()).toEqual([...TIRELIRES].sort());
+    const parTirelire = Object.fromEntries(lignes.map((l) => [l.label, centimes(l.num)]));
+    expect(parTirelire).toEqual({ 'Taxe foncière': 10000, 'Assurance auto': 5000, Vacances: 20000, 'Épargne de précaution': 30000 });
+    expect(Object.values(parTirelire).reduce((a, b) => a + b, 0)).toBe(demandé);
+
+    // Refermer, pour que la suite parte de la carte telle qu'elle s'ouvre.
+    const refermer = (await carte(page)).boutons.find((b) => /^détail|masquer|fermer/i.test(b));
+    if (refermer) await cliquerDansCarte(page, refermer);
   });
 
   it('le bouton ouvre une saisie dans la carte, visible, préremplie au pas au-dessus', async () => {

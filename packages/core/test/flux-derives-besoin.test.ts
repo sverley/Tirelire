@@ -9,6 +9,11 @@
  * son ordre, la banque vire, l'import rapproche (`proposeMatches` → `applyMatch`), le plan est relu.
  * Une garde rouge ici veut dire qu'une exigence de l'issue n'est pas tenue, pas que le test est à
  * adapter.
+ *
+ * Arbitrage de Simon (10 septembre, PR #19) : ce que le budget demande comme ordre permanent vers
+ * un compte est la **somme des dotations mensuelles** des tirelires placées sur ce compte, quel que
+ * soit ce qui a déjà été viré dans la période. La section 7 le garde ; elle lit le montant auquel le
+ * plan compare l'ordre (`bankOrder.amount + bankOrder.drift`), pas un champ particulier.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -117,6 +122,67 @@ function gelé<T>(o: T): T {
     for (const v of Object.values(o)) gelé(v);
   }
   return o;
+}
+
+/**
+ * Budget minimal sans arriéré : un compte courant, un livret, une tirelire Vacances à 200 € par
+ * période sur le livret, un ordre de 200 € enregistré, et le virement du 28 septembre importé des
+ * deux côtés.
+ */
+function budgetMinimalAprèsVirement() {
+  const l = emptyLedger({ periodStartDay: 28 });
+  l.accounts.push(
+    { id: 'p', name: 'Courant', kind: 'principal', openingBalance: euros(1000), openingDate: '2026-09-27' },
+    { id: 'e', name: 'Livret', kind: 'epargne', openingBalance: 0, openingDate: '2026-09-27' },
+  );
+  l.tirelires.push({ id: 't', name: 'Vacances', placement: [{ accountId: 'e', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-09-28' });
+  l.needs.push({ id: 'n', tirelireId: 't', kind: 'goal', amount: euros(5000), monthlyAmount: euros(200), priority: 30 } as Need);
+  l.plannedFlows.push({ id: 's', name: 'Salaire', kind: 'income', amount: euros(2000), accountId: 'p', periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-28' }, dateWindowDays: 3 });
+
+  const plan = computePlan(l, '2026-09-28');
+  const t = plan.transfers.find((x) => x.accountId === 'e')!;
+  expect(t.standing).toBe(euros(200));
+  const flux = standingTransferFlow(plan, t, 'p', 'o', euros(200))!;
+  const avecOrdre: Ledger = { ...l, plannedFlows: [...l.plannedFlows, flux] };
+  expect(computePlan(avecOrdre, '2026-09-28').warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(0);
+
+  const libellé = `VIR PERMANENT ${flux.labelPattern}`;
+  const sortie: Operation = { id: 'v', accountId: 'p', origin: 'imported', date: '2026-09-28', label: libellé, normalizedLabel: normalizeLabel(libellé), amount: -euros(200), state: 'untreated' };
+  const entrée: Operation = { id: 'v2', accountId: 'e', origin: 'imported', date: '2026-09-28', label: libellé, normalizedLabel: normalizeLabel(libellé), amount: euros(200), state: 'reconciled', transferAccountId: 'p' };
+  const { proposition, après } = importer({ ...avecOrdre, operations: [entrée] }, sortie);
+  expect(proposition?.auto).toBe(true);
+  return { après, compte: 'e' };
+}
+
+/** Nombre de mois couverts par une périodicité (jour et semaine ramenés au mois). */
+function moisDe(p: NonNullable<Need['periodicity']>): number {
+  const u = p.unit as string;
+  const n = p.interval ?? 1;
+  return u === 'year' ? 12 * n : u === 'month' ? n : u === 'week' ? (n * 7) / 30.4375 : n / 30.4375;
+}
+
+/**
+ * La somme des dotations mensuelles des tirelires placées sur le compte, telle que l'arbitrage la
+ * définit, recalculée ici depuis les besoins et non lue dans le plan. Les tirelires versantes
+ * (`payout`, D48) ne demandent rien.
+ */
+function sommeDesDotations(l: Ledger, compte: string, asOf: string): number {
+  const placées = new Set(alive(l.tirelires).filter((e) => e.placement.some((p) => p.accountId === compte)).map((e) => e.id));
+  let total = 0;
+  for (const n of alive(l.needs)) {
+    if (!placées.has(n.tirelireId)) continue;
+    if ((n.activeFrom && asOf < n.activeFrom) || (n.activeTo && asOf > n.activeTo)) continue;
+    if (n.kind === 'goal') total += n.monthlyAmount ?? 0;
+    else if (n.kind === 'recurring') total += Math.round((n.amount ?? 0) / (n.periodicity ? moisDe(n.periodicity) : 1));
+    else if (n.kind === 'dueDate') total += Math.round((n.amount ?? 0) / (n.periodicity ? moisDe(n.periodicity) : 12));
+  }
+  return total;
+}
+
+/** Le montant auquel le plan compare l'ordre enregistré vers ce compte. */
+function montantComparé(l: Ledger, compte: string, asOf: string): number | undefined {
+  const b = computePlan(l, asOf).transfers.find((x) => x.accountId === compte)?.bankOrder;
+  return b ? b.amount + b.drift : undefined;
 }
 
 // Trois façons dont le budget bouge, tirées de l'issue.
@@ -287,29 +353,7 @@ describe('#14 · cycle mensuel sans changement : aucune fausse alerte', () => {
   });
 
   it('sur un budget minimal sans arriéré, l’ordre juste n’est pas déclaré « à supprimer » après son virement', () => {
-    // Un compte courant, un livret, une tirelire Vacances à 200 € par période sur le livret.
-    const l = emptyLedger({ periodStartDay: 28 });
-    l.accounts.push(
-      { id: 'p', name: 'Courant', kind: 'principal', openingBalance: euros(1000), openingDate: '2026-09-27' },
-      { id: 'e', name: 'Livret', kind: 'epargne', openingBalance: 0, openingDate: '2026-09-27' },
-    );
-    l.tirelires.push({ id: 't', name: 'Vacances', placement: [{ accountId: 'e', share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-09-28' });
-    l.needs.push({ id: 'n', tirelireId: 't', kind: 'goal', amount: euros(5000), monthlyAmount: euros(200), priority: 30 } as Need);
-    l.plannedFlows.push({ id: 's', name: 'Salaire', kind: 'income', amount: euros(2000), accountId: 'p', periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-28' }, dateWindowDays: 3 });
-
-    const plan = computePlan(l, '2026-09-28');
-    const t = plan.transfers.find((x) => x.accountId === 'e')!;
-    expect(t.standing).toBe(euros(200));
-    const flux = standingTransferFlow(plan, t, 'p', 'o', euros(200))!;
-    const avecOrdre: Ledger = { ...l, plannedFlows: [...l.plannedFlows, flux] };
-    expect(computePlan(avecOrdre, '2026-09-28').warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(0);
-
-    // La banque vire les 200 € le 28 ; les deux côtés du virement sont connus.
-    const libellé = `VIR PERMANENT ${flux.labelPattern}`;
-    const sortie: Operation = { id: 'v', accountId: 'p', origin: 'imported', date: '2026-09-28', label: libellé, normalizedLabel: normalizeLabel(libellé), amount: -euros(200), state: 'untreated' };
-    const entrée: Operation = { id: 'v2', accountId: 'e', origin: 'imported', date: '2026-09-28', label: libellé, normalizedLabel: normalizeLabel(libellé), amount: euros(200), state: 'reconciled', transferAccountId: 'p' };
-    const { proposition, après } = importer({ ...avecOrdre, operations: [entrée] }, sortie);
-    expect(proposition?.auto).toBe(true);
+    const { après } = budgetMinimalAprèsVirement();
     for (const jour of ['2026-09-29', '2026-10-15', '2026-10-27'])
       expect(computePlan(après, jour).warnings.filter((w) => w.code === 'bankOrderDrift').map((w) => `${jour} : ${w.message}`)).toEqual([]);
   });
@@ -409,5 +453,38 @@ describe('#14 · la reconnaissance à l’import tient quand le budget bouge', (
     const patch = matchTirelireTransfers({ ...l, operations: [...l.operations, op] });
     expect(patch.operations.find((o) => o.id === op.id)?.transferAccountId).toBe(LIVRET);
     expect(ventilation(patch)).toEqual(attendue(l, op));
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 7. Arbitrage du 10 septembre : l'ordre voulu est la somme des dotations mensuelles des tirelires
+//    placées sur le compte, quel que soit ce qui a déjà été viré dans la période.
+// ---------------------------------------------------------------------------------------------
+
+describe('#14 · arbitrage : l’ordre voulu est la somme des dotations mensuelles', () => {
+  it('le harnais recalcule bien la somme de l’exemple (650 € vers le Livret A, 1 150 € dès la paie de décembre)', () => {
+    const l = exampleLedger();
+    expect(sommeDesDotations(l, LIVRET, AVANT)).toBe(euros(650));
+    expect(sommeDesDotations(l, LIVRET, '2026-12-29')).toBe(euros(1150));
+  });
+
+  it('avant tout virement, le plan compare l’ordre à cette somme, période après période', () => {
+    const l = enregistrerOrdre(exampleLedger(), euros(1));
+    for (const jour of [AVANT, LENDEMAIN, '2026-10-29', '2026-11-29', '2026-12-29'])
+      expect(montantComparé(l, LIVRET, jour), jour).toBe(sommeDesDotations(l, LIVRET, jour));
+  });
+
+  it('après l’import du virement du mois, la somme comparée ne baisse pas', () => {
+    const base = exampleLedger();
+    const posé = sommeDesDotations(base, LIVRET, LENDEMAIN);
+    const avecOrdre = enregistrerOrdre(base, posé, LENDEMAIN);
+    const { après } = importer(avecOrdre, ligneBancaire(avecOrdre, posé));
+    for (const jour of [LENDEMAIN, '2026-10-15', '2026-10-27'])
+      expect(montantComparé(après, LIVRET, jour), jour).toBe(sommeDesDotations(après, LIVRET, jour));
+  });
+
+  it('sur le budget minimal, la somme comparée reste 200 € après le virement', () => {
+    const { après, compte } = budgetMinimalAprèsVirement();
+    for (const jour of ['2026-09-29', '2026-10-15', '2026-10-27']) expect(montantComparé(après, compte, jour), jour).toBe(euros(200));
   });
 });
