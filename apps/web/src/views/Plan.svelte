@@ -45,6 +45,8 @@
   let ordreEdite = $state<string | undefined>(undefined);
   let montantOrdre = $state('');
   let erreurOrdre = $state('');
+  /** Ce qu'annonce le panneau (D59) : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titreOrdre = $state('');
 
   const pasArrondi = $derived(app.ledger.settings.orderRounding);
 
@@ -69,6 +71,7 @@
 
   function ouvrirOrdre(t: PlanTransfer) {
     ordreEdite = t.accountId;
+    titreOrdre = `${t.bankOrder ? 'Corriger' : 'Enregistrer'} mon ordre permanent — ${t.accountName}`;
     montantOrdre = centsToInput(roundOrderUp(t.permanent, pasArrondi));
     erreurOrdre = '';
   }
@@ -203,6 +206,7 @@
         </div>
         {#if ordreEdite === t.accountId}
           <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
+            <p class="titre-panneau">{titreOrdre}</p>
             <p class="muted small" style="margin:0">
               Le montant que <strong>ton ordre exécute chez ta banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
               Proposé arrondi au-dessus de {money(t.permanent)} ; corrige-le pour coller à ce que tu as réellement posé.

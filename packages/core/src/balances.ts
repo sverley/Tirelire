@@ -430,11 +430,10 @@ export function wantedComponents(e: Tirelire, idx: LedgerIndex, asOf: ISODate): 
 }
 
 /**
- * Répartition d'un montant entre les comptes de placement d'une tirelire (D37, D38), avec les
- * mêmes parts que la position voulue. Sert à savoir quelle part d'une dotation part vers quel
- * compte : sans elle, une tirelire posée sur deux livrets serait demandée en entier des deux
- * côtés. `fromAccountId` garde ce qu'aucune part ne réclame — la dotation naît sur le compte
- * principal et y reste tant que rien ne la place ailleurs.
+ * Position voulue d'une tirelire qui porterait `amount` (D37, D38). Une dotation se répartit en
+ * comparant deux appels — la position voulue après, moins celle d'avant : une part fixe est un
+ * plafond de position, pas une part du flux du mois. `fromAccountId` garde ce qu'aucune part ne
+ * réclame : l'argent naît sur le compte principal et y reste tant que rien ne le place ailleurs.
  */
 export function placementShares(e: Tirelire, amount: Cents, fromAccountId: Id): Components {
   return resolvePlacement(e, new Map([[fromAccountId, amount]]));

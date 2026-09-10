@@ -126,7 +126,7 @@ export interface PlanTransfer {
   net: Cents;
   /**
    * Ordre permanent enregistré chez la banque (D60), s'il l'a été : le **fait**, en regard de
-   * `standing` qui est le **calcul**. `drift` vaut ce que le budget demande moins ce que l'ordre
+   * `permanent` qui est le **calcul**. `drift` vaut ce que le budget demande moins ce que l'ordre
    * exécute ; non nul, l'ordre est à modifier chez la banque, puis à confirmer ici — l'application
    * ne peut ni le connaître ni le changer toute seule.
    */
@@ -320,16 +320,26 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
    * - une tirelire **placée sur deux comptes** partage sa dotation entre eux (D37) au lieu de la
    *   demander deux fois.
    *
+   * Le partage se lit comme une **différence de positions voulues** — celle qu'aurait la tirelire
+   * après la dotation, moins celle qu'elle vise avant — et non comme un découpage du seul flux du
+   * mois : une part fixe est un plafond de position (D38). Une précaution plafonnée à 1 000 € sur
+   * un livret et déjà à 3 200 € n'en réclame plus rien, sans quoi le plan demanderait d'en rapatrier
+   * l'excédent tout en réglant un ordre permanent qui l'y renvoie.
+   *
    * Le rattrapage n'en fait pas partie : il est exceptionnel, un ordre permanent ne s'y règle pas.
    */
   const wantedByAccount = new Map<Id, PlanTransfer['breakdown']>();
   for (const e of idx.tireliresById.values()) {
-    const dotation = lines
-      .filter((l) => l.tirelireId === e.id && l.kind !== 'payout' && !(l.kind === 'goal' && l.requested === 0))
-      .reduce((s, l) => s + l.cruise, 0);
+    const siennes = lines.filter((l) => l.tirelireId === e.id);
+    const dotation = siennes.filter((l) => l.kind !== 'payout' && !(l.kind === 'goal' && l.requested === 0)).reduce((s, l) => s + l.cruise, 0);
     if (dotation <= 0) continue;
-    for (const [accountId, part] of placementShares(e, dotation, principal?.id ?? '')) {
-      if (part <= 0 || (principal && accountId === principal.id)) continue;
+    const source = principal?.id ?? '';
+    const solde = siennes[0]?.balance ?? 0;
+    const avant = placementShares(e, solde, source);
+    const apres = placementShares(e, solde + dotation, source);
+    for (const accountId of apres.keys()) {
+      const part = (apres.get(accountId) ?? 0) - (avant.get(accountId) ?? 0);
+      if (part <= 0 || accountId === source) continue;
       wantedByAccount.set(accountId, [...(wantedByAccount.get(accountId) ?? []), { tirelireId: e.id, tirelireName: e.name, cruise: part }]);
     }
   }

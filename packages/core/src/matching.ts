@@ -6,7 +6,7 @@
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
  */
 import type { Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
-import { alive, isLocked } from './model.js';
+import { alive, isDerivedFlow, isLocked } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
 import { fundByPriority, transferLabel } from './plan.js';
@@ -234,13 +234,18 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   patch.operations.push(next);
   const existing = allocationsOf(ledger, op.id);
   /*
-   * Virement permanent (D21, D57) : sa ventilation ne se lit pas dans le flux, elle se **rejoue**
-   * par l'ordre de financement (D06) sur le montant réellement viré, au jour de l'opération. Une
-   * ventilation mémorisée redeviendrait fausse au premier changement de budget — et le pire cas
-   * était le montant resté identique, où l'ancienne photo s'appliquait sans que rien ne le dise.
+   * Virement permanent **dérivé** (D21, D57) : sa ventilation ne se lit pas dans le flux, elle se
+   * **rejoue** par l'ordre de financement (D06) sur le montant réellement viré, au jour de
+   * l'opération. Une ventilation mémorisée redeviendrait fausse au premier changement de budget —
+   * et le pire cas était le montant resté identique, où l'ancienne photo s'appliquait sans que rien
+   * ne le dise.
+   *
+   * Un virement **déclaré**, lui, n'est pas un calcul : il garde la tirelire et la catégorie qu'on
+   * lui a données, avec la part variable qui suit le montant du jour. Le rejouer reviendrait à
+   * réécrire un fait de l'utilisateur, ce que D57 interdit.
    */
   const target = f.counterpartAccountId ?? op.transferAccountId;
-  const parts = f.kind === 'transfer' && existing.length === 0 && target ? distributeTransfer(ledger, target, op.amount, op.date) : [];
+  const parts = f.kind === 'transfer' && isDerivedFlow(f) && existing.length === 0 && target ? distributeTransfer(ledger, target, op.amount, op.date) : [];
   if (parts.length > 0) {
     for (const part of parts) {
       patch.allocations.push({

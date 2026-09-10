@@ -96,6 +96,30 @@ describe('un flux dérivé se recalcule au lieu d’être figé (D57)', () => {
   });
 });
 
+describe('un virement déclaré n’est pas un calcul (D57)', () => {
+  it('sa ventilation reste celle qu’on lui a donnée, part variable comprise', () => {
+    const l = sansOrdre(exampleLedger());
+    // Un virement saisi à la main vers le livret, rattaché à une tirelire précise.
+    const declare: PlannedFlow = {
+      id: 'flow-main',
+      name: 'Virement saisi',
+      kind: 'transfer',
+      amount: -euros(650),
+      accountId: 'acc-principal',
+      counterpartAccountId: 'acc-livret',
+      tirelireId: 'env-vac',
+      periodicity: { interval: 1, unit: 'month', anchorDate: '2026-08-28' },
+      dateWindowDays: 5,
+      labelPattern: 'VIR LIVRET',
+    };
+    const parts = ventilation(l, declare, -euros(650));
+    // Une seule ligne, sur la tirelire déclarée : rejouer l'ordre de financement ici réécrirait un
+    // fait de l'utilisateur, et la part variable (D27) serait perdue au passage.
+    expect([...parts.keys()]).toEqual(['env-vac']);
+    expect(parts.get('env-vac')).toBe(0); // part variable : aucun montant figé
+  });
+});
+
 describe('deux montants distincts : ce que le budget veut, ce que la banque fait (D60)', () => {
   it('l’écart se voit dans le plan et se dit', () => {
     const l = sansOrdre(exampleLedger());
