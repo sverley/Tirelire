@@ -105,7 +105,7 @@ describe('deux montants distincts : ce que le budget veut, ce que la banque fait
     const enRetard: Ledger = { ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l, demande - euros(50))] };
     const plan = computePlan(enRetard, asOf);
     const t = plan.transfers.find((x) => x.accountId === 'acc-livret')!;
-    expect(t.bankOrder).toEqual({ flowId: 'flow-vir', amount: demande - euros(50), drift: euros(50) });
+    expect(t.bankOrder).toEqual({ flowId: 'flow-vir', amount: demande - euros(50), drift: euros(50), since: '2026-08-28' });
     // Le budget, lui, n'a pas bougé : ce qu'il demande reste ce qu'il demande.
     expect(t.standing).toBe(demande);
     const alerte = plan.warnings.find((w) => w.code === 'bankOrderDrift')!;
@@ -145,7 +145,7 @@ describe('deux montants distincts : ce que le budget veut, ce que la banque fait
     const alerte = plan.warnings.find((w) => w.code === 'bankOrderDrift' && w.accountId === 'acc-vide')!;
     // Aucune tirelire n'y est placée : le budget ne demande rien, l'ordre continue pourtant de virer.
     expect(t.standing).toBe(0);
-    expect(t.bankOrder).toEqual({ flowId: 'flow-vide', amount: euros(300), drift: -euros(300) });
+    expect(t.bankOrder).toEqual({ flowId: 'flow-vide', amount: euros(300), drift: -euros(300), since: '2026-08-28' });
     expect(alerte.message).toContain('supprimer');
 
     // Le geste que propose alors le Plan : oublier l'ordre. Rien d'autre ne s'en trouve changé.
@@ -208,7 +208,7 @@ describe('le jeu d’exemple porte un ordre permanent décalé', () => {
     const t = plan.transfers.find((x) => x.accountId === 'acc-livret')!;
     // Ce que le budget demande n'a pas bougé d'un centime : l'ordre enregistré ne le touche pas.
     expect(t.standing).toBe(euros(650));
-    expect(t.bankOrder).toEqual({ flowId: 'flow-vir-livret', amount: euros(600), drift: euros(50) });
+    expect(t.bankOrder).toEqual({ flowId: 'flow-vir-livret', amount: euros(600), drift: euros(50), since: '2026-08-28' });
     expect(plan.warnings.map((w) => w.code)).toContain('bankOrderDrift');
   });
 

@@ -357,7 +357,7 @@ export interface PlannedFlow {
    * Sur un flux dérivé (D60), c'est ce que l'**ordre permanent exécute chez la banque** : un fait
    * du monde réel, que seul l'utilisateur peut apprendre à l'application, et qui sert à reconnaître
    * la ligne à l'import. Ce que le budget demande, lui, ne se stocke pas : c'est
-   * `PlanTransfer.standing`, recalculé à chaque lecture du plan.
+   * `PlanTransfer.permanent`, recalculé à chaque lecture du plan.
    */
   amount: Cents;
   accountId: Id;

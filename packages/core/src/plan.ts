@@ -14,13 +14,14 @@ import {
   tirelireComponents,
   indexLedger,
   needCruise,
+  placementShares,
   periodSnapshot,
   settlementBalance,
   unallocated,
   type LedgerIndex,
 } from './balances.js';
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
-import { addDays } from './dates.js';
+import { addDays, addMonths } from './dates.js';
 
 export interface PlanFlowLine {
   flowId: Id;
@@ -129,7 +130,7 @@ export interface PlanTransfer {
    * exécute ; non nul, l'ordre est à modifier chez la banque, puis à confirmer ici — l'application
    * ne peut ni le connaître ni le changer toute seule.
    */
-  bankOrder?: { flowId: Id; amount: Cents; drift: Cents };
+  bankOrder?: { flowId: Id; amount: Cents; drift: Cents; since: ISODate };
 }
 
 export interface PlanWarning {
@@ -307,6 +308,32 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   }
 
   // Virements par compte (vue principal ↔ compte), règlements des tiers, surplus des comptes d'accueil.
+  /*
+   * Ce que chaque tirelire demande comme **dotation permanente**, compte par compte (D60). Quatre
+   * pièges, qu'un simple `needCruise` par tirelire ne verrait pas :
+   *
+   * - un **objectif atteint** ne demande plus rien (D06) : un ordre qui le compterait encore
+   *   virerait de l'argent sans emploi ;
+   * - une **échéance déjà provisionnée**, elle, continue de compter : elle sera dépensée, et
+   *   l'épargne reprend juste après — on ne suspend pas un ordre permanent pour un mois ;
+   * - un **besoin versant** (D48) rend de l'argent au lieu d'en réclamer ;
+   * - une tirelire **placée sur deux comptes** partage sa dotation entre eux (D37) au lieu de la
+   *   demander deux fois.
+   *
+   * Le rattrapage n'en fait pas partie : il est exceptionnel, un ordre permanent ne s'y règle pas.
+   */
+  const wantedByAccount = new Map<Id, PlanTransfer['breakdown']>();
+  for (const e of idx.tireliresById.values()) {
+    const dotation = lines
+      .filter((l) => l.tirelireId === e.id && l.kind !== 'payout' && !(l.kind === 'goal' && l.requested === 0))
+      .reduce((s, l) => s + l.cruise, 0);
+    if (dotation <= 0) continue;
+    for (const [accountId, part] of placementShares(e, dotation, principal?.id ?? '')) {
+      if (part <= 0 || (principal && accountId === principal.id)) continue;
+      wantedByAccount.set(accountId, [...(wantedByAccount.get(accountId) ?? []), { tirelireId: e.id, tirelireName: e.name, cruise: part }]);
+    }
+  }
+
   const transfers: PlanTransfer[] = [];
   for (const a of idx.accountsById.values()) {
     if (principal && a.id === principal.id) continue;
@@ -359,17 +386,12 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
      * pas (D60). Les deux se comparent ici, et l'écart se dit — c'est le seul endroit du plan qui
      * demande un geste hors de l'application.
      */
-    const breakdown = [...idx.tireliresById.values()]
-      .filter((e) => e.placement.some((p) => p.accountId === a.id))
-      .map((e) => ({
-        tirelireId: e.id,
-        tirelireName: e.name,
-        cruise: (idx.needsByTirelire.get(e.id) ?? []).filter((n) => needActive(n, asOf)).reduce((x, n) => x + needCruise(n), 0),
-      }))
-      .filter((b) => b.cruise !== 0);
+    const breakdown = wantedByAccount.get(a.id) ?? [];
     const permanent = Math.max(0, breakdown.reduce((s, b) => s + b.cruise, 0));
     const flux = standingOrderFlow(flows, a.id);
-    const bankOrder = flux ? { flowId: flux.id, amount: Math.abs(flux.amount), drift: permanent - Math.abs(flux.amount) } : undefined;
+    const bankOrder = flux
+      ? { flowId: flux.id, amount: Math.abs(flux.amount), drift: permanent - Math.abs(flux.amount), since: flux.periodicity.anchorDate }
+      : undefined;
     // L'ordre arrondi au-dessus du budget couvre ce qu'on lui demande : rien à corriger. On ne
     // signale que l'ordre trop court, celui qui vire plus d'un pas d'arrondi de trop, et celui que
     // le budget ne demande plus du tout — celui-là quel que soit son montant.
@@ -480,6 +502,20 @@ export function roundOrderUp(cents: Cents, step: Cents): Cents {
   return Math.ceil(cents / step) * step;
 }
 
+/**
+ * Ancrage du flux de l'ordre permanent. Un ordre déjà enregistré garde le sien : corriger son
+ * montant ne dit pas qu'il commence aujourd'hui, et le déplacer ferait perdre la reconnaissance
+ * des virements déjà passés. Un ordre nouveau s'ancre sur la période en cours, jamais sur celle
+ * qu'on regarde — le Plan se feuillette, et un ordre enregistré en lisant décembre vire dès ce
+ * mois-ci.
+ */
+function standingAnchor(plan: Plan, transfer: PlanTransfer): ISODate {
+  if (transfer.bankOrder) return transfer.bankOrder.since;
+  let anchor = plan.period.start;
+  while (anchor > plan.today) anchor = addMonths(anchor, -1);
+  return anchor;
+}
+
 /** L'ordre permanent enregistré vers un compte (D57) : un flux dérivé, un seul par compte. */
 export function standingOrderFlow(flows: PlannedFlow[], accountId: Id): PlannedFlow | undefined {
   return alive(flows).find((f) => f.kind === 'transfer' && isDerivedFlow(f) && f.counterpartAccountId === accountId);
@@ -505,7 +541,7 @@ export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, princip
     amount: -amount,
     accountId: principalId,
     counterpartAccountId: transfer.accountId,
-    periodicity: { interval: 1, unit: 'month' as const, anchorDate: plan.period.start },
+    periodicity: { interval: 1, unit: 'month' as const, anchorDate: standingAnchor(plan, transfer) },
     dateWindowDays: 5,
     labelPattern: transfer.label,
     amountTolerance: { pct: 20 },

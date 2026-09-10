@@ -1110,7 +1110,7 @@ Un ordre permanent porte deux montants de nature différente, et les confondre c
 dans les deux sens :
 
 - **Ce que le budget demande** est un calcul. Il ne se stocke pas — ce qui se recalcule ne se stocke
-  jamais — il se relit à chaque lecture du plan (`PlanTransfer.standing`). Rien n'est donc à mettre
+  jamais — il se relit à chaque lecture du plan (`PlanTransfer.permanent`). Rien n'est donc à mettre
   à jour, et aucun bouton n'est à penser à appuyer : un besoin ajouté, une échéance passée, une
   priorité changée se voient au tour suivant sans autre geste.
 - **Ce que l'ordre exécute chez la banque** est un fait du monde réel. L'application ne peut ni le
@@ -1133,6 +1133,22 @@ plus le cas de secours : à l'import, la répartition est celle de l'ordre de fi
 l'opération (D06), planchers d'abord. Le pire cas que cela corrige est le montant resté **identique**
 — l'ancienne photo s'appliquait alors telle quelle, sans que rien ne signale qu'elle ne
 correspondait plus au budget.
+
+Ce que le budget demande comme ordre permanent est **la somme des dotations mensuelles** des
+tirelires placées sur ce compte, quoi qu'il ait déjà été viré dans la période — c'est un régime, pas
+un reste à faire. Comparer l'ordre au reste à virer (`PlanTransfer.standing`) allumait l'alerte le
+lendemain de chaque virement. Quatre cas s'en déduisent, et sont tenus par le harnais : un objectif
+atteint sort de la somme (il ne demande plus rien, D06) ; une échéance déjà provisionnée y reste
+(elle sera dépensée, l'épargne reprend juste après) ; un besoin versant (D48) n'y entre pas, il rend
+de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D37) au lieu de
+l'exiger deux fois. Le rattrapage n'en fait jamais partie : un ordre permanent ne se règle pas sur
+l'exceptionnel. L'écran l'affiche comme une somme, dépliable par « Détail » — c'est là que viendra
+la division d'un virement en plusieurs ordres (issue #25).
+
+Un ordre déjà enregistré garde son ancrage quand on corrige son montant : le déplacer ferait perdre
+la reconnaissance des virements déjà passés. Un ordre nouveau s'ancre sur la période en cours, et
+non sur celle qu'on regarde — le Plan se feuillette, et un ordre enregistré en lisant décembre vire
+dès ce mois-ci.
 
 Le jeu d'exemple porte l'ordre, et le porte **décalé** : la banque vire 600 €, le budget en demande
 650, si bien que le plan du 6 septembre montre les deux montants côte à côte sans qu'on ait rien à
