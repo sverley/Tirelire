@@ -514,3 +514,62 @@ describe('#14 · arbitrage : diviser le virement, simple par défaut, souple sur
   it.todo('le regroupement est un choix de l’utilisateur (fait déclaré) ; les montants des groupes restent des calculs jamais stockés');
   it.todo('une tirelire ajoutée sur le compte après la division est rattachée à un ordre, et le plan dit lequel est à modifier');
 });
+
+// ---------------------------------------------------------------------------------------------
+// 9. Audit du code (10 septembre, après « codage fini ») : cas limites de `permanent` et de
+//    l'enregistrement. Chaque garde part d'une phrase du besoin ou d'une règle déjà en vigueur ;
+//    rouge = le code de la branche ne la tient pas.
+// ---------------------------------------------------------------------------------------------
+
+describe('#14 · audit : ce que le budget demande ne compte que ce que le plan financera', () => {
+  it('une tirelire placée sur deux livrets n’est pas comptée deux fois dans les ordres voulus', () => {
+    // Épargne de précaution moitié sur le Livret A, moitié sur un second livret : sa dotation de
+    // 300 € se partage entre deux ordres, elle ne se demande pas deux fois.
+    const base = exampleLedger();
+    const LDD = 'acc-harnais-ldd';
+    const l: Ledger = {
+      ...base,
+      accounts: [...base.accounts, { id: LDD, name: 'LDDS', kind: 'epargne', openingBalance: euros(1600), openingDate: '2026-08-27' }],
+      tirelires: base.tirelires.map((e) =>
+        e.id === 'env-precaution'
+          ? { ...e, placement: [{ accountId: LIVRET, share: { kind: 'percent', pct: 50 } }, { accountId: LDD, share: { kind: 'percent', pct: 50 } }] }
+          : e,
+      ),
+    };
+    const plan = computePlan(l, AVANT);
+    const total = plan.transfers.filter((t) => t.accountId === LIVRET || t.accountId === LDD).reduce((s, t) => s + t.permanent, 0);
+    expect(total).toBe(euros(650));
+  });
+
+  it('une tirelire versante (payout, D48) ne fait pas monter l’ordre demandé : elle verse, elle ne réclame pas', () => {
+    const base = exampleLedger();
+    const avant = demande(base, AVANT);
+    const l: Ledger = {
+      ...base,
+      needs: [...base.needs, { id: 'need-harnais-versant', tirelireId: 'env-vac', kind: 'payout', amount: euros(1200), periodicity: { interval: 1, unit: 'year', anchorDate: '2026-01-01' }, priority: 50 } as Need],
+    };
+    expect(demande(l, AVANT)).toBeLessThanOrEqual(avant);
+  });
+
+  it('un objectif atteint ne réclame plus sa dotation (D06) : il sort de la somme demandée', () => {
+    // L'épargne de précaution vise 6 000 € ; on la dit pleine. Le financement ne lui donne plus
+    // rien (`requested = 0`) : un ordre qui la compterait encore virerait de l'argent sans emploi.
+    const base = exampleLedger();
+    const pleine: Ledger = { ...base, tirelires: base.tirelires.map((e) => (e.id === 'env-precaution' ? { ...e, openingBalance: euros(6000) } : e)) };
+    expect(demande(pleine, AVANT)).toBe(demande(base, AVANT) - euros(300));
+  });
+});
+
+describe('#14 · audit : un ordre enregistré depuis n’importe quelle période reste reconnu', () => {
+  it('enregistré en regardant le plan de décembre, l’ordre reconnaît quand même le virement de septembre', () => {
+    // Le Plan se feuillette (periodsAround) ; le geste « Enregistrer / Corriger mon ordre » prend
+    // pour ancrage le début de la période affichée. Un ordre bancaire, lui, vire déjà.
+    const base = exampleLedger();
+    const décembre = computePlan(base, '2026-12-06');
+    const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
+    const flux = standingTransferFlow(décembre, t, PRINCIPAL, t.bankOrder!.flowId, euros(650))!;
+    const l: Ledger = { ...base, plannedFlows: base.plannedFlows.map((f) => (f.id === flux.id ? flux : f)) };
+    const { proposition } = importer(l, ligneBancaire(l, euros(650), JOUR_VIREMENT));
+    expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
+  });
+});
