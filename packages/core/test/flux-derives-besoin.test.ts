@@ -574,3 +574,31 @@ describe('#14 · audit : un ordre enregistré depuis n’importe quelle période
     expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// 10. Contre-vérification de afe97f0 (10 septembre, 21 h) : la dotation se partage désormais avec
+//     les parts du placement (`placementShares`). Une part **fixe** est un plafond de position,
+//     pas une part de flux : une fois atteinte, ce compte ne doit plus rien recevoir de la dotation.
+// ---------------------------------------------------------------------------------------------
+
+describe('#14 · contre-vérification : une part fixe déjà atteinte ne réclame plus de dotation', () => {
+  it('précaution plafonnée à 1 000 € sur le Livret A et déjà au-delà : l’ordre vers le livret ne la compte plus', () => {
+    const base = exampleLedger();
+    const l: Ledger = {
+      ...base,
+      tirelires: base.tirelires.map((e) =>
+        e.id === 'env-precaution'
+          ? { ...e, placement: [{ accountId: LIVRET, share: { kind: 'fixed', amount: euros(1000) } }, { accountId: PRINCIPAL, share: { kind: 'variable' } }] }
+          : e,
+      ),
+    };
+    const plan = computePlan(l, AVANT);
+    // Le plan demande de ramener l'excédent du livret vers le compte courant…
+    const retour = plan.gaps.find((g) => g.tirelireId === 'env-precaution' && g.fromAccountId === LIVRET && g.toAccountId === PRINCIPAL);
+    expect(retour?.amount ?? 0).toBeGreaterThan(0);
+    // …il ne peut pas, dans le même temps, demander un ordre permanent qui l'y renvoie.
+    const t = plan.transfers.find((x) => x.accountId === LIVRET)!;
+    expect(t.breakdown.map((b) => b.tirelireId)).not.toContain('env-precaution');
+    expect(t.permanent).toBe(euros(350));
+  });
+});
