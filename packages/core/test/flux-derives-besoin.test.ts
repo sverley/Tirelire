@@ -51,9 +51,13 @@ function transfert(l: Ledger, asOf: string) {
   return { plan, t: plan.transfers.find((x) => x.accountId === LIVRET) };
 }
 
-/** Ce que le budget demande vers le Livret A à cette date. */
+/**
+ * Ce que le budget demande vers le Livret A à cette date, comme ordre permanent : la croisière des
+ * tirelires placées là (`permanent`), et non ce qui reste à virer cette période (`standing`), qui
+ * fond dès que le virement est passé.
+ */
 function demande(l: Ledger, asOf: string): number {
-  return transfert(l, asOf).t?.standing ?? 0;
+  return transfert(l, asOf).t?.permanent ?? 0;
 }
 
 /** Le geste de l'écran Plan : enregistrer le montant que l'ordre exécute chez la banque. */
@@ -255,7 +259,7 @@ describe('#14 · l’ordre chez la banque diverge : signalé, jamais réécrit',
     const vide: Ledger = { ...base, needs: base.needs.filter((n) => !['env-tf', 'env-auto', 'env-vac', 'env-precaution'].includes(n.tirelireId)) };
     for (const montant of [euros(300), euros(10), euros(5)]) {
       const l = enregistrerOrdre(vide, montant);
-      expect(transfert(l, AVANT).t?.standing).toBe(0);
+      expect(demande(l, AVANT)).toBe(0);
       expect(alertes(l, AVANT), `ordre de ${formatCents(montant)} devenu inutile, non signalé`).toHaveLength(1);
     }
   });
@@ -332,7 +336,9 @@ describe('#14 · déclaré ou dérivé', () => {
   });
 
   it('un virement saisi à la main reste déclaré et n’est pas pris pour l’ordre permanent', () => {
-    const l = exampleLedger();
+    // L'exemple porte son propre ordre dérivé (D58) : on le retire pour n'avoir que celui saisi.
+    const base = exampleLedger();
+    const l: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
     const main: PlannedFlow = {
       id: 'flow-main',
       name: 'Virement saisi',

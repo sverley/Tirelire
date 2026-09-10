@@ -50,7 +50,7 @@
 
   function ouvrirOrdre(t: PlanTransfer) {
     ordreEdite = t.accountId;
-    montantOrdre = centsToInput(roundOrderUp(t.standing, pasArrondi));
+    montantOrdre = centsToInput(roundOrderUp(t.permanent, pasArrondi));
     erreurOrdre = '';
   }
 
@@ -145,28 +145,28 @@
           {/each}
         </div>
       {/if}
-      {#if t.standing > 0 || t.exceptional > 0 || t.bankOrder}
+      {#if t.permanent > 0 || t.exceptional > 0 || t.bankOrder}
         <div class="row">
-          <div class="label">Virement permanent<span class="sub">ce que le budget demande, recalculé</span></div>
-          <div class="num">{money(t.standing)}</div>
+          <div class="label">Virement permanent<span class="sub">ce que le budget demande chaque période, recalculé</span></div>
+          <div class="num">{money(t.permanent)}</div>
         </div>
         {#if t.bankOrder}
           <div class="row">
             <div class="label">Ordre permanent chez la banque
               <span class="sub">
-                {t.standing === 0
+                {t.permanent === 0
                   ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
                   : t.bankOrder.drift === 0
                     ? 'au montant du budget'
                     : t.bankOrder.drift < 0 && t.bankOrder.drift >= -pasArrondi
                       ? 'arrondi au-dessus du budget : il couvre ce qui est demandé'
-                      : `à passer à ${money(roundOrderUp(t.standing, pasArrondi))} chez la banque, puis à confirmer ici`}
+                      : `à passer à ${money(roundOrderUp(t.permanent, pasArrondi))} chez la banque, puis à confirmer ici`}
               </span>
             </div>
             <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
           </div>
         {/if}
-        {#if t.standing > 0 && ordreEdite !== t.accountId}
+        {#if t.permanent > 0 && ordreEdite !== t.accountId}
           <div class="actions" style="margin:6px 0 0">
             <button class="btn small" onclick={() => ouvrirOrdre(t)}>{t.bankOrder ? 'Corriger mon ordre' : 'Enregistrer mon ordre permanent'}</button>
           </div>
@@ -175,7 +175,7 @@
           <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
             <p class="muted small" style="margin:0">
               Le montant que <strong>ton ordre exécute chez ta banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
-              Proposé arrondi au-dessus de {money(t.standing)} ; corrige-le pour coller à ce que tu as réellement posé.
+              Proposé arrondi au-dessus de {money(t.permanent)} ; corrige-le pour coller à ce que tu as réellement posé.
             </p>
             <div class="grid">
               <label class="f">Montant de l’ordre permanent (€) <input bind:value={montantOrdre} inputmode="decimal" /></label>

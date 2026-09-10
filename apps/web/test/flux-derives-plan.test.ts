@@ -107,19 +107,25 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
 
   let demandé = 0;
 
-  it('le Plan montre ce que le budget demande, et propose d’enregistrer l’ordre', async () => {
+  it('le Plan montre les deux montants dès l’exemple, et dit lequel changer', async () => {
+    // Le jeu d'exemple porte un ordre volontairement décalé (D58) : la banque vire 600 €, le
+    // budget en demande 650. La comparaison est donc là sans qu'on ait rien saisi.
     const c = await carte(page);
     expect(c.visible, `carte « ${COMPTE} » absente du Plan`).toBe(true);
     const permanent = ligne(c, 'Virement permanent');
     expect(permanent, 'ligne « Virement permanent » absente').toBeTruthy();
     demandé = centimes(permanent!.montant);
     expect(demandé).toBeGreaterThan(0);
-    expect(ligne(c, 'Ordre permanent chez la banque')).toBeUndefined();
-    expect(c.boutons).toContain('Enregistrer mon ordre permanent');
+    const banque = ligne(c, 'Ordre permanent chez la banque');
+    expect(banque, 'ligne « Ordre permanent chez la banque » absente').toBeTruthy();
+    expect(centimes(banque!.montant)).toBeLessThan(demandé);
+    expect(c.boutons).toContain('Corriger mon ordre');
+    const [alerte] = await alertesÀlÉcran(page);
+    expect(alerte).toContain(COMPTE);
   });
 
   it('le bouton ouvre une saisie dans la carte, visible, préremplie au pas au-dessus', async () => {
-    expect(await cliquerDansCarte(page, 'Enregistrer mon ordre permanent')).toBe(true);
+    expect(await cliquerDansCarte(page, 'Corriger mon ordre')).toBe(true);
     await attendre(400);
     const c = await carte(page);
     expect(dialogues, 'une boîte de confirmation fige-t-elle encore un calcul ?').toEqual([]);
@@ -133,15 +139,17 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
   });
 
   it('Annuler n’enregistre rien', async () => {
+    const avant = centimes((await carte(page)).lignes.find((l) => l.libellé.startsWith('Ordre permanent chez la banque'))?.montant ?? '');
     expect(await cliquerDansCarte(page, 'Annuler')).toBe(true);
     const c = await carte(page);
     expect(c.formulaire).toBeUndefined();
-    expect(ligne(c, 'Ordre permanent chez la banque')).toBeUndefined();
+    // Le montant enregistré n'a pas bougé : rien n'a été écrit.
+    expect(centimes(ligne(c, 'Ordre permanent chez la banque')!.montant)).toBe(avant);
   });
 
   it('un ordre posé trop court s’enregistre tel quel, et le plan dit lequel changer', async () => {
-    await cliquerDansCarte(page, 'Enregistrer mon ordre permanent');
-    const posé = demandé - 5000;
+    await cliquerDansCarte(page, 'Corriger mon ordre');
+    const posé = demandé - 7000;
     await saisirMontant(page, euros(posé));
     await cliquerDansCarte(page, 'Enregistrer');
     const c = await carte(page);
@@ -164,7 +172,7 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => [...document.querySelectorAll('h2')].some((h) => h.textContent === 'Tirelires'));
     const c = await carte(page);
-    expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(demandé - 5000);
+    expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(demandé - 7000);
   });
 
   it('corrigé à un montant arrondi au-dessus, l’ordre ne crie plus', async () => {

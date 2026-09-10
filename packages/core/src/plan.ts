@@ -101,8 +101,15 @@ export interface PlanTransfer {
   label: string;
   /** Détail par tirelire. */
   orders: StandingOrder[];
-  /** Somme des parts permanentes. */
+  /** Somme des parts permanentes restant à virer cette période. */
   standing: Cents;
+  /**
+   * Ce que le budget demande comme **ordre permanent** vers ce compte (D58) : la croisière des
+   * tirelires qui y sont placées, indépendante de ce qui a déjà été viré. `standing`, lui, fond à
+   * mesure que la période s'exécute — le comparer à l'ordre de la banque ferait crier « ordre
+   * inutile » le lendemain du virement.
+   */
+  permanent: Cents;
   /** Somme des compléments exceptionnels. */
   exceptional: Cents;
   /** Compte tiers : règlement de la dette. Positif = principal → tiers, négatif = tiers → principal. */
@@ -347,17 +354,24 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
      * pas (D58). Les deux se comparent ici, et l'écart se dit — c'est le seul endroit du plan qui
      * demande un geste hors de l'application.
      */
+    const permanent = Math.max(
+      0,
+      [...idx.tireliresById.values()]
+        .filter((e) => e.placement.some((p) => p.accountId === a.id))
+        .reduce((s, e) => s + (idx.needsByTirelire.get(e.id) ?? []).filter((n) => needActive(n, asOf)).reduce((x, n) => x + needCruise(n), 0), 0),
+    );
     const flux = standingOrderFlow(flows, a.id);
-    const bankOrder = flux ? { flowId: flux.id, amount: Math.abs(flux.amount), drift: standing - Math.abs(flux.amount) } : undefined;
+    const bankOrder = flux ? { flowId: flux.id, amount: Math.abs(flux.amount), drift: permanent - Math.abs(flux.amount) } : undefined;
     // L'ordre arrondi au-dessus du budget couvre ce qu'on lui demande : rien à corriger. On ne
-    // signale que l'ordre trop court, ou celui qui vire plus d'un pas d'arrondi de trop.
-    if (bankOrder && (bankOrder.drift > 0 || bankOrder.drift < -ledger.settings.orderRounding))
+    // signale que l'ordre trop court, celui qui vire plus d'un pas d'arrondi de trop, et celui que
+    // le budget ne demande plus du tout — celui-là quel que soit son montant.
+    if (bankOrder && (permanent === 0 || bankOrder.drift > 0 || bankOrder.drift < -ledger.settings.orderRounding))
       warnings.push({
         code: 'bankOrderDrift',
         message:
-          standing === 0
+          permanent === 0
             ? `L'ordre permanent de ${formatCents(bankOrder.amount)} vers « ${a.name} » n'est plus demandé par le budget : à supprimer chez la banque, puis ici.`
-            : `L'ordre permanent vers « ${a.name} » est à ${formatCents(bankOrder.amount)}, le budget en demande ${formatCents(standing)} : à modifier chez la banque, puis à confirmer ici.`,
+            : `L'ordre permanent vers « ${a.name} » est à ${formatCents(bankOrder.amount)}, le budget en demande ${formatCents(permanent)} : à modifier chez la banque, puis à confirmer ici.`,
         accountId: a.id,
       });
     const net = standing + exceptional + settlement - surplus;
@@ -369,6 +383,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       label: transferLabel(a.name),
       orders,
       standing,
+      permanent,
       exceptional,
       settlement,
       surplus,
@@ -467,11 +482,11 @@ export function standingOrderFlow(flows: PlannedFlow[], accountId: Id): PlannedF
  * banque, son libellé, sa tolérance — pour que la ligne soit reconnue à l'import. Sa ventilation,
  * elle, ne s'écrit nulle part : elle se rejoue par l'ordre de financement au jour de l'opération.
  *
- * `amount` vaut par défaut la part permanente que demande le budget — le cas de celui qui vient de
- * poser l'ordre chez sa banque. Le complément exceptionnel du mois n'en fait jamais partie : il
- * n'a pas vocation à devenir un ordre permanent.
+ * `amount` vaut par défaut ce que le budget demande comme ordre permanent — la croisière des
+ * tirelires placées là, pas ce qui reste à virer cette période, et jamais le complément
+ * exceptionnel du mois : celui-ci n'a pas vocation à devenir un ordre permanent.
  */
-export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, principalId: Id, id: Id, amount: Cents = transfer.standing): PlannedFlow | undefined {
+export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, principalId: Id, id: Id, amount: Cents = transfer.permanent): PlannedFlow | undefined {
   if (amount <= 0) return undefined;
   return {
     id,
