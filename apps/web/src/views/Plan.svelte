@@ -54,6 +54,18 @@
     erreurOrdre = '';
   }
 
+  /**
+   * Le seul cas où l'ordre enregistré n'a plus lieu d'être : le budget ne demande plus rien vers ce
+   * compte. Le bouton n'apparaît que là, et il y remplace « Corriger mon ordre » — la carte n'en
+   * porte jamais deux. Supprimer ici n'arrête rien chez la banque : c'est le sens de la question.
+   */
+  function supprimerOrdre(t: PlanTransfer) {
+    const id = t.bankOrder?.flowId;
+    if (!id) return;
+    if (!confirm(`Supprimer l'ordre permanent vers « ${t.accountName} » ?\n\nÀ faire une fois qu'il est supprimé chez ta banque — sinon le virement continuera d'arriver sans être reconnu.`)) return;
+    app.remove('plannedFlows', id);
+  }
+
   function enregistrerOrdre(e: Event, t: PlanTransfer) {
     e.preventDefault();
     if (!principalId) return;
@@ -169,6 +181,10 @@
         {#if t.permanent > 0 && ordreEdite !== t.accountId}
           <div class="actions" style="margin:6px 0 0">
             <button class="btn small" onclick={() => ouvrirOrdre(t)}>{t.bankOrder ? 'Corriger mon ordre' : 'Enregistrer mon ordre permanent'}</button>
+          </div>
+        {:else if t.permanent === 0 && t.bankOrder}
+          <div class="actions" style="margin:6px 0 0">
+            <button class="btn small danger" onclick={() => supprimerOrdre(t)}>Supprimer l’ordre enregistré</button>
           </div>
         {/if}
         {#if ordreEdite === t.accountId}

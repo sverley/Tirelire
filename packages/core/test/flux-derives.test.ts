@@ -147,6 +147,14 @@ describe('deux montants distincts : ce que le budget veut, ce que la banque fait
     expect(t.standing).toBe(0);
     expect(t.bankOrder).toEqual({ flowId: 'flow-vide', amount: euros(300), drift: -euros(300) });
     expect(alerte.message).toContain('supprimer');
+
+    // Le geste que propose alors le Plan : oublier l'ordre. Rien d'autre ne s'en trouve changé.
+    const oublie = computePlan(
+      { ...vide, plannedFlows: vide.plannedFlows.map((f) => (f.id === 'flow-vide' ? { ...f, deletedAt: '2026-09-06T10:00:00.000Z' } : f)) },
+      asOf,
+    );
+    expect(oublie.transfers.find((x) => x.accountId === 'acc-vide')).toBeUndefined();
+    expect(oublie.warnings.filter((w) => w.accountId === 'acc-vide')).toEqual([]);
   });
 });
 
