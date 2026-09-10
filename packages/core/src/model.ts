@@ -577,6 +577,13 @@ export interface Settings {
   principalCushion: Cents;
   /** En dessous de ce montant, un écart de placement (D20) est « à surveiller » plutôt qu'« à faire ». */
   transferThreshold: Cents;
+  /**
+   * Pas d'arrondi d'un ordre permanent (D58) : on pose chez sa banque un montant rond, pas
+   * 683,50 €. Le plan propose le multiple au-dessus de ce que le budget demande, et un ordre
+   * arrondi au-dessus dans ce pas ne se signale pas — il couvre ce qui est demandé. `0` propose
+   * le montant au centime près et signale alors tout écart.
+   */
+  orderRounding: Cents;
   /** Identifiant de cet appareil (pour l'horloge logique et le journal). */
   siteId: string;
 }
@@ -585,6 +592,7 @@ export const DEFAULT_SETTINGS: Settings = {
   periodStartDay: 1,
   principalCushion: 0,
   transferThreshold: 1000,
+  orderRounding: 1000,
   siteId: 'local',
 };
 

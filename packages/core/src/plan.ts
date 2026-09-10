@@ -350,8 +350,8 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     const flux = standingOrderFlow(flows, a.id);
     const bankOrder = flux ? { flowId: flux.id, amount: Math.abs(flux.amount), drift: standing - Math.abs(flux.amount) } : undefined;
     // L'ordre arrondi au-dessus du budget couvre ce qu'on lui demande : rien à corriger. On ne
-    // signale que l'ordre trop court, ou celui qui vire nettement plus que ce qui est demandé.
-    if (bankOrder && (bankOrder.drift > 0 || bankOrder.drift < -ORDER_STEP))
+    // signale que l'ordre trop court, ou celui qui vire plus d'un pas d'arrondi de trop.
+    if (bankOrder && (bankOrder.drift > 0 || bankOrder.drift < -ledger.settings.orderRounding))
       warnings.push({
         code: 'bankOrderDrift',
         message:
@@ -448,15 +448,12 @@ function flowLines(flows: PlannedFlow[], p: Period): PlanFlowLine[] {
 }
 
 /**
- * Pas d'un ordre permanent : on pose chez sa banque un montant rond, jamais 683,50 €. Il sert à
- * deux choses — proposer le montant à confirmer, et servir de zone morte au signalement : un ordre
- * arrondi au-dessus de ce que le budget demande n'est pas un ordre à corriger.
+ * Le montant d'ordre permanent proposé pour couvrir `cents` : le multiple de `step` au-dessus
+ * (`settings.orderRounding`, une dizaine d'euros par défaut). Un pas nul rend le montant tel quel.
  */
-export const ORDER_STEP: Cents = 1000;
-
-/** Le montant d'ordre proposé pour couvrir `cents` : la dizaine d'euros au-dessus. */
-export function roundOrderUp(cents: Cents): Cents {
-  return Math.ceil(cents / ORDER_STEP) * ORDER_STEP;
+export function roundOrderUp(cents: Cents, step: Cents): Cents {
+  if (step <= 0) return cents;
+  return Math.ceil(cents / step) * step;
 }
 
 /** L'ordre permanent enregistré vers un compte (D57) : un flux dérivé, un seul par compte. */

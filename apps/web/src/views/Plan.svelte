@@ -3,7 +3,7 @@
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
   import { revealed } from '../lib/actions';
   import { centsToInput, inputToCents } from '../lib/format';
-  import { computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, ORDER_STEP, type Period, type PlanTransfer } from '@tirelire/core';
+  import { computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -46,9 +46,11 @@
   let montantOrdre = $state('');
   let erreurOrdre = $state('');
 
+  const pasArrondi = $derived(app.ledger.settings.orderRounding);
+
   function ouvrirOrdre(t: PlanTransfer) {
     ordreEdite = t.accountId;
-    montantOrdre = centsToInput(roundOrderUp(t.standing));
+    montantOrdre = centsToInput(roundOrderUp(t.standing, pasArrondi));
     erreurOrdre = '';
   }
 
@@ -156,9 +158,9 @@
                   ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
                   : t.bankOrder.drift === 0
                     ? 'au montant du budget'
-                    : t.bankOrder.drift < 0 && t.bankOrder.drift >= -ORDER_STEP
+                    : t.bankOrder.drift < 0 && t.bankOrder.drift >= -pasArrondi
                       ? 'arrondi au-dessus du budget : il couvre ce qui est demandé'
-                      : `à passer à ${money(roundOrderUp(t.standing))} chez la banque, puis à confirmer ici`}
+                      : `à passer à ${money(roundOrderUp(t.standing, pasArrondi))} chez la banque, puis à confirmer ici`}
               </span>
             </div>
             <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
@@ -173,7 +175,7 @@
           <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
             <p class="muted small" style="margin:0">
               Le montant que <strong>ton ordre exécute chez ta banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
-              Proposé à la dizaine au-dessus de {money(t.standing)} ; corrige-le pour coller à ce que tu as réellement posé.
+              Proposé arrondi au-dessus de {money(t.standing)} ; corrige-le pour coller à ce que tu as réellement posé.
             </p>
             <div class="grid">
               <label class="f">Montant de l’ordre permanent (€) <input bind:value={montantOrdre} inputmode="decimal" /></label>

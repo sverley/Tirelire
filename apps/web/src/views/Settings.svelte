@@ -58,6 +58,19 @@
     cushion = centsToInput(app.ledger.settings.principalCushion);
   });
 
+  let arrondi = $state(centsToInput(app.ledger.settings.orderRounding));
+
+  $effect(() => {
+    arrondi = centsToInput(app.ledger.settings.orderRounding);
+  });
+
+  function saveArrondi() {
+    const c = inputToCents(arrondi);
+    if (c === undefined || c < 0) return void (msg = 'Montant invalide.');
+    app.setSetting('orderRounding', c);
+    msg = 'Pas d’arrondi enregistré.';
+  }
+
   function saveCushion() {
     const c = inputToCents(cushion);
     if (c === undefined) return void (msg = 'Montant invalide.');
@@ -120,6 +133,15 @@
   <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
     <label class="f">Coussin <input bind:value={cushion} inputmode="decimal" /></label>
     <button class="btn" onclick={saveCushion}>Enregistrer</button>
+  </div>
+</div>
+
+<h2>Arrondi des ordres permanents</h2>
+<div class="card">
+  <p class="small muted">Un ordre permanent se pose rond chez une banque. Le Plan propose donc le multiple au-dessus de ce que le budget demande, et ne signale pas un ordre arrondi au-dessus dans ce pas : il couvre ce qui est demandé. Un ordre trop court, lui, est toujours signalé. Mets 0 pour proposer le montant au centime près.</p>
+  <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+    <label class="f">Pas d’arrondi <input bind:value={arrondi} inputmode="decimal" /></label>
+    <button class="btn" onclick={saveArrondi}>Enregistrer</button>
   </div>
 </div>
 

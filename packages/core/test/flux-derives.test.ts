@@ -141,14 +141,20 @@ describe('deux montants distincts : ce que le budget veut, ce que la banque fait
 });
 
 describe('un ordre permanent se pose rond (D58)', () => {
-  it('le montant proposé est la dizaine d’euros au-dessus', () => {
-    expect(roundOrderUp(euros(683.5))).toBe(euros(690));
-    expect(roundOrderUp(euros(650))).toBe(euros(650));
-    expect(roundOrderUp(euros(0.01))).toBe(euros(10));
+  const pas = euros(10);
+
+  it('le montant proposé est le multiple du pas au-dessus', () => {
+    expect(roundOrderUp(euros(683.5), pas)).toBe(euros(690));
+    expect(roundOrderUp(euros(650), pas)).toBe(euros(650));
+    expect(roundOrderUp(euros(0.01), pas)).toBe(euros(10));
+    // Un autre pas se règle (settings.orderRounding) ; un pas nul rend le montant au centime.
+    expect(roundOrderUp(euros(683.5), euros(50))).toBe(euros(700));
+    expect(roundOrderUp(euros(683.5), 0)).toBe(euros(683.5));
   });
 
   it('l’arrondi au-dessus ne se signale pas, un vrai écart si', () => {
     const l = exampleLedger();
+    expect(l.settings.orderRounding).toBe(pas);
     const demande = computePlan(l, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
 
     // Ordre posé quelques euros au-dessus : il couvre ce que le budget demande, rien à corriger.
@@ -159,5 +165,16 @@ describe('un ordre permanent se pose rond (D58)', () => {
     // Au-delà du pas d'arrondi, l'ordre vire nettement trop : là, on le dit.
     const trop = computePlan({ ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l, demande + euros(15))] }, asOf);
     expect(trop.warnings.map((w) => w.code)).toContain('bankOrderDrift');
+  });
+
+  it('le pas est un réglage : à zéro, le moindre écart se dit', () => {
+    const l = exampleLedger();
+    const sansArrondi = { ...l, settings: { ...l.settings, orderRounding: 0 } };
+    const demande = computePlan(sansArrondi, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
+    const plan = computePlan(
+      { ...sansArrondi, plannedFlows: [...l.plannedFlows, ordreVersLivret(sansArrondi, demande + euros(5))] },
+      asOf,
+    );
+    expect(plan.warnings.map((w) => w.code)).toContain('bankOrderDrift');
   });
 });
