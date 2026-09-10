@@ -602,3 +602,31 @@ describe('#14 · contre-vérification : une part fixe déjà atteinte ne réclam
     expect(t.permanent).toBe(euros(350));
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// 11. Audit de a059494 : deux évolutions du besoin consignées dans #14 n'avaient pas de garde.
+// ---------------------------------------------------------------------------------------------
+
+describe('#14 · évolutions du besoin : ce qui reste dans la somme, et l’ordre nouveau', () => {
+  it('une échéance déjà provisionnée reste dans la somme : elle sera dépensée, l’épargne reprend juste après', () => {
+    // La taxe foncière (1 200 € au 15 octobre) est déjà entièrement provisionnée.
+    const base = exampleLedger();
+    const provisionnée: Ledger = { ...base, tirelires: base.tirelires.map((e) => (e.id === 'env-tf' ? { ...e, openingBalance: euros(1200) } : e)) };
+    const t = transfert(provisionnée, AVANT).t!;
+    expect(t.breakdown.find((b) => b.tirelireId === 'env-tf')?.cruise).toBe(euros(100));
+    expect(t.permanent).toBe(demande(base, AVANT));
+  });
+
+  it('un ordre nouveau, enregistré en regardant décembre, reconnaît le virement de septembre', () => {
+    // Le Plan se feuillette : la période lue est décembre, la date du jour reste le 6 septembre.
+    const base = exampleLedger();
+    const sansOrdre: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => !isDerivedFlow(f)) };
+    const décembre = computePlan(sansOrdre, '2026-12-06', AVANT);
+    const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
+    expect(t.bankOrder).toBeUndefined();
+    const flux = standingTransferFlow(décembre, t, PRINCIPAL, 'flow-ordre-neuf', euros(650))!;
+    const l: Ledger = { ...sansOrdre, plannedFlows: [...sansOrdre.plannedFlows, flux] };
+    const { proposition } = importer(l, ligneBancaire(l, euros(650), JOUR_VIREMENT));
+    expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
+  });
+});
