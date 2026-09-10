@@ -1,0 +1,259 @@
+import { describe, expect, it } from 'vitest';
+import {
+  applyMatch,
+  budgetSuggestions,
+  computePlan,
+  euros,
+  exampleLedger,
+  formatCents,
+  isDerivedFlow,
+  roundOrderUp,
+  standingOrderFlow,
+  standingTransferFlow,
+  type Ledger,
+  type Operation,
+  type PlannedFlow,
+} from '../src/index.js';
+
+const asOf = '2026-09-06';
+
+/** La ventilation que produirait l'import d'un virement de ce montant, tirelire par tirelire. */
+function ventilation(l: Ledger, flow: PlannedFlow, montant: number): Map<string, number> {
+  const op: Operation = {
+    id: 'op-vir',
+    accountId: 'acc-principal',
+    origin: 'imported',
+    date: '2026-09-28',
+    label: flow.labelPattern!,
+    normalizedLabel: flow.labelPattern!,
+    amount: montant,
+    state: 'untreated',
+  };
+  const avec: Ledger = { ...l, operations: [...l.operations, op], plannedFlows: [...l.plannedFlows, flow] };
+  const patch = applyMatch(avec, {
+    operationId: op.id,
+    flowId: flow.id,
+    expectedDate: '2026-09-28',
+    expectedAmount: flow.amount,
+    score: 1,
+    auto: true,
+    reasons: [],
+  });
+  return new Map(patch.allocations.map((a) => [a.tirelireId!, a.share.kind === 'fixed' ? a.share.amount : 0]));
+}
+
+const total = (m: Map<string, number>) => [...m.values()].reduce((s, v) => s + v, 0);
+
+/**
+ * L'exemple porte déjà un ordre permanent vers le livret (décalé de 50 €) : les cas construits
+ * ici le retirent pour poser le leur, sans quoi deux ordres viseraient le même compte.
+ */
+function sansOrdre(l: Ledger): Ledger {
+  return { ...l, plannedFlows: l.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
+}
+
+function ordreVersLivret(l: Ledger, montant?: number): PlannedFlow {
+  const plan = computePlan(l, asOf);
+  const t = plan.transfers.find((x) => x.accountId === 'acc-livret')!;
+  return standingTransferFlow(plan, t, 'acc-principal', 'flow-vir', montant ?? t.standing)!;
+}
+
+describe('un flux dérivé se recalcule au lieu d’être figé (D57)', () => {
+  it('à montant inchangé, un budget qui bouge donne une autre ventilation', () => {
+    const avantLedger = sansOrdre(exampleLedger());
+    const flow = ordreVersLivret(avantLedger);
+    const avant = ventilation(avantLedger, flow, flow.amount);
+
+    // Le budget change sans que la banque le sache : la taxe foncière est revue de 1 200 à
+    // 2 400 €. L'ordre permanent, lui, vire toujours la même somme.
+    const apresLedger: Ledger = {
+      ...avantLedger,
+      needs: avantLedger.needs.map((n) => (n.id === 'need-tf' ? { ...n, amount: euros(2400) } : n)),
+    };
+    const apres = ventilation(apresLedger, flow, flow.amount);
+
+    // Le virement est réparti en entier dans les deux cas — mais pas de la même façon : c'est le
+    // budget du jour qui décide, jamais la photo prise à l'enregistrement.
+    expect(total(avant)).toBe(flow.amount);
+    expect(total(apres)).toBe(flow.amount);
+    expect([...apres.entries()]).not.toEqual([...avant.entries()]);
+  });
+
+  it('le flux enregistré ne sert qu’à reconnaître la ligne bancaire', () => {
+    const l = sansOrdre(exampleLedger());
+    const flow = ordreVersLivret(l);
+    expect(isDerivedFlow(flow)).toBe(true);
+    // Ce qui reste écrit : le libellé, la tolérance, la fenêtre. Rien du budget.
+    expect(flow.labelPattern).toBeTruthy();
+    expect(flow.amountTolerance?.pct).toBe(20);
+    expect(Object.keys(flow)).not.toContain('plannedAllocation');
+    // Un flux saisi à la main reste déclaré : rien ne le réécrira.
+    const { origin: _derive, ...reste } = flow;
+    const declare: PlannedFlow = { ...reste, id: 'flow-main' };
+    expect(isDerivedFlow(declare)).toBe(false);
+    expect(standingOrderFlow([declare], 'acc-livret')).toBeUndefined();
+    expect(standingOrderFlow([flow], 'acc-livret')?.id).toBe('flow-vir');
+  });
+});
+
+describe('un virement déclaré n’est pas un calcul (D57)', () => {
+  it('sa ventilation reste celle qu’on lui a donnée, part variable comprise', () => {
+    const l = sansOrdre(exampleLedger());
+    // Un virement saisi à la main vers le livret, rattaché à une tirelire précise.
+    const declare: PlannedFlow = {
+      id: 'flow-main',
+      name: 'Virement saisi',
+      kind: 'transfer',
+      amount: -euros(650),
+      accountId: 'acc-principal',
+      counterpartAccountId: 'acc-livret',
+      tirelireId: 'env-vac',
+      periodicity: { interval: 1, unit: 'month', anchorDate: '2026-08-28' },
+      dateWindowDays: 5,
+      labelPattern: 'VIR LIVRET',
+    };
+    const parts = ventilation(l, declare, -euros(650));
+    // Une seule ligne, sur la tirelire déclarée : rejouer l'ordre de financement ici réécrirait un
+    // fait de l'utilisateur, et la part variable (D27) serait perdue au passage.
+    expect([...parts.keys()]).toEqual(['env-vac']);
+    expect(parts.get('env-vac')).toBe(0); // part variable : aucun montant figé
+  });
+});
+
+describe('deux montants distincts : ce que le budget veut, ce que la banque fait (D60)', () => {
+  it('l’écart se voit dans le plan et se dit', () => {
+    const l = sansOrdre(exampleLedger());
+    const demande = computePlan(l, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
+
+    // Ordre posé chez la banque 50 € en dessous de ce que le budget demande.
+    const enRetard: Ledger = { ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l, demande - euros(50))] };
+    const plan = computePlan(enRetard, asOf);
+    const t = plan.transfers.find((x) => x.accountId === 'acc-livret')!;
+    expect(t.bankOrder).toEqual({ flowId: 'flow-vir', amount: demande - euros(50), drift: euros(50), since: '2026-08-28' });
+    // Le budget, lui, n'a pas bougé : ce qu'il demande reste ce qu'il demande.
+    expect(t.standing).toBe(demande);
+    const alerte = plan.warnings.find((w) => w.code === 'bankOrderDrift')!;
+    expect(alerte.message).toContain('Livret A');
+    expect(alerte.message).toContain(formatCents(demande - euros(50)));
+    expect(alerte.message).toContain(formatCents(demande));
+
+    // Une fois l'ordre modifié chez la banque et confirmé ici, plus rien à signaler.
+    const aligne: Ledger = { ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l)] };
+    const planAligne = computePlan(aligne, asOf);
+    expect(planAligne.transfers.find((x) => x.accountId === 'acc-livret')!.bankOrder!.drift).toBe(0);
+    expect(planAligne.warnings.map((w) => w.code)).not.toContain('bankOrderDrift');
+  });
+
+  it('un ordre que le budget ne demande plus reste signalé', () => {
+    const l = exampleLedger();
+    const vide: Ledger = {
+      ...l,
+      accounts: [...l.accounts, { id: 'acc-vide', name: 'Livret vide', kind: 'epargne', openingBalance: 0, openingDate: '2026-08-27' }],
+      plannedFlows: [
+        ...l.plannedFlows,
+        {
+          id: 'flow-vide',
+          name: 'Virement Livret vide',
+          kind: 'transfer',
+          origin: 'derived',
+          amount: -euros(300),
+          accountId: 'acc-principal',
+          counterpartAccountId: 'acc-vide',
+          periodicity: { interval: 1, unit: 'month', anchorDate: '2026-08-28' },
+          dateWindowDays: 5,
+        },
+      ],
+    };
+    const plan = computePlan(vide, asOf);
+    const t = plan.transfers.find((x) => x.accountId === 'acc-vide')!;
+    const alerte = plan.warnings.find((w) => w.code === 'bankOrderDrift' && w.accountId === 'acc-vide')!;
+    // Aucune tirelire n'y est placée : le budget ne demande rien, l'ordre continue pourtant de virer.
+    expect(t.standing).toBe(0);
+    expect(t.bankOrder).toEqual({ flowId: 'flow-vide', amount: euros(300), drift: -euros(300), since: '2026-08-28' });
+    expect(alerte.message).toContain('supprimer');
+
+    // Le geste que propose alors le Plan : oublier l'ordre. Rien d'autre ne s'en trouve changé.
+    const oublie = computePlan(
+      { ...vide, plannedFlows: vide.plannedFlows.map((f) => (f.id === 'flow-vide' ? { ...f, deletedAt: '2026-09-06T10:00:00.000Z' } : f)) },
+      asOf,
+    );
+    expect(oublie.transfers.find((x) => x.accountId === 'acc-vide')).toBeUndefined();
+    expect(oublie.warnings.filter((w) => w.accountId === 'acc-vide')).toEqual([]);
+  });
+});
+
+describe('un ordre permanent se pose rond (D60)', () => {
+  const pas = euros(10);
+
+  it('le montant proposé est le multiple du pas au-dessus', () => {
+    expect(roundOrderUp(euros(683.5), pas)).toBe(euros(690));
+    expect(roundOrderUp(euros(650), pas)).toBe(euros(650));
+    expect(roundOrderUp(euros(0.01), pas)).toBe(euros(10));
+    // Un autre pas se règle (settings.orderRounding) ; un pas nul rend le montant au centime.
+    expect(roundOrderUp(euros(683.5), euros(50))).toBe(euros(700));
+    expect(roundOrderUp(euros(683.5), 0)).toBe(euros(683.5));
+  });
+
+  it('l’arrondi au-dessus ne se signale pas, un vrai écart si', () => {
+    const l = sansOrdre(exampleLedger());
+    expect(l.settings.orderRounding).toBe(pas);
+    const demande = computePlan(l, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
+
+    // Ordre posé quelques euros au-dessus : il couvre ce que le budget demande, rien à corriger.
+    const arrondi = computePlan({ ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l, demande + euros(5))] }, asOf);
+    expect(arrondi.transfers.find((x) => x.accountId === 'acc-livret')!.bankOrder!.drift).toBe(-euros(5));
+    expect(arrondi.warnings.map((w) => w.code)).not.toContain('bankOrderDrift');
+
+    // Au-delà du pas d'arrondi, l'ordre vire nettement trop : là, on le dit.
+    const trop = computePlan({ ...l, plannedFlows: [...l.plannedFlows, ordreVersLivret(l, demande + euros(15))] }, asOf);
+    expect(trop.warnings.map((w) => w.code)).toContain('bankOrderDrift');
+  });
+
+  it('le pas est un réglage : à zéro, le moindre écart se dit', () => {
+    const l = sansOrdre(exampleLedger());
+    const sansArrondi = { ...l, settings: { ...l.settings, orderRounding: 0 } };
+    const demande = computePlan(sansArrondi, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
+    const plan = computePlan(
+      { ...sansArrondi, plannedFlows: [...l.plannedFlows, ordreVersLivret(sansArrondi, demande + euros(5))] },
+      asOf,
+    );
+    expect(plan.warnings.map((w) => w.code)).toContain('bankOrderDrift');
+  });
+});
+
+describe('le jeu d’exemple porte un ordre permanent décalé', () => {
+  it('le plan montre les deux montants et dit d’aller modifier l’ordre', () => {
+    const l = exampleLedger();
+    const ordre = standingOrderFlow(l.plannedFlows, 'acc-livret')!;
+    expect(ordre.id).toBe('flow-vir-livret');
+    expect(isDerivedFlow(ordre)).toBe(true);
+
+    const plan = computePlan(l, asOf);
+    const t = plan.transfers.find((x) => x.accountId === 'acc-livret')!;
+    // Ce que le budget demande n'a pas bougé d'un centime : l'ordre enregistré ne le touche pas.
+    expect(t.standing).toBe(euros(650));
+    expect(t.bankOrder).toEqual({ flowId: 'flow-vir-livret', amount: euros(600), drift: euros(50), since: '2026-08-28' });
+    expect(plan.warnings.map((w) => w.code)).toContain('bankOrderDrift');
+  });
+
+  it('la somme demandée se détaille en dotations', () => {
+    const t = computePlan(exampleLedger(), asOf).transfers.find((x) => x.accountId === 'acc-livret')!;
+    expect(Object.fromEntries(t.breakdown.map((b) => [b.tirelireName, b.cruise]))).toEqual({
+      'Taxe foncière': euros(100),
+      'Assurance auto': euros(50),
+      Vacances: euros(200),
+      'Épargne de précaution': euros(300),
+    });
+    // C'est ce que « Détail » affiche : la somme et ses parts ne peuvent pas se contredire.
+    expect(t.breakdown.reduce((s, b) => s + b.cruise, 0)).toBe(t.permanent);
+  });
+
+  it('il ne se glisse pas dans les propositions de l’assistant', () => {
+    // Un flux dérivé est une conséquence du budget, pas une ligne à proposer (D43, D57).
+    const s = budgetSuggestions(asOf);
+    const noms = [...s.incomes, ...s.charges, ...s.everyday, ...s.periodic, ...s.savings].map((x) => x.name);
+    expect(noms).not.toContain('Virement Livret A');
+    expect(noms.length).toBeGreaterThan(0);
+  });
+});
+

@@ -1100,3 +1100,63 @@ le panneau disparaissant et la suite de la liste remontant de sa hauteur. C'est 
 tranché : le panneau s'ouvre *sous* sa ligne, donc tout ce qui est au-dessus — la ligne elle-même et
 le bouton qu'on vient de presser — ne bouge pas d'un pixel à la fermeture. Seule la suite de la
 liste remonte, et on ne la regardait pas. Il n'y a rien à corriger de ce côté.
+
+## D60 · 2026-09-10 · Deux montants pour un virement permanent, un seul se stocke
+
+Applique D57 au virement permanent — le seul flux dérivé du budget, et le seul endroit où une photo
+du plan était enregistrée (D21, lot 4).
+
+Un ordre permanent porte deux montants de nature différente, et les confondre casse quelque chose
+dans les deux sens :
+
+- **Ce que le budget demande** est un calcul. Il ne se stocke pas — ce qui se recalcule ne se stocke
+  jamais — il se relit à chaque lecture du plan (`PlanTransfer.permanent`). Rien n'est donc à mettre
+  à jour, et aucun bouton n'est à penser à appuyer : un besoin ajouté, une échéance passée, une
+  priorité changée se voient au tour suivant sans autre geste.
+- **Ce que l'ordre exécute chez la banque** est un fait du monde réel. L'application ne peut ni le
+  connaître ni le changer, et elle en a pourtant besoin — avec sa tolérance — pour reconnaître la
+  ligne à l'import. C'est le seul des deux qui s'enregistre : le `amount` d'un `PlannedFlow` dont
+  `origin` vaut `derived`.
+
+Faire suivre le montant enregistré au budget aurait cassé la reconnaissance dès le mois où le budget
+bouge, alors que l'ordre bancaire, lui, n'avait pas changé. Le bouton de l'écran Plan ne disparaît
+donc pas : il change de sens. Il figeait un calcul, il **enregistre un fait** — « mon ordre vers le
+Livret A est désormais à 700 € ». Le plan compare les deux : `PlanTransfer.bankOrder` porte le
+montant enregistré et l'écart, et l'avertissement `bankOrderDrift` dit lequel est à aller changer,
+et où. Un ordre que le budget ne demande plus est signalé plutôt que supprimé en douce : il continue
+de virer chez la banque tant que personne n'y a touché.
+
+`PlannedFlow.plannedAllocation` disparaît (colonne dépréciée, D30 ; migration 9 → 10 : les flux qui
+en portaient une deviennent dérivés, les autres restent déclarés — un virement saisi à la main est
+un flux déclaré comme un autre). `distributeTransfer` (`matching.ts`) devient le cas normal et non
+plus le cas de secours : à l'import, la répartition est celle de l'ordre de financement au jour de
+l'opération (D06), planchers d'abord. Le pire cas que cela corrige est le montant resté **identique**
+— l'ancienne photo s'appliquait alors telle quelle, sans que rien ne signale qu'elle ne
+correspondait plus au budget.
+
+Ce que le budget demande comme ordre permanent est **la somme des dotations mensuelles** des
+tirelires placées sur ce compte, quoi qu'il ait déjà été viré dans la période — c'est un régime, pas
+un reste à faire. Comparer l'ordre au reste à virer (`PlanTransfer.standing`) allumait l'alerte le
+lendemain de chaque virement. Quatre cas s'en déduisent, et sont tenus par le harnais : un objectif
+atteint sort de la somme (il ne demande plus rien, D06) ; une échéance déjà provisionnée y reste
+(elle sera dépensée, l'épargne reprend juste après) ; un besoin versant (D48) n'y entre pas, il rend
+de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D37) au lieu de
+l'exiger deux fois. Le rattrapage n'en fait jamais partie : un ordre permanent ne se règle pas sur
+l'exceptionnel. L'écran l'affiche comme une somme, dépliable par « Détail » — c'est là que viendra
+la division d'un virement en plusieurs ordres (issue #25).
+
+Un ordre déjà enregistré garde son ancrage quand on corrige son montant : le déplacer ferait perdre
+la reconnaissance des virements déjà passés. Un ordre nouveau s'ancre sur la période en cours, et
+non sur celle qu'on regarde — le Plan se feuillette, et un ordre enregistré en lisant décembre vire
+dès ce mois-ci.
+
+Le jeu d'exemple porte l'ordre, et le porte **décalé** : la banque vire 600 €, le budget en demande
+650, si bien que le plan du 6 septembre montre les deux montants côte à côte sans qu'on ait rien à
+saisir — un ordre déjà juste n'aurait rien appris. L'écart grandit encore en janvier, quand
+l'épargne de précaution reprend la mensualité du crédit (D51). Aucune opération ne lui correspond :
+l'exemple n'importe aucun relevé, et lui en donner une retrancherait 600 € de ce que le plan
+demande, alors que ce plan est celui de l'analyse au centime près.
+
+Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
+(virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
+budget, pas une ligne de budget à offrir (D43).

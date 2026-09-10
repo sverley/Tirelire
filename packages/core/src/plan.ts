@@ -4,7 +4,8 @@
  * virements ramènent chaque tirelire à son placement voulu (D20, D21).
  */
 import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow } from './model.js';
-import { alive, needActive, needName } from './model.js';
+import { alive, isDerivedFlow, needActive, needName } from './model.js';
+import { formatCents } from './money.js';
 import {
   homeAccount,
   placementGaps,
@@ -13,13 +14,14 @@ import {
   tirelireComponents,
   indexLedger,
   needCruise,
+  placementShares,
   periodSnapshot,
   settlementBalance,
   unallocated,
   type LedgerIndex,
 } from './balances.js';
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
-import { addDays } from './dates.js';
+import { addDays, addMonths } from './dates.js';
 
 export interface PlanFlowLine {
   flowId: Id;
@@ -100,8 +102,20 @@ export interface PlanTransfer {
   label: string;
   /** Détail par tirelire. */
   orders: StandingOrder[];
-  /** Somme des parts permanentes. */
+  /** Somme des parts permanentes restant à virer cette période. */
   standing: Cents;
+  /**
+   * Ce que le budget demande comme **ordre permanent** vers ce compte (D60) : la croisière des
+   * tirelires qui y sont placées, indépendante de ce qui a déjà été viré. `standing`, lui, fond à
+   * mesure que la période s'exécute — le comparer à l'ordre de la banque ferait crier « ordre
+   * inutile » le lendemain du virement.
+   */
+  permanent: Cents;
+  /**
+   * De quoi cette somme est faite : une ligne par tirelire placée sur ce compte, avec sa dotation.
+   * L'écran l'affiche sous « Détail » — la carte montre une somme, pas quatre lignes.
+   */
+  breakdown: Array<{ tirelireId: Id; tirelireName: string; cruise: Cents }>;
   /** Somme des compléments exceptionnels. */
   exceptional: Cents;
   /** Compte tiers : règlement de la dette. Positif = principal → tiers, négatif = tiers → principal. */
@@ -110,11 +124,18 @@ export interface PlanTransfer {
   surplus: Cents;
   /** Total net à virer ce mois-ci depuis le compte principal (négatif = vers le compte principal). */
   net: Cents;
+  /**
+   * Ordre permanent enregistré chez la banque (D60), s'il l'a été : le **fait**, en regard de
+   * `permanent` qui est le **calcul**. `drift` vaut ce que le budget demande moins ce que l'ordre
+   * exécute ; non nul, l'ordre est à modifier chez la banque, puis à confirmer ici — l'application
+   * ne peut ni le connaître ni le changer toute seule.
+   */
+  bankOrder?: { flowId: Id; amount: Cents; drift: Cents; since: ISODate };
 }
 
 export interface PlanWarning {
   code: 'noPrincipal' | 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'principalOverdrawn'
-    | 'payoutShort';
+    | 'payoutShort' | 'bankOrderDrift';
   message: string;
   tirelireId?: Id;
   needId?: Id;
@@ -287,6 +308,42 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   }
 
   // Virements par compte (vue principal ↔ compte), règlements des tiers, surplus des comptes d'accueil.
+  /*
+   * Ce que chaque tirelire demande comme **dotation permanente**, compte par compte (D60). Quatre
+   * pièges, qu'un simple `needCruise` par tirelire ne verrait pas :
+   *
+   * - un **objectif atteint** ne demande plus rien (D06) : un ordre qui le compterait encore
+   *   virerait de l'argent sans emploi ;
+   * - une **échéance déjà provisionnée**, elle, continue de compter : elle sera dépensée, et
+   *   l'épargne reprend juste après — on ne suspend pas un ordre permanent pour un mois ;
+   * - un **besoin versant** (D48) rend de l'argent au lieu d'en réclamer ;
+   * - une tirelire **placée sur deux comptes** partage sa dotation entre eux (D37) au lieu de la
+   *   demander deux fois.
+   *
+   * Le partage se lit comme une **différence de positions voulues** — celle qu'aurait la tirelire
+   * après la dotation, moins celle qu'elle vise avant — et non comme un découpage du seul flux du
+   * mois : une part fixe est un plafond de position (D38). Une précaution plafonnée à 1 000 € sur
+   * un livret et déjà à 3 200 € n'en réclame plus rien, sans quoi le plan demanderait d'en rapatrier
+   * l'excédent tout en réglant un ordre permanent qui l'y renvoie.
+   *
+   * Le rattrapage n'en fait pas partie : il est exceptionnel, un ordre permanent ne s'y règle pas.
+   */
+  const wantedByAccount = new Map<Id, PlanTransfer['breakdown']>();
+  for (const e of idx.tireliresById.values()) {
+    const siennes = lines.filter((l) => l.tirelireId === e.id);
+    const dotation = siennes.filter((l) => l.kind !== 'payout' && !(l.kind === 'goal' && l.requested === 0)).reduce((s, l) => s + l.cruise, 0);
+    if (dotation <= 0) continue;
+    const source = principal?.id ?? '';
+    const solde = siennes[0]?.balance ?? 0;
+    const avant = placementShares(e, solde, source);
+    const apres = placementShares(e, solde + dotation, source);
+    for (const accountId of apres.keys()) {
+      const part = (apres.get(accountId) ?? 0) - (avant.get(accountId) ?? 0);
+      if (part <= 0 || accountId === source) continue;
+      wantedByAccount.set(accountId, [...(wantedByAccount.get(accountId) ?? []), { tirelireId: e.id, tirelireName: e.name, cruise: part }]);
+    }
+  }
+
   const transfers: PlanTransfer[] = [];
   for (const a of idx.accountsById.values()) {
     if (principal && a.id === principal.id) continue;
@@ -334,8 +391,31 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     } else if (a.kind === 'epargne') {
       surplus = unallocated(a, ledger, idx, known);
     }
+    /*
+     * Ce que le budget demande vient d'être calculé ; ce que la banque exécute, lui, ne se devine
+     * pas (D60). Les deux se comparent ici, et l'écart se dit — c'est le seul endroit du plan qui
+     * demande un geste hors de l'application.
+     */
+    const breakdown = wantedByAccount.get(a.id) ?? [];
+    const permanent = Math.max(0, breakdown.reduce((s, b) => s + b.cruise, 0));
+    const flux = standingOrderFlow(flows, a.id);
+    const bankOrder = flux
+      ? { flowId: flux.id, amount: Math.abs(flux.amount), drift: permanent - Math.abs(flux.amount), since: flux.periodicity.anchorDate }
+      : undefined;
+    // L'ordre arrondi au-dessus du budget couvre ce qu'on lui demande : rien à corriger. On ne
+    // signale que l'ordre trop court, celui qui vire plus d'un pas d'arrondi de trop, et celui que
+    // le budget ne demande plus du tout — celui-là quel que soit son montant.
+    if (bankOrder && (permanent === 0 || bankOrder.drift > 0 || bankOrder.drift < -ledger.settings.orderRounding))
+      warnings.push({
+        code: 'bankOrderDrift',
+        message:
+          permanent === 0
+            ? `L'ordre permanent de ${formatCents(bankOrder.amount)} vers « ${a.name} » n'est plus demandé par le budget : à supprimer chez la banque, puis ici.`
+            : `L'ordre permanent vers « ${a.name} » est à ${formatCents(bankOrder.amount)}, le budget en demande ${formatCents(permanent)} : à modifier chez la banque, puis à confirmer ici.`,
+        accountId: a.id,
+      });
     const net = standing + exceptional + settlement - surplus;
-    if (orders.length === 0 && settlement === 0 && surplus === 0) continue;
+    if (orders.length === 0 && settlement === 0 && surplus === 0 && !bankOrder) continue;
     transfers.push({
       accountId: a.id,
       accountName: a.name,
@@ -343,10 +423,13 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       label: transferLabel(a.name),
       orders,
       standing,
+      permanent,
+      breakdown,
       exceptional,
       settlement,
       surplus,
       net,
+      ...(bankOrder ? { bankOrder } : {}),
     });
   }
   transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
@@ -421,30 +504,57 @@ function flowLines(flows: PlannedFlow[], p: Period): PlanFlowLine[] {
 }
 
 /**
- * Flux attendu correspondant au virement permanent vers un compte (D21) : un seul par couple de
- * comptes, mensuel, avec sa ventilation calculée d'avance. Enregistré, il rend le virement
- * reconnaissable à l'import par montant et libellé, et sa ventilation proposée.
- *
- * Le montant retenu est la part permanente, pas le total : le complément exceptionnel de ce
- * mois-ci n'a pas vocation à devenir un ordre permanent.
+ * Le montant d'ordre permanent proposé pour couvrir `cents` : le multiple de `step` au-dessus
+ * (`settings.orderRounding`, une dizaine d'euros par défaut). Un pas nul rend le montant tel quel.
  */
-export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, principalId: Id, id: Id): PlannedFlow | undefined {
-  if (transfer.standing <= 0) return undefined;
-  const allocation = transfer.orders
-    .filter((o) => o.standing > 0)
-    .map((o) => ({ tirelireId: o.tirelireId, share: { kind: 'fixed' as const, amount: -o.standing } }));
+export function roundOrderUp(cents: Cents, step: Cents): Cents {
+  if (step <= 0) return cents;
+  return Math.ceil(cents / step) * step;
+}
+
+/**
+ * Ancrage du flux de l'ordre permanent. Un ordre déjà enregistré garde le sien : corriger son
+ * montant ne dit pas qu'il commence aujourd'hui, et le déplacer ferait perdre la reconnaissance
+ * des virements déjà passés. Un ordre nouveau s'ancre sur la période en cours, jamais sur celle
+ * qu'on regarde — le Plan se feuillette, et un ordre enregistré en lisant décembre vire dès ce
+ * mois-ci.
+ */
+function standingAnchor(plan: Plan, transfer: PlanTransfer): ISODate {
+  if (transfer.bankOrder) return transfer.bankOrder.since;
+  let anchor = plan.period.start;
+  while (anchor > plan.today) anchor = addMonths(anchor, -1);
+  return anchor;
+}
+
+/** L'ordre permanent enregistré vers un compte (D57) : un flux dérivé, un seul par compte. */
+export function standingOrderFlow(flows: PlannedFlow[], accountId: Id): PlannedFlow | undefined {
+  return alive(flows).find((f) => f.kind === 'transfer' && isDerivedFlow(f) && f.counterpartAccountId === accountId);
+}
+
+/**
+ * Flux **dérivé** du virement permanent vers un compte (D21, D57, D60) : un seul par couple de
+ * comptes, mensuel. Ce qu'il enregistre est un fait — le montant que l'ordre exécute chez la
+ * banque, son libellé, sa tolérance — pour que la ligne soit reconnue à l'import. Sa ventilation,
+ * elle, ne s'écrit nulle part : elle se rejoue par l'ordre de financement au jour de l'opération.
+ *
+ * `amount` vaut par défaut ce que le budget demande comme ordre permanent — la croisière des
+ * tirelires placées là, pas ce qui reste à virer cette période, et jamais le complément
+ * exceptionnel du mois : celui-ci n'a pas vocation à devenir un ordre permanent.
+ */
+export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, principalId: Id, id: Id, amount: Cents = transfer.permanent): PlannedFlow | undefined {
+  if (amount <= 0) return undefined;
   return {
     id,
     name: `Virement ${transfer.accountName}`,
     kind: 'transfer',
-    amount: -transfer.standing,
+    origin: 'derived',
+    amount: -amount,
     accountId: principalId,
     counterpartAccountId: transfer.accountId,
-    periodicity: { interval: 1, unit: 'month' as const, anchorDate: plan.period.start },
+    periodicity: { interval: 1, unit: 'month' as const, anchorDate: standingAnchor(plan, transfer) },
     dateWindowDays: 5,
     labelPattern: transfer.label,
     amountTolerance: { pct: 20 },
-    plannedAllocation: allocation,
   };
 }
 

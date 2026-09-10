@@ -1,7 +1,9 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
-  import { computePlan, periodsAround, missingFlows, addDays, alive, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
+  import { revealed } from '../lib/actions';
+  import { centsToInput, inputToCents } from '../lib/format';
+  import { computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -33,20 +35,68 @@
   // Écarts qui n'impliquent pas le compte principal : ils ne sont dans aucun virement principal ↔ compte.
   const principalId = $derived(app.ledger.accounts.find((a) => a.kind === 'principal' && !a.deletedAt)?.id);
   const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== principalId && g.toAccountId !== principalId));
-  const transferFlows = $derived(alive(app.ledger.plannedFlows).filter((f) => f.kind === 'transfer'));
-  const flowFor = (t: PlanTransfer) => transferFlows.find((f) => f.counterpartAccountId === t.accountId);
+  /*
+   * Enregistrer un ordre permanent, c'est écrire un **fait** (D57, D60) : le montant que la banque
+   * exécute vraiment. L'application ne peut ni le connaître ni le changer là-bas, d'où la saisie —
+   * proposée à la dizaine au-dessus de ce que le budget demande, parce qu'un ordre se pose rond,
+   * puis corrigeable pour coller à ce qui a réellement été posé. Ce que le budget demande, lui, se
+   * recalcule seul, et la ventilation du virement se rejouera au jour de l'opération.
+   */
+  let ordreEdite = $state<string | undefined>(undefined);
+  let montantOrdre = $state('');
+  let erreurOrdre = $state('');
+  /** Ce qu'annonce le panneau (D59) : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titreOrdre = $state('');
+
+  const pasArrondi = $derived(app.ledger.settings.orderRounding);
+
+  /*
+   * La carte montre une somme, pas la liste des tirelires : quatre lignes de plus sur un téléphone
+   * noient le seul chiffre qu'on vient chercher. « Détail » les rend à qui les demande — et ce sera
+   * l'endroit où diviser le virement en plusieurs ordres.
+   */
+  let detaille = $state<string[]>([]);
+
+  function basculerDetail(t: PlanTransfer) {
+    detaille = detaille.includes(t.accountId) ? detaille.filter((x) => x !== t.accountId) : [...detaille, t.accountId];
+  }
+
+  /** Ce qu'il reste à virer pour cette tirelire dans la période, la dotation étant déjà affichée. */
+  function aVirer(t: PlanTransfer, tirelireId: string): string {
+    const o = t.orders.find((x) => x.tirelireId === tirelireId);
+    if (!o) return 'rien à virer ce mois-ci';
+    const reste = o.standing + o.exceptional;
+    return `à virer : ${money(reste)}${o.status === 'watch' ? ' · petit écart, à surveiller' : ''}`;
+  }
+
+  function ouvrirOrdre(t: PlanTransfer) {
+    ordreEdite = t.accountId;
+    titreOrdre = `${t.bankOrder ? 'Corriger' : 'Enregistrer'} mon ordre permanent — ${t.accountName}`;
+    montantOrdre = centsToInput(roundOrderUp(t.permanent, pasArrondi));
+    erreurOrdre = '';
+  }
 
   /**
-   * Enregistre le virement permanent comme flux attendu (D21) : à l'import, la ligne bancaire sera
-   * reconnue par montant et libellé, et sa ventilation proposée.
+   * Le seul cas où l'ordre enregistré n'a plus lieu d'être : le budget ne demande plus rien vers ce
+   * compte. Le bouton n'apparaît que là, et il y remplace « Corriger mon ordre » — la carte n'en
+   * porte jamais deux. Supprimer ici n'arrête rien chez la banque : c'est le sens de la question.
    */
-  function saveStandingOrder(t: PlanTransfer) {
+  function supprimerOrdre(t: PlanTransfer) {
+    const id = t.bankOrder?.flowId;
+    if (!id) return;
+    if (!confirm(`Supprimer l'ordre permanent vers « ${t.accountName} » ?\n\nÀ faire une fois qu'il est supprimé chez ta banque — sinon le virement continuera d'arriver sans être reconnu.`)) return;
+    app.remove('plannedFlows', id);
+  }
+
+  function enregistrerOrdre(e: Event, t: PlanTransfer) {
+    e.preventDefault();
     if (!principalId) return;
-    const existing = flowFor(t);
-    const flow = standingTransferFlow(plan, t, principalId, existing?.id ?? app.newId());
+    const montant = inputToCents(montantOrdre);
+    if (montant === undefined || montant <= 0) return void (erreurOrdre = 'Montant invalide (le montant que vire ton ordre, en positif).');
+    const flow = standingTransferFlow(plan, t, principalId, t.bankOrder?.flowId ?? app.newId(), montant);
     if (!flow) return;
-    if (!confirm(`${existing ? 'Mettre à jour' : 'Enregistrer'} le virement permanent vers « ${t.accountName} » (${money(t.standing)}) ?`)) return;
     app.upsert('plannedFlows', flow);
+    ordreEdite = undefined;
   }
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
@@ -113,31 +163,63 @@
         </div>
         <div class="{moneyClass(-t.net)}" style="font-size:18px">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
       </div>
-      {#if t.orders.length}
-        <div class="orders">
-          {#each t.orders as o (o.tirelireId)}
-            <div class="row">
-              <div class="label">
-                {o.tirelireName}
-                <span class="sub">{o.status === 'watch' ? 'petit écart, à surveiller' : 'à faire'}</span>
-              </div>
-              <div class="num">
-                {money(o.standing)}
-                {#if o.exceptional !== 0}<span class="neg"> {o.exceptional > 0 ? '+' : '−'} {money(Math.abs(o.exceptional))} ce mois</span>{/if}
-              </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
-      {#if t.standing > 0 || t.exceptional > 0}
+      {#if t.permanent > 0 || t.exceptional > 0 || t.bankOrder}
         <div class="row">
-          <div class="label">Virement permanent (total){#if flowFor(t)}<span class="sub">enregistré comme flux attendu</span>{/if}</div>
-          <div class="num">{money(t.standing)}</div>
+          <div class="label">Virement permanent<span class="sub">somme des dotations des tirelires placées là, recalculée</span></div>
+          <div class="num">{money(t.permanent)}</div>
         </div>
-        {#if t.standing > 0}
-          <div class="actions" style="margin:6px 0 0">
-            <button class="btn small" onclick={() => saveStandingOrder(t)}>{flowFor(t) ? 'Mettre à jour le flux' : 'Enregistrer comme flux attendu'}</button>
+        {#if detaille.includes(t.accountId)}
+          <div class="orders">
+            {#each t.breakdown as b (b.tirelireId)}
+              <div class="row">
+                <div class="label">{b.tirelireName}<span class="sub">{aVirer(t, b.tirelireId)}</span></div>
+                <div class="num">{money(b.cruise)}</div>
+              </div>
+            {/each}
           </div>
+        {/if}
+        {#if t.bankOrder}
+          <div class="row">
+            <div class="label">Ordre permanent chez la banque
+              <span class="sub">
+                {t.permanent === 0
+                  ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
+                  : t.bankOrder.drift === 0
+                    ? 'au montant du budget'
+                    : t.bankOrder.drift < 0 && t.bankOrder.drift >= -pasArrondi
+                      ? 'arrondi au-dessus du budget : il couvre ce qui est demandé'
+                      : `à passer à ${money(roundOrderUp(t.permanent, pasArrondi))} chez la banque, puis à confirmer ici`}
+              </span>
+            </div>
+            <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
+          </div>
+        {/if}
+        <div class="actions" style="margin:6px 0 0">
+          {#if t.breakdown.length}
+            <button class="btn small" onclick={() => basculerDetail(t)}>{detaille.includes(t.accountId) ? 'Masquer le détail' : 'Détail'}</button>
+          {/if}
+          {#if t.permanent > 0 && ordreEdite !== t.accountId}
+            <button class="btn small" onclick={() => ouvrirOrdre(t)}>{t.bankOrder ? 'Corriger mon ordre' : 'Enregistrer mon ordre permanent'}</button>
+          {:else if t.permanent === 0 && t.bankOrder}
+            <button class="btn small danger" onclick={() => supprimerOrdre(t)}>Supprimer l’ordre enregistré</button>
+          {/if}
+        </div>
+        {#if ordreEdite === t.accountId}
+          <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
+            <p class="titre-panneau">{titreOrdre}</p>
+            <p class="muted small" style="margin:0">
+              Le montant que <strong>ton ordre exécute chez ta banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
+              Proposé arrondi au-dessus de {money(t.permanent)} ; corrige-le pour coller à ce que tu as réellement posé.
+            </p>
+            <div class="grid">
+              <label class="f">Montant de l’ordre permanent (€) <input bind:value={montantOrdre} inputmode="decimal" /></label>
+            </div>
+            {#if erreurOrdre}<div class="err">{erreurOrdre}</div>{/if}
+            <div class="actions" style="margin:0">
+              <button class="btn primary" type="submit">Enregistrer</button>
+              <button class="btn" type="button" onclick={() => (ordreEdite = undefined)}>Annuler</button>
+            </div>
+          </form>
         {/if}
       {/if}
       {#if t.exceptional > 0}

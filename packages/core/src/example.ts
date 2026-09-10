@@ -228,6 +228,33 @@ export function exampleLedger(): Ledger {
       variable: true,
     },
     {
+      /*
+       * L'ordre permanent vers le Livret A : le seul flux **dérivé** du budget (D57), et le seul
+       * dont le montant écrit n'est pas une décision mais un constat — ce que la banque exécute.
+       * Il est volontairement **décalé** : la banque vire 600 €, le budget en demande 650 (les
+       * dotations des quatre tirelires du livret : 100 + 50 + 200 + 300). Le plan affiche donc les
+       * deux montants côte à côte et dit d'aller modifier l'ordre — c'est ce qu'on vient voir, et
+       * cela ne se verrait pas sur un ordre déjà juste. L'écart grandit encore en janvier, quand
+       * l'épargne de précaution reprend la mensualité du crédit (D51).
+       *
+       * Rien n'est viré dans l'exemple : aucune opération ne lui correspond, comme aucun relevé
+       * n'y est importé. Le budget se lit et se construit sans banque (D57) ; en ajouter une
+       * exécution reviendrait à retrancher 600 € de ce que le plan demande, et le plan du
+       * 6 septembre ne serait plus celui de l'analyse.
+       */
+      id: 'flow-vir-livret',
+      name: 'Virement Livret A',
+      kind: 'transfer',
+      origin: 'derived',
+      amount: euros(-600),
+      accountId: 'acc-principal',
+      counterpartAccountId: 'acc-livret',
+      periodicity: monthly('2026-08-28'),
+      dateWindowDays: 5,
+      labelPattern: 'TIRELIRE LIVRET A',
+      amountTolerance: { pct: 20 },
+    },
+    {
       id: 'flow-tf',
       name: 'Taxe foncière (prélèvement)',
       kind: 'dueDate',

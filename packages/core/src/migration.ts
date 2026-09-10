@@ -27,6 +27,7 @@ export function migrateModel(store: LedgerStore): MigrationReport {
   if (from < 7) steps.push({ version: 7, written: migrateTo7(store) });
   if (from < 8) steps.push({ version: 8, written: migrateTo8(store) });
   if (from < 9) steps.push({ version: 9, written: migrateTo9(store) });
+  if (from < 10) steps.push({ version: 10, written: migrateTo10(store) });
   if (from < MODEL_VERSION) store.setModelVersion(MODEL_VERSION);
   return { from, to: MODEL_VERSION, steps };
 }
@@ -249,6 +250,26 @@ function migrateTo9(store: LedgerStore): number {
       void ligne;
       written++;
     }
+  }
+  return written;
+}
+
+/**
+ * 9 → 10 (D60) : un virement permanent portait sa ventilation figée (`plannedAllocation`), photo
+ * du plan prise au moment de l'enregistrement. Elle cesse d'être stockée : la répartition se rejoue
+ * par l'ordre de financement au jour de l'opération (D06). Les flux qui en portaient une sont
+ * exactement ceux qu'a écrits l'écran Plan : ils deviennent des flux **dérivés** (D57), les autres
+ * restent déclarés. La colonne reste déclarée et dépréciée (D30) : un pair non migré continue de
+ * l'écrire sans que personne ne la lise.
+ */
+function migrateTo10(store: LedgerStore): number {
+  let written = 0;
+  for (const raw of store.readRawTable('plannedFlows')) {
+    if (raw['kind'] !== 'transfer' || raw['origin']) continue;
+    const ventilation = raw['plannedAllocation'];
+    if (!Array.isArray(ventilation) || ventilation.length === 0) continue;
+    store.upsert('plannedFlows', { ...(raw as object), origin: 'derived' } as never);
+    written++;
   }
   return written;
 }

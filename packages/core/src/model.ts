@@ -333,6 +333,15 @@ export function findCategoryByName(categories: Category[], name: string, nature:
  */
 export type PlannedFlowKind = 'income' | 'fixedCharge' | 'dueDate' | 'transfer';
 
+/**
+ * D'où vient un flux (D57), et donc qui a le droit de l'écrire :
+ * - `declared` : un fait de l'utilisateur — salaire, loyer, échéance connue. Rien ne le réécrit.
+ * - `derived`  : une conséquence du budget — le virement permanent. Sa ventilation et le montant
+ *   qu'il devrait porter sont des calculs, refaits à chaque changement du budget ; seul le montant
+ *   que l'ordre exécute réellement chez la banque s'y enregistre, faute de pouvoir le deviner.
+ */
+export type FlowOrigin = 'declared' | 'derived';
+
 export interface AmountTolerance {
   abs?: Cents;
   pct?: number;
@@ -342,7 +351,14 @@ export interface PlannedFlow {
   id: Id;
   name: string;
   kind: PlannedFlowKind;
-  /** Signé : positif = crédit sur `accountId`, négatif = débit. */
+  /**
+   * Signé : positif = crédit sur `accountId`, négatif = débit.
+   *
+   * Sur un flux dérivé (D60), c'est ce que l'**ordre permanent exécute chez la banque** : un fait
+   * du monde réel, que seul l'utilisateur peut apprendre à l'application, et qui sert à reconnaître
+   * la ligne à l'import. Ce que le budget demande, lui, ne se stocke pas : c'est
+   * `PlanTransfer.permanent`, recalculé à chaque lecture du plan.
+   */
   amount: Cents;
   accountId: Id;
   /** dueDate : tirelire vidée ; transfer : compte de contrepartie via `counterpartAccountId`. */
@@ -361,13 +377,17 @@ export interface PlannedFlow {
   activeTo?: ISODate;
   /** Le flux engendre-t-il une règle déterministe (D24) ? */
   makesRule?: boolean;
-  /**
-   * Virement permanent : ventilation prévue par couple de comptes (D21), calculée d'avance par le
-   * plan. Si le montant constaté diffère du prévu, elle est rejouée par l'ordre de financement de
-   * D06 plutôt qu'appliquée telle quelle — un prorata saupoudrerait au lieu de servir les planchers.
-   */
-  plannedAllocation?: Array<{ tirelireId: Id; share: Share }>;
+  /** D57 : absent vaut `declared`, si bien qu'aucun flux déjà écrit n'est à réécrire. */
+  origin?: FlowOrigin;
   deletedAt?: string;
+}
+
+/**
+ * Flux dérivé du budget (D57) : il ne se modifie pas à la main, il se recalcule. L'interface le
+ * signale plutôt que d'en ouvrir l'éditeur, et sa ventilation ne se lit jamais dans le flux.
+ */
+export function isDerivedFlow(f: PlannedFlow): boolean {
+  return f.origin === 'derived';
 }
 
 // ---------------------------------------------------------------------------
@@ -557,6 +577,13 @@ export interface Settings {
   principalCushion: Cents;
   /** En dessous de ce montant, un écart de placement (D20) est « à surveiller » plutôt qu'« à faire ». */
   transferThreshold: Cents;
+  /**
+   * Pas d'arrondi d'un ordre permanent (D60) : on pose chez sa banque un montant rond, pas
+   * 683,50 €. Le plan propose le multiple au-dessus de ce que le budget demande, et un ordre
+   * arrondi au-dessus dans ce pas ne se signale pas — il couvre ce qui est demandé. `0` propose
+   * le montant au centime près et signale alors tout écart.
+   */
+  orderRounding: Cents;
   /** Identifiant de cet appareil (pour l'horloge logique et le journal). */
   siteId: string;
 }
@@ -565,6 +592,7 @@ export const DEFAULT_SETTINGS: Settings = {
   periodStartDay: 1,
   principalCushion: 0,
   transferThreshold: 1000,
+  orderRounding: 1000,
   siteId: 'local',
 };
 

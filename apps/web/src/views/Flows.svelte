@@ -6,6 +6,7 @@
   import {
     alive,
     countStates,
+    isDerivedFlow,
     needForDueDateFlow,
     nextOccurrence,
     stepOf,
@@ -164,7 +165,7 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Flux prévus</h1>
-<p class="muted small">Revenus, charges fixes, échéances payées par une tirelire. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au rapprochement de flux.</p>
+<p class="muted small">Revenus, charges fixes, échéances payées par une tirelire. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au rapprochement de flux. Les virements permanents, eux, sont <strong>dérivés du budget</strong> (D57) : ils se confirment depuis le Plan et ne se modifient pas ici.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
@@ -250,12 +251,18 @@
         <div class="label">
           <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · automatisme' : ''}
           {#if badge}<span class="pill dim">{badge}</span>{/if}
+          {#if isDerivedFlow(f)}<span class="pill dim">dérivé du budget</span>{/if}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}{validite ? ` · ${validite}` : ''}</span>
           {#if provision}<span class="sub">{provision}</span>{/if}
+          {#if isDerivedFlow(f)}<span class="sub">montant de l’ordre permanent chez la banque ; la ventilation se recalcule à l’import</span>{/if}
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>
         <div class="actions" style="margin:0">
-          <button class="btn small" onclick={() => startEdit(f)}>Modifier</button>
+          {#if isDerivedFlow(f)}
+            <button class="btn small" onclick={() => app.switchTab('plan')}>Voir dans le Plan</button>
+          {:else}
+            <button class="btn small" onclick={() => startEdit(f)}>Modifier</button>
+          {/if}
           <button class="btn small danger" onclick={() => remove(f)}>Supprimer</button>
         </div>
       </div>

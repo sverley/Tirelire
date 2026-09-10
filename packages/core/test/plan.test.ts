@@ -256,21 +256,23 @@ describe('libellés de virement', () => {
   });
 });
 
-describe('virement permanent à ventilation prévue (D21)', () => {
-  it('un flux par couple de comptes, ventilation calculée d’avance', () => {
+describe('virement permanent : le fait bancaire s’enregistre, la ventilation se recalcule (D57)', () => {
+  it('un flux dérivé par couple de comptes, sans ventilation figée', () => {
     const l = exampleLedger();
     const plan = computePlan(l, '2026-09-06');
     const t = plan.transfers.find((x) => x.accountKind === 'epargne')!;
     const flow = standingTransferFlow(plan, t, 'acc-principal', 'flow-vir')!;
     expect(flow.kind).toBe('transfer');
+    expect(flow.origin).toBe('derived');
     expect(flow.counterpartAccountId).toBe(t.accountId);
     expect(flow.labelPattern).toBe(t.label);
     // Le permanent, pas le total : le complément de ce mois-ci n'est pas un ordre permanent.
     expect(flow.amount).toBe(-t.standing);
-    expect(flow.plannedAllocation!.reduce((s, a) => s + (a.share.kind === 'fixed' ? a.share.amount : 0), 0)).toBe(-t.standing);
+    // Rien de la ventilation ne s'écrit : elle se rejouera au jour de l'opération (D57).
+    expect('plannedAllocation' in flow).toBe(false);
   });
 
-  it('au montant prévu, la ventilation prévue s’applique ; sinon l’ordre de financement rejoue', () => {
+  it('l’ordre de financement répartit, au montant attendu comme à un autre', () => {
     let l = exampleLedger();
     const plan = computePlan(l, '2026-09-06');
     const t = plan.transfers.find((x) => x.accountKind === 'epargne')!;
@@ -287,19 +289,22 @@ describe('virement permanent à ventilation prévue (D21)', () => {
       amount,
       state: 'untreated',
     });
+    const somme = (as: Array<{ share: { kind: string; amount?: number } }>) =>
+      as.reduce((s, a) => s + (a.share.kind === 'fixed' ? (a.share as { amount: number }).amount : 0), 0);
 
-    // Montant exact : on retrouve la ventilation prévue.
+    // Montant attendu : tout est réparti, entre les seules tirelires placées sur ce compte.
     l.operations.push(virement('op-vir-exact', flow.amount));
     let patch = applyMatch(l, { operationId: 'op-vir-exact', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
-    expect(patch.allocations.map((a) => a.tirelireId)).toEqual(flow.plannedAllocation!.map((a) => a.tirelireId));
+    expect(patch.allocations.length).toBeGreaterThan(0);
+    expect(somme(patch.allocations)).toBe(flow.amount);
+    const placees = new Set(l.tirelires.filter((e) => e.placement.some((p) => p.accountId === t.accountId)).map((e) => e.id));
+    for (const a of patch.allocations) expect(placees.has(a.tirelireId!)).toBe(true);
 
     // Montant moindre : les planchers passent d'abord, on ne saupoudre pas au prorata.
     const moindre = Math.round(flow.amount / 2);
     l = applyPatchToLedger(l, { operations: [virement('op-vir-court', moindre)], allocations: [] });
     patch = applyMatch(l, { operationId: 'op-vir-court', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
-    const total = patch.allocations.reduce((s, a) => s + (a.share.kind === 'fixed' ? a.share.amount : 0), 0);
-    expect(total).toBe(moindre);
-    expect(patch.allocations.length).toBeLessThanOrEqual(flow.plannedAllocation!.length);
+    expect(somme(patch.allocations)).toBe(moindre);
   });
 });
 
