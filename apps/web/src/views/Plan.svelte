@@ -48,6 +48,25 @@
 
   const pasArrondi = $derived(app.ledger.settings.orderRounding);
 
+  /*
+   * La carte montre une somme, pas la liste des tirelires : quatre lignes de plus sur un téléphone
+   * noient le seul chiffre qu'on vient chercher. « Détail » les rend à qui les demande — et ce sera
+   * l'endroit où diviser le virement en plusieurs ordres.
+   */
+  let detaille = $state<string[]>([]);
+
+  function basculerDetail(t: PlanTransfer) {
+    detaille = detaille.includes(t.accountId) ? detaille.filter((x) => x !== t.accountId) : [...detaille, t.accountId];
+  }
+
+  /** Ce qu'il reste à virer pour cette tirelire dans la période, la dotation étant déjà affichée. */
+  function aVirer(t: PlanTransfer, tirelireId: string): string {
+    const o = t.orders.find((x) => x.tirelireId === tirelireId);
+    if (!o) return 'rien à virer ce mois-ci';
+    const reste = o.standing + o.exceptional;
+    return `à virer : ${money(reste)}${o.status === 'watch' ? ' · petit écart, à surveiller' : ''}`;
+  }
+
   function ouvrirOrdre(t: PlanTransfer) {
     ordreEdite = t.accountId;
     montantOrdre = centsToInput(roundOrderUp(t.permanent, pasArrondi));
@@ -141,27 +160,21 @@
         </div>
         <div class="{moneyClass(-t.net)}" style="font-size:18px">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
       </div>
-      {#if t.orders.length}
-        <div class="orders">
-          {#each t.orders as o (o.tirelireId)}
-            <div class="row">
-              <div class="label">
-                {o.tirelireName}
-                <span class="sub">{o.status === 'watch' ? 'petit écart, à surveiller' : 'à faire'}</span>
-              </div>
-              <div class="num">
-                {money(o.standing)}
-                {#if o.exceptional !== 0}<span class="neg"> {o.exceptional > 0 ? '+' : '−'} {money(Math.abs(o.exceptional))} ce mois</span>{/if}
-              </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
       {#if t.permanent > 0 || t.exceptional > 0 || t.bankOrder}
         <div class="row">
-          <div class="label">Virement permanent<span class="sub">ce que le budget demande chaque période, recalculé</span></div>
+          <div class="label">Virement permanent<span class="sub">somme des dotations des tirelires placées là, recalculée</span></div>
           <div class="num">{money(t.permanent)}</div>
         </div>
+        {#if detaille.includes(t.accountId)}
+          <div class="orders">
+            {#each t.breakdown as b (b.tirelireId)}
+              <div class="row">
+                <div class="label">{b.tirelireName}<span class="sub">{aVirer(t, b.tirelireId)}</span></div>
+                <div class="num">{money(b.cruise)}</div>
+              </div>
+            {/each}
+          </div>
+        {/if}
         {#if t.bankOrder}
           <div class="row">
             <div class="label">Ordre permanent chez la banque
@@ -178,15 +191,16 @@
             <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
           </div>
         {/if}
-        {#if t.permanent > 0 && ordreEdite !== t.accountId}
-          <div class="actions" style="margin:6px 0 0">
+        <div class="actions" style="margin:6px 0 0">
+          {#if t.breakdown.length}
+            <button class="btn small" onclick={() => basculerDetail(t)}>{detaille.includes(t.accountId) ? 'Masquer le détail' : 'Détail'}</button>
+          {/if}
+          {#if t.permanent > 0 && ordreEdite !== t.accountId}
             <button class="btn small" onclick={() => ouvrirOrdre(t)}>{t.bankOrder ? 'Corriger mon ordre' : 'Enregistrer mon ordre permanent'}</button>
-          </div>
-        {:else if t.permanent === 0 && t.bankOrder}
-          <div class="actions" style="margin:6px 0 0">
+          {:else if t.permanent === 0 && t.bankOrder}
             <button class="btn small danger" onclick={() => supprimerOrdre(t)}>Supprimer l’ordre enregistré</button>
-          </div>
-        {/if}
+          {/if}
+        </div>
         {#if ordreEdite === t.accountId}
           <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
             <p class="muted small" style="margin:0">

@@ -110,6 +110,11 @@ export interface PlanTransfer {
    * inutile » le lendemain du virement.
    */
   permanent: Cents;
+  /**
+   * De quoi cette somme est faite : une ligne par tirelire placée sur ce compte, avec sa dotation.
+   * L'écran l'affiche sous « Détail » — la carte montre une somme, pas quatre lignes.
+   */
+  breakdown: Array<{ tirelireId: Id; tirelireName: string; cruise: Cents }>;
   /** Somme des compléments exceptionnels. */
   exceptional: Cents;
   /** Compte tiers : règlement de la dette. Positif = principal → tiers, négatif = tiers → principal. */
@@ -354,12 +359,15 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
      * pas (D58). Les deux se comparent ici, et l'écart se dit — c'est le seul endroit du plan qui
      * demande un geste hors de l'application.
      */
-    const permanent = Math.max(
-      0,
-      [...idx.tireliresById.values()]
-        .filter((e) => e.placement.some((p) => p.accountId === a.id))
-        .reduce((s, e) => s + (idx.needsByTirelire.get(e.id) ?? []).filter((n) => needActive(n, asOf)).reduce((x, n) => x + needCruise(n), 0), 0),
-    );
+    const breakdown = [...idx.tireliresById.values()]
+      .filter((e) => e.placement.some((p) => p.accountId === a.id))
+      .map((e) => ({
+        tirelireId: e.id,
+        tirelireName: e.name,
+        cruise: (idx.needsByTirelire.get(e.id) ?? []).filter((n) => needActive(n, asOf)).reduce((x, n) => x + needCruise(n), 0),
+      }))
+      .filter((b) => b.cruise !== 0);
+    const permanent = Math.max(0, breakdown.reduce((s, b) => s + b.cruise, 0));
     const flux = standingOrderFlow(flows, a.id);
     const bankOrder = flux ? { flowId: flux.id, amount: Math.abs(flux.amount), drift: permanent - Math.abs(flux.amount) } : undefined;
     // L'ordre arrondi au-dessus du budget couvre ce qu'on lui demande : rien à corriger. On ne
@@ -384,6 +392,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       orders,
       standing,
       permanent,
+      breakdown,
       exceptional,
       settlement,
       surplus,

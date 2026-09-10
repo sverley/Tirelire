@@ -212,6 +212,18 @@ describe('le jeu d’exemple porte un ordre permanent décalé', () => {
     expect(plan.warnings.map((w) => w.code)).toContain('bankOrderDrift');
   });
 
+  it('la somme demandée se détaille en dotations', () => {
+    const t = computePlan(exampleLedger(), asOf).transfers.find((x) => x.accountId === 'acc-livret')!;
+    expect(Object.fromEntries(t.breakdown.map((b) => [b.tirelireName, b.cruise]))).toEqual({
+      'Taxe foncière': euros(100),
+      'Assurance auto': euros(50),
+      Vacances: euros(200),
+      'Épargne de précaution': euros(300),
+    });
+    // C'est ce que « Détail » affiche : la somme et ses parts ne peuvent pas se contredire.
+    expect(t.breakdown.reduce((s, b) => s + b.cruise, 0)).toBe(t.permanent);
+  });
+
   it('il ne se glisse pas dans les propositions de l’assistant', () => {
     // Un flux dérivé est une conséquence du budget, pas une ligne à proposer (D43, D57).
     const s = budgetSuggestions(asOf);
