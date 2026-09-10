@@ -266,7 +266,8 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
   });
 
   // Arbitrage du 10 septembre, suite : « simple pour le plus grand nombre, souple pour les
-  // exigeants ». À rendre concrètes quand l'écran existe (les libellés ne sont pas encore choisis).
+  // exigeants ». Sorti de #14 : c'est l'issue #25. À rendre concrètes quand l'écran existe (les
+  // libellés ne sont pas encore choisis).
   it.todo('sans rien toucher, la carte montre une seule ligne de virement permanent et un seul ordre à poser');
   it.todo('depuis « Détail », diviser le virement ne demande pas de quitter la carte, et Annuler revient à la somme');
   it.todo('depuis « Détail », regrouper des tirelires en plusieurs ordres : chaque ordre affiche sa demande, son fait bancaire et son écart');

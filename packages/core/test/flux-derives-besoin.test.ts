@@ -493,8 +493,9 @@ describe('#14 · arbitrage : l’ordre voulu est la somme des dotations mensuell
 // 8. Arbitrage du 10 septembre, suite : le « Détail » divise le virement, « simple pour le plus
 //    grand nombre, souple pour les exigeants ».
 //
-//    Gardes à écrire dès que la forme du modèle existe : les écrire maintenant obligerait à
-//    inventer des noms que le développement choisira. Elles restent listées ici pour qu'aucune ne
+//    Sorti du périmètre de #14 le 10 septembre : la division est l'issue #25, et ces gardes en sont
+//    la vérification. À écrire dès que la forme du modèle existe : les écrire maintenant obligerait
+//    à inventer des noms que le développement choisira. Elles restent listées ici pour qu'aucune ne
 //    soit oubliée ; `vitest` les affiche comme « todo ».
 // ---------------------------------------------------------------------------------------------
 
