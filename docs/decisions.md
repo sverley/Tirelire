@@ -1045,7 +1045,14 @@ l'opération (D06), planchers d'abord. Le pire cas que cela corrige est le monta
 — l'ancienne photo s'appliquait alors telle quelle, sans que rien ne signale qu'elle ne
 correspondait plus au budget.
 
-Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque, et le
-jeu d'exemple ne porte pas d'ordre permanent enregistré — il se crée en un clic depuis le Plan, et
-les budgets datés de D51 le font diverger dès la période de novembre, ce qui suffit à voir le geste.
+Le jeu d'exemple porte l'ordre, et le porte **décalé** : la banque vire 600 €, le budget en demande
+650, si bien que le plan du 6 septembre montre les deux montants côte à côte sans qu'on ait rien à
+saisir — un ordre déjà juste n'aurait rien appris. L'écart grandit encore en janvier, quand
+l'épargne de précaution reprend la mensualité du crédit (D51). Aucune opération ne lui correspond :
+l'exemple n'importe aucun relevé, et lui en donner une retrancherait 600 € de ce que le plan
+demande, alors que ce plan est celui de l'analyse au centime près.
+
+Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
+(virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
+budget, pas une ligne de budget à offrir (D43).
 

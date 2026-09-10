@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyMatch,
+  budgetSuggestions,
   computePlan,
   euros,
   exampleLedger,
@@ -43,6 +44,14 @@ function ventilation(l: Ledger, flow: PlannedFlow, montant: number): Map<string,
 
 const total = (m: Map<string, number>) => [...m.values()].reduce((s, v) => s + v, 0);
 
+/**
+ * L'exemple porte déjà un ordre permanent vers le livret (décalé de 50 €) : les cas construits
+ * ici le retirent pour poser le leur, sans quoi deux ordres viseraient le même compte.
+ */
+function sansOrdre(l: Ledger): Ledger {
+  return { ...l, plannedFlows: l.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
+}
+
 function ordreVersLivret(l: Ledger, montant?: number): PlannedFlow {
   const plan = computePlan(l, asOf);
   const t = plan.transfers.find((x) => x.accountId === 'acc-livret')!;
@@ -51,7 +60,7 @@ function ordreVersLivret(l: Ledger, montant?: number): PlannedFlow {
 
 describe('un flux dérivé se recalcule au lieu d’être figé (D57)', () => {
   it('à montant inchangé, un budget qui bouge donne une autre ventilation', () => {
-    const avantLedger = exampleLedger();
+    const avantLedger = sansOrdre(exampleLedger());
     const flow = ordreVersLivret(avantLedger);
     const avant = ventilation(avantLedger, flow, flow.amount);
 
@@ -71,7 +80,7 @@ describe('un flux dérivé se recalcule au lieu d’être figé (D57)', () => {
   });
 
   it('le flux enregistré ne sert qu’à reconnaître la ligne bancaire', () => {
-    const l = exampleLedger();
+    const l = sansOrdre(exampleLedger());
     const flow = ordreVersLivret(l);
     expect(isDerivedFlow(flow)).toBe(true);
     // Ce qui reste écrit : le libellé, la tolérance, la fenêtre. Rien du budget.
@@ -89,7 +98,7 @@ describe('un flux dérivé se recalcule au lieu d’être figé (D57)', () => {
 
 describe('deux montants distincts : ce que le budget veut, ce que la banque fait (D58)', () => {
   it('l’écart se voit dans le plan et se dit', () => {
-    const l = exampleLedger();
+    const l = sansOrdre(exampleLedger());
     const demande = computePlan(l, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
 
     // Ordre posé chez la banque 50 € en dessous de ce que le budget demande.
@@ -133,10 +142,11 @@ describe('deux montants distincts : ce que le budget veut, ce que la banque fait
     };
     const plan = computePlan(vide, asOf);
     const t = plan.transfers.find((x) => x.accountId === 'acc-vide')!;
+    const alerte = plan.warnings.find((w) => w.code === 'bankOrderDrift' && w.accountId === 'acc-vide')!;
     // Aucune tirelire n'y est placée : le budget ne demande rien, l'ordre continue pourtant de virer.
     expect(t.standing).toBe(0);
     expect(t.bankOrder).toEqual({ flowId: 'flow-vide', amount: euros(300), drift: -euros(300) });
-    expect(plan.warnings.find((w) => w.code === 'bankOrderDrift')?.message).toContain('supprimer');
+    expect(alerte.message).toContain('supprimer');
   });
 });
 
@@ -153,7 +163,7 @@ describe('un ordre permanent se pose rond (D58)', () => {
   });
 
   it('l’arrondi au-dessus ne se signale pas, un vrai écart si', () => {
-    const l = exampleLedger();
+    const l = sansOrdre(exampleLedger());
     expect(l.settings.orderRounding).toBe(pas);
     const demande = computePlan(l, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
 
@@ -168,7 +178,7 @@ describe('un ordre permanent se pose rond (D58)', () => {
   });
 
   it('le pas est un réglage : à zéro, le moindre écart se dit', () => {
-    const l = exampleLedger();
+    const l = sansOrdre(exampleLedger());
     const sansArrondi = { ...l, settings: { ...l.settings, orderRounding: 0 } };
     const demande = computePlan(sansArrondi, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
     const plan = computePlan(
@@ -178,3 +188,28 @@ describe('un ordre permanent se pose rond (D58)', () => {
     expect(plan.warnings.map((w) => w.code)).toContain('bankOrderDrift');
   });
 });
+
+describe('le jeu d’exemple porte un ordre permanent décalé', () => {
+  it('le plan montre les deux montants et dit d’aller modifier l’ordre', () => {
+    const l = exampleLedger();
+    const ordre = standingOrderFlow(l.plannedFlows, 'acc-livret')!;
+    expect(ordre.id).toBe('flow-vir-livret');
+    expect(isDerivedFlow(ordre)).toBe(true);
+
+    const plan = computePlan(l, asOf);
+    const t = plan.transfers.find((x) => x.accountId === 'acc-livret')!;
+    // Ce que le budget demande n'a pas bougé d'un centime : l'ordre enregistré ne le touche pas.
+    expect(t.standing).toBe(euros(650));
+    expect(t.bankOrder).toEqual({ flowId: 'flow-vir-livret', amount: euros(600), drift: euros(50) });
+    expect(plan.warnings.map((w) => w.code)).toContain('bankOrderDrift');
+  });
+
+  it('il ne se glisse pas dans les propositions de l’assistant', () => {
+    // Un flux dérivé est une conséquence du budget, pas une ligne à proposer (D43, D57).
+    const s = budgetSuggestions(asOf);
+    const noms = [...s.incomes, ...s.charges, ...s.everyday, ...s.periodic, ...s.savings].map((x) => x.name);
+    expect(noms).not.toContain('Virement Livret A');
+    expect(noms.length).toBeGreaterThan(0);
+  });
+});
+
