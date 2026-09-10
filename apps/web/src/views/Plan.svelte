@@ -36,7 +36,7 @@
   const principalId = $derived(app.ledger.accounts.find((a) => a.kind === 'principal' && !a.deletedAt)?.id);
   const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== principalId && g.toAccountId !== principalId));
   /*
-   * Enregistrer un ordre permanent, c'est écrire un **fait** (D57, D58) : le montant que la banque
+   * Enregistrer un ordre permanent, c'est écrire un **fait** (D57, D60) : le montant que la banque
    * exécute vraiment. L'application ne peut ni le connaître ni le changer là-bas, d'où la saisie —
    * proposée à la dizaine au-dessus de ce que le budget demande, parce qu'un ordre se pose rond,
    * puis corrigeable pour coller à ce qui a réellement été posé. Ce que le budget demande, lui, se

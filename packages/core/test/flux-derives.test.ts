@@ -96,7 +96,7 @@ describe('un flux dérivé se recalcule au lieu d’être figé (D57)', () => {
   });
 });
 
-describe('deux montants distincts : ce que le budget veut, ce que la banque fait (D58)', () => {
+describe('deux montants distincts : ce que le budget veut, ce que la banque fait (D60)', () => {
   it('l’écart se voit dans le plan et se dit', () => {
     const l = sansOrdre(exampleLedger());
     const demande = computePlan(l, asOf).transfers.find((x) => x.accountId === 'acc-livret')!.standing;
@@ -158,7 +158,7 @@ describe('deux montants distincts : ce que le budget veut, ce que la banque fait
   });
 });
 
-describe('un ordre permanent se pose rond (D58)', () => {
+describe('un ordre permanent se pose rond (D60)', () => {
   const pas = euros(10);
 
   it('le montant proposé est le multiple du pas au-dessus', () => {

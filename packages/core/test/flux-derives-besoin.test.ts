@@ -380,7 +380,7 @@ describe('#14 · déclaré ou dérivé', () => {
   });
 
   it('un virement saisi à la main reste déclaré et n’est pas pris pour l’ordre permanent', () => {
-    // L'exemple porte son propre ordre dérivé (D58) : on le retire pour n'avoir que celui saisi.
+    // L'exemple porte son propre ordre dérivé (D60) : on le retire pour n'avoir que celui saisi.
     const base = exampleLedger();
     const l: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
     const main: PlannedFlow = {

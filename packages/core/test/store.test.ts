@@ -300,7 +300,7 @@ describe('migration du modèle (D30)', () => {
     expect(livret.tracksSettlement).toBeUndefined();
   });
 
-  it('9 → 10 (D58) : un virement à ventilation figée devient un flux dérivé sans ventilation', async () => {
+  it('9 → 10 (D60) : un virement à ventilation figée devient un flux dérivé sans ventilation', async () => {
     const store = await storeAtModel1([
       ['planned_flows', 'flow_vir', 'name', 'Virement Livret A'],
       ['planned_flows', 'flow_vir', 'kind', 'transfer'],

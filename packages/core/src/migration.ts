@@ -255,7 +255,7 @@ function migrateTo9(store: LedgerStore): number {
 }
 
 /**
- * 9 → 10 (D58) : un virement permanent portait sa ventilation figée (`plannedAllocation`), photo
+ * 9 → 10 (D60) : un virement permanent portait sa ventilation figée (`plannedAllocation`), photo
  * du plan prise au moment de l'enregistrement. Elle cesse d'être stockée : la répartition se rejoue
  * par l'ordre de financement au jour de l'opération (D06). Les flux qui en portaient une sont
  * exactement ceux qu'a écrits l'écran Plan : ils deviennent des flux **dérivés** (D57), les autres

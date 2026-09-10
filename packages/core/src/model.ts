@@ -354,7 +354,7 @@ export interface PlannedFlow {
   /**
    * Signé : positif = crédit sur `accountId`, négatif = débit.
    *
-   * Sur un flux dérivé (D58), c'est ce que l'**ordre permanent exécute chez la banque** : un fait
+   * Sur un flux dérivé (D60), c'est ce que l'**ordre permanent exécute chez la banque** : un fait
    * du monde réel, que seul l'utilisateur peut apprendre à l'application, et qui sert à reconnaître
    * la ligne à l'import. Ce que le budget demande, lui, ne se stocke pas : c'est
    * `PlanTransfer.standing`, recalculé à chaque lecture du plan.
@@ -578,7 +578,7 @@ export interface Settings {
   /** En dessous de ce montant, un écart de placement (D20) est « à surveiller » plutôt qu'« à faire ». */
   transferThreshold: Cents;
   /**
-   * Pas d'arrondi d'un ordre permanent (D58) : on pose chez sa banque un montant rond, pas
+   * Pas d'arrondi d'un ordre permanent (D60) : on pose chez sa banque un montant rond, pas
    * 683,50 €. Le plan propose le multiple au-dessus de ce que le budget demande, et un ordre
    * arrondi au-dessus dans ce pas ne se signale pas — il couvre ce qui est demandé. `0` propose
    * le montant au centime près et signale alors tout écart.

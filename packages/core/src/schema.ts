@@ -126,7 +126,7 @@ export const TABLES: Record<string, TableDef> = {
       c('activeTo'),
       c('makesRule', 'boolean'),
       c('origin'), // D57 : flux déclaré ou dérivé du budget
-      old('plannedAllocation', 'json'), // D58 : la ventilation d'un virement ne se stocke plus
+      old('plannedAllocation', 'json'), // D60 : la ventilation d'un virement ne se stocke plus
       c('deletedAt'),
     ],
   },

@@ -114,7 +114,7 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
   let demandé = 0;
 
   it('le Plan montre les deux montants dès l’exemple, et dit lequel changer', async () => {
-    // Le jeu d'exemple porte un ordre volontairement décalé (D58) : la banque vire 600 €, le
+    // Le jeu d'exemple porte un ordre volontairement décalé (D60) : la banque vire 600 €, le
     // budget en demande 650. La comparaison est donc là sans qu'on ait rien saisi.
     const c = await carte(page);
     expect(c.visible, `carte « ${COMPTE} » absente du Plan`).toBe(true);

@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
@@ -28,6 +29,7 @@
     "@types/node": "^26.4.1",
     "@types/qrcode": "^1.5.6",
     "@types/sql.js": "^1.4.9",
+    "jsdom": "^28.0.0",
     "puppeteer-core": "^24.30.0",
     "svelte": "^5.57.0",
     "svelte-check": "^4.3.4",

@@ -104,7 +104,7 @@ export interface PlanTransfer {
   /** Somme des parts permanentes restant à virer cette période. */
   standing: Cents;
   /**
-   * Ce que le budget demande comme **ordre permanent** vers ce compte (D58) : la croisière des
+   * Ce que le budget demande comme **ordre permanent** vers ce compte (D60) : la croisière des
    * tirelires qui y sont placées, indépendante de ce qui a déjà été viré. `standing`, lui, fond à
    * mesure que la période s'exécute — le comparer à l'ordre de la banque ferait crier « ordre
    * inutile » le lendemain du virement.
@@ -124,7 +124,7 @@ export interface PlanTransfer {
   /** Total net à virer ce mois-ci depuis le compte principal (négatif = vers le compte principal). */
   net: Cents;
   /**
-   * Ordre permanent enregistré chez la banque (D58), s'il l'a été : le **fait**, en regard de
+   * Ordre permanent enregistré chez la banque (D60), s'il l'a été : le **fait**, en regard de
    * `standing` qui est le **calcul**. `drift` vaut ce que le budget demande moins ce que l'ordre
    * exécute ; non nul, l'ordre est à modifier chez la banque, puis à confirmer ici — l'application
    * ne peut ni le connaître ni le changer toute seule.
@@ -356,7 +356,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     }
     /*
      * Ce que le budget demande vient d'être calculé ; ce que la banque exécute, lui, ne se devine
-     * pas (D58). Les deux se comparent ici, et l'écart se dit — c'est le seul endroit du plan qui
+     * pas (D60). Les deux se comparent ici, et l'écart se dit — c'est le seul endroit du plan qui
      * demande un geste hors de l'application.
      */
     const breakdown = [...idx.tireliresById.values()]
@@ -486,7 +486,7 @@ export function standingOrderFlow(flows: PlannedFlow[], accountId: Id): PlannedF
 }
 
 /**
- * Flux **dérivé** du virement permanent vers un compte (D21, D57, D58) : un seul par couple de
+ * Flux **dérivé** du virement permanent vers un compte (D21, D57, D60) : un seul par couple de
  * comptes, mensuel. Ce qu'il enregistre est un fait — le montant que l'ordre exécute chez la
  * banque, son libellé, sa tolérance — pour que la ligne soit reconnue à l'import. Sa ventilation,
  * elle, ne s'écrit nulle part : elle se rejoue par l'ordre de financement au jour de l'opération.

@@ -1012,7 +1012,96 @@ Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé �
 de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
 fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
 
-## D58 · 2026-09-09 · Deux montants pour un virement permanent, un seul se stocke
+## D58 · 2026-09-09 · Le fichier est un état : pas de journal, une horloge par ligne
+
+Le journal de changements de D08 (`changes`, `cell_versions`, chaîne d'empreintes) ne servait qu'à
+la synchronisation, et il faisait grossir le fichier avec les gestes et non avec les données : une
+opération importée, quinze colonnes, pesait quinze entrées d'environ 300 octets — dix fois la
+donnée — et chaque reclassement en ajoutait sans que rien ne s'efface. À l'usage prévu (un import
+par mois, deux retouches du plan par an, une ou deux synchronisations par mois entre deux ou trois
+appareils, le calcul des écarts et des virements n'écrivant rien), cela faisait 15 à 20 Mo par an,
+réécrits en entier dans IndexedDB à chaque correction, pour environ 1 Mo de données.
+
+Le fichier SQLite est désormais un **état** : les tables, plus une colonne `hlc` par ligne
+(horloge logique hybride, qui porte l'appareil), `settings` compris. Fusion par ligne entière, la
+plus récente gagne, `deleted_at` inclus. Synchronisation par delta d'état : chaque appareil garde
+un vecteur d'horloges (le maximum vu par appareil) ; au `hello` les pairs échangent leurs vecteurs,
+chacun envoie les lignes plus récentes que le vecteur de l'autre, et le relais entre appareils qui
+ne se croisent pas est gratuit puisque l'état d'un pair contient ce qu'il a reçu des autres. Une
+ligne modifiée des deux côtés depuis la dernière synchronisation est signalée, pas tue. Le
+protocole et les transports de D16 restent ; seul le contenu des paquets change. Ce qu'on
+abandonne : l'historique des valeurs remplacées — un « annuler » futur passera par un journal
+séparé, régénérable pour le présent, qui ne touchera pas à ce format — et la preuve de chaîne,
+superflue pour un foyer sur relais chiffré. La granularité par cellule a été chiffrée et écartée :
+1,7 Ko de versions par opération pour des conflits que l'usage ne produit pas.
+
+Rupture sans migration, le produit n'ayant pas d'utilisateur : un fichier antérieur est refusé
+avec un message clair, `meta` porte un marqueur de format et une version, `MODEL_VERSION` repart
+à 1, `migration.ts` et les colonnes dépréciées disparaissent — le mécanisme D30 resservira après
+la première version publiée. La même passe renomme ce que le domaine avait renommé sans le
+stockage : `envelopes` → `tirelires`, `envelope_id` → `tirelire_id` (la réserve de D42 tombait
+dès que le nom SQL devenait une interface, issue #18), `makes_rule` → `makes_automation` (D39), et
+sépare les deux sens de `rank`. La clé d'une opération importée (D09) se raccourcit à `op_` + 16
+hexadécimaux. L'écriture par ligne entière autorise `NOT NULL` et `CHECK` ; les références et les
+autres invariants sont vérifiés par une fonction du cœur, qui sert aussi à l'ouverture d'un
+fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` pour pouvoir être
+fabriqué depuis l'extérieur.
+
+## D59 · 2026-09-10 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
+
+Écrite le 8 septembre en parallèle d'autres chantiers, et numérotée D52 à l'époque ; le numéro
+ayant servi ailleurs entre-temps, elle arrive ici en D59 sans autre changement que celui-ci et les
+deux rectifications signalées plus bas.
+
+Le correctif de placement avait laissé passer, sur les cinq écrans de Configuration, un formulaire écrit **avant** la
+liste : il s'insérait en haut du document, quel que soit l'endroit d'où l'on venait de cliquer.
+Mesuré sur la version en ligne : liste des tirelires déroulée jusqu'en bas (`scrollY = 1102`),
+« Ajouter un besoin » sur la dernière tirelire ouvrait un panneau dont le
+`getBoundingClientRect().top` valait −1133 px, sans que la page défile. Rien ne bougeait à l'écran :
+le bouton passait pour mort. Le commit `00991be` a corrigé le placement en faisant de chaque
+formulaire un `{#snippet}` rendu au point d'usage, attaché à sa ligne et ramené dans le champ de
+vision par `revealed`. Cette entrée finit le travail sur les deux points qu'il laissait ouverts.
+
+**Le panneau nomme ce qu'il modifie.** L'adjacence le suggère, elle ne le dit pas — et le panneau
+des besoins affichait un simple `Besoin`, alors qu'une tirelire peut en porter plusieurs (D28) et
+qu'on peut ouvrir le panneau depuis trois boutons différents. Chaque formulaire porte donc une ligne
+de titre : « Ajouter un compte », « Modifier le compte — Carte enfants »,
+« Modifier le besoin « Cours de piano » — Enfants et loisirs », « Réviser le besoin — … ». Le titre
+est **figé à l'ouverture** plutôt que lu depuis le champ « Nom » du formulaire, sinon il suivrait la
+frappe et se déferait à mesure qu'on corrige le nom.
+
+**`apps/web` a un harnais de test.** Il n'en avait aucun ; le défaut a donc pu naître, être corrigé,
+et pourrait renaître sans que rien ne l'attrape. Vitest et jsdom y entrent, avec trois tests sur
+`revealed` (il amène le panneau au rendu suivant, en `block: 'nearest'` pour déplacer le moins
+possible, sans animation quand le mouvement est réduit) et quinze tests de structure qui figent, sur
+les cinq écrans, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
+il porte `attached` et `use:revealed`, il porte un titre figé. Vérifié en remettant le
+`Flows.svelte` d'avant la correction : les trois échouent.
+
+**Ce que ce harnais ne fait pas.** jsdom exécute le code d'un composant mais ne met rien en page :
+la garde est structurelle, jamais géométrique. Le rendu à 375 px, le débordement et la position
+réelle d'un panneau se mesurent dans un navigateur. `main` sait le faire depuis D55 : `harnais.ts`
+construit le site, le sert et le pilote. La mesure du panneau — ouvrir « Ajouter un besoin » sur la
+dernière tirelire à 375 px et vérifier qu'il tombe dans la fenêtre — a sa place là, et reste à
+écrire. Aucun composant n'étant monté ici, ce harnais n'a besoin ni du plugin Svelte ni d'un
+environnement jsdom global : seul `revealed.test.ts` le demande, par son en-tête.
+
+**Deux voies écartées, et pourquoi.** La *feuille modale* — le formulaire en superposition, avec
+focus, Échap et retour exact au point de départ — traitait le même défaut plus rigoureusement, mais
+elle cache la liste pendant la saisie : on ne corrige plus un montant en voyant ceux d'à côté. Elle
+ajoutait aussi une couche dont le comportement avec le clavier virtuel d'Android n'était pas
+vérifiable dans la session. L'édition sur place étant déjà fusionnée et éprouvée sur le téléphone,
+la remplacer aurait coûté plus qu'elle ne rapportait. Le *focus automatique sur le premier champ*
+est écarté pour la même raison de terrain : sur un téléphone, il ouvre le clavier au moment même où
+`revealed` fait défiler, et les deux se battent pour la position de la page.
+
+**Un doute levé.** Cette entrée a d'abord annoncé qu'Annuler ne ramenait pas d'où l'on était parti,
+le panneau disparaissant et la suite de la liste remontant de sa hauteur. C'est faux, et l'usage l'a
+tranché : le panneau s'ouvre *sous* sa ligne, donc tout ce qui est au-dessus — la ligne elle-même et
+le bouton qu'on vient de presser — ne bouge pas d'un pixel à la fermeture. Seule la suite de la
+liste remonte, et on ne la regardait pas. Il n'y a rien à corriger de ce côté.
+
+## D60 · 2026-09-10 · Deux montants pour un virement permanent, un seul se stocke
 
 Applique D57 au virement permanent — le seul flux dérivé du budget, et le seul endroit où une photo
 du plan était enregistrée (D21, lot 4).
@@ -1055,4 +1144,3 @@ demande, alors que ce plan est celui de l'analyse au centime près.
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
 (virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
 budget, pas une ligne de budget à offrir (D43).
-
