@@ -7,6 +7,8 @@
 - Lire ensuite `docs/invariants.md` : ce que le produit doit rester, tiré de la description. Une décision se prend au
   regard des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
   une décision.
+- Lire aussi `docs/contraintes.md` : ce que les plateformes imposent à une application multiplateforme
+  qui doit rester simple ; tout choix technique la respecte.
 - Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro ; toute
   décision nouvelle y est ajoutée, datée, sans réécrire les anciennes.
 - Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
@@ -31,3 +33,7 @@
   commentaires dans la discussion de la PR.
 - **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
   répertoire de travail (voir #22).
+- **Choix techniques.** Une cible de distribution, une technologie ou un outil est un choix
+  technique : il se consigne dans une issue de besoin, une par cible identifiée, jamais dans la
+  description du projet ni dans les invariants. Il se traite le moment venu, au regard des
+  invariants et de `docs/contraintes.md`.

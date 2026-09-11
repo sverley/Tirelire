@@ -44,11 +44,3 @@ Réponse au point 1 de l'issue #29 (relais).
 Correction du porteur, le même jour :
 
 > J'ai trop réduit le verbatim en ne pensant qu'à un utilisateur, on peut prévoir une synchronisation agnostique tant qu'il y a partage des clés de chiffrement.
-
-## 11 septembre 2026 · distribution du relais
-
-Réponse à la question 2 de l'issue #31, qui proposait de retirer le relais autonome (`apps/relay`).
-
-> Non, il faut le porter en cible de distribution. Il fait partie d'une release pour qu'un utilisateur puisse le mettre en place sur un serveur sans mettre l'appli web entiere
->
-> Mais il doit utiliser le même code, ce n'est que sa distribution qui est proposée seule en plus d'embarquée dans la distribution web

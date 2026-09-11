@@ -5,7 +5,8 @@ Comptes de la famille : des tirelires réparties sur les comptes réels, portant
 saisis à la main, l'import des relevés et un moteur de règles pour les classer.
 
 Nom de code. Description du projet, qui fait foi : [`docs/description-projet.md`](docs/description-projet.md) ;
-ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
+ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md) ;
+ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
 
 ## Structure
 
@@ -16,7 +17,7 @@ ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md). Anal
   (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
-- `docs` — description du projet, invariants du produit, analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
+- `docs` — description du projet, invariants du produit, contraintes du projet, analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
 
 ## Démarrer
 
