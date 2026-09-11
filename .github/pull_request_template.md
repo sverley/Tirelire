@@ -21,6 +21,9 @@ sur son autorisation explicite. Cocher enregistre la validation ;
 un commit qui modifie le code, ou un changement de branche cible, l'annule. Documentation et
 harnais se modifient sans l'annuler.
 
+Une PR qui ne touche que des tests, de l'outillage ou de la documentation ne joue ni manipulation de
+l'application ni construction de l'APK : l'analyse dit pourquoi elles ne sont pas atteintes (D62).
+
 Préparer la section : node packages/gardes/cli.mjs demander --base origin/main
 -->
 

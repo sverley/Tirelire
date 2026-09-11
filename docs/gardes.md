@@ -19,7 +19,7 @@ correspondance ; `packages/gardes` le relit.
   absent (#59).
   Un test qui se saute faute d'outil compte comme un test qui tourne, parce qu'en CI
   `TIRELIRE_STRICT` rend l'outil obligatoire : un harnais du registre qui se saute sous condition
-  sans lire cette variable est refusé.
+  sans lire cette variable est refusé, comme une CI dont l'étape `pnpm test` ne la pose plus.
 - **Sur chaque PR**, par la vérification « Vérifications manuelles » : la description déclare les
   identifiants touchés et ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux
   `Chemins` d'une entrée impose de la déclarer ; chaque vérification manuelle des entrées déclarées,
@@ -56,7 +56,9 @@ compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refu
   `test` écrit en toutes lettres, qui doit exister et tourner dans l'un des fichiers cités, et non
   le seul fichier (tranché dans #59).
 - Une ligne `Vérification manuelle` : un identifiant `VM-<entrée>-<nom>`, un tiret cadratin, puis ce
-  qu'on fait, sur quoi, et ce qu'on doit constater.
+  qu'on fait, sur quoi, et ce qu'on doit constater. La consigne se proportionne à la PR (D62) : une
+  PR qui ne touche que des tests, de l'outillage ou de la documentation ne déclenche ni manipulation
+  de l'application ni construction de l'APK ; son analyse dit pourquoi l'application n'est pas atteinte.
 - Une ligne `Couvert par` : des identifiants, un tiret cadratin, puis pourquoi. Déclarer l'entrée
   demande alors aussi les vérifications des entrées citées.
 - Une ligne `À bâtir` : un harnais prévu (#38). Il ne garde rien tant qu'il n'existe pas ; une
@@ -195,11 +197,13 @@ Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/we
 
 - **Harnais** · `.github/workflows/ci.yml` — sur chaque PR, le web et le site d'hébergement se
   construisent ; l'APK Android ne se construit qu'après fusion sur `main`.
-- **Vérification manuelle** · `VM-I9-apk` — Si la PR touche la construction (dépendances, Vite,
-  Capacitor, projet Android, CI) : construire l'APK depuis la branche en local (`pnpm build`,
-  `npx cap sync android`, puis `./gradlew assembleRelease` dans `apps/web/android`) ; sinon, dire
-  dans l'analyse pourquoi la construction de l'APK n'est pas atteinte. Ne pas lancer « CI et
-  livraison » à la main sur la branche : sa publication déplacerait la release `latest`.
+- **Vérification manuelle** · `VM-I9-apk` — Si la PR touche la construction de l'application (ses
+  dépendances, Vite, Capacitor, le projet Android, les jobs de la CI qui construisent ou publient) :
+  construire l'APK depuis la branche en local (`pnpm build`, `npx cap sync android`, puis
+  `./gradlew assembleRelease` dans `apps/web/android`). Sinon, et notamment si elle ne touche que des
+  tests, de l'outillage ou de la documentation (D62) : dire dans l'analyse pourquoi la construction
+  n'est pas atteinte, et ce qui dépend de ce qu'elle change. Ne pas lancer « CI et livraison » à la
+  main sur la branche : sa publication déplacerait la release `latest`.
 - **À bâtir** · construire l'APK sur chaque PR, sans rien publier (#38).
 
 ## I10 · Proposer, et ne jamais faire de manière cachée
@@ -247,9 +251,10 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
 
 - **Harnais** · `apps/hebergement/verifier.sh` — après chaque dépôt depuis `main`, le site en ligne
   redirige HTTP vers HTTPS.
-- **Vérification manuelle** · `VM-C3-https` — Donner à l'application un relais en `http://` hors
-  de `localhost` : elle le refuse ou le signale. Constater aussi que la PR ne fait rien charger en
-  HTTP.
+- **Vérification manuelle** · `VM-C3-https` — Si la PR touche l'application ou le relais : donner à
+  l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,
+  et que la PR ne fait rien charger en HTTP. Si elle ne touche que des tests, de l'outillage ou de la
+  documentation (D62) : dire dans l'analyse pourquoi ni l'application ni le relais ne sont atteints.
 - **À bâtir** · le refus ou le signalement d'un relais en HTTP (#38).
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer

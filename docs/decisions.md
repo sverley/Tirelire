@@ -1236,3 +1236,11 @@ ne tournait jamais en CI.
 Dans le code : le crochet de pré-commit laisse l'amorçage et les harnais d'audit à la CI ; la
 couverture vérifie que l'étape `pnpm test` de la CI pose `TIRELIRE_STRICT` ; les demandes d'une PR,
 ou les consignes du registre, épargnent les PR qui ne touchent que tests, outillage ou documentation.
+
+Mis en œuvre dans la PR #63 : le crochet de pré-commit lance le typecheck et les tests du cœur, puis
+les tests unitaires de la garde, couverture comprise (17 s mesurées) ; le typecheck complet et le
+build passent au push, et `pnpm test` joue tout en CI, amorçage et harnais d'audit compris. La
+couverture lit l'étape `pnpm test` de `ci.yml` et refuse qu'elle cesse de poser `TIRELIRE_STRICT`.
+La règle d'« Écrire une entrée » et les consignes de `VM-I9-apk` et `VM-C3-https` épargnent les PR de
+tests, d'outillage ou de documentation ; la garde ne classe pas elle-même les fichiers : l'analyse le
+dit, et qui valide le contrôle.
