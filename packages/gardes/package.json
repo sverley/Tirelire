@@ -6,6 +6,7 @@
   "description": "Garde de l'objectif primaire (#58, D61) : chaque invariant et chaque contrainte a son harnais ou sa vérification manuelle, et chaque PR demande les siennes.",
   "scripts": {
     "test": "node --test",
+    "test:commit": "node --test gardes.test.mjs",
     "typecheck": "echo ok",
     "build": "echo ok",
     "couverture": "node cli.mjs couverture"

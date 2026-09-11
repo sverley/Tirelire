@@ -17,7 +17,9 @@
   jamais stocker ce qui se recalcule (soldes, plan, soldes à régler).
 - Écritures uniquement via `LedgerStore.upsert/remove/setSetting` (journal de changements).
 - Aucune donnée bancaire réelle dans le dépôt ; exemples et tests sur données inventées.
-- Avant de pousser : `pnpm typecheck && pnpm test && pnpm build` (les hooks le font).
+- Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font l'essentiel :
+  typecheck et tests du cœur, puis tests unitaires de la garde, au commit (moins de 20 s) ;
+  typecheck complet et build au push. La CI joue tout, amorçage et harnais d'audit compris (D62).
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
 - Simon lit surtout sur téléphone : réponses courtes, en prose, une question à la fois.
 
