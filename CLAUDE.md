@@ -54,3 +54,5 @@
     demandée n'est pas analysée et validée.
   - Un agent ne coche jamais « Validée », ne retire pas une garde pour faire passer une PR, et ne
     fusionne jamais une PR dont la vérification « Vérifications manuelles » est rouge.
+- **Dépendances.** Elles se tiennent à deux endroits, toujours d'accord : la section « Dépendances »
+  de l'issue et les liens GitHub « bloquée par ». Qui recalcule l'une met l'autre à jour.
