@@ -10,7 +10,8 @@ d'après elle. Les invariants disent **quoi** et **pour qui** ; les décisions
   d'abord dans une issue.
 - Un invariant ne change pas au détour d'un développement : il change à la demande du porteur du
   projet, par une entrée datée dans l'historique en bas de ce document.
-- Un invariant ne nomme ni modèle, ni écran, ni technique : ce sont des choix, donc des décisions.
+- Un invariant ne nomme ni modèle, ni écran, ni technique, sauf quand la description du projet
+  l'impose : le reste est un choix, donc une décision.
 
 ## I1 · Aider un particulier à tenir un budget sur plusieurs comptes
 
@@ -64,11 +65,24 @@ Classer les opérations par catégorie est aisé et demande peu de clics.
 
 Les données sont stockées en local, sur les appareils de l'utilisateur, et non sur un serveur.
 Distribuer l'application par un serveur web (I9) n'y déroge pas : le serveur sert l'application,
-pas les données.
+pas les données. Une seule exception : le stockage temporaire de paquets chiffrés sur un relais,
+pour la synchronisation asynchrone (I8), que l'utilisateur accepte après avoir été averti.
 
-## I8 · Synchroniser sessions et plateformes
+## I8 · Synchroniser de pair à pair les instances d'un même utilisateur
 
-Les données se synchronisent entre les sessions et entre les plateformes d'un même utilisateur.
+Les instances d'un même utilisateur, sur ses sessions et ses plateformes, se synchronisent de pair
+à pair.
+
+- **Mise en relation.** Deux instances se relient par le partage d'un QR code, en mode simple et
+  complètement automatique, ou par un processus qui ne demande pas d'appareil photo, entre deux
+  sessions sur ordinateur.
+- **Synchronisation asynchrone.** Une fois les instances reliées, une instance web de
+  l'application peut servir de serveur relais : elle stocke temporairement les paquets, pour que
+  des instances qui ne sont pas connectées en même temps se synchronisent. Ce relais n'est pas
+  présenté comme privé.
+- **Consentement averti.** Cette possibilité est proposée à l'utilisateur lors de sa première
+  mise en lien de deux sessions, avec un avertissement : des données chiffrées seront déposées sur
+  le serveur.
 
 ## I9 · Plusieurs distributions
 
@@ -82,3 +96,6 @@ L'application se distribue par un serveur web et en application Android, et à t
   (issue #29). Une partie était déjà portée par des décisions (D19, D21, D35, D40, D57) ; elle
   en est extraite pour que les décisions s'y réfèrent. Les écarts relevés entre décisions et
   invariants sont consignés dans l'issue.
+- **2026-09-11** · I7 et I8 précisés d'après le complément de la description du projet sur la
+  synchronisation (point 1 de l'issue #29) : pair à pair, mise en relation par QR code ou sans
+  appareil photo, relais web temporaire proposé avec un avertissement.
