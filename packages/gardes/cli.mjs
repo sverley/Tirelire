@@ -16,7 +16,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
-import { DOCUMENTS, RACINE, lireRegistre, preparerSection, resumePr, verifierCouverture, verifierPr } from './gardes.mjs';
+import { DOCUMENTS, RACINE, fichiersDepuisValidation, lireRegistre, preparerSection, resumePr, verifierCouverture, verifierPr } from './gardes.mjs';
 import { verifierPrSurGithub } from './github.mjs';
 
 const [commande, ...args] = process.argv.slice(2);
@@ -124,7 +124,10 @@ async function pr() {
     const fichiersModifies = noms(git('diff', '-z', '--name-only', `${base.sha}...${head.sha}`));
     let resultat;
     try {
-      resultat = await verifierPrSurGithub({ evenement, api: apiGithub(), entrees: couvert.entrees, entreesAvant, fichiersModifies });
+      resultat = await verifierPrSurGithub({
+        evenement, api: apiGithub(), entrees: couvert.entrees, entreesAvant, fichiersModifies,
+        fichiersDepuis: (ancienne, t) => fichiersDepuisValidation({ ancienne, base: base.sha, tete: t }),
+      });
     } catch (e) {
       resultat = verifierPr({ entrees: couvert.entrees, entreesAvant, corps: body ?? '', fichiersModifies, validations: { tete: head.sha, cible: base.ref, horodatages: [] } });
       resultat.aCorriger.push(`La vérification n'a pas pu lire ou écrire la PR sur GitHub : ${e.message}`);

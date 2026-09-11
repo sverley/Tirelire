@@ -15,9 +15,9 @@ doute, les déclarer. Écrire « aucun » plutôt que laisser vide.
 
 Sous « Vérifications manuelles » : chaque vérification des identifiants déclarés (docs/gardes.md),
 et chaque garde que la PR retire du registre, avec son analyse, écrite par un développeur ou un
-agent, et sa case « Validée », que seul un développeur humain coche. Cocher enregistre la validation
-pour l'état de la PR ; un nouveau commit, un changement de branche cible ou une analyse modifiée
-l'annulent.
+agent, et sa case « Validée », que seul un développeur humain coche. Cocher enregistre la validation ;
+un commit qui modifie le code, ou un changement de branche cible, l'annule. Documentation et
+harnais se modifient sans l'annuler.
 
 Préparer la section : node packages/gardes/cli.mjs demander --base origin/main
 -->

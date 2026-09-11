@@ -54,8 +54,9 @@
     demandée n'est pas analysée et validée.
   - Un agent ne coche jamais « Validée », ne retire pas une garde pour faire passer une PR, et ne
     fusionne jamais une PR dont la vérification « Vérifications manuelles » est rouge.
-  - Une validation vaut pour l'état de la PR au moment où elle est cochée : tout commit, changement
-    de branche cible ou modification de l'analyse l'annule, et la vérification décoche la case. Un
-    agent ne recoche jamais une case décochée ; il signale dans la PR que la validation est à refaire.
+  - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
+    branche cible, l'annule et la vérification décoche la case ; documentation et harnais se
+    modifient sans l'annuler. Un agent ne recoche jamais une case décochée ; il signale dans la PR
+    que la validation est à refaire.
 - **Dépendances.** Elles se tiennent à deux endroits, toujours d'accord : la section « Dépendances »
   de l'issue et les liens GitHub « bloquée par ». Qui recalcule l'une met l'autre à jour.

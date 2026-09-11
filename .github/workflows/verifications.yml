@@ -2,9 +2,9 @@ name: Vérifications manuelles
 
 # Garde de l'objectif primaire #58 (D61) : la description de la PR déclare les invariants et les
 # contraintes qu'elle touche, et chaque vérification manuelle qui s'y rattache y est analysée puis
-# validée par un développeur humain. Cocher « Validée » l'enregistre pour l'état de la PR à cet
-# instant ; un nouveau commit, un changement de branche cible ou une analyse modifiée l'annulent et
-# décochent la case (#61). Tourne aussi quand la description change, sans rejouer tests ni build.
+# validée par un développeur humain. Cocher « Validée » l'enregistre ; un commit qui modifie le
+# code, ou un changement de branche cible, l'annule et décoche la case ; documentation et harnais,
+# non (#61). Tourne aussi quand la description change, sans rejouer tests ni build.
 
 on:
   pull_request:

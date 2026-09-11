@@ -1,6 +1,6 @@
 /**
  * La garde sur GitHub (#58, #61, D61). À chaque événement d'une PR : enregistre les validations que
- * cet événement vient de cocher, décoche celles qu'une modification postérieure a annulées, puis rend
+ * cet événement vient de cocher, décoche celles qu'une modification postérieure du code a annulées, puis rend
  * le bilan de `verifierPr`. Toute lecture et écriture passe par `api`, que les tests remplacent.
  */
 import { analyseEcrite, cochees, decocher, empreinteAnalyse, lireDescriptionPr, lireHorodatages, texteAnnulation, texteHorodatage, verifierPr } from './gardes.mjs';
@@ -16,6 +16,7 @@ export async function verifierPrSurGithub({
   entrees,
   entreesAvant = new Map(),
   fichiersModifies = [],
+  fichiersDepuis = () => null,
   attendre = (ms) => new Promise((fin) => setTimeout(fin, ms)),
   maintenant = () => new Date(),
 }) {
@@ -47,7 +48,7 @@ export async function verifierPrSurGithub({
   const evaluer = async () => {
     const pr = await api.lirePr(numero);
     const horodatages = lireHorodatages(await api.lireCommentaires(numero));
-    return { pr, resultat: verifierPr({ entrees, entreesAvant, corps: pr.body ?? '', fichiersModifies, validations: { tete, cible, horodatages } }) };
+    return { pr, resultat: verifierPr({ entrees, entreesAvant, corps: pr.body ?? '', fichiersModifies, validations: { tete, cible, horodatages, fichiersDepuis } }) };
   };
   let { pr, resultat } = await evaluer();
   for (let essai = 1; essai < ESSAIS && resultat.nonEnregistrees.length && aJour(pr); essai++) {

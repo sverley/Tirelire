@@ -10,6 +10,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname } from 'node:path';
 import * as V from './gardes.mjs';
 import { verifierPrSurGithub } from './github.mjs';
 import {
@@ -249,7 +253,8 @@ function fauxGithub(corps, { tete = TETE, cible = 'main', commentaires = [] } = 
   return { etat, api };
 }
 const surEvenement = (etat, action, extra = {}) => ({ action, sender: { login: 'sverley' }, pull_request: structuredClone(etat.pr), ...extra });
-const github = (evenement, api) => verifierPrSurGithub({ evenement, api, entrees, fichiersModifies: [], attendre: async () => {} });
+const github = (evenement, api, fichiersDepuis = () => ['apps/web/src/App.svelte']) =>
+  verifierPrSurGithub({ evenement, api, entrees, fichiersModifies: [], fichiersDepuis, attendre: async () => {} });
 
 test("sur GitHub, une case cochée ne vaut validation qu'enregistrée pour l'état actuel de la PR", () => {
   const horodatages = V.lireHorodatages([duBot(enregistree())]);
@@ -261,16 +266,69 @@ test("sur GitHub, une case cochée ne vaut validation qu'enregistrée pour l'ét
   assert.deepEqual(V.lireHorodatages([{ user: { login: 'sverley' }, body: V.texteHorodatage([enregistree()]) }]), []);
 });
 
-test('une modification postérieure annule la validation : nouveaux commits, branche cible ou analyse', () => {
+test('seule une modification postérieure du code annule la validation ; documentation, harnais et analyse, non', () => {
   const horodatages = V.lireHorodatages([duBot(enregistree())]);
-  for (const [r, raison] of [
-    [valider(cochee(), { tete: NOUVELLE, cible: 'main', horodatages }), /nouveaux commits \(aaaaaaa → bbbbbbb\)/],
-    [valider(cochee(), { tete: TETE, cible: 'autre', horodatages }), /branche cible changée \(main → autre\)/],
-    [valider(cochee('Une autre analyse, réécrite après la validation.'), { tete: TETE, cible: 'main', horodatages }), /analyse modifiée/],
-  ]) {
-    assert.deepEqual([r.validees, r.annulees.map((a) => a.cle)], [[], ['VM-C1-appareil']]);
-    assert.match(texte(r.enAttente), /validation annulée par une modification postérieure/);
-    assert.match(texte(r.enAttente), raison);
+  const apres = (fichiers, cible = 'main') => ({ tete: NOUVELLE, cible, horodatages, fichiersDepuis: () => fichiers });
+  const code = valider(cochee(), apres(['docs/x.md', 'apps/web/src/App.svelte']));
+  assert.deepEqual([code.validees, code.annulees.map((a) => a.cle)], [[], ['VM-C1-appareil']]);
+  assert.match(texte(code.enAttente), /validation annulée, code modifié depuis la validation, de aaaaaaa à bbbbbbb : apps\/web\/src\/App\.svelte\./);
+  assert.doesNotMatch(texte(code.enAttente), /docs\/x\.md/);
+
+  const sansCode = valider(cochee('Une autre analyse, réécrite après la validation.'), apres(['docs/x.md', 'README.md', 'apps/web/test/harnais.ts', 'packages/core/test/plan.test.ts']));
+  assert.deepEqual([sansCode.aCorriger, sansCode.enAttente, sansCode.validees], [[], [], ['VM-C1-appareil']]);
+
+  assert.match(texte(valider(cochee(), apres([], 'autre')).enAttente), /branche cible changée, de main à autre/);
+  assert.match(texte(valider(cochee(), apres(null)).enAttente), /impossibles à comparer/);
+});
+
+test('documentation et harnais ne sont pas du code, et docs/gardes.md cite leurs motifs', () => {
+  const nonCode = ['README.md', 'CLAUDE.md', '.github/pull_request_template.md', 'docs/analyse-du-besoin.html', 'apps/web/test/harnais.ts', 'packages/core/test/plan.test.ts', 'apps/relay/server.test.mjs', 'packages/gardes/gardes.test.mjs'];
+  const code = ['apps/web/src/App.svelte', 'package.json', 'pnpm-lock.yaml', '.github/workflows/ci.yml', 'apps/web/vitest.config.ts', 'packages/gardes/gardes.mjs', 'apps/hebergement/verifier.sh'];
+  assert.deepEqual(V.fichiersDeCode([...nonCode, ...code]), code);
+  const registre = lire(DOCUMENTS.gardes);
+  for (const motif of [...V.SANS_EFFET.documentation, ...V.SANS_EFFET.harnais]) assert.ok(registre.includes(`\`${motif}\``), `${motif} manque dans ${DOCUMENTS.gardes}`);
+});
+
+test("sur un vrai dépôt : une fusion propre de la cible n'apporte aucun fichier, une résolution de conflit si", () => {
+  const racine = mkdtempSync(join(tmpdir(), 'gardes-validation-'));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([cle]) => !cle.startsWith('GIT_')));
+  try {
+    const g = (...a) => execFileSync('git', ['-c', 'user.name=Essai', '-c', 'user.email=essai@exemple.invalid', '-c', 'commit.gpgsign=false', ...a], { cwd: racine, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const ecrire = (fichier, contenu) => {
+      mkdirSync(dirname(join(racine, fichier)), { recursive: true });
+      writeFileSync(join(racine, fichier), contenu);
+    };
+    const commit = (message) => (g('add', '-A'), g('commit', '-q', '-m', message), g('rev-parse', 'HEAD'));
+    const depuis = (ancienne) => V.fichiersDepuisValidation({ ancienne, base: g('rev-parse', 'main'), tete: g('rev-parse', 'HEAD'), racine });
+    g('init', '-q', '-b', 'main');
+    ecrire('src/a.ts', 'a\nb\nc\n');
+    ecrire('src/b.ts', 'x\n');
+    ecrire('docs/x.md', 'doc\n');
+    commit('départ');
+    g('checkout', '-q', '-b', 'pr');
+    ecrire('src/a.ts', 'A\nb\nc\n');
+    const validee = commit('le code de la PR, validé');
+    g('checkout', '-q', 'main');
+    ecrire('src/b.ts', 'y\n');
+    commit('main avance');
+    g('checkout', '-q', 'pr');
+    ecrire('docs/x.md', 'doc revue\n');
+    ecrire('pkg/test/a.test.ts', 'garde\n');
+    commit('documentation et harnais');
+    g('merge', '-q', '--no-edit', 'main');
+    assert.deepEqual(depuis(validee).sort(), ['docs/x.md', 'pkg/test/a.test.ts']);
+
+    g('checkout', '-q', 'main');
+    ecrire('src/a.ts', 'Z\nb\nc\n');
+    commit('main touche la même ligne');
+    g('checkout', '-q', 'pr');
+    assert.throws(() => g('merge', '-q', '--no-edit', 'main'));
+    ecrire('src/a.ts', 'AZ\nb\nc\n');
+    commit('conflit résolu dans le code');
+    assert.deepEqual(V.fichiersDeCode(depuis(validee)), ['src/a.ts']);
+    assert.equal(depuis('f'.repeat(40)), null);
+  } finally {
+    rmSync(racine, { recursive: true, force: true });
   }
 });
 
@@ -289,21 +347,21 @@ test('cocher la case enregistre la validation, et la vérification passe au vert
   assert.deepEqual(V.lireHorodatages(etat.commentaires).map((h) => [h.cle, h.tete, h.cible]), [['VM-C1-appareil', TETE, 'main']]);
 });
 
-test("un commit poussé après la validation l'annule : la case se décoche et la vérification redevient rouge", async () => {
+test("un commit de code poussé après la validation l'annule : la case se décoche et la vérification redevient rouge", async () => {
   const { etat, api } = fauxGithub(cochee(), { tete: NOUVELLE, commentaires: [duBot(enregistree())] });
   const r = await github(surEvenement(etat, 'synchronize'), api);
   assert.deepEqual(r.validees, []);
   assert.match(texte(r.enAttente), /analysée, en attente de validation/);
   assert.deepEqual([...V.cochees(etat.pr.body)], []);
-  assert.match(etat.commentaires.at(-1).body, /\*\*Validation annulée\*\*[\s\S]*nouveaux commits \(aaaaaaa → bbbbbbb\)/);
+  assert.match(etat.commentaires.at(-1).body, /\*\*Validation annulée\*\*[\s\S]*code modifié depuis la validation, de aaaaaaa à bbbbbbb : apps\/web\/src\/App\.svelte/);
 });
 
-test("réécrire l'analyse après la validation l'annule aussi", async () => {
+test("un commit de documentation ou de harnais, ou l'analyse réécrite, laissent la validation en place", async () => {
   const autre = cochee('Une autre analyse, réécrite après la validation.');
-  const { etat, api } = fauxGithub(autre, { commentaires: [duBot(enregistree())] });
-  const r = await github(surEvenement(etat, 'edited', { changes: { body: { from: cochee() } } }), api);
-  assert.deepEqual([r.validees, [...V.cochees(etat.pr.body)]], [[], []]);
-  assert.match(etat.commentaires.at(-1).body, /analyse modifiée/);
+  const { etat, api } = fauxGithub(autre, { tete: NOUVELLE, commentaires: [duBot(enregistree())] });
+  const r = await github(surEvenement(etat, 'synchronize'), api, () => ['docs/gardes.md', 'packages/gardes/gardes.test.mjs']);
+  assert.deepEqual([r.aCorriger, r.enAttente, r.validees], [[], [], ['VM-C1-appareil']]);
+  assert.deepEqual([[...V.cochees(etat.pr.body)], etat.descriptions, etat.commentaires.length], [['VM-C1-appareil'], 0, 1]);
 });
 
 test("une case cochée à l'ouverture ou juste avant un push n'est pas une validation", async () => {

@@ -448,7 +448,7 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
       if (v.etat === 'validee') validees.push(item.cle);
       else if (v.etat === 'annulee') {
         annulees.push({ cle: item.cle, raisons: v.raisons });
-        enAttente.push(`\`${item.cle}\` : validation annulée par une modification postérieure (${v.raisons.join(', ')}) : relire, puis cocher de nouveau.`);
+        enAttente.push(`\`${item.cle}\` : validation annulée, ${v.raisons.join(' ; ')}. Relire, puis cocher de nouveau.`);
       } else {
         nonEnregistrees.push(item.cle);
         enAttente.push(`\`${item.cle}\` : case cochée sans validation enregistrée pour l'état actuel de la PR : la décocher, puis la cocher de nouveau.`);
@@ -459,10 +459,10 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
 }
 
 // ─── Validations (#61) ──────────────────────────────────────────────────────────────────────────
-// Une case « Validée » ne vaut que pour l'état de la PR au moment où elle est cochée (tranché le
-// 11 septembre). La vérification l'enregistre alors dans un commentaire que seul le compte de GitHub
-// Actions écrit : tête, branche cible, empreinte de l'analyse. Un nouveau commit, un changement de
-// branche cible ou une analyse modifiée rendent l'enregistrement caduc.
+// Une case « Validée » vaut pour le code de la PR au moment où elle est cochée (tranché, puis limité
+// le 11 septembre). La vérification l'enregistre alors dans un commentaire que seul le compte de
+// GitHub Actions écrit : tête et branche cible. Un commit qui modifie le code, ou un changement de
+// branche cible, rend l'enregistrement caduc ; documentation, harnais et analyse, non.
 
 /** Auteur des commentaires qui enregistrent les validations : un agent ne peut pas l'imiter. */
 export const AUTEUR_HORODATAGE = 'github-actions[bot]';
@@ -471,7 +471,7 @@ const court = (sha) => String(sha).slice(0, 7);
 
 export const analyseEcrite = (analyse) => !ANALYSE_VIDE.test(String(analyse ?? ''));
 
-/** Empreinte de l'analyse : la réécrire après la validation annule celle-ci. */
+/** Empreinte de l'analyse, gardée pour mémoire : la réécrire n'annule pas la validation. */
 export function empreinteAnalyse(analyse) {
   return createHash('sha256').update(String(analyse).replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12);
 }
@@ -506,7 +506,7 @@ export function texteHorodatage(horodatages) {
     '',
     ...horodatages.map((v) => `- \`${v.cle}\``),
     '',
-    "Un nouveau commit, un changement de branche cible ou une analyse modifiée l'annuleront.",
+    "Un commit qui modifie le code, ou un changement de branche cible, l'annulera ; documentation et harnais, non.",
     '',
     `<!-- tirelire-validation ${JSON.stringify(horodatages)} -->`,
   ].join('\n');
@@ -516,25 +516,60 @@ export function texteAnnulation(annulees, nonEnregistrees = []) {
   return [
     '**Validation annulée** : la PR a changé depuis.',
     '',
-    ...annulees.map((a) => `- \`${a.cle}\` : ${a.raisons.join(', ')}.`),
+    ...annulees.map((a) => `- \`${a.cle}\` : ${a.raisons.join(' ; ')}.`),
     ...nonEnregistrees.map((cle) => `- \`${cle}\` : case cochée sans validation enregistrée pour l'état actuel de la PR.`),
     '',
     'Relire, puis cocher de nouveau la case.',
   ].join('\n');
 }
 
+/** Ce qui n'est pas du code : modifié après une validation, cela ne l'annule pas (#61). */
+export const SANS_EFFET = Object.freeze({
+  documentation: Object.freeze(['docs/**', '**/*.md']),
+  harnais: Object.freeze(['**/test/**', '**/*.test.*']),
+});
+const SANS_EFFET_REGEX = [...SANS_EFFET.documentation, ...SANS_EFFET.harnais].map(globVersRegex);
+export const fichiersDeCode = (fichiers) => fichiers.filter((f) => !SANS_EFFET_REGEX.some((r) => r.test(f)));
+const SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * Fichiers modifiés par les commits apportés depuis la validation, sans ceux de la branche cible :
+ * une fusion propre de la cible n'ajoute rien, une résolution de conflit ajoute ses fichiers.
+ * `null` quand on ne peut pas comparer, par exemple si la branche a été réécrite.
+ */
+export function fichiersDepuisValidation({ ancienne, base, tete, racine = RACINE }) {
+  if (![ancienne, base, tete].every((sha) => SHA.test(String(sha)))) return null;
+  const env = Object.fromEntries(Object.entries(process.env).filter(([cle]) => !cle.startsWith('GIT_')));
+  const git = (...a) => execFileSync('git', a, { cwd: racine, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+  try {
+    git('cat-file', '-e', `${ancienne}^{commit}`);
+  } catch {
+    try {
+      git('fetch', '-q', 'origin', ancienne);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const sortie = git('log', '-z', '--format=', '--name-only', '--diff-merges=dense-combined', `^${ancienne}`, `^${base}`, tete);
+    return [...new Set(sortie.split('\0').map((f) => f.trim()).filter(Boolean))];
+  } catch {
+    return null;
+  }
+}
+
 /** Où en est la case cochée d'une vérification : validée, annulée (et pourquoi), ou non enregistrée. */
-export function etatValidation(item, { tete, cible, horodatages }) {
-  const empreinte = empreinteAnalyse(item.analyse);
-  const siens = horodatages.filter((h) => h.cle === item.cle);
-  if (siens.some((h) => h.tete === tete && h.cible === cible && h.analyse === empreinte)) return { etat: 'validee' };
-  const dernier = siens.at(-1);
+export function etatValidation(item, { tete, cible, horodatages, fichiersDepuis = () => null }) {
+  const dernier = horodatages.filter((h) => h.cle === item.cle).at(-1);
   if (!dernier) return { etat: 'non-enregistree' };
-  const raisons = [];
-  if (dernier.tete !== tete) raisons.push(`nouveaux commits (${court(dernier.tete)} → ${court(tete)})`);
-  if (dernier.cible !== cible) raisons.push(`branche cible changée (${dernier.cible} → ${cible})`);
-  if (dernier.analyse !== empreinte) raisons.push('analyse modifiée');
-  return { etat: 'annulee', raisons };
+  if (dernier.cible !== cible) return { etat: 'annulee', raisons: [`branche cible changée, de ${dernier.cible} à ${cible}`] };
+  if (dernier.tete === tete) return { etat: 'validee' };
+  const de = `de ${court(dernier.tete)} à ${court(tete)}`;
+  const fichiers = fichiersDepuis(dernier.tete, tete);
+  if (!fichiers) return { etat: 'annulee', raisons: [`nouveaux commits depuis la validation, ${de}, impossibles à comparer`] };
+  const code = fichiersDeCode(fichiers);
+  if (code.length) return { etat: 'annulee', raisons: [`code modifié depuis la validation, ${de} : ${listeCourte(code)}`] };
+  return { etat: 'validee' };
 }
 
 /** Décoche la case « Validée » des vérifications désignées, sans rien toucher d'autre. */
