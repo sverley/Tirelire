@@ -11,7 +11,10 @@ correspondance ; `packages/gardes` le relit.
 - **À chaque `pnpm test`**, donc avant chaque commit et dans la CI : chaque identifiant des deux
   documents a son entrée ici, gardée par un harnais qui existe, une vérification manuelle décrite
   ou un renvoi vers des entrées elles-mêmes gardées. Un invariant, un usage ou une contrainte ajouté
-  sans garde fait échouer les tests, un harnais renommé aussi.
+  sans garde fait échouer les tests, un harnais renommé aussi. Un titre ou un élément en gras qui
+  s'ouvre sur un identifiant sans en avoir la forme (`## I7 · …`, `- **U1 · ….**`, `## C3 · …`) est
+  refusé plutôt qu'ignoré, et un test que nomme une ligne `Harnais` doit exister dans l'un des
+  fichiers cités (#59).
 - **Sur chaque PR**, par la vérification « Vérifications manuelles » : la description déclare les
   identifiants touchés et ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux
   `Chemins` d'une entrée impose de la déclarer ; chaque vérification manuelle des entrées déclarées,
@@ -37,13 +40,16 @@ Préparer la section d'une PR : `node packages/gardes/cli.mjs demander --base or
 ## Écrire une entrée
 
 Le titre commence par l'identifiant (`## I7 · …`, `### U1 · …`, `## C3 · …`) ; seul l'identifiant
-compte. Viennent ensuite, au choix :
+compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refusé. Viennent ensuite, au choix :
 
 - `Chemins :` suivi de motifs entre accents graves (`*` dans un dossier, `**` à travers les
   dossiers) : modifier un fichier qui y répond impose de déclarer l'entrée. C'est un plancher,
   volontairement étroit ; l'analyse ajoute ce qu'il ne voit pas.
 - Une ligne `Harnais` : un ou plusieurs chemins entre accents graves, un tiret cadratin, puis ce que
-  le harnais garde.
+  le harnais garde. Pour un test précis, son nom vient en tête, entre guillemets, comme « positions
+  et soldes (D19, D29) » pour I2 : c'est alors ce test, titre d'un `describe`, d'un `it` ou d'un
+  `test` écrit en toutes lettres, qui doit exister dans l'un des fichiers cités, et non le seul
+  fichier (tranché dans #59).
 - Une ligne `Vérification manuelle` : un identifiant `VM-<entrée>-<nom>`, un tiret cadratin, puis ce
   qu'on fait, sur quoi, et ce qu'on doit constater.
 - Une ligne `Couvert par` : des identifiants, un tiret cadratin, puis pourquoi. Déclarer l'entrée

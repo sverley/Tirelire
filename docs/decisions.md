@@ -1175,7 +1175,9 @@ téléphone, et `packages/gardes` le relit sans dépendance.
 - **Couverture**, dans `pnpm test`, donc au commit et en CI : un identifiant sans entrée, une entrée
   sans garde, un renvoi en boucle, un harnais ou un motif de chemin qui ne désigne plus rien font
   échouer les tests. Un harnais seulement prévu ne garde rien : une vérification manuelle tient sa
-  place.
+  place. Un identifiant écrit sous une forme voisine est refusé plutôt qu'ignoré, et un harnais qui
+  nomme un test désigne ce test, titre d'un `describe`, d'un `it` ou d'un `test`, et non son seul
+  fichier (tranché le 11 septembre dans #59).
 - **Demandes**, sur chaque PR, par la vérification « Vérifications manuelles » : la description
   déclare les identifiants touchés et ceux dont le lien pourrait être masqué ; les motifs `Chemins`
   du registre imposent un plancher, volontairement étroit ; chaque vérification manuelle des
