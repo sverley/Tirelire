@@ -12,6 +12,10 @@
  * l'entrée, et le registre continue de dire le contraire. Une ligne qui ne nomme aucun test ne demande
  * que son fichier : le témoin le tient, puisque le registre du jour en compte.
  *
+ * Mettre ce test en commentaire, en `//` ou dans un commentaire de bloc, revient à le supprimer : il
+ * ne tourne plus. Le correctif `5da4f4d` le dit d'un nom cité dans un commentaire (décision 18 dans
+ * #63) ; ces cas l'étendent au bloc entier, titre compris.
+ *
  * Boîte noire, comme l'amorçage : copie du dépôt, fichier ou registre modifié, puis
  * `node packages/gardes/cli.mjs couverture`. Seuls comptent le code de sortie et le message. Les tests
  * nommés se cherchent dans le registre du jour ; s'il n'en nomme plus aucun, le harnais le dit au lieu
@@ -144,6 +148,44 @@ for (const { entree, chemins, nom } of NOMMES) {
     for (const c of contenant) ecrire(racine, c, lire(racine, c).split(nom).join(RENOMME));
     rougeEtNomme(couverture(racine), nom, `« ${nom} » n'est plus dans ${contenant.join(', ')}`);
   });
+}
+
+/**
+ * Bloc d'un test nommé : de la ligne de son titre à la première ligne qui le ferme au même
+ * renfoncement, comme s'écrivent les fichiers du cœur.
+ */
+function blocDuTest(texte, nom) {
+  const lignes = lignesDe(texte);
+  const echappe = nom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const titre = new RegExp(`\\b(?:describe|it|test)(?:\\.\\w+)*\\(\\s*['"\`]${echappe}['"\`]`);
+  const debut = lignes.findIndex((x) => titre.test(x));
+  if (debut < 0) return null;
+  const renfoncement = lignes[debut].length - lignes[debut].trimStart().length;
+  const fin = lignes.findIndex((x, i) => i > debut && x.trimStart().startsWith('}') && x.length - x.trimStart().length === renfoncement);
+  return fin < 0 ? null : { lignes, debut, fin };
+}
+
+const COMMENTAIRES = [
+  ['en « // »', ({ lignes, debut, fin }) => lignes.map((x, i) => (i >= debut && i <= fin ? `// ${x}` : x))],
+  [
+    'dans un commentaire de bloc',
+    ({ lignes, debut, fin }) => {
+      assert.ok(!lignes.slice(debut, fin + 1).some((x) => x.includes('*/')), `le bloc contient déjà une fin de commentaire : ${RELIRE}`);
+      return [...lignes.slice(0, debut), '/*', ...lignes.slice(debut, fin + 1), '*/', ...lignes.slice(fin + 1)];
+    },
+  ],
+];
+
+for (const { entree, chemins, nom } of NOMMES) {
+  for (const [style, commenter] of COMMENTAIRES) {
+    test(`#59 · ${entree} : le test « ${nom} » mis en commentaire ${style}, son fichier gardé, fait échouer la couverture en le nommant`, () => {
+      const racine = copierDepot();
+      const fichier = chemins.find((c) => existsSync(join(racine, c)) && blocDuTest(lire(racine, c), nom));
+      assert.ok(fichier, `le titre de « ${nom} » ou la fin de son bloc est introuvable dans ${chemins.join(', ')} : ${RELIRE}`);
+      ecrire(racine, fichier, commenter(blocDuTest(lire(racine, fichier), nom)).join('\n'));
+      rougeEtNomme(couverture(racine), nom, `« ${nom} » n'est plus qu'en commentaire dans ${fichier}`);
+    });
+  }
 }
 
 test('#59 · un test que son fichier ne contient pas, nommé au registre, fait échouer la couverture en le nommant', () => {
