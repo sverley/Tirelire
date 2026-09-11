@@ -420,7 +420,8 @@ export function analyserTests(source) {
     const options = chaine && masque.slice(chaine.fin + 1).match(/^\s*,\s*\{/);
     if (options) {
       const accolade = chaine.fin + options[0].length;
-      inactif ||= /\b(?:skip|todo)\s*:\s*(?!false\b|null\b|undefined\b|0\b)/.test(masque.slice(accolade, fermante(masque, accolade)));
+      // `{ skip: true }` ou `{ todo: 'raison' }` désactivent ; `{ skip: !php }` est conditionnel, comme skipIf.
+      inactif ||= /\b(?:skip|todo)\s*:\s*(?:true\b|['"`])/.test(masque.slice(accolade, fermante(masque, accolade)));
     }
     const titre = chaine?.valeur == null ? null : chaine.valeur.replace(/\s+/g, ' ').trim();
     appels.push({ titre, suite: m[2] === 'describe' || m[2] === 'suite', inactif, ouvrante, fin });

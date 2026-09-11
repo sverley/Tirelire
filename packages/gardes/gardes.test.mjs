@@ -425,12 +425,13 @@ test('un test nommé au registre se cherche parmi les tests qui tournent, pas n\
     "describe.skip('suite désactivée', () => { it('dans la suite désactivée', () => {}); });",
     "test('option skip', { skip: 'plus tard' }, () => {});",
     "test('option sans effet', { timeout: 10 }, () => {});",
+    "test('option conditionnelle', { skip: !process.env.PHP }, () => {});",
     "it.skipIf(false)('conditionnel', () => {});",
     "// it('en commentaire', () => {});",
     "/* describe('en bloc', () => { it('dans le bloc', () => {}); }); */",
   ].join('\n');
   const { actifs, inactifs } = V.analyserTests(source);
-  assert.deepEqual([...actifs], ['positions et soldes (D19, D29)', "budget construit par l'assistant (D40)", 'un titre en gabarit', 'option sans effet', 'conditionnel']);
+  assert.deepEqual([...actifs], ['positions et soldes (D19, D29)', "budget construit par l'assistant (D40)", 'un titre en gabarit', 'option sans effet', 'option conditionnelle', 'conditionnel']);
   assert.deepEqual([...inactifs], ['désactivé', 'seulement prévu', 'sans test actif', 'en pause', 'suite désactivée', 'dans la suite désactivée', 'option skip']);
   assert.deepEqual([...V.titresDeTests(source)], [...actifs]);
   assert.equal(V.testNomme("« budget construit par  l'assistant (D40) » : sans aucune opération"), "budget construit par l'assistant (D40)");
