@@ -24,15 +24,24 @@
 ## Méthode de travail
 
 - **L'issue définit le besoin, la PR définit la solution.**
+- **Issue en cours.** Une session qui prend une issue (objectif, audit ou codage) lui pose
+  l'étiquette `en cours` dès le début du travail ; le titre ne s'édite jamais pour cela. L'étiquette
+  est retirée d'elle-même à la fermeture de l'issue (`.github/workflows/etiquette-en-cours.yml`).
+- **Objectif.** Méta-analyse, en chef de projet : analyser les besoins (issues) et les dépendances
+  qui mènent à l'objectif, sur la documentation seulement, sans analyser le code. Si l'objectif
+  n'est pas assez clair, poser la question et la consigner dans la discussion de l'issue d'objectif.
+  En fin d'objectif, consigner les nouvelles fonctionnalités dans la documentation du dépôt, par une
+  PR.
 - **Audit d'une PR.** Partir de l'issue. Si le besoin n'est pas clair ou appelle des questions, les
-  poser et les consigner dans l'issue. Une fois le besoin explicite, éditer l'issue au début du
-  travail pour la marquer en cours avec sa branche (titre préfixé `[audit en cours · <branche>]`),
-  puis écrire les harnais qui contrôlent le résultat dans la branche de la PR associée. **En audit,
-  ne jamais toucher au code** : seulement la documentation et les harnais.
+  poser et les consigner dans l'issue. Une fois le besoin explicite, indiquer la branche de travail
+  dans le corps de l'issue, puis écrire les harnais qui contrôlent le résultat dans la branche de la
+  PR associée. **En audit, ne jamais toucher au code** : seulement la documentation et les harnais.
 - **Codage d'une PR.** Les questions de développement et les décisions techniques se consignent en
   commentaires dans la discussion de la PR.
 - **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
   répertoire de travail (voir #22).
+- **Sessions Claude Chat.** Regrouper les commandes en peu d'appels d'outils, pour ne pas atteindre
+  trop vite les limites d'usage.
 - **Choix techniques.** Une cible de distribution, une technologie ou un outil est un choix
   technique : il se consigne dans une issue de besoin, une par cible identifiée, jamais dans la
   description du projet ni dans les invariants. Il se traite le moment venu, au regard des
