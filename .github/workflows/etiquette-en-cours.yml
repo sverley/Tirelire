@@ -1,0 +1,61 @@
+name: Étiquette « en cours »
+
+# Une issue fermée n'est plus en cours : l'étiquette « en cours » lui est retirée à la fermeture,
+# quelle qu'en soit la cause (fermeture à la main, PR fusionnée qui la ferme, « not planned »).
+#
+# Deux limites de GitHub, que le balayage rattrape :
+# - les événements `issues` ne lisent que la version de ce fichier présente sur `main` : la règle
+#   ne vaut qu'une fois fusionnée ;
+# - une issue fermée par une autre action (jeton GITHUB_TOKEN) ne déclenche aucun workflow.
+# Le balayage retire l'étiquette de toutes les issues fermées qui la portent encore. Il tourne quand
+# ce fichier arrive ou change sur `main`, et à la demande depuis l'onglet Actions.
+
+on:
+  issues:
+    types: [closed]
+  push:
+    branches: [main]
+    paths: ['.github/workflows/etiquette-en-cours.yml']
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  retirer:
+    name: Retirer « en cours » des issues fermées
+    # Fermeture d'une issue qui ne porte pas l'étiquette : rien à faire, le job est ignoré.
+    if: github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'en cours')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retirer l'étiquette
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Vide hors fermeture d'issue : on balaie alors toutes les issues fermées.
+          NUMERO: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          ETIQUETTE='en%20cours' # « en cours », encodée pour les adresses de l'API
+          if [ -n "$NUMERO" ]; then
+            numeros="$NUMERO"
+          else
+            # L'API des issues rend aussi les PR : elles sont écartées, la règle porte sur les issues.
+            numeros=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues?state=closed&labels=$ETIQUETTE&per_page=100" \
+              --jq '.[] | select(.pull_request == null) | .number')
+          fi
+          if [ -z "$numeros" ]; then
+            echo "Aucune issue fermée ne porte l'étiquette « en cours »." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "### Étiquette « en cours » retirée" >> "$GITHUB_STEP_SUMMARY"
+          for n in $numeros; do
+            # Une 404 veut dire que l'étiquette a déjà été retirée entre-temps : ce n'est pas une erreur.
+            if sortie=$(gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/$n/labels/$ETIQUETTE" 2>&1); then
+              echo "- #$n" >> "$GITHUB_STEP_SUMMARY"
+            elif grep -q 'HTTP 404' <<< "$sortie"; then
+              echo "- #$n (déjà retirée)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "$sortie" >&2
+              exit 1
+            fi
+          done
