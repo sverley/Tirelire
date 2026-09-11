@@ -29,6 +29,8 @@
   travail pour la marquer en cours avec sa branche (titre préfixé `[audit en cours · <branche>]`),
   puis écrire les harnais qui contrôlent le résultat dans la branche de la PR associée. **En audit,
   ne jamais toucher au code** : seulement la documentation et les harnais.
+  Il s'en tient aux « Fait quand » et aux erreurs plausibles par accident : une forme exotique ou un
+  contournement se note dans la PR, sans devenir un harnais rouge (D62).
 - **Codage d'une PR.** Les questions de développement et les décisions techniques se consignent en
   commentaires dans la discussion de la PR.
 - **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
@@ -58,6 +60,8 @@
     « Vérifications manuelles » est rouge.
   - Un test qui a besoin d'un outil (navigateur, PHP, `lftp`…) peut se sauter en local s'il manque,
     mais échoue quand `TIRELIRE_STRICT` est posé, comme en CI ; la CI installe ses outils.
+  - Le crochet de pré-commit tient en moins de 20 s : l'amorçage et les harnais d'audit tournent en
+    CI, pas au commit (D62).
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
     branche cible, l'annule et la vérification décoche la case ; documentation et harnais se
     modifient sans l'annuler. Une case décochée par la vérification ne se recoche qu'aux mêmes
