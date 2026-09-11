@@ -21,90 +21,34 @@
  * comme absent. Lecture appliquée de la même faille : un test dont le `describe` est désactivé, et un
  * `describe` nommé dont aucun test ne tourne.
  *
- * Boîte noire, comme l'amorçage : copie du dépôt, fichier ou registre modifié, puis
- * `node packages/gardes/cli.mjs couverture`. Seuls comptent le code de sortie et le message. Les tests
- * nommés se cherchent dans le registre du jour ; s'il n'en nomme plus aucun, le harnais le dit au lieu
- * de passer.
+ * Le dépôt est copié une fois ; chaque cas y modifie un fichier, lit la couverture, puis le rétablit.
+ * Le témoin passe par `node packages/gardes/cli.mjs couverture`, comme la CI ; les cas appellent
+ * `verifierCouverture`, qu'utilisent la CLI et la vérification des PR, pour rester assez rapides pour
+ * le crochet de pré-commit. Les tests nommés se cherchent dans le registre du jour ; s'il n'en nomme
+ * plus aucun, le harnais le dit au lieu de passer.
  */
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve, sep } from 'node:path';
-import { after, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { DEPOT, RELIRE, copieDuDepot, couvertureCli, lignesDe, lire, modifie, problemes } from './test/copie-du-depot.mjs';
 
-const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const CLI = 'packages/gardes/cli.mjs';
 const REGISTRE = 'docs/gardes.md';
-const RELIRE = "le harnais d'audit de #59 est à relire";
 // Sans apostrophe droite ni guillemet : le nom remplacé reste une chaîne valide dans le fichier de test.
 const RENOMME = 'test renommé pour l’audit de #59';
 const ABSENT = 'test absent, nommé pour l’audit de #59';
+const RACINE = copieDuDepot();
 
-/** Rien du crochet git ni de la CI n'atteint la garde lancée : un GIT_DIR hérité lui ferait lire le vrai dépôt. */
-const ENV = Object.fromEntries(
-  Object.entries(process.env).filter(([cle]) => !/^(GITHUB_|GIT_)/.test(cle) && cle !== 'NODE_TEST_CONTEXT'),
-);
-
-const temporaires = [];
-after(() => {
-  for (const dossier of temporaires) rmSync(dossier, { recursive: true, force: true });
-});
-
-// ─── Dépôt copié et garde lancée ─────────────────────────────────────────────────────────────
-
-const IGNORES = new Set(['.git', 'node_modules', 'dist', 'build', '.gradle']);
-
-/**
- * Copie de l'arbre de travail : fichiers suivis et nouveaux, sans les ignorés. Hors dépôt git, quand
- * un autre harnais lance les tests du paquet dans sa propre copie, tout sauf les dossiers ignorés.
- */
-function copierDepot() {
-  const racine = mkdtempSync(join(tmpdir(), 'tirelire-audit-59-'));
-  temporaires.push(racine);
-  let fichiers = null;
-  try {
-    fichiers = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
-      cwd: DEPOT, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024,
-    }).split('\0').filter(Boolean);
-  } catch {
-    // pas un dépôt git
-  }
-  if (!fichiers) {
-    cpSync(DEPOT, racine, {
-      recursive: true,
-      filter: (source) => !source.slice(DEPOT.length).split(sep).some((partie) => IGNORES.has(partie)),
-    });
-    return racine;
-  }
-  for (const fichier of fichiers) {
-    try {
-      mkdirSync(dirname(join(racine, fichier)), { recursive: true });
-      cpSync(join(DEPOT, fichier), join(racine, fichier));
-    } catch {
-      // suivi par git mais retiré de l'arbre de travail
-    }
-  }
-  return racine;
+function rougeEtNomme(liste, nom, cas) {
+  assert.ok(liste.length, `la couverture passe alors que ${cas} : le registre déclare un harnais qui ne garde plus rien.`);
+  assert.ok(liste.some((p) => p.includes(nom)), `la couverture échoue sans nommer « ${nom} » :\n${liste.join('\n').slice(-2000)}`);
 }
 
-const lire = (racine, fichier) => readFileSync(join(racine, fichier), 'utf8');
-const ecrire = (racine, fichier, texte) => writeFileSync(join(racine, fichier), texte);
-
-function couverture(racine) {
-  const r = spawnSync(process.execPath, [CLI, 'couverture'], { cwd: racine, env: ENV, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
-  return { code: r.status, sortie: `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? String(r.error) : ''}` };
-}
-
-function rougeEtNomme(r, nom, cas) {
-  assert.notEqual(r.code, 0, `la couverture passe alors que ${cas} : le registre déclare un harnais qui n'existe plus.`);
-  assert.ok(r.sortie.includes(nom), `la couverture échoue sans nommer « ${nom} » :\n${r.sortie.slice(-2000)}`);
-}
+/** Modifie chacun des fichiers le temps de `mesurer`. */
+const modifies = (fichiers, transformer, mesurer) =>
+  fichiers.length ? modifie(RACINE, fichiers[0], transformer, () => modifies(fichiers.slice(1), transformer, mesurer)) : mesurer();
 
 // ─── Tests nommés par le registre du jour ────────────────────────────────────────────────────
-
-const lignesDe = (texte) => texte.replace(/\r\n?/g, '\n').split('\n');
 
 /** Lignes « Harnais » qui nomment un test, lignes de suite comprises : entrée, chemins cités, nom. */
 function testsNommes(registre) {
@@ -132,10 +76,36 @@ function testsNommes(registre) {
 
 const NOMMES = testsNommes(readFileSync(join(DEPOT, REGISTRE), 'utf8'));
 
+const echapper = (texte) => texte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const appelDuTitre = (nom) => new RegExp(`(\\b(?:describe|suite|context|it|test)(?:\\.\\w+)*)(\\s*\\(\\s*['"\`]${echapper(nom)}['"\`])`);
+const renfoncementDe = (ligne) => ligne.length - ligne.trimStart().length;
+const ligneDuTitre = (lignes, nom) => lignes.findIndex((x) => appelDuTitre(nom).test(x));
+
+/** Bloc d'un test nommé : de la ligne de son titre à la première ligne qui le ferme au même renfoncement. */
+function blocDuTest(texte, nom) {
+  const lignes = lignesDe(texte);
+  const debut = ligneDuTitre(lignes, nom);
+  if (debut < 0) return null;
+  const fin = lignes.findIndex((x, i) => i > debut && x.trimStart().startsWith('}') && renfoncementDe(x) === renfoncementDe(lignes[debut]));
+  return fin < 0 ? null : { lignes, debut, fin };
+}
+
+/** Ligne du `describe` qui contient la ligne `i` : la première ligne non vide, au-dessus, moins renfoncée. */
+function ligneDuParent(lignes, i) {
+  for (let j = i - 1; j >= 0; j--) {
+    if (!lignes[j].trim() || renfoncementDe(lignes[j]) >= renfoncementDe(lignes[i])) continue;
+    return /\b(?:describe|suite|context)(?:\.\w+)*\s*\(/.test(lignes[j]) ? j : -1;
+  }
+  return -1;
+}
+
+/** Premier fichier cité où `trouve(texte)` répond, lu dans `racine`. */
+const fichierCite = (racine, chemins, trouve) => chemins.find((c) => existsSync(join(racine, c)) && trouve(lire(racine, c)));
+
 // ─── Cas ─────────────────────────────────────────────────────────────────────────────────────
 
 test('#59 · témoin : le dépôt copié tient sa garde, tests nommés compris', () => {
-  const r = couverture(copierDepot());
+  const r = couvertureCli(RACINE);
   assert.equal(r.code, 0, `la couverture échoue déjà sur le dépôt copié :\n${r.sortie.slice(-2000)}`);
 });
 
@@ -146,28 +116,12 @@ if (!NOMMES.length) {
 }
 
 for (const { entree, chemins, nom } of NOMMES) {
-  test(`#59 · ${entree} : le test « ${nom} » renommé, son fichier gardé, fait échouer la couverture en le nommant`, () => {
-    const racine = copierDepot();
-    const contenant = chemins.filter((c) => existsSync(join(racine, c)) && lire(racine, c).includes(nom));
+  test(`#59 · ${entree} : le test « ${nom} » renommé, son fichier gardé, fait échouer la couverture en le nommant`, async () => {
+    const contenant = chemins.filter((c) => existsSync(join(RACINE, c)) && lire(RACINE, c).includes(nom));
     assert.ok(contenant.length, `« ${nom} » n'est déjà dans aucun de ${chemins.join(', ')} : la couverture devrait déjà échouer`);
-    for (const c of contenant) ecrire(racine, c, lire(racine, c).split(nom).join(RENOMME));
-    rougeEtNomme(couverture(racine), nom, `« ${nom} » n'est plus dans ${contenant.join(', ')}`);
+    await modifies(contenant, (t) => t.split(nom).join(RENOMME), async () =>
+      rougeEtNomme(await problemes(RACINE), nom, `« ${nom} » n'est plus dans ${contenant.join(', ')}`));
   });
-}
-
-/**
- * Bloc d'un test nommé : de la ligne de son titre à la première ligne qui le ferme au même
- * renfoncement, comme s'écrivent les fichiers du cœur.
- */
-function blocDuTest(texte, nom) {
-  const lignes = lignesDe(texte);
-  const echappe = nom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const titre = new RegExp(`\\b(?:describe|it|test)(?:\\.\\w+)*\\(\\s*['"\`]${echappe}['"\`]`);
-  const debut = lignes.findIndex((x) => titre.test(x));
-  if (debut < 0) return null;
-  const renfoncement = lignes[debut].length - lignes[debut].trimStart().length;
-  const fin = lignes.findIndex((x, i) => i > debut && x.trimStart().startsWith('}') && x.length - x.trimStart().length === renfoncement);
-  return fin < 0 ? null : { lignes, debut, fin };
 }
 
 const COMMENTAIRES = [
@@ -183,101 +137,91 @@ const COMMENTAIRES = [
 
 for (const { entree, chemins, nom } of NOMMES) {
   for (const [style, commenter] of COMMENTAIRES) {
-    test(`#59 · ${entree} : le test « ${nom} » mis en commentaire ${style}, son fichier gardé, fait échouer la couverture en le nommant`, () => {
-      const racine = copierDepot();
-      const fichier = chemins.find((c) => existsSync(join(racine, c)) && blocDuTest(lire(racine, c), nom));
+    test(`#59 · ${entree} : le test « ${nom} » mis en commentaire ${style}, son fichier gardé, fait échouer la couverture en le nommant`, async () => {
+      const fichier = fichierCite(RACINE, chemins, (t) => blocDuTest(t, nom));
       assert.ok(fichier, `le titre de « ${nom} » ou la fin de son bloc est introuvable dans ${chemins.join(', ')} : ${RELIRE}`);
-      ecrire(racine, fichier, commenter(blocDuTest(lire(racine, fichier), nom)).join('\n'));
-      rougeEtNomme(couverture(racine), nom, `« ${nom} » n'est plus qu'en commentaire dans ${fichier}`);
+      await modifie(RACINE, fichier, (t) => commenter(blocDuTest(t, nom)).join('\n'), async () =>
+        rougeEtNomme(await problemes(RACINE), nom, `« ${nom} » n'est plus qu'en commentaire dans ${fichier}`));
     });
   }
 }
 
 // ─── Tests qui ne tournent pas (tranché le 11 septembre dans #59) ───────────────────────────
 
-const echapper = (texte) => texte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const appelDuTitre = (nom) => new RegExp(`(\\b(?:describe|suite|context|it|test)(?:\\.\\w+)*)(\\s*\\(\\s*['"\`]${echapper(nom)}['"\`])`);
-const renfoncementDe = (ligne) => ligne.length - ligne.trimStart().length;
-
-/** Fichier cité, lignes et ligne du titre d'un test nommé. */
-function titreDuTest(racine, chemins, nom) {
-  for (const fichier of chemins) {
-    if (!existsSync(join(racine, fichier))) continue;
-    const lignes = lignesDe(lire(racine, fichier));
-    const i = lignes.findIndex((x) => appelDuTitre(nom).test(x));
-    if (i >= 0) return { fichier, lignes, i };
-  }
-  return null;
-}
-
-/** Ligne du `describe` qui contient la ligne `i` : la première ligne non vide, au-dessus, moins renfoncée. */
-function ligneDuParent(lignes, i) {
-  for (let j = i - 1; j >= 0; j--) {
-    if (!lignes[j].trim() || renfoncementDe(lignes[j]) >= renfoncementDe(lignes[i])) continue;
-    return /\b(?:describe|suite|context)(?:\.\w+)*\s*\(/.test(lignes[j]) ? j : -1;
-  }
-  return -1;
-}
-
 for (const { entree, chemins, nom } of NOMMES) {
   for (const [etat, modificateur] of [['désactivé par « .skip »', 'skip'], ['seulement prévu par « .todo »', 'todo']]) {
-    test(`#59 · ${entree} : le test « ${nom} » ${etat}, son fichier gardé, fait échouer la couverture en le nommant`, () => {
-      const racine = copierDepot();
-      const cible = titreDuTest(racine, chemins, nom);
-      assert.ok(cible, `le titre de « ${nom} » est introuvable dans ${chemins.join(', ')} : ${RELIRE}`);
-      cible.lignes[cible.i] = cible.lignes[cible.i].replace(appelDuTitre(nom), `$1.${modificateur}$2`);
-      ecrire(racine, cible.fichier, cible.lignes.join('\n'));
-      rougeEtNomme(couverture(racine), nom, `« ${nom} » est marqué .${modificateur} dans ${cible.fichier}`);
+    test(`#59 · ${entree} : le test « ${nom} » ${etat}, son fichier gardé, fait échouer la couverture en le nommant`, async () => {
+      const fichier = fichierCite(RACINE, chemins, (t) => ligneDuTitre(lignesDe(t), nom) >= 0);
+      assert.ok(fichier, `le titre de « ${nom} » est introuvable dans ${chemins.join(', ')} : ${RELIRE}`);
+      const marquer = (t) => {
+        const l = lignesDe(t);
+        const i = ligneDuTitre(l, nom);
+        l[i] = l[i].replace(appelDuTitre(nom), `$1.${modificateur}$2`);
+        return l.join('\n');
+      };
+      await modifie(RACINE, fichier, marquer, async () =>
+        rougeEtNomme(await problemes(RACINE), nom, `« ${nom} » est marqué .${modificateur} dans ${fichier}`));
     });
   }
 }
 
+const dansLeDepot = (chemins, nom) => {
+  const fichier = fichierCite(DEPOT, chemins, (t) => ligneDuTitre(lignesDe(t), nom) >= 0);
+  if (!fichier) return null;
+  const lignes = lignesDe(lire(DEPOT, fichier));
+  return { lignes, i: ligneDuTitre(lignes, nom) };
+};
+
 const IMBRIQUES = NOMMES.filter(({ chemins, nom }) => {
-  const cible = titreDuTest(DEPOT, chemins, nom);
-  return cible && ligneDuParent(cible.lignes, cible.i) >= 0;
+  const d = dansLeDepot(chemins, nom);
+  return d && ligneDuParent(d.lignes, d.i) >= 0;
 });
 if (!IMBRIQUES.length) {
   test('#59 · un test nommé est contenu dans un describe', () => assert.fail(`aucun test nommé n'est contenu dans un describe : ${RELIRE}`));
 }
 for (const { entree, chemins, nom } of IMBRIQUES) {
-  test(`#59 · ${entree} : le describe qui contient « ${nom} » désactivé par « .skip », fait échouer la couverture en le nommant`, () => {
-    const racine = copierDepot();
-    const cible = titreDuTest(racine, chemins, nom);
-    const j = ligneDuParent(cible.lignes, cible.i);
-    cible.lignes[j] = cible.lignes[j].replace(/(\b(?:describe|suite|context)(?:\.\w+)*)(\s*\()/, '$1.skip$2');
-    ecrire(racine, cible.fichier, cible.lignes.join('\n'));
-    rougeEtNomme(couverture(racine), nom, `le describe qui contient « ${nom} » est marqué .skip dans ${cible.fichier}`);
+  test(`#59 · ${entree} : le describe qui contient « ${nom} » désactivé par « .skip », fait échouer la couverture en le nommant`, async () => {
+    const fichier = fichierCite(RACINE, chemins, (t) => ligneDuTitre(lignesDe(t), nom) >= 0);
+    const marquer = (t) => {
+      const l = lignesDe(t);
+      const j = ligneDuParent(l, ligneDuTitre(l, nom));
+      l[j] = l[j].replace(/(\b(?:describe|suite|context)(?:\.\w+)*)(\s*\()/, '$1.skip$2');
+      return l.join('\n');
+    };
+    await modifie(RACINE, fichier, marquer, async () =>
+      rougeEtNomme(await problemes(RACINE), nom, `le describe qui contient « ${nom} » est marqué .skip dans ${fichier}`));
   });
 }
 
 const DESCRIBES = NOMMES.filter(({ chemins, nom }) => {
-  const cible = titreDuTest(DEPOT, chemins, nom);
-  return cible && /\b(?:describe|suite|context)\b/.test(cible.lignes[cible.i].match(appelDuTitre(nom))[1]);
+  const d = dansLeDepot(chemins, nom);
+  return d && /\b(?:describe|suite|context)\b/.test(d.lignes[d.i].match(appelDuTitre(nom))[1]);
 });
 for (const { entree, chemins, nom } of DESCRIBES) {
-  test(`#59 · ${entree} : tous les tests du describe « ${nom} » désactivés par « .skip », fait échouer la couverture en le nommant`, () => {
-    const racine = copierDepot();
-    const fichier = chemins.find((c) => existsSync(join(racine, c)) && blocDuTest(lire(racine, c), nom));
+  test(`#59 · ${entree} : tous les tests du describe « ${nom} » désactivés par « .skip », fait échouer la couverture en le nommant`, async () => {
+    const fichier = fichierCite(RACINE, chemins, (t) => blocDuTest(t, nom));
     assert.ok(fichier, `le bloc de « ${nom} » est introuvable dans ${chemins.join(', ')} : ${RELIRE}`);
-    const { lignes, debut, fin } = blocDuTest(lire(racine, fichier), nom);
-    let desactives = 0;
-    for (let k = debut + 1; k < fin; k++) {
-      lignes[k] = lignes[k].replace(/(?<![\w$.])((?:it|test)(?:\.\w+)*)(\s*\()/g, (_, appel, parenthese) => {
-        desactives++;
-        return `${appel}.skip${parenthese}`;
-      });
-    }
-    assert.ok(desactives, `« ${nom} » ne contient aucun it ni test : ${RELIRE}`);
-    ecrire(racine, fichier, lignes.join('\n'));
-    rougeEtNomme(couverture(racine), nom, `aucun test du describe « ${nom} » ne tourne dans ${fichier}`);
+    const desactiver = (t) => {
+      const { lignes, debut, fin } = blocDuTest(t, nom);
+      let desactives = 0;
+      for (let k = debut + 1; k < fin; k++) {
+        lignes[k] = lignes[k].replace(/(?<![\w$.])((?:it|test)(?:\.\w+)*)(\s*\()/g, (_, appel, parenthese) => {
+          desactives++;
+          return `${appel}.skip${parenthese}`;
+        });
+      }
+      assert.ok(desactives, `« ${nom} » ne contient aucun it ni test : ${RELIRE}`);
+      return lignes.join('\n');
+    };
+    await modifie(RACINE, fichier, desactiver, async () =>
+      rougeEtNomme(await problemes(RACINE), nom, `aucun test du describe « ${nom} » ne tourne dans ${fichier}`));
   });
 }
 
-test('#59 · un test que son fichier ne contient pas, nommé au registre, fait échouer la couverture en le nommant', () => {
-  const racine = copierDepot();
-  const registre = lire(racine, REGISTRE);
+test('#59 · un test que son fichier ne contient pas, nommé au registre, fait échouer la couverture en le nommant', async () => {
+  const registre = lire(RACINE, REGISTRE);
   const cible = NOMMES.find(({ nom }) => registre.includes(`« ${nom} »`));
   assert.ok(cible, `aucun test nommé sur une seule ligne de ${REGISTRE} : ${RELIRE}`);
-  ecrire(racine, REGISTRE, registre.replace(`« ${cible.nom} »`, `« ${ABSENT} »`));
-  rougeEtNomme(couverture(racine), ABSENT, `${cible.entree} nomme « ${ABSENT} », que ${cible.chemins.join(', ')} ne contient pas`);
+  await modifie(RACINE, REGISTRE, (t) => t.replace(`« ${cible.nom} »`, `« ${ABSENT} »`), async () =>
+    rougeEtNomme(await problemes(RACINE), ABSENT, `${cible.entree} nomme « ${ABSENT} », que ${cible.chemins.join(', ')} ne contient pas`));
 });
