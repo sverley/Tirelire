@@ -44,4 +44,5 @@
   contrainte est gardé par un harnais tant que c'est possible. Ce qui ne se programme pas fait
   l'objet, dans la PR, d'une demande explicite de vérification manuelle, faite avant tout merge :
   pour les invariants et contraintes que la PR touche, et pour ceux qui semblent hors de sa portée
-  mais dont le lien pourrait être masqué. Dans le doute, on demande.
+  mais dont le lien pourrait être masqué. Dans le doute, on demande. Un agent peut préparer
+  l'analyse d'une vérification ; seul un développeur humain la valide.
