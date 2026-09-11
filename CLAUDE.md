@@ -49,8 +49,8 @@
   - La correspondance se tient dans `docs/gardes.md`. Ajouter ou renommer un invariant, une
     contrainte ou un harnais met ce document à jour dans la même PR : `pnpm test` échoue sinon.
   - Toute PR remplit la section « Invariants et contraintes » de son modèle ;
-    `node packages/gardes/cli.mjs demander --base <branche cible>` la prépare, l'analyse reste à
-    écrire. La vérification « Vérifications manuelles » reste rouge tant qu'une vérification
+    `node packages/gardes/cli.mjs demander --base <branche cible>` la prépare, consignes du registre
+    recopiées, l'analyse reste à écrire. La vérification « Vérifications manuelles » reste rouge tant qu'une vérification
     demandée n'est pas analysée et validée.
   - Un agent ne coche jamais « Validée » sans une autorisation explicite de Simon pour cette
     vérification ; quand il la coche, il cite l'autorisation dans un commentaire de la PR. Il ne

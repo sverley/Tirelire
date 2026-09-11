@@ -1179,8 +1179,10 @@ téléphone, et `packages/gardes` le relit sans dépendance.
 - **Demandes**, sur chaque PR, par la vérification « Vérifications manuelles » : la description
   déclare les identifiants touchés et ceux dont le lien pourrait être masqué ; les motifs `Chemins`
   du registre imposent un plancher, volontairement étroit ; chaque vérification manuelle des
-  entrées déclarées, et des entrées qui les couvrent, figure avec son analyse et une case
-  « Validée ». Retirer une vérification manuelle ou un harnais du registre demande la même
+  entrées déclarées, et des entrées qui les couvrent, figure avec sa consigne recopiée du registre,
+  son analyse et une case « Validée » (tranché le 11 septembre dans #60 : « explicite vaut mieux
+  qu'implicite »). La description se lit comme GitHub l'affiche : ni les blocs de code ni les
+  commentaires ne déclarent, et ce qui se lirait de deux façons est refusé. Retirer une vérification manuelle ou un harnais du registre demande la même
   validation. Cette vérification tourne à part de la CI et se relance quand la description change :
   cocher une case ne rejoue ni tests ni build.
 - **Vert veut dire validé.** Sur un dépôt privé de l'offre gratuite, GitHub ne peut pas rendre une

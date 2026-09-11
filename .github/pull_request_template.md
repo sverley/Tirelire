@@ -14,7 +14,8 @@ Lien possible masqué : ceux qui semblent hors de sa portée mais pourraient êt
 doute, les déclarer. Écrire « aucun » plutôt que laisser vide.
 
 Sous « Vérifications manuelles » : chaque vérification des identifiants déclarés (docs/gardes.md),
-et chaque garde que la PR retire du registre, avec son analyse, écrite par un développeur ou un
+sa consigne recopiée mot pour mot après le tiret cadratin, et chaque garde que la PR retire du
+registre, avec son analyse, écrite par un développeur ou un
 agent, et sa case « Validée », que seul un développeur humain coche, ou un agent
 sur son autorisation explicite. Cocher enregistre la validation ;
 un commit qui modifie le code, ou un changement de branche cible, l'annule. Documentation et

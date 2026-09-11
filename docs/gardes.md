@@ -16,7 +16,14 @@ correspondance ; `packages/gardes` le relit.
   identifiants touchés et ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux
   `Chemins` d'une entrée impose de la déclarer ; chaque vérification manuelle des entrées déclarées,
   et chaque garde retirée de ce document, figure dans la description avec son analyse et une case
-  « Validée » cochée par un développeur humain. Tant qu'il en manque une, la vérification est rouge.
+  « Validée » cochée par un développeur humain. Une vérification manuelle y recopie sa consigne, mot
+  pour mot, après le tiret cadratin : qui valide la lit dans la PR (#60). Tant qu'il en manque une, ou
+  qu'une consigne diffère, la vérification est rouge.
+- **La déclaration se lit comme GitHub l'affiche** (#60). Les blocs de code et les commentaires HTML
+  ne comptent pas ; une déclaration se poursuit à la ligne jusqu'à une ligne vide, une puce, un titre
+  ou l'autre étiquette ; les identifiants se lisent sans tenir compte de la casse, et une plage
+  (`U1 à U3`, `U1–U3`) déclare chacun de ceux qu'elle couvre. Une section ou une ligne en double, ou
+  une plage qui mêle deux familles, est refusée plutôt que devinée.
 - **Une validation vaut pour le code validé** (#61). Cocher « Validée » l'enregistre, dans un
   commentaire que seule la vérification écrit, avec la tête de la PR et sa branche cible. Un commit
   qui modifie le code, y compris en résolvant un conflit, ou un changement de branche cible l'annulent :
