@@ -92,6 +92,12 @@ sessions et des plateformes d'une même personne ou des appareils de plusieurs p
 
 L'application se distribue par un serveur web et en application Android, et à terme sur Apple.
 
+## I10 · Proposer, et ne jamais faire de manière cachée
+
+Le plan de virements permanents reste lié au budget, durablement. Quand le budget évolue,
+l'application propose les évolutions du plan qui en découlent ; elle n'en fait jamais aucune de
+manière cachée.
+
 ---
 
 ## Historique
@@ -108,3 +114,4 @@ L'application se distribue par un serveur web et en application Android, et à t
 - **2026-09-11** · La distribution du relais, un temps ajoutée à I8 et I9, en est retirée : les cibles
   de distribution sont des choix techniques, suivis en issues (#32, #33, #34, #35, #36, #37), et les contraintes des
   plateformes sont consignées dans [`contraintes.md`](contraintes.md).
+- **2026-09-11** · I10 ajouté d'après les objectifs du porteur (objectif 4, #48).

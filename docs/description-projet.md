@@ -44,3 +44,10 @@ Réponse au point 1 de l'issue #29 (relais).
 Correction du porteur, le même jour :
 
 > J'ai trop réduit le verbatim en ne pensant qu'à un utilisateur, on peut prévoir une synchronisation agnostique tant qu'il y a partage des clés de chiffrement.
+
+## 11 septembre 2026 · objectifs
+
+Extrait des objectifs du projet : la ligne que le porteur marque « invariant ». Les dix objectifs
+sont suivis en issues (#45 à #54).
+
+> 4. l'appli propose un plan de virement permanent en lien avec le budget (les liens sont perennes, si un budget évolue, on doit "proposer et jamais faire de manière cachée" (invariant) des évolutions du plan

@@ -38,5 +38,5 @@
   description du projet ni dans les invariants. Il se traite le moment venu, au regard des
   invariants et de `docs/contraintes.md`.
 - **Étiquettes GitHub.** `besoin` (issue qui définit un besoin), `cible` (cible de distribution),
-  `harnais` ; `U1` à `U5`, `I…` et `C…` renvoient aux usages, invariants et contraintes qu'une
+  `harnais`, `objectif` (objectif du projet) ; `U1` à `U5`, `I…` et `C…` renvoient aux usages, invariants et contraintes qu'une
   issue sert.
