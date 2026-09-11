@@ -23,6 +23,20 @@ import { after, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** Consigne d'une vérification manuelle, mot pour mot : ce qui suit le tiret cadratin au registre, suite renfoncée comprise. */
+function consigneDu(cle, racine = DEPOT) {
+  const lignes = readFileSync(join(racine, 'docs/gardes.md'), 'utf8').split(/\r?\n/);
+  const cle_ = cle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const i = lignes.findIndex((l) => new RegExp(`^[-*]\\s+\\*\\*Vérification manuelle\\*\\*\\s+·\\s+\`${cle_}\`\\s+—\\s+`).test(l));
+  if (i < 0) return '';
+  const morceaux = [lignes[i].replace(/^.*?`\s+—\s+/, '').trim()];
+  for (let j = i + 1; j < lignes.length && /^\s+\S/.test(lignes[j]); j++) morceaux.push(lignes[j].trim());
+  return morceaux.join(' ');
+}
+/** Tête d'une vérification listée dans la PR, consigne recopiée comme `demander` l'écrit (tranché dans #60). */
+const teteVm = (cle) => `- \`${cle}\` · essai${consigneDu(cle) ? ` — ${consigneDu(cle)}` : ''}`;
+
 const CLI = 'packages/gardes/cli.mjs';
 const CE_HARNAIS = 'packages/gardes/amorcage.test.mjs';
 const REGISTRE = 'docs/gardes.md';
@@ -195,7 +209,7 @@ function corps({ touches = 'aucun', masques = 'aucun', verifications = [] } = {}
     '### Vérifications manuelles',
     '',
     ...verifications.flatMap(({ cle, analyse = ANALYSE, validee = false }) => [
-      `- \`${cle}\` · essai`,
+      teteVm(cle),
       `  - Analyse (audit, 2026-09-11) : ${analyse}`,
       `  - [${validee ? 'x' : ' '}] Validée par un développeur humain`,
     ]),
