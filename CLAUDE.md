@@ -46,3 +46,5 @@
   pour les invariants et contraintes que la PR touche, et pour ceux qui semblent hors de sa portée
   mais dont le lien pourrait être masqué. Dans le doute, on demande. Un agent peut préparer
   l'analyse d'une vérification ; seul un développeur humain la valide.
+- **Dépendances.** Elles se tiennent à deux endroits, toujours d'accord : la section « Dépendances »
+  de l'issue et les liens GitHub « bloquée par ». Qui recalcule l'une met l'autre à jour.
