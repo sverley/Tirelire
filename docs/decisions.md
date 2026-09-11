@@ -1188,6 +1188,12 @@ téléphone, et `packages/gardes` le relit sans dépendance.
   une fusion reste possible, #62 la fera signaler aussitôt. La couleur de la vérification est donc
   le seul signal avant de fusionner : elle ne passe au vert que lorsque chaque vérification demandée
   est analysée et validée, jamais sur leur seule présence.
+- **Une validation tient à ce qu'elle a validé.** Tranché le 11 septembre (#61) : une modification
+  postérieure à la validation l'annule. La vérification enregistre chaque case cochée dans un
+  commentaire du compte de GitHub Actions, avec la tête de la PR, sa branche cible et l'empreinte de
+  l'analyse. Un nouveau commit, un changement de branche cible ou une analyse réécrite rendent
+  l'enregistrement caduc : la case se décoche, un commentaire dit pourquoi, la vérification repasse
+  au rouge. Une case cochée sans enregistrement, à l'ouverture ou juste avant un push, ne vaut rien.
 - **Limite connue.** Toutes les sessions écrivent avec le compte du porteur : rien ne distingue une
   case cochée par un agent (question posée dans #58, pour #61). En attendant, la règle est écrite
   dans `CLAUDE.md`.

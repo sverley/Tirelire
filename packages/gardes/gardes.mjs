@@ -15,6 +15,7 @@
  * Tout travaille sur des textes et des listes de fichiers : les tests nourrissent ces fonctions de
  * documents inventés, `cli.mjs` de ceux du dépôt.
  */
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -398,15 +399,17 @@ export function lireDescriptionPr(corps) {
  * Ce qu'une PR doit encore faire. `aCorriger` : la description est incomplète ou fausse ;
  * `enAttente` : une vérification analysée attend la validation d'un développeur humain.
  */
-export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersModifies = [] }) {
+export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersModifies = [], validations }) {
   const aCorriger = [];
   const enAttente = [];
   const validees = [];
+  const annulees = [];
+  const nonEnregistrees = [];
   const imposes = plancher(entrees, fichiersModifies);
   const pr = lireDescriptionPr(corps);
   if (!pr) {
     aCorriger.push(`La description n'a pas de section « ## Invariants et contraintes » : la reprendre du modèle \`${DOCUMENTS.modele}\`.`);
-    return { aCorriger, enAttente, validees, declares: [], imposes, requises: new Map() };
+    return { aCorriger, enAttente, validees, annulees, nonEnregistrees, declares: [], imposes, requises: new Map() };
   }
 
   for (const [nom, d] of [
@@ -439,9 +442,112 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
   for (const item of listees.values()) {
     if (ANALYSE_VIDE.test(item.analyse)) aCorriger.push(`\`${item.cle}\` : analyse à écrire, par un développeur ou un agent.`);
     else if (!item.validee) enAttente.push(`\`${item.cle}\` : analysée, en attente de validation par un développeur humain.`);
-    else validees.push(item.cle);
+    else if (!validations) validees.push(item.cle); // hors GitHub : rien pour dire quand la case a été cochée
+    else {
+      const v = etatValidation(item, validations);
+      if (v.etat === 'validee') validees.push(item.cle);
+      else if (v.etat === 'annulee') {
+        annulees.push({ cle: item.cle, raisons: v.raisons });
+        enAttente.push(`\`${item.cle}\` : validation annulée par une modification postérieure (${v.raisons.join(', ')}) : relire, puis cocher de nouveau.`);
+      } else {
+        nonEnregistrees.push(item.cle);
+        enAttente.push(`\`${item.cle}\` : case cochée sans validation enregistrée pour l'état actuel de la PR : la décocher, puis la cocher de nouveau.`);
+      }
+    }
   }
-  return { aCorriger, enAttente, validees, declares, imposes, requises };
+  return { aCorriger, enAttente, validees, annulees, nonEnregistrees, declares, imposes, requises };
+}
+
+// ─── Validations (#61) ──────────────────────────────────────────────────────────────────────────
+// Une case « Validée » ne vaut que pour l'état de la PR au moment où elle est cochée (tranché le
+// 11 septembre). La vérification l'enregistre alors dans un commentaire que seul le compte de GitHub
+// Actions écrit : tête, branche cible, empreinte de l'analyse. Un nouveau commit, un changement de
+// branche cible ou une analyse modifiée rendent l'enregistrement caduc.
+
+/** Auteur des commentaires qui enregistrent les validations : un agent ne peut pas l'imiter. */
+export const AUTEUR_HORODATAGE = 'github-actions[bot]';
+const MARQUE_VALIDATION = /<!-- tirelire-validation (\[[\s\S]*?\]) -->/g;
+const court = (sha) => String(sha).slice(0, 7);
+
+export const analyseEcrite = (analyse) => !ANALYSE_VIDE.test(String(analyse ?? ''));
+
+/** Empreinte de l'analyse : la réécrire après la validation annule celle-ci. */
+export function empreinteAnalyse(analyse) {
+  return createHash('sha256').update(String(analyse).replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12);
+}
+
+/** Cases cochées d'une description. */
+export function cochees(corps) {
+  return new Set((lireDescriptionPr(corps ?? '')?.items ?? []).filter((i) => i.validee).map((i) => i.cle));
+}
+
+/** Validations enregistrées, dans l'ordre des commentaires ; les autres auteurs sont ignorés. */
+export function lireHorodatages(commentaires) {
+  const horodatages = [];
+  for (const c of commentaires ?? []) {
+    if (c?.user?.login !== AUTEUR_HORODATAGE) continue;
+    for (const m of String(c.body ?? '').matchAll(MARQUE_VALIDATION)) {
+      try {
+        for (const h of JSON.parse(m[1])) {
+          if (['cle', 'tete', 'cible', 'analyse'].every((k) => typeof h?.[k] === 'string')) horodatages.push(h);
+        }
+      } catch {
+        // marque illisible : elle ne valide rien
+      }
+    }
+  }
+  return horodatages;
+}
+
+export function texteHorodatage(horodatages) {
+  const [h] = horodatages;
+  return [
+    `**Validation enregistrée** par ${h.par}, le ${h.date.slice(0, 10)} à ${h.date.slice(11, 16)} UTC, sur \`${court(h.tete)}\` vers \`${h.cible}\` :`,
+    '',
+    ...horodatages.map((v) => `- \`${v.cle}\``),
+    '',
+    "Un nouveau commit, un changement de branche cible ou une analyse modifiée l'annuleront.",
+    '',
+    `<!-- tirelire-validation ${JSON.stringify(horodatages)} -->`,
+  ].join('\n');
+}
+
+export function texteAnnulation(annulees, nonEnregistrees = []) {
+  return [
+    '**Validation annulée** : la PR a changé depuis.',
+    '',
+    ...annulees.map((a) => `- \`${a.cle}\` : ${a.raisons.join(', ')}.`),
+    ...nonEnregistrees.map((cle) => `- \`${cle}\` : case cochée sans validation enregistrée pour l'état actuel de la PR.`),
+    '',
+    'Relire, puis cocher de nouveau la case.',
+  ].join('\n');
+}
+
+/** Où en est la case cochée d'une vérification : validée, annulée (et pourquoi), ou non enregistrée. */
+export function etatValidation(item, { tete, cible, horodatages }) {
+  const empreinte = empreinteAnalyse(item.analyse);
+  const siens = horodatages.filter((h) => h.cle === item.cle);
+  if (siens.some((h) => h.tete === tete && h.cible === cible && h.analyse === empreinte)) return { etat: 'validee' };
+  const dernier = siens.at(-1);
+  if (!dernier) return { etat: 'non-enregistree' };
+  const raisons = [];
+  if (dernier.tete !== tete) raisons.push(`nouveaux commits (${court(dernier.tete)} → ${court(tete)})`);
+  if (dernier.cible !== cible) raisons.push(`branche cible changée (${dernier.cible} → ${cible})`);
+  if (dernier.analyse !== empreinte) raisons.push('analyse modifiée');
+  return { etat: 'annulee', raisons };
+}
+
+/** Décoche la case « Validée » des vérifications désignées, sans rien toucher d'autre. */
+export function decocher(corps, cles) {
+  const lignes = String(corps ?? '').split('\n');
+  let courante = null;
+  for (let i = 0; i < lignes.length; i++) {
+    const tete = lignes[i].match(/^\s*[-*]\s+`([^`]+)`/);
+    if (tete) courante = tete[1];
+    else if (/^#{1,6}\s/.test(lignes[i])) courante = null;
+    else if (courante && cles.includes(courante)) lignes[i] = lignes[i].replace(/^(\s*[-*]\s+)\[[xX]\](?=\s+Validée)/, '$1[ ]');
+  }
+  return lignes.join('\n');
 }
 
 /** Section à coller dans la description : plancher des chemins et vérifications à analyser. */

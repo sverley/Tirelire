@@ -17,6 +17,10 @@ correspondance ; `packages/gardes` le relit.
   `Chemins` d'une entrée impose de la déclarer ; chaque vérification manuelle des entrées déclarées,
   et chaque garde retirée de ce document, figure dans la description avec son analyse et une case
   « Validée » cochée par un développeur humain. Tant qu'il en manque une, la vérification est rouge.
+- **Une validation vaut pour ce qui a été validé** (#61). Cocher « Validée » l'enregistre, dans un
+  commentaire que seule la vérification écrit, pour l'état de la PR à cet instant. Un nouveau commit,
+  un changement de branche cible ou une analyse modifiée l'annulent : la case se décoche, un
+  commentaire dit pourquoi, et la vérification redevient rouge jusqu'à une nouvelle validation.
 
 Préparer la section d'une PR : `node packages/gardes/cli.mjs demander --base origin/main`, puis
 écrire l'analyse. Faire le point : `node packages/gardes/cli.mjs couverture`.

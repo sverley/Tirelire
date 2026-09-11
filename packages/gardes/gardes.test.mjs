@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import * as V from './gardes.mjs';
+import { verifierPrSurGithub } from './github.mjs';
 import {
   DOCUMENTS,
   RACINE,
@@ -223,4 +225,97 @@ test("la section préparée par « demander » reste rouge tant que l'analyse n'
   const r = pr(`Pour #1 : rien.\n\n${preparee}\n`, ['b/deux.mjs']);
   assert.match(texte(r.aCorriger), /« Lien possible masqué : » à remplir/);
   assert.match(texte(r.aCorriger), /`VM-C1-appareil` : analyse à écrire/);
+});
+
+// ─── Validations enregistrées, et annulées par une modification postérieure (#61) ─────────────
+
+const TETE = 'a'.repeat(40);
+const NOUVELLE = 'b'.repeat(40);
+const ANALYSE = "La PR change l'écran Plan : le regarder à 375 px.";
+const enregistree = (extra = {}) => ({ cle: 'VM-C1-appareil', tete: TETE, cible: 'main', analyse: V.empreinteAnalyse(ANALYSE), par: 'sverley', date: '2026-09-11T10:42:00.000Z', ...extra });
+const duBot = (...h) => ({ user: { login: V.AUTEUR_HORODATAGE }, body: V.texteHorodatage(h) });
+const valider = (corps, validations) => verifierPr({ entrees, corps, fichiersModifies: [], validations });
+const ouverte = section('C1', 'aucun', item('VM-C1-appareil'));
+const cochee = (analyse = ANALYSE) => section('C1', 'aucun', item('VM-C1-appareil', { analyse, cochee: true }));
+
+function fauxGithub(corps, { tete = TETE, cible = 'main', commentaires = [] } = {}) {
+  const etat = { pr: { number: 7, body: corps, head: { sha: tete }, base: { ref: cible } }, commentaires: [...commentaires], descriptions: 0 };
+  const api = {
+    lirePr: async () => structuredClone(etat.pr),
+    lireCommentaires: async () => structuredClone(etat.commentaires),
+    commenter: async (_n, body) => void etat.commentaires.push({ user: { login: V.AUTEUR_HORODATAGE }, body }),
+    modifierDescription: async (_n, body) => void ((etat.pr.body = body), etat.descriptions++),
+  };
+  return { etat, api };
+}
+const surEvenement = (etat, action, extra = {}) => ({ action, sender: { login: 'sverley' }, pull_request: structuredClone(etat.pr), ...extra });
+const github = (evenement, api) => verifierPrSurGithub({ evenement, api, entrees, fichiersModifies: [], attendre: async () => {} });
+
+test("sur GitHub, une case cochée ne vaut validation qu'enregistrée pour l'état actuel de la PR", () => {
+  const horodatages = V.lireHorodatages([duBot(enregistree())]);
+  assert.deepEqual(valider(cochee(), { tete: TETE, cible: 'main', horodatages }).validees, ['VM-C1-appareil']);
+  const sans = valider(cochee(), { tete: TETE, cible: 'main', horodatages: [] });
+  assert.deepEqual([sans.validees, sans.nonEnregistrees], [[], ['VM-C1-appareil']]);
+  assert.match(texte(sans.enAttente), /case cochée sans validation enregistrée/);
+  // Un commentaire qui imite l'enregistrement, écrit avec un compte ordinaire, ne valide rien.
+  assert.deepEqual(V.lireHorodatages([{ user: { login: 'sverley' }, body: V.texteHorodatage([enregistree()]) }]), []);
+});
+
+test('une modification postérieure annule la validation : nouveaux commits, branche cible ou analyse', () => {
+  const horodatages = V.lireHorodatages([duBot(enregistree())]);
+  for (const [r, raison] of [
+    [valider(cochee(), { tete: NOUVELLE, cible: 'main', horodatages }), /nouveaux commits \(aaaaaaa → bbbbbbb\)/],
+    [valider(cochee(), { tete: TETE, cible: 'autre', horodatages }), /branche cible changée \(main → autre\)/],
+    [valider(cochee('Une autre analyse, réécrite après la validation.'), { tete: TETE, cible: 'main', horodatages }), /analyse modifiée/],
+  ]) {
+    assert.deepEqual([r.validees, r.annulees.map((a) => a.cle)], [[], ['VM-C1-appareil']]);
+    assert.match(texte(r.enAttente), /validation annulée par une modification postérieure/);
+    assert.match(texte(r.enAttente), raison);
+  }
+});
+
+test('décocher ne touche que les cases désignées', () => {
+  const corps = section('C1', 'aucun', item('VM-C1-appareil', { cochee: true }) + item('VM-C1-autre', { cochee: true }));
+  const apres = V.decocher(corps, ['VM-C1-appareil']);
+  assert.deepEqual([...V.cochees(apres)], ['VM-C1-autre']);
+  assert.equal(apres.replace('- [ ] Validée', '- [x] Validée'), corps);
+});
+
+test('cocher la case enregistre la validation, et la vérification passe au vert', async () => {
+  const { etat, api } = fauxGithub(cochee());
+  const r = await github(surEvenement(etat, 'edited', { changes: { body: { from: ouverte } } }), api);
+  assert.deepEqual([r.aCorriger, r.enAttente, r.validees], [[], [], ['VM-C1-appareil']]);
+  assert.match(etat.commentaires[0].body, /\*\*Validation enregistrée\*\* par sverley/);
+  assert.deepEqual(V.lireHorodatages(etat.commentaires).map((h) => [h.cle, h.tete, h.cible]), [['VM-C1-appareil', TETE, 'main']]);
+});
+
+test("un commit poussé après la validation l'annule : la case se décoche et la vérification redevient rouge", async () => {
+  const { etat, api } = fauxGithub(cochee(), { tete: NOUVELLE, commentaires: [duBot(enregistree())] });
+  const r = await github(surEvenement(etat, 'synchronize'), api);
+  assert.deepEqual(r.validees, []);
+  assert.match(texte(r.enAttente), /analysée, en attente de validation/);
+  assert.deepEqual([...V.cochees(etat.pr.body)], []);
+  assert.match(etat.commentaires.at(-1).body, /\*\*Validation annulée\*\*[\s\S]*nouveaux commits \(aaaaaaa → bbbbbbb\)/);
+});
+
+test("réécrire l'analyse après la validation l'annule aussi", async () => {
+  const autre = cochee('Une autre analyse, réécrite après la validation.');
+  const { etat, api } = fauxGithub(autre, { commentaires: [duBot(enregistree())] });
+  const r = await github(surEvenement(etat, 'edited', { changes: { body: { from: cochee() } } }), api);
+  assert.deepEqual([r.validees, [...V.cochees(etat.pr.body)]], [[], []]);
+  assert.match(etat.commentaires.at(-1).body, /analyse modifiée/);
+});
+
+test("une case cochée à l'ouverture ou juste avant un push n'est pas une validation", async () => {
+  const ouverture = fauxGithub(cochee());
+  const r = await github(surEvenement(ouverture.etat, 'opened'), ouverture.api);
+  assert.deepEqual([r.validees, [...V.cochees(ouverture.etat.pr.body)], V.lireHorodatages(ouverture.etat.commentaires)], [[], [], []]);
+
+  const push = fauxGithub(cochee(), { tete: NOUVELLE });
+  const evenement = surEvenement(push.etat, 'edited', { changes: { body: { from: ouverte } } });
+  evenement.pull_request.head.sha = TETE; // la case a été cochée sur la tête d'avant le push
+  const avantPush = await github(evenement, push.api);
+  assert.deepEqual([avantPush.validees, V.lireHorodatages(push.etat.commentaires)], [[], []]);
+  assert.match(texte(avantPush.enAttente), /La PR a changé pendant la validation/);
+  assert.equal(push.etat.descriptions, 0, 'une vérification en retard ne décoche rien');
 });
