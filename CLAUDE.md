@@ -1,7 +1,9 @@
 # Tirelire — conventions pour les sessions d'assistant
 
 - Langue : français partout (code, commentaires, commits, interface, docs).
-- Lire `docs/invariants.md` avant tout : ce que le produit doit rester. Une décision se prend au
+- Lire `docs/description-projet.md` avant tout : le texte du porteur, mot pour mot, qui fait foi.
+  Il ne se reformule ni ne se corrige ; un complément du porteur s'y ajoute daté, tel quel.
+- Lire ensuite `docs/invariants.md` : ce que le produit doit rester, tiré de la description. Une décision se prend au
   regard des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
   une décision.
 - Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro ; toute

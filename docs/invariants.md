@@ -1,8 +1,10 @@
 # Invariants du produit
 
-Ce que Tirelire doit rester, quelles que soient les solutions retenues. Les invariants disent
-**quoi** et **pour qui** ; les décisions ([`decisions.md`](decisions.md)) disent **comment**, et se
-prennent au regard des invariants.
+Ce que Tirelire doit rester, quelles que soient les solutions retenues. Les invariants sont tirés de
+la description du projet ([`description-projet.md`](description-projet.md)), le texte du porteur
+conservé mot pour mot : c'est elle qui fait foi, et un invariant qui s'en écarterait se corrige
+d'après elle. Les invariants disent **quoi** et **pour qui** ; les décisions
+([`decisions.md`](decisions.md)) disent **comment**, et se prennent au regard des invariants.
 
 - Une décision ne contredit pas un invariant. Si un besoin semble l'exiger, la question se pose
   d'abord dans une issue.
@@ -76,7 +78,7 @@ L'application se distribue par un serveur web et en application Android, et à t
 
 ## Historique
 
-- **2026-09-11** · Création, d'après la description du produit donnée par le porteur du projet
+- **2026-09-11** · Création, d'après la [description du projet](description-projet.md)
   (issue #29). Une partie était déjà portée par des décisions (D19, D21, D35, D40, D57) ; elle
   en est extraite pour que les décisions s'y réfèrent. Les écarts relevés entre décisions et
   invariants sont consignés dans l'issue.
