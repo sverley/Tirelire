@@ -3,6 +3,10 @@
 Chaque décision est datée, motivée, et dit ce qu'elle implique dans le code. Pour en changer une,
 ajouter une entrée qui la remplace plutôt que réécrire l'ancienne.
 
+Les décisions se prennent au regard des invariants du produit ([`invariants.md`](invariants.md))
+et des contraintes du projet ([`contraintes.md`](contraintes.md)) : les invariants disent quoi, les décisions disent comment. Une décision ne contredit pas un
+invariant ; si le besoin semble l'exiger, la question se pose d'abord dans une issue.
+
 ## D01 · 2026-09-06 · Deux niveaux de comptabilité
 
 Les **comptes** sont le réel bancaire (solde importé) ; les **tirelires** sont des sous-comptes
