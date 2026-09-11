@@ -98,6 +98,17 @@ Le plan de virements permanents reste lié au budget, durablement. Quand le budg
 l'application propose les évolutions du plan qui en découlent ; elle n'en fait jamais aucune de
 manière cachée.
 
+## I11 · Les assistants font partie de la vie de l'application
+
+Un assistant guide ; il ne fait rien que l'application ne fasse aussi, en dehors de lui, tout au
+long de son usage.
+
+- **Rien de réservé aux assistants.** Ce qu'un assistant crée reste vivant dans l'application, et
+  ce qu'il fait se retrouve dans l'usage courant.
+- **Le train de vie évolue : le budget propose des adaptations.**
+- **Le budget évolue : l'application propose les changements de comportement à reproduire**, côté
+  banque (les virements permanents, I10) ou côté train de vie.
+
 ---
 
 ## Historique
@@ -115,3 +126,5 @@ manière cachée.
   de distribution sont des choix techniques, suivis en issues (#32, #33, #34, #35, #36, #37), et les contraintes des
   plateformes sont consignées dans [`contraintes.md`](contraintes.md).
 - **2026-09-11** · I10 ajouté d'après les objectifs du porteur (objectif 4, #48).
+- **2026-09-11** · I11 ajouté d'après le porteur : les assistants font partie de la vie de
+  l'application (#55, #56, #57).
