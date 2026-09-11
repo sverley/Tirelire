@@ -1164,3 +1164,26 @@ demande, alors que ce plan est celui de l'analyse au centime près.
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
 (virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
 budget, pas une ligne de budget à offrir (D43).
+
+## D61 · 2026-09-11 · Les gardes se tiennent dans un registre, et chaque PR demande les siennes
+
+Objectif primaire #58. `docs/gardes.md` relie chaque invariant (I…, et les usages U… d'I3) et
+chaque contrainte (C…) à ses harnais, à ses vérifications manuelles (`VM-<entrée>-<nom>`) ou aux
+entrées qui le couvrent. C'est un document et non un fichier de données : Simon le lit sur
+téléphone, et `packages/gardes` le relit sans dépendance.
+
+- **Couverture**, dans `pnpm test`, donc au commit et en CI : un identifiant sans entrée, une entrée
+  sans garde, un renvoi en boucle, un harnais ou un motif de chemin qui ne désigne plus rien font
+  échouer les tests. Un harnais seulement prévu ne garde rien : une vérification manuelle tient sa
+  place.
+- **Demandes**, sur chaque PR, par la vérification « Vérifications manuelles » : la description
+  déclare les identifiants touchés et ceux dont le lien pourrait être masqué ; les motifs `Chemins`
+  du registre imposent un plancher, volontairement étroit ; chaque vérification manuelle des
+  entrées déclarées, et des entrées qui les couvrent, figure avec son analyse et une case
+  « Validée ». Retirer une vérification manuelle ou un harnais du registre demande la même
+  validation. Cette vérification tourne à part de la CI et se relance quand la description change :
+  cocher une case ne rejoue ni tests ni build.
+- **Limites connues.** Sur un dépôt privé de l'offre gratuite, GitHub ne peut pas rendre une
+  vérification obligatoire avant fusion (question posée dans #58). Toutes les sessions écrivent
+  avec le compte du porteur : rien ne distingue une case cochée par un agent ; la règle est écrite
+  dans `CLAUDE.md`.

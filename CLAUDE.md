@@ -40,9 +40,17 @@
 - **Étiquettes GitHub.** `besoin` (issue qui définit un besoin), `cible` (cible de distribution),
   `harnais`, `objectif` (objectif du projet) ; `U1` à `U5`, `I…` et `C…` renvoient aux usages, invariants et contraintes qu'une
   issue sert.
-- **Harnais et vérifications manuelles (objectif primaire #58).** Chaque invariant et chaque
+- **Harnais et vérifications manuelles (objectif primaire #58, D61).** Chaque invariant et chaque
   contrainte est gardé par un harnais tant que c'est possible. Ce qui ne se programme pas fait
   l'objet, dans la PR, d'une demande explicite de vérification manuelle, faite avant tout merge :
   pour les invariants et contraintes que la PR touche, et pour ceux qui semblent hors de sa portée
   mais dont le lien pourrait être masqué. Dans le doute, on demande. Un agent peut préparer
   l'analyse d'une vérification ; seul un développeur humain la valide.
+  - La correspondance se tient dans `docs/gardes.md`. Ajouter ou renommer un invariant, une
+    contrainte ou un harnais met ce document à jour dans la même PR : `pnpm test` échoue sinon.
+  - Toute PR remplit la section « Invariants et contraintes » de son modèle ;
+    `node packages/gardes/cli.mjs demander --base <branche cible>` la prépare, l'analyse reste à
+    écrire. La vérification « Vérifications manuelles » reste rouge tant qu'une vérification
+    demandée n'est pas analysée et validée.
+  - Un agent ne coche jamais « Validée », ne retire pas une garde pour faire passer une PR, et ne
+    fusionne jamais une PR dont la vérification « Vérifications manuelles » est rouge.
