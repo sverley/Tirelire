@@ -40,3 +40,6 @@
 - **Étiquettes GitHub.** `besoin` (issue qui définit un besoin), `cible` (cible de distribution),
   `harnais`, `objectif` (objectif du projet) ; `U1` à `U5`, `I…` et `C…` renvoient aux usages, invariants et contraintes qu'une
   issue sert.
+- **Harnais et vérifications manuelles (objectif primaire #58).** Chaque invariant et chaque
+  contrainte est gardé par un harnais tant que c'est possible. Ce qui ne se programme pas fait
+  l'objet, dans la PR, d'une demande explicite de vérification manuelle, faite avant tout merge.
