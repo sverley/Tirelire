@@ -366,17 +366,30 @@ test('#59 · la couverture tourne dans les tests du paquet, donc au commit et da
   assert.match(ci, /^\s+pull_request:/m, 'la CI ne tourne pas sur les PR');
   assert.match(ci, /run:\s*pnpm (-r )?test\b/, 'la CI ne lance pas pnpm test');
 
-  // Boîte noire : les tests du paquet passent sur le dépôt copié, puis échouent dès qu'une entrée manque.
+  // Boîte noire : un test du paquet qui passe sur le dépôt copié échoue dès qu'une entrée manque.
+  // D'autres harnais d'audit peuvent être rouges à dessein : seuls comptent les tests qui changent d'état.
   const script = JSON.parse(lire(DEPOT, 'packages/gardes/package.json')).scripts.test;
   const racine = copierDepot();
   rmSync(join(racine, CE_HARNAIS)); // pas de récursion
-  const lancer = () => spawnSync('sh', ['-c', script], { cwd: join(racine, 'packages/gardes'), env: ENV, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  const intact = lancer();
-  assert.equal(intact.status, 0, `les tests du paquet échouent déjà sur le dépôt copié :\n${`${intact.stdout}${intact.stderr}`.slice(-3000)}`);
+  const bilan = () => {
+    const r = spawnSync('sh', ['-c', script], { cwd: join(racine, 'packages/gardes'), env: ENV, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const tests = new Map();
+    for (const ligne of String(r.stdout).split('\n')) {
+      const tap = ligne.match(/^(not ok|ok) \d+ - (.+?)(?: # .*)?$/);
+      const spec = ligne.match(/^(✔|✖) (.+?) \(\d+(?:\.\d+)?ms\)$/);
+      if (tap) tests.set(tap[2], tap[1] === 'ok');
+      else if (spec) tests.set(spec[2], spec[1] === '✔');
+    }
+    assert.ok(tests.size, `aucun résultat lisible dans la sortie des tests du paquet : ${RELIRE}\n${String(r.stdout).slice(-2000)}`);
+    return tests;
+  };
+  const intact = bilan();
   const texte = lire(racine, REGISTRE);
   const derniere = entrees(texte).at(-1);
   ecrire(racine, REGISTRE, retirerLignes(texte, derniere));
-  assert.notEqual(lancer().status, 0, `les tests du paquet passent alors que ${derniere.id} n'a plus d'entrée`);
+  const ampute = bilan();
+  const rougis = [...intact].filter(([nom, passe]) => passe && ampute.get(nom) === false);
+  assert.ok(rougis.length, `aucun test du paquet ne rougit quand ${derniere.id} n'a plus d'entrée`);
 });
 
 // ─── #60 : chaque PR déclare et demande ──────────────────────────────────────────────────────
