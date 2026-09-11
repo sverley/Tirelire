@@ -1,0 +1,13 @@
+{
+  "name": "@tirelire/gardes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Garde de l'objectif primaire (#58, D61) : chaque invariant et chaque contrainte a son harnais ou sa vérification manuelle, et chaque PR demande les siennes.",
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "echo ok",
+    "build": "echo ok",
+    "couverture": "node cli.mjs couverture"
+  }
+}

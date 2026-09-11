@@ -15,7 +15,7 @@
     "simple-git-hooks": "^2.14.0"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm -r typecheck && pnpm --filter @tirelire/core test",
+    "pre-commit": "pnpm -r typecheck && pnpm --filter @tirelire/core test && pnpm --filter @tirelire/gardes test",
     "pre-push": "pnpm build"
   }
 }
