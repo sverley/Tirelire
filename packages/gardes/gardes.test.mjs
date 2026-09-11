@@ -463,3 +463,27 @@ test("un test nommé présent mais qui ne tourne pas est signalé comme tel", ()
   }).problemes;
   assert.match(texte(problemes), /le test « suite gardée » ne tourne dans aucun de `a\/un\.test\.ts` \(il y figure sans tourner/);
 });
+
+test("un harnais du registre qui se saute faute d'outil doit rendre l'outil obligatoire en CI", () => {
+  const documents = {
+    invariants: '## I1 · Premier\n',
+    contraintes: '',
+    gardes: '## I1 · Premier\n\n- **Harnais** · `a/outil.test.mjs` — garde I1.\n',
+    fichiers: ['a/outil.test.mjs', 'a/harnais.ts'],
+  };
+  const couverture = (contenus) => V.verifierCouvertureTextes({ ...documents, lireFichier: (c) => contenus[c] ?? null }).problemes;
+  const saute = "const present = false;\ntest('avec outil', { skip: !present && 'absent' }, () => {});\n";
+  assert.match(
+    texte(couverture({ 'a/outil.test.mjs': `// TIRELIRE_STRICT, cité en commentaire, ne suffit pas\n${saute}` })),
+    /le harnais `a\/outil\.test\.mjs` se saute sous condition sans rendre son outil obligatoire en CI/,
+  );
+  assert.deepEqual(couverture({ 'a/outil.test.mjs': saute.replace('!present &&', '!present && !process.env.TIRELIRE_STRICT &&') }), []);
+  assert.deepEqual(
+    couverture({
+      'a/outil.test.mjs': "import { nav } from './harnais.js';\ndescribe.skipIf(!nav)('suite', () => { it('t', () => {}); });\n",
+      'a/harnais.ts': 'export const nav = null;\nif (!nav && process.env.TIRELIRE_STRICT) throw new Error();\n',
+    }),
+    [],
+  );
+  assert.deepEqual(couverture({ 'a/outil.test.mjs': "test('sans condition', () => {});\n" }), []);
+});

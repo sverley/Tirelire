@@ -16,6 +16,7 @@
  * documents inventés, `cli.mjs` de ceux du dépôt.
  */
 import { createHash } from 'node:crypto';
+import { posix } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -297,6 +298,11 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
           problemes.push(`${ou} : le test « ${nom} » ne tourne dans aucun de ${presents.map((c) => `\`${c}\``).join(', ')} (${pourquoi}).`);
         }
       }
+      for (const c of lireFichier ? presents : []) {
+        if (analyserTests(lireFichier(c) ?? '').conditionnels && !exigeSesOutils(c, lireFichier, existe)) {
+          problemes.push(`${ou} : le harnais \`${c}\` se saute sous condition sans rendre son outil obligatoire en CI : lire \`TIRELIRE_STRICT\` et échouer quand l'outil manque (#59).`);
+        }
+      }
     }
     const nom = new RegExp(`^VM-${e.id}-[a-z0-9]+(?:-[a-z0-9]+)*$`);
     for (const v of e.verifications) {
@@ -417,14 +423,17 @@ export function analyserTests(source) {
     const chaine = chaines.get(premier(ouvrante));
     const modificateurs = m[3].replace(/\s/g, '').split('.');
     let inactif = m[1] === 'x' || modificateurs.includes('skip') || modificateurs.includes('todo');
+    let conditionnel = modificateurs.includes('skipIf') || modificateurs.includes('runIf');
     const options = chaine && masque.slice(chaine.fin + 1).match(/^\s*,\s*\{/);
     if (options) {
       const accolade = chaine.fin + options[0].length;
+      const texteOptions = masque.slice(accolade, fermante(masque, accolade));
       // `{ skip: true }` ou `{ todo: 'raison' }` désactivent ; `{ skip: !php }` est conditionnel, comme skipIf.
-      inactif ||= /\b(?:skip|todo)\s*:\s*(?:true\b|['"`])/.test(masque.slice(accolade, fermante(masque, accolade)));
+      inactif ||= /\b(?:skip|todo)\s*:\s*(?:true\b|['"`])/.test(texteOptions);
+      conditionnel ||= /\b(?:skip|todo)\s*:\s*(?!true\b|false\b|null\b|undefined\b|0\b|['"`])\S/.test(texteOptions);
     }
     const titre = chaine?.valeur == null ? null : chaine.valeur.replace(/\s+/g, ' ').trim();
-    appels.push({ titre, suite: m[2] === 'describe' || m[2] === 'suite', inactif, ouvrante, fin });
+    appels.push({ titre, suite: m[2] === 'describe' || m[2] === 'suite', inactif, conditionnel, ouvrante, fin });
   }
   const englobantes = (a) => appels.filter((b) => b !== a && b.suite && b.ouvrante < a.ouvrante && a.ouvrante < b.fin);
   const tourne = (a) =>
@@ -434,7 +443,25 @@ export function analyserTests(source) {
   const actifs = new Set();
   const inactifs = new Set();
   for (const a of appels) if (a.titre !== null) (tourne(a) ? actifs : inactifs).add(a.titre);
-  return { actifs, inactifs };
+  return { actifs, inactifs, conditionnels: appels.filter((a) => a.conditionnel).length };
+}
+
+/**
+ * Un test qui se saute faute d'outil compte comme un test qui tourne, parce qu'en CI
+ * `TIRELIRE_STRICT` rend l'outil obligatoire (#59). Le fichier, ou un module qu'il importe, doit
+ * donc lire cette variable ailleurs qu'en commentaire.
+ */
+function exigeSesOutils(chemin, lireFichier, existe, vus = new Set()) {
+  if (vus.has(chemin) || vus.size > 20) return false;
+  vus.add(chemin);
+  const source = lireFichier(chemin) ?? '';
+  if (/\bTIRELIRE_STRICT\b/.test(masquer(source).masque)) return true;
+  for (const m of source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g)) {
+    const cible = posix.join(posix.dirname(chemin), m[1]);
+    const trouve = [cible, cible.replace(/\.[mc]?js$/, '.ts'), `${cible}.ts`, `${cible}.mjs`, `${cible}.js`, `${cible}/index.ts`].find((x) => existe.has(x));
+    if (trouve && exigeSesOutils(trouve, lireFichier, existe, vus)) return true;
+  }
+  return false;
 }
 
 /** Titres des suites et des tests qui tournent, écrits en toutes lettres. */
