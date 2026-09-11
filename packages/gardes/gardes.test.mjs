@@ -397,3 +397,41 @@ test("une case cochée à l'ouverture ou juste avant un push n'est pas une valid
   assert.match(texte(avantPush.enAttente), /La PR a changé pendant la validation/);
   assert.equal(push.etat.descriptions, 0, 'une vérification en retard ne décoche rien');
 });
+
+// ─── Formes voisines et tests nommés (#59) ────────────────────────────────────────────────────
+
+test('un identifiant écrit sous une forme voisine est refusé en le nommant, dans les documents comme au registre', () => {
+  const { ids, illisibles } = V.lireIdentifiants(
+    '## I1 · Premier\n\n## I2 — Voisin\n### I3 · Trop bas\n\n- **U1 · Usage lu.** Oui.\n- **U2** · Voisin.\n## C1 · Dans le mauvais document\n',
+    '## C1 · Contrainte\n## c2 · En minuscules\n',
+  );
+  assert.deepEqual([...ids.keys()], ['I1', 'U1', 'C1']);
+  assert.deepEqual(illisibles.map((p) => p.split(' ')[0]), ['I2', 'I3', 'U2', 'C1', 'C2']);
+  assert.match(illisibles[0], /un invariant s'écrit « ## I2 · Titre » dans docs\/invariants\.md/);
+  assert.match(illisibles[3], /une contrainte s'écrit « ## C1 · Titre » dans docs\/contraintes\.md/);
+  assert.match(texte(V.lireRegistre('## I1 — Voisin\n\n- **Harnais** · `a.test.ts` — garde.\n').problemes), /I1 n'est pas lu ; une entrée s'écrit « ## I1 · Titre »/);
+});
+
+test("un test nommé au registre se cherche parmi les titres des tests, pas n'importe où dans le fichier", () => {
+  const source = [
+    "describe('positions et soldes (D19, D29)', () => {",
+    '  it("budget construit par l\'assistant (D40)", () => {});',
+    '  test.skip(`un titre en gabarit`, () => {});',
+    "  expect(/x/.test('pas un titre')).toBe(true);",
+    '});',
+    '// le test nommé, cité dans un commentaire',
+  ].join('\n');
+  assert.deepEqual([...V.titresDeTests(source)], ['positions et soldes (D19, D29)', "budget construit par l'assistant (D40)", 'un titre en gabarit']);
+  assert.equal(V.testNomme("« budget construit par  l'assistant (D40) » : sans aucune opération"), "budget construit par l'assistant (D40)");
+  assert.equal(V.testNomme('moteur de règles de classement.'), null);
+
+  const documents = {
+    invariants: '## I1 · Premier\n',
+    contraintes: '',
+    gardes: '## I1 · Premier\n\n- **Harnais** · `a/un.test.ts`, `a/deux.test.ts` — « le test\n  nommé » : garde I1.\n',
+    fichiers: ['a/un.test.ts', 'a/deux.test.ts'],
+  };
+  const couverture = (contenus) => V.verifierCouvertureTextes({ ...documents, lireFichier: (c) => contenus[c] ?? null }).problemes;
+  assert.deepEqual(couverture({ 'a/deux.test.ts': "it('le test nommé', () => {});" }), []);
+  assert.match(texte(couverture({ 'a/un.test.ts': "// le test nommé\nit('un autre', () => {});" })), /le test « le test nommé » n'est dans aucun de `a\/un\.test\.ts`, `a\/deux\.test\.ts`/);
+});

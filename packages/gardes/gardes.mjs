@@ -117,24 +117,55 @@ function couper(texte) {
 // ─── Documents sources ───────────────────────────────────────────────────────────────────────
 
 /** Identifiants définis : titres `## I…` et usages `- **U… · …**` des invariants, titres `## C…` des contraintes. */
+/** Forme d'une définition, par famille : ce qui s'ouvre sur un identifiant sans elle est refusé (#59). */
+const DEFINITIONS = {
+  I: { nature: 'un invariant', document: DOCUMENTS.invariants, forme: (id) => `« ## ${id} · Titre »` },
+  U: { nature: 'un usage', document: DOCUMENTS.invariants, forme: (id) => `« - **${id} · Titre.** », dans la liste d'I3` },
+  C: { nature: 'une contrainte', document: DOCUMENTS.contraintes, forme: (id) => `« ## ${id} · Titre »` },
+};
+/** Un titre, ou le gras qui ouvre un élément de liste, commence par un identifiant. */
+const OUVRE_TITRE = /^ {0,3}#{1,6}\s+\**\s*([IUC]\d+)\b/i;
+const OUVRE_GRAS = /^\s*[-*+]\s+\*\*\s*([IUC]\d+)\b/i;
+
+/** Message pour une ligne qui s'ouvre sur un identifiant sans avoir la forme de sa définition. */
+function formeRefusee(id, ligne, source) {
+  const { nature, document, forme } = DEFINITIONS[id[0]];
+  return `${id} n'est pas lu : « ${ligne.trim()} » (${source}) s'ouvre sur un identifiant sans en avoir la forme ; ${nature} s'écrit ${forme(id)} dans ${document}.`;
+}
+
 export function lireIdentifiants(invariants, contraintes) {
   const ids = new Map();
   const doublons = [];
+  const illisibles = [];
   const ajouter = (id, titre, source) => {
     if (ids.has(id)) doublons.push(`${id} est défini deux fois (${ids.get(id).source}, ${source}).`);
     else ids.set(id, { id, titre: titre.trim(), source });
   };
-  for (const ligne of String(invariants).split(/\r?\n/)) {
-    const invariant = ligne.match(/^##\s+(I\d+)\s+·\s+(.+?)\s*$/);
-    if (invariant) ajouter(invariant[1], invariant[2], DOCUMENTS.invariants);
-    const usage = ligne.match(/^\s*[-*]\s+\*\*(U\d+)\s+·\s+(.+?)\.?\*\*/);
-    if (usage) ajouter(usage[1], usage[2], DOCUMENTS.invariants);
-  }
-  for (const ligne of String(contraintes).split(/\r?\n/)) {
-    const contrainte = ligne.match(/^##\s+(C\d+)\s+·\s+(.+?)\s*$/);
-    if (contrainte) ajouter(contrainte[1], contrainte[2], DOCUMENTS.contraintes);
-  }
-  return { ids, doublons };
+  const lire = (texte, source) => {
+    for (const ligne of String(texte).split(/\r?\n/)) {
+      const dansInvariants = source === DOCUMENTS.invariants;
+      const invariant = dansInvariants && ligne.match(/^##\s+(I\d+)\s+·\s+(.+?)\s*$/);
+      if (invariant) {
+        ajouter(invariant[1], invariant[2], source);
+        continue;
+      }
+      const usage = dansInvariants && ligne.match(/^\s*[-*]\s+\*\*(U\d+)\s+·\s+(.+?)\.?\*\*/);
+      if (usage) {
+        ajouter(usage[1], usage[2], source);
+        continue;
+      }
+      const contrainte = !dansInvariants && ligne.match(/^##\s+(C\d+)\s+·\s+(.+?)\s*$/);
+      if (contrainte) {
+        ajouter(contrainte[1], contrainte[2], source);
+        continue;
+      }
+      const voisine = ligne.match(OUVRE_TITRE) ?? ligne.match(OUVRE_GRAS);
+      if (voisine) illisibles.push(formeRefusee(voisine[1].toUpperCase(), ligne, source));
+    }
+  };
+  lire(invariants, DOCUMENTS.invariants);
+  lire(contraintes, DOCUMENTS.contraintes);
+  return { ids, doublons, illisibles };
 }
 
 // ─── Registre ────────────────────────────────────────────────────────────────────────────────
@@ -158,6 +189,8 @@ export function lireRegistre(texte) {
         suite = null;
         const m = titre[1].match(/^([IUC]\d+)\s+·\s+(.+)$/);
         if (!m) {
+          const voisine = titre[1].match(/^\**\s*([IUC]\d+)\b/i);
+          if (voisine) problemes.push(`${ou} : ${voisine[1].toUpperCase()} n'est pas lu ; une entrée s'écrit « ## ${voisine[1].toUpperCase()} · Titre ».`);
           entree = null;
         } else if (entrees.has(m[1])) {
           problemes.push(`${ou} : ${m[1]} a déjà une entrée.`);
@@ -226,10 +259,10 @@ function estGardee(id, entrees, enCours = new Set()) {
 
 // ─── Couverture ──────────────────────────────────────────────────────────────────────────────
 
-export function verifierCouvertureTextes({ invariants, contraintes, gardes, fichiers }) {
-  const { ids, doublons } = lireIdentifiants(invariants, contraintes);
+export function verifierCouvertureTextes({ invariants, contraintes, gardes, fichiers, lireFichier }) {
+  const { ids, doublons, illisibles } = lireIdentifiants(invariants, contraintes);
   const { entrees, problemes } = lireRegistre(gardes);
-  problemes.unshift(...doublons);
+  problemes.unshift(...doublons, ...illisibles);
   const existe = new Set(fichiers);
 
   for (const { id, titre, source } of ids.values()) {
@@ -250,6 +283,11 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
       for (const chemin of h.chemins) {
         if (!existe.has(chemin)) problemes.push(`${ou} : le harnais \`${chemin}\` n'existe pas (renommé ou supprimé ?).`);
       }
+      const nom = testNomme(h.description);
+      const presents = h.chemins.filter((c) => existe.has(c));
+      if (nom && lireFichier && presents.length && !presents.some((c) => titresDeTests(lireFichier(c) ?? '').has(nom))) {
+        problemes.push(`${ou} : le test « ${nom} » n'est dans aucun de ${presents.map((c) => `\`${c}\``).join(', ')} (renommé ou supprimé ?).`);
+      }
     }
     const nom = new RegExp(`^VM-${e.id}-[a-z0-9]+(?:-[a-z0-9]+)*$`);
     for (const v of e.verifications) {
@@ -265,6 +303,24 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
     if (!estGardee(e.id, entrees)) problemes.push(`${ou} : ni harnais, ni vérification manuelle, ni renvoi vers des entrées gardées.`);
   }
   return { problemes, ids, entrees };
+}
+
+/** Nom du test qu'une ligne « Harnais » désigne : entre guillemets, en tête de ce qu'elle garde (#59). */
+export function testNomme(description) {
+  const m = String(description ?? '').match(/^«\s*(.+?)\s*»/);
+  return m ? m[1].replace(/\s+/g, ' ') : null;
+}
+
+const TITRE_DE_TEST =
+  /(?<![\w$.])(?:describe|suite|context|it|test)(?:\.(?:only|skip|todo|concurrent|sequential|fails))*\s*\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.|\$(?!\{))*)`)/g;
+
+/** Titres des `describe`, `it` et `test` d'un fichier de tests, écrits en toutes lettres. */
+export function titresDeTests(source) {
+  const titres = new Set();
+  for (const m of String(source).matchAll(TITRE_DE_TEST)) {
+    titres.add((m[1] ?? m[2] ?? m[3] ?? '').replace(/\\(.)/g, '$1').replace(/\s+/g, ' ').trim());
+  }
+  return titres;
 }
 
 /** Couverture des documents du dépôt. */
@@ -283,6 +339,13 @@ export function verifierCouverture(racine = RACINE) {
     contraintes: lire(DOCUMENTS.contraintes),
     gardes: lire(DOCUMENTS.gardes),
     fichiers: fichiersDuDepot(racine),
+    lireFichier: (chemin) => {
+      try {
+        return readFileSync(join(racine, chemin), 'utf8');
+      } catch {
+        return null;
+      }
+    },
   });
   resultat.problemes.unshift(...manquants);
   return resultat;
