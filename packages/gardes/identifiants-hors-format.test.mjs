@@ -5,7 +5,8 @@
  * y compris une entrée qu'on vient d'ajouter ». Le harnais d'amorçage le montre pour un ajout écrit
  * exactement comme les entrées existantes (`## I99 · …`). Celui-ci essaie les formes voisines qu'un
  * rédacteur emploie sans y penser : un autre séparateur que le point médian, un titre d'un autre
- * niveau, un usage dont seul l'identifiant est en gras.
+ * niveau, un usage dont seul l'identifiant est en gras, un usage en liste numérotée ou en gras
+ * souligné : GitHub affiche ces deux derniers comme un usage (ajoutés après le correctif `5da4f4d`).
  *
  * Un identifiant qui ouvre un titre, ou le gras d'un élément de liste, définit un invariant, un usage
  * ou une contrainte. La garde peut reconnaître la forme ou la refuser : les deux répondent au besoin,
@@ -150,6 +151,8 @@ const FORMES_VOISINES = [
   ['U99', 'un usage en « - **U99 — ….** »', INVARIANTS, (t) => ajouterUsage(t, `- **U99 — Usage ${MOT}.** Sans entrée au registre.`)],
   ['U99', 'un usage en « - **U99** · … »', INVARIANTS, (t) => ajouterUsage(t, `- **U99** · Usage ${MOT}. Sans entrée au registre.`)],
   ['U99', 'un usage en « ### U99 · »', INVARIANTS, (t) => ajouterUsageEnTitre(t, `### U99 · Usage ${MOT}`)],
+  ['U99', 'un usage en liste numérotée « 1. **U99 · ….** »', INVARIANTS, (t) => ajouterUsage(t, `1. **U99 · Usage ${MOT}.** Sans entrée au registre.`)],
+  ['U99', 'un usage en gras souligné « - __U99 · ….__ »', INVARIANTS, (t) => ajouterUsage(t, `- __U99 · Usage ${MOT}.__ Sans entrée au registre.`)],
   ['C99', 'une contrainte en « ## C99 — »', CONTRAINTES, (t) => ajouterTitre(t, `## C99 — Contrainte ${MOT}`)],
 ];
 
