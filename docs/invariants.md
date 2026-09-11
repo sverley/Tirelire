@@ -77,9 +77,9 @@ sessions et des plateformes d'une même personne ou des appareils de plusieurs p
 - **Mise en relation.** Deux instances se relient par le partage d'un QR code, en mode simple et
   complètement automatique, ou par un processus qui ne demande pas d'appareil photo, entre deux
   sessions sur ordinateur.
-- **Synchronisation asynchrone.** Une fois les instances reliées, une instance web de
-  l'application peut servir de serveur relais : elle stocke temporairement les paquets, pour que
-  des instances qui ne sont pas connectées en même temps se synchronisent. Ce relais n'est pas
+- **Synchronisation asynchrone.** Une fois les instances reliées, un serveur relais — une instance
+  web de l'application, ou le relais installé seul (I9) — stocke temporairement les paquets, pour
+  que des instances qui ne sont pas connectées en même temps se synchronisent. Ce relais n'est pas
   présenté comme privé.
 - **Consentement averti.** Cette possibilité est proposée à l'utilisateur lors de sa première
   mise en lien de deux sessions, avec un avertissement : des données chiffrées seront déposées sur
@@ -88,6 +88,10 @@ sessions et des plateformes d'une même personne ou des appareils de plusieurs p
 ## I9 · Plusieurs distributions
 
 L'application se distribue par un serveur web et en application Android, et à terme sur Apple.
+
+Le relais de synchronisation (I8) est un seul code, distribué de deux façons : embarqué dans la
+distribution web, et seul, dans une release, pour qu'un utilisateur l'installe sur un serveur sans
+l'application web entière.
 
 ---
 
@@ -102,3 +106,5 @@ L'application se distribue par un serveur web et en application Android, et à t
   appareil photo, relais web temporaire proposé avec un avertissement.
 - **2026-09-11** · I8 élargi d'après la correction du porteur : la synchronisation ne se limite pas
   à un même utilisateur, elle vaut entre les instances qui partagent les clés de chiffrement.
+- **2026-09-11** · I8 et I9 précisés d'après le complément du porteur sur le relais : un seul code,
+  embarqué dans la distribution web et publié seul dans une release.
