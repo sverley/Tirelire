@@ -276,6 +276,7 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
   }
 
   const definies = new Map();
+  const sautsSousCondition = new Set();
   for (const e of entrees.values()) {
     const ou = `${G}:${e.ligne} · ${e.id}`;
     if (!ids.has(e.id)) problemes.push(`${ou} : ${e.id} n'existe ni dans ${DOCUMENTS.invariants} ni dans ${DOCUMENTS.contraintes}.`);
@@ -299,7 +300,9 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
         }
       }
       for (const c of lireFichier ? presents : []) {
-        if (analyserTests(lireFichier(c) ?? '').conditionnels && !exigeSesOutils(c, lireFichier, existe)) {
+        if (!analyserTests(lireFichier(c) ?? '').conditionnels) continue;
+        sautsSousCondition.add(c);
+        if (!exigeSesOutils(c, lireFichier, existe)) {
           problemes.push(`${ou} : le harnais \`${c}\` se saute sous condition sans rendre son outil obligatoire en CI : lire \`TIRELIRE_STRICT\` et échouer quand l'outil manque (#59).`);
         }
       }
@@ -317,7 +320,60 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
     }
     if (!estGardee(e.id, entrees)) problemes.push(`${ou} : ni harnais, ni vérification manuelle, ni renvoi vers des entrées gardées.`);
   }
+  // Un harnais qui se saute faute d'outil ne compte que parce que la CI rend l'outil obligatoire (#59, D62).
+  if (sautsSousCondition.size && !etapeTestsStricte(lireFichier(CI_WORKFLOW))) {
+    problemes.push(
+      `${CI_WORKFLOW} : l'étape « pnpm test » ne pose pas \`TIRELIRE_STRICT\`, alors que ${listeCourte([...sautsSousCondition].sort())} se sautent faute d'outil : ils passeraient pour verts en CI.`,
+    );
+  }
   return { problemes, ids, entrees };
+}
+
+export const CI_WORKFLOW = '.github/workflows/ci.yml';
+
+/**
+ * L'étape `pnpm test` du workflow pose-t-elle `TIRELIRE_STRICT` à une valeur vraie, dans son `env`,
+ * celui de son job ou celui du workflow ? Lecture par renfoncement, commentaires retirés, sans
+ * dépendance YAML : la forme du `ci.yml` du dépôt, pas toutes celles que YAML permet.
+ */
+export function etapeTestsStricte(yaml) {
+  const lignes = String(yaml ?? '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => l.replace(/(^|\s)#.*$/, '').replace(/\s+$/, ''));
+  const renfoncement = (l) => l.length - l.trimStart().length;
+  const finDuBloc = (debut) => {
+    let fin = debut + 1;
+    while (fin < lignes.length && (!lignes[fin].trim() || renfoncement(lignes[fin]) > renfoncement(lignes[debut]))) fin++;
+    return fin;
+  };
+  const posee = (debut, fin, niveau) => {
+    for (let i = debut; i < fin; i++) {
+      if (renfoncement(lignes[i]) !== niveau || !/^\s*env:$/.test(lignes[i])) continue;
+      for (let j = i + 1; j < fin && (!lignes[j].trim() || renfoncement(lignes[j]) > niveau); j++) {
+        const m = lignes[j].match(/^\s*TIRELIRE_STRICT\s*:\s*(.*)$/);
+        if (m && !/^(?:['"]?(?:0|false)?['"]?)$/i.test(m[1].trim())) return true;
+      }
+    }
+    return false;
+  };
+  const etape = lignes.findIndex((l) => /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test$/.test(l));
+  if (etape < 0) return false;
+  let tiret = etape;
+  if (!/^\s*-\s/.test(lignes[etape])) {
+    do tiret--;
+    while (tiret >= 0 && !(/^\s*-\s/.test(lignes[tiret]) && renfoncement(lignes[tiret]) < renfoncement(lignes[etape])));
+  }
+  if (tiret < 0) return false;
+  if (posee(tiret + 1, finDuBloc(tiret), renfoncement(lignes[tiret]) + 2)) return true;
+  let steps = tiret;
+  while (steps >= 0 && !(/^\s*steps:$/.test(lignes[steps]) && renfoncement(lignes[steps]) < renfoncement(lignes[tiret]))) steps--;
+  if (steps >= 0) {
+    let job = steps;
+    while (job >= 0 && !(lignes[job].trim() && renfoncement(lignes[job]) < renfoncement(lignes[steps]))) job--;
+    if (job >= 0 && posee(job + 1, finDuBloc(job), renfoncement(lignes[steps]))) return true;
+  }
+  return posee(0, lignes.length, 0);
 }
 
 /** Nom du test qu'une ligne « Harnais » désigne : entre guillemets, en tête de ce qu'elle garde (#59). */

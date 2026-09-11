@@ -471,7 +471,9 @@ test("un harnais du registre qui se saute faute d'outil doit rendre l'outil obli
     gardes: '## I1 · Premier\n\n- **Harnais** · `a/outil.test.mjs` — garde I1.\n',
     fichiers: ['a/outil.test.mjs', 'a/harnais.ts'],
   };
-  const couverture = (contenus) => V.verifierCouvertureTextes({ ...documents, lireFichier: (c) => contenus[c] ?? null }).problemes;
+  const CI_STRICTE = "jobs:\n  test:\n    steps:\n      - run: pnpm test\n        env:\n          TIRELIRE_STRICT: '1'\n";
+  const couverture = (contenus) =>
+    V.verifierCouvertureTextes({ ...documents, lireFichier: (c) => ({ '.github/workflows/ci.yml': CI_STRICTE, ...contenus })[c] ?? null }).problemes;
   const saute = "const present = false;\ntest('avec outil', { skip: !present && 'absent' }, () => {});\n";
   assert.match(
     texte(couverture({ 'a/outil.test.mjs': `// TIRELIRE_STRICT, cité en commentaire, ne suffit pas\n${saute}` })),
@@ -485,5 +487,22 @@ test("un harnais du registre qui se saute faute d'outil doit rendre l'outil obli
     }),
     [],
   );
-  assert.deepEqual(couverture({ 'a/outil.test.mjs': "test('sans condition', () => {});\n" }), []);
+  assert.deepEqual(couverture({ 'a/outil.test.mjs': "test('sans condition', () => {});\n", '.github/workflows/ci.yml': '' }), []);
+  const strict = saute.replace('!present &&', '!present && !process.env.TIRELIRE_STRICT &&');
+  assert.match(texte(couverture({ 'a/outil.test.mjs': strict, '.github/workflows/ci.yml': 'jobs: {}\n' })), /\.github\/workflows\/ci\.yml : l'étape « pnpm test » ne pose pas `TIRELIRE_STRICT`, alors que a\/outil\.test\.mjs se sautent faute d'outil/);
+});
+
+test("l'étape pnpm test de la CI pose TIRELIRE_STRICT, dans son env, celui du job ou celui du workflow", () => {
+  const ci = (etape, { job = '', workflow = '' } = {}) =>
+    `name: CI\n${workflow}jobs:\n  test:\n    runs-on: ubuntu-latest\n${job}    steps:\n      - uses: actions/checkout@v4\n${etape}      - run: pnpm build\n`;
+  const strict = "        env:\n          TIRELIRE_STRICT: '1'\n";
+  assert.equal(V.etapeTestsStricte(ci(`      - run: pnpm test\n${strict}`)), true);
+  assert.equal(V.etapeTestsStricte(ci(`      - name: Tests\n        run: pnpm test\n${strict}`)), true);
+  assert.equal(V.etapeTestsStricte(ci('      - run: pnpm test\n', { job: "    env:\n      TIRELIRE_STRICT: '1'\n" })), true);
+  assert.equal(V.etapeTestsStricte(ci('      - run: pnpm test\n', { workflow: "env:\n  TIRELIRE_STRICT: '1'\n" })), true);
+  assert.equal(V.etapeTestsStricte(ci("      - run: pnpm test\n        env:\n          # TIRELIRE_STRICT: '1'\n")), false);
+  assert.equal(V.etapeTestsStricte(ci("      - run: pnpm test\n        env:\n          TIRELIRE_STRICT: '0'\n")), false);
+  assert.equal(V.etapeTestsStricte(ci('      - run: pnpm test\n').replace('      - run: pnpm build\n', `      - run: pnpm build\n${strict}`)), false);
+  assert.equal(V.etapeTestsStricte(''), false);
+  assert.equal(V.etapeTestsStricte(lire(V.CI_WORKFLOW)), true);
 });
