@@ -164,8 +164,10 @@ const { entrees } = lireRegistre(GARDES);
 const pr = (corps, fichiersModifies = []) => verifierPr({ entrees, corps, fichiersModifies });
 const section = (touches, masques, verifications = '') =>
   `Pour #1 : rien.\n\n## Ce qui change\n\nRien.\n\n## Invariants et contraintes\n\nTouchés : ${touches}\nLien possible masqué : ${masques}\n\n### Vérifications manuelles\n\n${verifications}\n## Après\n\nFin.\n`;
+/** Consigne du registre inventé, recopiée comme `demander` l'écrit (tranché dans #60). */
+const consigneDe = (cle) => [...entrees.values()].flatMap((e) => e.verifications).find((v) => v.id === cle)?.description ?? '';
 const item = (cle, { analyse = "La PR change l'écran Plan : le regarder à 375 px.", cochee = false } = {}) =>
-  `- \`${cle}\` · consigne\n  - Analyse (agent, 2026-09-11) : ${analyse}\n  - [${cochee ? 'x' : ' '}] Validée par un développeur humain\n`;
+  `- \`${cle}\` · essai${consigneDe(cle) ? ` — ${consigneDe(cle)}` : ''}\n  - Analyse (agent, 2026-09-11) : ${analyse}\n  - [${cochee ? 'x' : ' '}] Validée par un développeur humain\n`;
 
 test("une PR sans section, ou avec la section du modèle laissée telle quelle, est refusée", () => {
   assert.match(texte(pr('Pour #1 : rien.').aCorriger), /pas de section « ## Invariants et contraintes »/);
@@ -209,6 +211,24 @@ test('les commentaires ne comptent pas, un identifiant ou une vérification inco
   assert.match(texte(commentee.aCorriger), /I7 est déclaré mais n'a pas d'entrée/);
   assert.deepEqual(commentee.validees, []);
   assert.match(texte(pr(section('aucun', 'aucun', item('VM-C1-apareil', { cochee: true }))).aCorriger), /`VM-C1-apareil` n'est ni une vérification manuelle/);
+});
+
+test('une vérification manuelle recopie sa consigne du registre, coupée ou non, et la déclaration se lit comme GitHub l’affiche (#60)', () => {
+  const avec = (tete, suite = '') => section('U2', 'aucun', `- \`VM-U2-parcours\` · U2${tete}\n${suite}  - Analyse (agent, 2026-09-11) : relu.\n  - [x] Validée par un développeur humain\n`);
+  assert.deepEqual(pr(avec(` — ${consigneDe('VM-U2-parcours')}`)).aCorriger, []);
+  assert.deepEqual(pr(avec(' — Suivre le second parcours', "  sur une base vide et constater qu'il aboutit.\n")).aCorriger, []);
+  assert.match(texte(pr(avec('')).aCorriger), /`VM-U2-parcours` : consigne à recopier/);
+  assert.match(texte(pr(avec(' — Suivre le second parcours')).aCorriger), /`VM-U2-parcours` : la consigne diffère/);
+
+  const declares = (touches, masques = 'aucun') => pr(section(touches, masques)).declares;
+  assert.deepEqual(declares('u1, C1'), ['U1', 'C1']);
+  assert.deepEqual(declares('U1 à U2'), ['U1', 'U2']);
+  assert.deepEqual(declares('U1,\nC1'), ['U1', 'C1']);
+  assert.match(texte(pr(section('U2–C1', 'aucun')).aCorriger), /n'est pas une plage/);
+  assert.match(texte(pr(section('aucun', 'aucun\nTouchés : C1')).aCorriger), /La ligne « Touchés : » figure 2 fois/);
+  const exemple = 'Exemple :\n\n~~~\n## Invariants et contraintes\n\nTouchés : aucun\n~~~\n\n';
+  assert.deepEqual(pr(exemple + section('C1', 'aucun')).declares, ['C1']);
+  assert.match(texte(pr(section('aucun', 'aucun') + '\n## Invariants et contraintes\n').aCorriger), /figure 2 fois/);
 });
 
 test('retirer une vérification manuelle ou un harnais du registre demande la même validation', () => {

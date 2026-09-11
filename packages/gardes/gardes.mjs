@@ -331,43 +331,111 @@ function demandes(entrees, entreesAvant, declares) {
   const requises = new Map();
   for (const id of declares) {
     for (const v of verificationsDe(id, entrees)) {
-      if (!requises.has(v.id)) requises.set(v.id, { cle: v.id, pourquoi: v.entree === id ? id : `${id}, par ${v.entree}`, description: v.description });
+      if (!requises.has(v.id)) requises.set(v.id, { cle: v.id, pourquoi: v.entree === id ? id : `${id}, par ${v.entree}`, description: v.description, consigne: v.description });
     }
   }
   for (const r of retraits(entreesAvant, entrees)) {
-    if (!requises.has(r.cle)) requises.set(r.cle, { cle: r.cle, pourquoi: r.genre, description: r.description });
+    if (!requises.has(r.cle)) requises.set(r.cle, { cle: r.cle, pourquoi: r.genre, description: r.description, ...(r.genre === 'vérification manuelle retirée' ? { consigne: r.description } : {}) });
   }
   return requises;
 }
 
-/** Lit la section « ## Invariants et contraintes » d'une description de PR ; `null` si elle manque. */
-export function lireDescriptionPr(corps) {
-  const lignes = String(corps ?? '')
+/**
+ * Lignes d'une description telles que GitHub les montre en texte : commentaires HTML retirés, blocs
+ * de code clôturés (trois accents graves ou tildes ou plus) vidés. Un exemple de section cité en code
+ * n'est donc jamais lu comme la déclaration de la PR (#60).
+ */
+function lignesHorsCode(corps) {
+  let cloture = null;
+  return String(corps ?? '')
     .replace(/\r\n?/g, '\n')
     .replace(/<!--[\s\S]*?-->/g, '')
-    .split('\n');
-  const debut = lignes.findIndex((l) => /^##\s+Invariants et contraintes\s*$/i.test(l.trim()));
-  if (debut < 0) return null;
-  const fin = lignes.findIndex((l, i) => i > debut && /^#{1,2}\s/.test(l));
+    .split('\n')
+    .map((ligne) => {
+      const m = ligne.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+      if (cloture) {
+        if (m && m[1][0] === cloture[0] && m[1].length >= cloture.length && !m[2].trim()) cloture = null;
+        return '';
+      }
+      if (m && !(m[1][0] === '`' && m[2].includes('`'))) {
+        cloture = m[1];
+        return '';
+      }
+      return ligne;
+    });
+}
+
+/**
+ * Titres et étiquettes ne se lisent qu'à trois espaces de renfoncement au plus : au-delà, GitHub
+ * affiche un bloc de code.
+ */
+const TITRE_SECTION = /^ {0,3}##\s+Invariants et contraintes\s*#*\s*$/i;
+const ETIQUETTES_PR = [
+  ['Touchés', /^ {0,3}Touch[ée]s\s*:/i],
+  ['Lien possible masqué', /^ {0,3}Liens?\s+possibles?\s+masqu[ée]s?\s*:/i],
+];
+/** Plage d'identifiants : « U1 à U3 », « U1–U3 », « U1-U3 ». */
+const PLAGE = /\b([IUC])(\d+)\s*(?:à|au|–|—|-)\s*([IUC])(\d+)\b/gi;
+const IDENTIFIANT_PR = /\b([IUC]\d+)\b/gi;
+
+/** Identifiants d'une déclaration, en majuscules, plages dépliées ; une plage incohérente est refusée. */
+function lireIdsDeclares(valeur, nom, problemes) {
+  const ids = [];
+  const reste = valeur.replace(PLAGE, (tout, l1, n1, l2, n2) => {
+    const [a, b] = [Number(n1), Number(n2)];
+    if (l1.toUpperCase() !== l2.toUpperCase() || b <= a) {
+      problemes.push(`« ${nom} : » : « ${tout} » n'est pas une plage d'une même famille dans l'ordre (écrire par exemple U1 à U3, ou énumérer).`);
+    } else {
+      for (let n = a; n <= b; n++) ids.push(`${l1.toUpperCase()}${n}`);
+    }
+    return ' ';
+  });
+  for (const m of reste.matchAll(IDENTIFIANT_PR)) ids.push(m[1].toUpperCase());
+  return ids;
+}
+
+/**
+ * Lit la section « ## Invariants et contraintes » d'une description de PR ; `null` si elle manque.
+ * `problemes` : ce que la lecture refuse plutôt que de le deviner (section ou ligne en double, plage
+ * incohérente).
+ */
+export function lireDescriptionPr(corps) {
+  const lignes = lignesHorsCode(corps);
+  const debuts = lignes.flatMap((l, i) => (TITRE_SECTION.test(l) ? [i] : []));
+  if (!debuts.length) return null;
+  const problemes = [];
+  if (debuts.length > 1) problemes.push(`La section « ## Invariants et contraintes » figure ${debuts.length} fois : n'en garder qu'une.`);
+  const debut = debuts[0];
+  const fin = lignes.findIndex((l, i) => i > debut && /^ {0,3}#{1,2}(\s|$)/.test(l));
   const section = lignes.slice(debut + 1, fin < 0 ? undefined : fin);
 
-  const declaration = (etiquette) => {
-    const ligne = section.find((l) => etiquette.test(l));
-    if (ligne === undefined) return { absente: true, ids: [], aucun: false };
-    const valeur = ligne.replace(etiquette, '').trim();
-    const ids = [...valeur.matchAll(IDENTIFIANT)].map((m) => m[1]);
-    return { absente: false, ids, aucun: !ids.length && /^aucun[es]*\.?$/i.test(valeur) };
+  // Une déclaration se poursuit sur les lignes suivantes, comme GitHub l'affiche, jusqu'à une ligne
+  // vide, une puce, un titre ou l'autre étiquette.
+  const finDeDeclaration = (l) =>
+    !l.trim() || /^\s*(?:[-*+]|\d+[.)])\s/.test(l) || /^ {0,3}#{1,6}(\s|$)/.test(l) || ETIQUETTES_PR.some(([, e]) => e.test(l));
+  const declaration = ([nom, etiquette]) => {
+    const indices = section.flatMap((l, i) => (etiquette.test(l) ? [i] : []));
+    if (!indices.length) return { absente: true, ids: [], aucun: false };
+    if (indices.length > 1) problemes.push(`La ligne « ${nom} : » figure ${indices.length} fois : tout déclarer sur une seule.`);
+    const morceaux = [section[indices[0]].replace(etiquette, '')];
+    for (let j = indices[0] + 1; j < section.length && !finDeDeclaration(section[j]); j++) morceaux.push(section[j]);
+    const valeur = morceaux.map((m) => m.trim()).join(' ').trim();
+    const avant = problemes.length;
+    const ids = lireIdsDeclares(valeur, nom, problemes);
+    return { absente: false, ids, aucun: !ids.length && problemes.length === avant && /^aucun[es]*\.?$/i.test(valeur) };
   };
 
   const items = [];
   let item = null;
   let dansAnalyse = false;
+  let dansTete = false;
   for (const ligne of section) {
-    const tete = ligne.match(/^[-*]\s+(?:\[[ xX]\]\s+)?`([^`]+)`/);
+    const tete = ligne.match(/^[-*]\s+(?:\[[ xX]\]\s+)?`([^`]+)`(.*)$/);
     if (tete) {
-      item = { cle: tete[1].trim(), analyse: '', validee: false };
+      item = { cle: tete[1].trim(), consigne: couper(tete[2])[1], analyse: '', validee: false };
       items.push(item);
       dansAnalyse = false;
+      dansTete = true;
       continue;
     }
     if (!item) continue;
@@ -380,20 +448,30 @@ export function lireDescriptionPr(corps) {
     if (analyse) {
       item.analyse = analyse[1].trim();
       dansAnalyse = true;
+      dansTete = false;
     } else if (validation) {
       item.validee = validation[1] !== ' ';
       dansAnalyse = false;
+      dansTete = false;
     } else if (dansAnalyse && ligne.trim()) {
       item.analyse = `${item.analyse} ${ligne.trim()}`.trim();
+    } else if (dansTete && ligne.trim()) {
+      // La consigne recopiée peut être coupée comme dans le registre, avant la première sous-puce.
+      if (/^\s+[-*+]\s/.test(ligne)) dansTete = false;
+      else item.consigne = `${item.consigne} ${ligne.trim()}`.trim();
     }
   }
 
   return {
-    touches: declaration(/^\s*Touch[ée]s\s*:/i),
-    masques: declaration(/^\s*Liens?\s+possibles?\s+masqu[ée]s?\s*:/i),
+    touches: declaration(ETIQUETTES_PR[0]),
+    masques: declaration(ETIQUETTES_PR[1]),
     items,
+    problemes,
   };
 }
+
+/** Deux consignes se comparent mot pour mot, espaces et coupures de ligne mis à part. */
+const memeTexte = (a, b) => String(a ?? '').replace(/\s+/g, ' ').trim() === String(b ?? '').replace(/\s+/g, ' ').trim();
 
 /**
  * Ce qu'une PR doit encore faire. `aCorriger` : la description est incomplète ou fausse ;
@@ -412,6 +490,7 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
     return { aCorriger, enAttente, validees, annulees, nonEnregistrees, declares: [], imposes, requises: new Map() };
   }
 
+  aCorriger.push(...pr.problemes);
   for (const [nom, d] of [
     ['Touchés', pr.touches],
     ['Lien possible masqué', pr.masques],
@@ -440,6 +519,16 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
     if (!listees.has(r.cle)) aCorriger.push(`\`${r.cle}\` (${r.pourquoi}) est demandée mais ne figure pas sous « Vérifications manuelles ».`);
   }
   for (const item of listees.values()) {
+    const consigne = requises.get(item.cle)?.consigne;
+    if (consigne !== undefined && !memeTexte(item.consigne, consigne)) {
+      // Tranché dans #60 : la consigne se recopie, pour que qui valide la lise dans la PR.
+      aCorriger.push(
+        item.consigne.trim()
+          ? `\`${item.cle}\` : la consigne diffère de celle de ${G} ; la recopier mot pour mot après le tiret cadratin (\`demander\` l'écrit).`
+          : `\`${item.cle}\` : consigne à recopier de ${G} après le tiret cadratin (\`demander\` l'écrit).`,
+      );
+      continue;
+    }
     if (ANALYSE_VIDE.test(item.analyse)) aCorriger.push(`\`${item.cle}\` : analyse à écrire, par un développeur ou un agent.`);
     else if (!item.validee) enAttente.push(`\`${item.cle}\` : analysée, en attente de validation par un développeur humain.`);
     else if (!validations) validees.push(item.cle); // hors GitHub : rien pour dire quand la case a été cochée
