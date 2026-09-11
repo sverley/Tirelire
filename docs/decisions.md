@@ -1183,7 +1183,11 @@ téléphone, et `packages/gardes` le relit sans dépendance.
   « Validée ». Retirer une vérification manuelle ou un harnais du registre demande la même
   validation. Cette vérification tourne à part de la CI et se relance quand la description change :
   cocher une case ne rejoue ni tests ni build.
-- **Limites connues.** Sur un dépôt privé de l'offre gratuite, GitHub ne peut pas rendre une
-  vérification obligatoire avant fusion (question posée dans #58). Toutes les sessions écrivent
-  avec le compte du porteur : rien ne distingue une case cochée par un agent ; la règle est écrite
+- **Vert veut dire validé.** Sur un dépôt privé de l'offre gratuite, GitHub ne peut pas rendre une
+  vérification obligatoire avant fusion, et le porteur a choisi le 11 septembre d'y rester (#58) :
+  une fusion reste possible, #62 la fera signaler aussitôt. La couleur de la vérification est donc
+  le seul signal avant de fusionner : elle ne passe au vert que lorsque chaque vérification demandée
+  est analysée et validée, jamais sur leur seule présence.
+- **Limite connue.** Toutes les sessions écrivent avec le compte du porteur : rien ne distingue une
+  case cochée par un agent (question posée dans #58, pour #61). En attendant, la règle est écrite
   dans `CLAUDE.md`.
