@@ -42,4 +42,6 @@
   issue sert.
 - **Harnais et vérifications manuelles (objectif primaire #58).** Chaque invariant et chaque
   contrainte est gardé par un harnais tant que c'est possible. Ce qui ne se programme pas fait
-  l'objet, dans la PR, d'une demande explicite de vérification manuelle, faite avant tout merge.
+  l'objet, dans la PR, d'une demande explicite de vérification manuelle, faite avant tout merge :
+  pour les invariants et contraintes que la PR touche, et pour ceux qui semblent hors de sa portée
+  mais dont le lien pourrait être masqué. Dans le doute, on demande.
