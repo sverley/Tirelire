@@ -4,7 +4,8 @@ Le texte du porteur du projet, conservé **mot pour mot**, sans correction ni re
 ses retours à la ligne sont devenus des paragraphes. **Il fait foi.** Les invariants
 ([`invariants.md`](invariants.md)) en sont tirés ; s'ils s'en écartent, ce sont eux qu'on corrige.
 
-Ce texte ne se réécrit pas. Un complément du porteur s'ajoute en bas, daté, mot pour mot.
+Ce texte ne se reformule pas. Seul le porteur le complète ou le corrige, avec ses propres mots,
+datés ; ce qu'il retire reste visible, barré.
 
 ## 11 septembre 2026
 
@@ -38,4 +39,8 @@ Donné à l'ouverture de l'issue #29.
 
 Réponse au point 1 de l'issue #29 (relais).
 
-> Le projet permet la synchronisation pair a pair des instances d'un même utilisateur. La mise en relation des instances se fait via un partage de qrcode (mode simple et complètement automatique) ou un processus sans besoin d'appareil photo (2 sessions ordinateur). on permet ensuite un stockage temporaire des paquets sur une instances web de l'appli servant de serveur relai (retirer la notion de privé) pour permettre une synchronisation asynchrone. Cette possibilité doit être proposée à l'utilisateur lors de sa première mis en lien de deux sessions avec un avertissement concernant le dépôt de données chiffrées sur le serveur.
+> Le projet permet la synchronisation pair a pair des instances ~~d'un même utilisateur~~. La mise en relation des instances se fait via un partage de qrcode (mode simple et complètement automatique) ou un processus sans besoin d'appareil photo (2 sessions ordinateur). on permet ensuite un stockage temporaire des paquets sur une instances web de l'appli servant de serveur relai (retirer la notion de privé) pour permettre une synchronisation asynchrone. Cette possibilité doit être proposée à l'utilisateur lors de sa première mis en lien de deux sessions avec un avertissement concernant le dépôt de données chiffrées sur le serveur.
+
+Correction du porteur, le même jour :
+
+> J'ai trop réduit le verbatim en ne pensant qu'à un utilisateur, on peut prévoir une synchronisation agnostique tant qu'il y a partage des clés de chiffrement.

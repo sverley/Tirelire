@@ -63,15 +63,16 @@ Classer les opérations par catégorie est aisé et demande peu de clics.
 
 ## I7 · Les données restent en local
 
-Les données sont stockées en local, sur les appareils de l'utilisateur, et non sur un serveur.
+Les données sont stockées en local, sur les appareils, et non sur un serveur.
 Distribuer l'application par un serveur web (I9) n'y déroge pas : le serveur sert l'application,
 pas les données. Une seule exception : le stockage temporaire de paquets chiffrés sur un relais,
 pour la synchronisation asynchrone (I8), que l'utilisateur accepte après avoir été averti.
 
-## I8 · Synchroniser de pair à pair les instances d'un même utilisateur
+## I8 · Synchroniser de pair à pair les instances qui partagent les clés
 
-Les instances d'un même utilisateur, sur ses sessions et ses plateformes, se synchronisent de pair
-à pair.
+Les instances se synchronisent de pair à pair. La synchronisation ne dépend pas de l'utilisateur :
+elle vaut entre toutes les instances qui partagent les clés de chiffrement, qu'il s'agisse des
+sessions et des plateformes d'une même personne ou des appareils de plusieurs personnes.
 
 - **Mise en relation.** Deux instances se relient par le partage d'un QR code, en mode simple et
   complètement automatique, ou par un processus qui ne demande pas d'appareil photo, entre deux
@@ -99,3 +100,5 @@ L'application se distribue par un serveur web et en application Android, et à t
 - **2026-09-11** · I7 et I8 précisés d'après le complément de la description du projet sur la
   synchronisation (point 1 de l'issue #29) : pair à pair, mise en relation par QR code ou sans
   appareil photo, relais web temporaire proposé avec un avertissement.
+- **2026-09-11** · I8 élargi d'après la correction du porteur : la synchronisation ne se limite pas
+  à un même utilisateur, elle vaut entre les instances qui partagent les clés de chiffrement.

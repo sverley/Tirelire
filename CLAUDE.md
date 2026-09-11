@@ -2,7 +2,8 @@
 
 - Langue : français partout (code, commentaires, commits, interface, docs).
 - Lire `docs/description-projet.md` avant tout : le texte du porteur, mot pour mot, qui fait foi.
-  Il ne se reformule ni ne se corrige ; un complément du porteur s'y ajoute daté, tel quel.
+  Il ne se reformule pas ; seul le porteur le complète ou le corrige, avec ses mots, datés, ce qu'il
+  retire restant barré.
 - Lire ensuite `docs/invariants.md` : ce que le produit doit rester, tiré de la description. Une décision se prend au
   regard des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
   une décision.
