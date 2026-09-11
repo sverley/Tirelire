@@ -1,0 +1,36 @@
+name: Vérifications manuelles
+
+# Garde de l'objectif primaire #58 (D61) : la description de la PR déclare les invariants et les
+# contraintes qu'elle touche, et chaque vérification manuelle qui s'y rattache y est analysée puis
+# validée par un développeur humain. Tourne aussi quand la description change : cocher une case
+# relance cette vérification seule, sans rejouer tests ni build.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verifications-manuelles-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verifications:
+    name: Vérifications manuelles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # la base, pour lister les fichiers modifiés et relire l'ancien registre
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # La description passe par l'environnement, jamais dans le script : qui ouvre la PR l'écrit.
+      - name: Invariants et contraintes de la PR
+        env:
+          CORPS: ${{ github.event.pull_request.body }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          TETE: ${{ github.event.pull_request.head.sha }}
+        run: node packages/gardes/cli.mjs pr --base "$BASE" --tete "$TETE"
