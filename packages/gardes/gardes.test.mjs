@@ -99,7 +99,7 @@ test('un invariant, un usage ou une contrainte ajouté sans garde se voit aussit
   assert.match(texte(couverture({ contraintes: `${CONTRAINTES}\n## C2 · Nouvelle\n` })), /^C2 · Nouvelle \(docs\/contraintes\.md\) n'a pas d'entrée/m);
 });
 
-test('dans les vrais documents aussi, un ajout sans garde fait échouer', () => {
+test('dans les vrais documents aussi, un ajout ou un retrait sans garde et un harnais absent font échouer', () => {
   const vrais = {
     invariants: lire(DOCUMENTS.invariants),
     contraintes: lire(DOCUMENTS.contraintes),
@@ -110,6 +110,11 @@ test('dans les vrais documents aussi, un ajout sans garde fait échouer', () => 
   assert.ok(ajoutI.some((p) => p.startsWith('I99 ')), texte(ajoutI));
   const ajoutC = verifierCouvertureTextes({ ...vrais, contraintes: `${vrais.contraintes}\n## C99 · Ajoutée sans garde\n` }).problemes;
   assert.ok(ajoutC.some((p) => p.startsWith('C99 ')), texte(ajoutC));
+  const retrait = verifierCouvertureTextes({ ...vrais, gardes: vrais.gardes.replace(/^## C6 · [\s\S]*?(?=^## C7 · )/m, '') }).problemes;
+  assert.ok(retrait.some((p) => p.startsWith('C6 ')), texte(retrait));
+  const harnais = 'packages/core/test/sync.test.ts';
+  const absent = verifierCouvertureTextes({ ...vrais, fichiers: vrais.fichiers.filter((f) => f !== harnais) }).problemes;
+  assert.ok(absent.some((p) => p.includes(`\`${harnais}\` n'existe pas`)), texte(absent));
 });
 
 test('une entrée sans garde, ou gardée seulement par une boucle de renvois, est refusée', () => {
