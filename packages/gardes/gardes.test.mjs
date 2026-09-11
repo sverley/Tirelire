@@ -412,16 +412,27 @@ test('un identifiant écrit sous une forme voisine est refusé en le nommant, da
   assert.match(texte(V.lireRegistre('## I1 — Voisin\n\n- **Harnais** · `a.test.ts` — garde.\n').problemes), /I1 n'est pas lu ; une entrée s'écrit « ## I1 · Titre »/);
 });
 
-test("un test nommé au registre se cherche parmi les titres des tests, pas n'importe où dans le fichier", () => {
+test('un test nommé au registre se cherche parmi les tests qui tournent, pas n\'importe où dans le fichier', () => {
   const source = [
     "describe('positions et soldes (D19, D29)', () => {",
     '  it("budget construit par l\'assistant (D40)", () => {});',
-    '  test.skip(`un titre en gabarit`, () => {});',
-    "  expect(/x/.test('pas un titre')).toBe(true);",
+    '  test(`un titre en gabarit`, () => {});',
+    '  test.skip("désactivé", () => {});',
+    "  it.todo('seulement prévu');",
+    "  expect(/'\\/\\//.test('pas un titre')).toBe(true);",
     '});',
-    '// le test nommé, cité dans un commentaire',
+    "describe('sans test actif', () => { it.skip('en pause', () => {}); });",
+    "describe.skip('suite désactivée', () => { it('dans la suite désactivée', () => {}); });",
+    "test('option skip', { skip: 'plus tard' }, () => {});",
+    "test('option sans effet', { timeout: 10 }, () => {});",
+    "it.skipIf(false)('conditionnel', () => {});",
+    "// it('en commentaire', () => {});",
+    "/* describe('en bloc', () => { it('dans le bloc', () => {}); }); */",
   ].join('\n');
-  assert.deepEqual([...V.titresDeTests(source)], ['positions et soldes (D19, D29)', "budget construit par l'assistant (D40)", 'un titre en gabarit']);
+  const { actifs, inactifs } = V.analyserTests(source);
+  assert.deepEqual([...actifs], ['positions et soldes (D19, D29)', "budget construit par l'assistant (D40)", 'un titre en gabarit', 'option sans effet', 'conditionnel']);
+  assert.deepEqual([...inactifs], ['désactivé', 'seulement prévu', 'sans test actif', 'en pause', 'suite désactivée', 'dans la suite désactivée', 'option skip']);
+  assert.deepEqual([...V.titresDeTests(source)], [...actifs]);
   assert.equal(V.testNomme("« budget construit par  l'assistant (D40) » : sans aucune opération"), "budget construit par l'assistant (D40)");
   assert.equal(V.testNomme('moteur de règles de classement.'), null);
 
@@ -433,5 +444,21 @@ test("un test nommé au registre se cherche parmi les titres des tests, pas n'im
   };
   const couverture = (contenus) => V.verifierCouvertureTextes({ ...documents, lireFichier: (c) => contenus[c] ?? null }).problemes;
   assert.deepEqual(couverture({ 'a/deux.test.ts': "it('le test nommé', () => {});" }), []);
-  assert.match(texte(couverture({ 'a/un.test.ts': "// le test nommé\nit('un autre', () => {});" })), /le test « le test nommé » n'est dans aucun de `a\/un\.test\.ts`, `a\/deux\.test\.ts`/);
+  assert.match(texte(couverture({ 'a/un.test.ts': "// le test nommé\nit('un autre', () => {});" })), /le test « le test nommé » ne tourne dans aucun de `a\/un\.test\.ts`, `a\/deux\.test\.ts` \(renommé, supprimé ou mis en commentaire \?\)/);
+});
+
+test('un usage en liste numérotée, en gras souligné ou en italique est refusé en le nommant', () => {
+  const { ids, illisibles } = V.lireIdentifiants('## I3 · Usages\n\n1. **U7 · Numéroté.**\n- __U8 · Souligné.__\n- *U9 · Italique.*\n- U1 et U2, dans une phrase, ne définissent rien.\n', '');
+  assert.deepEqual([[...ids.keys()], illisibles.map((p) => p.split(' ')[0])], [['I3'], ['U7', 'U8', 'U9']]);
+});
+
+test("un test nommé présent mais qui ne tourne pas est signalé comme tel", () => {
+  const problemes = V.verifierCouvertureTextes({
+    invariants: '## I1 · Premier\n',
+    contraintes: '',
+    gardes: '## I1 · Premier\n\n- **Harnais** · `a/un.test.ts` — « suite gardée » : garde I1.\n',
+    fichiers: ['a/un.test.ts'],
+    lireFichier: () => "describe('suite gardée', () => {\n  it.skip('seul test', () => {});\n});\n",
+  }).problemes;
+  assert.match(texte(problemes), /le test « suite gardée » ne tourne dans aucun de `a\/un\.test\.ts` \(il y figure sans tourner/);
 });

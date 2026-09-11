@@ -123,9 +123,12 @@ const DEFINITIONS = {
   U: { nature: 'un usage', document: DOCUMENTS.invariants, forme: (id) => `« - **${id} · Titre.** », dans la liste d'I3` },
   C: { nature: 'une contrainte', document: DOCUMENTS.contraintes, forme: (id) => `« ## ${id} · Titre »` },
 };
-/** Un titre, ou le gras qui ouvre un élément de liste, commence par un identifiant. */
-const OUVRE_TITRE = /^ {0,3}#{1,6}\s+\**\s*([IUC]\d+)\b/i;
-const OUVRE_GRAS = /^\s*[-*+]\s+\*\*\s*([IUC]\d+)\b/i;
+/**
+ * Un titre, ou un élément de liste (puce ou numéro) dont le gras ou l'italique commence par un
+ * identifiant : GitHub l'affiche comme une définition, la garde doit donc le lire ou le refuser.
+ */
+const OUVRE_TITRE = /^ {0,3}#{1,6}\s+[*_]*\s*([IUC]\d+)\b/i;
+const OUVRE_GRAS = /^\s*(?:[-*+]|\d+[.)])\s+[*_]{1,2}\s*([IUC]\d+)\b/i;
 
 /** Message pour une ligne qui s'ouvre sur un identifiant sans avoir la forme de sa définition. */
 function formeRefusee(id, ligne, source) {
@@ -285,8 +288,14 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
       }
       const nom = testNomme(h.description);
       const presents = h.chemins.filter((c) => existe.has(c));
-      if (nom && lireFichier && presents.length && !presents.some((c) => titresDeTests(lireFichier(c) ?? '').has(nom))) {
-        problemes.push(`${ou} : le test « ${nom} » n'est dans aucun de ${presents.map((c) => `\`${c}\``).join(', ')} (renommé ou supprimé ?).`);
+      if (nom && lireFichier && presents.length) {
+        const analyses = presents.map((c) => analyserTests(lireFichier(c) ?? ''));
+        if (!analyses.some((a) => a.actifs.has(nom))) {
+          const pourquoi = analyses.some((a) => a.inactifs.has(nom))
+            ? 'il y figure sans tourner : désactivé, seulement prévu, dans une suite désactivée, ou suite sans test actif'
+            : 'renommé, supprimé ou mis en commentaire ?';
+          problemes.push(`${ou} : le test « ${nom} » ne tourne dans aucun de ${presents.map((c) => `\`${c}\``).join(', ')} (${pourquoi}).`);
+        }
       }
     }
     const nom = new RegExp(`^VM-${e.id}-[a-z0-9]+(?:-[a-z0-9]+)*$`);
@@ -311,16 +320,125 @@ export function testNomme(description) {
   return m ? m[1].replace(/\s+/g, ' ') : null;
 }
 
-const TITRE_DE_TEST =
-  /(?<![\w$.])(?:describe|suite|context|it|test)(?:\.(?:only|skip|todo|concurrent|sequential|fails))*\s*\(\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.|\$(?!\{))*)`)/g;
+// ─── Tests nommés : ce qui tourne vraiment ────────────────────────────────────────────────────
+// Tranché dans #59 : un test nommé mis en commentaire, désactivé (`.skip`) ou seulement prévu
+// (`.todo`) compte comme absent, comme un test dans une suite désactivée ou une suite sans test actif.
 
-/** Titres des `describe`, `it` et `test` d'un fichier de tests, écrits en toutes lettres. */
-export function titresDeTests(source) {
-  const titres = new Set();
-  for (const m of String(source).matchAll(TITRE_DE_TEST)) {
-    titres.add((m[1] ?? m[2] ?? m[3] ?? '').replace(/\\(.)/g, '$1').replace(/\s+/g, ' ').trim());
+const APPEL_DE_TEST = /(?<![\w$.])(x?)(describe|suite|it|test)((?:\s*\.\s*[A-Za-z]+)*)\s*\(/g;
+const AVANT_EXPRESSION_REGULIERE = '(,=:[!&|?{};+-*%<>~^';
+
+/**
+ * Commentaires effacés ; intérieurs des chaînes, gabarits et expressions régulières masqués. Les
+ * parenthèses et les appels se cherchent alors sans se tromper ; chaque chaîne garde sa valeur.
+ */
+function masquer(source) {
+  const s = String(source);
+  const sortie = s.split('');
+  const chaines = new Map();
+  const effacer = (debut, fin) => {
+    for (let k = debut; k < fin && k < s.length; k++) if (sortie[k] !== '\n') sortie[k] = ' ';
+  };
+  let dernier = '';
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '/' && s[i + 1] === '/') {
+      const fin = s.indexOf('\n', i);
+      effacer(i, fin < 0 ? s.length : fin);
+      i = fin < 0 ? s.length : fin;
+    } else if (c === '/' && s[i + 1] === '*') {
+      const fin = s.indexOf('*/', i + 2);
+      effacer(i, fin < 0 ? s.length : fin + 2);
+      i = fin < 0 ? s.length : fin + 2;
+    } else if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      let valeur = '';
+      let gabarit = false;
+      while (j < s.length && s[j] !== c && (c === '`' || s[j] !== '\n')) {
+        if (s[j] === '\\') {
+          valeur += s[j + 1] ?? '';
+          j += 2;
+        } else if (c === '`' && s[j] === '$' && s[j + 1] === '{') {
+          gabarit = true;
+          let profondeur = 1;
+          for (j += 2; j < s.length && profondeur; j++) profondeur += s[j] === '{' ? 1 : s[j] === '}' ? -1 : 0;
+        } else {
+          valeur += s[j++];
+        }
+      }
+      chaines.set(i, { valeur: gabarit ? null : valeur, fin: j });
+      effacer(i + 1, j);
+      i = j + 1;
+      dernier = 'a';
+    } else if (c === '/' && (AVANT_EXPRESSION_REGULIERE.includes(dernier) || /\b(?:return|typeof|case|in|of|void|yield|await)\s*$/.test(s.slice(Math.max(0, i - 12), i)))) {
+      let j = i + 1;
+      let classe = false;
+      while (j < s.length && s[j] !== '\n' && (classe || s[j] !== '/')) {
+        if (s[j] === '\\') j++;
+        else if (s[j] === '[') classe = true;
+        else if (s[j] === ']') classe = false;
+        j++;
+      }
+      effacer(i + 1, j);
+      i = j + 1;
+      dernier = 'a';
+    } else {
+      if (!/\s/.test(c)) dernier = c;
+      i++;
+    }
   }
-  return titres;
+  return { masque: sortie.join(''), chaines };
+}
+
+function fermante(masque, ouvrante) {
+  let profondeur = 0;
+  for (let i = ouvrante; i < masque.length; i++) {
+    if ('([{'.includes(masque[i])) profondeur++;
+    else if (')]}'.includes(masque[i]) && --profondeur === 0) return i;
+  }
+  return masque.length;
+}
+
+/** Suites et tests d'un fichier, et les titres de ceux qui tournent. */
+export function analyserTests(source) {
+  const { masque, chaines } = masquer(source);
+  const appels = [];
+  for (const m of masque.matchAll(APPEL_DE_TEST)) {
+    if (/\bfunction\s*$/.test(masque.slice(Math.max(0, m.index - 12), m.index))) continue;
+    let ouvrante = m.index + m[0].length - 1;
+    let fin = fermante(masque, ouvrante);
+    const premier = (o) => o + 1 + masque.slice(o + 1).match(/^\s*/)[0].length;
+    // `it.skipIf(condition)('titre', …)`, `test.each([…])('titre', …)` : le titre est dans le second appel.
+    const curry = !chaines.has(premier(ouvrante)) && masque.slice(fin + 1).match(/^\s*\(/);
+    if (curry) {
+      ouvrante = fin + curry[0].length;
+      fin = fermante(masque, ouvrante);
+    }
+    const chaine = chaines.get(premier(ouvrante));
+    const modificateurs = m[3].replace(/\s/g, '').split('.');
+    let inactif = m[1] === 'x' || modificateurs.includes('skip') || modificateurs.includes('todo');
+    const options = chaine && masque.slice(chaine.fin + 1).match(/^\s*,\s*\{/);
+    if (options) {
+      const accolade = chaine.fin + options[0].length;
+      inactif ||= /\b(?:skip|todo)\s*:\s*(?!false\b|null\b|undefined\b|0\b)/.test(masque.slice(accolade, fermante(masque, accolade)));
+    }
+    const titre = chaine?.valeur == null ? null : chaine.valeur.replace(/\s+/g, ' ').trim();
+    appels.push({ titre, suite: m[2] === 'describe' || m[2] === 'suite', inactif, ouvrante, fin });
+  }
+  const englobantes = (a) => appels.filter((b) => b !== a && b.suite && b.ouvrante < a.ouvrante && a.ouvrante < b.fin);
+  const tourne = (a) =>
+    !a.inactif &&
+    !englobantes(a).some((b) => b.inactif) &&
+    (!a.suite || appels.some((t) => !t.suite && englobantes(t).includes(a) && tourne(t)));
+  const actifs = new Set();
+  const inactifs = new Set();
+  for (const a of appels) if (a.titre !== null) (tourne(a) ? actifs : inactifs).add(a.titre);
+  return { actifs, inactifs };
+}
+
+/** Titres des suites et des tests qui tournent, écrits en toutes lettres. */
+export function titresDeTests(source) {
+  return analyserTests(source).actifs;
 }
 
 /** Couverture des documents du dépôt. */
