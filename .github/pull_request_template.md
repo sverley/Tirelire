@@ -15,7 +15,8 @@ doute, les déclarer. Écrire « aucun » plutôt que laisser vide.
 
 Sous « Vérifications manuelles » : chaque vérification des identifiants déclarés (docs/gardes.md),
 et chaque garde que la PR retire du registre, avec son analyse, écrite par un développeur ou un
-agent, et sa case « Validée », que seul un développeur humain coche. Cocher enregistre la validation ;
+agent, et sa case « Validée », que seul un développeur humain coche, ou un agent
+sur son autorisation explicite. Cocher enregistre la validation ;
 un commit qui modifie le code, ou un changement de branche cible, l'annule. Documentation et
 harnais se modifient sans l'annuler.
 

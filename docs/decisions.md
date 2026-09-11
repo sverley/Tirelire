@@ -1196,6 +1196,7 @@ téléphone, et `packages/gardes` le relit sans dépendance.
   vérification repasse au rouge. Documentation, harnais et analyse se modifient sans l'annuler, et
   une fusion propre de la branche cible non plus. Une case cochée sans enregistrement, à l'ouverture
   ou juste avant un push, ne vaut rien.
-- **Limite connue.** Toutes les sessions écrivent avec le compte du porteur : rien ne distingue une
-  case cochée par un agent (question posée dans #58, pour #61). En attendant, la règle est écrite
-  dans `CLAUDE.md`.
+- **Qui coche.** Toutes les sessions écrivent avec le compte du porteur : rien ne distingue une case
+  cochée par un agent. Tranché le 11 septembre (#58) : une instruction interdit aux agents de cocher
+  sans autorisation explicite du porteur ; elle est écrite dans `CLAUDE.md`, et l'agent qui coche sur
+  autorisation la cite dans la PR.

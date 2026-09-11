@@ -52,11 +52,13 @@
     `node packages/gardes/cli.mjs demander --base <branche cible>` la prépare, l'analyse reste à
     écrire. La vérification « Vérifications manuelles » reste rouge tant qu'une vérification
     demandée n'est pas analysée et validée.
-  - Un agent ne coche jamais « Validée », ne retire pas une garde pour faire passer une PR, et ne
-    fusionne jamais une PR dont la vérification « Vérifications manuelles » est rouge.
+  - Un agent ne coche jamais « Validée » sans une autorisation explicite de Simon pour cette
+    vérification ; quand il la coche, il cite l'autorisation dans un commentaire de la PR. Il ne
+    retire pas une garde pour faire passer une PR, et ne fusionne jamais une PR dont la vérification
+    « Vérifications manuelles » est rouge.
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
     branche cible, l'annule et la vérification décoche la case ; documentation et harnais se
-    modifient sans l'annuler. Un agent ne recoche jamais une case décochée ; il signale dans la PR
-    que la validation est à refaire.
+    modifient sans l'annuler. Une case décochée par la vérification ne se recoche qu'aux mêmes
+    conditions ; sinon l'agent signale dans la PR que la validation est à refaire.
 - **Dépendances.** Elles se tiennent à deux endroits, toujours d'accord : la section « Dépendances »
   de l'issue et les liens GitHub « bloquée par ». Qui recalcule l'une met l'autre à jour.
