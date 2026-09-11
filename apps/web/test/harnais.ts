@@ -4,8 +4,8 @@
  *
  * Il faut un Chrome ou un Chromium déjà installé : `TIRELIRE_NAV` (ou `CHROME_BIN`, `CHROME_PATH`,
  * `PUPPETEER_EXECUTABLE_PATH`), sinon les emplacements habituels. Sans navigateur les gardes
- * s'abstiennent, sauf si `TIRELIRE_NAV_STRICT` est posé — ce que fait l'intégration continue, pour
- * qu'une garde muette ne passe pas pour une garde verte.
+ * s'abstiennent, sauf si `TIRELIRE_STRICT` (ou l'ancien `TIRELIRE_NAV_STRICT`) est posé — ce que fait
+ * l'intégration continue, pour qu'une garde muette ne passe pas pour une garde verte (#59).
  */
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +30,7 @@ const EMPLACEMENTS = [
 
 export const navigateur = EMPLACEMENTS.find((c): c is string => !!c && existsSync(c));
 
-if (!navigateur && process.env.TIRELIRE_NAV_STRICT) {
+if (!navigateur && (process.env.TIRELIRE_STRICT || process.env.TIRELIRE_NAV_STRICT)) {
   throw new Error(
     "Aucun Chrome ni Chromium trouvé pour les tests d'interface. Installer un navigateur ou " +
       'indiquer son chemin dans TIRELIRE_NAV.',

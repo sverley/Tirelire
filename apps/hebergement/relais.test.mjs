@@ -1,5 +1,5 @@
 // Le relais PHP répond comme le relais Node (`apps/relay/server.test.mjs`).
-// Sauté si `php` n'est pas installé.
+// Sauté si `php` n'est pas installé, sauf si `TIRELIRE_STRICT` est posé, comme en CI : il échoue alors (#59).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -9,7 +9,10 @@ import path from 'node:path';
 
 const phpPresent = spawnSync('php', ['-v'], { stdio: 'ignore' }).status === 0;
 
-test('relais PHP : push puis pull filtré par appareil', { skip: !phpPresent && 'php absent' }, async () => {
+const strict = Boolean(process.env.TIRELIRE_STRICT);
+
+test('relais PHP : push puis pull filtré par appareil', { skip: !phpPresent && !strict && 'php absent' }, async () => {
+  assert.ok(phpPresent, 'php absent, alors que TIRELIRE_STRICT le rend obligatoire');
   const dir = mkdtempSync(path.join(tmpdir(), 'relais-php-'));
   // Le serveur intégré de PHP joue le rôle d'Apache : relais.php lit le salon dans le chemin.
   const child = spawn('php', ['-S', '127.0.0.1:18788', '-t', 'serveur', 'serveur/relais.php'], {

@@ -11,7 +11,7 @@
  *
  * Il lui faut un Chrome ou un Chromium déjà installé : `TIRELIRE_NAV` (ou `CHROME_BIN`,
  * `CHROME_PATH`, `PUPPETEER_EXECUTABLE_PATH`), sinon les emplacements habituels. Sans navigateur il
- * s'abstient, sauf si `TIRELIRE_NAV_STRICT` est posé — ce que fait l'intégration continue, pour
+ * s'abstient, sauf si `TIRELIRE_STRICT` est posé — ce que fait l'intégration continue, pour
  * qu'une garde muette ne passe pas pour une garde verte.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

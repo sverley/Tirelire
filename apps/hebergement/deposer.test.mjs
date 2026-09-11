@@ -1,6 +1,7 @@
 // Le script de dépôt (`deposer.sh`) transfère bien le site et laisse intact ce qui vit sur le
 // serveur : paquets de synchronisation (`donnees/*.jsonl`) et configuration locale du relais.
-// Joué contre un vrai serveur FTP local (pyftpdlib). Sauté si `lftp` ou `pyftpdlib` manquent.
+// Joué contre un vrai serveur FTP local (pyftpdlib). Sauté si `lftp` ou `pyftpdlib` manquent, sauf si
+// `TIRELIRE_STRICT` est posé, comme en CI : il échoue alors (#59).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -13,6 +14,7 @@ const ici = path.dirname(fileURLToPath(import.meta.url));
 const lftp = spawnSync('lftp', ['--version'], { stdio: 'ignore' }).status === 0;
 const pyftpdlib = spawnSync('python3', ['-c', 'import pyftpdlib'], { stdio: 'ignore' }).status === 0;
 const raison = !lftp ? 'lftp absent' : !pyftpdlib ? 'pyftpdlib absent' : false;
+const strict = Boolean(process.env.TIRELIRE_STRICT);
 
 const PORT = 2121;
 
@@ -69,7 +71,8 @@ function deposer(source, racineDistante, env = {}) {
   return r.stdout + r.stderr;
 }
 
-test('dépôt FTP : le site monte, les données du serveur restent', { skip: raison }, async (t) => {
+test('dépôt FTP : le site monte, les données du serveur restent', { skip: !strict && raison }, async (t) => {
+  assert.equal(raison, false, `${raison}, alors que TIRELIRE_STRICT rend l'outil obligatoire`);
   const base = mkdtempSync(path.join(tmpdir(), 'depot-'));
   const source = path.join(base, 'site');
   const distant = path.join(base, 'serveur');
