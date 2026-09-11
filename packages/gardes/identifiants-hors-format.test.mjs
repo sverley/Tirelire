@@ -86,6 +86,7 @@ const FORMES_VOISINES = [
   ['U99', 'un usage en « ### U99 · »', INVARIANTS, (t) => ajouterUsageEnTitre(t, `### U99 · Usage ${MOT}`)],
   ['U99', 'un usage en liste numérotée « 1. **U99 · ….** »', INVARIANTS, (t) => ajouterUsage(t, `1. **U99 · Usage ${MOT}.** Sans entrée au registre.`)],
   ['U99', 'un usage en gras souligné « - __U99 · ….__ »', INVARIANTS, (t) => ajouterUsage(t, `- __U99 · Usage ${MOT}.__ Sans entrée au registre.`)],
+  ['U99', 'un usage en gras italique « - ***U99 · ….*** »', INVARIANTS, (t) => ajouterUsage(t, `- ***U99 · Usage ${MOT}.*** Sans entrée au registre.`)],
   ['C99', 'une contrainte en « ## C99 — »', CONTRAINTES, (t) => ajouterTitre(t, `## C99 — Contrainte ${MOT}`)],
 ];
 
