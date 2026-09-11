@@ -1179,6 +1179,9 @@ téléphone, et `packages/gardes` le relit sans dépendance.
   nomme un test désigne ce test, titre d'un `describe`, d'un `it` ou d'un `test`, et non son seul
   fichier ; un test qui ne tourne pas, mis en commentaire, désactivé ou seulement prévu, compte comme
   absent (tranché le 11 septembre dans #59).
+  Un test qui se saute faute d'outil compte comme un test qui tourne : l'outil est requis en CI, où
+  `TIRELIRE_STRICT` fait échouer au lieu de sauter, et l'abstention reste permise en local (tranché le
+  même jour). `TIRELIRE_NAV_STRICT`, de D54, reste lu.
 - **Demandes**, sur chaque PR, par la vérification « Vérifications manuelles » : la description
   déclare les identifiants touchés et ceux dont le lien pourrait être masqué ; les motifs `Chemins`
   du registre imposent un plancher, volontairement étroit ; chaque vérification manuelle des

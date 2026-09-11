@@ -56,6 +56,8 @@
     vérification ; quand il la coche, il cite l'autorisation dans un commentaire de la PR. Il ne
     retire pas une garde pour faire passer une PR, et ne fusionne jamais une PR dont la vérification
     « Vérifications manuelles » est rouge.
+  - Un test qui a besoin d'un outil (navigateur, PHP, `lftp`…) peut se sauter en local s'il manque,
+    mais échoue quand `TIRELIRE_STRICT` est posé, comme en CI ; la CI installe ses outils.
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
     branche cible, l'annule et la vérification décoche la case ; documentation et harnais se
     modifient sans l'annuler. Une case décochée par la vérification ne se recoche qu'aux mêmes

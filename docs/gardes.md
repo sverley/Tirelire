@@ -17,6 +17,9 @@ correspondance ; `packages/gardes` le relit.
   doit exister et tourner dans l'un des fichiers cités : mis en commentaire, désactivé (`.skip`),
   seulement prévu (`.todo`), dans une suite désactivée, ou suite sans test actif, il compte comme
   absent (#59).
+  Un test qui se saute faute d'outil compte comme un test qui tourne, parce qu'en CI
+  `TIRELIRE_STRICT` rend l'outil obligatoire : un harnais du registre qui se saute sous condition
+  sans lire cette variable est refusé.
 - **Sur chaque PR**, par la vérification « Vérifications manuelles » : la description déclare les
   identifiants touchés et ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux
   `Chemins` d'une entrée impose de la déclarer ; chaque vérification manuelle des entrées déclarées,
