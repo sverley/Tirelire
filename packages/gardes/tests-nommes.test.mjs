@@ -16,6 +16,11 @@
  * ne tourne plus. Le correctif `5da4f4d` le dit d'un nom cité dans un commentaire (décision 18 dans
  * #63) ; ces cas l'étendent au bloc entier, titre compris.
  *
+ * Un test qui ne tourne pas ne garde rien. Tranché ensuite dans #59 (« oui, sinon c'est une faille
+ * potentielle de couverture ») : un test nommé désactivé (`.skip`) ou seulement prévu (`.todo`) compte
+ * comme absent. Lecture appliquée de la même faille : un test dont le `describe` est désactivé, et un
+ * `describe` nommé dont aucun test ne tourne.
+ *
  * Boîte noire, comme l'amorçage : copie du dépôt, fichier ou registre modifié, puis
  * `node packages/gardes/cli.mjs couverture`. Seuls comptent le code de sortie et le message. Les tests
  * nommés se cherchent dans le registre du jour ; s'il n'en nomme plus aucun, le harnais le dit au lieu
@@ -186,6 +191,86 @@ for (const { entree, chemins, nom } of NOMMES) {
       rougeEtNomme(couverture(racine), nom, `« ${nom} » n'est plus qu'en commentaire dans ${fichier}`);
     });
   }
+}
+
+// ─── Tests qui ne tournent pas (tranché le 11 septembre dans #59) ───────────────────────────
+
+const echapper = (texte) => texte.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const appelDuTitre = (nom) => new RegExp(`(\\b(?:describe|suite|context|it|test)(?:\\.\\w+)*)(\\s*\\(\\s*['"\`]${echapper(nom)}['"\`])`);
+const renfoncementDe = (ligne) => ligne.length - ligne.trimStart().length;
+
+/** Fichier cité, lignes et ligne du titre d'un test nommé. */
+function titreDuTest(racine, chemins, nom) {
+  for (const fichier of chemins) {
+    if (!existsSync(join(racine, fichier))) continue;
+    const lignes = lignesDe(lire(racine, fichier));
+    const i = lignes.findIndex((x) => appelDuTitre(nom).test(x));
+    if (i >= 0) return { fichier, lignes, i };
+  }
+  return null;
+}
+
+/** Ligne du `describe` qui contient la ligne `i` : la première ligne non vide, au-dessus, moins renfoncée. */
+function ligneDuParent(lignes, i) {
+  for (let j = i - 1; j >= 0; j--) {
+    if (!lignes[j].trim() || renfoncementDe(lignes[j]) >= renfoncementDe(lignes[i])) continue;
+    return /\b(?:describe|suite|context)(?:\.\w+)*\s*\(/.test(lignes[j]) ? j : -1;
+  }
+  return -1;
+}
+
+for (const { entree, chemins, nom } of NOMMES) {
+  for (const [etat, modificateur] of [['désactivé par « .skip »', 'skip'], ['seulement prévu par « .todo »', 'todo']]) {
+    test(`#59 · ${entree} : le test « ${nom} » ${etat}, son fichier gardé, fait échouer la couverture en le nommant`, () => {
+      const racine = copierDepot();
+      const cible = titreDuTest(racine, chemins, nom);
+      assert.ok(cible, `le titre de « ${nom} » est introuvable dans ${chemins.join(', ')} : ${RELIRE}`);
+      cible.lignes[cible.i] = cible.lignes[cible.i].replace(appelDuTitre(nom), `$1.${modificateur}$2`);
+      ecrire(racine, cible.fichier, cible.lignes.join('\n'));
+      rougeEtNomme(couverture(racine), nom, `« ${nom} » est marqué .${modificateur} dans ${cible.fichier}`);
+    });
+  }
+}
+
+const IMBRIQUES = NOMMES.filter(({ chemins, nom }) => {
+  const cible = titreDuTest(DEPOT, chemins, nom);
+  return cible && ligneDuParent(cible.lignes, cible.i) >= 0;
+});
+if (!IMBRIQUES.length) {
+  test('#59 · un test nommé est contenu dans un describe', () => assert.fail(`aucun test nommé n'est contenu dans un describe : ${RELIRE}`));
+}
+for (const { entree, chemins, nom } of IMBRIQUES) {
+  test(`#59 · ${entree} : le describe qui contient « ${nom} » désactivé par « .skip », fait échouer la couverture en le nommant`, () => {
+    const racine = copierDepot();
+    const cible = titreDuTest(racine, chemins, nom);
+    const j = ligneDuParent(cible.lignes, cible.i);
+    cible.lignes[j] = cible.lignes[j].replace(/(\b(?:describe|suite|context)(?:\.\w+)*)(\s*\()/, '$1.skip$2');
+    ecrire(racine, cible.fichier, cible.lignes.join('\n'));
+    rougeEtNomme(couverture(racine), nom, `le describe qui contient « ${nom} » est marqué .skip dans ${cible.fichier}`);
+  });
+}
+
+const DESCRIBES = NOMMES.filter(({ chemins, nom }) => {
+  const cible = titreDuTest(DEPOT, chemins, nom);
+  return cible && /\b(?:describe|suite|context)\b/.test(cible.lignes[cible.i].match(appelDuTitre(nom))[1]);
+});
+for (const { entree, chemins, nom } of DESCRIBES) {
+  test(`#59 · ${entree} : tous les tests du describe « ${nom} » désactivés par « .skip », fait échouer la couverture en le nommant`, () => {
+    const racine = copierDepot();
+    const fichier = chemins.find((c) => existsSync(join(racine, c)) && blocDuTest(lire(racine, c), nom));
+    assert.ok(fichier, `le bloc de « ${nom} » est introuvable dans ${chemins.join(', ')} : ${RELIRE}`);
+    const { lignes, debut, fin } = blocDuTest(lire(racine, fichier), nom);
+    let desactives = 0;
+    for (let k = debut + 1; k < fin; k++) {
+      lignes[k] = lignes[k].replace(/(?<![\w$.])((?:it|test)(?:\.\w+)*)(\s*\()/g, (_, appel, parenthese) => {
+        desactives++;
+        return `${appel}.skip${parenthese}`;
+      });
+    }
+    assert.ok(desactives, `« ${nom} » ne contient aucun it ni test : ${RELIRE}`);
+    ecrire(racine, fichier, lignes.join('\n'));
+    rougeEtNomme(couverture(racine), nom, `aucun test du describe « ${nom} » ne tourne dans ${fichier}`);
+  });
 }
 
 test('#59 · un test que son fichier ne contient pas, nommé au registre, fait échouer la couverture en le nommant', () => {
