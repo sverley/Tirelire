@@ -255,7 +255,7 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
   l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,
   et que la PR ne fait rien charger en HTTP. Si elle ne touche que des tests, de l'outillage ou de la
   documentation (D62) : dire dans l'analyse pourquoi ni l'application ni le relais ne sont atteints.
-- **À bâtir** · le refus ou le signalement d'un relais en HTTP (#38).
+- **À bâtir** · le refus ou le signalement d'un relais en HTTP (besoin #67, harnais #38).
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
 
