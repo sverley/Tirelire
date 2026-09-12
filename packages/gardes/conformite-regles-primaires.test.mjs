@@ -7,7 +7,9 @@
  * nouvelle ne les contredit pas. Une PR qui ajoute ou remplace une décision, modifie `CLAUDE.md` ou
  * modifie la garde (son code, sa vérification, ses harnais, le modèle de PR) reste donc rouge tant
  * que cette conformité n'est pas analysée puis validée par un développeur humain ; une PR qui
- * modifie un invariant, tant que l'accord explicite du porteur n'y figure pas.
+ * modifie un invariant, tant que l'accord explicite du porteur n'y figure pas — tranché le
+ * 12 septembre 2026 : cet accord est une ligne « Accord du porteur : … » de la section, que la garde
+ * lit et refuse quand elle manque ou reste vide, et non une consigne laissée à l'analyse.
  *
  * Le harnais part des « Fait quand » de #64, pas du code. Il ne présume ni du nom ni de la forme de
  * la vérification nouvelle : sur une copie du dépôt, il ouvre une PR qui modifie le vrai document,
@@ -133,12 +135,23 @@ function consigneDe(section, cle) {
  * Description au format du modèle, bâtie sur la section que `demander` prépare : ce qu'un
  * développeur ou un agent en fait, sans rien inventer sur la forme de la vérification.
  */
-function corps(section, { analyse, validee = false } = {}) {
+function corps(section, { analyse, validee = false, accord } = {}) {
   let rempli = section.replace(/^(Touchés|Lien possible masqué) : à analyser$/gm, '$1 : aucun');
   if (analyse) rempli = rempli.replace(/^(\s+-\s+Analyse\b[^:]*:)\s*à écrire$/gm, `$1 ${analyse}`);
   if (validee) rempli = rempli.replace(/\[ \] Validée/g, '[x] Validée');
+  if (accord !== undefined) rempli = avecAccord(rempli, accord);
   return ["Pour #64 : essai du harnais d'audit.", '', '## Ce qui change', '', 'Essai.', '', rempli, ''].join('\n');
 }
+
+/**
+ * Ligne d'accord du porteur, telle que la garde doit la reconnaître (tranché le 12 septembre 2026) :
+ * un paragraphe à part de la section, pour qu'elle ne prolonge pas la déclaration qui la précède.
+ */
+const ACCORD = /^ {0,3}Accord du porteur\s*:.*$/m;
+const avecAccord = (texte, valeur) =>
+  ACCORD.test(texte)
+    ? texte.replace(ACCORD, `Accord du porteur : ${valeur}`)
+    : texte.replace(/^(Lien possible masqué : .*)$/m, `$1\n\nAccord du porteur : ${valeur}`);
 
 /** `pr --base main` hors GitHub : une case cochée y compte comme validée. */
 function prLocale(depot, texte) {
@@ -234,15 +247,32 @@ test("#64 · la consigne demande de nommer les règles primaires touchées et de
 
 // ─── #64 · un invariant ne change qu'avec l'accord explicite du porteur ───────────────────────
 
+test("#64 · `demander` prépare la ligne d'accord du porteur pour une PR qui modifie un invariant, et pour elle seule", () => {
+  const pr = prQuiModifie(ajoutA('docs/invariants.md', "Précision ajoutée par le harnais d'audit de #64."));
+  assert.ok(
+    ACCORD.test(pr.section),
+    `#64 : « demander » ne prépare aucune ligne « Accord du porteur : » pour une PR qui modifie un invariant.\n` +
+      `Section préparée :\n${pr.section}`,
+  );
+  const neutre = prQuiModifie(ajoutA('README.md', "Autre ligne ajoutée par le harnais d'audit de #64."));
+  assert.ok(
+    !ACCORD.test(neutre.section),
+    `#64 : la ligne « Accord du porteur : » est demandée à une PR qui ne touche aucun invariant : elle viserait tout, donc rien.\n` +
+      `Section préparée :\n${neutre.section}`,
+  );
+});
+
 test("#64 · une PR qui modifie un invariant reste rouge tant que l'accord explicite du porteur n'y figure pas", () => {
   const pr = prQuiModifie(ajoutA('docs/invariants.md', "Précision ajoutée par le harnais d'audit de #64."));
-  const consignes = enPlus(pr, 'un invariant').map((cle) => consigneDe(pr.section, cle));
-  assert.ok(
-    consignes.some((t) => /porteur/i.test(t) && /(accord|autorisation)/i.test(t)),
-    `#64 : rien ne demande l'accord explicite du porteur à une PR qui modifie un invariant.\n` +
-      `Consignes demandées :\n${consignes.map((t) => `- ${t}`).join('\n') || '- aucune'}`,
+  const plein = { analyse: ANALYSE, validee: true };
+  rouge(prLocale(pr.depot, corps(pr.section, plein)), 'invariant modifié, aucune ligne d\'accord du porteur');
+  for (const vide of ['', 'à analyser', '…']) {
+    rouge(prLocale(pr.depot, corps(pr.section, { ...plein, accord: vide })), `invariant modifié, accord laissé « ${vide || 'vide'} »`);
+  }
+  vert(
+    prLocale(pr.depot, corps(pr.section, { ...plein, accord: 'https://github.com/sverley/Tirelire/issues/64#issuecomment-5647314489 (accord du 12 septembre 2026)' })),
+    "invariant modifié, accord du porteur écrit, vérifications analysées et validées",
   );
-  rougeJusquALaValidation(pr.depot, pr.section, 'un invariant modifié');
 });
 
 // ─── #64 · la règle est écrite là où les sessions la lisent ───────────────────────────────────
