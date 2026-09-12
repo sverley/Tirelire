@@ -1,0 +1,46 @@
+name: Alerte de fusion non vérifiée
+
+# Garde de #62, chantier de l'objectif primaire #58. Sur un dépôt privé de l'offre gratuite, GitHub
+# refuse la protection de branche comme les règles de fusion : rien ne peut interdire une fusion ni
+# un push, et le porteur a choisi d'y rester (option B, tranchée le 11 septembre). La garde est donc
+# une alerte après coup — une issue ouverte aussitôt — doublée de la règle écrite dans `CLAUDE.md`.
+#
+# Deux événements, un seul juge à la fois :
+# - la fermeture d'une PR : fusionnée dans `main` alors que « Vérifications manuelles » n'était pas
+#   verte sur la tête fusionnée, l'alerte s'ouvre ; fermée sans fusion, rien ;
+# - un push sur `main` : direct quand aucun de ses commits n'appartient à une PR fusionnée. Le push
+#   qui porte un commit de fusion se tait, la fermeture de la PR l'ayant déjà jugé.
+#
+# Limite connue, hors périmètre (D62) : un push direct qui retire ce fichier dans le même commit se
+# tait, GitHub jouant la version poussée. C'est un contournement, pas une erreur par accident ; la
+# piste d'un dépôt miroir reste en réserve dans #58.
+
+on:
+  pull_request:
+    types: [closed]
+  push:
+    branches: [main]
+
+# Ouvrir l'issue ; lire la couleur des vérifications et le rattachement d'un commit à sa PR.
+permissions:
+  contents: read
+  issues: write
+  actions: read
+  checks: read
+  pull-requests: read
+
+jobs:
+  alerte:
+    name: Fusion non vérifiée ou push direct
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Tout vient du fichier d'événement de GitHub, jamais du script. La sortie est rouge quand il y
+      # a eu à signaler, rejeu compris : l'issue est le signal, la couleur le répète.
+      - name: Signaler une fusion non vérifiée ou un push direct
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node packages/gardes/cli.mjs alerte --github

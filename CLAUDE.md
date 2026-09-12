@@ -69,6 +69,13 @@
     vérification ; quand il la coche, il cite l'autorisation dans un commentaire de la PR. Il ne
     retire pas une garde pour faire passer une PR, et ne fusionne jamais une PR dont la vérification
     « Vérifications manuelles » est rouge.
+  - **Aucune fusion au rouge, aucun push direct (#62).** La règle vaut pour tout le monde, agents
+    comme porteur : tout changement de `main` passe par une PR dont la vérification « Vérifications
+    manuelles » est verte, et un push direct sur `main` vaut fusion non vérifiée, puisqu'aucune
+    vérification ne l'a relu. L'offre gratuite ne permet pas de l'empêcher : la règle se signale
+    après coup. Le workflow « Alerte de fusion non vérifiée » ouvre aussitôt une issue étiquetée
+    `alerte`, qui nomme la PR ou le commit et dit ce qui manquait ; elle se ferme à la main, une fois
+    les vérifications refaites ou le passage assumé.
   - Un test qui a besoin d'un outil (navigateur, PHP, `lftp`…) peut se sauter en local s'il manque,
     mais échoue quand `TIRELIRE_STRICT` est posé, comme en CI ; la CI installe ses outils.
   - Un harnais du registre cite son témoin rouge (les mêmes assertions rejouées sur une version
