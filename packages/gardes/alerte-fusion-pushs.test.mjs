@@ -3,17 +3,17 @@
  *
  * Les deux harnais précédents jugent la fusion sous toutes ses couleurs, et le push sur le seul cas
  * droit : des commits neufs, poussés en avant. Or « un push direct sur `main` vaut fusion non
- * vérifiée » (#62) ne dit rien de la forme du push, et la lecture codée — un push est direct quand
- * *aucun* de ses commits n'appartient à une PR fusionnée — répond à la question 1 de l'issue, restée
- * sans réponse du porteur. Ce fichier éprouve cette lecture sur les pushs qui ne vont pas tout droit.
+ * vérifiée » (#62) ne dit rien de la forme du push. Ce fichier éprouve les pushs qui ne vont pas
+ * tout droit.
  *
- * Deux cas tiennent et sont gardés ici contre une régression : un push forcé qui réécrit `main`
- * alerte, la suppression de la branche ne dit rien.
+ * Deux cas tiennent depuis le début : un push forcé qui réécrit `main` alerte, la suppression de la
+ * branche ne dit rien.
  *
- * Deux cas ne tiennent pas et sont marqués « à faire » plutôt que rouges (D62) : ils ne sont pas des
- * erreurs de code mais les angles morts de la lecture proposée, et c'est au porteur de trancher la
- * question 1 avant qu'ils deviennent des cas fermes. Ils tournent : la sortie de `node --test` dit,
- * à chaque exécution, où en est chacun.
+ * Deux cas ne tenaient pas, et ont d'abord été marqués « à faire », le temps que la question 1 de
+ * #62 soit tranchée. Elle l'a été le 12 septembre : « si ça fait partie du besoin 62, ça va dans 75
+ * sans question ». Un changement de `main` qu'aucune PR n'explique est un push direct, qu'il soit
+ * forcé ou glissé au milieu d'une fusion : les deux cas sont fermes, et rouges tant que la garde ne
+ * les tient pas.
  *
  * Même méthode que les deux autres : boîte noire, dépôt copié, GitHub simulé au niveau de `fetch`,
  * et seuls comptent les issues ouvertes et le code de sortie.
@@ -189,11 +189,13 @@ test("#62 · la suppression de `main` n'ouvre rien : la branche n'a pas été mo
   silence(s.push({ portes: [], deleted: true, tete: '0'.repeat(40) }), 'branche supprimée');
 });
 
-// ─── Les angles morts de la lecture proposée · question 1 de #62, à trancher par le porteur ──
+// ─── Tranché par le porteur le 12 septembre : ces deux cas font partie de #62 ────────────────
+// « Si ça fait partie du besoin 62, ça va dans 75 sans question. » Un changement de `main` qu'aucune
+// PR n'explique est un push direct, forcé ou glissé au milieu d'une fusion : il ouvre une issue. Les
+// deux cas cessent d'être « à faire » et deviennent fermes.
 
 test(
   "#62 · un push forcé qui ramène `main` en arrière ouvre une issue",
-  { todo: "à faire : la garde se tait, la tête étant un vieux commit de fusion — question 1 de #62, à trancher avant d'en faire un cas ferme" },
   () => {
     const s = scene();
     const { fusion } = s.fusionPassee();
@@ -205,7 +207,6 @@ test(
 
 test(
   '#62 · un commit direct poussé par-dessus une fusion locale ouvre une issue',
-  { todo: 'à faire : le premier commit rattaché à une PR fusionnée fait taire tout le push — question 1 de #62' },
   () => {
     const s = scene();
     const { fusion } = s.fusionPassee();
