@@ -1266,8 +1266,9 @@ manuelle, `VM-regles-primaires`, demandée par les chemins que la PR modifie (D6
 
 Elle ne tient pas dans une entrée de `docs/gardes.md` : une entrée y porte un invariant ou une
 contrainte, et ni une décision, ni `CLAUDE.md`, ni la garde n'en sont un. D'où une table de chemins
-à part, dans `packages/gardes/gardes.mjs`. `docs/gardes.md` n'y figure pas : retirer une garde du
-registre est déjà demandé par la comparaison des deux registres.
+à part, dans `packages/gardes/gardes.mjs`. Le porteur l'a étendue le 12 septembre à `docs/gardes.md`
+— la comparaison des deux registres voit une garde retirée, pas une consigne affaiblie — et à
+`docs/description-projet.md`, qui fonde les invariants.
 
 La garde reste jugée par la version que porte la PR (piste 2 de #58, tranché le 11 septembre) :
 retirer cette demande en modifiant la garde reste donc possible, mais c'est une modification de la
@@ -1275,7 +1276,10 @@ garde, donc une règle nouvelle, et l'amorçage (`packages/gardes/amorcage.test.
 garde s'affaiblit. Piste 1 en réserve — faire juger chaque PR par la garde de `main` — si elle est
 contournée.
 
-Un invariant ne change qu'à la demande du porteur (tranché le 12 septembre) : son accord explicite
-n'est pas laissé à l'analyse, c'est une ligne « Accord du porteur : … » de la section « Invariants
-et contraintes », que la garde lit et refuse quand elle manque ou reste vide. `demander` la prépare
-pour une PR qui modifie `docs/invariants.md`, et pour elle seule.
+La description du projet et les invariants ne changent qu'à la demande du porteur (tranché le
+12 septembre) : son accord explicite n'est pas laissé à l'analyse, c'est une ligne « Accord du
+porteur : … » de la section « Invariants et contraintes », posée en paragraphe à part, que la garde
+lit et refuse quand elle manque ou reste en attente (vide, « … », « à écrire », « à analyser »).
+Lien ou citation datée : la garde accepte l'un comme l'autre, elle ne juge pas la forme de l'accord.
+`demander` la prépare pour une PR qui modifie `docs/description-projet.md` ou `docs/invariants.md`,
+et pour elle seule.

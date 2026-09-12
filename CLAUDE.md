@@ -83,15 +83,17 @@
     garde ou ces règles-ci. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les
     **règles primaires** — les invariants et usages (`docs/invariants.md`), les contraintes
     (`docs/contraintes.md`) et la garde de l'objectif primaire (#58, D61). Une PR qui modifie
-    `docs/decisions.md`, `docs/invariants.md`, `docs/contraintes.md`, ce fichier, ou la garde (son
-    code, ses harnais, sa vérification, le modèle de PR) se voit demander `VM-regles-primaires` :
+    `docs/decisions.md`, `docs/description-projet.md`, `docs/invariants.md`, `docs/contraintes.md`,
+    ce fichier, ou la garde (son code, ses harnais, son registre `docs/gardes.md`, sa vérification,
+    le modèle de PR) se voit demander `VM-regles-primaires` :
     l'analyse nomme les règles primaires touchées et dit pourquoi la règle nouvelle ne les contredit
     pas ; un développeur humain valide avant la fusion. Une contradiction ne se tranche pas dans la
     PR : elle devient une question dans une issue.
-  - **Un invariant ne change qu'à la demande du porteur.** Une PR qui modifie `docs/invariants.md`
-    porte, dans la section « Invariants et contraintes », une ligne « Accord du porteur : … » — lien
-    ou citation datée de son accord explicite. La garde la lit et reste rouge tant qu'elle manque ou
-    reste vide ; `demander` la prépare pour ces PR et pour elles seules.
+  - **La description du projet et les invariants ne changent qu'à la demande du porteur.** Une PR
+    qui modifie `docs/description-projet.md` ou `docs/invariants.md` porte, dans la section
+    « Invariants et contraintes », une ligne « Accord du porteur : … » — lien ou citation datée de
+    son accord explicite. La garde la lit et reste rouge tant qu'elle manque ou reste vide ;
+    `demander` la prépare pour ces PR et pour elles seules.
   - **Aucune fusion au rouge, aucun push direct (#62).** La règle vaut pour tout le monde, agents
     comme porteur : tout changement de `main` passe par une PR dont la vérification « Vérifications
     manuelles » est verte, et un push direct sur `main` vaut fusion non vérifiée, puisqu'aucune

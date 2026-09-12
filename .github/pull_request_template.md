@@ -24,11 +24,12 @@ harnais se modifient sans l'annuler.
 Une PR qui ne touche que des tests, de l'outillage ou de la documentation ne joue ni manipulation de
 l'application ni construction de l'APK : l'analyse dit pourquoi elles ne sont pas atteintes (D62).
 
-Une PR qui change une règle (une décision, un invariant, une contrainte, CLAUDE.md, ou la garde
-elle-même) se voit demander VM-regles-primaires : l'analyse nomme les règles primaires touchées et
-dit pourquoi la règle nouvelle ne les contredit pas (#64). Une PR qui modifie docs/invariants.md
-ajoute en plus, en paragraphe à part sous les déclarations, une ligne
-« Accord du porteur : … » avec le lien ou la citation datée de son accord explicite.
+Une PR qui change une règle (une décision, la description du projet, un invariant, une contrainte,
+CLAUDE.md, ou la garde elle-même, registre compris) se voit demander VM-regles-primaires :
+l'analyse nomme les règles primaires touchées et dit pourquoi la règle nouvelle ne les contredit
+pas (#64). Une PR qui modifie docs/description-projet.md ou docs/invariants.md ajoute en plus, en
+paragraphe à part sous les déclarations, une ligne « Accord du porteur : … » avec le lien ou la
+citation datée de son accord explicite.
 
 Préparer la section : node packages/gardes/cli.mjs demander --base origin/main
 -->

@@ -33,6 +33,7 @@ export const DOCUMENTS = Object.freeze({
   contraintes: 'docs/contraintes.md',
   gardes: 'docs/gardes.md',
   modele: '.github/pull_request_template.md',
+  description: 'docs/description-projet.md',
 });
 
 /** Étiquettes admises en tête d'une ligne d'entrée du registre. */
@@ -49,16 +50,19 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 /**
  * Familles de chemins dont la modification ajoute ou change une règle. Une table à part du registre,
  * parce qu'une entrée du registre porte un invariant ou une contrainte, et que `CLAUDE.md`, les
- * décisions et la garde n'en sont pas. `docs/gardes.md` n'y figure pas : retirer une garde du
- * registre est déjà demandé par `retraits()`.
+ * décisions et la garde n'en sont pas. `docs/gardes.md` y figure depuis l'accord du porteur du
+ * 12 septembre : `retraits()` voit une garde retirée du registre, pas une consigne affaiblie.
  */
 export const CHEMINS_DES_REGLES = Object.freeze([
   Object.freeze({ quoi: 'une décision', motifs: Object.freeze(['docs/decisions.md']) }),
   Object.freeze({ quoi: 'les règles des sessions', motifs: Object.freeze(['CLAUDE.md']) }),
-  Object.freeze({ quoi: 'une règle primaire', motifs: Object.freeze(['docs/invariants.md', 'docs/contraintes.md']) }),
+  Object.freeze({
+    quoi: 'une règle primaire',
+    motifs: Object.freeze(['docs/description-projet.md', 'docs/invariants.md', 'docs/contraintes.md']),
+  }),
   Object.freeze({
     quoi: 'la garde',
-    motifs: Object.freeze(['packages/gardes/**', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
+    motifs: Object.freeze(['packages/gardes/**', 'docs/gardes.md', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
   }),
 ]);
 
@@ -93,10 +97,15 @@ function conformiteDemandee(fichiersModifies) {
 }
 
 /**
- * Un invariant ne change qu'à la demande du porteur (#64). Son accord ne reste pas dans l'analyse :
- * c'est une ligne « Accord du porteur : … » de la section, que la garde lit et refuse vide.
+ * Ce qui ne change qu'à la demande du porteur (#64) : les invariants, et la description du projet
+ * qui les fonde — son texte, mot pour mot, que seul le porteur complète ou corrige (`CLAUDE.md`).
+ * Son accord ne reste pas dans l'analyse : c'est une ligne « Accord du porteur : … » de la section,
+ * que la garde lit et refuse quand elle manque ou reste vide.
  */
-export const modifieUnInvariant = (fichiersModifies = []) => fichiersModifies.includes(DOCUMENTS.invariants);
+export const DOCUMENTS_DU_PORTEUR = Object.freeze([DOCUMENTS.description, DOCUMENTS.invariants]);
+
+/** Documents du porteur que la PR modifie, dans l'ordre ; vide quand elle n'y touche pas. */
+export const documentsDuPorteurModifies = (fichiersModifies = []) => DOCUMENTS_DU_PORTEUR.filter((d) => fichiersModifies.includes(d));
 
 const G = DOCUMENTS.gardes;
 const IDENTIFIANT = /\b([IUC]\d+)\b/g;
@@ -874,13 +883,14 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
     }
   }
 
-  if (modifieUnInvariant(fichiersModifies)) {
+  const duPorteur = documentsDuPorteurModifies(fichiersModifies);
+  if (duPorteur.length) {
     if (pr.accord.absente) {
       aCorriger.push(
-        `La PR modifie ${DOCUMENTS.invariants} : ajouter à la section une ligne « Accord du porteur : … » (lien ou citation datée de son accord explicite). Un invariant ne change qu'à sa demande.`,
+        `La PR modifie ${duPorteur.join(' et ')} : ajouter à la section une ligne « Accord du porteur : … » (lien ou citation datée de son accord explicite), en paragraphe à part. Ces documents ne changent qu'à sa demande.`,
       );
     } else if (!analyseEcrite(pr.accord.valeur)) {
-      aCorriger.push("« Accord du porteur : » à remplir : le lien ou la citation datée de l'accord explicite du porteur sur ce changement d'invariant.");
+      aCorriger.push(`« Accord du porteur : » à remplir : le lien ou la citation datée de son accord explicite sur ce changement de ${duPorteur.join(' et ')}.`);
     }
   }
 
@@ -1063,7 +1073,7 @@ export function preparerSection({ entrees, entreesAvant = new Map(), fichiersMod
     'Lien possible masqué : à analyser',
   ];
   // Paragraphe à part : collée à la déclaration qui précède, la ligne la prolongerait (#64).
-  if (modifieUnInvariant(fichiersModifies)) lignes.push('', 'Accord du porteur : à écrire');
+  if (documentsDuPorteurModifies(fichiersModifies).length) lignes.push('', 'Accord du porteur : à écrire');
   lignes.push('', '### Vérifications manuelles', '');
   if (!requises.size) lignes.push('Aucune pour les identifiants déclarés.');
   for (const r of requises.values()) {

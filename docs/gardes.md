@@ -42,19 +42,21 @@ correspondance ; `packages/gardes` le relit.
   les invariants et usages ([`invariants.md`](invariants.md)), les contraintes
   ([`contraintes.md`](contraintes.md)) et la garde de l'objectif primaire (#58, D61). Changer une
   règle reste libre ; ce qui se vérifie, c'est qu'elle ne les contredit pas. Une PR qui modifie
-  `docs/decisions.md`, `docs/invariants.md`, `docs/contraintes.md`, `CLAUDE.md`, ou la garde
-  (`packages/gardes/**`, `.github/workflows/verifications.yml`,
+  `docs/decisions.md`, `docs/description-projet.md`, `docs/invariants.md`, `docs/contraintes.md`,
+  `CLAUDE.md`, ou la garde (`packages/gardes/**`, ce document, `.github/workflows/verifications.yml`,
   `.github/pull_request_template.md`) se voit demander `VM-regles-primaires`, à analyser puis à
   faire valider comme toute vérification manuelle : l'analyse nomme les règles primaires que la
   règle nouvelle touche et dit pourquoi elle ne les contredit pas. Une contradiction ne se tranche
   pas dans la PR : elle devient une question dans une issue. Cette vérification ne tient pas dans une
   entrée de ce document — une entrée porte un invariant ou une contrainte, et ni une décision ni la
   garde n'en sont un : elle vient d'une table de chemins tenue dans `packages/gardes/gardes.mjs`.
-  Retirer une garde de ce document reste demandé, lui, par la comparaison des deux registres.
+  Ce document y figure lui aussi (accord du porteur du 12 septembre) : la comparaison des deux
+  registres voit une garde retirée, pas une consigne affaiblie.
   La garde est jugée par la version que porte la PR (piste 2 de #58) : c'est l'amorçage
   (`packages/gardes/amorcage.test.mjs`) qui empêche de l'affaiblir en silence.
-- **Un invariant ne change qu'à la demande du porteur** (#64). Une PR qui modifie
-  `docs/invariants.md` porte dans sa section une ligne « Accord du porteur : … », paragraphe à part,
+- **Ce qui vient du porteur ne change qu'à sa demande** (#64). Une PR qui modifie
+  [`description-projet.md`](description-projet.md) — son texte, mot pour mot, qui fait foi — ou
+  [`invariants.md`](invariants.md) porte dans sa section une ligne « Accord du porteur : … », paragraphe à part,
   avec le lien ou la citation datée de son accord explicite. `demander` la prépare pour ces PR et
   pour elles seules ; laissée vide ou en attente (« à écrire », « à analyser », « … »), elle compte
   comme absente et la vérification reste rouge.
