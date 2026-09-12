@@ -231,3 +231,35 @@ describe('règles engendrées par les flux (D24)', () => {
     expect(patch.automations[0]!.deletedAt).toBeUndefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoins rouges des harnais U5 et I6 (docs/gardes.md) : les assertions du moteur de règles et de
+// l'aperçu, rejouées sur des versions volontairement cassées du besoin.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+it.fails('témoin rouge · un moteur de règles qui applique les rangs à l’envers', () => {
+  const rules = [
+    rule({ id: 'haut', rank: 'z', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim' } }),
+    rule({ id: 'bas', rank: 'a', selection: {}, action: { categoryId: 'cat-sante', oneOff: true, state: 'reconcile' } }),
+  ];
+  // Version cassée : les règles sont parcourues dans l'ordre inverse des rangs, donc la règle
+  // générale écrase la règle précise — classer « toutes les opérations semblables » ne veut plus
+  // rien dire.
+  const àLEnvers = [...rules].reverse();
+  const out = outcomeFor(op('o1', 'SUPERMARCHE', euros(-40)), àLEnvers, new Map());
+
+  expect(out.allocation[0]!.categoryId).toBe('cat-alim');
+  expect(out.by).toEqual(['haut', 'bas']);
+});
+
+it.fails('témoin rouge · un aperçu de règle qui enregistre la règle d’essai', () => {
+  const l = withOps(op('o1', 'SUPERMARCHE', euros(-40)));
+  const essai = rule({ id: 'essai', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } });
+  // Version cassée : l'aperçu écrit la règle d'essai dans le grand livre avant de calculer. Ce
+  // qu'on croyait regarder est déjà appliqué.
+  l.automations.push(essai);
+  const diffs = previewAutomations(l, essai).filter((d) => d.changed);
+
+  expect(diffs.length).toBe(1);
+  expect(l.automations.find((r) => r.id === 'essai')).toBeUndefined();
+});

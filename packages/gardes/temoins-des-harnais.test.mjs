@@ -8,9 +8,9 @@
  * cité qui n'existe pas ou ne tourne pas. Ce qu'elle ne fait pas, et que ce fichier garde :
  *
  * 1. **La dette est réglée** — plus aucune ligne `Harnais` ne porte « à bâtir » pour #38 ni #69 ;
- *    la couverture, elle, accepte la dette. C'est le « Fait quand » de #69, et le seul test de ce
- *    fichier qui soit rouge avant le codage : il porte donc `todo` avec l'issue qui le corrige,
- *    comme le veut #66. **La PR qui bâtit les 22 témoins retire ce `todo`.**
+ *    la couverture, elle, accepte la dette. C'était le « Fait quand » de #69, et le seul test de ce
+ *    fichier qui fût rouge avant le codage ; les 22 témoins bâtis, il est vert et le `todo` est
+ *    retiré.
  * 2. **Elle est réglée en bâtissant, pas en effaçant** — une dette disparaît aussi si la ligne
  *    `Harnais` disparaît. Le compte des harnais par entrée est figé ici : le registre ne peut plus
  *    en perdre un sans que ce harnais le dise. Retirer un harnais reste possible, mais par la
@@ -86,13 +86,9 @@ function enDette(texte) {
   return texte;
 }
 
-test(
-  '#69 · plus aucun harnais du registre ne porte « Témoin rouge : à bâtir »',
-  { todo: 'rouge tant que les 22 témoins ne sont pas bâtis ; la PR qui les bâtit retire ce todo (#69)' },
-  () => {
-    aucuneDette(registre());
-  },
-);
+test('#69 · plus aucun harnais du registre ne porte « Témoin rouge : à bâtir »', () => {
+  aucuneDette(registre());
+});
 
 test('#69 · témoin rouge — un harnais laissé « à bâtir » fait échouer « plus aucun harnais en dette »', () => {
   const casse = enDette(reglee(registre()));

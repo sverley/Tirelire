@@ -359,3 +359,23 @@ describe('placement réparti sur plusieurs comptes (D37)', () => {
     expect(computePlan(l, '2026-09-06').gaps).toEqual([]);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoin rouge du harnais I2 (docs/gardes.md) : les assertions de « positions et soldes
+// (D19, D29) », rejouées sur une version volontairement cassée du besoin. Il doit échouer ;
+// `it.fails` tient l'échec attendu, et `pnpm test` rougit le jour où il se mettrait à passer (#66).
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+it.fails('témoin rouge · un solde de tirelire qui ne compte que son compte de placement', () => {
+  const idx = indexLedger(exampleLedger());
+  const tirelire = idx.tireliresById.get('env-tf')!;
+  // Version cassée : ce que la tirelire porte ailleurs que sur son compte de placement est perdu.
+  // Elle cesse d'être un livre de compte tenu à travers les comptes, et sa dotation en attente sur
+  // le compte principal disparaît de son solde.
+  const placés = new Set(tirelire.placement.map((p) => p.accountId));
+  const composantes = new Map([...tirelireComponents(tirelire, idx, asOf)].filter(([compte]) => placés.has(compte)));
+
+  expect(composantes.get('acc-livret')).toBe(euros(900));
+  expect(composantes.get('acc-principal')).toBe(euros(150));
+  expect([...composantes.values()].reduce((s, v) => s + v, 0)).toBe(euros(1050));
+});

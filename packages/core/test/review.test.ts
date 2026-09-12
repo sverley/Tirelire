@@ -111,3 +111,22 @@ describe('renflouements (D49)', () => {
     expect(reviewReplenishments(withHistory(), periods)).toEqual([]);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoin rouge du harnais U4 (docs/gardes.md) : les assertions du bilan par catégorie, rejouées
+// sur une version volontairement cassée du besoin.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+it.fails('témoin rouge · un bilan qui compte les dépenses ponctuelles dans la moyenne', () => {
+  const periods = lastPeriods(withHistory(), '2026-09-06', 12);
+  const sans = reviewCategories(withHistory(), periods).find((r) => r.categoryId === 'cat-alim')!;
+  // Version cassée : le frigo (600 €, acheté une fois) n'est plus distingué d'une dépense
+  // courante. Reconstruire un budget depuis l'historique proposerait alors 100 € de courses de
+  // trop chaque mois, à cause d'un achat qui ne reviendra pas.
+  const l = withHistory();
+  l.operations = l.operations.map((o) => (o.id === 'op-frigo' ? { ...o, oneOff: false } : o));
+  const avec = reviewCategories(l, periods).find((r) => r.categoryId === 'cat-alim')!;
+
+  expect(avec.avg6).toBe(sans.avg6);
+  expect(avec.periods.find((p) => p.key === '2026-06')!.oneOff).toBe(euros(600));
+});

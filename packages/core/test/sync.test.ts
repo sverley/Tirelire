@@ -74,3 +74,21 @@ describe('synchronisation', () => {
     expect(() => importBundle(b, { ...delta, format: 'x' as never })).toThrow();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoin rouge du harnais I8 (docs/gardes.md) : les assertions de l'échange par fichier, rejouées
+// sur une version volontairement cassée du besoin.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+it.fails('témoin rouge · un échange par fichier qui repart toujours de zéro', async () => {
+  const a = await seeded('A');
+  const b = await LedgerStore.create({ sqlJs: SQL, siteId: 'B' });
+  importBundle(b, exportBundle(a, 0, 'Téléphone'));
+  const acc = a.load().accounts[0]!;
+  a.upsert('accounts', { ...acc, name: 'Renommé' });
+  // Version cassée : le curseur du pair est ignoré ; chaque échange renvoie tout le journal, et
+  // deux appareils ne « n'échangent plus que le delta » jamais.
+  const delta = exportBundle(a, 0);
+
+  expect(delta.entries.length).toBe(1);
+});

@@ -110,7 +110,8 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 
 - **Harnais** · `packages/core/test/plan.test.ts` — « positions et soldes (D19, D29) » : une
   tirelire répartie sur plusieurs comptes, son solde égal à la somme de ses composantes, le solde
-  bancaire égal aux composantes portées plus le non-affecté. Témoin rouge : à bâtir (#38).
+  bancaire égal aux composantes portées plus le non-affecté.
+  Témoin rouge : « témoin rouge · un solde de tirelire qui ne compte que son compte de placement »
 - **À bâtir** · un même cas où un compte porte plusieurs tirelires et une tirelire se répartit sur
   plusieurs comptes (#38).
 
@@ -124,7 +125,8 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 ### U1 · Budget seul
 
 - **Harnais** · `packages/core/test/assistant.test.ts` — « budget construit par l'assistant
-  (D40) » : sans aucune opération, le budget se voit dès la période en cours. Témoin rouge : à bâtir (#38).
+  (D40) » : sans aucune opération, le budget se voit dès la période en cours.
+  Témoin rouge : « témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir »
 - **Vérification manuelle** · `VM-U1-parcours` — Sur une base vide, construire un budget avec
   l'assistant jusqu'au plan sans importer de relevé : aucun écran ne bloque ni n'insiste pour
   importer, et le plan se lit.
@@ -134,9 +136,11 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — le virement permanent enregistre
   le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le budget se
-  signale sans rien réécrire (#14, D60). Témoin rouge : à bâtir (#38).
+  signale sans rien réécrire (#14, D60).
+  Témoin rouge : « témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer »
 - **Harnais** · `apps/web/test/flux-derives-plan.test.ts` — à 375 px, l'écran Plan enregistre
-  l'ordre, qui survit au rechargement. Témoin rouge : à bâtir (#38).
+  l'ordre, qui survit au rechargement.
+  Témoin rouge : « témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire »
 - **Vérification manuelle** · `VM-U2-ordres` — Construire un budget, puis valider la mise en place
   des virements permanents proposés : chaque ordre est enregistré, et sa ventilation sur les
   tirelires se lit dans le plan.
@@ -146,7 +150,8 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 
 - **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » : virements « TIRELIRE … »
   reconnus et répartis par l'ordre de financement (D21), flux rapprochés quand libellé et montant
-  concordent. Témoin rouge : à bâtir (#38).
+  concordent.
+  Témoin rouge : « témoin rouge · un virement reconnu versé en entier à une seule tirelire »
 - **Vérification manuelle** · `VM-U3-rapprochement` — Construire un budget sans valider les
   virements, puis importer un relevé inventé qui les contient : l'application propose de les
   rapprocher et reprend la ventilation prévue par le budget.
@@ -155,7 +160,8 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 ### U4 · Budget reconstruit depuis l'historique
 
 - **Harnais** · `packages/core/test/review.test.ts` — bilans par catégorie et des provisions tirés
-  des opérations ; une proposition d'ajustement ne s'applique jamais seule. Témoin rouge : à bâtir (#38).
+  des opérations ; une proposition d'ajustement ne s'applique jamais seule.
+  Témoin rouge : « témoin rouge · un bilan qui compte les dépenses ponctuelles dans la moyenne »
 - **Vérification manuelle** · `VM-U4-reconstruction` — Sans budget, importer un historique inventé
   et reconstruire un budget depuis les opérations : chaque lien entre une opération et un flux se
   valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
@@ -164,8 +170,10 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 ### U5 · Import seul
 
 - **Harnais** · `packages/core/test/import.test.ts` — lecture des relevés, doublons exacts et
-  probables. Témoin rouge : à bâtir (#38).
-- **Harnais** · `packages/core/test/automations.test.ts` — moteur de règles de classement. Témoin rouge : à bâtir (#38).
+  probables.
+  Témoin rouge : « témoin rouge · un import qui ne cherche les doublons que dans le fichier »
+- **Harnais** · `packages/core/test/automations.test.ts` — moteur de règles de classement.
+  Témoin rouge : « témoin rouge · un moteur de règles qui applique les rangs à l’envers »
 - **Vérification manuelle** · `VM-U5-sans-tirelire` — Sur une base vide, importer un relevé
   inventé, classer ses opérations et lire l'analyse par catégorie sans jamais créer de tirelire ni
   de budget : aucun écran ne l'exige, aucun ne reste vide faute d'en avoir.
@@ -190,7 +198,8 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 Chemins : `packages/core/src/automations.ts`, `apps/web/src/views/Operations.svelte`
 
 - **Harnais** · `packages/core/test/automations.test.ts` — une règle classe toutes les opérations
-  semblables, se rejoue sans effet de bord, et son aperçu ne modifie rien. Témoin rouge : à bâtir (#38).
+  semblables, se rejoue sans effet de bord, et son aperçu ne modifie rien.
+  Témoin rouge : « témoin rouge · un aperçu de règle qui enregistre la règle d’essai »
 - **Vérification manuelle** · `VM-I6-gestes` — Compter les gestes pour classer une opération
   importée, puis toutes les opérations semblables ; écrire les deux nombres dans l'analyse et
   signaler toute hausse par rapport à `main`.
@@ -211,11 +220,14 @@ Chemins : `packages/core/src/sync.ts`, `apps/web/src/lib/db.ts`, `apps/web/src/l
 Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/core/src/hlc.ts`, `apps/web/src/lib/relay.ts`, `apps/web/src/lib/webrtc.ts`, `apps/web/src/views/Sync.svelte`, `apps/relay/**`, `apps/hebergement/serveur/**`
 
 - **Harnais** · `packages/core/test/sync.test.ts` — deux puis trois appareils convergent par le
-  protocole, les changements d'un tiers sont relayés, l'échange par fichier est idempotent. Témoin rouge : à bâtir (#38).
+  protocole, les changements d'un tiers sont relayés, l'échange par fichier est idempotent.
+  Témoin rouge : « témoin rouge · un échange par fichier qui repart toujours de zéro »
 - **Harnais** · `packages/core/test/store.test.ts` — « fusion entre deux appareils » : champs
-  modifiés en concurrence, le plus récent gagne, une empreinte fausse est refusée. Témoin rouge : à bâtir (#38).
+  modifiés en concurrence, le plus récent gagne, une empreinte fausse est refusée.
+  Témoin rouge : « témoin rouge · une fusion qui réécrit la ligne entière au lieu de la colonne »
 - **Harnais** · `apps/relay/server.test.mjs`, `apps/hebergement/relais.test.mjs` — relais Node et
-  PHP : dépôt, puis retrait filtré par appareil. Témoin rouge : à bâtir (#38).
+  PHP : dépôt, puis retrait filtré par appareil.
+  Témoin rouge : « témoin rouge · un relais qui rend à chaque appareil ce qu’il a lui-même déposé »
 - **Vérification manuelle** · `VM-I8-deux-instances` — Relier deux instances par QR code, puis deux
   sessions d'ordinateur sans appareil photo ; modifier des deux côtés : elles convergent en direct,
   puis par le relais quand elles ne sont pas ouvertes ensemble, et l'avertissement sur le dépôt de
@@ -226,8 +238,11 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
 
 Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/capacitor.config.ts`, `apps/web/android/**`, `apps/hebergement/assembler.mjs`
 
-- **Harnais** · `.github/workflows/ci.yml` — sur chaque PR, le web et le site d'hébergement se
-  construisent ; l'APK Android ne se construit qu'après fusion sur `main`. Témoin rouge : à bâtir (#38).
+- **Harnais** · `.github/workflows/ci.yml`, `packages/gardes/distributions.test.mjs` — sur chaque
+  PR, le web et le site d'hébergement se construisent ; l'APK Android ne se construit qu'après
+  fusion sur `main`. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
+  (tranché dans #69).
+  Témoin rouge : « témoin rouge · une CI qui construit l'APK sur chaque PR et le site d'hébergement seulement après fusion »
 - **Vérification manuelle** · `VM-I9-apk` — Si la PR touche la construction de l'application (ses
   dépendances, Vite, Capacitor, le projet Android, les jobs de la CI qui construisent ou publient) :
   construire l'APK depuis la branche en local (`pnpm build`, `npx cap sync android`, puis
@@ -243,7 +258,8 @@ Chemins : `packages/core/src/plan.ts`
 
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — un budget qui monte ou baisse
   fait dire au plan l'ancien montant de l'ordre et le nouveau ; un ordre qui diverge est signalé,
-  jamais réécrit. Témoin rouge : à bâtir (#38).
+  jamais réécrit.
+  Témoin rouge : « témoin rouge · un plan qui réécrit l’ordre chez la banque au lieu de le signaler »
 - **Vérification manuelle** · `VM-I10-propositions` — Faire évoluer le budget (monter, baisser,
   retirer un besoin) : le plan propose chaque évolution d'ordre qui en découle, et aucun ordre
   enregistré ne change sans validation.
@@ -280,8 +296,11 @@ Chemins : `apps/web/src/lib/platform.ts`, `apps/web/src/views/Sync.svelte`
 
 Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**`, `apps/hebergement/**`
 
-- **Harnais** · `apps/hebergement/verifier.sh` — après chaque dépôt depuis `main`, le site en ligne
-  redirige HTTP vers HTTPS. Témoin rouge : à bâtir (#38).
+- **Harnais** · `apps/hebergement/verifier.sh`, `apps/hebergement/verifier.test.mjs` — après chaque
+  dépôt depuis `main`, le site en ligne redirige HTTP vers HTTPS. La redirection se constate sur le
+  site réel, par le script ; le harnais garde ce dont ce constat dépend — que le script sonde bien
+  l'adresse en `http://` et relève où elle mène (tranché dans #69).
+  Témoin rouge : « témoin rouge · un script de vérification qui ne sonde plus l’adresse en http:// »
 - **Vérification manuelle** · `VM-C3-https` — Si la PR touche l'application ou le relais : donner à
   l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,
   et que la PR ne fait rien charger en HTTP. Si elle ne touche que des tests, de l'outillage ou de la
@@ -303,7 +322,8 @@ Chemins : `apps/web/src/lib/db.ts`, `apps/web/vite.config.ts`, `apps/hebergement
 Chemins : `apps/web/src/lib/db.ts`, `apps/web/src/views/Settings.svelte`
 
 - **Harnais** · `packages/core/test/store.test.ts` — « survit à un export / réouverture » : le
-  fichier exporté se rouvre à l'identique. Témoin rouge : à bâtir (#38).
+  fichier exporté se rouvre à l'identique.
+  Témoin rouge : « témoin rouge · une sauvegarde qui rejoue les tables et en oublie une »
 - **Vérification manuelle** · `VM-C5-sauvegarde` — Depuis l'accueil, trouver comment sauvegarder
   sans le chercher ; exporter, vider le navigateur, réimporter le fichier : tout revient.
 - **À bâtir** · l'absence de sauvegarde récente signalée (#41).
@@ -327,9 +347,11 @@ Chemins : `apps/web/android/**`, `apps/web/capacitor.config.ts`
 Chemins : `packages/core/src/schema.ts`, `packages/core/src/migration.ts`, `packages/core/src/model.ts`, `packages/core/src/store.ts`, `packages/core/src/sync.ts`
 
 - **Harnais** · `packages/core/test/store.test.ts` — « migration du modèle (D30) » : un champ
-  réécrit par un pair non migré reste compris, et la migration est idempotente. Témoin rouge : à bâtir (#38).
+  réécrit par un pair non migré reste compris, et la migration est idempotente.
+  Témoin rouge : « témoin rouge · une lecture qui rend les anciens genres tels quels »
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — une vieille photo de ventilation
-  écrite par un pair non migré est ignorée. Témoin rouge : à bâtir (#38).
+  écrite par un pair non migré est ignorée.
+  Témoin rouge : « témoin rouge · une vieille photo de pair non migré prise pour la ventilation »
 - **Vérification manuelle** · `VM-C8-deux-versions` — Si la PR change le schéma, le modèle ou le
   protocole : synchroniser une instance construite depuis `main` avec une instance de la branche,
   dans les deux sens, en modifiant des deux côtés : rien ne se perd, ou l'écart est signalé
@@ -341,13 +363,17 @@ Chemins : `packages/core/src/schema.ts`, `packages/core/src/migration.ts`, `pack
 Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/app.css`
 
 - **Harnais** · `apps/web/test/mise-en-page.test.ts` — à 320 et 375 px, le document ne défile pas
-  en largeur et aucun libellé ne recouvre son montant (D54). Témoin rouge : à bâtir (#38).
+  en largeur et aucun libellé ne recouvre son montant (D54).
+  Témoin rouge : « témoin rouge · une page dont une ligne insécable déborde de l’écran »
 - **Harnais** · `apps/web/test/ergonomie.test.ts` — cibles de 44 px, texte de 12 px, contraste de
-  4,5:1, aucun champ caché sous la barre d'onglets (D55). Témoin rouge : à bâtir (#38).
+  4,5:1, aucun champ caché sous la barre d'onglets (D55).
+  Témoin rouge : « témoin rouge · un écran aux cibles de 20 px et au texte gris pâle »
 - **Harnais** · `apps/web/test/panneaux-edition.test.ts`, `apps/web/test/revealed.test.ts` — un
-  formulaire s'ouvre sous la ligne qu'il modifie et vient dans le champ de vision. Témoin rouge : à bâtir (#38).
+  formulaire s'ouvre sous la ligne qu'il modifie et vient dans le champ de vision.
+  Témoin rouge : « témoin rouge · un panneau écrit en tête de document, hors extrait et sans titre »
 - **Harnais** · `apps/web/test/panneaux-nommes.test.ts` — un panneau d'édition nomme ce qu'il
-  modifie, lisible à 375 px (D59). Témoin rouge : à bâtir (#38).
+  modifie, lisible à 375 px (D59).
+  Témoin rouge : « témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe »
 - **Vérification manuelle** · `VM-C9-telephone` — Sur un vrai téléphone, dans l'application
   installée : les écrans que la PR touche restent lisibles et atteignables au pouce, bord à bord,
   clavier logiciel ouvert, avec les polices du système.

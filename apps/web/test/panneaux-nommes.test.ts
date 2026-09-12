@@ -298,6 +298,53 @@ function installer() {
 }
 
 // ---------------------------------------------------------------------------
+// Ce qu'un panneau ouvert doit dire, et le témoin rouge qui le garde
+// ---------------------------------------------------------------------------
+
+/** Ce qu'on attend d'un panneau ouvert : il nomme l'élément touché, lui seul, et se lit. */
+function vérifierUneOuverture(écran: string, o: Ouverture, tous: string[]) {
+  const où = `${écran}, « ${o.libellé} » ${o.requis.length ? `sur ${o.requis.join(' + ')}` : '(création)'}`;
+  expect.soft(o.panneaux, `${où} : un et un seul panneau`).toBe(1);
+  expect.soft(o.titre, `${où} : panneau sans titre`).not.toBe('');
+  for (const nom of o.requis) expect.soft(o.titre.includes(nom), `${où} : « ${o.titre} » ne nomme pas « ${nom} »`).toBe(true);
+  const intrus = tous.filter((nom) => !o.requis.includes(nom) && o.titre.includes(nom));
+  expect.soft(intrus, `${où} : « ${o.titre} » nomme un autre élément`).toEqual([]);
+  expect.soft(o.lisible, `${où} : titre pas lisible à l’ouverture (${o.position})`).toBe(true);
+  expect.soft(o.figé, `${où} : le titre suit la frappe`).toBe(true);
+  expect.soft(o.déborde, `${où} : le titre déborde du panneau`).toBe(false);
+  expect.soft(o.ajouteDébordement, `${où} : ouvrir le panneau fait défiler la page latéralement`).toBe(false);
+  expect.soft(o.taille, `${où} : titre sous ${TEXTE_MIN} px`).toBeGreaterThanOrEqual(TEXTE_MIN);
+  expect.soft(o.contraste, `${où} : contraste du titre sous ${CONTRASTE_MIN}:1`).toBeGreaterThanOrEqual(CONTRASTE_MIN - 0.01);
+  expect.soft(o.fermé, `${où} : Annuler n’a pas fermé le panneau`).toBe(true);
+}
+
+/**
+ * Témoin rouge du harnais C9 (docs/gardes.md) : les mêmes assertions, rejouées sur la lecture d'un
+ * panneau volontairement cassé — le panneau d'avant #21, intitulé « Modifier » tout court, écrit en
+ * gris pâle et renommé à chaque frappe. Il doit échouer ; `it.fails` tient l'échec attendu (#66).
+ * Il se joue sans navigateur : c'est la règle qu'on garde ici, pas une seconde visite des écrans.
+ */
+it.fails('témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe', () => {
+  vérifierUneOuverture(
+    'Tirelires',
+    {
+      libellé: 'Modifier',
+      conteneur: 'ligne',
+      requis: ['Taxe foncière'],
+      panneaux: 1,
+      titre: 'Modifier',
+      lisible: true,
+      position: 'inventée',
+      figé: false,
+      déborde: false,
+      ajouteDébordement: false,
+      taille: 10,
+      contraste: 2.1,
+      fermé: true,
+    },
+    ['Taxe foncière', 'Assurance auto'],
+  );
+});
 
 describe.skipIf(!navigateur)('panneaux d’édition : ils disent sur quoi ils portent (issue #23, second défaut)', () => {
   let site: Site;
@@ -434,21 +481,7 @@ describe.skipIf(!navigateur)('panneaux d’édition : ils disent sur quoi ils po
       expect(erreur).toBeUndefined();
       console.log(`[titres] ${écran.titre} : ${ouvertures.length} panneaux — ${ouvertures.map((o) => `« ${o.titre} »`).join(' ; ')}`);
 
-      for (const o of ouvertures) {
-        const où = `${écran.titre}, « ${o.libellé} » ${o.requis.length ? `sur ${o.requis.join(' + ')}` : '(création)'}`;
-        expect.soft(o.panneaux, `${où} : un et un seul panneau`).toBe(1);
-        expect.soft(o.titre, `${où} : panneau sans titre`).not.toBe('');
-        for (const nom of o.requis) expect.soft(o.titre.includes(nom), `${où} : « ${o.titre} » ne nomme pas « ${nom} »`).toBe(true);
-        const intrus = TOUS.filter((nom) => !o.requis.includes(nom) && o.titre.includes(nom));
-        expect.soft(intrus, `${où} : « ${o.titre} » nomme un autre élément`).toEqual([]);
-        expect.soft(o.lisible, `${où} : titre pas lisible à l’ouverture (${o.position})`).toBe(true);
-        expect.soft(o.figé, `${où} : le titre suit la frappe`).toBe(true);
-        expect.soft(o.déborde, `${où} : le titre déborde du panneau`).toBe(false);
-        expect.soft(o.ajouteDébordement, `${où} : ouvrir le panneau fait défiler la page latéralement`).toBe(false);
-        expect.soft(o.taille, `${où} : titre sous ${TEXTE_MIN} px`).toBeGreaterThanOrEqual(TEXTE_MIN);
-        expect.soft(o.contraste, `${où} : contraste du titre sous ${CONTRASTE_MIN}:1`).toBeGreaterThanOrEqual(CONTRASTE_MIN - 0.01);
-        expect.soft(o.fermé, `${où} : Annuler n’a pas fermé le panneau`).toBe(true);
-      }
+      for (const o of ouvertures) vérifierUneOuverture(écran.titre, o, TOUS);
 
       // Deux actions différentes sur les mêmes éléments doivent s'annoncer différemment.
       const parCible = new Map<string, Map<string, Set<string>>>();

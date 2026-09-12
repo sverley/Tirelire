@@ -171,3 +171,27 @@ describe('tirelire de saison (D48)', () => {
     expect(plan.totals.margin).toBe(euros(-800));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoin rouge du harnais U1 (docs/gardes.md) : les assertions de « budget construit par
+// l'assistant (D40) », rejouées sur la version que l'en-tête de ce fichier décrit comme fausse.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Version cassée : tirelires ouvertes « aujourd'hui », flux ancrés sur une occurrence à venir. */
+function budgetCassé(): Ledger {
+  const l = budgetDeLAssistant();
+  return {
+    ...l,
+    tirelires: l.tirelires.map((t) => ({ ...t, openingDate: asOf })),
+    plannedFlows: l.plannedFlows.map((f) => ({ ...f, periodicity: { interval: 1, unit: 'month' as const, anchorDate: '2026-10-28' } })),
+  };
+}
+
+it.fails('témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir', () => {
+  const plan = computePlan(budgetCassé(), asOf);
+
+  expect(plan.totals.incomes).toBe(euros(2400));
+  expect(plan.totals.fixedCharges).toBe(euros(750));
+  expect(plan.warnings.map((w) => w.code)).not.toContain('noIncome');
+  expect(plan.lines.map((l) => l.needId).sort()).toEqual(['n-assurance', 'n-courses']);
+});

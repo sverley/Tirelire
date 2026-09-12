@@ -53,6 +53,32 @@ function mesurer() {
   };
 }
 
+/** Ce que les mesures doivent dire d'un écran qui tient dans la largeur qu'on lui donne. */
+function vérifier(r: ReturnType<typeof mesurer>, largeur: number) {
+  expect(r.clientWidth).toBe(largeur);
+  expect(r.scrollWidth, `défilement horizontal à ${largeur} px`).toBeLessThanOrEqual(r.clientWidth);
+  expect(r.chevauchements, 'un libellé recouvre le montant de sa ligne').toEqual([]);
+  expect(r.ongletsHorsÉcran, 'un onglet de la barre du bas sort de la fenêtre').toEqual([]);
+}
+
+/**
+ * Témoin rouge du harnais C9 (docs/gardes.md) : les mêmes assertions, rejouées sur la mesure
+ * d'une page volontairement cassée — celle du 8 septembre 2026, relevée telle quelle. Il doit
+ * échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur : c'est la règle
+ * qu'on garde ici, pas une seconde mesure de l'application.
+ */
+it.fails('témoin rouge · une page dont une ligne insécable déborde de l’écran', () => {
+  vérifier(
+    {
+      clientWidth: 375,
+      scrollWidth: 462,
+      chevauchements: ['« retenu 900,00 · croisière 100,00 · dem » 402 > 300'],
+      ongletsHorsÉcran: ['Plus'],
+    },
+    375,
+  );
+});
+
 describe.skipIf(!navigateur)('mise en page mobile de l’écran Plan', () => {
   let site: Site;
 
@@ -70,10 +96,7 @@ describe.skipIf(!navigateur)('mise en page mobile de l’écran Plan', () => {
       const r = await page.evaluate(mesurer);
       await page.close();
 
-      expect(r.clientWidth).toBe(largeur);
-      expect(r.scrollWidth, `défilement horizontal à ${largeur} px`).toBeLessThanOrEqual(r.clientWidth);
-      expect(r.chevauchements, 'un libellé recouvre le montant de sa ligne').toEqual([]);
-      expect(r.ongletsHorsÉcran, 'un onglet de la barre du bas sort de la fenêtre').toEqual([]);
+      vérifier(r, largeur);
     });
   }
 });

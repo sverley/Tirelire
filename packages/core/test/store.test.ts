@@ -357,3 +357,56 @@ describe('migration du modèle (D30)', () => {
     expect(store.changesSince(0, 'mig').some((c) => c.tbl === 'needs')).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoins rouges des harnais I8, C5 et C8 (docs/gardes.md) : les assertions de la fusion, de
+// l'export et de la migration, rejouées sur des versions volontairement cassées du besoin.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+it.fails('témoin rouge · une fusion qui réécrit la ligne entière au lieu de la colonne', async () => {
+  const a = await seeded('A');
+  const b = await open('B');
+  b.applyRemote(a.changesSince(0));
+  const envA = a.load().tirelires.find((e) => e.id === 'env-tf')!;
+  a.upsert('tirelires', { ...envA, openingBalance: euros(950) });
+  const envB = b.load().tirelires.find((e) => e.id === 'env-tf')!;
+  b.upsert('tirelires', { ...envB, name: 'Taxe foncière 2026' });
+  // Version cassée : au lieu de fusionner colonne par colonne, chaque côté réécrit la ligne
+  // entière que le pair lui envoie — l'une des deux modifications concurrentes est perdue.
+  a.upsert('tirelires', b.load().tirelires.find((e) => e.id === 'env-tf')!);
+  const finalA = a.load().tirelires.find((e) => e.id === 'env-tf')!;
+  const finalB = b.load().tirelires.find((e) => e.id === 'env-tf')!;
+
+  expect(finalA).toEqual(finalB);
+  expect(finalA.openingBalance).toBe(euros(950));
+  expect(finalA.name).toBe('Taxe foncière 2026');
+});
+
+it.fails('témoin rouge · une sauvegarde qui rejoue les tables et en oublie une', async () => {
+  const s = await seeded('A');
+  // Version cassée : au lieu du fichier exporté, la sauvegarde réécrit les tables une à une — et
+  // en oublie une, exactement comme la fonction qui chargeait l'exemple sans ses besoins.
+  const copie = await open('A');
+  const l = s.load();
+  for (const a of l.accounts) copie.upsert('accounts', a);
+  for (const n of l.needs) copie.upsert('needs', n);
+
+  expect(copie.load().tirelires.length).toBe(exampleLedger().tirelires.length);
+  expect(copie.lastSeq).toBe(s.lastSeq);
+});
+
+it.fails('témoin rouge · une lecture qui rend les anciens genres tels quels', async () => {
+  const store = await storeAtModel1([
+    ['accounts', 'acc_p', 'name', 'Compte courant'],
+    ['accounts', 'acc_p', 'kind', 'pivot'],
+    ['accounts', 'acc_p', 'opening_balance', 0],
+    ['accounts', 'acc_p', 'opening_date', '2026-01-01'],
+  ]);
+  migrateModel(store);
+  store.query(`UPDATE accounts SET kind = 'pivot' WHERE id = 'acc_p'`);
+  // Version cassée : la lecture ne traduit plus ce qu'un pair resté en arrière vient de réécrire,
+  // elle rend la colonne telle quelle. Deux versions ne se comprennent plus.
+  const brut = store.query(`SELECT kind FROM accounts WHERE id = 'acc_p'`)[0]!['kind'];
+
+  expect(brut).toBe('principal');
+});

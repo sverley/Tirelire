@@ -28,33 +28,69 @@ function positions(texte: string, motif: string): number[] {
 /** Balise ouvrante complète commençant à `debut`. */
 const balise = (texte: string, debut: number) => texte.slice(debut, texte.indexOf('>', debut));
 
+/** Les trois conditions, séparées de leur source pour être rejouables sur un écran inventé. */
+function extraitAuPointDUsage(vue: string, texte: string) {
+  const formulaires = positions(texte, '<form class="edit');
+  expect(formulaires.length).toBeGreaterThan(0);
+  for (const position of formulaires) {
+    const ouvert = Math.max(...positions(texte.slice(0, position), '{#snippet'), -1);
+    const referme = Math.max(...positions(texte.slice(0, position), '{/snippet}'), -1);
+    expect(ouvert, `${vue} : formulaire écrit en dur au lieu d’un {#snippet}`).toBeGreaterThan(referme);
+  }
+}
+
+function attachéEtRamené(vue: string, texte: string) {
+  for (const position of positions(texte, '<form class="edit')) {
+    const ouvrante = balise(texte, position);
+    expect(ouvrante, `${vue} : panneau sans la classe « attached »`).toContain('class="edit attached"');
+    expect(ouvrante, `${vue} : panneau sans use:revealed`).toContain('use:revealed');
+  }
+}
+
+function nommeCeQuIlModifie(vue: string, texte: string) {
+  const formulaires = positions(texte, '<form class="edit');
+  const titres = positions(texte, 'class="titre-panneau"');
+  expect(titres.length, `${vue} : autant de titres que de panneaux`).toBe(formulaires.length);
+  // Le titre est figé à l'ouverture : lu depuis `form.name`, il suivrait la frappe.
+  expect(texte, `${vue} : titre non figé à l’ouverture`).toMatch(/^\s*(need)?[Tt]itre = /m);
+}
+
 describe('panneaux d’édition de la Configuration', () => {
   it.each(VUES)('%s : chaque panneau est un extrait rendu au point d’usage', (vue) => {
-    const texte = source(vue);
-    const formulaires = positions(texte, '<form class="edit');
-    expect(formulaires.length).toBeGreaterThan(0);
-    for (const position of formulaires) {
-      const ouvert = Math.max(...positions(texte.slice(0, position), '{#snippet'), -1);
-      const referme = Math.max(...positions(texte.slice(0, position), '{/snippet}'), -1);
-      expect(ouvert, `${vue} : formulaire écrit en dur au lieu d’un {#snippet}`).toBeGreaterThan(referme);
-    }
+    extraitAuPointDUsage(vue, source(vue));
   });
 
   it.each(VUES)('%s : chaque panneau est attaché à sa ligne et ramené à l’écran', (vue) => {
-    const texte = source(vue);
-    for (const position of positions(texte, '<form class="edit')) {
-      const ouvrante = balise(texte, position);
-      expect(ouvrante, `${vue} : panneau sans la classe « attached »`).toContain('class="edit attached"');
-      expect(ouvrante, `${vue} : panneau sans use:revealed`).toContain('use:revealed');
-    }
+    attachéEtRamené(vue, source(vue));
   });
 
   it.each(VUES)('%s : chaque panneau nomme ce qu’il modifie', (vue) => {
-    const texte = source(vue);
-    const formulaires = positions(texte, '<form class="edit');
-    const titres = positions(texte, 'class="titre-panneau"');
-    expect(titres.length, `${vue} : autant de titres que de panneaux`).toBe(formulaires.length);
-    // Le titre est figé à l'ouverture : lu depuis `form.name`, il suivrait la frappe.
-    expect(texte, `${vue} : titre non figé à l’ouverture`).toMatch(/^\s*(need)?[Tt]itre = /m);
+    nommeCeQuIlModifie(vue, source(vue));
   });
+});
+
+/**
+ * Témoin rouge du harnais C9 (docs/gardes.md) : les trois mêmes conditions, rejouées sur un écran
+ * volontairement écrit comme celui d'avant D52 — formulaire en tête de document, hors extrait, sans
+ * attache, sans titre. Il doit échouer ; `it.fails` tient l'échec attendu (#66).
+ */
+const VUE_CASSÉE = [
+  '<script lang="ts">',
+  "  let ouvert = $state('');",
+  '</script>',
+  '',
+  '<form class="edit" onsubmit={enregistrer}>',
+  '  <label>Nom<input bind:value={form.name} /></label>',
+  '</form>',
+  '',
+  '{#snippet ligne(t)}',
+  '  <div class="row"><button onclick={() => (ouvert = t.id)}>Modifier</button></div>',
+  '{/snippet}',
+  '',
+].join('\n');
+
+it.fails('témoin rouge · un panneau écrit en tête de document, hors extrait et sans titre', () => {
+  extraitAuPointDUsage('Cassée', VUE_CASSÉE);
+  attachéEtRamené('Cassée', VUE_CASSÉE);
+  nommeCeQuIlModifie('Cassée', VUE_CASSÉE);
 });

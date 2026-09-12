@@ -151,6 +151,29 @@ function mesurerLOcclusion() {
 }
 
 // ---------------------------------------------------------------------------
+// Ce que les mesures doivent dire, et le témoin rouge qui le garde
+// ---------------------------------------------------------------------------
+
+function vérifierLesCibles(r: { tropPetites: string[]; collés: string[] }, écran: string) {
+  expect(r.tropPetites, `cibles sous ${CIBLE} px sur l'écran ${écran}`).toEqual([]);
+  expect(r.collés, `bouton destructif à moins de ${ÉCART_DESTRUCTIF} px de son voisin`).toEqual([]);
+}
+
+function vérifierLeTexte(r: { tropPetits: string[]; tropPâles: string[] }, écran: string) {
+  expect(r.tropPetits, `texte sous ${TEXTE} px sur l'écran ${écran}`).toEqual([]);
+  expect(r.tropPâles, `contraste sous ${CONTRASTE}:1 sur l'écran ${écran}`).toEqual([]);
+}
+
+/**
+ * Témoin rouge du harnais C9 (docs/gardes.md) : les mêmes assertions, rejouées sur la mesure d'un
+ * écran volontairement cassé — cibles de 20 px, destructif collé à son voisin, texte de 9 px en
+ * gris pâle. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur :
+ * ce sont les seuils qu'on garde ici, pas une seconde mesure de l'application.
+ */
+it.fails('témoin rouge · un écran aux cibles de 20 px et au texte gris pâle', () => {
+  vérifierLesCibles({ tropPetites: ['Modifier — 20×20'], collés: ['Supprimer à 2 px de Modifier'] }, 'inventé');
+  vérifierLeTexte({ tropPetits: ['« Solde à régler » à 9 px'], tropPâles: ['« Solde à régler » 2.10:1 (rgb(180, 180, 180) sur fond)'] }, 'inventé');
+});
 
 describe.skipIf(!navigateur)('ergonomie au doigt', () => {
   let site: Site;
@@ -185,8 +208,7 @@ describe.skipIf(!navigateur)('ergonomie au doigt', () => {
       const r = await page.evaluate(mesurerLesCibles, CIBLE, ÉCART_DESTRUCTIF);
       await page.close();
 
-      expect(r.tropPetites, `cibles sous ${CIBLE} px sur l'écran ${écran.nom}`).toEqual([]);
-      expect(r.collés, `bouton destructif à moins de ${ÉCART_DESTRUCTIF} px de son voisin`).toEqual([]);
+      vérifierLesCibles(r, écran.nom);
     }, 60_000);
 
     it(`${écran.nom} : rien sous ${TEXTE} px ni sous ${CONTRASTE}:1`, async () => {
@@ -196,8 +218,7 @@ describe.skipIf(!navigateur)('ergonomie au doigt', () => {
       const r = await page.evaluate(mesurerLeTexte, TEXTE, CONTRASTE);
       await page.close();
 
-      expect(r.tropPetits, `texte sous ${TEXTE} px sur l'écran ${écran.nom}`).toEqual([]);
-      expect(r.tropPâles, `contraste sous ${CONTRASTE}:1 sur l'écran ${écran.nom}`).toEqual([]);
+      vérifierLeTexte(r, écran.nom);
     }, 60_000);
   }
 

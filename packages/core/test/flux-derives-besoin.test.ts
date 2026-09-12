@@ -630,3 +630,42 @@ describe('#14 · évolutions du besoin : ce qui reste dans la somme, et l’ordr
     expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoins rouges des harnais U2, I10 et C8 (docs/gardes.md) : les assertions des sections 1, 2
+// et 3 ci-dessus, rejouées sur des versions volontairement cassées du besoin.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+it.fails('témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer', () => {
+  const avant = enregistrerOrdre(exampleLedger(), euros(650));
+  const après = besoinAjouté(avant);
+  const op = ligneBancaire(avant, euros(650));
+  const vAvant = ventilation(importer(avant, op).patch);
+  // Version cassée : la ventilation est la photo prise le jour où l'ordre a été enregistré. Le
+  // budget a bougé, le virement se répartit toujours comme avant.
+  const vAprès = vAvant;
+
+  expect(vAprès).toEqual(attendue(après, op));
+  expect(vAprès).not.toEqual(vAvant);
+});
+
+it.fails('témoin rouge · un plan qui réécrit l’ordre chez la banque au lieu de le signaler', () => {
+  const l = enregistrerOrdre(exampleLedger(), euros(650));
+  const budgetBougé = dotationRevue(besoinAjouté(l));
+  // Version cassée : le montant enregistré suit le budget tout seul. Plus rien ne diverge, donc
+  // plus rien n'est signalé — et l'ordre chez la banque, lui, n'a pas bougé.
+  const après = enregistrerOrdre(budgetBougé, demande(budgetBougé, AVANT));
+
+  expect(ordre(après).amount).toBe(-euros(650));
+  expect(alertes(après, AVANT)).toHaveLength(1);
+});
+
+it.fails('témoin rouge · une vieille photo de pair non migré prise pour la ventilation', () => {
+  const l = enregistrerOrdre(exampleLedger(), euros(650));
+  const op = ligneBancaire(l, euros(650));
+  // Version cassée : `plannedAllocation`, écrit par un pair resté au modèle d'avant, est lu comme
+  // la ventilation du virement au lieu d'être ignoré.
+  const photo: Record<string, number> = { 'env-auto': euros(650) };
+
+  expect(photo).toEqual(attendue(l, op));
+});
