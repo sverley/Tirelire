@@ -1244,3 +1244,13 @@ couverture lit l'étape `pnpm test` de `ci.yml` et refuse qu'elle cesse de poser
 La règle d'« Écrire une entrée » et les consignes de `VM-I9-apk` et `VM-C3-https` épargnent les PR de
 tests, d'outillage ou de documentation ; la garde ne classe pas elle-même les fichiers : l'analyse le
 dit, et qui valide le contrôle.
+
+## D63 · 2026-09-12 · Une sous-issue, une PR, une fusion
+
+L'objectif primaire (#58) a été découpé en sept sous-issues, mais une seule PR (#63) en portait
+trois et a absorbé les deux besoins découverts pendant son audit : une branche qui s'élargit à
+chaque découverte n'atteint jamais son terme, et #59 comme #60 ont été fermées alors que rien
+n'était fusionné. D'où la règle : une sous-issue, une PR, une fusion ; un besoin découvert en route
+devient une sous-issue et attend sa propre PR, sauf s'il rend la PR courante fausse ; une issue se
+ferme à la fusion ; un objectif permanent ne se ferme pas. Le découpage d'un objectif en sous-issues
+précède le codage (`CLAUDE.md`).

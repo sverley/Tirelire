@@ -26,6 +26,15 @@
 ## Méthode de travail
 
 - **L'issue définit le besoin, la PR définit la solution.**
+- **Découpage et fusion (D63).** Un objectif se découpe en sous-issues avant tout codage ; l'issue
+  d'objectif ne porte jamais de code elle-même.
+  - **Une sous-issue, une PR, une fusion.** Une sous-issue est taillée pour être fusionnable seule ;
+    une PR qui en porterait plusieurs se découpe avant d'être ouverte.
+  - **Un besoin découvert en route devient une sous-issue** du même objectif et attend sa propre PR.
+    Il ne rejoint la branche en cours que s'il rend la PR courante fausse.
+  - **Une issue se ferme à la fusion**, jamais à la fin du codage : une issue fermée veut dire que
+    la garantie est sur `main`.
+  - **Un objectif permanent ne se ferme pas** ; il se tient par ses gardes, pas par sa fermeture.
 - **Issue en cours.** Une session qui prend une issue (objectif, audit ou codage) lui pose
   l'étiquette `en cours` dès le début du travail ; le titre ne s'édite jamais pour cela. L'étiquette
   est retirée d'elle-même à la fermeture de l'issue (`.github/workflows/etiquette-en-cours.yml`).
