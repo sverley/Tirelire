@@ -10,9 +10,13 @@
  * - `pull_request` de type `closed` : la PR fusionnée dans la branche principale dont la vérification
  *   « Vérifications manuelles » n'était pas verte sur la tête fusionnée ouvre l'alerte. Une
  *   vérification absente ou inachevée vaut rouge — « vert veut dire validé » (D61) ;
- * - `push` sur la branche principale : le push est direct quand aucun de ses commits n'appartient à
- *   une PR fusionnée vers cette branche. Le push qui porte un commit de fusion se tait : l'événement
- *   de fermeture l'a déjà jugé, une fusion n'alerte pas deux fois.
+ * - `push` sur la branche principale : seul se tait le push dont *tous* les commits viennent de PR
+ *   fusionnées vers cette branche — la fermeture de ces PR les a déjà jugées, une fusion n'alerte pas
+ *   deux fois. Tout le reste est un push direct : un commit glissé par-dessus une fusion faite en
+ *   local, et tout push forcé, qui réécrit la branche et peut en retirer des fusions vérifiées sans
+ *   porter un seul commit neuf. Question 1 de #62, tranchée par le porteur le 12 septembre : un
+ *   changement de `main` qu'aucune PR n'explique est un push direct, et se tromper en parlant vaut
+ *   mieux, pour une garde, que se tromper en se taisant.
  *
  * Le titre de l'issue est déterministe, et l'alerte cherche ce titre avant d'ouvrir : un événement
  * rejoué retrouve la sienne et n'en ouvre pas de seconde. Toute lecture et toute écriture passent par
@@ -23,7 +27,7 @@
 export const VERIFICATION = 'Vérifications manuelles';
 /** `alerte` marque ce que la garde ouvre ; `primaire` la rattache au chantier #58. */
 export const ETIQUETTES = ['alerte', 'primaire'];
-/** Un push en porte rarement plus ; au-delà, l'un des premiers a déjà répondu. */
+/** Un push en porte rarement plus, et la tête est lue la première : la fenêtre ne la manque jamais. */
 const COMMITS_LUS = 20;
 
 const court = (sha) => String(sha ?? '').slice(0, 7);
@@ -97,24 +101,50 @@ async function surPush(evenement, principale, api) {
   const commits = commitsDuPush(evenement);
   if (!commits.length) return { motif: 'le push ne porte aucun commit' };
 
-  // Une fusion de PR est elle-même un push sur `main` : elle a déjà été jugée à la fermeture de la
-  // PR, et n'alerte pas une seconde fois (lecture proposée par l'audit, question 1 de #62).
-  for (const sha of commits.slice(0, COMMITS_LUS)) {
-    const fusionnee = (await api.prsDuCommit(sha)).find((p) => p && (p.merged || p.merged_at) && p.base?.ref === principale);
-    if (fusionnee) return { motif: `le commit \`${court(sha)}\` vient de la PR #${fusionnee.number}, déjà jugée à sa fermeture` };
+  const tete = evenement.after || evenement.head_commit?.id;
+  // La tête d'abord : c'est le commit le plus parlant, et la fenêtre ne doit jamais la manquer.
+  const aJuger = [...new Set([tete, ...commits].filter(Boolean))].slice(0, COMMITS_LUS);
+
+  // Un push forcé n'est jamais l'effet d'une fusion : il réécrit la branche, et peut en retirer des
+  // fusions déjà vérifiées sans porter un seul commit neuf. Rien à interroger, il est direct.
+  const force = evenement.forced === true;
+  let directs = aJuger;
+  if (!force) {
+    directs = [];
+    let jugee;
+    for (const sha of aJuger) {
+      const pr = (await api.prsDuCommit(sha)).find((p) => p && (p.merged || p.merged_at) && p.base?.ref === principale);
+      if (pr) jugee ??= pr;
+      else directs.push(sha);
+    }
+    // Le silence demande que *tous* les commits viennent d'une PR fusionnée, pas au moins un : un
+    // commit poussé par-dessus une fusion faite en local n'a été relu par personne.
+    if (!directs.length) return { motif: `tous les commits poussés viennent de PR fusionnées, dont #${jugee.number}, déjà jugées à leur fermeture` };
   }
 
-  const tete = evenement.after || evenement.head_commit?.id;
+  const raison = force
+    ? `push forcé sur \`${principale}\` : \`${court(tete)}\` réécrit la branche, ce qu'aucune fusion ne fait`
+    : `push direct sur \`${principale}\` : ${directs.map((s) => `\`${court(s)}\``).join(', ')} n'appartiennent à aucune PR fusionnée`;
+
   return {
-    motif: `push direct sur \`${principale}\` : \`${court(tete)}\` n'appartient à aucune PR fusionnée`,
+    motif: raison,
     alerte: {
       titre: `Push direct sur \`${principale}\` · \`${court(tete)}\``,
       corps: [
-        `Un push direct sur \`${principale}\` : aucun des commits poussés n'appartient à une PR fusionnée,`,
-        'donc aucune vérification manuelle ne les a validés. Un push direct vaut fusion non vérifiée.',
+        ...(force
+          ? [
+              `\`${principale}\` a été réécrite par un push forcé. Un push forcé n'est jamais l'effet d'une fusion : il`,
+              "peut retirer de la branche des fusions déjà vérifiées sans porter un seul commit neuf, et aucune",
+              'PR ne l\'explique. Un push direct vaut fusion non vérifiée.',
+            ]
+          : [
+              `Un push direct sur \`${principale}\` : des commits poussés n'appartiennent à aucune PR fusionnée,`,
+              "donc aucune vérification manuelle ne les a relus. Un push direct vaut fusion non vérifiée.",
+            ]),
         '',
         `- Commit de tête : \`${tete}\``,
-        `- Commits poussés : ${commits.map((s) => `\`${s}\``).join(', ')}`,
+        `- Commits poussés : ${commits.map((s) => `\`${s}\``).join(', ') || 'aucun commit neuf dans la plage'}`,
+        ...(force ? ['- Push forcé : oui'] : [`- Commits qu'aucune PR fusionnée n'explique : ${directs.map((s) => `\`${s}\``).join(', ')}`]),
         `- Poussé par @${qui(evenement.pusher?.name, evenement.sender?.login)}`,
         ...(evenement.compare ? [`- Comparaison : ${evenement.compare}`] : []),
         RAPPEL,
