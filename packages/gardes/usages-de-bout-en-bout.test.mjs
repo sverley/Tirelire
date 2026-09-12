@@ -19,9 +19,9 @@
  *
  * 1. **U1, U2 et U5 portent chacun un harnais de plus que leurs harnais unitaires du 13 septembre,
  *    et ce harnais cite son témoin rouge.** La couverture se contente des gardes du jour : un usage
- *    resté à ses seuls tests unitaires lui paraît gardé. C'est le « Fait quand » de #70, donc rouge
- *    avant le codage : le test porte `todo` avec l'issue qui le corrige, et **la PR qui bâtit les
- *    trois parcours le retire**.
+ *    resté à ses seuls tests unitaires lui paraît gardé. C'est le « Fait quand » de #70 : les trois
+ *    parcours sont bâtis (`packages/core/test/parcours-u{1,2,5}.test.ts`), et les deux `todo` que
+ *    portait ce fichier avant leur construction ont été retirés par la PR qui les a bâtis.
  * 2. **U3 et U4 gardent une dette qui renvoie à leur besoin, tant qu'ils n'ont pas leur parcours.**
  *    Vert dès aujourd'hui, et vert après #40 et #16 : l'un ou l'autre, jamais rien. La couverture,
  *    elle, accepterait qu'une ligne « À bâtir » disparaisse sans rien à sa place.
@@ -168,13 +168,9 @@ function parcoursDeBoutEnBout(texte, ids = PORTENT_UN_PARCOURS) {
   assert.deepEqual(manquants, [], `des usages n'ont pas leur harnais de bout en bout au registre :\n${manquants.join('\n')}`);
 }
 
-test(
-  '#70 · U1, U2 et U5 portent au registre un harnais de bout en bout, avec son témoin rouge',
-  { todo: 'rouge tant que les trois parcours ne sont pas bâtis ; la PR qui les bâtit retire ce todo (#70)' },
-  () => {
-    parcoursDeBoutEnBout(registre());
-  },
-);
+test('#70 · U1, U2 et U5 portent au registre un harnais de bout en bout, avec son témoin rouge', () => {
+  parcoursDeBoutEnBout(registre());
+});
 
 test('#70 · un registre où chaque usage cite son parcours est accepté', () => {
   parcoursDeBoutEnBout(avecParcours(registre()), USAGES);
@@ -227,13 +223,9 @@ function detteReglee(texte, ids = PORTENT_UN_PARCOURS) {
   assert.deepEqual(restes, [], `des usages restent « À bâtir » au lieu d'être gardés :\n${restes.join('\n')}`);
 }
 
-test(
-  '#70 · U1, U2 et U5 ne restent plus « À bâtir » (#15, #13, #39)',
-  { todo: 'rouge tant que les trois parcours ne sont pas bâtis ; la PR qui les bâtit retire ce todo (#70)' },
-  () => {
-    detteReglee(registre());
-  },
-);
+test('#70 · U1, U2 et U5 ne restent plus « À bâtir » (#15, #13, #39)', () => {
+  detteReglee(registre());
+});
 
 test('#70 · un registre sans dette sur ces trois usages est accepté', () => {
   detteReglee(sansDette(registre()));
