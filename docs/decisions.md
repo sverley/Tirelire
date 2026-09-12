@@ -1254,3 +1254,32 @@ n'était fusionné. D'où la règle : une sous-issue, une PR, une fusion ; un be
 devient une sous-issue et attend sa propre PR, sauf s'il rend la PR courante fausse ; une issue se
 ferme à la fusion ; un objectif permanent ne se ferme pas. Le découpage d'un objectif en sous-issues
 précède le codage (`CLAUDE.md`).
+
+## D64 · 2026-09-12 · Une règle nouvelle se vérifie contre les règles primaires
+
+Changer une règle doit rester possible : une PR ajoute une décision, en remplace une par une entrée
+nouvelle, fait évoluer la garde ou les règles des sessions. Ce qui se vérifie avant la fusion, c'est
+que la règle nouvelle ne contredit pas les **règles primaires** — les invariants et usages
+(`docs/invariants.md`), les contraintes (`docs/contraintes.md`) et la garde de l'objectif primaire
+(#58, D61). La conformité porte sur le sens et ne se programme pas : elle devient une vérification
+manuelle, `VM-regles-primaires`, demandée par les chemins que la PR modifie (D61, #61).
+
+Elle ne tient pas dans une entrée de `docs/gardes.md` : une entrée y porte un invariant ou une
+contrainte, et ni une décision, ni `CLAUDE.md`, ni la garde n'en sont un. D'où une table de chemins
+à part, dans `packages/gardes/gardes.mjs`. Le porteur l'a étendue le 12 septembre à `docs/gardes.md`
+— la comparaison des deux registres voit une garde retirée, pas une consigne affaiblie — et à
+`docs/description-projet.md`, qui fonde les invariants.
+
+La garde reste jugée par la version que porte la PR (piste 2 de #58, tranché le 11 septembre) :
+retirer cette demande en modifiant la garde reste donc possible, mais c'est une modification de la
+garde, donc une règle nouvelle, et l'amorçage (`packages/gardes/amorcage.test.mjs`) rougit quand la
+garde s'affaiblit. Piste 1 en réserve — faire juger chaque PR par la garde de `main` — si elle est
+contournée.
+
+La description du projet et les invariants ne changent qu'à la demande du porteur (tranché le
+12 septembre) : son accord explicite n'est pas laissé à l'analyse, c'est une ligne « Accord du
+porteur : … » de la section « Invariants et contraintes », posée en paragraphe à part, que la garde
+lit et refuse quand elle manque ou reste en attente (vide, « … », « à écrire », « à analyser »).
+Lien ou citation datée : la garde accepte l'un comme l'autre, elle ne juge pas la forme de l'accord.
+`demander` la prépare pour une PR qui modifie `docs/description-projet.md` ou `docs/invariants.md`,
+et pour elle seule.

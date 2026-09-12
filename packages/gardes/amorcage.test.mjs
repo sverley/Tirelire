@@ -466,7 +466,19 @@ test('D61 · retirer une vérification manuelle ou un harnais du registre demand
     const r = prLocale(depot, corps());
     rouge(r, `${genre} de ${e.id} retiré sans être listé`);
     nomme(r, ...cles);
-    vert(prLocale(depot, corps({ verifications: listees(cles, { validee: true }) })), `${genre} retiré, listé, analysé, validé`);
+    // Modifier le registre, c'est changer une règle (#64) : la section préparée porte la garde
+    // retirée et ce que la PR demande par ailleurs ; on la remplit sans rien présumer de sa forme.
+    const d = garde(depot.racine, ['demander', '--base', 'main']);
+    vert(d, 'demander');
+    for (const cle of cles) assert.ok(d.sortie.includes(`\`${cle}\``), `« demander » ne demande pas ${cle} : ${RELIRE}\n${d.sortie}`);
+    const preparee = `Pour #… : essai.\n\n## Ce qui change\n\nEssai.\n\n${d.sortie.trim()}\n`;
+    const remplie = cocherTout(
+      preparee
+        .replace(/Touchés : à analyser/, 'Touchés : aucun')
+        .replace(/Lien possible masqué : à analyser/, 'Lien possible masqué : aucun')
+        .replace(/: à écrire/g, `: ${ANALYSE}`),
+    );
+    vert(prLocale(depot, remplie), `${genre} retiré, listé, analysé, validé`);
   }
 });
 
