@@ -6,7 +6,8 @@ saisis à la main, l'import des relevés et un moteur de règles pour les classe
 
 Nom de code. Description du projet, qui fait foi : [`docs/description-projet.md`](docs/description-projet.md) ;
 ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md) ;
-ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
+ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md) ;
+ce qui les garde : [`docs/gardes.md`](docs/gardes.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
 
 ## Structure
 
@@ -15,6 +16,8 @@ ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md). 
   besoins, écarts de placement, virements par couple de comptes, règlements avec les comptes
   tiers), positions reconstruites par compte, moteur de règles et actions groupées, dépôt SQLite
   (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
+- `packages/gardes` — la garde de l'objectif primaire (#58) : chaque invariant et chaque
+  contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et chaque PR demande les siennes.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
 - `docs` — description du projet, invariants du produit, contraintes du projet, analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.

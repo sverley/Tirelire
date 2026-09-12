@@ -1164,3 +1164,83 @@ demande, alors que ce plan est celui de l'analyse au centime près.
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
 (virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
 budget, pas une ligne de budget à offrir (D43).
+
+## D61 · 2026-09-11 · Les gardes se tiennent dans un registre, et chaque PR demande les siennes
+
+Objectif primaire #58. `docs/gardes.md` relie chaque invariant (I…, et les usages U… d'I3) et
+chaque contrainte (C…) à ses harnais, à ses vérifications manuelles (`VM-<entrée>-<nom>`) ou aux
+entrées qui le couvrent. C'est un document et non un fichier de données : Simon le lit sur
+téléphone, et `packages/gardes` le relit sans dépendance.
+
+- **Couverture**, dans `pnpm test`, donc au commit et en CI : un identifiant sans entrée, une entrée
+  sans garde, un renvoi en boucle, un harnais ou un motif de chemin qui ne désigne plus rien font
+  échouer les tests. Un harnais seulement prévu ne garde rien : une vérification manuelle tient sa
+  place. Un identifiant écrit sous une forme voisine est refusé plutôt qu'ignoré, et un harnais qui
+  nomme un test désigne ce test, titre d'un `describe`, d'un `it` ou d'un `test`, et non son seul
+  fichier ; un test qui ne tourne pas, mis en commentaire, désactivé ou seulement prévu, compte comme
+  absent (tranché le 11 septembre dans #59).
+  Un test qui se saute faute d'outil compte comme un test qui tourne : l'outil est requis en CI, où
+  `TIRELIRE_STRICT` fait échouer au lieu de sauter, et l'abstention reste permise en local (tranché le
+  même jour). `TIRELIRE_NAV_STRICT`, de D54, reste lu.
+- **Demandes**, sur chaque PR, par la vérification « Vérifications manuelles » : la description
+  déclare les identifiants touchés et ceux dont le lien pourrait être masqué ; les motifs `Chemins`
+  du registre imposent un plancher, volontairement étroit ; chaque vérification manuelle des
+  entrées déclarées, et des entrées qui les couvrent, figure avec sa consigne recopiée du registre,
+  son analyse et une case « Validée » (tranché le 11 septembre dans #60 : « explicite vaut mieux
+  qu'implicite »). La description se lit comme GitHub l'affiche : ni les blocs de code ni les
+  commentaires ne déclarent, et ce qui se lirait de deux façons est refusé. Retirer une vérification manuelle ou un harnais du registre demande la même
+  validation. Cette vérification tourne à part de la CI et se relance quand la description change :
+  cocher une case ne rejoue ni tests ni build.
+- **Vert veut dire validé.** Sur un dépôt privé de l'offre gratuite, GitHub ne peut pas rendre une
+  vérification obligatoire avant fusion, et le porteur a choisi le 11 septembre d'y rester (#58) :
+  une fusion reste possible, #62 la fera signaler aussitôt. La couleur de la vérification est donc
+  le seul signal avant de fusionner : elle ne passe au vert que lorsque chaque vérification demandée
+  est analysée et validée, jamais sur leur seule présence.
+- **Une validation tient au code qu'elle a validé.** Tranché le 11 septembre (#61), puis limité le
+  même jour : seule une modification du code annule la validation. La vérification enregistre chaque
+  case cochée dans un commentaire du compte de GitHub Actions, avec la tête de la PR et sa branche
+  cible. Un commit qui modifie le code, y compris une résolution de conflit, ou un changement de
+  branche cible rendent l'enregistrement caduc : la case se décoche, un commentaire dit pourquoi, la
+  vérification repasse au rouge. Documentation, harnais et analyse se modifient sans l'annuler, et
+  une fusion propre de la branche cible non plus. Une case cochée sans enregistrement, à l'ouverture
+  ou juste avant un push, ne vaut rien.
+- **Qui coche.** Toutes les sessions écrivent avec le compte du porteur : rien ne distingue une case
+  cochée par un agent. Tranché le 11 septembre (#58) : une instruction interdit aux agents de cocher
+  sans autorisation explicite du porteur ; elle est écrite dans `CLAUDE.md`, et l'agent qui coche sur
+  autorisation la cite dans la PR.
+
+## D62 · 2026-09-11 · Des gardes à la mesure du projet : les erreurs plausibles, pas les contournements
+
+Tranché par le porteur dans l'audit de #59, consigné dans #58 : les gardes de #58 à #61 coûtaient
+plus qu'elles ne rapportaient pendant le développement. Les tests de la garde prenaient 95 s, dont
+61 s pour l'amorçage ; le crochet de pré-commit dépassait le temps d'une session et se contournait ;
+chaque tour d'audit ajoutait une forme à refuser ; deux vérifications manuelles demandaient une APK
+et un essai de relais pour une PR qui ne touchait pas l'application, dont le produit n'a pas encore
+d'utilisateur. Le registre, la vérification simple de la couverture, la déclaration des PR et le
+mode strict de la CI restent : ils attrapent des erreurs réelles, comme un test qui, vraisemblablement,
+ne tournait jamais en CI.
+
+- **Critère.** Une garde protège des erreurs plausibles par accident, pas des contournements : un
+  test mis en commentaire pour tromper la garde se voit dans le diff, et la relecture l'attrape.
+- **Budget.** Le crochet de pré-commit tient en moins de 20 s. L'amorçage et les harnais d'audit
+  tournent en CI, pas au commit ; la couverture reste dans `pnpm test`.
+- **Audit.** Il contrôle les « Fait quand » et les erreurs plausibles. Une forme exotique ou un
+  contournement se note dans la PR, sans devenir un harnais rouge.
+- **#59 figée.** Il reste à vérifier que la CI pose `TIRELIRE_STRICT` sur `pnpm test`. Le
+  demi-cadratin, le point, le gras souligné et le gras italique sortent du harnais d'audit ; la garde
+  conserve ce qu'elle refuse déjà, sans qu'on lui demande davantage.
+- **Consignes proportionnées.** Une PR qui ne touche que des tests, de l'outillage ou de la
+  documentation ne déclenche ni manipulation de l'application ni construction de l'APK.
+- **Retour au produit.** Les harnais « À bâtir » d'U1 à U5 passent avant la robustesse de la garde.
+
+Dans le code : le crochet de pré-commit laisse l'amorçage et les harnais d'audit à la CI ; la
+couverture vérifie que l'étape `pnpm test` de la CI pose `TIRELIRE_STRICT` ; les demandes d'une PR,
+ou les consignes du registre, épargnent les PR qui ne touchent que tests, outillage ou documentation.
+
+Mis en œuvre dans la PR #63 : le crochet de pré-commit lance le typecheck et les tests du cœur, puis
+les tests unitaires de la garde, couverture comprise (17 s mesurées) ; le typecheck complet et le
+build passent au push, et `pnpm test` joue tout en CI, amorçage et harnais d'audit compris. La
+couverture lit l'étape `pnpm test` de `ci.yml` et refuse qu'elle cesse de poser `TIRELIRE_STRICT`.
+La règle d'« Écrire une entrée » et les consignes de `VM-I9-apk` et `VM-C3-https` épargnent les PR de
+tests, d'outillage ou de documentation ; la garde ne classe pas elle-même les fichiers : l'analyse le
+dit, et qui valide le contrôle.

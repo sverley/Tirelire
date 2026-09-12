@@ -111,6 +111,8 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@26.4.1)(jsdom@28.1.0(@noble/hashes@1.8.0))(terser@5.51.2)
 
+  packages/gardes: {}
+
 packages:
 
   '@acemir/cssom@0.9.31':

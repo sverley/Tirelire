@@ -29,12 +29,21 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      # La garde de mise en page mobile (D54) a besoin d'un navigateur ; les images GitHub en
-      # fournissent un. `TIRELIRE_NAV_STRICT` fait échouer le test s'il n'en trouve pas, plutôt
-      # que de le laisser s'abstenir en silence et passer pour vert.
+      # Outils des tests : sans eux, un test se saute en local. En CI, `TIRELIRE_STRICT` les rend
+      # obligatoires, pour qu'un test muet ne passe pas pour vert (D54, #59) : navigateur des gardes
+      # d'interface, PHP du relais, lftp et pyftpdlib du dépôt FTP. L'image GitHub fournit Chrome et
+      # PHP ; le reste s'installe.
+      - name: Outils des tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lftp python3-pyftpdlib
+          command -v php > /dev/null || sudo apt-get install -y -qq php-cli
+          php -v | head -n 1
+          lftp --version | head -n 1
+          python3 -c 'import pyftpdlib; print("pyftpdlib présent")'
       - run: pnpm test
         env:
-          TIRELIRE_NAV_STRICT: '1'
+          TIRELIRE_STRICT: '1'
       - run: pnpm build
       - name: Archiver le site (à déposer tel quel sur un serveur privé)
         uses: actions/upload-artifact@v4

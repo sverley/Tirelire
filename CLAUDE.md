@@ -17,7 +17,9 @@
   jamais stocker ce qui se recalcule (soldes, plan, soldes à régler).
 - Écritures uniquement via `LedgerStore.upsert/remove/setSetting` (journal de changements).
 - Aucune donnée bancaire réelle dans le dépôt ; exemples et tests sur données inventées.
-- Avant de pousser : `pnpm typecheck && pnpm test && pnpm build` (les hooks le font).
+- Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font l'essentiel :
+  typecheck et tests du cœur, puis tests unitaires de la garde, au commit (moins de 20 s) ;
+  typecheck complet et build au push. La CI joue tout, amorçage et harnais d'audit compris (D62).
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
 - Simon lit surtout sur téléphone : réponses courtes, en prose, une question à la fois.
 
@@ -36,6 +38,8 @@
   poser et les consigner dans l'issue. Une fois le besoin explicite, indiquer la branche de travail
   dans le corps de l'issue, puis écrire les harnais qui contrôlent le résultat dans la branche de la
   PR associée. **En audit, ne jamais toucher au code** : seulement la documentation et les harnais.
+  Il s'en tient aux « Fait quand » et aux erreurs plausibles par accident : une forme exotique ou un
+  contournement se note dans la PR, sans devenir un harnais rouge (D62).
 - **Codage d'une PR.** Les questions de développement et les décisions techniques se consignent en
   commentaires dans la discussion de la PR.
 - **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
@@ -49,11 +53,35 @@
 - **Étiquettes GitHub.** `besoin` (issue qui définit un besoin), `cible` (cible de distribution),
   `harnais`, `objectif` (objectif du projet) ; `U1` à `U5`, `I…` et `C…` renvoient aux usages, invariants et contraintes qu'une
   issue sert.
-- **Harnais et vérifications manuelles (objectif primaire #58).** Chaque invariant et chaque
+- **Harnais et vérifications manuelles (objectif primaire #58, D61).** Chaque invariant et chaque
   contrainte est gardé par un harnais tant que c'est possible. Ce qui ne se programme pas fait
   l'objet, dans la PR, d'une demande explicite de vérification manuelle, faite avant tout merge :
   pour les invariants et contraintes que la PR touche, et pour ceux qui semblent hors de sa portée
   mais dont le lien pourrait être masqué. Dans le doute, on demande. Un agent peut préparer
   l'analyse d'une vérification ; seul un développeur humain la valide.
+  - La correspondance se tient dans `docs/gardes.md`. Ajouter ou renommer un invariant, une
+    contrainte ou un harnais met ce document à jour dans la même PR : `pnpm test` échoue sinon.
+  - Toute PR remplit la section « Invariants et contraintes » de son modèle ;
+    `node packages/gardes/cli.mjs demander --base <branche cible>` la prépare, consignes du registre
+    recopiées, l'analyse reste à écrire. La vérification « Vérifications manuelles » reste rouge tant qu'une vérification
+    demandée n'est pas analysée et validée.
+  - Un agent ne coche jamais « Validée » sans une autorisation explicite de Simon pour cette
+    vérification ; quand il la coche, il cite l'autorisation dans un commentaire de la PR. Il ne
+    retire pas une garde pour faire passer une PR, et ne fusionne jamais une PR dont la vérification
+    « Vérifications manuelles » est rouge.
+  - Un test qui a besoin d'un outil (navigateur, PHP, `lftp`…) peut se sauter en local s'il manque,
+    mais échoue quand `TIRELIRE_STRICT` est posé, comme en CI ; la CI installe ses outils.
+  - Un harnais du registre cite son témoin rouge (les mêmes assertions rejouées sur une version
+    volontairement cassée du besoin, qui doit échouer) ou porte « à faire » avec le numéro de son
+    issue ; la couverture échoue sinon, en le nommant, comme pour un témoin rouge cité qui n'existe
+    pas. Un témoin rouge qui se met à passer fait échouer `pnpm test`, l'outil de test tenant
+    l'échec attendu (`test.fails` avec vitest, une assertion qui attend l'échec avec `node:test`) —
+    la couverture ne le voit pas (#66).
+  - Le crochet de pré-commit tient en moins de 20 s : l'amorçage et les harnais d'audit tournent en
+    CI, pas au commit (D62).
+  - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
+    branche cible, l'annule et la vérification décoche la case ; documentation et harnais se
+    modifient sans l'annuler. Une case décochée par la vérification ne se recoche qu'aux mêmes
+    conditions ; sinon l'agent signale dans la PR que la validation est à refaire.
 - **Dépendances.** Elles se tiennent à deux endroits, toujours d'accord : la section « Dépendances »
   de l'issue et les liens GitHub « bloquée par ». Qui recalcule l'une met l'autre à jour.
