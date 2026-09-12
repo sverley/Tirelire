@@ -6,6 +6,7 @@
  *   node packages/gardes/cli.mjs demander [--base origin/main] [--ids I7,C3] [--auteur agent]
  *   node packages/gardes/cli.mjs pr --base <ref> [--tete <ref>] [--corps-fichier <chemin>]
  *   node packages/gardes/cli.mjs pr --github
+ *   node packages/gardes/cli.mjs alerte --github
  *
  * `demander` prépare la section « Invariants et contraintes » d'une PR d'après les fichiers modifiés
  * depuis la base ; l'analyse reste à écrire. `pr` lit la description dans la variable CORPS si aucun
@@ -13,10 +14,13 @@
  * vérification des PR : il lit l'événement de GitHub Actions, enregistre les validations cochées et
  * décoche celles qu'une modification postérieure annule (#61). Le bilan va dans le résumé de GitHub
  * Actions quand il y en a un ; la sortie est en erreur tant qu'il reste à corriger ou à valider.
+ * `alerte --github` est la garde de #62 : elle lit le même fichier d'événement et ouvre une issue
+ * quand une PR a été fusionnée sans vérification verte, ou quand `main` a reçu un push direct.
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { DOCUMENTS, RACINE, fichiersDepuisValidation, lireRegistre, preparerSection, resumePr, verifierCouverture, verifierPr } from './gardes.mjs';
+import { alerter } from './alerte.mjs';
 import { verifierPrSurGithub } from './github.mjs';
 
 const [commande, ...args] = process.argv.slice(2);
@@ -83,9 +87,9 @@ function rendre(resultat) {
   process.exit(resultat.aCorriger.length || resultat.enAttente.length ? 1 : 0);
 }
 
-function apiGithub() {
-  const depot = process.env.GITHUB_REPOSITORY;
-  const appel = async (methode, chemin, donnees) => {
+/** Un appel à l'API du dépôt, avec le jeton du workflow. `fetch` global : les harnais le remplacent. */
+function requete(depot) {
+  return async (methode, chemin, donnees) => {
     const reponse = await fetch(`https://api.github.com/repos/${depot}${chemin}`, {
       method: methode,
       headers: {
@@ -99,6 +103,10 @@ function apiGithub() {
     if (!reponse.ok) throw new Error(`${methode} ${chemin} : ${reponse.status} ${(await reponse.text()).slice(0, 160)}`);
     return reponse.json();
   };
+}
+
+function apiGithub() {
+  const appel = requete(process.env.GITHUB_REPOSITORY);
   return {
     lirePr: (n) => appel('GET', `/pulls/${n}`),
     lireCommentaires: async (n) => {
@@ -149,9 +157,80 @@ async function pr() {
   rendre(resultat);
 }
 
-const commandes = { couverture, demander, pr };
+/**
+ * Ce que la garde de #62 lit et écrit sur GitHub. `/actions/runs` se lit aussi bien avec le jeton du
+ * workflow qu'avec un jeton personnel, contrairement à `check-runs` (403 constaté pendant l'audit) :
+ * il passe en premier, l'autre reste un recours. Les issues se relisent sans filtre d'étiquette, pour
+ * que l'alerte se retrouve même si son étiquette a disparu — la recherche, elle, indexe trop tard
+ * pour un rejeu.
+ */
+function apiAlerte() {
+  const appel = requete(process.env.GITHUB_REPOSITORY);
+  return {
+    courses: async (sha) => {
+      try {
+        const r = await appel('GET', `/actions/runs?head_sha=${encodeURIComponent(sha)}&per_page=100`);
+        if (r.workflow_runs?.length) return r.workflow_runs;
+      } catch {
+        /* recours ci-dessous */
+      }
+      try {
+        return (await appel('GET', `/commits/${sha}/check-runs?per_page=100`)).check_runs ?? [];
+      } catch {
+        return []; // ni l'un ni l'autre ne se lit : la vérification est tenue pour absente, donc rouge
+      }
+    },
+    prsDuCommit: async (sha) => {
+      try {
+        return await appel('GET', `/commits/${sha}/pulls?per_page=100`);
+      } catch {
+        return [];
+      }
+    },
+    issues: async () => {
+      const tous = [];
+      for (let page = 1; page <= 10; page++) {
+        const lot = await appel('GET', `/issues?state=all&per_page=100&page=${page}`);
+        tous.push(...lot);
+        if (lot.length < 100) break;
+      }
+      return tous;
+    },
+    ouvrir: async (donnees) => {
+      try {
+        return await appel('POST', '/issues', donnees);
+      } catch (e) {
+        if (!donnees.labels?.length) throw e;
+        // L'alerte compte plus que son étiquette : une étiquette inconnue ne la fait pas taire.
+        return appel('POST', '/issues', { ...donnees, labels: [] });
+      }
+    },
+  };
+}
+
+async function alerte() {
+  if (!args.includes('--github')) {
+    console.error('Usage : node packages/gardes/cli.mjs alerte --github');
+    process.exit(2);
+  }
+  const evenement = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+  const r = await alerter({ evenement, nom: process.env.GITHUB_EVENT_NAME, api: apiAlerte() });
+
+  let bilan;
+  if (!r.alerte) bilan = `Rien à signaler : ${r.motif}.`;
+  else if (r.deja) bilan = `Déjà signalé par #${r.deja.number} — ${r.alerte.titre} : ${r.motif}.`;
+  else bilan = `Alerte ouverte #${r.ouverte.number} — ${r.alerte.titre} : ${r.motif}.`;
+  console.log(bilan);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${bilan}\n`);
+  if (r.alerte && process.env.GITHUB_ACTIONS) console.log(`::error title=Fusion non vérifiée::${annotation(bilan)}`);
+
+  // Rouge quand il y a eu à signaler, rejeu compris : l'issue est le signal, la couleur le répète.
+  process.exit(r.alerte ? 1 : 0);
+}
+
+const commandes = { couverture, demander, pr, alerte };
 if (!commandes[commande]) {
-  console.error('Usage : node packages/gardes/cli.mjs couverture | demander [--base <ref>] [--ids I7,C3] | pr --base <ref> [--tete <ref>] [--corps-fichier <chemin>] | pr --github');
+  console.error('Usage : node packages/gardes/cli.mjs couverture | demander [--base <ref>] [--ids I7,C3] | pr --base <ref> [--tete <ref>] [--corps-fichier <chemin>] | pr --github | alerte --github');
   process.exit(2);
 }
 Promise.resolve(commandes[commande]()).catch((e) => {
