@@ -155,7 +155,7 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 - **Vérification manuelle** · `VM-U3-rapprochement` — Construire un budget sans valider les
   virements, puis importer un relevé inventé qui les contient : l'application propose de les
   rapprocher et reprend la ventilation prévue par le budget.
-- **À bâtir** · #40.
+- **À bâtir** · le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
 
 ### U4 · Budget reconstruit depuis l'historique
 
@@ -165,7 +165,7 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 - **Vérification manuelle** · `VM-U4-reconstruction` — Sans budget, importer un historique inventé
   et reconstruire un budget depuis les opérations : chaque lien entre une opération et un flux se
   valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
-- **À bâtir** · #16.
+- **À bâtir** · le parcours complet, des opérations importées au budget reconstruit (#16).
 
 ### U5 · Import seul
 

@@ -7,33 +7,40 @@
  * harnais unitaires du cœur, et porte une ligne « À bâtir » qui renvoie à l'issue de son parcours
  * (#15, #13, #40, #16, #39).
  *
+ * **Tranché par le porteur le 13 septembre**, sur la question posée dans #70 : #70 ne bâtit que les
+ * parcours que le produit tient — U1, U2, U5. Ceux de U3 et U4 partent avec leur besoin (#40, #16),
+ * parce qu'une PR ne se fusionne pas au rouge (#58) et qu'un parcours durablement rouge au registre
+ * userait la garde. Leur dette reste donc au registre, et ce fichier la tient : elle ne peut pas
+ * disparaître sans qu'un parcours la remplace.
+ *
  * Ce que la couverture fait déjà (#59, #66) : elle refuse un usage sans garde, un harnais dont le
  * test nommé n'existe pas ou ne tourne pas, un harnais sans témoin rouge ni dette. Ce qu'elle ne
  * fait pas, et que ce fichier garde :
  *
- * 1. **Chaque usage a un harnais de plus que ses harnais unitaires du 13 septembre, et ce harnais
- *    cite son témoin rouge.** La couverture se contente des gardes du jour : un usage resté à ses
- *    seuls tests unitaires lui paraît gardé. C'est le « Fait quand » de #70, donc rouge avant le
- *    codage : le test porte `todo` avec l'issue qui le corrige, et **la PR qui bâtit les cinq
- *    parcours le retire**.
- * 2. **La dette « À bâtir » des cinq usages est réglée.** Même raison : la couverture accepte une
- *    dette déclarée. `todo` lui aussi ; si un usage que le produit n'outille pas encore devait
- *    garder la sienne, le `todo` reste et nomme l'usage — la question est posée dans #70.
- * 3. **Elle est réglée en bâtissant, pas en effaçant.** Une dette disparaît aussi si l'on retire la
- *    ligne « À bâtir », et un usage paraît gardé de bout en bout si l'on remplace ses harnais
- *    unitaires au lieu d'en ajouter un. Les sept harnais et les six vérifications manuelles des
- *    usages sont figés ici : le registre ne peut plus en perdre un sans que ce harnais le dise.
- *    Retirer une garde reste possible, mais par la section « Vérifications manuelles » de la PR,
- *    analysée et validée (docs/gardes.md).
+ * 1. **U1, U2 et U5 portent chacun un harnais de plus que leurs harnais unitaires du 13 septembre,
+ *    et ce harnais cite son témoin rouge.** La couverture se contente des gardes du jour : un usage
+ *    resté à ses seuls tests unitaires lui paraît gardé. C'est le « Fait quand » de #70, donc rouge
+ *    avant le codage : le test porte `todo` avec l'issue qui le corrige, et **la PR qui bâtit les
+ *    trois parcours le retire**.
+ * 2. **U3 et U4 gardent une dette qui renvoie à leur besoin, tant qu'ils n'ont pas leur parcours.**
+ *    Vert dès aujourd'hui, et vert après #40 et #16 : l'un ou l'autre, jamais rien. La couverture,
+ *    elle, accepterait qu'une ligne « À bâtir » disparaisse sans rien à sa place.
+ * 3. **La dette de U1, U2 et U5 est réglée**, et réglée **en bâtissant, pas en effaçant** : une
+ *    dette disparaît aussi si l'on retire la ligne, et un usage paraît gardé de bout en bout si l'on
+ *    remplace ses harnais unitaires au lieu d'en ajouter un. Les sept harnais et les six
+ *    vérifications manuelles des usages sont figés ici : le registre ne peut plus en perdre un sans
+ *    que ce harnais le dise. Retirer une garde reste possible, mais par la section « Vérifications
+ *    manuelles » de la PR, analysée et validée (docs/gardes.md).
  *
  * Ce fichier ne juge pas le contenu des parcours : ce qu'un parcours doit traverser est dit par
  * l'issue de chaque usage, et se relit en audit. Il garde ce qui se vérifie sans interpréter, et
  * laisse au registre le soin de nommer les tests.
  *
  * Chaque vérification a son témoin rouge ici même : les mêmes assertions rejouées sur une version
- * volontairement cassée — un usage laissé à ses seuls harnais unitaires, un usage remis en dette,
- * une garde effacée — qui doit échouer. Tout se joue sur du texte en mémoire : le vrai registre pour
- * ce qui doit tenir sur le dépôt du jour, des versions dérivées pour ce qui doit tenir en général.
+ * volontairement cassée — un usage laissé à ses seuls harnais unitaires, une dette effacée sans
+ * parcours, un usage remis « À bâtir », une garde effacée — qui doit échouer. Tout se joue sur du
+ * texte en mémoire : le vrai registre pour ce qui doit tenir sur le dépôt du jour, des versions
+ * dérivées pour ce qui doit tenir en général.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -45,8 +52,14 @@ const REGISTRE = 'docs/gardes.md';
 const RELIRE = "le harnais d'audit de #70 est à relire";
 const USAGES = Object.freeze(['U1', 'U2', 'U3', 'U4', 'U5']);
 
+/** Tranché le 13 septembre : #70 ne bâtit que les parcours que le produit tient. */
+const PORTENT_UN_PARCOURS = Object.freeze(['U1', 'U2', 'U5']);
+
+/** Les deux usages dont le produit reste à outiller : leur parcours part avec leur besoin. */
+const PARCOURS_AVEC_LE_BESOIN = Object.freeze({ U3: '40', U4: '16' });
+
 /** Les issues du chantier : une dette nouvelle citerait la sienne, et se verrait. */
-const CHANTIER = new Set(['13', '15', '16', '38', '39', '40', '70']);
+const CHANTIER = new Set(['13', '15', '38', '39', '70']);
 
 const registre = () => {
   try {
@@ -62,10 +75,10 @@ const memeTexte = (t) => String(t ?? '').replace(/[\u2018\u2019]/g, "'").replace
 /** De quoi reconnaître une ligne `Harnais` d'une fois sur l'autre : son entrée, ses fichiers, son test nommé. */
 const identite = (id, h) => `${id} · ${h.chemins.join(', ')} · ${memeTexte(testNomme(h.description)) || '—'}`;
 
-/** Les entrées des cinq usages, dans l'ordre ; une entrée disparue est une erreur de lecture. */
-const entreesDesUsages = (texte) => {
+/** Les entrées d'usages demandées, dans l'ordre ; une entrée disparue est une erreur de lecture. */
+const entreesDesUsages = (texte, ids = USAGES) => {
   const entrees = lireRegistre(texte).entrees;
-  return USAGES.map((id) => entrees.get(id) ?? assert.fail(`${id} n'a plus d'entrée au registre : ${RELIRE}`));
+  return ids.map((id) => entrees.get(id) ?? assert.fail(`${id} n'a plus d'entrée au registre : ${RELIRE}`));
 };
 
 /** Les lignes `Harnais` des usages au jour de l'audit (13 septembre 2026) : sept, unitaires. */
@@ -89,20 +102,13 @@ const VERIFICATIONS_DU_JOUR = Object.freeze({
   U5: ['VM-U5-sans-tirelire'],
 });
 
-// ─── 1. Chaque usage a son harnais de bout en bout ───────────────────────────────────────────────
+/** Les harnais qu'une entrée porte en plus de ses harnais unitaires du 13 septembre. */
+const ajoutes = (e) => e.harnais.filter((h) => !HARNAIS_DU_JOUR.has(identite(e.id, h)));
 
-function parcoursDeBoutEnBout(texte) {
-  const manquants = [];
-  for (const e of entreesDesUsages(texte)) {
-    const ajoutes = e.harnais.filter((h) => !HARNAIS_DU_JOUR.has(identite(e.id, h)));
-    if (!ajoutes.length) {
-      manquants.push(`${e.id} · aucun harnais de bout en bout : l'usage en reste à ses ${e.harnais.length} harnais du 13 septembre`);
-    } else if (!ajoutes.some((h) => temoinRouge(h.description)?.nom)) {
-      manquants.push(`${e.id} · le harnais de bout en bout ne cite pas de témoin rouge : « à bâtir » ne tient pas le « Fait quand » de #70`);
-    }
-  }
-  assert.deepEqual(manquants, [], `des usages n'ont pas leur harnais de bout en bout au registre :\n${manquants.join('\n')}`);
-}
+/** Un parcours bâti : un harnais ajouté qui cite son témoin rouge — « à bâtir » ne compte pas. */
+const porteUnParcours = (e) => ajoutes(e).some((h) => temoinRouge(h.description)?.nom);
+
+// ─── Versions dérivées du registre, pour les témoins rouges ──────────────────────────────────────
 
 /** La version « besoin tenu » : chaque usage reçoit un parcours inventé, témoin rouge cité. */
 const avecParcours = (texte) =>
@@ -130,36 +136,90 @@ function retirerLignes(texte, numeros) {
 /** La version volontairement cassée : les usages retombent à leurs seuls harnais du 13 septembre. */
 function sansParcours(texte) {
   const otees = new Set();
-  for (const e of entreesDesUsages(texte)) {
-    for (const h of e.harnais) if (!HARNAIS_DU_JOUR.has(identite(e.id, h))) otees.add(h.ligne);
-  }
+  for (const e of entreesDesUsages(texte)) for (const h of ajoutes(e)) otees.add(h.ligne);
   return retirerLignes(texte, otees);
 }
 
+/** La version « besoin tenu » : plus aucune ligne « À bâtir » au registre. */
+const sansDette = (texte) => texte.replace(/^- \*\*À bâtir\*\* · .*\n(?:[ \t]+\S.*\n)*/gm, '');
+
+/** La dette d'un seul usage, effacée. */
+const sansDetteDe = (texte, id) =>
+  texte
+    .split(/^(?=### U\d · )/m)
+    .map((section) => (section.startsWith(`### ${id} · `) ? section.replace(/^- \*\*À bâtir\*\* · .*\n(?:[ \t]+\S.*\n)*/m, '') : section))
+    .join('');
+
+/** La version volontairement cassée : U1 retombe en dette. */
+const enDette = (texte) =>
+  texte.replace(/^### U1 · .*$/m, (ligne) => `${ligne}\n\n- **À bâtir** · le parcours complet sans aucune opération (#15).`);
+
+// ─── 1. U1, U2 et U5 portent leur harnais de bout en bout ────────────────────────────────────────
+
+function parcoursDeBoutEnBout(texte, ids = PORTENT_UN_PARCOURS) {
+  const manquants = [];
+  for (const e of entreesDesUsages(texte, ids)) {
+    if (!ajoutes(e).length) {
+      manquants.push(`${e.id} · aucun harnais de bout en bout : l'usage en reste à ses ${e.harnais.length} harnais du 13 septembre`);
+    } else if (!porteUnParcours(e)) {
+      manquants.push(`${e.id} · le harnais de bout en bout ne cite pas de témoin rouge : « à bâtir » ne tient pas le « Fait quand » de #70`);
+    }
+  }
+  assert.deepEqual(manquants, [], `des usages n'ont pas leur harnais de bout en bout au registre :\n${manquants.join('\n')}`);
+}
+
 test(
-  '#70 · chaque usage porte au registre un harnais de bout en bout, avec son témoin rouge',
-  { todo: 'rouge tant que les cinq parcours ne sont pas bâtis ; la PR qui les bâtit retire ce todo (#70)' },
+  '#70 · U1, U2 et U5 portent au registre un harnais de bout en bout, avec son témoin rouge',
+  { todo: 'rouge tant que les trois parcours ne sont pas bâtis ; la PR qui les bâtit retire ce todo (#70)' },
   () => {
     parcoursDeBoutEnBout(registre());
   },
 );
 
 test('#70 · un registre où chaque usage cite son parcours est accepté', () => {
-  parcoursDeBoutEnBout(avecParcours(registre()));
+  parcoursDeBoutEnBout(avecParcours(registre()), USAGES);
 });
 
-test('#70 · témoin rouge — un usage laissé à ses seuls harnais unitaires fait échouer « chaque usage porte un harnais de bout en bout »', () => {
+test('#70 · témoin rouge — un usage laissé à ses seuls harnais unitaires fait échouer « U1, U2 et U5 portent un harnais de bout en bout »', () => {
   const tenu = avecParcours(registre());
   const casse = sansParcours(tenu);
   assert.notEqual(casse, tenu, `aucun parcours n'a pu être retiré : ${RELIRE}`);
   assert.throws(() => parcoursDeBoutEnBout(casse), /n'ont pas leur harnais de bout en bout/);
 });
 
-// ─── 2. La dette « À bâtir » des cinq usages est réglée ──────────────────────────────────────────
+// ─── 2. U3 et U4 : un parcours, ou une dette qui renvoie à leur besoin ───────────────────────────
 
-function detteReglee(texte) {
+function detteOuParcours(texte) {
+  const orphelins = [];
+  for (const [id, issue] of Object.entries(PARCOURS_AVEC_LE_BESOIN)) {
+    const [e] = entreesDesUsages(texte, [id]);
+    const dette = e.aBatir.some((a) => [...a.matchAll(/#(\d+)/g)].some((m) => m[1] === issue));
+    if (!dette && !porteUnParcours(e)) {
+      orphelins.push(`${id} · ni harnais de bout en bout, ni « À bâtir » qui renvoie à #${issue}`);
+    }
+  }
+  assert.deepEqual(orphelins, [], `des usages ont perdu leur dette sans recevoir leur parcours :\n${orphelins.join('\n')}`);
+}
+
+test('#70 · U3 et U4 gardent une dette qui renvoie à #40 et #16 tant que leur parcours n\'est pas bâti', () => {
+  detteOuParcours(registre());
+});
+
+test('#70 · un parcours bâti tient lieu de dette : U3 sans « À bâtir » mais avec son parcours est accepté', () => {
+  detteOuParcours(sansDetteDe(avecParcours(registre()), 'U3'));
+});
+
+test('#70 · témoin rouge — la dette de U3 effacée sans parcours fait échouer « U3 et U4 gardent leur dette »', () => {
+  const casse = sansDetteDe(registre(), 'U3');
+  assert.notEqual(casse, registre(), `la dette de U3 n'a pas pu être effacée : ${RELIRE}`);
+  assert.throws(() => detteOuParcours(casse), /ont perdu leur dette sans recevoir leur parcours/);
+});
+
+// ─── 3. La dette de U1, U2 et U5 est réglée, en bâtissant ────────────────────────────────────────
+
+function detteReglee(texte, ids = PORTENT_UN_PARCOURS) {
   const restes = [];
-  for (const e of entreesDesUsages(texte)) {
+  for (const e of entreesDesUsages(texte, ids)) {
     for (const a of e.aBatir) {
       if ([...a.matchAll(/#(\d+)/g)].some((m) => CHANTIER.has(m[1]))) restes.push(`${e.id} · À bâtir · ${a}`);
     }
@@ -167,32 +227,23 @@ function detteReglee(texte) {
   assert.deepEqual(restes, [], `des usages restent « À bâtir » au lieu d'être gardés :\n${restes.join('\n')}`);
 }
 
-/** La version « besoin tenu » : plus aucune ligne « À bâtir » au registre. */
-const sansDette = (texte) => texte.replace(/^- \*\*À bâtir\*\* · .*\n(?:[ \t]+\S.*\n)*/gm, '');
-
-/** La version volontairement cassée : U1 retombe en dette. */
-const enDette = (texte) =>
-  texte.replace(/^### U1 · .*$/m, (ligne) => `${ligne}\n\n- **À bâtir** · le parcours complet sans aucune opération (#15).`);
-
 test(
-  '#70 · plus aucun usage ne reste « À bâtir » (#13, #15, #16, #39, #40)',
-  { todo: 'rouge tant que les cinq parcours ne sont pas bâtis ; la PR qui les bâtit retire ce todo (#70)' },
+  '#70 · U1, U2 et U5 ne restent plus « À bâtir » (#15, #13, #39)',
+  { todo: 'rouge tant que les trois parcours ne sont pas bâtis ; la PR qui les bâtit retire ce todo (#70)' },
   () => {
     detteReglee(registre());
   },
 );
 
-test('#70 · un registre sans dette sur les usages est accepté', () => {
+test('#70 · un registre sans dette sur ces trois usages est accepté', () => {
   detteReglee(sansDette(registre()));
 });
 
-test('#70 · témoin rouge — un usage remis « À bâtir » fait échouer « plus aucun usage ne reste à bâtir »', () => {
+test('#70 · témoin rouge — un usage remis « À bâtir » fait échouer « U1, U2 et U5 ne restent plus à bâtir »', () => {
   const casse = enDette(sansDette(registre()));
   assert.notEqual(casse, sansDette(registre()), `aucune ligne « À bâtir » n'a pu être remise : ${RELIRE}`);
   assert.throws(() => detteReglee(casse), /restent « À bâtir »/);
 });
-
-// ─── 3. Réglée en bâtissant, pas en effaçant ─────────────────────────────────────────────────────
 
 function gardesTenues(texte) {
   const entrees = lireRegistre(texte).entrees;
