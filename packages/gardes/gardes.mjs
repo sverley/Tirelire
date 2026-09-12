@@ -38,6 +38,66 @@ export const DOCUMENTS = Object.freeze({
 /** Étiquettes admises en tête d'une ligne d'entrée du registre. */
 export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'Couvert par', 'À bâtir']);
 
+// ─── Règles primaires (#64) ──────────────────────────────────────────────────────────────────
+// Changer une règle reste libre : toute PR peut ajouter une décision, faire évoluer la garde ou les
+// règles des sessions. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les règles
+// primaires. La conformité porte sur le sens et ne se programme pas : elle devient donc une
+// vérification manuelle, demandée par les chemins que la PR modifie, analysée puis validée par un
+// développeur humain avant la fusion. La garde reste jugée par la version que porte la PR (piste 2
+// de #58) ; l'amorçage (`amorcage.test.mjs`) est ce qui empêche de l'affaiblir en silence.
+
+/**
+ * Familles de chemins dont la modification ajoute ou change une règle. Une table à part du registre,
+ * parce qu'une entrée du registre porte un invariant ou une contrainte, et que `CLAUDE.md`, les
+ * décisions et la garde n'en sont pas. `docs/gardes.md` n'y figure pas : retirer une garde du
+ * registre est déjà demandé par `retraits()`.
+ */
+export const CHEMINS_DES_REGLES = Object.freeze([
+  Object.freeze({ quoi: 'une décision', motifs: Object.freeze(['docs/decisions.md']) }),
+  Object.freeze({ quoi: 'les règles des sessions', motifs: Object.freeze(['CLAUDE.md']) }),
+  Object.freeze({ quoi: 'une règle primaire', motifs: Object.freeze(['docs/invariants.md', 'docs/contraintes.md']) }),
+  Object.freeze({
+    quoi: 'la garde',
+    motifs: Object.freeze(['packages/gardes/**', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
+  }),
+]);
+
+/** Clé de la vérification de conformité. Hors registre : elle ne garde pas un identifiant, mais les règles. */
+export const CLE_CONFORMITE = 'VM-regles-primaires';
+
+/** Ce que lira qui valide ; recopié mot pour mot dans la PR, comme toute consigne (#60). */
+export const CONSIGNE_CONFORMITE =
+  'Nommer les règles primaires (les invariants et usages de `docs/invariants.md`, les contraintes de ' +
+  "`docs/contraintes.md`, la garde de l'objectif primaire #58) que la règle nouvelle touche, et dire " +
+  'pourquoi elle ne les contredit pas. Une contradiction ne se tranche pas dans la PR : elle devient une ' +
+  'question dans une issue.';
+
+/** Familles de règles que les fichiers modifiés touchent, dans l'ordre de la table. */
+export function reglesTouchees(fichiersModifies = []) {
+  return CHEMINS_DES_REGLES.filter((r) => {
+    const motifs = r.motifs.map(globVersRegex);
+    return fichiersModifies.some((f) => motifs.some((re) => re.test(f)));
+  }).map((r) => r.quoi);
+}
+
+/** La vérification de conformité quand la PR change une règle, `null` sinon. */
+function conformiteDemandee(fichiersModifies) {
+  const familles = reglesTouchees(fichiersModifies);
+  if (!familles.length) return null;
+  return {
+    cle: CLE_CONFORMITE,
+    pourquoi: `règle nouvelle : ${familles.join(', ')}`,
+    description: CONSIGNE_CONFORMITE,
+    consigne: CONSIGNE_CONFORMITE,
+  };
+}
+
+/**
+ * Un invariant ne change qu'à la demande du porteur (#64). Son accord ne reste pas dans l'analyse :
+ * c'est une ligne « Accord du porteur : … » de la section, que la garde lit et refuse vide.
+ */
+export const modifieUnInvariant = (fichiersModifies = []) => fichiersModifies.includes(DOCUMENTS.invariants);
+
 const G = DOCUMENTS.gardes;
 const IDENTIFIANT = /\b([IUC]\d+)\b/g;
 /** Ce que contient une analyse laissée telle que le modèle ou `demander` l'ont écrite. */
@@ -619,8 +679,10 @@ export function retraits(avant, apres) {
   return retirees;
 }
 
-function demandes(entrees, entreesAvant, declares) {
+function demandes(entrees, entreesAvant, declares, fichiersModifies = []) {
   const requises = new Map();
+  const conformite = conformiteDemandee(fichiersModifies);
+  if (conformite) requises.set(conformite.cle, conformite); // #64 : en tête, c'est elle qui porte sur la règle
   for (const id of declares) {
     for (const v of verificationsDe(id, entrees)) {
       if (!requises.has(v.id)) requises.set(v.id, { cle: v.id, pourquoi: v.entree === id ? id : `${id}, par ${v.entree}`, description: v.description, consigne: v.description });
@@ -662,9 +724,12 @@ function lignesHorsCode(corps) {
  * affiche un bloc de code.
  */
 const TITRE_SECTION = /^ {0,3}##\s+Invariants et contraintes\s*#*\s*$/i;
+/** Accord explicite du porteur sur un changement d'invariant (#64) : une ligne de la section. */
+const ACCORD_PORTEUR = /^ {0,3}Accord\s+du\s+porteur\s*:/i;
 const ETIQUETTES_PR = [
   ['Touchés', /^ {0,3}Touch[ée]s\s*:/i],
   ['Lien possible masqué', /^ {0,3}Liens?\s+possibles?\s+masqu[ée]s?\s*:/i],
+  ['Accord du porteur', ACCORD_PORTEUR],
 ];
 /** Plage d'identifiants : « U1 à U3 », « U1–U3 », « U1-U3 ». */
 const PLAGE = /\b([IUC])(\d+)\s*(?:à|au|–|—|-)\s*([IUC])(\d+)\b/gi;
@@ -717,6 +782,15 @@ export function lireDescriptionPr(corps) {
     return { absente: false, ids, aucun: !ids.length && problemes.length === avant && /^aucun[es]*\.?$/i.test(valeur) };
   };
 
+  const indicesAccord = section.flatMap((l, i) => (ACCORD_PORTEUR.test(l) ? [i] : []));
+  if (indicesAccord.length > 1) problemes.push(`La ligne « Accord du porteur : » figure ${indicesAccord.length} fois : n'en garder qu'une.`);
+  let accord = { absente: true, valeur: '' };
+  if (indicesAccord.length) {
+    const morceaux = [section[indicesAccord[0]].replace(ACCORD_PORTEUR, '')];
+    for (let j = indicesAccord[0] + 1; j < section.length && !finDeDeclaration(section[j]); j++) morceaux.push(section[j]);
+    accord = { absente: false, valeur: morceaux.map((m) => m.trim()).join(' ').trim() };
+  }
+
   const items = [];
   let item = null;
   let dansAnalyse = false;
@@ -757,6 +831,7 @@ export function lireDescriptionPr(corps) {
   return {
     touches: declaration(ETIQUETTES_PR[0]),
     masques: declaration(ETIQUETTES_PR[1]),
+    accord,
     items,
     problemes,
   };
@@ -799,7 +874,17 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
     }
   }
 
-  const requises = demandes(entrees, entreesAvant, declares);
+  if (modifieUnInvariant(fichiersModifies)) {
+    if (pr.accord.absente) {
+      aCorriger.push(
+        `La PR modifie ${DOCUMENTS.invariants} : ajouter à la section une ligne « Accord du porteur : … » (lien ou citation datée de son accord explicite). Un invariant ne change qu'à sa demande.`,
+      );
+    } else if (!analyseEcrite(pr.accord.valeur)) {
+      aCorriger.push("« Accord du porteur : » à remplir : le lien ou la citation datée de l'accord explicite du porteur sur ce changement d'invariant.");
+    }
+  }
+
+  const requises = demandes(entrees, entreesAvant, declares, fichiersModifies);
   const connues = new Set([...requises.keys(), ...[...entrees.values()].flatMap((e) => e.verifications.map((v) => v.id))]);
   const listees = new Map();
   for (const item of pr.items) {
@@ -970,16 +1055,16 @@ export function decocher(corps, cles) {
 export function preparerSection({ entrees, entreesAvant = new Map(), fichiersModifies = [], ids = [], auteur = 'agent', date }) {
   const imposes = plancher(entrees, fichiersModifies);
   const touches = [...new Set([...imposes.keys(), ...ids])].sort(ordreIds);
-  const requises = demandes(entrees, entreesAvant, touches);
+  const requises = demandes(entrees, entreesAvant, touches, fichiersModifies);
   const lignes = [
     '## Invariants et contraintes',
     '',
     `Touchés : ${touches.length ? touches.join(', ') : 'à analyser'}`,
     'Lien possible masqué : à analyser',
-    '',
-    '### Vérifications manuelles',
-    '',
   ];
+  // Paragraphe à part : collée à la déclaration qui précède, la ligne la prolongerait (#64).
+  if (modifieUnInvariant(fichiersModifies)) lignes.push('', 'Accord du porteur : à écrire');
+  lignes.push('', '### Vérifications manuelles', '');
   if (!requises.size) lignes.push('Aucune pour les identifiants déclarés.');
   for (const r of requises.values()) {
     lignes.push(`- \`${r.cle}\` · ${r.pourquoi} — ${r.description}`, `  - Analyse (${auteur}, ${date}) : à écrire`, '  - [ ] Validée par un développeur humain');

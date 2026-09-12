@@ -38,6 +38,26 @@ correspondance ; `packages/gardes` le relit.
   ou l'autre étiquette ; les identifiants se lisent sans tenir compte de la casse, et une plage
   (`U1 à U3`, `U1–U3`) déclare chacun de ceux qu'elle couvre. Une section ou une ligne en double, ou
   une plage qui mêle deux familles, est refusée plutôt que devinée.
+- **Une règle nouvelle ne contredit pas les règles primaires** (#64). Les **règles primaires** sont
+  les invariants et usages ([`invariants.md`](invariants.md)), les contraintes
+  ([`contraintes.md`](contraintes.md)) et la garde de l'objectif primaire (#58, D61). Changer une
+  règle reste libre ; ce qui se vérifie, c'est qu'elle ne les contredit pas. Une PR qui modifie
+  `docs/decisions.md`, `docs/invariants.md`, `docs/contraintes.md`, `CLAUDE.md`, ou la garde
+  (`packages/gardes/**`, `.github/workflows/verifications.yml`,
+  `.github/pull_request_template.md`) se voit demander `VM-regles-primaires`, à analyser puis à
+  faire valider comme toute vérification manuelle : l'analyse nomme les règles primaires que la
+  règle nouvelle touche et dit pourquoi elle ne les contredit pas. Une contradiction ne se tranche
+  pas dans la PR : elle devient une question dans une issue. Cette vérification ne tient pas dans une
+  entrée de ce document — une entrée porte un invariant ou une contrainte, et ni une décision ni la
+  garde n'en sont un : elle vient d'une table de chemins tenue dans `packages/gardes/gardes.mjs`.
+  Retirer une garde de ce document reste demandé, lui, par la comparaison des deux registres.
+  La garde est jugée par la version que porte la PR (piste 2 de #58) : c'est l'amorçage
+  (`packages/gardes/amorcage.test.mjs`) qui empêche de l'affaiblir en silence.
+- **Un invariant ne change qu'à la demande du porteur** (#64). Une PR qui modifie
+  `docs/invariants.md` porte dans sa section une ligne « Accord du porteur : … », paragraphe à part,
+  avec le lien ou la citation datée de son accord explicite. `demander` la prépare pour ces PR et
+  pour elles seules ; laissée vide ou en attente (« à écrire », « à analyser », « … »), elle compte
+  comme absente et la vérification reste rouge.
 - **Une validation vaut pour le code validé** (#61). Cocher « Validée » l'enregistre, dans un
   commentaire que seule la vérification écrit, avec la tête de la PR et sa branche cible. Un commit
   qui modifie le code, y compris en résolvant un conflit, ou un changement de branche cible l'annulent :

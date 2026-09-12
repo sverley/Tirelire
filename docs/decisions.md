@@ -1254,3 +1254,28 @@ n'était fusionné. D'où la règle : une sous-issue, une PR, une fusion ; un be
 devient une sous-issue et attend sa propre PR, sauf s'il rend la PR courante fausse ; une issue se
 ferme à la fusion ; un objectif permanent ne se ferme pas. Le découpage d'un objectif en sous-issues
 précède le codage (`CLAUDE.md`).
+
+## D64 · 2026-09-12 · Une règle nouvelle se vérifie contre les règles primaires
+
+Changer une règle doit rester possible : une PR ajoute une décision, en remplace une par une entrée
+nouvelle, fait évoluer la garde ou les règles des sessions. Ce qui se vérifie avant la fusion, c'est
+que la règle nouvelle ne contredit pas les **règles primaires** — les invariants et usages
+(`docs/invariants.md`), les contraintes (`docs/contraintes.md`) et la garde de l'objectif primaire
+(#58, D61). La conformité porte sur le sens et ne se programme pas : elle devient une vérification
+manuelle, `VM-regles-primaires`, demandée par les chemins que la PR modifie (D61, #61).
+
+Elle ne tient pas dans une entrée de `docs/gardes.md` : une entrée y porte un invariant ou une
+contrainte, et ni une décision, ni `CLAUDE.md`, ni la garde n'en sont un. D'où une table de chemins
+à part, dans `packages/gardes/gardes.mjs`. `docs/gardes.md` n'y figure pas : retirer une garde du
+registre est déjà demandé par la comparaison des deux registres.
+
+La garde reste jugée par la version que porte la PR (piste 2 de #58, tranché le 11 septembre) :
+retirer cette demande en modifiant la garde reste donc possible, mais c'est une modification de la
+garde, donc une règle nouvelle, et l'amorçage (`packages/gardes/amorcage.test.mjs`) rougit quand la
+garde s'affaiblit. Piste 1 en réserve — faire juger chaque PR par la garde de `main` — si elle est
+contournée.
+
+Un invariant ne change qu'à la demande du porteur (tranché le 12 septembre) : son accord explicite
+n'est pas laissé à l'analyse, c'est une ligne « Accord du porteur : … » de la section « Invariants
+et contraintes », que la garde lit et refuse quand elle manque ou reste vide. `demander` la prépare
+pour une PR qui modifie `docs/invariants.md`, et pour elle seule.
