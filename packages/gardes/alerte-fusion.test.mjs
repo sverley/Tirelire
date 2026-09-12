@@ -175,8 +175,11 @@ function scene() {
     writeFileSync(fichier, JSON.stringify(e));
   };
 
-  /** Une PR fusionnée (ou seulement fermée), avec la couleur de sa vérification sur la tête fusionnée. */
-  const pr = ({ numero = 63, tete = 'aaa1111', fusion = 'mmm1111', verification = 'success', fusionnee = true, auteur = 'sverley' } = {}) => {
+  /**
+   * Une PR fusionnée (ou seulement fermée), avec la couleur de sa vérification sur la tête fusionnée ;
+   * `base` dit dans quelle branche elle est fusionnée.
+   */
+  const pr = ({ numero = 63, tete = 'aaa1111', fusion = 'mmm1111', verification = 'success', fusionnee = true, auteur = 'sverley', base = 'main' } = {}) => {
     modifier((e) => {
       e.pulls[numero] = {
         number: numero,
@@ -187,7 +190,7 @@ function scene() {
         merged_by: fusionnee ? { login: auteur } : null,
         user: { login: 'sverley' },
         head: { sha: tete, ref: 'feature/essai' },
-        base: { ref: 'main' },
+        base: { ref: base },
         html_url: 'https://github.com/' + CIBLE + '/pull/' + numero,
       };
       if (verification) e.verification[tete] = verification;
@@ -309,6 +312,32 @@ test('#62 · le même événement rejoué n’ouvre pas de doublon', () => {
   alerte(s.fermeture(numero), 'première fusion au rouge');
   const rejoue = s.fermeture(numero);
   assert.equal(rejoue.issues.length, 1, `l'événement rejoué a ouvert une seconde issue :\n${rejoue.sortie}`);
+});
+
+// ─── #62 · cas ajoutés par l'audit du codage (PR #75) — mêmes « Fait quand », mêmes lectures ──
+// Les exécutions multiples sur une même tête sont traitées à part, dans `alerte-fusion-relecture.test.mjs`.
+
+test("#62 · une PR fusionnée ailleurs que dans main n’ouvre rien, même au rouge", () => {
+  const s = scene();
+  const { numero } = s.pr({ verification: 'failure', base: 'harnais/objectif-0-gardes' });
+  silence(s.fermeture(numero), 'PR fusionnée dans une branche de travail');
+});
+
+test('#62 · une fusion au rouge ouvre une issue et une seule : le push qui la porte ne la double pas', () => {
+  const s = scene();
+  const { numero, fusion } = s.pr({ verification: 'failure' });
+  alerte(s.fermeture(numero), 'fusion au rouge');
+  const apres = s.push({ shas: [fusion] });
+  assert.equal(apres.issues.length, 1, `la fusion au rouge a ouvert deux alertes, la fermeture puis le push :\n${apres.sortie}`);
+  assert.equal(apres.code, 0, `le push d'une fusion déjà signalée devrait être vert :\n${apres.sortie}`);
+});
+
+test('#62 · deux pushs directs différents ouvrent chacun leur issue', () => {
+  const s = scene();
+  alerte(s.push({ shas: ['ddd1111'] }), 'premier push direct');
+  const second = s.push({ shas: ['eee2222'] });
+  assert.equal(second.issues.length, 2, `le second push direct n'a pas été signalé :\n${second.sortie}`);
+  assert.notEqual(second.issues[0].title, second.issues[1].title, `les deux alertes portent le même titre :\n${second.issues.map((i) => i.title).join('\n')}`);
 });
 
 // ─── #62, point 1 · la garde est reliée aux événements de GitHub ─────────────────────────────
