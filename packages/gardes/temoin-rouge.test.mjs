@@ -77,7 +77,8 @@ test('#66 · sur une copie du dépôt, retirer la citation du témoin rouge d\'u
   const p = await modifie(
     racine,
     'docs/gardes.md',
-    (avant) => avant.replace(/ Témoin rouge : à bâtir \(#38\)\.(?=\n(?:  |- \*\*|\n|$))/, ''),
+    // Les 22 harnais du registre citent leur témoin depuis #69 : on retire la citation du premier.
+    (avant) => avant.replace(/\n {2}Témoin rouge : «[^»]*»(?=\n)/, ''),
     () => problemes(racine),
   );
   assert.ok(
@@ -92,10 +93,9 @@ test('#66 · sur une copie du dépôt, citer un témoin rouge introuvable pour u
     racine,
     'docs/gardes.md',
     (avant) => {
-      const cible = 'Témoin rouge : à bâtir (#38).';
-      const i = avant.indexOf(cible);
-      if (i < 0) throw new Error("aucune ligne « à bâtir (#38) » trouvée : le harnais d'audit de #66 est à relire");
-      return `${avant.slice(0, i)}Témoin rouge : « ce test n'existe nulle part (#66) ».${avant.slice(i + cible.length)}`;
+      const m = avant.match(/\n {2}Témoin rouge : «[^»]*»(?=\n)/);
+      if (!m) throw new Error("aucune ligne « Témoin rouge » trouvée : le harnais d'audit de #66 est à relire");
+      return avant.replace(m[0], "\n  Témoin rouge : « ce test n'existe nulle part (#66) »");
     },
     () => problemes(racine),
   );

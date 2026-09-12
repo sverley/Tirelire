@@ -271,3 +271,44 @@ describe('correspondance des comptes par numéro', () => {
     expect(matchAccountByNumber(accounts, '999999999999')).toBeUndefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Témoins rouges des harnais U3 et U5 (docs/gardes.md) : les assertions du rapprochement et des
+// doublons, rejouées sur des versions volontairement cassées du besoin. Ils doivent échouer ;
+// `it.fails` tient l'échec attendu, et `pnpm test` rougit s'ils se mettaient à passer (#66).
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Le relevé inventé, importé sur le grand livre d'exemple — comme dans « rapprochement ». */
+function importé(): Ledger {
+  const { ledger, profile } = ledgerWithBank();
+  const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
+  const prep = prepareImport(ledger, rows, profile);
+  return { ...ledger, operations: prep.candidates.filter((c) => !c.exact).map((c) => c.operation) };
+}
+
+it.fails('témoin rouge · un virement reconnu versé en entier à une seule tirelire', () => {
+  const l = importé();
+  const patch = matchTirelireTransfers(l);
+  // Version cassée : le libellé est bien reconnu, mais le virement n'est pas réparti par l'ordre
+  // de financement (D21) — tout tombe dans la première tirelire venue.
+  const cassé: Patch = { ...patch, allocations: patch.allocations.map((a) => ({ ...a, tirelireId: 'env-vac' })) };
+  const idx = indexLedger(applyPatchToLedger(l, cassé));
+
+  const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, '2026-09-06');
+  expect(tf.get('acc-livret')).toBe(euros(1000));
+  expect(tf.get('acc-principal')).toBe(euros(50));
+  expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
+});
+
+it.fails('témoin rouge · un import qui ne cherche les doublons que dans le fichier', () => {
+  const { ledger, profile } = ledgerWithBank();
+  const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
+  const l2 = { ...ledger, operations: prepareImport(ledger, rows, profile).candidates.map((c) => c.operation) };
+  // Version cassée : le grand livre n'est pas consulté. Ni doublon exact au réimport, ni doublon
+  // probable quand une autre source réécrit le libellé et décale la date.
+  const oublieuse = (lignes: Parameters<typeof prepareImport>[1]) => prepareImport({ ...l2, operations: [] }, lignes, profile);
+
+  const encore = oublieuse([{ line: 2, date: '2026-09-05', label: 'Eau du village', amount: euros(-76), accountKey: '00011111111' }]);
+  expect(encore.counts.probable).toBe(1);
+  expect(oublieuse(rows).counts.exact).toBe(8);
+});

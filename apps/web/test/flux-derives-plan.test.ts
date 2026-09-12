@@ -94,6 +94,45 @@ async function saisirMontant(page: Page, valeur: string): Promise<void> {
   await attendre(50);
 }
 
+/**
+ * Ce que la carte doit dire une fois l'ordre posé : le fait tel qu'il a été saisi, ce que le budget
+ * demande, et l'écart signalé — sans que rien ne soit réécrit.
+ */
+function vérifierOrdrePosé(c: Carte, posé: number, demandé: number, alertes: string[]) {
+  expect(c.formulaire).toBeUndefined();
+  // Le fait enregistré est celui qui a été saisi, pas ce que le budget demande.
+  expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(posé);
+  expect(centimes(ligne(c, 'Virement permanent')?.montant ?? '')).toBe(demandé);
+  expect(ligne(c, 'Ordre permanent chez la banque')?.sous).toMatch(/banque/);
+  const [alerte, ...autres] = alertes;
+  expect(autres).toEqual([]);
+  expect(alerte).toContain(COMPTE);
+  expect(alerte).toContain(euros(posé));
+  expect(alerte).toContain(euros(demandé));
+  expect(c.boutons).toContain('Corriger mon ordre');
+}
+
+/**
+ * Témoin rouge du harnais U2 (docs/gardes.md) : les mêmes assertions, rejouées sur la lecture d'un
+ * écran volontairement cassé — un Plan qui, au lieu d'enregistrer le fait bancaire, réécrit l'ordre
+ * sur ce que le budget demande : plus d'écart, donc plus d'alerte, et l'ordre chez la banque, lui,
+ * n'a pas bougé. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans
+ * navigateur : c'est la règle qu'on garde ici, pas une seconde visite de l'écran.
+ */
+it.fails('témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire', () => {
+  const demandé = 65000;
+  const posé = demandé - 7000;
+  const carteCassée: Carte = {
+    visible: true,
+    lignes: [
+      { libellé: 'Virement permanent', sous: '', montant: '650,00 €' },
+      { libellé: 'Ordre permanent chez la banque', sous: 'chez la banque', montant: '650,00 €' },
+    ],
+    boutons: ['Détail', 'Corriger mon ordre'],
+  };
+  vérifierOrdrePosé(carteCassée, posé, demandé, []);
+});
+
 describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 px', () => {
   let site: Site;
   let page: Page;
@@ -188,17 +227,7 @@ describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 p
     await saisirMontant(page, euros(posé));
     await cliquerDansCarte(page, 'Enregistrer');
     const c = await carte(page);
-    expect(c.formulaire).toBeUndefined();
-    // Le fait enregistré est celui qui a été saisi, pas ce que le budget demande.
-    expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(posé);
-    expect(centimes(ligne(c, 'Virement permanent')?.montant ?? '')).toBe(demandé);
-    expect(ligne(c, 'Ordre permanent chez la banque')?.sous).toMatch(/banque/);
-    const [alerte, ...autres] = await alertesÀlÉcran(page);
-    expect(autres).toEqual([]);
-    expect(alerte).toContain(COMPTE);
-    expect(alerte).toContain(euros(posé));
-    expect(alerte).toContain(euros(demandé));
-    expect(c.boutons).toContain('Corriger mon ordre');
+    vérifierOrdrePosé(c, posé, demandé, await alertesÀlÉcran(page));
   });
 
   it('le fait enregistré survit au rechargement', async () => {
