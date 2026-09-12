@@ -6,7 +6,9 @@
  * - **Couverture.** Chaque invariant de `docs/invariants.md` (I…, et les usages U… d'I3) et chaque
  *   contrainte de `docs/contraintes.md` (C…) a son entrée dans `docs/gardes.md`, gardée par au
  *   moins un harnais qui existe, une vérification manuelle décrite, ou un renvoi vers des entrées
- *   elles-mêmes gardées.
+ *   elles-mêmes gardées. Chaque harnais cite en plus son témoin rouge — ou porte « à bâtir » avec
+ *   l'issue qui le doit (#66) ; qu'un témoin rouge sache vraiment échouer n'est pas du ressort de
+ *   la couverture, mais de l'outil de test qui le fait tourner.
  * - **Demandes d'une PR.** La description déclare les identifiants que la PR touche et ceux dont le
  *   lien pourrait être masqué ; les motifs `Chemins` du registre en imposent un plancher ; chaque
  *   vérification manuelle qui s'y rattache, et chaque garde retirée du registre, y figure avec une
@@ -299,6 +301,20 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
           problemes.push(`${ou} : le test « ${nom} » ne tourne dans aucun de ${presents.map((c) => `\`${c}\``).join(', ')} (${pourquoi}).`);
         }
       }
+      const rouge = temoinRouge(h.description);
+      if (!rouge) {
+        problemes.push(
+          `${ou} : le harnais \`${h.chemins.join(', ')}\` ne cite pas de témoin rouge (assertions rejouées sur une version cassée du besoin) ni ne le porte « à bâtir » avec une issue (#66).`,
+        );
+      } else if (rouge.nom && lireFichier && presents.length) {
+        const analyses = presents.map((c) => analyserTests(lireFichier(c) ?? ''));
+        if (!analyses.some((a) => a.actifs.has(rouge.nom))) {
+          const pourquoi = analyses.some((a) => a.inactifs.has(rouge.nom))
+            ? 'il y figure sans tourner : désactivé, seulement prévu, dans une suite désactivée, ou suite sans test actif'
+            : 'renommé, supprimé ou mis en commentaire ?';
+          problemes.push(`${ou} : le témoin rouge « ${rouge.nom} » ne tourne dans aucun de ${presents.map((c) => `\`${c}\``).join(', ')} (${pourquoi}).`);
+        }
+      }
       for (const c of lireFichier ? presents : []) {
         if (!analyserTests(lireFichier(c) ?? '').conditionnels) continue;
         sautsSousCondition.add(c);
@@ -380,6 +396,17 @@ export function etapeTestsStricte(yaml) {
 export function testNomme(description) {
   const m = String(description ?? '').match(/^«\s*(.+?)\s*»/);
   return m ? m[1].replace(/\s+/g, ' ') : null;
+}
+
+/**
+ * Témoin rouge cité en fin d'une ligne « Harnais » : `Témoin rouge : « nom du test »`, ou la dette
+ * `Témoin rouge : à bâtir (#123)` (#66). `null` si la ligne n'en cite aucun.
+ */
+const TEMOIN_ROUGE = /Témoin rouge\s*:\s*(?:«\s*(.+?)\s*»|à\s+bâtir\s*\(#(\d+)\))\s*\.?\s*$/i;
+export function temoinRouge(description) {
+  const m = String(description ?? '').match(TEMOIN_ROUGE);
+  if (!m) return null;
+  return m[1] ? { nom: m[1].replace(/\s+/g, ' ') } : { aBatir: m[2] };
 }
 
 // ─── Tests nommés : ce qui tourne vraiment ────────────────────────────────────────────────────

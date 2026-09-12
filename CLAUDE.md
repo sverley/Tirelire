@@ -71,6 +71,12 @@
     « Vérifications manuelles » est rouge.
   - Un test qui a besoin d'un outil (navigateur, PHP, `lftp`…) peut se sauter en local s'il manque,
     mais échoue quand `TIRELIRE_STRICT` est posé, comme en CI ; la CI installe ses outils.
+  - Un harnais du registre cite son témoin rouge (les mêmes assertions rejouées sur une version
+    volontairement cassée du besoin, qui doit échouer) ou porte « à faire » avec le numéro de son
+    issue ; la couverture échoue sinon, en le nommant, comme pour un témoin rouge cité qui n'existe
+    pas. Un témoin rouge qui se met à passer fait échouer `pnpm test`, l'outil de test tenant
+    l'échec attendu (`test.fails` avec vitest, une assertion qui attend l'échec avec `node:test`) —
+    la couverture ne le voit pas (#66).
   - Le crochet de pré-commit tient en moins de 20 s : l'amorçage et les harnais d'audit tournent en
     CI, pas au commit (D62).
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de

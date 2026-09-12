@@ -64,7 +64,7 @@ const GARDES = `# Gardes
 
 Chemins : \`a/src/**\`
 
-- **Harnais** · \`a/test/un.test.ts\` — garde le calcul.
+- **Harnais** · \`a/test/un.test.ts\` — garde le calcul. Témoin rouge : à bâtir (#38).
 - **Couvert par** · U1, U2 — chaque usage.
 
 ### U1 · Usage un
@@ -440,7 +440,7 @@ test('un test nommé au registre se cherche parmi les tests qui tournent, pas n\
   const documents = {
     invariants: '## I1 · Premier\n',
     contraintes: '',
-    gardes: '## I1 · Premier\n\n- **Harnais** · `a/un.test.ts`, `a/deux.test.ts` — « le test\n  nommé » : garde I1.\n',
+    gardes: '## I1 · Premier\n\n- **Harnais** · `a/un.test.ts`, `a/deux.test.ts` — « le test\n  nommé » : garde I1. Témoin rouge : à bâtir (#38).\n',
     fichiers: ['a/un.test.ts', 'a/deux.test.ts'],
   };
   const couverture = (contenus) => V.verifierCouvertureTextes({ ...documents, lireFichier: (c) => contenus[c] ?? null }).problemes;
@@ -468,7 +468,7 @@ test("un harnais du registre qui se saute faute d'outil doit rendre l'outil obli
   const documents = {
     invariants: '## I1 · Premier\n',
     contraintes: '',
-    gardes: '## I1 · Premier\n\n- **Harnais** · `a/outil.test.mjs` — garde I1.\n',
+    gardes: '## I1 · Premier\n\n- **Harnais** · `a/outil.test.mjs` — garde I1. Témoin rouge : à bâtir (#38).\n',
     fichiers: ['a/outil.test.mjs', 'a/harnais.ts'],
   };
   const CI_STRICTE = "jobs:\n  test:\n    steps:\n      - run: pnpm test\n        env:\n          TIRELIRE_STRICT: '1'\n";
