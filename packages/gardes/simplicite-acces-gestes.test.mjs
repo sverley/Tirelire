@@ -17,10 +17,11 @@
  *    l'autre, jamais rien, et jamais une ligne « À bâtir » laissée sous #38 ou #71.
  * 2. **Le nombre de gestes d'I6 est fixé au registre, et mesuré.** Tranché par le porteur le
  *    13 septembre dans #71 : depuis l'écran Opérations, **2 gestes pour catégoriser, 3 avec une
- *    sous-catégorie**, objectif vers lequel tendre, et **le harnais mesure avec une marge d'un
- *    geste**. L'entrée porte donc l'objectif, la marge, et le compte pour toutes les opérations
- *    semblables ; un harnais les mesure, ou une renonciation écrite le dit. Un objectif qui ne vit
- *    que dans l'analyse d'une PR ne se compare à rien au tour suivant.
+ *    sous-catégorie** ; **un geste de plus pour automatiser** toutes les opérations semblables,
+ *    soit 3 et 4 ; et **le harnais mesure à l'objectif plus un geste de marge**, soit 3 et 4 pour
+ *    catégoriser, 4 et 5 pour automatiser. L'entrée porte donc les quatre objectifs et la marge ;
+ *    un harnais les mesure, ou une renonciation écrite le dit. Un objectif qui ne vit que dans
+ *    l'analyse d'une PR ne se compare à rien au tour suivant.
  * 3. **Les gardes du jour ne disparaissent pas.** Le harnais d'I6 et les trois vérifications
  *    manuelles (`VM-I4-simple`, `VM-I5-acces`, `VM-I6-gestes`) sont figés ici : une dette se règle
  *    en bâtissant, pas en effaçant. Retirer une garde reste possible, mais par la section
@@ -57,12 +58,18 @@ const CHANTIER = new Set(['38', '71']);
 
 /**
  * Tranché par le porteur le 13 septembre 2026 (#71) : depuis l'écran Opérations, catégoriser demande
- * au plus deux gestes, trois avec une sous-catégorie. C'est un objectif vers lequel tendre ; le
- * harnais qui le mesure s'autorise un geste de marge, soit trois et quatre.
+ * au plus deux gestes, trois avec une sous-catégorie ; automatiser toutes les opérations semblables
+ * en demande un de plus. Ce sont des objectifs vers lesquels tendre ; le harnais qui les mesure
+ * s'autorise un geste de marge — soit 3 et 4 pour catégoriser, 4 et 5 pour automatiser.
  */
-const OBJECTIF = Object.freeze({ categorie: 2, sousCategorie: 3 });
+const OBJECTIF = Object.freeze({
+  'catégoriser': 2,
+  'catégoriser avec une sous-catégorie': 3,
+  'automatiser les semblables': 3,
+  'automatiser les semblables avec une sous-catégorie': 4,
+});
 
-/** La marge que le porteur accorde au harnais, en gestes. */
+/** La marge que le porteur accorde au harnais, en gestes, sur chacun des objectifs. */
 const MARGE = 1;
 
 const registre = () => {
@@ -171,11 +178,11 @@ const avecRenonciation = (texte, id) =>
       ` la vérification manuelle ci-dessous en tient lieu. Accord du porteur du 2026-09-13 (#71).`,
   );
 
-/** L'objectif du porteur, écrit comme le registre l'attend : objectif, marge, et les semblables. */
+/** L'objectif du porteur, écrit comme le registre l'attend : les quatre nombres et la marge. */
 const OBJECTIF_ECRIT =
-  `Objectif (porteur, #71) : au plus ${OBJECTIF.categorie} gestes pour catégoriser une opération, ` +
-  `${OBJECTIF.sousCategorie} gestes avec une sous-catégorie, et 3 gestes pour toutes les opérations ` +
-  `semblables ; le harnais mesure avec une marge de ${MARGE} geste. `;
+  `Objectif (porteur, #71) : au plus 2 gestes pour catégoriser une opération depuis l'écran ` +
+  `Opérations, 3 gestes avec une sous-catégorie, et 1 geste de plus pour automatiser toutes les ` +
+  `opérations semblables, soit 3 et 4 gestes ; le harnais mesure avec une marge de ${MARGE} geste. `;
 
 /** La version « besoin tenu » pour I6 : l'objectif écrit, et un harnais qui le mesure. */
 const avecLesNombres = (texte) =>
@@ -223,11 +230,11 @@ function gestesFixesEtMesures(texte) {
   for (const [cas, n] of Object.entries(OBJECTIF)) {
     if (!gestes.has(String(n))) manquants.push(`I6 · l'objectif de ${n} gestes (${cas}) n'est écrit nulle part dans l'entrée`);
   }
-  if (!new RegExp(`marge|tolérance`, 'i').test(t) || !new RegExp(`${MARGE}\\s*gestes?\\b`, 'i').test(t)) {
+  if (!/marge|tolérance/i.test(t) || !new RegExp(`${MARGE}\\s*gestes?\\b`, 'i').test(t)) {
     manquants.push(`I6 · la marge de ${MARGE} geste accordée au harnais n'est pas écrite`);
   }
-  if (!/semblables[^.\n]*?\d+\s*gestes?|\d+\s*gestes?[^.\n]*?semblables/i.test(t)) {
-    manquants.push("I6 · aucun nombre de gestes pour classer toutes les opérations semblables");
+  if (!/(automatis|semblables)[^.\n]*?\d+\s*gestes?|\d+\s*gestes?[^.\n]*?(automatis|semblables)/i.test(t)) {
+    manquants.push("I6 · aucun nombre de gestes pour automatiser toutes les opérations semblables");
   }
   const e = entree(texte, 'I6');
   if (!porteUnHarnaisNeuf(e) && !renonciationEcrite(texte, 'I6')) {
