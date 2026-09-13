@@ -19,7 +19,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import * as V from './gardes.mjs';
+import * as V from '../packages/gardes/gardes.mjs';
 import { copieDuDepot, modifie, problemes } from './test/copie-du-depot.mjs';
 
 const texte = (p) => p.join('\n');

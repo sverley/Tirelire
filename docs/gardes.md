@@ -6,6 +6,10 @@ qui ne se programme pas devient une vérification manuelle : demandée dans la P
 développeur ou un agent, validée par un développeur humain avant la fusion. Ce document tient la
 correspondance ; `packages/gardes` le relit.
 
+Ce document ne porte que les besoins du produit. Ce qu'une session d'audit écrit pour vérifier la
+livraison d'une règle du projet est un méta-harnais : il vit dans `meta-harnais/`, n'entre pas dans
+une entrée et ne tourne pas dans `pnpm test` (#82, D65).
+
 ## Ce qui est vérifié
 
 - **À chaque `pnpm test`**, donc avant chaque commit et dans la CI : chaque identifiant des deux
@@ -52,8 +56,10 @@ correspondance ; `packages/gardes` le relit.
   garde n'en sont un : elle vient d'une table de chemins tenue dans `packages/gardes/gardes.mjs`.
   Ce document y figure lui aussi (accord du porteur du 12 septembre) : la comparaison des deux
   registres voit une garde retirée, pas une consigne affaiblie.
+  Une PR qui modifie `meta-harnais/**` s'y voit demander la même vérification (#82) : affaiblir un
+  méta-harnais, c'est affaiblir la garde par l'autre bout.
   La garde est jugée par la version que porte la PR (piste 2 de #58) : c'est l'amorçage
-  (`packages/gardes/amorcage.test.mjs`) qui empêche de l'affaiblir en silence.
+  (`meta-harnais/amorcage.test.mjs`) qui empêche de l'affaiblir en silence.
 - **Ce qui vient du porteur ne change qu'à sa demande** (#64). Une PR qui modifie
   [`description-projet.md`](description-projet.md) — son texte, mot pour mot, qui fait foi — ou
   [`invariants.md`](invariants.md) porte dans sa section une ligne « Accord du porteur : … », paragraphe à part,

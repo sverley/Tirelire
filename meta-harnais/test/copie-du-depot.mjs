@@ -13,7 +13,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { after } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+export const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const RELIRE = "le harnais d'audit de #59 est à relire";
 
 // Rien du crochet git ni de la CI n'atteint la garde : un GIT_DIR hérité lui ferait lire le vrai dépôt.

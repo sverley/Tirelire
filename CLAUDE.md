@@ -18,8 +18,9 @@
 - Écritures uniquement via `LedgerStore.upsert/remove/setSetting` (journal de changements).
 - Aucune donnée bancaire réelle dans le dépôt ; exemples et tests sur données inventées.
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font l'essentiel :
-  typecheck et tests du cœur, puis tests unitaires de la garde, au commit (moins de 20 s) ;
-  typecheck complet et build au push. La CI joue tout, amorçage et harnais d'audit compris (D62).
+  typecheck et tests du cœur, puis tests de la garde, au commit (moins de 30 s, D66) ;
+  typecheck complet et build au push. La CI joue tout ce qui garde un comportement ; les
+  méta-harnais s'appellent par `pnpm meta` (D62, D65).
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
 - Simon lit surtout sur téléphone : réponses courtes, en prose, une question à la fois.
 
@@ -49,6 +50,13 @@
   PR associée. **En audit, ne jamais toucher au code** : seulement la documentation et les harnais.
   Il s'en tient aux « Fait quand » et aux erreurs plausibles par accident : une forme exotique ou un
   contournement se note dans la PR, sans devenir un harnais rouge (D62).
+- **Où poser le harnais qu'on écrit** (D65). Deux questions : qui l'écrit, et pour quel besoin. Le
+  harnais d'un besoin produit va auprès de ce qu'il garde (`packages/core/test`, `apps/web/test`,
+  `apps/relay`, `apps/hebergement`), ou dans `packages/gardes` s'il n'appartient à aucune
+  application. Le harnais que le codeur écrit sur la garde va dans `packages/gardes/gardes.test.mjs`.
+  Le harnais qu'un auditeur écrit sur une règle est un **méta-harnais** : il va dans `meta-harnais/`,
+  hors du workspace, s'appelle par `pnpm meta`, et ne tourne de lui-même que sur une PR qui touche
+  aux règles. Il ne va jamais dans `pnpm test`.
 - **Codage d'une PR.** Les questions de développement et les décisions techniques se consignent en
   commentaires dans la discussion de la PR.
 - **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
@@ -109,7 +117,7 @@
     pas. Un témoin rouge qui se met à passer fait échouer `pnpm test`, l'outil de test tenant
     l'échec attendu (`test.fails` avec vitest, une assertion qui attend l'échec avec `node:test`) —
     la couverture ne le voit pas (#66).
-  - Le crochet de pré-commit tient en moins de 20 s : l'amorçage et les harnais d'audit tournent en
+  - Le crochet de pré-commit tient en moins de 30 s (D66) : les méta-harnais (D65) tournent en
     CI, pas au commit (D62).
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
     branche cible, l'annule et la vérification décoche la case ; documentation et harnais se

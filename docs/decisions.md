@@ -1222,7 +1222,7 @@ ne tournait jamais en CI.
 
 - **Critère.** Une garde protège des erreurs plausibles par accident, pas des contournements : un
   test mis en commentaire pour tromper la garde se voit dans le diff, et la relecture l'attrape.
-- **Budget.** Le crochet de pré-commit tient en moins de 20 s. L'amorçage et les harnais d'audit
+- **Budget.** Le crochet de pré-commit tient en moins de 20 s — relevé à 30 s par D66. Les méta-harnais (D65)
   tournent en CI, pas au commit ; la couverture reste dans `pnpm test`.
 - **Audit.** Il contrôle les « Fait quand » et les erreurs plausibles. Une forme exotique ou un
   contournement se note dans la PR, sans devenir un harnais rouge.
@@ -1233,13 +1233,13 @@ ne tournait jamais en CI.
   documentation ne déclenche ni manipulation de l'application ni construction de l'APK.
 - **Retour au produit.** Les harnais « À bâtir » d'U1 à U5 passent avant la robustesse de la garde.
 
-Dans le code : le crochet de pré-commit laisse l'amorçage et les harnais d'audit à la CI ; la
+Dans le code : le crochet de pré-commit laisse les méta-harnais à `pnpm meta` (D65) ; la
 couverture vérifie que l'étape `pnpm test` de la CI pose `TIRELIRE_STRICT` ; les demandes d'une PR,
 ou les consignes du registre, épargnent les PR qui ne touchent que tests, outillage ou documentation.
 
 Mis en œuvre dans la PR #63 : le crochet de pré-commit lance le typecheck et les tests du cœur, puis
 les tests unitaires de la garde, couverture comprise (17 s mesurées) ; le typecheck complet et le
-build passent au push, et `pnpm test` joue tout en CI, amorçage et harnais d'audit compris. La
+build passent au push, et `pnpm test` joue en CI tout ce qui garde un comportement. La
 couverture lit l'étape `pnpm test` de `ci.yml` et refuse qu'elle cesse de poser `TIRELIRE_STRICT`.
 La règle d'« Écrire une entrée » et les consignes de `VM-I9-apk` et `VM-C3-https` épargnent les PR de
 tests, d'outillage ou de documentation ; la garde ne classe pas elle-même les fichiers : l'analyse le
@@ -1272,7 +1272,7 @@ contrainte, et ni une décision, ni `CLAUDE.md`, ni la garde n'en sont un. D'où
 
 La garde reste jugée par la version que porte la PR (piste 2 de #58, tranché le 11 septembre) :
 retirer cette demande en modifiant la garde reste donc possible, mais c'est une modification de la
-garde, donc une règle nouvelle, et l'amorçage (`packages/gardes/amorcage.test.mjs`) rougit quand la
+garde, donc une règle nouvelle, et l'amorçage (`meta-harnais/amorcage.test.mjs`) rougit quand la
 garde s'affaiblit. Piste 1 en réserve — faire juger chaque PR par la garde de `main` — si elle est
 contournée.
 
@@ -1283,3 +1283,53 @@ lit et refuse quand elle manque ou reste en attente (vide, « … », « à écr
 Lien ou citation datée : la garde accepte l'un comme l'autre, elle ne juge pas la forme de l'accord.
 `demander` la prépare pour une PR qui modifie `docs/description-projet.md` ou `docs/invariants.md`,
 et pour elle seule.
+
+## D65 · 2026-09-12 · Deux questions classent un harnais ; seuls les méta-harnais sortent du jeu courant
+
+Besoin #82, posé par le porteur : « je ne fais pas confiance au codeur ». Pour chaque besoin, deux
+sessions : l'une code le besoin, l'autre code le harnais qui vérifiera que le codeur y a répondu.
+Deux questions suffisent alors à classer un harnais — **qui l'a écrit** (le codeur, avec le besoin ;
+l'auditeur, contre le besoin) et **quel besoin** (une fonctionnalité du produit, ou une règle du
+projet) :
+
+| | Fonctionnalité | Règle |
+|---|---|---|
+| **Codeur** | le produit et ses tests | la garde et `gardes.test.mjs` |
+| **Auditeur** | harnais du besoin | **méta-harnais** |
+
+Une seule case sort du jeu courant : **auditeur × règle**, le méta-harnais. Il contrôle le travail du
+codeur sur une règle ; il n'a rien à dire quand on code une fonctionnalité. Les trois autres gardent
+un comportement qui doit continuer de tenir.
+
+- **Lieu.** Les méta-harnais vivent dans `meta-harnais/`, hors du workspace pnpm : `pnpm test` ne peut
+  pas les atteindre, par construction et non par convention. `packages/gardes` garde la règle livrée
+  (`gardes.mjs`, `github.mjs`, `alerte.mjs`, `cli.mjs`), le harnais que le codeur en a écrit
+  (`gardes.test.mjs`) et les harnais de besoins produit qui n'appartiennent à aucune application
+  (`distributions`, `simplicite-acces-gestes`, `usages-de-bout-en-bout`).
+- **Moment.** Les trois cases qui tiennent un comportement tournent au crochet de pré-commit et dans
+  `pnpm test`, donc en CI. Les méta-harnais s'appellent par `pnpm meta`, et tournent d'eux-mêmes sur
+  une PR qui touche aux règles (`.github/workflows/meta-harnais.yml`) : ailleurs, jamais.
+- **Vocabulaire.** « Harnais d'audit » reste le mode de travail, « amorçage » la technique de
+  `meta-harnais/amorcage.test.mjs` — écrire depuis le besoin, juger en boîte noire. Ni l'un ni l'autre
+  ne nomme la case : un audit sur une PR du plan écrit des harnais de produit, qui restent dans
+  `pnpm test`.
+- **L'intervention humaine n'est pas un niveau de plus** : c'est la part d'un harnais ou d'un
+  méta-harnais que le codage ne peut pas couvrir. Pour un besoin produit, les `VM-…` du registre ;
+  pour un besoin de règle, la case « Validée » de la PR.
+- **Une PR qui touche `meta-harnais/**` se voit demander `VM-regles-primaires`** (D64) : affaiblir un
+  méta-harnais, c'est affaiblir la garde par l'autre bout.
+
+## D66 · 2026-09-13 · Le budget du crochet de pré-commit passe à 30 s
+
+Remplace le budget de D62. Mesuré sur la branche de #82 : le crochet prend 20,5 s, dont 13,8 s pour
+les tests du cœur, 5,5 s pour son typecheck et 1,3 s pour le paquet de la garde. D62 l'avait mesuré à
+17 s ; l'écart vient des tests du cœur, passés de 220 à 241 depuis.
+
+Tranché par le porteur le 13 septembre (« On peut augmenter un peu le seuil »). Ce que le budget
+protège ne change pas : un crochet qui dépasse le temps d'une session se contourne, et un crochet
+contourné ne garde rien. Trente secondes laissent la place aux tests du cœur pour continuer de
+grossir un peu, sans rouvrir la question à chaque PR.
+
+Ce qui reste hors du crochet ne change pas : typecheck complet et build au push, méta-harnais à
+`pnpm meta` (D65), le reste en CI. Si les 30 s sont à leur tour dépassées, la réponse ne sera pas de
+relever encore le seuil : ce sera d'alléger le crochet.

@@ -62,7 +62,7 @@ export const CHEMINS_DES_REGLES = Object.freeze([
   }),
   Object.freeze({
     quoi: 'la garde',
-    motifs: Object.freeze(['packages/gardes/**', 'docs/gardes.md', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
+    motifs: Object.freeze(['packages/gardes/**', 'meta-harnais/**', 'docs/gardes.md', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
   }),
 ]);
 

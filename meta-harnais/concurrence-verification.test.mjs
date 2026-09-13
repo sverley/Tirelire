@@ -11,8 +11,8 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { verifierPrSurGithub } from './github.mjs';
-import { AUTEUR_HORODATAGE, empreinteAnalyse, lireRegistre, texteHorodatage } from './gardes.mjs';
+import { verifierPrSurGithub } from '../packages/gardes/github.mjs';
+import { AUTEUR_HORODATAGE, empreinteAnalyse, lireRegistre, texteHorodatage } from '../packages/gardes/gardes.mjs';
 
 const GARDES = `# Gardes
 

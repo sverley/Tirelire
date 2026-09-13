@@ -31,7 +31,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { RACINE, lireRegistre, temoinRouge } from './gardes.mjs';
+import { RACINE, lireRegistre, temoinRouge } from '../packages/gardes/gardes.mjs';
 
 const REGISTRE = 'docs/gardes.md';
 const RELIRE = "le harnais d'audit de #69 est à relire";
