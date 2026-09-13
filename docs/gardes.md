@@ -252,11 +252,18 @@ devant le produit, et le seuil interdit la hausse.
 
 Chemins : `packages/core/src/sync.ts`, `apps/web/src/lib/db.ts`, `apps/web/src/lib/relay.ts`, `apps/web/src/lib/webrtc.ts`, `apps/relay/**`, `apps/hebergement/serveur/**`
 
-- **Vérification manuelle** · `VM-I7-reseau` — Outils de développement ouverts sur l'onglet
-  Réseau, suivre un parcours complet sans synchronisation (exemple, budget, import d'un relevé
-  inventé, export) : rien ne part hors des fichiers de l'application. Avec le relais, seuls des
-  paquets chiffrés partent, et seulement après l'avertissement.
-- **À bâtir** · la même observation dans un navigateur piloté (#38).
+- **Harnais** · `apps/web/test/donnees-locales.test.ts` — « un parcours complet sans synchronisation
+  ne fait sortir aucune donnée de l’appareil » : l'exemple chargé, un aller-retour par Opérations,
+  Bilan, l'import d'un relevé inventé et l'export du fichier SQLite ne fait partir aucune requête
+  réseau.
+  Témoin rouge : « témoin rouge · une requête réseau partie pendant un parcours sans synchronisation »
+- **Harnais** · `apps/web/test/donnees-locales.test.ts` — « avec un relais renseigné, seuls des
+  paquets chiffrés partent, et seulement après le remplissage et le clic explicites » : remplir
+  l'adresse, le salon et la phrase puis cliquer sur « Synchroniser maintenant » vaut l'acceptation,
+  avertissement compris (tranché avec le porteur le 13 septembre 2026) ; rien ne part avant, et ce
+  qui part ensuite ne porte que `site`, `upTo`, `iv`, `blob`, `blob` ne se relisant pas comme du
+  JSON en clair.
+  Témoin rouge : « témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair »
 
 ## I8 · Synchroniser de pair à pair les instances qui partagent les clés
 
@@ -310,11 +317,21 @@ Chemins : `packages/core/src/plan.ts`
 
 ## I11 · Les assistants font partie de la vie de l'application
 
-Chemins : `apps/web/src/views/Wizard.svelte`, `packages/core/src/suggestions.ts`
+Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svelte`,
+`apps/web/src/views/Flows.svelte`, `apps/web/src/views/Accounts.svelte`,
+`packages/core/src/suggestions.ts`
 
-- **Vérification manuelle** · `VM-I11-hors-assistant` — Pour chaque étape d'assistant que la PR
-  ajoute ou modifie : retrouver le même geste hors de l'assistant, dans l'usage courant, et
-  constater que ce que l'assistant a créé se modifie ensuite depuis les écrans ordinaires.
+- **Harnais** · `apps/web/test/assistant-equivalent.test.ts` — sur un projet vierge, chaque étape de
+  l'assistant qui sème une ligne (compte, revenu, charge fixe, budget courant, échéance, épargne) a
+  cette ligne retrouvée dans l'écran de configuration ordinaire correspondant (Comptes, Flux
+  prévus, Tirelires), avec un bouton d'édition (« Modifier », ou « Placer » pour une tirelire semée
+  sans placement — même formulaire) qui ouvre un champ éditable portant ce même nom.
+  Témoin rouge : « témoin rouge · une ligne créée par l’assistant introuvable hors assistant »
+- **Vérification manuelle** · `VM-I11-hors-assistant` — Pour une étape d'assistant que la PR ajoute
+  et que le harnais ci-dessus ne couvre pas encore (nouvel assistant hors de « Construire mon
+  budget », #55/#56), ou pour l'adaptation proposée quand le train de vie ou le budget évolue (#17,
+  #48, #57) : retrouver le même geste hors de l'assistant, dans l'usage courant, et constater que
+  ce que l'assistant a créé se modifie ensuite depuis les écrans ordinaires.
 - **À bâtir** · #55, #56 ; adaptations proposées quand le train de vie ou le budget évoluent (#17,
   #48, #57).
 
