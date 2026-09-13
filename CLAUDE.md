@@ -18,7 +18,7 @@
 - Écritures uniquement via `LedgerStore.upsert/remove/setSetting` (journal de changements).
 - Aucune donnée bancaire réelle dans le dépôt ; exemples et tests sur données inventées.
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font l'essentiel :
-  typecheck et tests du cœur, puis tests unitaires de la garde, au commit (moins de 20 s) ;
+  typecheck et tests du cœur, puis tests de la garde, au commit (moins de 30 s, D66) ;
   typecheck complet et build au push. La CI joue tout ce qui garde un comportement ; les
   méta-harnais s'appellent par `pnpm meta` (D62, D65).
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
@@ -117,7 +117,7 @@
     pas. Un témoin rouge qui se met à passer fait échouer `pnpm test`, l'outil de test tenant
     l'échec attendu (`test.fails` avec vitest, une assertion qui attend l'échec avec `node:test`) —
     la couverture ne le voit pas (#66).
-  - Le crochet de pré-commit tient en moins de 20 s : les méta-harnais (D65) tournent en
+  - Le crochet de pré-commit tient en moins de 30 s (D66) : les méta-harnais (D65) tournent en
     CI, pas au commit (D62).
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
     branche cible, l'annule et la vérification décoche la case ; documentation et harnais se

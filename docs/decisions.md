@@ -1222,7 +1222,7 @@ ne tournait jamais en CI.
 
 - **Critère.** Une garde protège des erreurs plausibles par accident, pas des contournements : un
   test mis en commentaire pour tromper la garde se voit dans le diff, et la relecture l'attrape.
-- **Budget.** Le crochet de pré-commit tient en moins de 20 s. Les méta-harnais (D65)
+- **Budget.** Le crochet de pré-commit tient en moins de 20 s — relevé à 30 s par D66. Les méta-harnais (D65)
   tournent en CI, pas au commit ; la couverture reste dans `pnpm test`.
 - **Audit.** Il contrôle les « Fait quand » et les erreurs plausibles. Une forme exotique ou un
   contournement se note dans la PR, sans devenir un harnais rouge.
@@ -1319,3 +1319,17 @@ un comportement qui doit continuer de tenir.
 - **Une PR qui touche `meta-harnais/**` se voit demander `VM-regles-primaires`** (D64) : affaiblir un
   méta-harnais, c'est affaiblir la garde par l'autre bout.
 
+## D66 · 2026-09-13 · Le budget du crochet de pré-commit passe à 30 s
+
+Remplace le budget de D62. Mesuré sur la branche de #82 : le crochet prend 20,5 s, dont 13,8 s pour
+les tests du cœur, 5,5 s pour son typecheck et 1,3 s pour le paquet de la garde. D62 l'avait mesuré à
+17 s ; l'écart vient des tests du cœur, passés de 220 à 241 depuis.
+
+Tranché par le porteur le 13 septembre (« On peut augmenter un peu le seuil »). Ce que le budget
+protège ne change pas : un crochet qui dépasse le temps d'une session se contourne, et un crochet
+contourné ne garde rien. Trente secondes laissent la place aux tests du cœur pour continuer de
+grossir un peu, sans rouvrir la question à chaque PR.
+
+Ce qui reste hors du crochet ne change pas : typecheck complet et build au push, méta-harnais à
+`pnpm meta` (D65), le reste en CI. Si les 30 s sont à leur tour dépassées, la réponse ne sera pas de
+relever encore le seuil : ce sera d'alléger le crochet.
