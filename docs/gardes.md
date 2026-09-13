@@ -193,29 +193,54 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 
 ## I4 · Simple par défaut, souple sur demande
 
+Chemins : `apps/web/src/views/Wizard.svelte`
+
+- **Harnais** · `apps/web/test/assistant-simple.test.ts` — « parcours simple · de la base vide au plan, sans un seul réglage avancé » :
+  d'une base vide, l'assistant s'ouvre depuis l'accueil en deux gestes au plus, chaque étape se
+  franchit par son seul bouton primaire — aucun champ rempli, aucune liste dépliée, aucun détour par
+  la Configuration — et le Plan qui suit dote des tirelires et réserve un montant non nul.
+  Témoin rouge : « témoin rouge · un parcours simple qui exige un réglage pour avancer »
 - **Vérification manuelle** · `VM-I4-simple` — Suivre l'usage simple que la PR touche (assistant,
   plan, saisie, import) : il aboutit sans ouvrir de réglage avancé, et ce que la PR ajoute pour un
   usage avancé reste replié ou hors de ce chemin.
-- **À bâtir** · l'assistant mène jusqu'au plan sans ouvrir de réglage avancé (#38).
 
 ## I5 · Inciter à tout utiliser
 
+Chemins : `apps/web/src/App.svelte`, `apps/web/src/views/More.svelte`
+
+- **Harnais** · `apps/web/test/acces-fonctions.test.ts` — « inventaire des fonctions · chacune atteinte, nommée, et amorcée à vide » :
+  l'inventaire couvre tous les écrans que le shell sait afficher ; chacun s'atteint depuis l'accueil
+  en deux gestes au plus, par un point d'entrée qui le nomme et dit à quoi il sert ; et, sur une base
+  vide, chaque écran porte son amorce — le bouton qui le remplit, ou l'écran par où commencer.
+  Témoin rouge : « témoin rouge · une fonction sans point d entrée depuis l accueil »
 - **Vérification manuelle** · `VM-I5-acces` — Pour chaque fonction que la PR ajoute ou déplace :
   dire d'où on l'atteint et en combien de gestes depuis l'accueil, et vérifier qu'un écran vide
   qu'elle touche dit ce qui le remplirait.
-- **À bâtir** · l'inventaire des fonctions et de leur point d'entrée (#38).
 
 ## I6 · Catégoriser en peu de clics
 
 Chemins : `packages/core/src/automations.ts`, `apps/web/src/views/Operations.svelte`
 
+Objectif du porteur (#71, 13 septembre 2026), depuis l'écran Opérations, l'opération sous les yeux :
+**2 gestes** pour catégoriser une opération et **3 gestes** avec une sous-catégorie ; automatiser
+toutes les opérations semblables coûte un geste de plus, soit **3 gestes** et **4 gestes**. Un geste
+est une frappe sur un bouton ou une ligne, un choix dans une liste, une case cochée.
+
+Le harnais mesure à l'objectif plus **1 geste** de marge, accordée par le porteur : il fait échouer
+à 4, 5, 5 et 6 gestes. Mesure du 13 septembre 2026 : 3, 3, 4 et 4 gestes — l'objectif de 2 reste
+devant le produit, et le seuil interdit la hausse.
+
 - **Harnais** · `packages/core/test/automations.test.ts` — une règle classe toutes les opérations
   semblables, se rejoue sans effet de bord, et son aperçu ne modifie rien.
   Témoin rouge : « témoin rouge · un aperçu de règle qui enregistre la règle d’essai »
+- **Harnais** · `apps/web/test/gestes-classement.test.ts` — « gestes de classement · catégoriser une opération, puis toutes les semblables » :
+  le compte des gestes mesuré dans le navigateur, sur les quatre cas de l'objectif ci-dessus, chacun
+  comparé à son seuil ; une opération remise à zéro par le harnais avant chaque mesure, et la
+  sous-catégorie créée par l'interface.
+  Témoin rouge : « témoin rouge · un classement qui coûte un geste de plus que le seuil »
 - **Vérification manuelle** · `VM-I6-gestes` — Compter les gestes pour classer une opération
   importée, puis toutes les opérations semblables ; écrire les deux nombres dans l'analyse et
   signaler toute hausse par rapport à `main`.
-- **À bâtir** · le même compte, automatisé ; objectif chiffré à fixer par le porteur (#38).
 
 ## I7 · Les données restent en local
 

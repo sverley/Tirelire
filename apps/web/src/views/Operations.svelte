@@ -568,9 +568,13 @@
     </div>
   {:else}
     <div class="muted">
-      Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}
-      {#if totalOps > 0 && matching.length === 0}
-        <span class="sub">Le dépôt contient {totalOps} opération(s) : élargis la recherche ou passe le filtre d'affichage sur « Toutes ».</span>
+      {#if totalOps === 0}
+        Aucune opération connue : importe un relevé depuis l'écran Import, ou saisis-en une depuis Saisie manuelle.
+      {:else}
+        Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}
+        {#if matching.length === 0}
+          <span class="sub">Le dépôt contient {totalOps} opération(s) : élargis la recherche ou passe le filtre d'affichage sur « Toutes ».</span>
+        {/if}
       {/if}
     </div>
   {/each}
