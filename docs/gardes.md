@@ -127,10 +127,14 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 - **Harnais** · `packages/core/test/assistant.test.ts` — « budget construit par l'assistant
   (D40) » : sans aucune opération, le budget se voit dès la période en cours.
   Témoin rouge : « témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir »
+- **Harnais** · `packages/core/test/parcours-u1.test.ts` — « parcours U1 · de la base vide au plan, sans une seule opération » :
+  d'une base vide, le budget écrit comme l'application l'écrit puis relu après redémarrage ; le plan
+  de la période en cours se lit en entier — dotations, lissage de l'échéance, marge, virement à
+  faire — et le bilan ne fabrique aucun observé, sans une seule opération.
+  Témoin rouge : « témoin rouge · un plan dont les dotations viennent de ce que les opérations montrent »
 - **Vérification manuelle** · `VM-U1-parcours` — Sur une base vide, construire un budget avec
   l'assistant jusqu'au plan sans importer de relevé : aucun écran ne bloque ni n'insiste pour
   importer, et le plan se lit.
-- **À bâtir** · le parcours complet sans aucune opération (#15).
 
 ### U2 · Budget et virements permanents
 
@@ -141,10 +145,14 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 - **Harnais** · `apps/web/test/flux-derives-plan.test.ts` — à 375 px, l'écran Plan enregistre
   l'ordre, qui survit au rechargement.
   Témoin rouge : « témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire »
+- **Harnais** · `packages/core/test/parcours-u2.test.ts` — « parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation » :
+  d'une base vide au plan, l'ordre proposé n'est écrit que si l'utilisateur le valide (I10), puis il
+  survit au redémarrage comme fait bancaire — un par couple de comptes, libellé à recopier — et le
+  plan lit sa ventilation sans jamais la figer.
+  Témoin rouge : « témoin rouge · un ordre validé qui ne laisse aucune trace dans la base »
 - **Vérification manuelle** · `VM-U2-ordres` — Construire un budget, puis valider la mise en place
   des virements permanents proposés : chaque ordre est enregistré, et sa ventilation sur les
   tirelires se lit dans le plan.
-- **À bâtir** · des ordres validés depuis l'assistant, enregistrés avec leur ventilation (#13).
 
 ### U3 · Budget sans virements validés, puis import
 
@@ -155,7 +163,7 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 - **Vérification manuelle** · `VM-U3-rapprochement` — Construire un budget sans valider les
   virements, puis importer un relevé inventé qui les contient : l'application propose de les
   rapprocher et reprend la ventilation prévue par le budget.
-- **À bâtir** · #40.
+- **À bâtir** · le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
 
 ### U4 · Budget reconstruit depuis l'historique
 
@@ -165,7 +173,7 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 - **Vérification manuelle** · `VM-U4-reconstruction` — Sans budget, importer un historique inventé
   et reconstruire un budget depuis les opérations : chaque lien entre une opération et un flux se
   valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
-- **À bâtir** · #16.
+- **À bâtir** · le parcours complet, des opérations importées au budget reconstruit (#16).
 
 ### U5 · Import seul
 
@@ -174,10 +182,14 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
   Témoin rouge : « témoin rouge · un import qui ne cherche les doublons que dans le fichier »
 - **Harnais** · `packages/core/test/automations.test.ts` — moteur de règles de classement.
   Témoin rouge : « témoin rouge · un moteur de règles qui applique les rangs à l’envers »
+- **Harnais** · `packages/core/test/parcours-u5.test.ts` — « parcours U5 · du relevé importé au bilan par catégorie, sans aucune tirelire » :
+  d'une base vide, un relevé inventé importé, des catégories et des automatismes, le classement
+  appliqué et relu après redémarrage ; le bilan par catégorie se lit et le plan ne réclame rien,
+  sans qu'aucune tirelire, aucun besoin ni aucun budget n'existe jamais.
+  Témoin rouge : « témoin rouge · un bilan qui ne compte que les opérations rattachées à une tirelire »
 - **Vérification manuelle** · `VM-U5-sans-tirelire` — Sur une base vide, importer un relevé
   inventé, classer ses opérations et lire l'analyse par catégorie sans jamais créer de tirelire ni
   de budget : aucun écran ne l'exige, aucun ne reste vide faute d'en avoir.
-- **À bâtir** · #39.
 
 ## I4 · Simple par défaut, souple sur demande
 
