@@ -22,7 +22,7 @@ import { dirname, join, resolve } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Consigne d'une vérification manuelle, mot pour mot : ce qui suit le tiret cadratin au registre, suite renfoncée comprise. */
 function consigneDu(cle, racine = DEPOT) {

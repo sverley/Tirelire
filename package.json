@@ -5,6 +5,7 @@
   "description": "Comptes de la famille : enveloppes, provisions, plan de virements et rapprochement bancaire.",
   "scripts": {
     "test": "pnpm -r test",
+    "meta": "node --test meta-harnais/*.test.mjs",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @tirelire/web dev",
     "typecheck": "pnpm -r typecheck",
@@ -15,7 +16,7 @@
     "simple-git-hooks": "^2.14.0"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm --filter @tirelire/core typecheck && pnpm --filter @tirelire/core test && pnpm --filter @tirelire/gardes test:commit",
+    "pre-commit": "pnpm --filter @tirelire/core typecheck && pnpm --filter @tirelire/core test && pnpm --filter @tirelire/gardes test",
     "pre-push": "pnpm -r typecheck && pnpm build"
   }
 }

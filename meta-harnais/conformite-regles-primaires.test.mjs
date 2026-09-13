@@ -30,9 +30,9 @@ import { dirname, join, resolve } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = 'packages/gardes/cli.mjs';
-const CE_HARNAIS = 'packages/gardes/conformite-regles-primaires.test.mjs';
+const CE_HARNAIS = 'meta-harnais/conformite-regles-primaires.test.mjs';
 const RELIRE = "le harnais d'audit de #64 est à relire";
 const ANALYSE = "Relu par la session d'audit de #64 : essai sur un dépôt copié, rien de réel n'est vérifié.";
 
@@ -216,12 +216,12 @@ const REGLES = [
   ['le code de la garde', () => ajoutA('packages/gardes/gardes.mjs', commentaireJs)],
   ['la vérification de la garde', () => ajoutA('.github/workflows/verifications.yml', commentaireYaml)],
   ['le modèle de PR', () => ajoutA('.github/pull_request_template.md', "<!-- Essai du harnais d'audit de #64. -->")],
-  ['un harnais de la garde', () => ajoutA('packages/gardes/amorcage.test.mjs', commentaireJs)],
+  ['un harnais de la garde', () => ajoutA('meta-harnais/amorcage.test.mjs', commentaireJs)],
   [
     'à la fois la garde et son harnais',
     () => ({
       ...ajoutA('packages/gardes/gardes.mjs', commentaireJs),
-      ...ajoutA('packages/gardes/amorcage.test.mjs', commentaireJs),
+      ...ajoutA('meta-harnais/amorcage.test.mjs', commentaireJs),
       ...ajoutA(CE_HARNAIS, commentaireJs),
     }),
   ],

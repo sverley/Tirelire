@@ -22,7 +22,7 @@ import { dirname, join, resolve } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Consigne d'une vérification manuelle, mot pour mot : ce qui suit le tiret cadratin au registre, suite renfoncée comprise. */
 function consigneDu(cle, racine = DEPOT) {
@@ -38,7 +38,7 @@ function consigneDu(cle, racine = DEPOT) {
 const teteVm = (cle) => `- \`${cle}\` · essai${consigneDu(cle) ? ` — ${consigneDu(cle)}` : ''}`;
 
 const CLI = 'packages/gardes/cli.mjs';
-const CE_HARNAIS = 'packages/gardes/amorcage.test.mjs';
+const CE_HARNAIS = 'meta-harnais/amorcage.test.mjs';
 const REGISTRE = 'docs/gardes.md';
 const INVARIANTS = 'docs/invariants.md';
 const CONTRAINTES = 'docs/contraintes.md';

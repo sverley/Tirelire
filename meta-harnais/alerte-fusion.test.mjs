@@ -27,7 +27,7 @@ import { dirname, join, resolve } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = 'packages/gardes/cli.mjs';
 const WORKFLOWS = '.github/workflows';
 const CIBLE = 'sverley/Tirelire';
