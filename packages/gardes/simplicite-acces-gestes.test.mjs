@@ -35,6 +35,13 @@
  * Ce fichier ne juge pas le contenu des harnais d'I4, I5 et I6 : ce qu'ils doivent traverser est dit
  * par l'issue, et se relit en audit. Il garde ce qui se vérifie sans interpréter.
  *
+ * **Reprise du 13 septembre 2026, session de codage.** Trois témoins rouges dérivaient le registre
+ * cassé en *défaisant une injection* (ôter la dette d'I4, retirer l'objectif que le témoin venait
+ * d'écrire) : une fois le besoin tenu, ils ne cassaient plus rien et passaient au vert à tort. Ils
+ * s'en prennent désormais au contenu réel de l'entrée — les lignes `Harnais` d'I4 retirées, les
+ * nombres de gestes d'I6 effacés, sa marge effacée — et redeviennent donc rouges quand la garde
+ * qu'ils surveillent disparaît. Aucune vérification n'a été retirée ni affaiblie.
+ *
  * Les deux premières vérifications sont le « Fait quand » de #71 : elles sont **rouges** tant que le
  * codage n'a pas livré, et c'est la PR de #71 qui doit les faire passer. Elles ne sont pas marquées
  * `todo` : un `todo` rend la suite verte, et rien n'obligerait alors à le retirer avant la fusion
@@ -151,6 +158,16 @@ function retirerLignes(texte, numeros) {
 const sansDetteDe = (texte, id) =>
   retirerLignes(texte, new Set(entree(texte, id).aBatir.length ? lignesABatir(texte, id) : []));
 
+/** Ôte à une entrée tout ce qui la garde par un programme : ses lignes `Harnais`, et sa dette. */
+const sansGardeProgrammee = (texte, id) =>
+  retirerLignes(texte, new Set([...entree(texte, id).harnais.map((h) => h.ligne), ...lignesABatir(texte, id)]));
+
+/** Récrit le texte d'une entrée, et lui seul : le reste du registre ne bouge pas. */
+const dansLEntree = (texte, id, transformer) => {
+  const bloc = texteDeLEntree(texte, id);
+  return texte.replace(bloc, () => transformer(bloc));
+};
+
 /** Numéros des lignes « À bâtir » d'une entrée : `lireRegistre` n'en garde que le texte. */
 function lignesABatir(texte, id) {
   const lignes = texte.split('\n');
@@ -217,9 +234,8 @@ test('#71 · témoin vert — I4 gardé par un harnais, I5 par une renonciation,
 });
 
 test("#71 · témoin rouge — une entrée laissée à sa seule vérification manuelle fait échouer « I4 et I5 sont gardés »", () => {
-  const tenu = avecRenonciation(avecHarnais(registre(), 'I4', 'apps/web/test/assistant-simple.test.ts'), 'I5');
-  const casse = sansDetteDe(registre(), 'I4');
-  assert.notEqual(casse, tenu, `la version cassée est identique à la version tenue : ${RELIRE}`);
+  const casse = sansGardeProgrammee(registre(), 'I4');
+  assert.notEqual(casse, registre(), `aucune garde programmée n'a pu être retirée d'I4 : ${RELIRE}`);
   assert.throws(() => garderOuRenoncer(casse), /restent sans garde programmée et sans renonciation/);
 });
 
@@ -255,16 +271,14 @@ test("#71 · témoin vert — l'objectif du porteur écrit et un harnais qui le 
 });
 
 test("#71 · témoin rouge — un objectif de gestes qui n'est écrit nulle part fait échouer « le nombre de gestes est fixé »", () => {
-  const tenu = avecLesNombres(registre());
-  const casse = tenu.replace(OBJECTIF_ECRIT, '');
-  assert.notEqual(casse, tenu, `l'objectif n'a pas pu être retiré : ${RELIRE}`);
-  assert.throws(() => gestesFixesEtMesures(casse), /n'est pas fixé et mesuré/);
+  const casse = dansLEntree(registre(), 'I6', (t) => t.replace(/\d+\s*gestes?/gi, 'peu de gestes'));
+  assert.notEqual(casse, registre(), `aucun nombre de gestes n'a pu être effacé : ${RELIRE}`);
+  assert.throws(() => gestesFixesEtMesures(casse), /l'objectif de 2 gestes/);
 });
 
 test("#71 · témoin rouge — la marge effacée fait échouer « le nombre de gestes est fixé »", () => {
-  const tenu = avecLesNombres(registre());
-  const casse = tenu.replace(`le harnais mesure avec une marge de ${MARGE} geste`, 'le harnais mesure');
-  assert.notEqual(casse, tenu, `la marge n'a pas pu être retirée : ${RELIRE}`);
+  const casse = dansLEntree(registre(), 'I6', (t) => t.replace(/marge|tolérance/gi, 'mesure'));
+  assert.notEqual(casse, registre(), `la marge n'a pas pu être retirée : ${RELIRE}`);
   assert.throws(() => gestesFixesEtMesures(casse), /la marge de 1 geste/);
 });
 
