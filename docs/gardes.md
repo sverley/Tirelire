@@ -339,10 +339,14 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
 
 Chemins : `apps/web/src/**/*.svelte`
 
-- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — aucun fichier de l'interface ne
-  porte, dans son texte, un des motifs concrets d'un geste technique (commande, terminal, adresse
-  locale…).
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — aucun fichier de l'interface
+  (`.svelte` et `.ts` : un message se fabrique aussi dans un module) ne porte, dans son texte, un
+  des motifs concrets d'un geste technique (commande, terminal, adresse locale…).
   Témoin rouge : « témoin rouge · un texte d’interface qui invite à ouvrir un terminal »
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — chaque document du dépôt est
+  classé, technique ou destiné à l'utilisateur, et les seconds passent le même balayage : aucun
+  n'existe aujourd'hui, mais un guide écrit demain ne peut plus échapper à C1 en silence.
+  Témoin rouge : « témoin rouge · un document destiné à l’utilisateur qui fait lancer un serveur »
 - **Vérification manuelle** · `VM-C1-sans-geste` — Relire les textes que la PR ajoute à
   l'interface et à la documentation destinée à l'utilisateur : installer, mettre à jour,
   sauvegarder et synchroniser ne demandent ni commande, ni serveur à lancer, ni réglage réseau, ni
