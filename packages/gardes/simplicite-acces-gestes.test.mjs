@@ -15,10 +15,12 @@
  *    une renonciation écrite et datée, validée par le porteur (tranché le 12 septembre dans #58 :
  *    « une session ne laisse pas d'elle-même une entrée en vérification manuelle »). L'un ou
  *    l'autre, jamais rien, et jamais une ligne « À bâtir » laissée sous #38 ou #71.
- * 2. **Le nombre de gestes d'I6 est fixé au registre, et mesuré.** Deux nombres — classer une
- *    opération, puis toutes les semblables — écrits en toutes lettres dans l'entrée, et tenus par
- *    un harnais qui les mesure ou par une renonciation écrite. Un objectif qui ne vit que dans
- *    l'analyse d'une PR ne se compare à rien au tour suivant.
+ * 2. **Le nombre de gestes d'I6 est fixé au registre, et mesuré.** Tranché par le porteur le
+ *    13 septembre dans #71 : depuis l'écran Opérations, **2 gestes pour catégoriser, 3 avec une
+ *    sous-catégorie**, objectif vers lequel tendre, et **le harnais mesure avec une marge d'un
+ *    geste**. L'entrée porte donc l'objectif, la marge, et le compte pour toutes les opérations
+ *    semblables ; un harnais les mesure, ou une renonciation écrite le dit. Un objectif qui ne vit
+ *    que dans l'analyse d'une PR ne se compare à rien au tour suivant.
  * 3. **Les gardes du jour ne disparaissent pas.** Le harnais d'I6 et les trois vérifications
  *    manuelles (`VM-I4-simple`, `VM-I5-acces`, `VM-I6-gestes`) sont figés ici : une dette se règle
  *    en bâtissant, pas en effaçant. Retirer une garde reste possible, mais par la section
@@ -53,8 +55,15 @@ const SANS_HARNAIS = Object.freeze(['I4', 'I5']);
 /** Les issues du chantier : une dette laissée sous l'une d'elles est une dette non réglée. */
 const CHANTIER = new Set(['38', '71']);
 
-/** Les deux nombres de gestes attendus : classer une opération, puis toutes les semblables. */
-const NOMBRES_ATTENDUS = 2;
+/**
+ * Tranché par le porteur le 13 septembre 2026 (#71) : depuis l'écran Opérations, catégoriser demande
+ * au plus deux gestes, trois avec une sous-catégorie. C'est un objectif vers lequel tendre ; le
+ * harnais qui le mesure s'autorise un geste de marge, soit trois et quatre.
+ */
+const OBJECTIF = Object.freeze({ categorie: 2, sousCategorie: 3 });
+
+/** La marge que le porteur accorde au harnais, en gestes. */
+const MARGE = 1;
 
 const registre = () => {
   try {
@@ -162,11 +171,17 @@ const avecRenonciation = (texte, id) =>
       ` la vérification manuelle ci-dessous en tient lieu. Accord du porteur du 2026-09-13 (#71).`,
   );
 
-/** La version « besoin tenu » pour I6 : les deux nombres écrits, et un harnais qui les mesure. */
+/** L'objectif du porteur, écrit comme le registre l'attend : objectif, marge, et les semblables. */
+const OBJECTIF_ECRIT =
+  `Objectif (porteur, #71) : au plus ${OBJECTIF.categorie} gestes pour catégoriser une opération, ` +
+  `${OBJECTIF.sousCategorie} gestes avec une sous-catégorie, et 3 gestes pour toutes les opérations ` +
+  `semblables ; le harnais mesure avec une marge de ${MARGE} geste. `;
+
+/** La version « besoin tenu » pour I6 : l'objectif écrit, et un harnais qui le mesure. */
 const avecLesNombres = (texte) =>
   avecHarnais(texte, 'I6', 'apps/web/test/gestes.test.ts').replace(
     /^(- \*\*Vérification manuelle\*\* · `VM-I6-gestes` — )/m,
-    '$1Au plus 3 gestes pour classer une opération, puis 1 geste de plus pour toutes les semblables. ',
+    `$1${OBJECTIF_ECRIT}`,
   );
 
 // ─── 1. I4 et I5 : un harnais, ou une renonciation écrite ────────────────────────────────────────
@@ -203,12 +218,16 @@ test("#71 · témoin rouge — une entrée laissée à sa seule vérification ma
 
 function gestesFixesEtMesures(texte) {
   const manquants = [];
-  const nombres = nombresDeGestes(texte, 'I6');
-  if (nombres.length < NOMBRES_ATTENDUS) {
-    manquants.push(
-      `I6 · ${nombres.length} nombre(s) de gestes au registre au lieu de ${NOMBRES_ATTENDUS} :` +
-        ' classer une opération, puis toutes les semblables',
-    );
+  const t = texteDeLEntree(texte, 'I6');
+  const gestes = new Set(nombresDeGestes(texte, 'I6'));
+  for (const [cas, n] of Object.entries(OBJECTIF)) {
+    if (!gestes.has(String(n))) manquants.push(`I6 · l'objectif de ${n} gestes (${cas}) n'est écrit nulle part dans l'entrée`);
+  }
+  if (!new RegExp(`marge|tolérance`, 'i').test(t) || !new RegExp(`${MARGE}\\s*gestes?\\b`, 'i').test(t)) {
+    manquants.push(`I6 · la marge de ${MARGE} geste accordée au harnais n'est pas écrite`);
+  }
+  if (!/semblables[^.\n]*?\d+\s*gestes?|\d+\s*gestes?[^.\n]*?semblables/i.test(t)) {
+    manquants.push("I6 · aucun nombre de gestes pour classer toutes les opérations semblables");
   }
   const e = entree(texte, 'I6');
   if (!porteUnHarnaisNeuf(e) && !renonciationEcrite(texte, 'I6')) {
@@ -222,15 +241,22 @@ test("#71 · le nombre de gestes d'I6 est fixé au registre et mesuré", { todo:
   gestesFixesEtMesures(registre());
 });
 
-test('#71 · témoin vert — les deux nombres écrits et un harnais qui les mesure sont acceptés', () => {
+test("#71 · témoin vert — l'objectif du porteur écrit et un harnais qui le mesure sont acceptés", () => {
   gestesFixesEtMesures(avecLesNombres(registre()));
 });
 
 test("#71 · témoin rouge — un objectif de gestes qui n'est écrit nulle part fait échouer « le nombre de gestes est fixé »", () => {
   const tenu = avecLesNombres(registre());
-  const casse = tenu.replace(/Au plus 3 gestes pour classer une opération, puis 1 geste de plus pour toutes les semblables\. /, '');
-  assert.notEqual(casse, tenu, `les nombres n'ont pas pu être retirés : ${RELIRE}`);
+  const casse = tenu.replace(OBJECTIF_ECRIT, '');
+  assert.notEqual(casse, tenu, `l'objectif n'a pas pu être retiré : ${RELIRE}`);
   assert.throws(() => gestesFixesEtMesures(casse), /n'est pas fixé et mesuré/);
+});
+
+test("#71 · témoin rouge — la marge effacée fait échouer « le nombre de gestes est fixé »", () => {
+  const tenu = avecLesNombres(registre());
+  const casse = tenu.replace(`le harnais mesure avec une marge de ${MARGE} geste`, 'le harnais mesure');
+  assert.notEqual(casse, tenu, `la marge n'a pas pu être retirée : ${RELIRE}`);
+  assert.throws(() => gestesFixesEtMesures(casse), /la marge de 1 geste/);
 });
 
 // ─── 3. Les gardes du jour ne disparaissent pas ──────────────────────────────────────────────────
