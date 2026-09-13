@@ -35,10 +35,12 @@
  * Ce fichier ne juge pas le contenu des harnais d'I4, I5 et I6 : ce qu'ils doivent traverser est dit
  * par l'issue, et se relit en audit. Il garde ce qui se vérifie sans interpréter.
  *
- * Les deux premières vérifications sont le « Fait quand » de #71 : elles sont `todo` tant que le
- * codage n'a pas livré, et la PR qui livre retire le `todo`. Chacune a son témoin vert — une version
- * dérivée où le besoin est tenu — et son témoin rouge — une version volontairement cassée, qui doit
- * échouer. Tout se joue sur du texte en mémoire : le vrai registre pour ce qui doit tenir sur le
+ * Les deux premières vérifications sont le « Fait quand » de #71 : elles sont **rouges** tant que le
+ * codage n'a pas livré, et c'est la PR de #71 qui doit les faire passer. Elles ne sont pas marquées
+ * `todo` : un `todo` rend la suite verte, et rien n'obligerait alors à le retirer avant la fusion
+ * (question du porteur, 13 septembre). Un rouge, lui, interdit la fusion (#58) tant que le besoin
+ * n'est pas tenu. Chacune a son témoin vert — une version dérivée où le besoin est tenu — et son
+ * témoin rouge — une version volontairement cassée, qui doit échouer. Tout se joue sur du texte en mémoire : le vrai registre pour ce qui doit tenir sur le
  * dépôt du jour, des versions dérivées pour ce qui doit tenir en général.
  */
 import assert from 'node:assert/strict';
@@ -205,7 +207,7 @@ function garderOuRenoncer(texte, ids = SANS_HARNAIS) {
   assert.deepEqual(manquants, [], `des invariants restent sans garde programmée et sans renonciation :\n${manquants.join('\n')}`);
 }
 
-test('#71 · I4 et I5 sont gardés par un harnais, ou par une renonciation écrite et datée', { todo: "livré par la PR de #71 ; le codage retire ce todo" }, () => {
+test('#71 · I4 et I5 sont gardés par un harnais, ou par une renonciation écrite et datée', () => {
   garderOuRenoncer(registre());
 });
 
@@ -244,7 +246,7 @@ function gestesFixesEtMesures(texte) {
   assert.deepEqual(manquants, [], `le nombre de gestes d'I6 n'est pas fixé et mesuré :\n${manquants.join('\n')}`);
 }
 
-test("#71 · le nombre de gestes d'I6 est fixé au registre et mesuré", { todo: "livré par la PR de #71 ; le codage retire ce todo" }, () => {
+test("#71 · le nombre de gestes d'I6 est fixé au registre et mesuré", () => {
   gestesFixesEtMesures(registre());
 });
 
