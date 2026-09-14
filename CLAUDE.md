@@ -37,6 +37,10 @@
     ses analyses, ni ses cases. Tout ce qu'il a à dire passe par des commentaires : il signale,
     propose, questionne, et attend que l'auditeur corrige ou que le porteur tranche. Il ne découpe
     pas le besoin et n'écrit pas l'attendu.
+  - **Le codeur justifie en commentaire ce qui appelle une validation humaine** : pour chaque
+    vérification manuelle demandée, ce que ses modifications changent, ce qu'elles ne touchent pas,
+    et ce qui reste à constater de visu. C'est lui qui sait ce qu'il a fait ; personne ne doit le
+    déduire de la diff. L'auditeur en tient compte dans la PR, le porteur valide.
   - **Un harnais n'est exigible que sur une tâche atomique**, celle qu'une session peut mener
     entièrement. Une tâche qui a des sous-tâches est vérifiée par les leurs ; son harnais global
     s'écrit quand elles sont vertes, jamais avant. Un rouge qui dure cesse d'être un signal.

@@ -1372,6 +1372,9 @@ Le porteur, en discussion le 14 septembre :
 
 > le codeur ne doit pas modifier une PR. Mais il peut mettre des commentaires
 
+> Le codeur doit aussi justifier dans un commentaire ce qu'il a fait comme modification qui
+> nécessitent un validation humaine
+
 > un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches,
 > on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
 
@@ -1384,7 +1387,9 @@ Le porteur, en discussion le 14 septembre :
   la vérification est celle des sous-tâches. Le harnais global s'écrit quand elles sont vertes. Reste
   à trancher : vertes, ou fermées (#91).
 - **La part humaine appartient au harnais** (D61) : l'auditeur écrit ce que le codage ne peut pas
-  trancher, le porteur valide.
+  trancher, le porteur valide. Mais la matière vient du codeur : pour chaque vérification manuelle
+  demandée, il justifie en commentaire ce que ses modifications changent, ce qu'elles ne touchent pas,
+  et ce qui reste à constater de visu. Sans cela, le porteur validerait sur une lecture de la diff.
 - **Conséquence.** Une partie de D61 devient sans objet : l'annulation d'une validation par une
   analyse réécrite ne peut plus venir du codeur, qui ne touche plus à la description.
 
