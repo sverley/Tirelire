@@ -37,6 +37,11 @@
     ses analyses, ni ses cases. Tout ce qu'il a à dire passe par des commentaires : il signale,
     propose, questionne, et attend que l'auditeur corrige ou que le porteur tranche. Il ne découpe
     pas le besoin et n'écrit pas l'attendu.
+  - **Le codeur rend compte de ce qui demande une validation humaine.** En fin de travail, un
+    commentaire dit ce qu'il a fait qui appelle un jugement : ce qu'il a modifié et que couvre une
+    vérification manuelle, les écarts qu'il a pris, ce qu'il n'a pas pu vérifier lui-même. Honnête et
+    concis : dire ce qui ne va pas autant que ce qui va, sans plaidoyer ni rapport exhaustif. Ce
+    compte rendu ne remplace pas l'analyse de l'auditeur, il la nourrit.
   - **Le codeur justifie en commentaire ce qui appelle une validation humaine** : pour chaque
     vérification manuelle demandée, ce que ses modifications changent, ce qu'elles ne touchent pas,
     et ce qui reste à constater de visu. C'est lui qui sait ce qu'il a fait ; personne ne doit le
