@@ -1333,3 +1333,27 @@ grossir un peu, sans rouvrir la question à chaque PR.
 Ce qui reste hors du crochet ne change pas : typecheck complet et build au push, méta-harnais à
 `pnpm meta` (D65), le reste en CI. Si les 30 s sont à leur tour dépassées, la réponse ne sera pas de
 relever encore le seuil : ce sera d'alléger le crochet.
+
+## D67 · 2026-09-14 · Une modification de la garde dit ce qui la couvre
+
+Besoin #89, tranché par le porteur le 14 septembre : le plus simple suffit. Une fonction neuve
+ajoutée à `packages/gardes/gardes.mjs`, sans un seul test ni méta-harnais, laissait tout vert —
+`pnpm test`, `pnpm meta`, la couverture du registre. `VM-regles-primaires` (D64) était bien demandée
+à cette PR, mais elle pose une autre question : « cette règle nouvelle contredit-elle les règles
+primaires ? », jamais « cette règle nouvelle est-elle gardée ? ».
+
+D'où une seconde clé hors registre, `VM-garde-couverture`, de la même forme que celle de D64 :
+demandée **sans condition** dès que la PR touche la famille « la garde » de `CHEMINS_DES_REGLES`,
+elle demande de nommer ce que la PR change dans la garde et, pour chaque changement, le harnais qui
+le couvre ou la raison pour laquelle il ne se programme pas. Un développeur humain valide, comme
+toute vérification manuelle.
+
+Deux clés plutôt qu'une consigne allongée (piste de #89, tranchée ici) : le validateur répond à
+chaque question par une case, et une contradiction avec une règle primaire ne se confond pas avec
+une couverture manquante. Elle est demandée à la garde seule, et non à tous les chemins des règles :
+la question « quel harnais couvre ce changement ? » n'a pas de sens pour une décision ou une ligne
+de `CLAUDE.md`, et une vérification qui vise tout ne vise rien.
+
+Ce qui est gardé, c'est que la question soit posée et que la PR reste rouge tant qu'elle n'est pas
+analysée puis validée (`gardes.test.mjs`) ; la réponse, elle, se lit — la proportion de l'analyse ne
+se programme pas (D62).

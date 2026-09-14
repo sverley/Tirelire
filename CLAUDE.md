@@ -97,6 +97,14 @@
     l'analyse nomme les règles primaires touchées et dit pourquoi la règle nouvelle ne les contredit
     pas ; un développeur humain valide avant la fusion. Une contradiction ne se tranche pas dans la
     PR : elle devient une question dans une issue.
+  - **Une modification de la garde dit ce qui la couvre (#89).** Une PR qui touche la garde — son
+    code, `gardes.test.mjs`, les méta-harnais, `docs/gardes.md`, `verifications.yml`, le modèle de
+    PR — se voit demander `VM-garde-couverture`, sans condition et en plus de `VM-regles-primaires` :
+    l'analyse nomme ce que la PR change dans la garde et, pour chaque changement, le harnais qui le
+    couvre (`packages/gardes/gardes.test.mjs`, un méta-harnais) ou la raison pour laquelle il ne se
+    programme pas (D62) ; un développeur humain valide. La consigne se proportionne à la PR : une PR
+    qui n'ajoute qu'un test le dit, et c'est tout. Les deux clés restent distinctes : contredire une
+    règle primaire et laisser un changement sans garde sont deux défauts différents.
   - **La description du projet et les invariants ne changent qu'à la demande du porteur.** Une PR
     qui modifie `docs/description-projet.md` ou `docs/invariants.md` porte, dans la section
     « Invariants et contraintes », une ligne « Accord du porteur : … » — lien ou citation datée de
