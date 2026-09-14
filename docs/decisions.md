@@ -1375,6 +1375,9 @@ Le porteur, en discussion le 14 septembre :
 > Le codeur doit aussi justifier dans un commentaire ce qu'il a fait comme modification qui
 > nécessitent un validation humaine
 
+> le codeur doit être honnête et concis dans son rapport de modifications nécessitant une validation
+> humaine
+
 > un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches,
 > on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
 
@@ -1390,6 +1393,9 @@ Le porteur, en discussion le 14 septembre :
   trancher, le porteur valide. Mais la matière vient du codeur : pour chaque vérification manuelle
   demandée, il justifie en commentaire ce que ses modifications changent, ce qu'elles ne touchent pas,
   et ce qui reste à constater de visu. Sans cela, le porteur validerait sur une lecture de la diff.
+  Ce compte rendu est honnête et concis : les écarts pris et ce qu'il n'a pas pu vérifier autant que
+  ce qui marche, et rien d'autre. Il nourrit l'analyse de l'auditeur, ne s'y substitue pas, et ne vaut
+  jamais validation.
 - **Conséquence.** Une partie de D61 devient sans objet : l'annulation d'une validation par une
   analyse réécrite ne peut plus venir du codeur, qui ne touche plus à la description.
 
