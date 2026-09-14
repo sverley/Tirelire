@@ -39,9 +39,12 @@
     pas le besoin et n'écrit pas l'attendu.
   - **Le codeur ne lit pas le harnais.** Il code depuis sa propre lecture du besoin, jamais depuis
     les attentes du harnais : sinon il écrit ce qu'il faut pour passer, et le harnais ne vérifie plus
-    rien. Il le lance et lit son verdict — ce qui échoue, et le message —, sans ouvrir son code pour
-    y chercher la réponse. Un harnais qu'il ne comprend pas se discute en commentaire ; l'auditeur
-    corrige le harnais, ou précise le besoin dans l'issue. Corollaire : l'issue doit suffire à coder.
+    rien. Il ne va pas le chercher non plus : il code, commet, pousse, et le verdict lui vient des
+    crochets de pré-commit et de pré-push, puis de la CI — et, pour un besoin de règle, du workflow
+    des méta-harnais. Un échec lui revient avec son message, ce qui suffit ; il n'ouvre pas le code du
+    harnais pour y trouver la réponse. Un verdict qu'il ne comprend pas se discute en commentaire ;
+    l'auditeur corrige le harnais, ou précise le besoin dans l'issue. Corollaire : l'issue doit
+    suffire à coder, et les crochets doivent faire le nécessaire.
   - **Le codeur rend compte de ce qui appelle une validation humaine**, en commentaire : pour chaque
     vérification manuelle demandée, ce que ses modifications changent, ce qu'elles ne touchent pas,
     et ce qui reste à constater de visu. C'est lui qui sait ce qu'il a fait ; personne ne doit le

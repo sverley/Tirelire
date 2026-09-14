@@ -1381,6 +1381,9 @@ Le porteur, en discussion le 14 septembre :
 > il faut ajouter que le codeur ne doit pas regarder le harnais (ou meta-harnais) pour coder le
 > besoin. il doit le faire depuis sa propre interprétation depuis le besoin
 
+> oui, le codeur s'en remet à la CI. il est censé y avoir des hook-precommit et pre-push pour faire
+> le nécessaire
+
 > une PR fusionnée doit fermer automatiquement l'issue (le besoin) qu'elle couvre. Si une discussion
 > née, soit cette discussion est bloquante pour la PR et elle fait partie de la PR, soit elle est
 > non-bloquante et fait l'objet d'une nouvelle issue avant la fusion
@@ -1395,7 +1398,10 @@ Le porteur, en discussion le 14 septembre :
   l'attendu l'alignerait, sans même le vouloir, sur ce qu'il a produit.
 - **Le codeur code à l'aveugle du harnais.** Il part de sa lecture du besoin, jamais des attentes du
   harnais : les lire reviendrait à écrire ce qu'il faut pour passer, et le harnais ne vérifierait plus
-  que lui-même. Il le lance et lit son verdict, sans ouvrir son code. Deux lectures indépendantes du
+  que lui-même. Il ne le lance pas non plus : le verdict lui vient des crochets de pré-commit et de
+  pré-push, puis de la CI, et du workflow des méta-harnais pour un besoin de règle. Ce que les
+  crochets ne portent pas, le codeur ne l'apprend qu'à la CI : c'est aux crochets de faire le
+  nécessaire, pas au codeur d'aller voir. Deux lectures indépendantes du
   même besoin se confrontent ainsi : un écart signale que le besoin est ambigu, que le harnais est
   faux, ou que le codage manque — et cela se tranche en commentaire, pas en recopiant les attentes.
   Corollaire : l'issue doit suffire à coder ; un codeur qui ne peut pas avancer sans lire le harnais
