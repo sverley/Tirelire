@@ -8,7 +8,9 @@ Nom de code. Description du projet, qui fait foi : [`docs/description-projet.md`
 ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md) ;
 ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md) ;
 ce qui les garde : [`docs/gardes.md`](docs/gardes.md) ;
-le vocabulaire : [`docs/glossaire.md`](docs/glossaire.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
+le vocabulaire : [`docs/glossaire.md`](docs/glossaire.md).
+Ce que l'objectif 0 doit produire, en attendant que les catalogues existent :
+[`docs/objectif-0.md`](docs/objectif-0.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
 
 ## Structure
 
