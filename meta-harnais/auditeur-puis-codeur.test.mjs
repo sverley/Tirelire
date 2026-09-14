@@ -13,7 +13,7 @@
  * attribue, à portée l'un de l'autre). La solution reste libre de sa formulation.
  *
  * Témoins. Une lecture qui dirait « oui » de tout serait verte sans #91 : chaque lecture est donc
- * rejouée sur les documents **tels qu'ils étaient avant D67** (commit `ebe590a`, fusion de #90, le
+ * rejouée sur les documents **tels qu'ils étaient avant D68** (commit `ebe590a`, fusion de #90, le
  * 14 septembre) et doit y dire « non ». La lecture des citations a ses deux témoins en mémoire : une
  * paraphrase doit être lue « non », les mots du porteur « oui ».
  *
@@ -35,8 +35,8 @@ const DECISIONS = 'docs/decisions.md';
 const RELIRE = "le méta-harnais d'audit de #91 est à relire";
 const STRICT = Boolean(process.env.TIRELIRE_STRICT);
 
-/** Les documents tels qu'ils étaient avant D67 : fusion de #90 sur `main`, le 14 septembre 2026. */
-const AVANT_D67 = 'ebe590af09063d67be85407fc9b19bb9d68be6c0';
+/** Les documents tels qu'ils étaient avant D68 : fusion de #90 sur `main`, le 14 septembre 2026. */
+const AVANT_D68 = 'ebe590af09063d67be85407fc9b19bb9d68be6c0';
 
 // ─── Lire les documents ───────────────────────────────────────────────────────────────────────
 
@@ -252,23 +252,23 @@ test("amorçage · la même règle écrite autrement se lit oui : aucune lecture
   }
 });
 
-test("amorçage · avant D67, aucune des lectures ne disait oui", (t) => {
-  const avant = lireA(AVANT_D67, CLAUDE);
+test("amorçage · avant D68, aucune des lectures ne disait oui", (t) => {
+  const avant = lireA(AVANT_D68, CLAUDE);
   if (avant === null) {
-    assert.ok(!STRICT, `le commit ${AVANT_D67.slice(0, 7)} est introuvable alors que TIRELIRE_STRICT est posé : ${RELIRE}`);
+    assert.ok(!STRICT, `le commit ${AVANT_D68.slice(0, 7)} est introuvable alors que TIRELIRE_STRICT est posé : ${RELIRE}`);
     return t.skip("dépôt sans historique : le témoin rouge ne peut pas être joué ici (il l'est en CI)");
   }
   for (const { cle, quoi } of LECTURES) {
     assert.ok(
       !dit(avant, cle),
-      `témoin rouge : la lecture « ${cle} » dit déjà oui sur le CLAUDE.md d'avant D67 — elle passerait au vert sans #91.\n` +
+      `témoin rouge : la lecture « ${cle} » dit déjà oui sur le CLAUDE.md d'avant D68 — elle passerait au vert sans #91.\n` +
         `Elle est censée mesurer : ${quoi}.\n${RELIRE}`,
     );
   }
   assert.equal(
-    decisionDuFonctionnement(lireA(AVANT_D67, DECISIONS) ?? ''),
+    decisionDuFonctionnement(lireA(AVANT_D68, DECISIONS) ?? ''),
     null,
-    `témoin rouge : une décision d'avant D67 est lue comme consignant le fonctionnement : ${RELIRE}`,
+    `témoin rouge : une décision d'avant D68 est lue comme consignant le fonctionnement : ${RELIRE}`,
   );
 });
 

@@ -1358,7 +1358,7 @@ Ce qui est gardé, c'est que la question soit posée et que la PR reste rouge ta
 analysée puis validée (`gardes.test.mjs`) ; la réponse, elle, se lit — la proportion de l'analyse ne
 se programme pas (D62).
 
-## D67 · 2026-09-14 · Deux agents par besoin : l'auditeur écrit le harnais et la PR, le codeur ne fait que coder
+## D68 · 2026-09-14 · Deux agents par besoin : l'auditeur écrit le harnais et la PR, le codeur ne fait que coder
 
 Le porteur, en discussion le 14 septembre :
 
@@ -1408,7 +1408,7 @@ Le porteur, en discussion le 14 septembre :
   le dit, et l'auditeur précise le besoin.
 - **Le harnais suit l'atomicité.** Exigible sur une tâche qu'une session mène entièrement ; au-dessus,
   la vérification est celle des sous-tâches. Le harnais global s'écrit quand elles sont vertes. Reste
-  à trancher : vertes, ou fermées (#91).
+  à trancher : vertes, ou fermées (#93).
 - **La part humaine appartient au harnais** (D61) : l'auditeur écrit ce que le codage ne peut pas
   trancher, le porteur valide. Mais la matière vient du codeur : pour chaque vérification manuelle
   demandée, il justifie en commentaire ce que ses modifications changent, ce qu'elles ne touchent pas,

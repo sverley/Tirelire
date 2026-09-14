@@ -27,7 +27,7 @@
 ## Méthode de travail
 
 - **L'issue définit le besoin, la PR définit la solution.**
-- **Deux agents par besoin, et l'auditeur passe en premier (D67).** La confiance envers le codeur
+- **Deux agents par besoin, et l'auditeur passe en premier (D68).** La confiance envers le codeur
   n'est pas présumée : un agent écrit le harnais du besoin, un autre code le besoin.
   - **L'auditeur d'abord.** Il juge si le besoin tient en une tâche ou se décline en sous-tâches,
     écrit le « Fait quand » de façon vérifiable, code le harnais, ouvre la PR et en rédige la
@@ -67,7 +67,7 @@
   - **Une issue se ferme à la fusion**, jamais à la fin du codage : une issue fermée veut dire que
     la garantie est sur `main`. La fermeture est **automatique** : la description de la PR porte
     `Close #<numéro>` pour le besoin qu'elle couvre, et personne ne ferme une issue à la main.
-  - **Une discussion née en cours de PR se range avant la fusion** (D67) : soit elle est bloquante,
+  - **Une discussion née en cours de PR se range avant la fusion** (D68) : soit elle est bloquante,
     et ce qu'elle décide entre dans la PR ; soit elle ne l'est pas, et elle devient une issue, ouverte
     avant la fusion. Rien ne se fusionne en laissant une question pendante dans un fil : une question
     sans issue est une question perdue.
