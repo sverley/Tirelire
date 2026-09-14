@@ -1378,6 +1378,9 @@ Le porteur, en discussion le 14 septembre :
 > le codeur doit être honnête et concis dans son rapport de modifications nécessitant une validation
 > humaine
 
+> il faut ajouter que le codeur ne doit pas regarder le harnais (ou meta-harnais) pour coder le
+> besoin. il doit le faire depuis sa propre interprétation depuis le besoin
+
 > un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches,
 > on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
 
@@ -1386,6 +1389,13 @@ Le porteur, en discussion le 14 septembre :
 - **La PR appartient à l'auditeur.** Le codeur n'en modifie ni la description, ni les consignes, ni
   les analyses, ni les cases ; il pousse des commits et commente. Un codeur qui pourrait réécrire
   l'attendu l'alignerait, sans même le vouloir, sur ce qu'il a produit.
+- **Le codeur code à l'aveugle du harnais.** Il part de sa lecture du besoin, jamais des attentes du
+  harnais : les lire reviendrait à écrire ce qu'il faut pour passer, et le harnais ne vérifierait plus
+  que lui-même. Il le lance et lit son verdict, sans ouvrir son code. Deux lectures indépendantes du
+  même besoin se confrontent ainsi : un écart signale que le besoin est ambigu, que le harnais est
+  faux, ou que le codage manque — et cela se tranche en commentaire, pas en recopiant les attentes.
+  Corollaire : l'issue doit suffire à coder ; un codeur qui ne peut pas avancer sans lire le harnais
+  le dit, et l'auditeur précise le besoin.
 - **Le harnais suit l'atomicité.** Exigible sur une tâche qu'une session mène entièrement ; au-dessus,
   la vérification est celle des sous-tâches. Le harnais global s'écrit quand elles sont vertes. Reste
   à trancher : vertes, ou fermées (#91).
