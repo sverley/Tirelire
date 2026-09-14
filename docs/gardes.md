@@ -337,23 +337,30 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
 
 ## C1 · Aucun geste technique pour l'utilisateur
 
-Chemins : `apps/web/src/**/*.svelte`
+Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`, `apps/web/index.html`,
+`apps/web/vite.config.ts`
 
 - **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « aucun fichier de apps/web/src ne
   porte un des motifs interdits » : les textes de l'interface, `.svelte` et `.ts` — un message se
   fabrique aussi dans un module — ne portent aucune des formes concrètes d'un geste technique
   (commande, terminal, adresse locale…).
   Témoin rouge : « témoin rouge · un texte d’interface qui invite à ouvrir un terminal »
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « ni index.html ni le manifeste de
+  vite.config.ts ne portent un des motifs interdits » : le titre de la page, et du manifeste PWA le
+  nom, le nom court et la description — ce que le système écrit sous l'icône — s'affichent sans
+  passer par `src`.
+  Témoin rouge : « témoin rouge · un manifeste dont la description fait ouvrir un terminal »
 - **Vérification manuelle** · `VM-C1-sans-geste` — Relire les textes que la PR ajoute à
   l'interface et à la documentation destinée à l'utilisateur : installer, mettre à jour,
   sauvegarder et synchroniser ne demandent ni commande, ni serveur à lancer, ni réglage réseau, ni
   adresse technique, sauf en voie avancée à côté d'une voie simple. Le harnais ci-dessus n'attrape
-  que des motifs concrets, et ne lit que le code de l'interface : la documentation destinée à
-  l'utilisateur et l'esprit de C1 (une voie avancée tolérée, jamais seule) restent à la revue.
+  que des motifs concrets, et ne lit que l'application elle-même — interface, page d'accueil,
+  manifeste : la documentation destinée à l'utilisateur et l'esprit de C1 (une voie avancée
+  tolérée, jamais seule) restent à la revue.
 
 ## C2 · L'essentiel ne dépend d'aucune capacité propre à une plateforme
 
-Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/lib/*.ts`
+Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`
 
 - **Harnais** · `apps/web/test/c2-parcours-sans-camera.test.ts` — « aucun fichier essentiel ne fait
   appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts » : la caméra et le QR code ne

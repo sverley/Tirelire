@@ -5,10 +5,16 @@
  *
  * C1 : « Installer, mettre à jour, sauvegarder et synchroniser ne demandent ni ligne de commande,
  * ni serveur à lancer, ni réglage réseau, ni adresse technique à saisir. » Ce harnais garde la part
- * programmable, et une seule : **les textes de l'interface** (`apps/web/src`, `.svelte` et `.ts` —
- * un message se fabrique aussi dans un module) ne portent aucune des formes concrètes que prendrait
- * un tel geste : nom d'outil de ligne de commande, invite à ouvrir un terminal, adresse locale
- * technique…
+ * programmable : aucun des textes que l'application met sous les yeux de l'utilisateur ne porte une
+ * des formes concrètes que prendrait un tel geste — nom d'outil de ligne de commande, invite à
+ * ouvrir un terminal, adresse locale technique… Deux endroits, donc deux garanties :
+ *
+ * 1. **L'interface** (`apps/web/src`, `.svelte` et `.ts` : un message se fabrique aussi dans un
+ *    module) ;
+ * 2. **Ce qui s'affiche sans passer par `src`** : le titre de `index.html`, et du manifeste PWA de
+ *    `vite.config.ts` le nom, le nom court et la description — ce que le système écrit sous
+ *    l'icône. Du fichier de configuration, seuls ces trois textes sont lus : le reste est du
+ *    réglage de construction, qu'un balayage de gestes techniques n'a pas à juger.
  *
  * Ce qu'il ne garde pas, tranché par le porteur le 14 septembre : la documentation destinée à
  * l'utilisateur. La garde vérifie que les règles de codage ne sont pas enfreintes ; un document
@@ -52,6 +58,16 @@ function fichiers(dossier: string, suffixes: string[]): string[] {
   });
 }
 
+/** Les textes du manifeste PWA que l'utilisateur lit, nommés pour le balayage. */
+export function textesDuManifeste(source: string): Map<string, string> {
+  const textes = new Map<string, string>();
+  for (const champ of ['name', 'short_name', 'description']) {
+    const trouvé = source.match(new RegExp(`\\b${champ}:\\s*'([^']*)'`));
+    if (trouvé?.[1] !== undefined) textes.set(`vite.config.ts · manifest.${champ}`, trouvé[1]);
+  }
+  return textes;
+}
+
 /** Chemin relatif à `apps/web`, en séparateurs de chemin d'URL. */
 const depuisLaRacine = (chemin: string) => relative(RACINE, chemin).split('\\').join('/');
 
@@ -84,6 +100,23 @@ describe('C1 · aucun geste technique dans les textes de l’interface (issue #7
       ).toBe(true);
     vérifierBalayage('l’interface', balayés, (c) => readFileSync(join(RACINE, c), 'utf8'));
   });
+
+  it('ni index.html ni le manifeste de vite.config.ts ne portent un des motifs interdits', () => {
+    const textes = new Map<string, string>([
+      ['index.html', readFileSync(join(RACINE, 'index.html'), 'utf8')],
+      ...textesDuManifeste(readFileSync(join(RACINE, 'vite.config.ts'), 'utf8')),
+    ]);
+    expect(
+      [...textes.keys()],
+      'le manifeste ne livre plus ses trois textes : champ renommé, guillemets changés ? de ce côté, C1 ne garderait plus rien',
+    ).toEqual([
+      'index.html',
+      'vite.config.ts · manifest.name',
+      'vite.config.ts · manifest.short_name',
+      'vite.config.ts · manifest.description',
+    ]);
+    vérifierBalayage('un texte affiché hors de l’interface', [...textes.keys()], (nom) => textes.get(nom) ?? '');
+  });
 });
 
 /**
@@ -92,4 +125,16 @@ describe('C1 · aucun geste technique dans les textes de l’interface (issue #7
  */
 it.fails('témoin rouge · un texte d’interface qui invite à ouvrir un terminal', () => {
   vérifierBalayage('l’interface', ['src/views/Reglages.svelte'], () => '<p>Ouvrez un terminal et lancez `pnpm install` puis `node serveur.js`.</p>');
+});
+
+/**
+ * Témoin rouge du second temps : les mêmes assertions rejouées sur un manifeste inventé dont la
+ * description fait ouvrir un terminal. Doit échouer ; `it.fails` tient l'échec attendu (#66).
+ */
+it.fails('témoin rouge · un manifeste dont la description fait ouvrir un terminal', () => {
+  vérifierBalayage(
+    'un texte affiché hors de l’interface',
+    ['vite.config.ts · manifest.description'],
+    () => 'Comptes de la famille. Pour sauvegarder, ouvrez un terminal.',
+  );
 });
