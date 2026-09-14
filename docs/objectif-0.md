@@ -91,6 +91,21 @@ conformité, elle imprime ce qui ressemble à une promotion — une décision qu
 « jamais », une décision qui en amende plusieurs, un incident sans règle ni harnais. L'auditeur juge.
 Un seul cas est **refusé**, parce qu'il est exact : un invariant qui nomme une décision pour source.
 
+**Rapprochement flou, puis lecture sémantique.** Ces signaux sont grossiers : une décision peut dire
+la même chose qu'un principe sans en employer les mots. La garde compare donc chaque entrée aux
+entrées des rangs supérieurs, et entre entrées d'un même rang pour les doublons. La comparaison est
+lexicale et déterministe — texte normalisé (minuscules, accents, mots vides retirés), n‑grammes de
+mots et de caractères, proximité par recouvrement, distance d'édition sur les intitulés — donc sans
+dépendance, sans réseau, et reproductible d'une exécution à l'autre.
+
+Elle rend une liste courte, ordonnée, qui nomme le score : « cette décision ressemble à tel principe,
+à telle règle ». **La lecture sémantique, c'est la session qui la fait** : l'agent lit la liste et
+juge si le rapprochement est un reclassement. La garde n'embarque donc aucun modèle, ce qui la garde
+déterministe et jouable hors ligne, et respecte le partage — elle signale, l'auditeur décide.
+
+Les seuils se règlent, et rien de tout cela n'est bloquant : seul le cas exact ci-dessus l'est. Un
+rapprochement écarté se note dans la PR, pour ne pas revenir à chaque exécution.
+
 **La garde exécutée est toujours celle de `main`** ; son résultat porte sur le code courant. En
 lecture comme en écriture.
 
