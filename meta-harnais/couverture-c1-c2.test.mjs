@@ -23,6 +23,14 @@
  * 1. **Chaque garantie promise est nommée** : les lignes `Harnais` de C1 et C2 nomment leur test
  *    entre guillemets, et chaque nom attendu ci-dessous y figure. La couverture générale exige
  *    alors que ce test précis existe et tourne ; le désactiver rougit `pnpm test`.
+ *
+ *    Ce que `PROMESSES` retient de C1 est le seul balayage du code de l'interface. Tranché par le
+ *    porteur le 14 septembre : la garde vérifie que les règles de codage ne sont pas enfreintes, et
+ *    un document destiné à l'utilisateur n'entre pas dans son périmètre — il reste à la revue
+ *    `VM-C1-sans-geste`, qui le nomme déjà (« les textes que la PR ajoute à l'interface **et à la
+ *    documentation destinée à l'utilisateur** »). Le classement des documents du dépôt n'est donc
+ *    pas exigé ici : s'il est retiré du harnais, la règle 2 ci-dessous suffit à ce que le registre
+ *    suive.
  * 2. **Aucune garantie muette** : tout test actif de ces fichiers, hors témoins rouges et titres de
  *    suite, est nommé par une ligne du registre. Une garantie ajoutée au code sans être écrite au
  *    registre rougit ici — c'est ce qui manquait quand le classement des documents est arrivé.
@@ -55,11 +63,7 @@ const registre = () => lire(REGISTRE);
 const PROMESSES = Object.freeze({
   C1: Object.freeze({
     fichier: 'apps/web/test/c1-sans-geste-technique.test.ts',
-    tests: Object.freeze([
-      'aucun fichier de apps/web/src ne porte un des motifs interdits',
-      'chaque document du dépôt est classé : technique, ou destiné à l’utilisateur',
-      'aucun document destiné à l’utilisateur ne demande un geste technique',
-    ]),
+    tests: Object.freeze(['aucun fichier de apps/web/src ne porte un des motifs interdits']),
   }),
   C2: Object.freeze({
     fichier: 'apps/web/test/c2-parcours-sans-camera.test.ts',
