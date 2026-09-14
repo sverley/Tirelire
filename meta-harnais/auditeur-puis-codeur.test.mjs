@@ -72,59 +72,88 @@ const normaliser = (texte) =>
 // ─── Ce que #91 demande que `CLAUDE.md` dise ─────────────────────────────────────────────────
 
 /**
- * Une lecture par « Fait quand ». Chacune tient en un motif appliqué au document normalisé : un
- * repère (le rôle, ou la notion) et ce qu'on lui attribue, séparés d'au plus quelques phrases.
+ * Deux notions à portée l'une de l'autre, **dans un sens comme dans l'autre** : une lecture mesure une
+ * idée, jamais un ordre de phrases. « L'auditeur écrit le harnais » et « le harnais est écrit par
+ * l'auditeur » disent la même chose et doivent se lire pareil.
+ */
+const proche = (a, b, ecart) => new RegExp(`(?:${a})[\\s\\S]{0,${ecart}}(?:${b})|(?:${b})[\\s\\S]{0,${ecart}}(?:${a})`);
+
+/**
+ * Une lecture par « Fait quand ». Chacune est une conjonction de motifs appliqués au document
+ * normalisé : toutes doivent dire oui, aucune ne présume de la place ni de la tournure.
  */
 const LECTURES = [
   {
     cle: 'ordre',
     quoi: "l'ordre des deux agents : l'auditeur passe avant le codeur",
-    motif: /l'auditeur (passe en premier|d'abord|avant le codeur)|auditeur,? puis (le )?codeur|le codeur (ensuite|apres)/,
+    motifs: [
+      /auditeur[\s\S]{0,80}(passe en premier|en premier|d'abord|avant le codeur|commence|ouvre le bal)|d'abord[\s\S]{0,60}auditeur|auditeur,? puis[\s\S]{0,20}cod|codeur[\s\S]{0,60}(ensuite|vient apres|apres l'auditeur|en second)/,
+    ],
   },
   {
     cle: 'auditeur-decoupage',
     quoi: "le découpage appartient à l'auditeur : c'est lui qui juge si le besoin tient en une tâche ou se décline",
-    motif: /auditeur[\s\S]{0,240}(se decline en (une ou plusieurs )?(sous-)?taches|tient en une tache|decoupe le besoin|une ou plusieurs taches)/,
+    motifs: [proche('auditeur', "se decline|se decoupe|sous-tache|decoupe le besoin|tient en une tache|une ou plusieurs taches", 260)],
   },
   {
     cle: 'auditeur-fait-quand',
     quoi: "le « Fait quand » vérifiable appartient à l'auditeur",
-    motif: /auditeur[\s\S]{0,320}fait quand/,
+    motifs: [proche('auditeur', 'fait quand', 320)],
   },
   {
     cle: 'auditeur-harnais-et-pr',
     quoi: "le harnais et la PR, description comprise, appartiennent à l'auditeur",
-    motif: /auditeur[\s\S]{0,320}(code|ecrit) le harnais[\s\S]{0,160}(ouvre|redige|ecrit)[\s\S]{0,80}(la pr|description)/,
+    motifs: [
+      proche('auditeur', 'harnais', 240),
+      proche('auditeur', "(ouvre|redige|ecrit)[^.]{0,60}(la pr|sa description|la description)", 320),
+    ],
   },
   {
     cle: 'codeur-ne-modifie-pas-la-pr',
     quoi: 'ce que le codeur ne peut pas faire : modifier la PR',
-    motif: /codeur[\s\S]{0,320}ne (modifie|touche)[^.]{0,40}(jamais |pas )?(a )?(la pr|sa description|la description)/,
+    motifs: [proche('codeur', "ne (modifie|touche|reecrit|change)[^.]{0,60}(la pr|sa description|la description)", 320)],
   },
   {
     cle: 'codeur-commente',
     quoi: 'ce que le codeur peut faire à la place : commenter',
-    motif: /ne (modifie|touche)[^.]{0,60}(la pr|description)[\s\S]{0,400}commentaire/,
+    motifs: [proche('codeur', 'commentaire|commente', 300)],
   },
   {
     cle: 'atomicite-tache',
     quoi: "un harnais n'est exigible que sur une tâche atomique, celle qu'une session mène entièrement",
-    motif: /harnais[\s\S]{0,160}atomique|atomique[\s\S]{0,160}harnais/,
+    motifs: [proche('harnais', 'atomique', 160)],
   },
   {
     cle: 'atomicite-sous-taches',
     quoi: "le harnais global d'une tâche à sous-tâches attend qu'elles soient vertes (ou fermées : #91)",
-    motif: /(sous-)?taches?[\s\S]{0,240}harnais global[\s\S]{0,160}(vertes|fermees)|harnais global[\s\S]{0,240}(sous-)?taches[\s\S]{0,160}(vertes|fermees)/,
+    motifs: [/sous-?tache/, proche('harnais global', 'vertes|fermees', 240)],
   },
   {
     cle: 'part-humaine',
     quoi: "l'intervention humaine fait partie du harnais, ce n'est pas un niveau de plus",
-    motif: /(intervention|part) humaine[\s\S]{0,200}harnais[\s\S]{0,200}(pas un niveau|ni un niveau)/,
+    motifs: [proche("(intervention|part) humaine", 'harnais', 200), /(pas|ni|non)[^.]{0,12}un niveau/],
   },
 ];
 
+/**
+ * La même règle écrite autrement — autres mots, autre ordre, aucune phrase reprise du texte livré.
+ * Toutes les lectures doivent la lire « oui » : c'est le témoin qui interdit de coudre un motif sur
+ * la formulation du jour. Une lecture qui échoue ici est trop étroite et se corrige, elle ; ce témoin
+ * ne se retouche pas pour la faire passer.
+ */
+const AUTRE_ECRITURE = [
+  "Ordre des sessions. Un besoin passe d'abord par l'auditeur ; le codeur vient après.",
+  "L'auditeur commence : il tranche si le besoin se découpe en sous-tâches, rend le « Fait quand »",
+  'mesurable, écrit le harnais, puis ouvre la PR dont il rédige la description.',
+  "Le codeur, lui, ne réécrit pas la PR : il commit, et tout le reste passe par un commentaire.",
+  'Réclamer un harnais suppose une tâche atomique ; au-dessus, le harnais global attend que les',
+  'sous-tâches soient vertes.',
+  "La part humaine relève du harnais lui-même, et non d'un niveau de plus : c'est ce que le code ne",
+  'sait pas trancher.',
+].join('\n');
+
 const lectureDe = (cle) => LECTURES.find((l) => l.cle === cle) ?? assert.fail(`lecture ${cle} inconnue : ${RELIRE}`);
-const dit = (texte, cle) => lectureDe(cle).motif.test(normaliser(texte));
+const dit = (texte, cle) => lectureDe(cle).motifs.every((m) => m.test(normaliser(texte)));
 
 // ─── La décision, et les mots du porteur ─────────────────────────────────────────────────────
 
@@ -209,6 +238,16 @@ test("amorçage · la lecture des citations sait dire oui, et sait dire non", ()
       motAMot(texte, PARAPHRASE),
       null,
       `témoin rouge : une paraphrase est lue comme une citation (${cle}) ; une décision qui reformulerait le porteur passerait : ${RELIRE}`,
+    );
+  }
+});
+
+test("amorçage · la même règle écrite autrement se lit oui : aucune lecture n'est cousue sur le texte livré", () => {
+  for (const { cle, quoi } of LECTURES) {
+    assert.ok(
+      dit(AUTRE_ECRITURE, cle),
+      `témoin vert : la lecture « ${cle} » dit non sur une autre écriture de la même règle — elle mesure une ` +
+        `formulation, pas un sens, et rendrait rouge une livraison correcte.\nElle est censée mesurer : ${quoi}.\n${RELIRE}`,
     );
   }
 });
