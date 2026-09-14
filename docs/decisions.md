@@ -1381,6 +1381,10 @@ Le porteur, en discussion le 14 septembre :
 > il faut ajouter que le codeur ne doit pas regarder le harnais (ou meta-harnais) pour coder le
 > besoin. il doit le faire depuis sa propre interprétation depuis le besoin
 
+> une PR fusionnée doit fermer automatiquement l'issue (le besoin) qu'elle couvre. Si une discussion
+> née, soit cette discussion est bloquante pour la PR et elle fait partie de la PR, soit elle est
+> non-bloquante et fait l'objet d'une nouvelle issue avant la fusion
+
 > un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches,
 > on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
 
@@ -1406,6 +1410,11 @@ Le porteur, en discussion le 14 septembre :
   Ce compte rendu est honnête et concis : les écarts pris et ce qu'il n'a pas pu vérifier autant que
   ce qui marche, et rien d'autre. Il nourrit l'analyse de l'auditeur, ne s'y substitue pas, et ne vaut
   jamais validation.
+- **La PR ferme son besoin, et rien ne reste en suspens.** La description porte `Close #<numéro>` :
+  la fusion ferme l'issue d'elle-même, personne ne la ferme à la main. Une discussion née en cours de
+  route se range avant la fusion, sans troisième voie : bloquante, ce qu'elle décide entre dans la
+  PR ; non bloquante, elle devient une issue, ouverte avant la fusion. Un fil de PR n'est pas un
+  endroit où une question peut dormir : la PR fermée, plus personne ne la relit.
 - **Conséquence.** Une partie de D61 devient sans objet : l'annulation d'une validation par une
   analyse réécrite ne peut plus venir du codeur, qui ne touche plus à la description.
 

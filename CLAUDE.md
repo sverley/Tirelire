@@ -62,7 +62,12 @@
   - **Un besoin découvert en route devient une sous-issue** du même objectif et attend sa propre PR.
     Il ne rejoint la branche en cours que s'il rend la PR courante fausse.
   - **Une issue se ferme à la fusion**, jamais à la fin du codage : une issue fermée veut dire que
-    la garantie est sur `main`.
+    la garantie est sur `main`. La fermeture est **automatique** : la description de la PR porte
+    `Close #<numéro>` pour le besoin qu'elle couvre, et personne ne ferme une issue à la main.
+  - **Une discussion née en cours de PR se range avant la fusion** (D67) : soit elle est bloquante,
+    et ce qu'elle décide entre dans la PR ; soit elle ne l'est pas, et elle devient une issue, ouverte
+    avant la fusion. Rien ne se fusionne en laissant une question pendante dans un fil : une question
+    sans issue est une question perdue.
   - **Un objectif permanent ne se ferme pas** ; il se tient par ses gardes, pas par sa fermeture.
 - **Issue en cours.** Une session qui prend une issue (objectif, audit ou codage) lui pose
   l'étiquette `en cours` dès le début du travail ; le titre ne s'édite jamais pour cela. L'étiquette
