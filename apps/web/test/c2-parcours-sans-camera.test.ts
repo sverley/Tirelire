@@ -39,25 +39,41 @@ export function dépendanceCaméraTrouvée(contenu: string): string[] {
   return MOTIFS_CAMÉRA.filter((motif) => motif.test(contenu)).map((motif) => motif.source);
 }
 
+/** Les fichiers non tolérés qui font appel à la caméra ou au QR code, chacun avec ses motifs. */
+export function dépendancesHorsTolérance(fichiers: string[], lire: (f: string) => string, tolérés: Set<string>): string[] {
+  return fichiers.flatMap((nom) => {
+    if (tolérés.has(nom)) return [];
+    const trouvés = dépendanceCaméraTrouvée(lire(nom));
+    return trouvés.length ? [`${nom} : ${trouvés.join(', ')}`] : [];
+  });
+}
+
+/**
+ * Ce qu'on exige du balayage, à part du test pour que le témoin rouge rejoue les mêmes assertions.
+ * La non-vacuité en fait partie : un balayage qui ne lit plus aucun fichier passerait pour vert en
+ * ne gardant plus rien.
+ */
+function vérifierAbsenceCaméra(fichiers: string[], lire: (f: string) => string, tolérés: Set<string>): void {
+  expect(fichiers.length, 'aucun fichier balayé : C2 ne garderait plus rien').toBeGreaterThan(0);
+  const fautifs = dépendancesHorsTolérance(fichiers, lire, tolérés);
+  expect(fautifs, `dépendance caméra/QR trouvée hors synchronisation :\n${fautifs.join('\n')}`).toEqual([]);
+}
+
 describe('C2 · les parcours essentiels passent sans caméra ni QR code (issue #73)', () => {
   it('aucun fichier essentiel ne fait appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts', () => {
-    const fautifs: string[] = [];
-    for (const chemin of fichiers(SOURCE, ['.svelte', '.ts'])) {
-      const relatif = relative(RACINE, chemin).split('\\').join('/');
-      if (FICHIERS_TOLÉRÉS.has(relatif)) continue;
-      const trouvés = dépendanceCaméraTrouvée(readFileSync(chemin, 'utf8'));
-      if (trouvés.length) fautifs.push(`${relatif} : ${trouvés.join(', ')}`);
-    }
-    expect(fautifs, `dépendance caméra/QR trouvée hors synchronisation :\n${fautifs.join('\n')}`).toEqual([]);
+    const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map((c) => relative(RACINE, c).split('\\').join('/'));
+    vérifierAbsenceCaméra(balayés, (c) => readFileSync(join(RACINE, c), 'utf8'), FICHIERS_TOLÉRÉS);
   });
 });
 
 /**
- * Témoin rouge : la même détection rejouée sur un fichier essentiel volontairement fautif — un
- * écran de Plan qui appellerait `BarcodeDetector`. Doit échouer ; `it.fails` tient l'échec
- * attendu (#66).
+ * Témoin rouge : les mêmes assertions rejouées sur un écran essentiel inventé — un Plan qui
+ * appellerait `BarcodeDetector`. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
 it.fails('témoin rouge · un écran essentiel qui dépend de BarcodeDetector', () => {
-  const contenuFautif = "const détecteur = new BarcodeDetector({ formats: ['qr_code'] });";
-  expect(dépendanceCaméraTrouvée(contenuFautif), 'la dépendance caméra aurait dû être détectée').toEqual([]);
+  vérifierAbsenceCaméra(
+    ['src/views/Plan.svelte'],
+    () => "const détecteur = new BarcodeDetector({ formats: ['qr_code'] });",
+    FICHIERS_TOLÉRÉS,
+  );
 });

@@ -5,16 +5,23 @@
  *
  * C1 : « Installer, mettre à jour, sauvegarder et synchroniser ne demandent ni ligne de commande,
  * ni serveur à lancer, ni réglage réseau, ni adresse technique à saisir. » Ce harnais garde la part
- * programmable, en deux temps :
+ * programmable, en trois garanties, chacune nommée au registre (`docs/gardes.md`) :
  *
  * 1. **Les textes de l'interface** (`apps/web/src`, `.svelte` et `.ts` : un message se fabrique
  *    aussi dans un module) ne portent aucune des formes concrètes que prendrait un tel geste — nom
  *    d'outil de ligne de commande, invite à ouvrir un terminal, adresse locale technique…
  * 2. **Les documents du dépôt sont classés** : lus par un développeur ou par qui héberge le serveur
- *    privé, ou destinés à qui tient son budget. Les seconds passent le même balayage que
- *    l'interface. Aucun n'existe aujourd'hui — `docs/hebergement-web.md` s'adresse à qui héberge,
- *    pas à qui budgète (D07) — mais un document nouveau ne peut plus échapper à C1 en silence : non
- *    classé, il fait rougir ce harnais, et qui le classe « utilisateur » le soumet au balayage.
+ *    privé, ou destinés à qui tient son budget. Un document neuf ne peut pas rester hors des deux
+ *    listes, ni une liste citer un document disparu.
+ * 3. **Les documents destinés à l'utilisateur passent le même balayage.** Aucun n'existe
+ *    aujourd'hui — `docs/hebergement-web.md` s'adresse à qui héberge, pas à qui budgète (D07) —
+ *    mais un guide écrit demain y tombe sans que personne ait à y penser.
+ *
+ * Ce que chaque contrôle exige est écrit dans une fonction à part (`vérifierBalayage`,
+ * `vérifierClassement`), pour que les témoins rouges rejouent **les mêmes assertions** sur un jeu
+ * inventé, et non une détection voisine qui passerait pour elles (#66, #69). Deux assertions de
+ * non-vacuité complètent l'ensemble : un balayage qui ne lit plus rien, ou un inventaire qui ne
+ * trouve plus aucun document, passerait sinon pour vert en ne gardant plus rien.
  *
  * Ce que ce harnais ne juge pas : l'esprit de C1 (une voie avancée tolérée, jamais seule), qui
  * reste à la revue manuelle `VM-C1-sans-geste`.
@@ -28,7 +35,7 @@ const SOURCE = join(RACINE, 'src');
 /** Racine du dépôt : `apps/web` remonte de deux crans. */
 const DÉPÔT = join(RACINE, '..', '..');
 
-/** Formes concrètes d'un geste technique qu'un texte d'interface ne doit jamais porter. */
+/** Formes concrètes d'un geste technique qu'un texte destiné à l'utilisateur ne doit jamais porter. */
 const MOTIFS_GESTE_TECHNIQUE: RegExp[] = [
   /\bpnpm\b/i,
   /\bnpm\s+(run|install|start|ci)\b/i,
@@ -76,7 +83,7 @@ function fichiers(dossier: string, suffixes: string[]): string[] {
   });
 }
 
-/** Chemin relatif à la racine du dépôt, en séparateurs de chemin d'URL. */
+/** Chemin relatif à une racine, en séparateurs de chemin d'URL. */
 const depuisLaRacine = (chemin: string, racine = DÉPÔT) => relative(racine, chemin).split('\\').join('/');
 
 /** Les documents du dépôt : ceux de `docs/`, et ceux que la racine porte. */
@@ -91,17 +98,36 @@ export function gestesTechniquesTrouvés(contenu: string): string[] {
   return MOTIFS_GESTE_TECHNIQUE.filter((motif) => motif.test(contenu)).map((motif) => motif.source);
 }
 
+/** Les textes fautifs d'un ensemble, chacun nommé avec les motifs qu'il porte. */
+export function balayageDesGestes(textes: string[], lire: (texte: string) => string): string[] {
+  return textes.flatMap((nom) => {
+    const trouvés = gestesTechniquesTrouvés(lire(nom));
+    return trouvés.length ? [`${nom} : ${trouvés.join(', ')}`] : [];
+  });
+}
+
+/** Ce qu'on exige d'un balayage, à part du test pour que le témoin rouge rejoue les mêmes assertions. */
+function vérifierBalayage(quoi: string, textes: string[], lire: (texte: string) => string): void {
+  const fautifs = balayageDesGestes(textes, lire);
+  expect(fautifs, `geste technique trouvé dans ${quoi} :\n${fautifs.join('\n')}`).toEqual([]);
+}
+
 /**
  * Les documents qu'aucune des deux listes ne range, et ceux qu'elles rangent sans qu'ils existent.
  * Écrite à part du test pour que le témoin rouge puisse la rejouer sur un jeu inventé.
  */
-export function documentsMalClassés(documents: string[], classés: string[], existe: (d: string) => boolean): { nonClassés: string[]; disparus: string[] } {
+export function documentsMalClassés(
+  documents: string[],
+  classés: string[],
+  existe: (d: string) => boolean,
+): { nonClassés: string[]; disparus: string[] } {
   const connus = new Set(classés);
   return { nonClassés: documents.filter((d) => !connus.has(d)), disparus: classés.filter((d) => !existe(d)) };
 }
 
 /** Ce qu'on exige du classement, à part du test pour que le témoin rouge rejoue les mêmes assertions. */
 function vérifierClassement(documents: string[], classés: string[], existe: (d: string) => boolean): void {
+  expect(documents.length, "l'inventaire ne trouve aucun document : le classement ne garde plus rien").toBeGreaterThan(0);
   const { nonClassés, disparus } = documentsMalClassés(documents, classés, existe);
   expect(
     nonClassés,
@@ -113,12 +139,13 @@ function vérifierClassement(documents: string[], classés: string[], existe: (d
 
 describe('C1 · aucun geste technique dans les textes de l’interface (issue #73)', () => {
   it('aucun fichier de apps/web/src ne porte un des motifs interdits', () => {
-    const fautifs: string[] = [];
-    for (const chemin of fichiers(SOURCE, ['.svelte', '.ts'])) {
-      const trouvés = gestesTechniquesTrouvés(readFileSync(chemin, 'utf8'));
-      if (trouvés.length) fautifs.push(`${depuisLaRacine(chemin, RACINE)} : ${trouvés.join(', ')}`);
-    }
-    expect(fautifs, `geste technique trouvé dans l'interface :\n${fautifs.join('\n')}`).toEqual([]);
+    const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map((c) => depuisLaRacine(c, RACINE));
+    for (const suffixe of ['.svelte', '.ts'])
+      expect(
+        balayés.some((c) => c.endsWith(suffixe)),
+        `aucun fichier ${suffixe} balayé : de ce côté, C1 ne garderait plus rien`,
+      ).toBe(true);
+    vérifierBalayage('l’interface', balayés, (c) => readFileSync(join(RACINE, c), 'utf8'));
   });
 
   it('chaque document du dépôt est classé : technique, ou destiné à l’utilisateur', () => {
@@ -126,31 +153,16 @@ describe('C1 · aucun geste technique dans les textes de l’interface (issue #7
   });
 
   it('aucun document destiné à l’utilisateur ne demande un geste technique', () => {
-    const fautifs: string[] = [];
-    for (const document of DOCUMENTS_UTILISATEUR) {
-      const trouvés = gestesTechniquesTrouvés(readFileSync(join(DÉPÔT, document), 'utf8'));
-      if (trouvés.length) fautifs.push(`${document} : ${trouvés.join(', ')}`);
-    }
-    expect(fautifs, `geste technique trouvé dans un document utilisateur :\n${fautifs.join('\n')}`).toEqual([]);
+    vérifierBalayage('un document destiné à l’utilisateur', DOCUMENTS_UTILISATEUR, (d) => readFileSync(join(DÉPÔT, d), 'utf8'));
   });
 });
 
 /**
- * Témoin rouge : la même détection rejouée sur un texte d'interface volontairement fautif — une
+ * Témoin rouge du balayage de l'interface : les mêmes assertions rejouées sur un écran inventé qui
  * invite à ouvrir un terminal. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
 it.fails('témoin rouge · un texte d’interface qui invite à ouvrir un terminal', () => {
-  const texteFautif = '<p>Ouvrez un terminal et lancez `pnpm install` puis `node serveur.js`.</p>';
-  expect(gestesTechniquesTrouvés(texteFautif), 'le motif fautif aurait dû être détecté').toEqual([]);
-});
-
-/**
- * Témoin rouge du second temps : un document rangé parmi ceux destinés à l'utilisateur, qui fait
- * lancer un serveur. Le balayage doit le voir ; `it.fails` tient l'échec attendu (#66).
- */
-it.fails('témoin rouge · un document destiné à l’utilisateur qui fait lancer un serveur', () => {
-  const guideFautif = '## Sauvegarder\n\nLancez le serveur avec `pnpm preview`, puis ouvrez http://localhost:4173.';
-  expect(gestesTechniquesTrouvés(guideFautif), 'le guide fautif aurait dû être détecté').toEqual([]);
+  vérifierBalayage('l’interface', ['src/views/Reglages.svelte'], () => '<p>Ouvrez un terminal et lancez `pnpm install` puis `node serveur.js`.</p>');
 });
 
 /**
@@ -159,4 +171,16 @@ it.fails('témoin rouge · un document destiné à l’utilisateur qui fait lanc
  */
 it.fails('témoin rouge · un document du dépôt laissé hors de tout classement', () => {
   vérifierClassement(['docs/guide-utilisateur.md', 'README.md'], ['README.md'], () => true);
+});
+
+/**
+ * Témoin rouge du balayage des documents utilisateur : les mêmes assertions rejouées sur un guide
+ * inventé qui fait lancer un serveur. Doit échouer ; `it.fails` tient l'échec attendu (#66).
+ */
+it.fails('témoin rouge · un document destiné à l’utilisateur qui fait lancer un serveur', () => {
+  vérifierBalayage(
+    'un document destiné à l’utilisateur',
+    ['docs/guide-utilisateur.md'],
+    () => '## Sauvegarder\n\nLancez le serveur avec `pnpm preview`, puis ouvrez http://localhost:4173.',
+  );
 });
