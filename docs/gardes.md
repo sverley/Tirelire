@@ -6,6 +6,9 @@ qui ne se programme pas devient une vérification manuelle : demandée dans la P
 développeur ou un agent, validée par un développeur humain avant la fusion. Ce document tient la
 correspondance ; `packages/gardes` le relit.
 
+Le vocabulaire employé ici est celui de [`glossaire.md`](glossaire.md), lui-même gardé : les termes
+que la garde emploie ne peuvent pas changer de sens sans qu'elle le voie.
+
 Ce document ne porte que les besoins du produit. Ce qu'une session d'audit écrit pour vérifier la
 livraison d'une règle du projet est un méta-harnais : il vit dans `meta-harnais/`, n'entre pas dans
 une entrée et ne tourne pas dans `pnpm test` (#82, D65).

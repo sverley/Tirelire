@@ -7,7 +7,8 @@ saisis à la main, l'import des relevés et un moteur de règles pour les classe
 Nom de code. Description du projet, qui fait foi : [`docs/description-projet.md`](docs/description-projet.md) ;
 ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md) ;
 ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md) ;
-ce qui les garde : [`docs/gardes.md`](docs/gardes.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
+ce qui les garde : [`docs/gardes.md`](docs/gardes.md) ;
+le vocabulaire : [`docs/glossaire.md`](docs/glossaire.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
 
 ## Structure
 

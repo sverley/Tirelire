@@ -34,6 +34,7 @@ export const DOCUMENTS = Object.freeze({
   gardes: 'docs/gardes.md',
   modele: '.github/pull_request_template.md',
   description: 'docs/description-projet.md',
+  glossaire: 'docs/glossaire.md',
 });
 
 /** Étiquettes admises en tête d'une ligne d'entrée du registre. */
@@ -64,7 +65,7 @@ export const CHEMINS_DES_REGLES = Object.freeze([
   Object.freeze({ quoi: 'les règles des sessions', motifs: Object.freeze(['CLAUDE.md']) }),
   Object.freeze({
     quoi: 'une règle primaire',
-    motifs: Object.freeze(['docs/description-projet.md', 'docs/invariants.md', 'docs/contraintes.md']),
+    motifs: Object.freeze(['docs/description-projet.md', 'docs/invariants.md', 'docs/contraintes.md', 'docs/glossaire.md']),
   }),
   Object.freeze({
     quoi: FAMILLE_GARDE,
@@ -136,7 +137,7 @@ function couvertureDemandee(fichiersModifies) {
  * Son accord ne reste pas dans l'analyse : c'est une ligne « Accord du porteur : … » de la section,
  * que la garde lit et refuse quand elle manque ou reste vide.
  */
-export const DOCUMENTS_DU_PORTEUR = Object.freeze([DOCUMENTS.description, DOCUMENTS.invariants]);
+export const DOCUMENTS_DU_PORTEUR = Object.freeze([DOCUMENTS.description, DOCUMENTS.invariants, DOCUMENTS.glossaire]);
 
 /** Documents du porteur que la PR modifie, dans l'ordre ; vide quand elle n'y touche pas. */
 export const documentsDuPorteurModifies = (fichiersModifies = []) => DOCUMENTS_DU_PORTEUR.filter((d) => fichiersModifies.includes(d));

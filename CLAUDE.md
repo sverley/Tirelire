@@ -26,6 +26,8 @@
 
 ## Méthode de travail
 
+- **Le vocabulaire est celui de [`docs/glossaire.md`](docs/glossaire.md)** : besoin, harnais,
+  garde, tests, amorçages. Il commande qui écrit un harnais, où il vit et quand il est joué.
 - **L'issue définit le besoin, la PR définit la solution.**
 - **Deux agents par besoin, et l'auditeur passe en premier (D68).** La confiance envers le codeur
   n'est pas présumée : un agent écrit le harnais du besoin, un autre code le besoin.
