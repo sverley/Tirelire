@@ -27,6 +27,37 @@
 ## Méthode de travail
 
 - **L'issue définit le besoin, la PR définit la solution.**
+- **Deux agents par besoin, et l'auditeur passe en premier (D68).** La confiance envers le codeur
+  n'est pas présumée : un agent écrit le harnais du besoin, un autre code le besoin.
+  - **L'auditeur d'abord.** Il juge si le besoin tient en une tâche ou se décline en sous-tâches,
+    écrit le « Fait quand » de façon vérifiable, code le harnais, ouvre la PR et en rédige la
+    description, ses consignes et les analyses des vérifications manuelles.
+  - **Le codeur ensuite**, dans une PR déjà cadrée, avec un harnais déjà en place : il pousse des
+    commits sur la branche et **ne modifie jamais la PR** — ni sa description, ni ses consignes, ni
+    ses analyses, ni ses cases. Tout ce qu'il a à dire passe par des commentaires : il signale,
+    propose, questionne, et attend que l'auditeur corrige ou que le porteur tranche. Il ne découpe
+    pas le besoin et n'écrit pas l'attendu.
+  - **Le codeur ne lit pas le harnais.** Il code depuis sa propre lecture du besoin, jamais depuis
+    les attentes du harnais : sinon il écrit ce qu'il faut pour passer, et le harnais ne vérifie plus
+    rien. Il ne va pas le chercher non plus : il code, commet, pousse, et le verdict lui vient des
+    crochets de pré-commit et de pré-push, puis de la CI — et, pour un besoin de règle, du workflow
+    des méta-harnais. Un échec lui revient avec son message, ce qui suffit ; il n'ouvre pas le code du
+    harnais pour y trouver la réponse. Un verdict qu'il ne comprend pas se discute en commentaire ;
+    l'auditeur corrige le harnais, ou précise le besoin dans l'issue. Corollaire : l'issue doit
+    suffire à coder, et les crochets doivent faire le nécessaire.
+  - **Le codeur rend compte de ce qui appelle une validation humaine**, en commentaire : pour chaque
+    vérification manuelle demandée, ce que ses modifications changent, ce qu'elles ne touchent pas,
+    et ce qui reste à constater de visu. C'est lui qui sait ce qu'il a fait ; personne ne doit le
+    déduire de la diff. **Honnête et concis** : les écarts pris et ce qu'il n'a pas pu vérifier
+    autant que ce qui marche, et rien d'autre — ni plaidoyer, ni rapport exhaustif. Ce compte rendu
+    nourrit l'analyse de l'auditeur, il ne s'y substitue pas, et ne vaut jamais validation.
+  - **Un harnais n'est exigible que sur une tâche atomique**, celle qu'une session peut mener
+    entièrement. Une tâche qui a des sous-tâches est vérifiée par les leurs ; son harnais global
+    s'écrit quand elles sont vertes, jamais avant. Un rouge qui dure cesse d'être un signal.
+  - **Si le besoin est une règle**, le codeur code la garde et le harnais de la garde ; l'auditeur
+    code le **méta-harnais** qui juge ce travail (D65).
+  - **L'intervention humaine fait partie du harnais**, ce n'est pas un niveau de plus : c'est la part
+    que le codage ne peut pas trancher. L'auditeur l'écrit, le porteur la valide.
 - **Découpage et fusion (D63).** Un objectif se découpe en sous-issues avant tout codage ; l'issue
   d'objectif ne porte jamais de code elle-même.
   - **Une sous-issue, une PR, une fusion.** Une sous-issue est taillée pour être fusionnable seule ;
@@ -34,7 +65,12 @@
   - **Un besoin découvert en route devient une sous-issue** du même objectif et attend sa propre PR.
     Il ne rejoint la branche en cours que s'il rend la PR courante fausse.
   - **Une issue se ferme à la fusion**, jamais à la fin du codage : une issue fermée veut dire que
-    la garantie est sur `main`.
+    la garantie est sur `main`. La fermeture est **automatique** : la description de la PR porte
+    `Close #<numéro>` pour le besoin qu'elle couvre, et personne ne ferme une issue à la main.
+  - **Une discussion née en cours de PR se range avant la fusion** (D68) : soit elle est bloquante,
+    et ce qu'elle décide entre dans la PR ; soit elle ne l'est pas, et elle devient une issue, ouverte
+    avant la fusion. Rien ne se fusionne en laissant une question pendante dans un fil : une question
+    sans issue est une question perdue.
   - **Un objectif permanent ne se ferme pas** ; il se tient par ses gardes, pas par sa fermeture.
 - **Issue en cours.** Une session qui prend une issue (objectif, audit ou codage) lui pose
   l'étiquette `en cours` dès le début du travail ; le titre ne s'édite jamais pour cela. L'étiquette
@@ -44,7 +80,7 @@
   n'est pas assez clair, poser la question et la consigner dans la discussion de l'issue d'objectif.
   En fin d'objectif, consigner les nouvelles fonctionnalités dans la documentation du dépôt, par une
   PR.
-- **Audit d'une PR.** Partir de l'issue. Si le besoin n'est pas clair ou appelle des questions, les
+- **Audit d'un besoin.** Partir de l'issue. Si le besoin n'est pas clair ou appelle des questions, les
   poser et les consigner dans l'issue. Une fois le besoin explicite, indiquer la branche de travail
   dans le corps de l'issue, puis écrire les harnais qui contrôlent le résultat dans la branche de la
   PR associée. **En audit, ne jamais toucher au code** : seulement la documentation et les harnais.
@@ -57,8 +93,9 @@
   Le harnais qu'un auditeur écrit sur une règle est un **méta-harnais** : il va dans `meta-harnais/`,
   hors du workspace, s'appelle par `pnpm meta`, et ne tourne de lui-même que sur une PR qui touche
   aux règles. Il ne va jamais dans `pnpm test`.
-- **Codage d'une PR.** Les questions de développement et les décisions techniques se consignent en
-  commentaires dans la discussion de la PR.
+- **Codage d'un besoin.** Le harnais est déjà là et rouge ; le travail consiste à le faire passer
+  au vert sans le modifier. Les questions de développement et les décisions techniques se consignent
+  en commentaires dans la discussion de la PR, jamais dans sa description.
 - **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
   répertoire de travail (voir #22).
 - **Sessions Claude Chat.** Regrouper les commandes en peu d'appels d'outils, pour ne pas atteindre

@@ -1357,3 +1357,70 @@ de `CLAUDE.md`, et une vérification qui vise tout ne vise rien.
 Ce qui est gardé, c'est que la question soit posée et que la PR reste rouge tant qu'elle n'est pas
 analysée puis validée (`gardes.test.mjs`) ; la réponse, elle, se lit — la proportion de l'analyse ne
 se programme pas (D62).
+
+## D68 · 2026-09-14 · Deux agents par besoin : l'auditeur écrit le harnais et la PR, le codeur ne fait que coder
+
+Le porteur, en discussion le 14 septembre :
+
+> je ne fais pas confiance au codeur. Aussi, quand un besoin est défini (que ce soit une règle ou une
+> fonctionnalité), je veux un agent qui code le harnais du besoin pour vérifier que le codeur va bien
+> répondre au besoin et un agent qui code le besoin.
+
+> c'est l'auditeur qui ouvre une PR. C'est donc l'auditeur d'un besoin qui évalue si le besoin doit se
+> décliner en une ou plusieurs taches. Le codeur ne fait que coder le besoin dont le harnais est déjà
+> en place
+
+> le codeur ne doit pas modifier une PR. Mais il peut mettre des commentaires
+
+> Le codeur doit aussi justifier dans un commentaire ce qu'il a fait comme modification qui
+> nécessitent un validation humaine
+
+> le codeur doit être honnête et concis dans son rapport de modifications nécessitant une validation
+> humaine
+
+> il faut ajouter que le codeur ne doit pas regarder le harnais (ou meta-harnais) pour coder le
+> besoin. il doit le faire depuis sa propre interprétation depuis le besoin
+
+> oui, le codeur s'en remet à la CI. il est censé y avoir des hook-precommit et pre-push pour faire
+> le nécessaire
+
+> une PR fusionnée doit fermer automatiquement l'issue (le besoin) qu'elle couvre. Si une discussion
+> née, soit cette discussion est bloquante pour la PR et elle fait partie de la PR, soit elle est
+> non-bloquante et fait l'objet d'une nouvelle issue avant la fusion
+
+> un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches,
+> on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
+
+- **L'ordre.** Auditeur, puis codeur. Le découpage en sous-tâches, le « Fait quand » vérifiable, le
+  harnais et la PR sont de l'auditeur. Le codeur reçoit une PR cadrée et un harnais rouge.
+- **La PR appartient à l'auditeur.** Le codeur n'en modifie ni la description, ni les consignes, ni
+  les analyses, ni les cases ; il pousse des commits et commente. Un codeur qui pourrait réécrire
+  l'attendu l'alignerait, sans même le vouloir, sur ce qu'il a produit.
+- **Le codeur code à l'aveugle du harnais.** Il part de sa lecture du besoin, jamais des attentes du
+  harnais : les lire reviendrait à écrire ce qu'il faut pour passer, et le harnais ne vérifierait plus
+  que lui-même. Il ne le lance pas non plus : le verdict lui vient des crochets de pré-commit et de
+  pré-push, puis de la CI, et du workflow des méta-harnais pour un besoin de règle. Ce que les
+  crochets ne portent pas, le codeur ne l'apprend qu'à la CI : c'est aux crochets de faire le
+  nécessaire, pas au codeur d'aller voir. Deux lectures indépendantes du
+  même besoin se confrontent ainsi : un écart signale que le besoin est ambigu, que le harnais est
+  faux, ou que le codage manque — et cela se tranche en commentaire, pas en recopiant les attentes.
+  Corollaire : l'issue doit suffire à coder ; un codeur qui ne peut pas avancer sans lire le harnais
+  le dit, et l'auditeur précise le besoin.
+- **Le harnais suit l'atomicité.** Exigible sur une tâche qu'une session mène entièrement ; au-dessus,
+  la vérification est celle des sous-tâches. Le harnais global s'écrit quand elles sont vertes. Reste
+  à trancher : vertes, ou fermées (#93).
+- **La part humaine appartient au harnais** (D61) : l'auditeur écrit ce que le codage ne peut pas
+  trancher, le porteur valide. Mais la matière vient du codeur : pour chaque vérification manuelle
+  demandée, il justifie en commentaire ce que ses modifications changent, ce qu'elles ne touchent pas,
+  et ce qui reste à constater de visu. Sans cela, le porteur validerait sur une lecture de la diff.
+  Ce compte rendu est honnête et concis : les écarts pris et ce qu'il n'a pas pu vérifier autant que
+  ce qui marche, et rien d'autre. Il nourrit l'analyse de l'auditeur, ne s'y substitue pas, et ne vaut
+  jamais validation.
+- **La PR ferme son besoin, et rien ne reste en suspens.** La description porte `Close #<numéro>` :
+  la fusion ferme l'issue d'elle-même, personne ne la ferme à la main. Une discussion née en cours de
+  route se range avant la fusion, sans troisième voie : bloquante, ce qu'elle décide entre dans la
+  PR ; non bloquante, elle devient une issue, ouverte avant la fusion. Un fil de PR n'est pas un
+  endroit où une question peut dormir : la PR fermée, plus personne ne la relit.
+- **Conséquence.** Une partie de D61 devient sans objet : l'annulation d'une validation par une
+  analyse réécrite ne peut plus venir du codeur, qui ne touche plus à la description.
+
