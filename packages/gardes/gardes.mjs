@@ -53,6 +53,12 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
  * décisions et la garde n'en sont pas. `docs/gardes.md` y figure depuis l'accord du porteur du
  * 12 septembre : `retraits()` voit une garde retirée du registre, pas une consigne affaiblie.
  */
+/**
+ * La garde elle-même, nommée à part : c'est cette famille-là qui demande en plus de dire ce qui
+ * couvre ce qu'on y change (#89), là où la conformité aux règles primaires (#64) porte sur toutes.
+ */
+export const FAMILLE_GARDE = 'la garde';
+
 export const CHEMINS_DES_REGLES = Object.freeze([
   Object.freeze({ quoi: 'une décision', motifs: Object.freeze(['docs/decisions.md']) }),
   Object.freeze({ quoi: 'les règles des sessions', motifs: Object.freeze(['CLAUDE.md']) }),
@@ -61,7 +67,7 @@ export const CHEMINS_DES_REGLES = Object.freeze([
     motifs: Object.freeze(['docs/description-projet.md', 'docs/invariants.md', 'docs/contraintes.md']),
   }),
   Object.freeze({
-    quoi: 'la garde',
+    quoi: FAMILLE_GARDE,
     motifs: Object.freeze(['packages/gardes/**', 'meta-harnais/**', 'docs/gardes.md', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
   }),
 ]);
@@ -75,6 +81,23 @@ export const CONSIGNE_CONFORMITE =
   "`docs/contraintes.md`, la garde de l'objectif primaire #58) que la règle nouvelle touche, et dire " +
   'pourquoi elle ne les contredit pas. Une contradiction ne se tranche pas dans la PR : elle devient une ' +
   'question dans une issue.';
+
+// ─── Couverture de la garde (#89) ────────────────────────────────────────────────────────────
+// Une fonction neuve dans `gardes.mjs`, sans un seul test ni méta-harnais, laissait tout vert :
+// `VM-regles-primaires` était bien demandée, mais elle pose une autre question — « cette règle
+// nouvelle contredit-elle les règles primaires ? », jamais « cette règle nouvelle est-elle gardée ? ».
+// D'où une seconde clé, de la même forme et hors registre, demandée sans condition dès que la PR
+// touche la garde. Ce qui est gardé, c'est que la question soit posée ; la réponse, elle, se lit.
+
+/** Clé de la vérification de couverture de la garde. Hors registre, comme celle de #64. */
+export const CLE_COUVERTURE = 'VM-garde-couverture';
+
+/** Ce que lira qui valide ; recopié mot pour mot dans la PR, comme toute consigne (#60). */
+export const CONSIGNE_COUVERTURE =
+  'Nommer ce que la PR change dans la garde, et pour chaque changement dire quel harnais le couvre ' +
+  "(`packages/gardes/gardes.test.mjs`, un méta-harnais) ou pourquoi il ne se programme pas. La consigne " +
+  "se proportionne à la PR (D62) : une PR qui n'ajoute qu'un test le dit, et c'est tout. Une garde " +
+  'ne se retire pas pour faire passer une PR ; un développeur humain valide.';
 
 /** Familles de règles que les fichiers modifiés touchent, dans l'ordre de la table. */
 export function reglesTouchees(fichiersModifies = []) {
@@ -93,6 +116,17 @@ function conformiteDemandee(fichiersModifies) {
     pourquoi: `règle nouvelle : ${familles.join(', ')}`,
     description: CONSIGNE_CONFORMITE,
     consigne: CONSIGNE_CONFORMITE,
+  };
+}
+
+/** La vérification de couverture quand la PR touche la garde elle-même (#89), `null` sinon. */
+function couvertureDemandee(fichiersModifies) {
+  if (!reglesTouchees(fichiersModifies).includes(FAMILLE_GARDE)) return null;
+  return {
+    cle: CLE_COUVERTURE,
+    pourquoi: 'la garde est modifiée',
+    description: CONSIGNE_COUVERTURE,
+    consigne: CONSIGNE_COUVERTURE,
   };
 }
 
@@ -711,6 +745,8 @@ function demandes(entrees, entreesAvant, declares, fichiersModifies = []) {
   const requises = new Map();
   const conformite = conformiteDemandee(fichiersModifies);
   if (conformite) requises.set(conformite.cle, conformite); // #64 : en tête, c'est elle qui porte sur la règle
+  const couverture = couvertureDemandee(fichiersModifies);
+  if (couverture) requises.set(couverture.cle, couverture); // #89 : sans condition, dès que la garde change
   for (const id of declares) {
     for (const v of verificationsDe(id, entrees)) {
       if (!requises.has(v.id)) requises.set(v.id, { cle: v.id, pourquoi: v.entree === id ? id : `${id}, par ${v.entree}`, description: v.description, consigne: v.description });

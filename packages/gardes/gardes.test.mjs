@@ -251,6 +251,52 @@ test("la section préparée par « demander » reste rouge tant que l'analyse n'
   assert.match(texte(r.aCorriger), /`VM-C1-appareil` : analyse à écrire/);
 });
 
+// ─── La garde modifiée dit ce qui la couvre (#89) ─────────────────────────────────────────────
+
+/** Une vérification hors registre, recopiée comme `demander` l'écrit (#60, #64, #89). */
+const CONSIGNES_HORS_REGISTRE = { [V.CLE_CONFORMITE]: V.CONSIGNE_CONFORMITE, [V.CLE_COUVERTURE]: V.CONSIGNE_COUVERTURE };
+const horsRegistre = (cle, { analyse = 'Le comportement neuf est couvert par le test « … ».', cochee = false, consigne = CONSIGNES_HORS_REGISTRE[cle] } = {}) =>
+  `- \`${cle}\` · essai — ${consigne}\n  - Analyse (agent, 2026-09-14) : ${analyse}\n  - [${cochee ? 'x' : ' '}] Validée par un développeur humain\n`;
+/** La conformité (#64) est demandée à toutes ces PR : la poser validée pour ne lire que #89. */
+const conformiteValidee = horsRegistre(V.CLE_CONFORMITE, { cochee: true });
+const prGarde = (fichiers, verifications = conformiteValidee) => pr(section('aucun', 'aucun', verifications), fichiers);
+
+test('une PR qui touche la garde se voit demander de dire quel harnais couvre ce qu’elle change', () => {
+  const chemins = ['packages/gardes/gardes.mjs', 'packages/gardes/gardes.test.mjs', 'meta-harnais/amorcage.test.mjs', DOCUMENTS.gardes, '.github/workflows/verifications.yml', DOCUMENTS.modele];
+  for (const fichier of chemins) {
+    assert.match(texte(prGarde([fichier]).aCorriger), /`VM-garde-couverture` \(la garde est modifiée\) est demandée/, fichier);
+  }
+  // Sans condition : y joindre un test ne fait pas disparaître la demande, la consigne se proportionne (D62).
+  assert.match(texte(prGarde(['packages/gardes/gardes.mjs', 'packages/gardes/gardes.test.mjs']).aCorriger), /`VM-garde-couverture` .* est demandée/);
+});
+
+test('la couverture de la garde ne vise pas une PR qui ne la touche pas : sinon elle viserait tout, donc rien', () => {
+  const decision = prGarde(['docs/decisions.md']);
+  assert.deepEqual([decision.aCorriger, decision.enAttente], [[], []]);
+  const rien = pr(section('aucun', 'aucun'), ['README.md']);
+  assert.deepEqual([rien.aCorriger, rien.enAttente], [[], []]);
+});
+
+test('la couverture de la garde reste rouge tant qu’elle n’est pas analysée puis validée par un développeur humain', () => {
+  const nonEcrite = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE, { analyse: 'à écrire', cochee: true }));
+  assert.match(texte(nonEcrite.aCorriger), /`VM-garde-couverture` : analyse à écrire/);
+
+  const attente = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE));
+  assert.deepEqual(attente.aCorriger, []);
+  assert.match(texte(attente.enAttente), /`VM-garde-couverture` : analysée, en attente de validation par un développeur humain/);
+
+  const validee = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE, { cochee: true }));
+  assert.deepEqual([validee.aCorriger, validee.enAttente, validee.validees], [[], [], [V.CLE_CONFORMITE, V.CLE_COUVERTURE]]);
+});
+
+test('la consigne de la couverture se recopie mot pour mot, et « demander » l’écrit', () => {
+  const autre = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE, { consigne: 'Dire si c’est bien gardé.', cochee: true }));
+  assert.match(texte(autre.aCorriger), /`VM-garde-couverture` : la consigne diffère/);
+
+  const preparee = preparerSection({ entrees, fichiersModifies: ['packages/gardes/gardes.mjs'], date: '2026-09-14' });
+  assert.ok(preparee.includes(`- \`${V.CLE_COUVERTURE}\` · la garde est modifiée — ${V.CONSIGNE_COUVERTURE}`), preparee);
+});
+
 // ─── Validations enregistrées, et annulées par une modification postérieure (#61) ─────────────
 
 const TETE = 'a'.repeat(40);
