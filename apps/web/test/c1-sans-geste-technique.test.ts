@@ -91,6 +91,26 @@ export function gestesTechniquesTrouvés(contenu: string): string[] {
   return MOTIFS_GESTE_TECHNIQUE.filter((motif) => motif.test(contenu)).map((motif) => motif.source);
 }
 
+/**
+ * Les documents qu'aucune des deux listes ne range, et ceux qu'elles rangent sans qu'ils existent.
+ * Écrite à part du test pour que le témoin rouge puisse la rejouer sur un jeu inventé.
+ */
+export function documentsMalClassés(documents: string[], classés: string[], existe: (d: string) => boolean): { nonClassés: string[]; disparus: string[] } {
+  const connus = new Set(classés);
+  return { nonClassés: documents.filter((d) => !connus.has(d)), disparus: classés.filter((d) => !existe(d)) };
+}
+
+/** Ce qu'on exige du classement, à part du test pour que le témoin rouge rejoue les mêmes assertions. */
+function vérifierClassement(documents: string[], classés: string[], existe: (d: string) => boolean): void {
+  const { nonClassés, disparus } = documentsMalClassés(documents, classés, existe);
+  expect(
+    nonClassés,
+    'document non classé : le ranger parmi les documents techniques, ou parmi ceux destinés à ' +
+      `l'utilisateur — auquel cas C1 le balaie :\n${nonClassés.join('\n')}`,
+  ).toEqual([]);
+  expect(disparus, `document classé mais introuvable (renommé, supprimé ?) :\n${disparus.join('\n')}`).toEqual([]);
+}
+
 describe('C1 · aucun geste technique dans les textes de l’interface (issue #73)', () => {
   it('aucun fichier de apps/web/src ne porte un des motifs interdits', () => {
     const fautifs: string[] = [];
@@ -102,15 +122,7 @@ describe('C1 · aucun geste technique dans les textes de l’interface (issue #7
   });
 
   it('chaque document du dépôt est classé : technique, ou destiné à l’utilisateur', () => {
-    const classés = new Set([...DOCUMENTS_TECHNIQUES, ...DOCUMENTS_UTILISATEUR]);
-    const nonClassés = documentsDuDépôt().filter((d) => !classés.has(d));
-    expect(
-      nonClassés,
-      'document non classé : le ranger parmi les documents techniques, ou parmi ceux destinés à ' +
-        `l'utilisateur — auquel cas C1 le balaie :\n${nonClassés.join('\n')}`,
-    ).toEqual([]);
-    const disparus = [...classés].filter((d) => !existsSync(join(DÉPÔT, d)));
-    expect(disparus, `document classé mais introuvable (renommé, supprimé ?) :\n${disparus.join('\n')}`).toEqual([]);
+    vérifierClassement(documentsDuDépôt(), [...DOCUMENTS_TECHNIQUES, ...DOCUMENTS_UTILISATEUR], (d) => existsSync(join(DÉPÔT, d)));
   });
 
   it('aucun document destiné à l’utilisateur ne demande un geste technique', () => {
@@ -139,4 +151,12 @@ it.fails('témoin rouge · un texte d’interface qui invite à ouvrir un termin
 it.fails('témoin rouge · un document destiné à l’utilisateur qui fait lancer un serveur', () => {
   const guideFautif = '## Sauvegarder\n\nLancez le serveur avec `pnpm preview`, puis ouvrez http://localhost:4173.';
   expect(gestesTechniquesTrouvés(guideFautif), 'le guide fautif aurait dû être détecté').toEqual([]);
+});
+
+/**
+ * Témoin rouge du classement : les mêmes assertions rejouées sur un dépôt inventé où un document
+ * neuf n'est rangé d'aucun côté. Doit échouer ; `it.fails` tient l'échec attendu (#66).
+ */
+it.fails('témoin rouge · un document du dépôt laissé hors de tout classement', () => {
+  vérifierClassement(['docs/guide-utilisateur.md', 'README.md'], ['README.md'], () => true);
 });

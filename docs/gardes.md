@@ -339,13 +339,18 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
 
 Chemins : `apps/web/src/**/*.svelte`
 
-- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — aucun fichier de l'interface
-  (`.svelte` et `.ts` : un message se fabrique aussi dans un module) ne porte, dans son texte, un
-  des motifs concrets d'un geste technique (commande, terminal, adresse locale…).
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « aucun fichier de apps/web/src ne
+  porte un des motifs interdits » : les textes de l'interface, `.svelte` et `.ts` — un message se
+  fabrique aussi dans un module — ne portent aucune des formes concrètes d'un geste technique
+  (commande, terminal, adresse locale…).
   Témoin rouge : « témoin rouge · un texte d’interface qui invite à ouvrir un terminal »
-- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — chaque document du dépôt est
-  classé, technique ou destiné à l'utilisateur, et les seconds passent le même balayage : aucun
-  n'existe aujourd'hui, mais un guide écrit demain ne peut plus échapper à C1 en silence.
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « chaque document du dépôt est
+  classé : technique, ou destiné à l’utilisateur » : un document neuf ne peut pas échapper à C1 en
+  restant hors des deux listes, ni une liste citer un document disparu.
+  Témoin rouge : « témoin rouge · un document du dépôt laissé hors de tout classement »
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « aucun document destiné à
+  l’utilisateur ne demande un geste technique » : les documents rangés du côté utilisateur passent
+  le même balayage que l'interface. Aucun n'existe aujourd'hui, mais un guide écrit demain y tombe.
   Témoin rouge : « témoin rouge · un document destiné à l’utilisateur qui fait lancer un serveur »
 - **Vérification manuelle** · `VM-C1-sans-geste` — Relire les textes que la PR ajoute à
   l'interface et à la documentation destinée à l'utilisateur : installer, mettre à jour,
@@ -358,8 +363,9 @@ Chemins : `apps/web/src/**/*.svelte`
 
 Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/lib/*.ts`
 
-- **Harnais** · `apps/web/test/c2-parcours-sans-camera.test.ts` — aucun fichier de l'interface,
-  hors `Sync.svelte` et `webrtc.ts` (I8), ne fait appel à la caméra ou au QR code.
+- **Harnais** · `apps/web/test/c2-parcours-sans-camera.test.ts` — « aucun fichier essentiel ne fait
+  appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts » : la caméra et le QR code ne
+  servent qu'à la mise en relation directe (I8), jamais dans les cinq usages.
   Témoin rouge : « témoin rouge · un écran essentiel qui dépend de BarcodeDetector »
 - **Vérification manuelle** · `VM-C2-equivalent` — Pour chaque capacité propre à une plateforme
   que la PR utilise (caméra, QR code, installation, partage, fichiers) : suivre le même parcours
