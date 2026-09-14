@@ -58,6 +58,8 @@ une entrée et ne tourne pas dans `pnpm test` (#82, D65).
   registres voit une garde retirée, pas une consigne affaiblie.
   Une PR qui modifie `meta-harnais/**` s'y voit demander la même vérification (#82) : affaiblir un
   méta-harnais, c'est affaiblir la garde par l'autre bout.
+  La garde est jugée par la version que porte la PR (piste 2 de #58) : c'est l'amorçage
+  (`meta-harnais/amorcage.test.mjs`) qui empêche de l'affaiblir en silence.
 - **Une modification de la garde dit ce qui la couvre** (#89). Une PR qui touche la garde
   (`packages/gardes/**`, `meta-harnais/**`, ce document, `.github/workflows/verifications.yml`,
   `.github/pull_request_template.md`) se voit demander `VM-garde-couverture`, sans condition et en
@@ -69,8 +71,6 @@ une entrée et ne tourne pas dans `pnpm test` (#82, D65).
   est gardée. Comme celle de #64, elle ne tient pas dans une entrée de ce document et vient de la
   table de chemins de `packages/gardes/gardes.mjs` ; la consigne se proportionne à la PR (D62), une
   PR qui n'ajoute qu'un test le dit, et c'est tout.
-  La garde est jugée par la version que porte la PR (piste 2 de #58) : c'est l'amorçage
-  (`meta-harnais/amorcage.test.mjs`) qui empêche de l'affaiblir en silence.
 - **Ce qui vient du porteur ne change qu'à sa demande** (#64). Une PR qui modifie
   [`description-projet.md`](description-projet.md) — son texte, mot pour mot, qui fait foi — ou
   [`invariants.md`](invariants.md) porte dans sa section une ligne « Accord du porteur : … », paragraphe à part,
