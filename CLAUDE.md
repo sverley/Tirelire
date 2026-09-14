@@ -27,6 +27,23 @@
 ## Méthode de travail
 
 - **L'issue définit le besoin, la PR définit la solution.**
+- **Deux agents par besoin, et l'auditeur passe en premier (D67).** La confiance envers le codeur
+  n'est pas présumée : un agent écrit le harnais du besoin, un autre code le besoin.
+  - **L'auditeur d'abord.** Il juge si le besoin tient en une tâche ou se décline en sous-tâches,
+    écrit le « Fait quand » de façon vérifiable, code le harnais, ouvre la PR et en rédige la
+    description, ses consignes et les analyses des vérifications manuelles.
+  - **Le codeur ensuite**, dans une PR déjà cadrée, avec un harnais déjà en place : il pousse des
+    commits sur la branche et **ne modifie jamais la PR** — ni sa description, ni ses consignes, ni
+    ses analyses, ni ses cases. Tout ce qu'il a à dire passe par des commentaires : il signale,
+    propose, questionne, et attend que l'auditeur corrige ou que le porteur tranche. Il ne découpe
+    pas le besoin et n'écrit pas l'attendu.
+  - **Un harnais n'est exigible que sur une tâche atomique**, celle qu'une session peut mener
+    entièrement. Une tâche qui a des sous-tâches est vérifiée par les leurs ; son harnais global
+    s'écrit quand elles sont vertes, jamais avant. Un rouge qui dure cesse d'être un signal.
+  - **Si le besoin est une règle**, le codeur code la garde et le harnais de la garde ; l'auditeur
+    code le **méta-harnais** qui juge ce travail (D65).
+  - **L'intervention humaine fait partie du harnais**, ce n'est pas un niveau de plus : c'est la part
+    que le codage ne peut pas trancher. L'auditeur l'écrit, le porteur la valide.
 - **Découpage et fusion (D63).** Un objectif se découpe en sous-issues avant tout codage ; l'issue
   d'objectif ne porte jamais de code elle-même.
   - **Une sous-issue, une PR, une fusion.** Une sous-issue est taillée pour être fusionnable seule ;
@@ -44,7 +61,7 @@
   n'est pas assez clair, poser la question et la consigner dans la discussion de l'issue d'objectif.
   En fin d'objectif, consigner les nouvelles fonctionnalités dans la documentation du dépôt, par une
   PR.
-- **Audit d'une PR.** Partir de l'issue. Si le besoin n'est pas clair ou appelle des questions, les
+- **Audit d'un besoin.** Partir de l'issue. Si le besoin n'est pas clair ou appelle des questions, les
   poser et les consigner dans l'issue. Une fois le besoin explicite, indiquer la branche de travail
   dans le corps de l'issue, puis écrire les harnais qui contrôlent le résultat dans la branche de la
   PR associée. **En audit, ne jamais toucher au code** : seulement la documentation et les harnais.
@@ -57,8 +74,9 @@
   Le harnais qu'un auditeur écrit sur une règle est un **méta-harnais** : il va dans `meta-harnais/`,
   hors du workspace, s'appelle par `pnpm meta`, et ne tourne de lui-même que sur une PR qui touche
   aux règles. Il ne va jamais dans `pnpm test`.
-- **Codage d'une PR.** Les questions de développement et les décisions techniques se consignent en
-  commentaires dans la discussion de la PR.
+- **Codage d'un besoin.** Le harnais est déjà là et rouge ; le travail consiste à le faire passer
+  au vert sans le modifier. Les questions de développement et les décisions techniques se consignent
+  en commentaires dans la discussion de la PR, jamais dans sa description.
 - **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
   répertoire de travail (voir #22).
 - **Sessions Claude Chat.** Regrouper les commandes en peu d'appels d'outils, pour ne pas atteindre

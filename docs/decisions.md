@@ -1357,3 +1357,34 @@ de `CLAUDE.md`, et une vérification qui vise tout ne vise rien.
 Ce qui est gardé, c'est que la question soit posée et que la PR reste rouge tant qu'elle n'est pas
 analysée puis validée (`gardes.test.mjs`) ; la réponse, elle, se lit — la proportion de l'analyse ne
 se programme pas (D62).
+
+## D67 · 2026-09-14 · Deux agents par besoin : l'auditeur écrit le harnais et la PR, le codeur ne fait que coder
+
+Le porteur, en discussion le 14 septembre :
+
+> je ne fais pas confiance au codeur. Aussi, quand un besoin est défini (que ce soit une règle ou une
+> fonctionnalité), je veux un agent qui code le harnais du besoin pour vérifier que le codeur va bien
+> répondre au besoin et un agent qui code le besoin.
+
+> c'est l'auditeur qui ouvre une PR. C'est donc l'auditeur d'un besoin qui évalue si le besoin doit se
+> décliner en une ou plusieurs taches. Le codeur ne fait que coder le besoin dont le harnais est déjà
+> en place
+
+> le codeur ne doit pas modifier une PR. Mais il peut mettre des commentaires
+
+> un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches,
+> on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
+
+- **L'ordre.** Auditeur, puis codeur. Le découpage en sous-tâches, le « Fait quand » vérifiable, le
+  harnais et la PR sont de l'auditeur. Le codeur reçoit une PR cadrée et un harnais rouge.
+- **La PR appartient à l'auditeur.** Le codeur n'en modifie ni la description, ni les consignes, ni
+  les analyses, ni les cases ; il pousse des commits et commente. Un codeur qui pourrait réécrire
+  l'attendu l'alignerait, sans même le vouloir, sur ce qu'il a produit.
+- **Le harnais suit l'atomicité.** Exigible sur une tâche qu'une session mène entièrement ; au-dessus,
+  la vérification est celle des sous-tâches. Le harnais global s'écrit quand elles sont vertes. Reste
+  à trancher : vertes, ou fermées (#91).
+- **La part humaine appartient au harnais** (D61) : l'auditeur écrit ce que le codage ne peut pas
+  trancher, le porteur valide.
+- **Conséquence.** Une partie de D61 devient sans objet : l'annulation d'une validation par une
+  analyse réécrite ne peut plus venir du codeur, qui ne touche plus à la description.
+
