@@ -257,20 +257,15 @@ function verifierCheminsCouvrentLeBalayage(id, texteDuRegistre, balayes) {
 }
 
 /**
- * Rouge au 14 septembre 2026, d'où le `todo` : `Chemins` de C1 tient sur deux lignes depuis
- * `7c974a3`, et `lireRegistre` ne lit que la première — `apps/web/vite.config.ts`, écrit au
- * registre, n'est jamais lu. Le `todo` se retire dès que les quatre motifs de C1 sont lus, que ce
- * soit en réécrivant `Chemins` sur une seule ligne ou en apprenant à la garde à prolonger la ligne.
- * I11 est dans le même cas, mais hors de #73 : son entrée ne vient pas de cette PR.
+ * Rouge au 14 septembre 2026 : `Chemins` de C1 tenait sur deux lignes depuis `7c974a3`, et
+ * `lireRegistre` ne lisait que la première — `apps/web/vite.config.ts`, écrit au registre, n'était
+ * jamais lu. Vert depuis `5a2ea94`, qui apprend à la garde à prolonger la ligne ; le `todo` qui
+ * portait cette dette est retiré le même jour, sans quoi ce test passerait sans plus rien dire.
  */
-test(
-  '#73 · les Chemins de C1 et C2 couvrent chaque fichier que leur harnais balaie',
-  { todo: 'rouge tant que `apps/web/vite.config.ts`, écrit au registre sur la seconde ligne de Chemins, n’est pas lu par la garde' },
-  () => {
-    const tous = fichiersDuDepot();
-    for (const id of Object.keys(BALAYES)) verifierCheminsCouvrentLeBalayage(id, registre(), BALAYES[id](tous));
-  },
-);
+test('#73 · les Chemins de C1 et C2 couvrent chaque fichier que leur harnais balaie', () => {
+  const tous = fichiersDuDepot();
+  for (const id of Object.keys(BALAYES)) verifierCheminsCouvrentLeBalayage(id, registre(), BALAYES[id](tous));
+});
 
 const C1_UNE_SEULE_LIGNE =
   "## C1 · Aucun geste technique pour l'utilisateur\n\nChemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`, `apps/web/index.html`, `apps/web/vite.config.ts`\n\n- **Vérification manuelle** · `VM-C1-sans-geste` — une consigne assez longue pour être acceptée par la lecture du registre.\n";
