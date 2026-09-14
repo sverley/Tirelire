@@ -344,20 +344,12 @@ Chemins : `apps/web/src/**/*.svelte`
   fabrique aussi dans un module — ne portent aucune des formes concrètes d'un geste technique
   (commande, terminal, adresse locale…).
   Témoin rouge : « témoin rouge · un texte d’interface qui invite à ouvrir un terminal »
-- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « chaque document du dépôt est
-  classé : technique, ou destiné à l’utilisateur » : un document neuf ne peut pas échapper à C1 en
-  restant hors des deux listes, ni une liste citer un document disparu.
-  Témoin rouge : « témoin rouge · un document du dépôt laissé hors de tout classement »
-- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « aucun document destiné à
-  l’utilisateur ne demande un geste technique » : les documents rangés du côté utilisateur passent
-  le même balayage que l'interface. Aucun n'existe aujourd'hui, mais un guide écrit demain y tombe.
-  Témoin rouge : « témoin rouge · un document destiné à l’utilisateur qui fait lancer un serveur »
 - **Vérification manuelle** · `VM-C1-sans-geste` — Relire les textes que la PR ajoute à
   l'interface et à la documentation destinée à l'utilisateur : installer, mettre à jour,
   sauvegarder et synchroniser ne demandent ni commande, ni serveur à lancer, ni réglage réseau, ni
   adresse technique, sauf en voie avancée à côté d'une voie simple. Le harnais ci-dessus n'attrape
-  que des motifs concrets ; l'esprit de C1 (une voie avancée tolérée, jamais seule) reste à la
-  revue.
+  que des motifs concrets, et ne lit que le code de l'interface : la documentation destinée à
+  l'utilisateur et l'esprit de C1 (une voie avancée tolérée, jamais seule) restent à la revue.
 
 ## C2 · L'essentiel ne dépend d'aucune capacité propre à une plateforme
 
