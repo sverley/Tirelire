@@ -60,7 +60,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { RACINE, analyserTests, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
+import { RACINE, analyserTests, fichiersDuDepot, globVersRegex, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
 
 const REGISTRE = 'docs/gardes.md';
 const RELIRE = "le harnais d'audit de #73 est à relire";
@@ -222,4 +222,64 @@ test('#73 · témoin rouge — une analyse réduite à du remplissage, sans renv
 test('#73 · témoin rouge — une entrée réduite à sa seule vérification manuelle fait échouer la règle 3', () => {
   const nue = "## C7 · Hors magasin, les systèmes alertent ou bloquent\n\n- **Vérification manuelle** · `VM-C7-installation` — à la main.\n";
   assert.throws(() => verifierAnalyseEcrite('C7', nue), /n'a pas d'analyse écrite/);
+});
+
+// ─── Règle 4 · les `Chemins` couvrent ce que le harnais balaie ───────────────────────────────
+
+/**
+ * Ce que chaque harnais balaie réellement, au 14 septembre 2026. Une entrée du registre annonce sous
+ * `Chemins` un **plancher** : modifier un fichier qui y répond impose de déclarer l'entrée, donc de
+ * demander sa vérification manuelle. Si le harnais lit un fichier que le plancher ignore, une PR
+ * peut toucher ce que C1 ou C2 garde sans que personne ait à relire quoi que ce soit — et le
+ * registre affirme le contraire de ce qu'il fait.
+ *
+ * La couverture ne peut pas le voir : elle refuse un motif qui ne désigne aucun fichier, jamais un
+ * fichier qu'aucun motif ne désigne. C'est un silence, pas une alerte, et c'est pour cela que cette
+ * vérification est ici.
+ */
+const BALAYES = Object.freeze({
+  C1: (tous) => [...tous.filter((f) => f.startsWith('apps/web/src/') && /\.(svelte|ts)$/.test(f)), 'apps/web/index.html', 'apps/web/vite.config.ts'],
+  C2: (tous) => tous.filter((f) => f.startsWith('apps/web/src/') && /\.(svelte|ts)$/.test(f)),
+});
+
+/** Chaque fichier balayé par le harnais de `id` répond à l'un des motifs `Chemins`, tels que la garde les lit. */
+function verifierCheminsCouvrentLeBalayage(id, texteDuRegistre, balayes) {
+  const entree = lireRegistre(texteDuRegistre).entrees.get(id);
+  if (!entree) assert.fail(`${id} n'a pas d'entrée dans ${REGISTRE} : ${RELIRE}`);
+  const motifs = entree.chemins.map(globVersRegex);
+  const oublies = balayes.filter((f) => !motifs.some((re) => re.test(f)));
+  assert.deepEqual(
+    oublies,
+    [],
+    `${id} : le harnais balaie des fichiers qu'aucun motif \`Chemins\` ne désigne — les modifier ne demanderait ` +
+      `aucune vérification manuelle, alors que le registre dit le contraire :\n${oublies.join('\n')}`,
+  );
+}
+
+/**
+ * Rouge au 14 septembre 2026, d'où le `todo` : `Chemins` de C1 tient sur deux lignes depuis
+ * `7c974a3`, et `lireRegistre` ne lit que la première — `apps/web/vite.config.ts`, écrit au
+ * registre, n'est jamais lu. Le `todo` se retire dès que les quatre motifs de C1 sont lus, que ce
+ * soit en réécrivant `Chemins` sur une seule ligne ou en apprenant à la garde à prolonger la ligne.
+ * I11 est dans le même cas, mais hors de #73 : son entrée ne vient pas de cette PR.
+ */
+test(
+  '#73 · les Chemins de C1 et C2 couvrent chaque fichier que leur harnais balaie',
+  { todo: 'rouge tant que `apps/web/vite.config.ts`, écrit au registre sur la seconde ligne de Chemins, n’est pas lu par la garde' },
+  () => {
+    const tous = fichiersDuDepot();
+    for (const id of Object.keys(BALAYES)) verifierCheminsCouvrentLeBalayage(id, registre(), BALAYES[id](tous));
+  },
+);
+
+const C1_UNE_SEULE_LIGNE =
+  "## C1 · Aucun geste technique pour l'utilisateur\n\nChemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`, `apps/web/index.html`, `apps/web/vite.config.ts`\n\n- **Vérification manuelle** · `VM-C1-sans-geste` — une consigne assez longue pour être acceptée par la lecture du registre.\n";
+
+test('#73 · témoin vert — des Chemins qui couvrent tout le balayage sont acceptés', () => {
+  verifierCheminsCouvrentLeBalayage('C1', C1_UNE_SEULE_LIGNE, ['apps/web/src/main.ts', 'apps/web/src/views/Plan.svelte', 'apps/web/index.html', 'apps/web/vite.config.ts']);
+});
+
+test('#73 · témoin rouge — un fichier balayé qu’aucun motif ne désigne fait échouer la règle 4', () => {
+  const sansManifeste = C1_UNE_SEULE_LIGNE.replace(', `apps/web/vite.config.ts`', '');
+  assert.throws(() => verifierCheminsCouvrentLeBalayage('C1', sansManifeste, ['apps/web/index.html', 'apps/web/vite.config.ts']), /qu'aucun motif `Chemins` ne désigne/);
 });
