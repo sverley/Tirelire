@@ -246,6 +246,14 @@ export function lireIdentifiants(invariants, contraintes) {
 // ─── Registre ────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Une ligne qui prolonge « Chemins » : rien que des chemins entre accents graves et des virgules.
+ * Tout le reste — une phrase, une étiquette, une ligne vide — ferme la liste.
+ */
+function suiteDeChemins(ligne) {
+  return /^\s*`[^`]+`(\s*,\s*`[^`]+`)*\s*,?\s*$/.test(ligne);
+}
+
+/**
  * Lit `docs/gardes.md`. Une entrée commence à un titre dont le texte commence par un identifiant
  * (`## I7 · …`, `### U1 · …`) et finit au titre suivant ; un titre sans identifiant ne porte rien.
  */
@@ -254,6 +262,7 @@ export function lireRegistre(texte) {
   const problemes = [];
   let entree = null;
   let suite = null; // élément qu'une ligne indentée prolonge
+  let cheminsEnCours = null; // entrée dont la ligne « Chemins » se prolonge en dessous
   String(texte)
     .replace(/\r\n?/g, '\n')
     .split('\n')
@@ -281,8 +290,18 @@ export function lireRegistre(texte) {
       if (chemins) {
         entree.chemins.push(...entreGraves(chemins[1]));
         suite = null;
+        cheminsEnCours = entree;
         return;
       }
+      // Une liste de chemins trop longue pour une ligne se prolonge en dessous : la ligne suivante
+      // ne porte alors que des chemins entre accents graves et des virgules. La lire évite qu'un
+      // chemin écrit au registre soit ignoré en silence, et le plancher de l'entrée s'en trouve
+      // plus étroit que ce qu'elle annonce.
+      if (cheminsEnCours === entree && suiteDeChemins(ligne)) {
+        entree.chemins.push(...entreGraves(ligne));
+        return;
+      }
+      cheminsEnCours = null;
       const element = ligne.match(/^[-*]\s+\*\*([^*]+)\*\*\s*·\s*(.*)$/);
       if (!element) {
         if (/^[-*]\s+\*\*/.test(ligne)) problemes.push(`${ou} · ${entree.id} : une ligne d'entrée s'écrit « - **Étiquette** · … ».`);

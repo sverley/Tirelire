@@ -337,20 +337,39 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
 
 ## C1 · Aucun geste technique pour l'utilisateur
 
+Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`, `apps/web/index.html`,
+`apps/web/vite.config.ts`
+
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « aucun fichier de apps/web/src ne
+  porte un des motifs interdits » : les textes de l'interface, `.svelte` et `.ts` — un message se
+  fabrique aussi dans un module — ne portent aucune des formes concrètes d'un geste technique
+  (commande, terminal, adresse locale…).
+  Témoin rouge : « témoin rouge · un texte d’interface qui invite à ouvrir un terminal »
+- **Harnais** · `apps/web/test/c1-sans-geste-technique.test.ts` — « ni index.html ni le manifeste de
+  vite.config.ts ne portent un des motifs interdits » : le titre de la page, et du manifeste PWA le
+  nom, le nom court et la description — ce que le système écrit sous l'icône — s'affichent sans
+  passer par `src`.
+  Témoin rouge : « témoin rouge · un manifeste dont la description fait ouvrir un terminal »
 - **Vérification manuelle** · `VM-C1-sans-geste` — Relire les textes que la PR ajoute à
   l'interface et à la documentation destinée à l'utilisateur : installer, mettre à jour,
   sauvegarder et synchroniser ne demandent ni commande, ni serveur à lancer, ni réglage réseau, ni
-  adresse technique, sauf en voie avancée à côté d'une voie simple.
+  adresse technique, sauf en voie avancée à côté d'une voie simple. Le harnais ci-dessus n'attrape
+  que des motifs concrets, et ne lit que l'application elle-même — interface, page d'accueil,
+  manifeste : la documentation destinée à l'utilisateur et l'esprit de C1 (une voie avancée
+  tolérée, jamais seule) restent à la revue.
 
 ## C2 · L'essentiel ne dépend d'aucune capacité propre à une plateforme
 
-Chemins : `apps/web/src/lib/platform.ts`, `apps/web/src/views/Sync.svelte`
+Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`
 
+- **Harnais** · `apps/web/test/c2-parcours-sans-camera.test.ts` — « aucun fichier essentiel ne fait
+  appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts » : la caméra et le QR code ne
+  servent qu'à la mise en relation directe (I8), jamais dans les cinq usages.
+  Témoin rouge : « témoin rouge · un écran essentiel qui dépend de BarcodeDetector »
 - **Vérification manuelle** · `VM-C2-equivalent` — Pour chaque capacité propre à une plateforme
   que la PR utilise (caméra, QR code, installation, partage, fichiers) : suivre le même parcours
   sans elle, sur un ordinateur sans caméra ou un navigateur qui ne l'offre pas, et constater qu'il
   aboutit.
-- **À bâtir** · les parcours essentiels sans caméra ni lecture de QR code (#38).
 
 ## C3 · Une application web se sert depuis une adresse sûre
 
@@ -368,6 +387,15 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
 - **À bâtir** · le refus ou le signalement d'un relais en HTTP (besoin #67, harnais #38).
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
+
+Analyse (audit #73, 13 septembre 2026) : la partie de C4 que #42 doit encore construire — demander
+`navigator.storage.persist()` et dire si elle est obtenue — n'existe pas dans le code
+(`apps/web/src/lib/db.ts` ne l'appelle pas). Un harnais ne peut garder un comportement qui n'existe
+pas : coder son témoin rouge demanderait de coder le comportement lui-même, ce qui sort de l'audit
+(#73 ne touche pas au code produit). Le harnais revient donc à #42, qui construit la demande de
+persistance et son harnais dans la même PR ; la ligne « À bâtir » ci-dessous le porte tant que #42
+n'est pas fusionnée, la vérification manuelle gardant la part déjà en place (les données déjà
+écrites survivent).
 
 Chemins : `apps/web/src/lib/db.ts`, `apps/web/vite.config.ts`, `apps/hebergement/assembler.mjs`
 
@@ -394,6 +422,14 @@ Chemins : `apps/web/src/lib/db.ts`, `apps/web/src/views/Settings.svelte`
   pour les autres, sont la réponse à C6.
 
 ## C7 · Hors magasin, les systèmes alertent ou bloquent
+
+Analyse (audit #73, 13 septembre 2026) : ce que C7 garde — l'avertissement ou le blocage qu'un
+système affiche à l'installation d'une application native hors magasin — est un fait de l'appareil
+et du système d'exploitation de qui installe, pas du code du dépôt ; aucun test lancé en CI n'ouvre
+un vrai Android, Windows ou macOS pour constater l'écran qu'ils affichent. C'est pour cela que #38
+la range dans les contraintes gardées « à la revue, quand une cible native est traitée » plutôt que
+par un harnais : la revue reste manuelle tant qu'une cible native n'est pas traitée (#36, #37), et
+le redevient à chaque cible nouvelle.
 
 Chemins : `apps/web/android/**`, `apps/web/capacitor.config.ts`
 

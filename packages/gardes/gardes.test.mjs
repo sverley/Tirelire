@@ -506,3 +506,18 @@ test("l'étape pnpm test de la CI pose TIRELIRE_STRICT, dans son env, celui du j
   assert.equal(V.etapeTestsStricte(''), false);
   assert.equal(V.etapeTestsStricte(lire(V.CI_WORKFLOW)), true);
 });
+
+test('une liste de chemins trop longue pour une ligne se prolonge en dessous, et s’arrête au premier texte', () => {
+  const registre = [
+    '## C9 · Une contrainte aux chemins nombreux',
+    '',
+    'Chemins : `a/un.ts`, `a/deux.ts`,',
+    '`b/**/*.svelte`, `c/trois.html`',
+    'Cette phrase ne prolonge rien : la liste est close.',
+    '',
+    '- **Vérification manuelle** · `VM-C9-relire` — Relire les quatre chemins et constater que la garde les lit tous.',
+  ].join('\n');
+  const { entrees, problemes } = lireRegistre(registre);
+  assert.deepEqual(entrees.get('C9').chemins, ['a/un.ts', 'a/deux.ts', 'b/**/*.svelte', 'c/trois.html']);
+  assert.deepEqual(problemes, []);
+});
