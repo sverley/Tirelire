@@ -1431,8 +1431,9 @@ qu'un terme employé vaut partout ailleurs : issues, PR, code, documentation. Il
 qu'il advient des **paroles conservées** — le texte du porteur gardé mot pour mot dans
 [`description-projet.md`](description-projet.md) et repris en blocs de citation dans ce journal.
 
-L'occasion est venue de #107 et de sa PR #108, qui renommait « méta-harnais » en « amorçage » :
-elle réécrivait au passage deux phrases du porteur à l'intérieur de blocs de citation. La session
+L'occasion est venue de #107 et de sa PR #108, qui a donné aux **amorçages** leur nom d'aujourd'hui
+en retirant celui qu'ils portaient avant : elle réécrivait au passage deux phrases du porteur à
+l'intérieur de blocs de citation. La session
 d'audit proposait de les rétablir mot pour mot, au motif qu'un témoignage n'est pas du vocabulaire.
 Le porteur a tranché l'inverse :
 
