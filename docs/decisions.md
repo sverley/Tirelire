@@ -1468,37 +1468,11 @@ au tri.
 
 ## D70 · 2026-09-15 · Une lecture d'amorçage qui compare à la base ne survit pas à la fusion de sa PR
 
-Besoin #112. Un amorçage est écrit pour juger une PR, et toutes ses lectures n'ont pas la même
-durée de vie. Celles qui **comparent l'arbre d'aujourd'hui à la base de la PR** sont périssables :
-pendant la PR, la base porte l'état d'avant et la comparaison dit ce que le codage a changé ; la PR
-fusionnée, la base devient `main`, et la même lecture compare l'arbre à lui-même — elle ne dit plus
-rien, ou elle échoue faute de retrouver ce qu'elle cherchait.
+Besoin #112. Une lecture d'amorçage qui a besoin de la base de la PR se retire à la fusion : la base
+devenue `main`, elle compare l'arbre à lui-même et ne dit plus rien, ou elle échoue faute de
+retrouver ce qu'elle cherchait. Un retrait dit, en commentaire du fichier ou dans une entrée, ce
+qu'il cesse de vérifier et pourquoi ce n'est plus utile.
 
-Constaté sur `main` : l'amorçage de #107 (`amorcage/renommage-en-amorcage.test.mjs`) rougissait deux
-fois sous `TIRELIRE_STRICT`, celui de #109 (`amorcage/paroles-conservees.test.mjs`) neuf fois dans
-les deux modes. La CI pose `TIRELIRE_STRICT` : l'atelier des amorçages était donc rouge sur toute PR
-qui touche aux règles, sans qu'elle y soit pour rien. Un rouge qui dure cesse d'être un signal (D62).
-
-- **La règle.** Une lecture qui a besoin de la base de la PR vaut pendant la PR et se retire à la
-  fusion. Une lecture qui se juge sur l'arbre seul est permanente et reste. Écrire un amorçage, c'est
-  trancher lecture par lecture de quel genre elle est ; fusionner, c'est faire le ménage des
-  premières.
-- **Un retrait se dit.** Retirer une lecture oblige à nommer, en commentaire du fichier ou dans une
-  entrée de ce journal, ce qui n'est plus vérifié et pourquoi ce n'est plus utile. Une garde retirée
-  en silence ne se distingue pas d'une garde oubliée.
-- **Ce qui a changé ici**, en trois gestes distincts. **Retiré** : « les amorçages gardent leurs
-  titres, aux mots renommés près » (#107) et « rien d'autre ne change », qui lisait le diff de la
-  branche (#109). **Allégé** : « le dossier des amorçages est en place » (#107) perd sa comparaison
-  des fichiers à la base et garde ce qui se constate sur l'arbre. **Remplacé** : la recherche de
-  l'entrée « nouvelle » de #109 par différence avec la base s'ancre désormais sur le rang D69, qui ne
-  bougera plus. Dans les trois cas, ce qui disparaît constatait le déroulement d'un codage fusionné
-  et relu, dont le diff est figé dans l'historique ; cela ne protégeait plus rien de ce qui peut
-  encore arriver.
-- **Ce qui reste.** Le balayage du terme retiré par #107, qui n'a pas besoin d'historique et vaut
-  pour toujours ; la place du dossier, du script, du workflow, des motifs de la garde, des tests de
-  besoins produit ; et ce que dit l'entrée de #109, lu sur l'entrée elle-même. Au 15 septembre 2026,
-  et c'est un constat et non une interdiction, plus aucun amorçage fusionné ne compare à un autre
-  commit : sur `main`, `TIRELIRE_STRICT` et le mode ordinaire rendent donc le même verdict.
-- **Ce que cela n'interdit pas.** Un amorçage a le droit de comparer à la base **pendant** la PR
-  qu'il juge : c'est souvent la seule façon de constater qu'un codage n'a pas débordé de son besoin.
-  Ce qui est proscrit, c'est de laisser cette lecture derrière soi.
+Comparer à la base **pendant** la PR qu'on juge reste légitime : c'est souvent la seule façon de
+constater qu'un codage n'a pas débordé de son besoin. Ce qui est proscrit, c'est de laisser cette
+lecture derrière soi.

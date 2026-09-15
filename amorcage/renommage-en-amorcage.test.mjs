@@ -10,10 +10,12 @@
  *   2. ce qui déclenchait quoi déclenche toujours la même chose : script, workflow, motifs de la
  *      garde, crochet de pré-commit, workspace pnpm — et le dossier renommé est à sa place.
  *
- * Allégé par #112, le 15 septembre 2026, des lectures qui comparaient à la base de la PR :
- * « le dossier des amorçages est en place » perd sa comparaison des fichiers à la base et garde ce
- * qui se constate sur l'arbre ; la comparaison des titres de test disparaît, avec ses aides et son
- * témoin. Ce qu'elles vérifiaient, et pourquoi ce n'est plus utile : D70.
+ * Allégé par #112 des lectures qui comparaient à la base de la PR (D70) : « le dossier des amorçages
+ * est en place » perd sa comparaison des fichiers à la base et garde ce qui se constate sur l'arbre ;
+ * la comparaison des titres de test disparaît, avec ses aides et son témoin. Elles vérifiaient
+ * qu'aucun amorçage n'ait été perdu, ajouté ou renommé pendant #107, et qu'aucune assertion n'ait
+ * bougé au passage. Ce n'est plus utile : #107 est fusionné et relu, son diff est figé dans
+ * l'historique, et une perte d'amorçage postérieure relève de la PR qui la porterait.
  *
  * Ce fichier est lui-même dans le champ du balayage : il n'écrit donc **jamais l'ancien mot en
  * toutes lettres**, il le compose là où il en a besoin. Une occurrence en clair ici rendrait la

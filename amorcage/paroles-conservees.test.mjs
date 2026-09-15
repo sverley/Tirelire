@@ -24,10 +24,12 @@
  * (`CLAUDE.md`). L'ancrage par le numéro remplace donc l'ancrage par la base, et la lecture garde
  * son sens sans historique.
  *
- * Allégé par #112, le 15 septembre 2026, des lectures qui comparaient à la base de la PR : la
- * lecture de périmètre « rien d'autre ne change » est retirée, et la recherche de l'entrée par
- * différence avec la base est remplacée par l'ancrage sur D69, dit juste au-dessus. Ce qu'elles
- * vérifiaient, et pourquoi ce n'est plus utile : D70.
+ * Allégé par #112 des lectures qui comparaient à la base de la PR (D70) : la lecture de périmètre
+ * « rien d'autre ne change » est retirée, et la recherche de l'entrée par différence avec la base
+ * est remplacée par l'ancrage sur D69, dit juste au-dessus. La première vérifiait que la PR de #109
+ * s'en tienne à l'entrée ; ce n'est plus utile — cette PR est fusionnée et relue, son diff est figé
+ * dans l'historique ; jouée sur `main` elle comparait `main` à lui-même, et ailleurs elle refusait
+ * des changements sans rapport avec #109.
  *
  * Témoins. La lecture qui juge le texte est une fonction pure, `notionsManquantes`, éprouvée sur
  * des textes fabriqués : une entrée qui dit tout doit passer, une entrée à qui manque une notion
