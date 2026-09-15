@@ -1424,3 +1424,39 @@ Le porteur, en discussion le 14 septembre :
 - **Conséquence.** Une partie de D61 devient sans objet : l'annulation d'une validation par une
   analyse réécrite ne peut plus venir du codeur, qui ne touche plus à la description.
 
+## D69 · 2026-09-15 · Le vocabulaire arrêté vaut aussi dans les paroles conservées
+
+Le glossaire ([`glossaire.md`](glossaire.md)), arrêté par le porteur le 14 septembre 2026, pose
+qu'un terme employé vaut partout ailleurs : issues, PR, code, documentation. Il ne disait pas ce
+qu'il advient des **paroles conservées** — le texte du porteur gardé mot pour mot dans
+[`description-projet.md`](description-projet.md) et repris en blocs de citation dans ce journal.
+
+L'occasion est venue de #107 et de sa PR #108, qui renommait « méta-harnais » en « amorçage » :
+elle réécrivait au passage deux phrases du porteur à l'intérieur de blocs de citation. La session
+d'audit proposait de les rétablir mot pour mot, au motif qu'un témoignage n'est pas du vocabulaire.
+Le porteur a tranché l'inverse :
+
+> je préfère amender mes paroles afin de maintenir un glossaire cohérent
+
+- **Ce qui décrit le projet et sa structure suit le terme arrêté, paroles conservées comprises.**
+  Quand un terme du glossaire change, la citation est **amendée** au terme nouveau. Elle ne reste
+  pas au mot d'avant : un texte conservé n'est pas une exception au glossaire, et « partout
+  ailleurs » inclut les paroles du porteur.
+- **Conséquence : le balayage d'un renommage porte sur le dépôt entier**, citations comprises.
+  L'issue de renommage ne réserve aucune zone ; `description-projet.md`, ce journal et tout autre
+  texte conservé entrent dans son périmètre au même titre que le code et les issues.
+- **Une citation ne s'amende que sous couvert de son auteur.** L'amendement silencieux est écarté :
+  l'accord du porteur se demande **à chaque issue de renommage**, et non une fois pour toutes. Cela
+  prolonge D64 : `description-projet.md` ne change qu'à la demande du porteur, ligne « Accord du
+  porteur : … » à l'appui dans la PR.
+- **Une incohérence constatée se remonte dans une issue**, nouvelle ou existante ; elle ne se
+  corrige pas au fil de l'eau, au détour d'une PR qui portait autre chose. Le rattrapage des termes
+  déjà retirés qui subsistent reste à #95.
+- **Rien d'autre ne change avec cette entrée** : elle ne fait aucun renommage et n'ajoute aucun
+  harnais permanent — ni entrée au registre `gardes.md`, ni test dans `pnpm test`.
+
+Ce qui n'entre pas ici. Mesurer cette règle en continu suppose que le glossaire garde **trace des
+termes qu'il a remplacés** : sans cette liste, rien ne dit quoi balayer. Cela relève de #106, où la
+question est posée. Au critère du même #106 — un invariant se mesure et nomme sa source — cette
+règle est un invariant ; le catalogue qui l'accueillerait n'existe pas encore, la promotion se fera
+au tri.
