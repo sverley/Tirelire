@@ -11,7 +11,7 @@
  *
  *   1. une entrée nouvelle, datée du 15 septembre 2026, porte un numéro libre et un titre ;
  *   2. elle dit la conséquence : le balayage d'un renommage porte sur le dépôt entier, et
- *      la limite : les fils clos et l'historique des commits ne se réécrivent pas ;
+ *      la limite : ce que la garde locale ne lit pas n'est pas balayé ;
  *   3. elle dit que les paroles conservées suivent, amendées et non laissées au mot d'avant ;
  *   4. elle dit la limite tranchée le 15 septembre : une citation ne s'amende que sous couvert de
  *      son auteur, et l'accord se demande à chaque issue de renommage ;
@@ -77,8 +77,8 @@ const NOTIONS = Object.freeze([
     formes: Object.freeze([/d[ée]p[ôo]t\s+(entier|complet)|tout\s+le\s+d[ée]p[ôo]t/i]),
   }),
   Object.freeze({
-    quoi: 'le balayage s\'arrête aux fils clos et à l\'historique',
-    formes: Object.freeze([/clos|ferm[ée]s?\b/i, /historique|commit/i]),
+    quoi: 'le balayage s\'arrête à ce que la garde locale ne lit pas',
+    formes: Object.freeze([/suivis?\s+par\s+git|fichiers?\s+suivis?|garde\s+locale/i, /github|commit/i]),
   }),
   Object.freeze({
     quoi: 'les paroles conservées suivent, amendées',
@@ -212,8 +212,9 @@ const TEMOIN_COMPLET = `## D99 · ${DATE} · Le vocabulaire arrêté vaut aussi 
 
 Quand un terme du glossaire change, le balayage porte sur le dépôt entier : tout ce qui décrit le
 projet et sa structure suit, y compris les paroles conservées. Les citations du porteur sont
-amendées ; elles ne restent pas au mot d'avant. Le balayage s'arrête aux fils clos et à
-l'historique des commits, qui ne se réécrivent pas.
+amendées ; elles ne restent pas au mot d'avant. Le balayage s'arrête à ce que la garde
+locale sait lire, les fichiers suivis par git : les fils GitHub et les messages de commit en sont
+dehors.
 
 Une citation ne s'amende que sous couvert de son auteur : chaque issue de renommage porte l'accord
 explicite du porteur. Une incohérence constatée — un terme retiré qui subsiste — se remonte dans une

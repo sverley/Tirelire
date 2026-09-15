@@ -1443,13 +1443,13 @@ Le porteur a tranché l'inverse :
   Quand un terme du glossaire change, la citation est **amendée** au terme nouveau. Elle ne reste
   pas au mot d'avant : un texte conservé n'est pas une exception au glossaire, et « partout
   ailleurs » inclut les paroles du porteur.
-- **Conséquence : le balayage d'un renommage porte sur le dépôt entier**, citations comprises.
-  `description-projet.md`, ce journal et tout autre texte conservé entrent dans son périmètre au
-  même titre que le code, et les issues et PR ouvertes suivent.
-- **Il s'arrête là où le texte ne se réécrit plus.** Les fils clos et les messages de commit restent
-  au mot d'avant : les amender supposerait de réécrire l'historique, et de retoucher la trace de
-  discussions déjà tranchées. Un terme retiré qui y subsiste n'est donc pas une incohérence à
-  remonter.
+- **Conséquence : le balayage d'un renommage porte sur le dépôt entier**, sans réserve et
+  rétroactivement. L'issue de renommage ne garde aucune zone ; `description-projet.md`, ce journal
+  et tout autre texte conservé entrent dans son périmètre au même titre que le code.
+- **Il s'arrête à ce que la garde locale ne sait pas lire.** Son périmètre, ce sont les fichiers
+  suivis par git : les fils GitHub et les messages de commit en sont dehors, et ne se balaient pas.
+  Le vocabulaire arrêté s'y emploie quand même, mais comme règle de conduite — aucun harnais ne
+  viendra le vérifier, et un terme retiré qui y subsiste n'est pas une incohérence à remonter.
 - **Une citation ne s'amende que sous couvert de son auteur.** L'amendement silencieux est écarté :
   l'accord du porteur se demande **à chaque issue de renommage**, et non une fois pour toutes. Cela
   prolonge D64 : `description-projet.md` ne change qu'à la demande du porteur, ligne « Accord du
