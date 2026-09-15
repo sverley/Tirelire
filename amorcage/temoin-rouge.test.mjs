@@ -3,7 +3,7 @@
  *
  * #66 étend la couverture de #59 : un harnais du registre ne cite plus seulement un test vert
  * (optionnel), il cite aussi son témoin rouge — ou porte « à faire » avec l'issue qui le doit. Ce
- * fichier montre, comme `amorcage.test.mjs` pour #59 à #61 : la couverture qui refuse un harnais
+ * fichier montre, comme `livraison-de-la-garde.test.mjs` pour #59 à #61 : la couverture qui refuse un harnais
  * sans témoin rouge ni dette, celle qui refuse un témoin rouge cité qui n'existe pas ou ne tourne
  * pas, celle qui accepte la dette « à bâtir (#N) », et enfin — hors couverture, dans l'outil de
  * test lui-même — qu'un témoin rouge qui se met à passer fait échouer `pnpm test`, en le nommant.

@@ -1,9 +1,9 @@
 /**
- * Méta-harnais d'audit de #91, écrit par la session d'audit du 14 septembre 2026.
+ * Amorçages d'audit de #91, écrit par la session d'audit du 14 septembre 2026.
  *
  * #91 est un besoin de règle, et sa livraison est un texte : l'ordre des deux agents, ce qui
  * appartient à chacun, ce que le codeur ne peut pas faire, l'atomicité du harnais, la part humaine.
- * Rien là-dedans ne garde un comportement du produit — c'est le cas d'un méta-harnais (D65) : il
+ * Rien là-dedans ne garde un comportement du produit — c'est le cas d'un amorçage (D65) : il
  * constate une livraison, il ne mord pas sur le code. Ce qui se vérifie, c'est que la règle soit
  * écrite **là où les sessions la lisent** (`CLAUDE.md`), qu'une décision la consigne **avec les mots
  * du porteur**, et que ce qu'elle rend sans objet soit signalé.
@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLAUDE = 'CLAUDE.md';
 const DECISIONS = 'docs/decisions.md';
-const RELIRE = "le méta-harnais d'audit de #91 est à relire";
+const RELIRE = "l'amorçage d'audit de #91 est à relire";
 const STRICT = Boolean(process.env.TIRELIRE_STRICT);
 
 /** Les documents tels qu'ils étaient avant D68 : fusion de #90 sur `main`, le 14 septembre 2026. */

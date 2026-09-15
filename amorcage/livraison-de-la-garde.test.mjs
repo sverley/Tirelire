@@ -38,7 +38,7 @@ function consigneDu(cle, racine = DEPOT) {
 const teteVm = (cle) => `- \`${cle}\` · essai${consigneDu(cle) ? ` — ${consigneDu(cle)}` : ''}`;
 
 const CLI = 'packages/gardes/cli.mjs';
-const CE_HARNAIS = 'meta-harnais/amorcage.test.mjs';
+const CE_HARNAIS = 'amorcage/livraison-de-la-garde.test.mjs';
 const REGISTRE = 'docs/gardes.md';
 const INVARIANTS = 'docs/invariants.md';
 const CONTRAINTES = 'docs/contraintes.md';

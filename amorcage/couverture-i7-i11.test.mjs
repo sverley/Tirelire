@@ -9,7 +9,7 @@
  * La couverture générale (#59, #66, #69) accepte déjà qu'une entrée soit gardée par une simple
  * vérification manuelle : rien ne l'oblige à devenir un harnais automatisé. Un retrait silencieux
  * des deux harnais de #72 — retour à la seule vérification manuelle d'avant — resterait donc
- * invisible pour `pnpm meta`. Ce fichier verrouille spécifiquement ce que #72 a promis :
+ * invisible pour `pnpm amorcage`. Ce fichier verrouille spécifiquement ce que #72 a promis :
  *
  * 1. I7 cite au moins deux harnais sur `apps/web/test/donnees-locales.test.ts` (parcours sans
  *    synchronisation ; relais chiffré après accord explicite), chacun avec un témoin rouge nommé,

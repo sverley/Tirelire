@@ -262,7 +262,7 @@ const conformiteValidee = horsRegistre(V.CLE_CONFORMITE, { cochee: true });
 const prGarde = (fichiers, verifications = conformiteValidee) => pr(section('aucun', 'aucun', verifications), fichiers);
 
 test('une PR qui touche la garde se voit demander de dire quel harnais couvre ce qu’elle change', () => {
-  const chemins = ['packages/gardes/gardes.mjs', 'packages/gardes/gardes.test.mjs', 'meta-harnais/amorcage.test.mjs', DOCUMENTS.gardes, '.github/workflows/verifications.yml', DOCUMENTS.modele];
+  const chemins = ['packages/gardes/gardes.mjs', 'packages/gardes/gardes.test.mjs', 'amorcage/livraison-de-la-garde.test.mjs', DOCUMENTS.gardes, '.github/workflows/verifications.yml', DOCUMENTS.modele];
   for (const fichier of chemins) {
     assert.match(texte(prGarde([fichier]).aCorriger), /`VM-garde-couverture` \(la garde est modifiée\) est demandée/, fichier);
   }

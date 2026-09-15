@@ -1222,7 +1222,7 @@ ne tournait jamais en CI.
 
 - **Critère.** Une garde protège des erreurs plausibles par accident, pas des contournements : un
   test mis en commentaire pour tromper la garde se voit dans le diff, et la relecture l'attrape.
-- **Budget.** Le crochet de pré-commit tient en moins de 20 s — relevé à 30 s par D66. Les méta-harnais (D65)
+- **Budget.** Le crochet de pré-commit tient en moins de 20 s — relevé à 30 s par D66. Les amorçages (D65)
   tournent en CI, pas au commit ; la couverture reste dans `pnpm test`.
 - **Audit.** Il contrôle les « Fait quand » et les erreurs plausibles. Une forme exotique ou un
   contournement se note dans la PR, sans devenir un harnais rouge.
@@ -1233,7 +1233,7 @@ ne tournait jamais en CI.
   documentation ne déclenche ni manipulation de l'application ni construction de l'APK.
 - **Retour au produit.** Les harnais « À bâtir » d'U1 à U5 passent avant la robustesse de la garde.
 
-Dans le code : le crochet de pré-commit laisse les méta-harnais à `pnpm meta` (D65) ; la
+Dans le code : le crochet de pré-commit laisse les amorçages à `pnpm amorcage` (D65) ; la
 couverture vérifie que l'étape `pnpm test` de la CI pose `TIRELIRE_STRICT` ; les demandes d'une PR,
 ou les consignes du registre, épargnent les PR qui ne touchent que tests, outillage ou documentation.
 
@@ -1272,7 +1272,7 @@ contrainte, et ni une décision, ni `CLAUDE.md`, ni la garde n'en sont un. D'où
 
 La garde reste jugée par la version que porte la PR (piste 2 de #58, tranché le 11 septembre) :
 retirer cette demande en modifiant la garde reste donc possible, mais c'est une modification de la
-garde, donc une règle nouvelle, et l'amorçage (`meta-harnais/amorcage.test.mjs`) rougit quand la
+garde, donc une règle nouvelle, et l'amorçage (`amorcage/livraison-de-la-garde.test.mjs`) rougit quand la
 garde s'affaiblit. Piste 1 en réserve — faire juger chaque PR par la garde de `main` — si elle est
 contournée.
 
@@ -1284,7 +1284,7 @@ Lien ou citation datée : la garde accepte l'un comme l'autre, elle ne juge pas 
 `demander` la prépare pour une PR qui modifie `docs/description-projet.md` ou `docs/invariants.md`,
 et pour elle seule.
 
-## D65 · 2026-09-12 · Deux questions classent un harnais ; seuls les méta-harnais sortent du jeu courant
+## D65 · 2026-09-12 · Deux questions classent un harnais ; seuls les amorçages sortent du jeu courant
 
 Besoin #82, posé par le porteur : « je ne fais pas confiance au codeur ». Pour chaque besoin, deux
 sessions : l'une code le besoin, l'autre code le harnais qui vérifiera que le codeur y a répondu.
@@ -1295,29 +1295,29 @@ projet) :
 | | Fonctionnalité | Règle |
 |---|---|---|
 | **Codeur** | le produit et ses tests | la garde et `gardes.test.mjs` |
-| **Auditeur** | harnais du besoin | **méta-harnais** |
+| **Auditeur** | harnais du besoin | **amorçage** |
 
-Une seule case sort du jeu courant : **auditeur × règle**, le méta-harnais. Il contrôle le travail du
+Une seule case sort du jeu courant : **auditeur × règle**, l'amorçage. Il contrôle le travail du
 codeur sur une règle ; il n'a rien à dire quand on code une fonctionnalité. Les trois autres gardent
 un comportement qui doit continuer de tenir.
 
-- **Lieu.** Les méta-harnais vivent dans `meta-harnais/`, hors du workspace pnpm : `pnpm test` ne peut
+- **Lieu.** Les amorçages vivent dans `amorcage/`, hors du workspace pnpm : `pnpm test` ne peut
   pas les atteindre, par construction et non par convention. `packages/gardes` garde la règle livrée
   (`gardes.mjs`, `github.mjs`, `alerte.mjs`, `cli.mjs`), le harnais que le codeur en a écrit
   (`gardes.test.mjs`) et les harnais de besoins produit qui n'appartiennent à aucune application
   (`distributions`, `simplicite-acces-gestes`, `usages-de-bout-en-bout`).
 - **Moment.** Les trois cases qui tiennent un comportement tournent au crochet de pré-commit et dans
-  `pnpm test`, donc en CI. Les méta-harnais s'appellent par `pnpm meta`, et tournent d'eux-mêmes sur
-  une PR qui touche aux règles (`.github/workflows/meta-harnais.yml`) : ailleurs, jamais.
+  `pnpm test`, donc en CI. Les amorçages s'appellent par `pnpm amorcage`, et tournent d'eux-mêmes sur
+  une PR qui touche aux règles (`.github/workflows/amorcage.yml`) : ailleurs, jamais.
 - **Vocabulaire.** « Harnais d'audit » reste le mode de travail, « amorçage » la technique de
-  `meta-harnais/amorcage.test.mjs` — écrire depuis le besoin, juger en boîte noire. Ni l'un ni l'autre
+  `amorcage/livraison-de-la-garde.test.mjs` — écrire depuis le besoin, juger en boîte noire. Ni l'un ni l'autre
   ne nomme la case : un audit sur une PR du plan écrit des harnais de produit, qui restent dans
   `pnpm test`.
 - **L'intervention humaine n'est pas un niveau de plus** : c'est la part d'un harnais ou d'un
-  méta-harnais que le codage ne peut pas couvrir. Pour un besoin produit, les `VM-…` du registre ;
+  amorçage que le codage ne peut pas couvrir. Pour un besoin produit, les `VM-…` du registre ;
   pour un besoin de règle, la case « Validée » de la PR.
-- **Une PR qui touche `meta-harnais/**` se voit demander `VM-regles-primaires`** (D64) : affaiblir un
-  méta-harnais, c'est affaiblir la garde par l'autre bout.
+- **Une PR qui touche `amorcage/**` se voit demander `VM-regles-primaires`** (D64) : affaiblir un
+  amorçage, c'est affaiblir la garde par l'autre bout.
 
 ## D66 · 2026-09-13 · Le budget du crochet de pré-commit passe à 30 s
 
@@ -1330,15 +1330,15 @@ protège ne change pas : un crochet qui dépasse le temps d'une session se conto
 contourné ne garde rien. Trente secondes laissent la place aux tests du cœur pour continuer de
 grossir un peu, sans rouvrir la question à chaque PR.
 
-Ce qui reste hors du crochet ne change pas : typecheck complet et build au push, méta-harnais à
-`pnpm meta` (D65), le reste en CI. Si les 30 s sont à leur tour dépassées, la réponse ne sera pas de
+Ce qui reste hors du crochet ne change pas : typecheck complet et build au push, amorçages à
+`pnpm amorcage` (D65), le reste en CI. Si les 30 s sont à leur tour dépassées, la réponse ne sera pas de
 relever encore le seuil : ce sera d'alléger le crochet.
 
 ## D67 · 2026-09-14 · Une modification de la garde dit ce qui la couvre
 
 Besoin #89, tranché par le porteur le 14 septembre : le plus simple suffit. Une fonction neuve
-ajoutée à `packages/gardes/gardes.mjs`, sans un seul test ni méta-harnais, laissait tout vert —
-`pnpm test`, `pnpm meta`, la couverture du registre. `VM-regles-primaires` (D64) était bien demandée
+ajoutée à `packages/gardes/gardes.mjs`, sans un seul test ni amorçage, laissait tout vert —
+`pnpm test`, `pnpm amorcage`, la couverture du registre. `VM-regles-primaires` (D64) était bien demandée
 à cette PR, mais elle pose une autre question : « cette règle nouvelle contredit-elle les règles
 primaires ? », jamais « cette règle nouvelle est-elle gardée ? ».
 
@@ -1378,7 +1378,7 @@ Le porteur, en discussion le 14 septembre :
 > le codeur doit être honnête et concis dans son rapport de modifications nécessitant une validation
 > humaine
 
-> il faut ajouter que le codeur ne doit pas regarder le harnais (ou meta-harnais) pour coder le
+> il faut ajouter que le codeur ne doit pas regarder le harnais (ou amorçage) pour coder le
 > besoin. il doit le faire depuis sa propre interprétation depuis le besoin
 
 > oui, le codeur s'en remet à la CI. il est censé y avoir des hook-precommit et pre-push pour faire
@@ -1399,7 +1399,7 @@ Le porteur, en discussion le 14 septembre :
 - **Le codeur code à l'aveugle du harnais.** Il part de sa lecture du besoin, jamais des attentes du
   harnais : les lire reviendrait à écrire ce qu'il faut pour passer, et le harnais ne vérifierait plus
   que lui-même. Il ne le lance pas non plus : le verdict lui vient des crochets de pré-commit et de
-  pré-push, puis de la CI, et du workflow des méta-harnais pour un besoin de règle. Ce que les
+  pré-push, puis de la CI, et du workflow des amorçages pour un besoin de règle. Ce que les
   crochets ne portent pas, le codeur ne l'apprend qu'à la CI : c'est aux crochets de faire le
   nécessaire, pas au codeur d'aller voir. Deux lectures indépendantes du
   même besoin se confrontent ainsi : un écart signale que le besoin est ambigu, que le harnais est

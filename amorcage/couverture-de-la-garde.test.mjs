@@ -2,7 +2,7 @@
  * Harnais d'audit de #89, écrit par la session d'audit du 14 septembre 2026.
  *
  * #89 ferme une brèche mesurée : une fonction neuve ajoutée à `packages/gardes/gardes.mjs`, sans un
- * seul test ni méta-harnais, laisse tout vert. `VM-regles-primaires` (#64) est bien demandée à cette
+ * seul test ni amorçage, laisse tout vert. `VM-regles-primaires` (#64) est bien demandée à cette
  * PR, mais sa consigne pose une autre question — « cette règle nouvelle contredit-elle les règles
  * primaires ? », jamais « cette règle nouvelle est-elle gardée ? ». Tranché par le porteur le
  * 14 septembre : le plus simple suffit — toute PR qui touche la garde se voit demander, sans
@@ -71,7 +71,7 @@ const CONSIGNE_DE_64 =
 /** Une consigne qui pose bien la question : témoin vert du détecteur. */
 const CONSIGNE_TEMOIN =
   'Nommer ce que la PR change dans la garde, et pour chaque changement dire quel harnais le couvre ' +
-  "(`gardes.test.mjs`, un méta-harnais) ou pourquoi il n'est pas programmable.";
+  "(`gardes.test.mjs`, un amorçage) ou pourquoi il n'est pas programmable.";
 
 // ─── Dépôt copié, garde lancée ───────────────────────────────────────────────────────────────
 
@@ -239,7 +239,7 @@ test('amorçage · la mesure sait voir une demande paraître, puis le rouge deve
 const LA_GARDE = [
   ['le code de la garde', () => ajoutA('packages/gardes/gardes.mjs', commentaireJs)],
   ['le harnais de la garde', () => ajoutA('packages/gardes/gardes.test.mjs', commentaireJs)],
-  ['un méta-harnais', () => ajoutA('meta-harnais/amorcage.test.mjs', commentaireJs)],
+  ['un amorçage', () => ajoutA('amorcage/livraison-de-la-garde.test.mjs', commentaireJs)],
   ['le registre des gardes', () => ajoutA('docs/gardes.md', "<!-- Essai du harnais d'audit de #89. -->")],
   ['la vérification de la garde', () => ajoutA('.github/workflows/verifications.yml', commentaireYaml)],
   ['le modèle de PR', () => ajoutA('.github/pull_request_template.md', "<!-- Essai du harnais d'audit de #89. -->")],

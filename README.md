@@ -21,8 +21,8 @@ Ce que l'objectif 0 doit produire, en attendant que les catalogues existent :
   (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
 - `packages/gardes` — la garde de l'objectif primaire (#58) : chaque invariant et chaque
   contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et chaque PR demande les siennes.
-- `meta-harnais` — les méta-harnais (#82, D65) : ce qu'une session d'audit écrit pour vérifier que le
-  codeur a bien livré une règle du projet. Hors du workspace, joués par `pnpm meta`, jamais par
+- `amorcage` — les amorçages (#82, D65) : ce qu'une session d'audit écrit pour vérifier que le
+  codeur a bien livré une règle du projet. Hors du workspace, joués par `pnpm amorcage`, jamais par
   `pnpm test`.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
