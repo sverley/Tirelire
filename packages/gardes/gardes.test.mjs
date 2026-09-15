@@ -572,7 +572,9 @@ test('une liste de chemins trop longue pour une ligne se prolonge en dessous, et
 
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { cibleDe, estLocal, message } from './sans-sortie.mjs';
+import net from 'node:net';
+import { existsSync } from 'node:fs';
+import { cibleDe, designer, estLocal, message, tentatives, vider } from './sans-sortie.mjs';
 
 const PRECHARGE = pathToFileURL(join(RACINE, V.SANS_SORTIE)).href;
 
@@ -608,6 +610,22 @@ test('#113 : la cible se lit sous toutes les formes de connect, et un path vide 
   assert.deepEqual(cibleDe(['/tmp/prise.sock']), { chemin: '/tmp/prise.sock' });
   assert.deepEqual(cibleDe([{ path: '/tmp/prise.sock' }]), { chemin: '/tmp/prise.sock' });
   assert.match(message([{ hote: 'exemple.com', port: 80 }, { hote: '2001:db8::1', port: 443 }]), /exemple\.com:80, \[2001:db8::1\]:443 \(#113/);
+  assert.equal(designer({ hote: 'exemple.com' }), 'exemple.com');
+  assert.equal(designer({ hote: '[::2]', port: 1 }), '[::2]:1');
+});
+
+test('#113 : dans ce processus même, la connexion sortante est refusée et retenue avant toute résolution, puis oubliée par vider', async () => {
+  const avant = tentatives().length;
+  const erreur = await new Promise((r) => net.connect({ host: 'retenue.invalid', port: 80 }).on('error', r).on('connect', () => r(null)));
+  try {
+    assert.equal(erreur?.code, 'ERR_TIRELIRE_HORS_MACHINE');
+    assert.match(erreur.message, /retenue\.invalid:80/);
+    assert.deepEqual(tentatives().slice(avant), [{ hote: 'retenue.invalid', port: 80 }]);
+  } finally {
+    // Oublier la sonde, sans quoi ce fichier sortirait en échec : c'est la garde qui le veut.
+    vider();
+  }
+  assert.deepEqual(tentatives(), []);
 });
 
 test('#113 : une connexion hors de la machine fait échouer node --test en nommant l’hôte, par fetch comme par node:http, depuis le code testé et erreur avalée', () => {
@@ -654,7 +672,30 @@ test('#113 : témoin — la boucle locale passe sous la même garde, par fetch c
 });
 
 test('#113 : chaque lanceur local du dépôt est branché sur la garde', () => {
+  assert.ok(existsSync(join(RACINE, V.SANS_SORTIE)) && existsSync(join(RACINE, V.SANS_SORTIE_VITEST)));
+  assert.deepEqual(V.paquetsDuWorkspace(), ['packages/core', 'packages/gardes', 'apps/hebergement', 'apps/relay', 'apps/web']);
   assert.deepEqual(V.verifierLanceursLocaux(), []);
+});
+
+test('#113 : sous vitest aussi, une connexion hors de la machine fait échouer le fichier en nommant l’hôte, erreur avalée', () => {
+  const vitest = join(RACINE, 'packages/core/node_modules/.bin/vitest');
+  const dossier = mkdtempSync(join(tmpdir(), 'tirelire-113-vitest-'));
+  try {
+    const setup = JSON.stringify(join(RACINE, V.SANS_SORTIE_VITEST));
+    writeFileSync(join(dossier, 'vitest.config.mjs'), `export default { test: { include: ['*.test.mjs'], setupFiles: [${setup}] } };\n`);
+    writeFileSync(join(dossier, 'sonde.test.mjs'), [
+      "import { test, expect } from 'vitest';",
+      "test('avalé', async () => expect(await fetch('http://vitest-hors-machine.invalid:80/').then(() => 'passé', () => 'avalé')).toBe('avalé'));",
+    ].join('\n'));
+    writeFileSync(join(dossier, 'boucle.test.mjs'), "import { test } from 'vitest';\ntest('rien ne sort', () => {});\n");
+    const r = spawnSync(vitest, ['run', '--root', dossier], { encoding: 'utf8', timeout: 60_000, env: { ...process.env, CI: '1', NO_COLOR: '1' } });
+    const sortie = `${r.stdout}\n${r.stderr}`.replace(/\x1b\[[0-9;]*m/g, '');
+    assert.notEqual(r.status, 0, sortie);
+    assert.match(sortie, /vitest-hors-machine\.invalid:80/);
+    assert.match(sortie, /1 failed \| 1 passed/, 'seul le fichier qui sort échoue');
+  } finally {
+    rmSync(dossier, { recursive: true, force: true });
+  }
 });
 
 test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node --test, vitest, inconnu, ou absent', () => {
