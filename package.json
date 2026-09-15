@@ -5,7 +5,7 @@
   "description": "Comptes de la famille : enveloppes, provisions, plan de virements et rapprochement bancaire.",
   "scripts": {
     "test": "pnpm -r test",
-    "amorcage": "node --test amorcage/*.test.mjs",
+    "amorcage": "node --import ./packages/gardes/sans-sortie.mjs --test amorcage/*.test.mjs",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @tirelire/web dev",
     "typecheck": "pnpm -r typecheck",

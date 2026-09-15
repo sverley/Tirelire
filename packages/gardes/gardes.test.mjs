@@ -567,3 +567,123 @@ test('une liste de chemins trop longue pour une ligne se prolonge en dessous, et
   assert.deepEqual(entrees.get('C9').chemins, ['a/un.ts', 'a/deux.ts', 'b/**/*.svelte', 'c/trois.html']);
   assert.deepEqual(problemes, []);
 });
+
+// ── #113 (D71) : un harnais joué en local ne sort pas de la machine ─────────────────────────────
+
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { cibleDe, estLocal, message } from './sans-sortie.mjs';
+
+const PRECHARGE = pathToFileURL(join(RACINE, V.SANS_SORTIE)).href;
+
+/** Joue `node --test` avec la garde préchargée, dans un dossier jetable garni de `fichiers`. */
+function jouerSousGarde(fichiers) {
+  const dossier = mkdtempSync(join(tmpdir(), 'tirelire-113-'));
+  try {
+    for (const [nom, contenu] of Object.entries(fichiers)) writeFileSync(join(dossier, nom), contenu);
+    // Sans ce retrait, le `node --test` enfant se croit dans celui-ci et ne joue rien.
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, ['--import', PRECHARGE, '--test'], { cwd: dossier, env, encoding: 'utf8', timeout: 30_000 });
+    return { code: r.status, sortie: `${r.stdout}\n${r.stderr}` };
+  } finally {
+    rmSync(dossier, { recursive: true, force: true });
+  }
+}
+
+test('#113 : la boucle locale est la machine, le reste non', () => {
+  for (const h of [undefined, '', 'localhost', 'LOCALHOST.', 'app.localhost', '127.0.0.1', '127.8.0.3', '::1', '[::1]', '::ffff:127.0.0.1', '0.0.0.0', '::']) {
+    assert.equal(estLocal(h), true, String(h));
+  }
+  for (const h of ['exemple.com', 'api.github.com', '10.0.0.1', '192.168.1.2', '128.0.0.1', '::2', 'localhost.exemple.com', '127.0.0.1.nip.io']) {
+    assert.equal(estLocal(h), false, h);
+  }
+});
+
+test('#113 : la cible se lit sous toutes les formes de connect, et un path vide n’est pas un socket de fichier', () => {
+  assert.deepEqual(cibleDe([{ host: 'exemple.com', port: 443 }]), { hote: 'exemple.com', port: 443 });
+  assert.deepEqual(cibleDe([[{ host: 'exemple.com', port: 80, path: null }, () => {}]]), { hote: 'exemple.com', port: 80 });
+  assert.deepEqual(cibleDe([80, 'exemple.com', () => {}]), { hote: 'exemple.com', port: 80 });
+  assert.deepEqual(cibleDe(['8080']), { hote: undefined, port: '8080' });
+  assert.deepEqual(cibleDe(['/tmp/prise.sock']), { chemin: '/tmp/prise.sock' });
+  assert.deepEqual(cibleDe([{ path: '/tmp/prise.sock' }]), { chemin: '/tmp/prise.sock' });
+  assert.match(message([{ hote: 'exemple.com', port: 80 }, { hote: '2001:db8::1', port: 443 }]), /exemple\.com:80, \[2001:db8::1\]:443 \(#113/);
+});
+
+test('#113 : une connexion hors de la machine fait échouer node --test en nommant l’hôte, par fetch comme par node:http, depuis le code testé et erreur avalée', () => {
+  const { code, sortie } = jouerSousGarde({
+    'code.mjs': [
+      "import http from 'node:http';",
+      "export const parFetch = () => fetch('http://hors-machine.invalid:80/').then(() => 'passé', () => 'avalé');",
+      "export const parHttp = () => new Promise((r) => http.get('http://autre-hors-machine.invalid:80/', { agent: false }, (x) => { x.resume(); r('passé'); }).on('error', () => r('avalé')));",
+    ].join('\n'),
+    'sonde.test.mjs': [
+      "import test from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { parFetch, parHttp } from './code.mjs';",
+      "test('fetch avalé', async () => assert.equal(await parFetch(), 'avalé'));",
+      "test('http avalé', async () => assert.equal(await parHttp(), 'avalé'));",
+    ].join('\n'),
+  });
+  assert.notEqual(code, 0, sortie);
+  assert.match(sortie, /# pass 2/, 'les deux tests passent : c’est la garde, pas une assertion, qui fait échouer');
+  assert.match(sortie, /hors-machine\.invalid:80/);
+  assert.match(sortie, /autre-hors-machine\.invalid:80/);
+});
+
+test('#113 : témoin — la boucle locale passe sous la même garde, par fetch comme par node:http', () => {
+  const { code, sortie } = jouerSousGarde({
+    'boucle.test.mjs': [
+      "import test from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import http from 'node:http';",
+      "test('boucle locale', async () => {",
+      "  const serveur = http.createServer((q, r) => r.end('ok')).listen(0, '127.0.0.1');",
+      "  await new Promise((r) => serveur.once('listening', r));",
+      "  const { port } = serveur.address();",
+      "  for (const h of ['127.0.0.1', 'localhost']) assert.equal(await (await fetch(`http://${h}:${port}/`)).text(), 'ok');",
+      "  const recu = await new Promise((r) => http.get(`http://127.0.0.1:${port}/`, { agent: false }, (x) => { let t = ''; x.on('data', (d) => (t += d)); x.on('end', () => r(t)); }));",
+      "  assert.equal(recu, 'ok');",
+      "  serveur.close();",
+      "});",
+    ].join('\n'),
+  });
+  assert.equal(code, 0, sortie);
+  assert.match(sortie, /# pass 1\b/, 'le témoin a bien joué son test');
+  assert.doesNotMatch(sortie, /hors de la machine/);
+});
+
+test('#113 : chaque lanceur local du dépôt est branché sur la garde', () => {
+  assert.deepEqual(V.verifierLanceursLocaux(), []);
+});
+
+test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node --test, vitest, inconnu, ou absent', () => {
+  const racine = mkdtempSync(join(tmpdir(), 'tirelire-113-depot-'));
+  try {
+    const ecrire = (chemin, contenu) => {
+      mkdirSync(dirname(join(racine, chemin)), { recursive: true });
+      writeFileSync(join(racine, chemin), typeof contenu === 'string' ? contenu : JSON.stringify(contenu));
+    };
+    ecrire('pnpm-workspace.yaml', 'packages:\n  - paquets/*\n\nonlyBuiltDependencies:\n  - esbuild\n');
+    ecrire('package.json', { scripts: { amorcage: 'node --import ./packages/gardes/sans-sortie.mjs --test amorcage/*.test.mjs' } });
+    ecrire('paquets/branche/package.json', { name: 'branche', scripts: { test: 'node --import ../../packages/gardes/sans-sortie.mjs --test' } });
+    ecrire('paquets/nu/package.json', { name: 'nu', scripts: { test: 'node --test' } });
+    ecrire('paquets/ailleurs/package.json', { name: 'ailleurs', scripts: { test: 'node --import ./sans-sortie.mjs --test' } });
+    ecrire('paquets/vite-branche/package.json', { name: 'vite-branche', scripts: { test: 'vitest run' } });
+    ecrire('paquets/vite-branche/vitest.config.ts', "export default { test: { setupFiles: ['../../packages/gardes/sans-sortie-vitest.mjs'] } };");
+    ecrire('paquets/vite-commente/package.json', { name: 'vite-commente', scripts: { test: 'vitest run' } });
+    ecrire('paquets/vite-commente/vitest.config.ts', "export default { test: {\n // setupFiles: ['../../packages/gardes/sans-sortie-vitest.mjs'],\n} };");
+    ecrire('paquets/vite-sans-config/package.json', { name: 'vite-sans-config', scripts: { test: 'vitest run' } });
+    ecrire('paquets/jest/package.json', { name: 'jest', scripts: { test: 'jest' } });
+    ecrire('paquets/sans-test/package.json', { name: 'sans-test', scripts: {} });
+    const problemes = V.verifierLanceursLocaux(racine);
+    const noms = problemes.map((p) => /^`([^`]+)`/.exec(p)?.[1]);
+    assert.deepEqual(noms.sort(), ['ailleurs', 'jest', 'nu', 'vite-commente', 'vite-sans-config'], problemes.join('\n'));
+    ecrire('package.json', { scripts: { amorcage: 'node --test amorcage/*.test.mjs' } });
+    assert.ok(V.verifierLanceursLocaux(racine).some((p) => p.startsWith('`pnpm amorcage`')));
+    ecrire('package.json', { scripts: {} });
+    assert.ok(V.verifierLanceursLocaux(racine).some((p) => p.includes('a disparu')));
+  } finally {
+    rmSync(racine, { recursive: true, force: true });
+  }
+});
