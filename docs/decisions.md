@@ -1465,3 +1465,14 @@ termes qu'il a remplacés** : sans cette liste, rien ne dit quoi balayer. Cela r
 question est posée. Au critère du même #106 — un invariant se mesure et nomme sa source — cette
 règle est un invariant ; le catalogue qui l'accueillerait n'existe pas encore, la promotion se fera
 au tri.
+
+## D70 · 2026-09-15 · Une lecture d'amorçage qui compare à la base ne survit pas à la fusion de sa PR
+
+Besoin #112. Une lecture d'amorçage qui a besoin de la base de la PR se retire à la fusion : la base
+devenue `main`, elle compare l'arbre à lui-même et ne dit plus rien, ou elle échoue faute de
+retrouver ce qu'elle cherchait. Un retrait dit, en commentaire du fichier ou dans une entrée, ce
+qu'il cesse de vérifier et pourquoi ce n'est plus utile.
+
+Comparer à la base **pendant** la PR qu'on juge reste légitime : c'est souvent la seule façon de
+constater qu'un codage n'a pas débordé de son besoin. Ce qui est proscrit, c'est de laisser cette
+lecture derrière soi.
