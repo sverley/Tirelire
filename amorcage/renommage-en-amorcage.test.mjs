@@ -10,16 +10,10 @@
  *   2. ce qui déclenchait quoi déclenche toujours la même chose : script, workflow, motifs de la
  *      garde, crochet de pré-commit, workspace pnpm — et le dossier renommé est à sa place.
  *
- * Retiré par #112, le 15 septembre 2026 : les deux lectures qui comparaient à la base de la PR —
- * « le dossier des amorçages contient les mêmes fichiers qu'avant » et « les amorçages gardent
- * leurs titres, aux mots renommés près ». Elles lisaient l'ancien dossier au point de départ de la
- * branche ; #107 fusionné, ce point de départ est `main`, où cet ancien dossier n'existe plus :
- * elles tombaient dans la branche « sans historique », prévue pour un clone court, et rougissaient
- * sous `TIRELIRE_STRICT` sur toute PR de règles. Ce qu'elles ne vérifient plus : qu'aucun amorçage
- * n'ait été perdu, ajouté ou renommé pendant #107, et qu'aucune assertion n'ait bougé au passage.
- * Ce n'est plus utile : le renommage est fusionné et relu, son diff est figé dans l'historique, et
- * une perte d'amorçage postérieure relève de la PR qui la porterait, pas de celle-ci. Ce qui reste
- * n'a pas besoin d'historique et vaut pour toujours (D70).
+ * Allégé par #112, le 15 septembre 2026, des lectures qui comparaient à la base de la PR :
+ * « le dossier des amorçages est en place » perd sa comparaison des fichiers à la base et garde ce
+ * qui se constate sur l'arbre ; la comparaison des titres de test disparaît, avec ses aides et son
+ * témoin. Ce qu'elles vérifiaient, et pourquoi ce n'est plus utile : D70.
  *
  * Ce fichier est lui-même dans le champ du balayage : il n'écrit donc **jamais l'ancien mot en
  * toutes lettres**, il le compose là où il en a besoin. Une occurrence en clair ici rendrait la

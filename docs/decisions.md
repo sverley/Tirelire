@@ -1466,7 +1466,7 @@ question est posée. Au critère du même #106 — un invariant se mesure et nom
 règle est un invariant ; le catalogue qui l'accueillerait n'existe pas encore, la promotion se fera
 au tri.
 
-## D70 · 2026-09-15 · Un amorçage qui compare à la base ne survit pas à la fusion de sa PR
+## D70 · 2026-09-15 · Une lecture d'amorçage qui compare à la base ne survit pas à la fusion de sa PR
 
 Besoin #112. Un amorçage est écrit pour juger une PR, et toutes ses lectures n'ont pas la même
 durée de vie. Celles qui **comparent l'arbre d'aujourd'hui à la base de la PR** sont périssables :
@@ -1486,16 +1486,19 @@ qui touche aux règles, sans qu'elle y soit pour rien. Un rouge qui dure cesse d
 - **Un retrait se dit.** Retirer une lecture oblige à nommer, en commentaire du fichier ou dans une
   entrée de ce journal, ce qui n'est plus vérifié et pourquoi ce n'est plus utile. Une garde retirée
   en silence ne se distingue pas d'une garde oubliée.
-- **Ce qui a été retiré ici.** De l'amorçage de #107 : « le dossier des amorçages contient les mêmes
-  fichiers qu'à la base » et « les amorçages gardent leurs titres, aux mots renommés près ». De celui
-  de #109 : la recherche de l'entrée « nouvelle » par différence avec la base — remplacée par un
-  ancrage sur le rang D69, qui ne bougera plus — et « rien d'autre ne change », qui lisait le diff de
-  la branche. Ces lectures constataient le déroulement d'un codage désormais fusionné et relu, dont
-  le diff est figé dans l'historique ; elles ne protégeaient plus rien de ce qui peut encore arriver.
+- **Ce qui a changé ici**, en trois gestes distincts. **Retiré** : « les amorçages gardent leurs
+  titres, aux mots renommés près » (#107) et « rien d'autre ne change », qui lisait le diff de la
+  branche (#109). **Allégé** : « le dossier des amorçages est en place » (#107) perd sa comparaison
+  des fichiers à la base et garde ce qui se constate sur l'arbre. **Remplacé** : la recherche de
+  l'entrée « nouvelle » de #109 par différence avec la base s'ancre désormais sur le rang D69, qui ne
+  bougera plus. Dans les trois cas, ce qui disparaît constatait le déroulement d'un codage fusionné
+  et relu, dont le diff est figé dans l'historique ; cela ne protégeait plus rien de ce qui peut
+  encore arriver.
 - **Ce qui reste.** Le balayage du terme retiré par #107, qui n'a pas besoin d'historique et vaut
   pour toujours ; la place du dossier, du script, du workflow, des motifs de la garde, des tests de
-  besoins produit ; et ce que dit l'entrée de #109, lu sur l'entrée elle-même. Plus aucun amorçage ne
-  compare à un autre commit : `TIRELIRE_STRICT` et le mode ordinaire rendent le même verdict.
+  besoins produit ; et ce que dit l'entrée de #109, lu sur l'entrée elle-même. Au 15 septembre 2026,
+  et c'est un constat et non une interdiction, plus aucun amorçage fusionné ne compare à un autre
+  commit : sur `main`, `TIRELIRE_STRICT` et le mode ordinaire rendent donc le même verdict.
 - **Ce que cela n'interdit pas.** Un amorçage a le droit de comparer à la base **pendant** la PR
   qu'il juge : c'est souvent la seule façon de constater qu'un codage n'a pas débordé de son besoin.
   Ce qui est proscrit, c'est de laisser cette lecture derrière soi.

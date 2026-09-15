@@ -24,12 +24,10 @@
  * (`CLAUDE.md`). L'ancrage par le numéro remplace donc l'ancrage par la base, et la lecture garde
  * son sens sans historique.
  *
- * Retiré par #112, le 15 septembre 2026, avec la comparaison à la base : « rien d'autre ne change :
- * aucun renommage, aucun harnais permanent nouveau », qui lisait le diff de la branche contre son
- * point de départ. Ce qu'elle ne vérifie plus : que la PR de #109 s'en soit tenue à l'entrée. Ce
- * n'est plus utile — cette PR est fusionnée, relue, et son diff est figé dans l'historique ; jouée
- * sur `main`, la lecture comparait `main` à lui-même et ne disait plus rien, et sur toute autre
- * branche elle refusait des changements qui n'avaient rien à voir avec #109 (D70).
+ * Allégé par #112, le 15 septembre 2026, des lectures qui comparaient à la base de la PR : la
+ * lecture de périmètre « rien d'autre ne change » est retirée, et la recherche de l'entrée par
+ * différence avec la base est remplacée par l'ancrage sur D69, dit juste au-dessus. Ce qu'elles
+ * vérifiaient, et pourquoi ce n'est plus utile : D70.
  *
  * Témoins. La lecture qui juge le texte est une fonction pure, `notionsManquantes`, éprouvée sur
  * des textes fabriqués : une entrée qui dit tout doit passer, une entrée à qui manque une notion
