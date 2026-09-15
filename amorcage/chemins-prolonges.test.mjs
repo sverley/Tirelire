@@ -1,11 +1,11 @@
 /**
- * Méta-harnais de la règle livrée par `5a2ea94` (#73, chantier de #38, objectif primaire #58),
+ * Amorçages de la règle livrée par `5a2ea94` (#73, chantier de #38, objectif primaire #58),
  * écrit par la session d'audit.
  *
  * **Où il vit, et pourquoi ici** (D65). Deux questions classent un harnais : qui l'a écrit, et
  * contre quel besoin. Celui-ci vient d'une session d'audit, et son besoin est une **règle du
  * projet** : `5a2ea94` change la façon dont la garde lit `docs/gardes.md`, en apprenant à `Chemins`
- * à se prolonger sous la ligne. Case auditeur × règle, donc méta-harnais, dans `meta-harnais/` et
+ * à se prolonger sous la ligne. Case auditeur × règle, donc amorçage, dans `amorcage/` et
  * hors de `pnpm test`.
  *
  * Le reste du travail d'audit de #73 est ailleurs — `packages/gardes/contraintes-c1-c2-c4-c7.test.mjs`
@@ -44,7 +44,7 @@ import { test } from 'node:test';
 import { RACINE, lireRegistre } from '../packages/gardes/gardes.mjs';
 
 const REGISTRE = 'docs/gardes.md';
-const RELIRE = 'le méta-harnais de la continuation des `Chemins` est à relire';
+const RELIRE = "l'amorçage de la continuation des `Chemins` est à relire";
 
 const registre = () => readFileSync(join(RACINE, REGISTRE), 'utf8');
 

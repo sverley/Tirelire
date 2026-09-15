@@ -10,7 +10,7 @@ Le vocabulaire employé ici est celui de [`glossaire.md`](glossaire.md), lui-mê
 que la garde emploie ne peuvent pas changer de sens sans qu'elle le voie.
 
 Ce document ne porte que les besoins du produit. Ce qu'une session d'audit écrit pour vérifier la
-livraison d'une règle du projet est un méta-harnais : il vit dans `meta-harnais/`, n'entre pas dans
+livraison d'une règle du projet est un amorçage : il vit dans `amorcage/`, n'entre pas dans
 une entrée et ne tourne pas dans `pnpm test` (#82, D65).
 
 ## Ce qui est vérifié
@@ -59,15 +59,15 @@ une entrée et ne tourne pas dans `pnpm test` (#82, D65).
   garde n'en sont un : elle vient d'une table de chemins tenue dans `packages/gardes/gardes.mjs`.
   Ce document y figure lui aussi (accord du porteur du 12 septembre) : la comparaison des deux
   registres voit une garde retirée, pas une consigne affaiblie.
-  Une PR qui modifie `meta-harnais/**` s'y voit demander la même vérification (#82) : affaiblir un
-  méta-harnais, c'est affaiblir la garde par l'autre bout.
+  Une PR qui modifie `amorcage/**` s'y voit demander la même vérification (#82) : affaiblir un
+  amorçage, c'est affaiblir la garde par l'autre bout.
   La garde est jugée par la version que porte la PR (piste 2 de #58) : c'est l'amorçage
-  (`meta-harnais/amorcage.test.mjs`) qui empêche de l'affaiblir en silence.
+  (`amorcage/livraison-de-la-garde.test.mjs`) qui empêche de l'affaiblir en silence.
 - **Une modification de la garde dit ce qui la couvre** (#89). Une PR qui touche la garde
-  (`packages/gardes/**`, `meta-harnais/**`, ce document, `.github/workflows/verifications.yml`,
+  (`packages/gardes/**`, `amorcage/**`, ce document, `.github/workflows/verifications.yml`,
   `.github/pull_request_template.md`) se voit demander `VM-garde-couverture`, sans condition et en
   plus de `VM-regles-primaires` : l'analyse nomme ce que la PR change dans la garde et, pour chaque
-  changement, le harnais qui le couvre (`packages/gardes/gardes.test.mjs`, un méta-harnais) ou la
+  changement, le harnais qui le couvre (`packages/gardes/gardes.test.mjs`, un amorçage) ou la
   raison pour laquelle il ne se programme pas ; un développeur humain valide. Elle ferme une brèche
   mesurée : une fonction neuve dans `gardes.mjs`, sans un seul test, laissait tout vert, parce que
   `VM-regles-primaires` demande si la règle nouvelle contredit les règles primaires, jamais si elle

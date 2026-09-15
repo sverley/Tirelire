@@ -92,7 +92,7 @@ dans D68 et n'est pas repris ici.
 
 > idem, l'application d'une décision doit être retroactivement. Les harnais de cette nouvelle regle peuvent d'ailleurs créer des voyants rouges sur le code actuel. Ces voyant nécessiteront une issue (ou plusieurs) pour être corrigés au regard de la nouvelle regle. Mais cette regle peut être posée meme si elle crée des voyants rouges
 
-> par contre, pour être fusionnée, la PR de codage de cette regle doit valider ses meta-harnais
+> par contre, pour être fusionnée, la PR de codage de cette regle doit valider ses amorçages
 
 > Et attention, une decision n'est pas "datée dans son intention". Une règle s'applique à tout moment. Si elle change, c'est rétroactif
 

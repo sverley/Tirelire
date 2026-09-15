@@ -46,7 +46,7 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 // primaires. La conformité porte sur le sens et ne se programme pas : elle devient donc une
 // vérification manuelle, demandée par les chemins que la PR modifie, analysée puis validée par un
 // développeur humain avant la fusion. La garde reste jugée par la version que porte la PR (piste 2
-// de #58) ; l'amorçage (`amorcage.test.mjs`) est ce qui empêche de l'affaiblir en silence.
+// de #58) ; l'amorçage (`livraison-de-la-garde.test.mjs`) est ce qui empêche de l'affaiblir en silence.
 
 /**
  * Familles de chemins dont la modification ajoute ou change une règle. Une table à part du registre,
@@ -69,7 +69,7 @@ export const CHEMINS_DES_REGLES = Object.freeze([
   }),
   Object.freeze({
     quoi: FAMILLE_GARDE,
-    motifs: Object.freeze(['packages/gardes/**', 'meta-harnais/**', 'docs/gardes.md', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
+    motifs: Object.freeze(['packages/gardes/**', 'amorcage/**', 'docs/gardes.md', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
   }),
 ]);
 
@@ -84,7 +84,7 @@ export const CONSIGNE_CONFORMITE =
   'question dans une issue.';
 
 // ─── Couverture de la garde (#89) ────────────────────────────────────────────────────────────
-// Une fonction neuve dans `gardes.mjs`, sans un seul test ni méta-harnais, laissait tout vert :
+// Une fonction neuve dans `gardes.mjs`, sans un seul test ni amorçage, laissait tout vert :
 // `VM-regles-primaires` était bien demandée, mais elle pose une autre question — « cette règle
 // nouvelle contredit-elle les règles primaires ? », jamais « cette règle nouvelle est-elle gardée ? ».
 // D'où une seconde clé, de la même forme et hors registre, demandée sans condition dès que la PR
@@ -96,7 +96,7 @@ export const CLE_COUVERTURE = 'VM-garde-couverture';
 /** Ce que lira qui valide ; recopié mot pour mot dans la PR, comme toute consigne (#60). */
 export const CONSIGNE_COUVERTURE =
   'Nommer ce que la PR change dans la garde, et pour chaque changement dire quel harnais le couvre ' +
-  "(`packages/gardes/gardes.test.mjs`, un méta-harnais) ou pourquoi il ne se programme pas. La consigne " +
+  "(`packages/gardes/gardes.test.mjs`, un amorçage) ou pourquoi il ne se programme pas. La consigne " +
   "se proportionne à la PR (D62) : une PR qui n'ajoute qu'un test le dit, et c'est tout. Une garde " +
   'ne se retire pas pour faire passer une PR ; un développeur humain valide.';
 

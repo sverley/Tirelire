@@ -8,9 +8,9 @@
  * auditeur × fonctionnalité, donc : un harnais du besoin, qui tient un comportement devant
  * continuer de tenir, et qui tourne dans `pnpm test`. Il rejoint ses deux frères de #38, écrits par
  * les sessions d'audit de #70 et #71 (`usages-de-bout-en-bout`, `simplicite-acces-gestes`), et non
- * `meta-harnais/`, réservé à la seule case auditeur × règle.
+ * `amorcage/`, réservé à la seule case auditeur × règle.
  *
- * Il a d'abord été écrit dans `meta-harnais/`, par un classement fait sur son objet — il lit le
+ * Il a d'abord été écrit dans `amorcage/`, par un classement fait sur son objet — il lit le
  * registre, le registre appartient à la garde, donc une règle. C'est précisément ce que D65 écarte :
  * le classement vient de qui écrit et contre quel besoin, jamais de ce que le fichier regarde.
  *
@@ -70,7 +70,7 @@ const registre = () => lire(REGISTRE);
 
 /**
  * Ce que #73 a promis, entrée par entrée : les tests que le registre doit nommer. Les garder ici en
- * toutes lettres est le but même d'un méta-harnais — le registre peut évoluer, ces garanties-là ne
+ * toutes lettres est le but même d'un amorçage — le registre peut évoluer, ces garanties-là ne
  * se retirent pas sans que cette liste le dise.
  */
 const PROMESSES = Object.freeze({

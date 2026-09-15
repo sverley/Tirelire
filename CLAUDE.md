@@ -20,7 +20,7 @@
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font l'essentiel :
   typecheck et tests du cœur, puis tests de la garde, au commit (moins de 30 s, D66) ;
   typecheck complet et build au push. La CI joue tout ce qui garde un comportement ; les
-  méta-harnais s'appellent par `pnpm meta` (D62, D65).
+  amorçages s'appellent par `pnpm amorcage` (D62, D65).
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
 - Simon lit surtout sur téléphone : réponses courtes, en prose, une question à la fois.
 
@@ -43,7 +43,7 @@
     les attentes du harnais : sinon il écrit ce qu'il faut pour passer, et le harnais ne vérifie plus
     rien. Il ne va pas le chercher non plus : il code, commet, pousse, et le verdict lui vient des
     crochets de pré-commit et de pré-push, puis de la CI — et, pour un besoin de règle, du workflow
-    des méta-harnais. Un échec lui revient avec son message, ce qui suffit ; il n'ouvre pas le code du
+    des amorçages. Un échec lui revient avec son message, ce qui suffit ; il n'ouvre pas le code du
     harnais pour y trouver la réponse. Un verdict qu'il ne comprend pas se discute en commentaire ;
     l'auditeur corrige le harnais, ou précise le besoin dans l'issue. Corollaire : l'issue doit
     suffire à coder, et les crochets doivent faire le nécessaire.
@@ -57,7 +57,7 @@
     entièrement. Une tâche qui a des sous-tâches est vérifiée par les leurs ; son harnais global
     s'écrit quand elles sont vertes, jamais avant. Un rouge qui dure cesse d'être un signal.
   - **Si le besoin est une règle**, le codeur code la garde et le harnais de la garde ; l'auditeur
-    code le **méta-harnais** qui juge ce travail (D65).
+    code l'**amorçage** qui juge ce travail (D65).
   - **L'intervention humaine fait partie du harnais**, ce n'est pas un niveau de plus : c'est la part
     que le codage ne peut pas trancher. L'auditeur l'écrit, le porteur la valide.
 - **Découpage et fusion (D63).** Un objectif se découpe en sous-issues avant tout codage ; l'issue
@@ -92,8 +92,8 @@
   harnais d'un besoin produit va auprès de ce qu'il garde (`packages/core/test`, `apps/web/test`,
   `apps/relay`, `apps/hebergement`), ou dans `packages/gardes` s'il n'appartient à aucune
   application. Le harnais que le codeur écrit sur la garde va dans `packages/gardes/gardes.test.mjs`.
-  Le harnais qu'un auditeur écrit sur une règle est un **méta-harnais** : il va dans `meta-harnais/`,
-  hors du workspace, s'appelle par `pnpm meta`, et ne tourne de lui-même que sur une PR qui touche
+  Le harnais qu'un auditeur écrit sur une règle est un **amorçage** : il va dans `amorcage/`,
+  hors du workspace, s'appelle par `pnpm amorcage`, et ne tourne de lui-même que sur une PR qui touche
   aux règles. Il ne va jamais dans `pnpm test`.
 - **Codage d'un besoin.** Le harnais est déjà là et rouge ; le travail consiste à le faire passer
   au vert sans le modifier. Les questions de développement et les décisions techniques se consignent
@@ -137,10 +137,10 @@
     pas ; un développeur humain valide avant la fusion. Une contradiction ne se tranche pas dans la
     PR : elle devient une question dans une issue.
   - **Une modification de la garde dit ce qui la couvre (#89).** Une PR qui touche la garde — son
-    code, `gardes.test.mjs`, les méta-harnais, `docs/gardes.md`, `verifications.yml`, le modèle de
+    code, `gardes.test.mjs`, les amorçages, `docs/gardes.md`, `verifications.yml`, le modèle de
     PR — se voit demander `VM-garde-couverture`, sans condition et en plus de `VM-regles-primaires` :
     l'analyse nomme ce que la PR change dans la garde et, pour chaque changement, le harnais qui le
-    couvre (`packages/gardes/gardes.test.mjs`, un méta-harnais) ou la raison pour laquelle il ne se
+    couvre (`packages/gardes/gardes.test.mjs`, un amorçage) ou la raison pour laquelle il ne se
     programme pas (D62) ; un développeur humain valide. La consigne se proportionne à la PR : une PR
     qui n'ajoute qu'un test le dit, et c'est tout. Les deux clés restent distinctes : contredire une
     règle primaire et laisser un changement sans garde sont deux défauts différents.
@@ -164,7 +164,7 @@
     pas. Un témoin rouge qui se met à passer fait échouer `pnpm test`, l'outil de test tenant
     l'échec attendu (`test.fails` avec vitest, une assertion qui attend l'échec avec `node:test`) —
     la couverture ne le voit pas (#66).
-  - Le crochet de pré-commit tient en moins de 30 s (D66) : les méta-harnais (D65) tournent en
+  - Le crochet de pré-commit tient en moins de 30 s (D66) : les amorçages (D65) tournent en
     CI, pas au commit (D62).
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
     branche cible, l'annule et la vérification décoche la case ; documentation et harnais se

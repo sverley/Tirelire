@@ -6,7 +6,7 @@
  * n'empêche une fusion ni un push. La garde est donc une alerte — une issue ouverte aussitôt — et
  * une règle écrite. Ce harnais part des deux « Fait quand » de #62, pas du code, et juge la garde en
  * boîte noire : il copie le dépôt, y joue les événements de GitHub Actions (`pull_request.closed`,
- * `push`) et simule GitHub au niveau de `fetch`, comme le fait `amorcage.test.mjs`. Seuls comptent
+ * `push`) et simule GitHub au niveau de `fetch`, comme le fait `livraison-de-la-garde.test.mjs`. Seuls comptent
  * les issues ouvertes, leur contenu et le code de sortie.
  *
  * Contrat, décidé par l'audit et consigné dans la PR : la garde s'appelle
