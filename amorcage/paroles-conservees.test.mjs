@@ -7,9 +7,9 @@
  * porteur a tranché pendant l'audit de #107 : les citations sont amendées, pas laissées au mot
  * d'avant. L'entrée écrit cette règle, ses limites et sa source.
  *
- * Sept lectures jugent l'entrée, une huitième juge ce qui l'entoure :
+ * Les lectures jugent l'entrée, désormais nommée D69 :
  *
- *   1. une entrée nouvelle, datée du 15 septembre 2026, porte un numéro libre et un titre ;
+ *   1. elle est là, datée du 15 septembre 2026, et porte un titre ;
  *   2. elle dit la conséquence : le balayage d'un renommage porte sur le dépôt entier, et
  *      la limite : ce que la garde locale ne lit pas n'est pas balayé ;
  *   3. elle dit que les paroles conservées suivent, amendées et non laissées au mot d'avant ;
@@ -17,23 +17,29 @@
  *      son auteur, et l'accord se demande à chaque issue de renommage ;
  *   5. elle dit ce qu'on fait d'une incohérence constatée : elle se remonte dans une issue ;
  *   6. elle nomme sa source (le glossaire, arrêté le 14 septembre) et son occasion (#107, PR #108) ;
- *   7. rien d'autre ne change : aucun renommage, aucun harnais permanent nouveau.
  *
- * Le numéro n'est pas codé en dur. #109 dit « numéro libre au moment du codage » : l'entrée se
- * cherche par sa date, et son numéro doit seulement dépasser ceux de la base. Coder `D69` ici
- * rendrait l'amorçage faux le jour où une autre PR prend ce rang.
+ * Le numéro, lui, est maintenant connu. Tant que #109 était en cours, il ne l'était pas : l'entrée
+ * se cherchait par sa date, et la comparaison à la base disait laquelle était nouvelle. Depuis la
+ * fusion, D69 est sur `main` et son rang ne bougera plus — une décision ne se réécrit pas
+ * (`CLAUDE.md`). L'ancrage par le numéro remplace donc l'ancrage par la base, et la lecture garde
+ * son sens sans historique.
+ *
+ * Retiré par #112, le 15 septembre 2026, avec la comparaison à la base : « rien d'autre ne change :
+ * aucun renommage, aucun harnais permanent nouveau », qui lisait le diff de la branche contre son
+ * point de départ. Ce qu'elle ne vérifie plus : que la PR de #109 s'en soit tenue à l'entrée. Ce
+ * n'est plus utile — cette PR est fusionnée, relue, et son diff est figé dans l'historique ; jouée
+ * sur `main`, la lecture comparait `main` à lui-même et ne disait plus rien, et sur toute autre
+ * branche elle refusait des changements qui n'avaient rien à voir avec #109 (D70).
  *
  * Témoins. La lecture qui juge le texte est une fonction pure, `notionsManquantes`, éprouvée sur
  * des textes fabriqués : une entrée qui dit tout doit passer, une entrée à qui manque une notion
- * doit être vue, notion par notion. Les autres lectures constatent un format ou un diff exact :
- * un témoin n'y ajouterait rien (D62, garder la garde à la mesure du projet).
+ * doit être vue, notion par notion. La lecture qui reste constate un format exact : un témoin n'y
+ * ajouterait rien (D62, garder la garde à la mesure du projet).
  *
- * Comparaison à la base : elle demande l'historique, que le workflow des amorçages pose déjà
- * (`fetch-depth: 0`). Sans historique — clone court, copie sans `.git` — le test le dit et passe,
- * sauf sous `TIRELIRE_STRICT`, où il échoue plutôt que de se taire.
+ * Plus rien ici ne lit l'historique git : l'amorçage rend le même verdict sur un clone court, et
+ * `TIRELIRE_STRICT` ne change plus rien à ce qu'il dit.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -41,14 +47,12 @@ import { fileURLToPath } from 'node:url';
 
 const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RELIRE = "l'amorçage de #109 est à relire";
-const STRICT = Boolean(process.env.TIRELIRE_STRICT);
 
 const DECISIONS = 'docs/decisions.md';
-const CE_FICHIER = 'amorcage/paroles-conservees.test.mjs';
 const DATE = '2026-09-15';
 
-/** Ce que la branche a le droit de changer : l'entrée, et l'amorçage qui la juge. */
-const CHEMINS_ADMIS = new Set([DECISIONS, CE_FICHIER]);
+/** L'entrée écrite pour #109, fusionnée le 15 septembre 2026 : son rang ne bouge plus. */
+const NUMERO = 69;
 
 // ─── Lecture du catalogue ────────────────────────────────────────────────────────────────────
 
@@ -114,97 +118,40 @@ export function notionsManquantes(texte) {
   return NOTIONS.filter((n) => !n.formes.every((f) => f.test(texte))).map((n) => n.quoi);
 }
 
-// ─── Accès à la base de la PR ────────────────────────────────────────────────────────────────
-
-function base() {
-  try {
-    const sha = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: DEPOT, encoding: 'utf8' }).trim();
-    return sha || null;
-  } catch {
-    return null;
-  }
-}
-
-function auPointDeDepart(sha, chemin) {
-  try {
-    return execFileSync('git', ['show', `${sha}:${chemin}`], { cwd: DEPOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-  } catch {
-    return null;
-  }
-}
-
-/** Sans historique, la comparaison se tait — sauf sous `TIRELIRE_STRICT`, où elle échoue. */
-function sansHistorique(quoi) {
-  assert.ok(!STRICT, `${quoi} : historique git absent, et TIRELIRE_STRICT est posé (${RELIRE})`);
-  console.log(`${quoi} : historique git absent, comparaison à la base ignorée`);
-}
+// ─── L'entrée jugée ──────────────────────────────────────────────────────────────────────────
 
 const CATALOGUE = () => readFileSync(resolve(DEPOT, DECISIONS), 'utf8');
 
-/** L'entrée jugée : la seule du 15 septembre 2026 qui ne soit pas déjà à la base. */
-function entreeDuBesoin() {
-  const nouvelles = entrees(CATALOGUE()).filter((e) => e.date === DATE);
-  const sha = base();
-  if (!sha) return { entrees: nouvelles, sha: null };
-  const avant = auPointDeDepart(sha, DECISIONS);
-  if (avant === null) return { entrees: nouvelles, sha: null };
-  const dejaLa = new Set(entrees(avant).map((e) => `${e.numero}·${e.titre}`));
-  return { entrees: nouvelles.filter((e) => !dejaLa.has(`${e.numero}·${e.titre}`)), sha, avant };
-}
+/** Les entrées portant le rang de #109 : une seule, sauf si le catalogue a été abîmé. */
+const entreesDuBesoin = () => entrees(CATALOGUE()).filter((e) => e.numero === NUMERO);
 
-// ─── 1. Une entrée nouvelle, datée, numérotée librement ──────────────────────────────────────
+// ─── 1. L'entrée est là, datée, titrée ───────────────────────────────────────────────────────
 
 test("docs/decisions.md porte une entrée nouvelle datée du 15 septembre 2026", () => {
-  const { entrees: nouvelles, sha, avant } = entreeDuBesoin();
+  const trouvees = entreesDuBesoin();
   assert.equal(
-    nouvelles.length,
+    trouvees.length,
     1,
-    `attendu une entrée nouvelle du ${DATE} dans ${DECISIONS}, trouvé ${nouvelles.length} (${RELIRE})`,
+    `attendu une entrée D${NUMERO} dans ${DECISIONS}, trouvé ${trouvees.length} (${RELIRE})`,
   );
-  const [entree] = nouvelles;
+  const [entree] = trouvees;
+  assert.equal(entree.date, DATE, `D${NUMERO} devait être datée du ${DATE}, lu : ${entree.date}`);
   assert.ok(entree.titre.length >= 10, `l'entrée doit porter un titre qui dit la règle, lu : « ${entree.titre} »`);
-
-  if (!sha || avant === undefined) return sansHistorique('numérotation');
-  const rangs = entrees(avant).map((e) => e.numero);
-  const dernier = Math.max(...rangs);
-  assert.ok(
-    entree.numero > dernier,
-    `le numéro doit être libre : D${entree.numero} proposé, la base va jusqu'à D${dernier}`,
-  );
-  const doublons = entrees(CATALOGUE()).filter((e) => e.numero === entree.numero);
-  assert.equal(doublons.length, 1, `D${entree.numero} apparaît ${doublons.length} fois dans le catalogue`);
 });
 
 // ─── 2 à 6. Ce que l'entrée dit ──────────────────────────────────────────────────────────────
 
 for (const notion of NOTIONS) {
   test(`l'entrée dit : ${notion.quoi}`, () => {
-    const { entrees: nouvelles } = entreeDuBesoin();
-    assert.equal(nouvelles.length, 1, `entrée du ${DATE} introuvable ou ambiguë (${RELIRE})`);
-    const manquantes = notionsManquantes(nouvelles[0].corps);
+    const trouvees = entreesDuBesoin();
+    assert.equal(trouvees.length, 1, `entrée D${NUMERO} introuvable ou ambiguë (${RELIRE})`);
+    const manquantes = notionsManquantes(trouvees[0].corps);
     assert.ok(
       !manquantes.includes(notion.quoi),
-      `l'entrée ne dit pas : ${notion.quoi}\n--- entrée lue ---\n${nouvelles[0].corps.trim()}`,
+      `l'entrée ne dit pas : ${notion.quoi}\n--- entrée lue ---\n${trouvees[0].corps.trim()}`,
     );
   });
 }
-
-// ─── 7. Rien d'autre ne change ───────────────────────────────────────────────────────────────
-
-test("rien d'autre ne change : aucun renommage, aucun harnais permanent nouveau", () => {
-  const sha = base();
-  if (!sha) return sansHistorique('périmètre');
-  const diff = execFileSync('git', ['diff', '--name-only', sha, 'HEAD'], { cwd: DEPOT, encoding: 'utf8' })
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const hors = diff.filter((chemin) => !CHEMINS_ADMIS.has(chemin));
-  assert.deepEqual(
-    hors,
-    [],
-    `#109 ne change que ${DECISIONS} : ${hors.join(', ')} sort du périmètre. Un besoin découvert en route devient une issue (D63).`,
-  );
-});
 
 // ─── Témoins de la lecture qui juge ──────────────────────────────────────────────────────────
 

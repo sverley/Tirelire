@@ -4,27 +4,34 @@
  * #107 est un renommage : le glossaire, arrêté par le porteur le 14 septembre, nomme « amorçages »
  * les harnais qui jugent le codage des harnais de la garde, et le dépôt emploie encore l'ancien mot.
  * La livraison attendue ne change **aucun comportement** — c'est cela qu'il faut constater, et pas
- * seulement que le mot ait changé. Trois lectures portent le jugement :
+ * seulement que le mot ait changé. Deux lectures portent le jugement, depuis #112 :
  *
  *   1. l'ancien mot a disparu de tout le dépôt, chemins compris ;
- *   2. les harnais du dossier renommé ont gardé leurs assertions, ce qui se lit en comparant leurs
- *      titres de test à ceux de la base de la PR, aux mots renommés près ;
- *   3. ce qui déclenchait quoi déclenche toujours la même chose : script, workflow, motifs de la
- *      garde, crochet de pré-commit, workspace pnpm.
+ *   2. ce qui déclenchait quoi déclenche toujours la même chose : script, workflow, motifs de la
+ *      garde, crochet de pré-commit, workspace pnpm — et le dossier renommé est à sa place.
+ *
+ * Retiré par #112, le 15 septembre 2026 : les deux lectures qui comparaient à la base de la PR —
+ * « le dossier des amorçages contient les mêmes fichiers qu'avant » et « les amorçages gardent
+ * leurs titres, aux mots renommés près ». Elles lisaient l'ancien dossier au point de départ de la
+ * branche ; #107 fusionné, ce point de départ est `main`, où cet ancien dossier n'existe plus :
+ * elles tombaient dans la branche « sans historique », prévue pour un clone court, et rougissaient
+ * sous `TIRELIRE_STRICT` sur toute PR de règles. Ce qu'elles ne vérifient plus : qu'aucun amorçage
+ * n'ait été perdu, ajouté ou renommé pendant #107, et qu'aucune assertion n'ait bougé au passage.
+ * Ce n'est plus utile : le renommage est fusionné et relu, son diff est figé dans l'historique, et
+ * une perte d'amorçage postérieure relève de la PR qui la porterait, pas de celle-ci. Ce qui reste
+ * n'a pas besoin d'historique et vaut pour toujours (D70).
  *
  * Ce fichier est lui-même dans le champ du balayage : il n'écrit donc **jamais l'ancien mot en
  * toutes lettres**, il le compose là où il en a besoin. Une occurrence en clair ici rendrait la
  * première lecture rouge à jamais, et la prose dit « l'ancien mot » pour la même raison.
  *
- * Témoins. Les deux lectures qui jugent (le balayage du mot, la comparaison des titres) sont des
- * fonctions pures, éprouvées sur des textes fabriqués : une prose qui garde l'ancien mot doit être
- * vue, une prose renommée doit passer, un titre réécrit au-delà du renommage doit être vu. Les
+ * Témoin. La lecture qui juge — le balayage du mot — est une fonction pure, éprouvée sur des textes
+ * fabriqués : une prose qui garde l'ancien mot doit être vue, une prose renommée doit passer. Les
  * autres vérifications lisent une configuration exacte — un script mot pour mot, un fichier présent
  * ou absent : un témoin n'y ajouterait rien (D62, garder la garde simple).
  *
- * Comparaison à la base : elle demande l'historique, que le workflow du dossier pose déjà
- * (`fetch-depth: 0`). Sans historique — clone court, copie sans `.git` — le test le dit et passe,
- * sauf si `TIRELIRE_STRICT` est posé, où il échoue plutôt que de se taire.
+ * Plus rien ici ne lit l'historique git : l'amorçage rend le même verdict sur un clone court, et
+ * `TIRELIRE_STRICT` ne change plus rien à ce qu'il dit.
  *
  * Périmètre. La sortie des quatre tests de besoins produit hors de `packages/gardes` a été sortie de
  * #107 par le porteur : elle retirerait ces tests du crochet de pré-commit, donc elle changerait un
@@ -39,7 +46,6 @@ import { fileURLToPath } from 'node:url';
 
 const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RELIRE = "l'amorçage de #107 est à relire";
-const STRICT = Boolean(process.env.TIRELIRE_STRICT);
 
 /** L'ancien mot, composé pour que ce fichier ne le contienne pas : accent ou non, tiret ou non. */
 const MOTIF_ANCIEN = ['m[', 'ée', ']ta[- ]?', 'harnais'].join('');
@@ -53,9 +59,6 @@ const WORKFLOW = `.github/workflows/${DOSSIER}.yml`;
 /** Le seul fichier que #107 renomme à l'intérieur du dossier : son nom disait son rang, pas son rôle. */
 const AVANT = `${DOSSIER}.test.mjs`;
 const APRES = 'livraison-de-la-garde.test.mjs';
-
-/** Ce fichier : ajouté par la branche d'audit, il peut manquer à la base sans que rien ne cloche. */
-const CE_FICHIER = 'renommage-en-amorcage.test.mjs';
 
 /** Les quatre tests de besoins produit, qui restent dans `packages/gardes` : #107 ne les déplace pas. */
 const TESTS_PRODUIT = [
@@ -87,36 +90,7 @@ function git(...args) {
 const lire = (chemin) => readFileSync(join(DEPOT, chemin), 'utf8');
 const fichiersSuivis = () => (git('ls-files', '-z') ?? '').split('\0').filter(Boolean);
 
-/**
- * Le commit de base de la PR, où l'ancien dossier existe encore : la référence de l'événement en CI,
- * sinon `main`. `null` si l'historique ne remonte pas jusque-là.
- */
-function baseDeLaPr() {
-  const refs = [process.env.GITHUB_BASE_REF && `origin/${process.env.GITHUB_BASE_REF}`, 'origin/main', 'main'].filter(Boolean);
-  for (const ref of refs) {
-    const tete = git('rev-parse', '--verify', `${ref}^{commit}`)?.trim();
-    if (!tete) continue;
-    const base = git('merge-base', 'HEAD', tete)?.trim() || tete;
-    if (fichiersDuDossierA(base).length) return base;
-  }
-  return null;
-}
-
-/** Les fichiers de l'ancien dossier à un commit donné, chemins relatifs au dossier. */
-const fichiersDuDossierA = (commit) =>
-  (git('ls-tree', '-r', '--name-only', commit, '--', `${ANCIEN_DOSSIER}/`) ?? '')
-    .split('\n')
-    .filter(Boolean)
-    .map((chemin) => chemin.slice(ANCIEN_DOSSIER.length + 1));
-
-/** Dit pourquoi une comparaison ne s'est pas faite, et laisse passer — sauf en mode strict. */
-function sansHistorique(quoi, t) {
-  const message = `sans historique git, ${quoi} ne se fait pas ; la CI pose « fetch-depth: 0 » pour cela`;
-  if (STRICT) assert.fail(message);
-  t.diagnostic(message);
-}
-
-// ─── Les deux lectures qui jugent ─────────────────────────────────────────────────────────────
+// ─── La lecture qui juge ──────────────────────────────────────────────────────────────────────
 
 /** Les numéros de ligne où l'ancien mot subsiste, vide si le texte est propre. */
 function lignesFautives(texte) {
@@ -127,31 +101,6 @@ function lignesFautives(texte) {
     .map((ligne, i) => (motif.test(ligne) ? i + 1 : 0))
     .filter(Boolean);
 }
-
-/** Les titres des `test(...)` d'un fichier, dans leur ordre d'écriture. */
-function titresDe(texte) {
-  const titres = [];
-  const motif = /^test\(\s*(['"`])((?:\\.|(?!\1)[\s\S])*?)\1/gm;
-  for (const trouve of texte.matchAll(motif)) titres.push(trouve[2]);
-  return titres;
-}
-
-/**
- * Un titre ramené à ce que #107 ne doit pas toucher : sans accents, sans les mots que le renommage
- * remplace, sans le nom du script ni celui du fichier renommé. Deux titres qui ne diffèrent que par
- * le renommage se ramènent ainsi au même texte ; toute autre réécriture ressort.
- */
-const sansLesMotsRenommes = (titre) =>
-  titre
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(new RegExp(`${MOTIF_ANCIEN}(?:e?s)?`, 'gi'), ' ')
-    .replace(/amorcages?/g, ' ')
-    .replace(/livraison-de-la-garde/g, ' ')
-    .replace(/\bmeta\b/g, ' ')
-    .replace(/[\s/]+/g, ' ')
-    .trim();
 
 // ─── Ce que #107 demande ──────────────────────────────────────────────────────────────────────
 
@@ -185,71 +134,11 @@ test("#107 · témoin : une prose qui garde l'ancien mot est vue, une prose reno
   assert.ok(ancien('i').test(`${exemple.replace('é', 'e')}/x.test.mjs`), `le balayage ne voit pas l'ancien mot dans un chemin : ${RELIRE}`);
 });
 
-test('#107 · le dossier des amorçages est en place, avec les mêmes fichiers', (t) => {
+test('#107 · le dossier des amorçages est en place', () => {
   assert.ok(existsSync(join(DEPOT, DOSSIER)), `le dossier ${DOSSIER}/ n'existe pas`);
   assert.ok(!existsSync(join(DEPOT, ANCIEN_DOSSIER)), "l'ancien dossier est toujours là : le renommage n'est pas fait, ou il a été copié");
   assert.ok(existsSync(join(DEPOT, DOSSIER, APRES)), `${DOSSIER}/${APRES} manque : le fichier renommé par #107`);
   assert.ok(!existsSync(join(DEPOT, DOSSIER, AVANT)), `${DOSSIER}/${AVANT} est toujours là : son nom disait son rang, pas son rôle`);
-
-  const base = baseDeLaPr();
-  if (!base) return sansHistorique('la comparaison des fichiers du dossier', t);
-  const attendus = fichiersDuDossierA(base)
-    .map((fichier) => (fichier === AVANT ? APRES : fichier))
-    .filter((fichier) => fichier !== CE_FICHIER);
-  const livres = fichiersSuivis()
-    .filter((chemin) => chemin.startsWith(`${DOSSIER}/`))
-    .map((chemin) => chemin.slice(DOSSIER.length + 1))
-    .filter((fichier) => fichier !== CE_FICHIER);
-  assert.deepEqual(livres.sort(), attendus.sort(), 'le dossier renommé ne contient plus les mêmes fichiers : un amorçage a été perdu, ajouté ou renommé au passage');
-});
-
-test('#107 · les amorçages gardent leurs assertions : mêmes titres, aux mots renommés près', (t) => {
-  const base = baseDeLaPr();
-  if (!base) return sansHistorique('la comparaison des titres de test', t);
-  const ecarts = [];
-  for (const fichier of fichiersDuDossierA(base)) {
-    if (!fichier.endsWith('.test.mjs')) continue;
-    const livre = fichier === AVANT ? APRES : fichier;
-    if (livre === CE_FICHIER) continue;
-    const texteAvant = git('show', `${base}:${ANCIEN_DOSSIER}/${fichier}`);
-    if (texteAvant === null) {
-      ecarts.push(`${fichier} · illisible à la base`);
-      continue;
-    }
-    if (!existsSync(join(DEPOT, DOSSIER, livre))) {
-      ecarts.push(`${livre} · manquant après le renommage`);
-      continue;
-    }
-    const avant = titresDe(texteAvant).map(sansLesMotsRenommes);
-    const apres = titresDe(lire(`${DOSSIER}/${livre}`)).map(sansLesMotsRenommes);
-    if (avant.length !== apres.length) {
-      ecarts.push(`${livre} · ${avant.length} tests avant, ${apres.length} après`);
-      continue;
-    }
-    avant.forEach((titre, i) => {
-      if (titre !== apres[i]) ecarts.push(`${livre} · titre ${i + 1} : « ${titre} » devenu « ${apres[i]} »`);
-    });
-  }
-  assert.deepEqual(ecarts, [], `des assertions ont bougé, alors que #107 ne déplace que des chemins :\n  ${ecarts.join('\n  ')}`);
-});
-
-test('#107 · témoin : un titre réécrit au-delà du renommage est vu, un titre seulement renommé passe', () => {
-  const exemple = ['m', 'éta-', 'harnais'].join('');
-  assert.equal(
-    sansLesMotsRenommes(`#82 · le crochet de pré-commit ne joue pas les ${exemple}`),
-    sansLesMotsRenommes('#82 · le crochet de pré-commit ne joue pas les amorçages'),
-    `la comparaison voit une différence là où seul le mot change : ${RELIRE}`,
-  );
-  assert.equal(
-    sansLesMotsRenommes(`#82 · « pnpm meta » appelle node --test sur ${exemple.replace('é', 'e')}/`),
-    sansLesMotsRenommes('#82 · « pnpm amorcage » appelle node --test sur amorcage/'),
-    `la comparaison voit une différence là où seuls le script et le dossier changent : ${RELIRE}`,
-  );
-  assert.notEqual(
-    sansLesMotsRenommes('#82 · le crochet de pré-commit ne joue pas les amorçages'),
-    sansLesMotsRenommes('#82 · le crochet de pré-commit joue les amorçages'),
-    `la comparaison ne mord pas sur un titre réécrit : ${RELIRE}`,
-  );
 });
 
 test('#107 · « pnpm amorcage » joue le dossier, toujours hors du chemin courant', () => {
