@@ -1476,3 +1476,41 @@ qu'il cesse de vérifier et pourquoi ce n'est plus utile.
 Comparer à la base **pendant** la PR qu'on juge reste légitime : c'est souvent la seule façon de
 constater qu'un codage n'a pas débordé de son besoin. Ce qui est proscrit, c'est de laisser cette
 lecture derrière soi.
+
+## D71 · 2026-09-15 · Un harnais se situe aussi par ce qu'il lit, et celui qu'on joue en local ne sort pas de la machine
+
+Besoin #113, tranché par le porteur le 15 septembre (Q1 à Q6 de l'issue). Le glossaire trie les
+harnais sur un axe, **ce qu'un harnais garde** : garde, tests, amorçages. Un second axe existait dans
+les faits sans être écrit nulle part : **ce qu'un harnais lit, et donc où il peut s'exécuter**. Les
+deux sont orthogonaux — `verifications.yml` est une garde au sens plein et ne vit que sur GitHub —
+et le second ne change ni « garde » ni « workflow ». Aucun mot nouveau n'entre au glossaire.
+
+- **L'axe.** Un harnais se situe par ce qu'il lit, avec deux valeurs : il **lit des fichiers
+  suivis** par git, ou il **lit hors des fichiers suivis** — GitHub (description d'une PR, cases,
+  événement de fusion), le site en ligne. GitHub n'est qu'un cas de la seconde valeur.
+- **L'axe situe une commande, pas un fichier.** `node packages/gardes/cli.mjs demander` lit des
+  fichiers suivis ; `cli.mjs pr --github` et `cli.mjs alerte --github` lisent hors d'eux. Le même
+  fichier porte les deux.
+- **Le local est prioritaire.** Une vérification se fait en local dès que ce qu'elle lit le permet ;
+  elle ne passe par GitHub que si son objet n'existe pas dans les fichiers suivis. C'est le harnais
+  qui porte ce choix. Rejouer un harnais local en CI ne change pas sa place sur l'axe.
+- **Règle du travail local.** Aucun harnais joué en local ne sort de la machine : ni les crochets de
+  pré-commit et de pré-push, ni `pnpm test`, ni `pnpm amorcage` n'ouvrent de connexion hors de la
+  machine — ni réseau, ni API GitHub. La boucle locale (`localhost`, `127.0.0.1`, `::1`) reste
+  permise : les tests du relais, du relais PHP et de l'interface y démarrent leurs serveurs.
+- **Chaque workflow est situé**, job par job, dans son commentaire de tête : « lit des fichiers
+  suivis », « lit hors des fichiers suivis » ou « hors harnais ». Un job qui mêle livraison et
+  vérification se situe par sa vérification (`deploiement` de `ci.yml`, par « Vérifier le site en
+  ligne »). `etiquette-en-cours.yml` est hors harnais : il ne garde rien, ne juge rien et ne fait
+  échouer aucune PR ; ce n'est pas une troisième famille, c'est un non-membre.
+- **La garde tient la règle en continu.** `packages/gardes/sans-sortie.mjs` intercepte les
+  connexions (`net.Socket`, par où passent `fetch` et `node:http`) : hors de la boucle locale, la
+  connexion est refusée, et le lanceur échoue en nommant l'hôte, même si le harnais ou le code testé
+  a intercepté l'erreur. Il est préchargé par chaque lanceur local — `node --import … --test` pour
+  les paquets en `node:test` et pour `pnpm amorcage`, `sans-sortie-vitest.mjs` en `setupFiles` pour
+  ceux en vitest — sans variable d'environnement. `verifierLanceursLocaux` refuse un script `test`
+  du workspace, ou un `pnpm amorcage`, qui ne serait pas branché. Harnais : `gardes.test.mjs`.
+- **Limites** (D62). Le crochet de pré-push ne joue aucun harnais (typecheck et build) et n'est donc
+  pas préchargé. Les processus qu'un test démarre (serveur du relais, PHP, navigateur) ne sont pas
+  préchargés, et ni un datagramme ni une résolution DNS ne sont des connexions. Ce sont des pistes,
+  pas des erreurs par accident.

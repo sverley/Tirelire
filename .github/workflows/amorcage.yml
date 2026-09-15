@@ -3,6 +3,9 @@ name: Amorçages
 # Les amorçages (#82, D63) jugent le travail du codeur sur une règle du projet : ils constatent
 # une livraison, ils ne gardent pas un comportement. Ils restent donc hors de `pnpm test` et des
 # crochets, et ne tournent que sur une PR qui touche aux règles, ou à la demande.
+#
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# - `amorcage` lit des fichiers suivis : il rejoue ici `pnpm amorcage`, tel qu'en local.
 
 on:
   workflow_dispatch:

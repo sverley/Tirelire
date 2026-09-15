@@ -1,5 +1,14 @@
 name: CI et livraison
 
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
+#   l'archive du site qu'il dépose ensuite ne juge rien.
+# - `hebergement` est hors harnais : il assemble le site, sans rien vérifier.
+# - `deploiement` lit hors des fichiers suivis : après le dépôt FTP, l'étape « Vérifier le site en
+#   ligne » (`verifier.sh`) lit le site déployé.
+# - `android` est hors harnais : il construit l'APK, sans rien vérifier.
+# - `publication` est hors harnais : il publie les releases.
+
 on:
   push:
     branches: [main]

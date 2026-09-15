@@ -14,6 +14,10 @@ name: Alerte de fusion non vérifiée
 # Limite connue, hors périmètre (D62) : un push direct qui retire ce fichier dans le même commit se
 # tait, GitHub jouant la version poussée. C'est un contournement, pas une erreur par accident ; la
 # piste d'un dépôt miroir reste en réserve dans #58.
+#
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# - `alerte` lit hors des fichiers suivis : l'événement de fusion ou de push, et la couleur des
+#   vérifications, n'existent que sur GitHub.
 
 on:
   pull_request:

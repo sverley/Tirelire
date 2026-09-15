@@ -9,6 +9,10 @@ name: Étiquette « en cours »
 # - une issue fermée par une autre action (jeton GITHUB_TOKEN) ne déclenche aucun workflow.
 # Le balayage retire l'étiquette de toutes les issues fermées qui la portent encore. Il tourne quand
 # ce fichier arrive ou change sur `main`, et à la demande depuis l'onglet Actions.
+#
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# - `retirer` est hors harnais : il range une étiquette, ne garde rien, ne juge rien et ne fait échouer
+#   aucune PR (porteur, 15 septembre).
 
 on:
   issues:

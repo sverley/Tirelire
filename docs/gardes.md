@@ -33,6 +33,11 @@ une entrée et ne tourne pas dans `pnpm test` (#82, D65).
   Un test qui se saute faute d'outil compte comme un test qui tourne, parce qu'en CI
   `TIRELIRE_STRICT` rend l'outil obligatoire : un harnais du registre qui se saute sous condition
   sans lire cette variable est refusé, comme une CI dont l'étape `pnpm test` ne la pose plus.
+- **Dans chaque lanceur local**, à chaque `pnpm test` comme à chaque `pnpm amorcage` : un harnais
+  joué en local ne sort pas de la machine (#113, D71). Le script `test` de chaque paquet précharge
+  `packages/gardes/sans-sortie.mjs` (vitest par `sans-sortie-vitest.mjs`) ; une connexion hors de la
+  boucle locale fait échouer le lanceur en nommant l'hôte, même interceptée. `gardes.test.mjs` tient
+  le blocage et vérifie que chaque lanceur y est branché.
 - **Sur chaque PR**, par la vérification « Vérifications manuelles » : la description déclare les
   identifiants touchés et ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux
   `Chemins` d'une entrée impose de la déclarer ; chaque vérification manuelle des entrées déclarées,
