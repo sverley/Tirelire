@@ -1444,8 +1444,12 @@ Le porteur a tranché l'inverse :
   pas au mot d'avant : un texte conservé n'est pas une exception au glossaire, et « partout
   ailleurs » inclut les paroles du porteur.
 - **Conséquence : le balayage d'un renommage porte sur le dépôt entier**, citations comprises.
-  L'issue de renommage ne réserve aucune zone ; `description-projet.md`, ce journal et tout autre
-  texte conservé entrent dans son périmètre au même titre que le code et les issues.
+  `description-projet.md`, ce journal et tout autre texte conservé entrent dans son périmètre au
+  même titre que le code, et les issues et PR ouvertes suivent.
+- **Il s'arrête là où le texte ne se réécrit plus.** Les fils clos et les messages de commit restent
+  au mot d'avant : les amender supposerait de réécrire l'historique, et de retoucher la trace de
+  discussions déjà tranchées. Un terme retiré qui y subsiste n'est donc pas une incohérence à
+  remonter.
 - **Une citation ne s'amende que sous couvert de son auteur.** L'amendement silencieux est écarté :
   l'accord du porteur se demande **à chaque issue de renommage**, et non une fois pour toutes. Cela
   prolonge D64 : `description-projet.md` ne change qu'à la demande du porteur, ligne « Accord du

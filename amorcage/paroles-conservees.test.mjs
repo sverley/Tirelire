@@ -7,10 +7,11 @@
  * porteur a tranché pendant l'audit de #107 : les citations sont amendées, pas laissées au mot
  * d'avant. L'entrée écrit cette règle, ses limites et sa source.
  *
- * Six lectures jugent l'entrée, une septième juge ce qui l'entoure :
+ * Sept lectures jugent l'entrée, une huitième juge ce qui l'entoure :
  *
  *   1. une entrée nouvelle, datée du 15 septembre 2026, porte un numéro libre et un titre ;
- *   2. elle dit la conséquence : le balayage d'un renommage porte sur le dépôt entier ;
+ *   2. elle dit la conséquence : le balayage d'un renommage porte sur le dépôt entier, et
+ *      la limite : les fils clos et l'historique des commits ne se réécrivent pas ;
  *   3. elle dit que les paroles conservées suivent, amendées et non laissées au mot d'avant ;
  *   4. elle dit la limite tranchée le 15 septembre : une citation ne s'amende que sous couvert de
  *      son auteur, et l'accord se demande à chaque issue de renommage ;
@@ -74,6 +75,10 @@ const NOTIONS = Object.freeze([
   Object.freeze({
     quoi: 'le balayage porte sur le dépôt entier',
     formes: Object.freeze([/d[ée]p[ôo]t\s+(entier|complet)|tout\s+le\s+d[ée]p[ôo]t/i]),
+  }),
+  Object.freeze({
+    quoi: 'le balayage s\'arrête aux fils clos et à l\'historique',
+    formes: Object.freeze([/clos|ferm[ée]s?\b/i, /historique|commit/i]),
   }),
   Object.freeze({
     quoi: 'les paroles conservées suivent, amendées',
@@ -207,7 +212,8 @@ const TEMOIN_COMPLET = `## D99 · ${DATE} · Le vocabulaire arrêté vaut aussi 
 
 Quand un terme du glossaire change, le balayage porte sur le dépôt entier : tout ce qui décrit le
 projet et sa structure suit, y compris les paroles conservées. Les citations du porteur sont
-amendées ; elles ne restent pas au mot d'avant.
+amendées ; elles ne restent pas au mot d'avant. Le balayage s'arrête aux fils clos et à
+l'historique des commits, qui ne se réécrivent pas.
 
 Une citation ne s'amende que sous couvert de son auteur : chaque issue de renommage porte l'accord
 explicite du porteur. Une incohérence constatée — un terme retiré qui subsiste — se remonte dans une
@@ -216,7 +222,7 @@ issue, nouvelle ou existante, elle ne se corrige pas au fil de l'eau.
 Source : le glossaire, arrêté par le porteur le 14 septembre 2026. Occasion : #107, PR #108.
 `;
 
-test("témoin vert : une entrée fabriquée qui dit tout passe les sept lectures", () => {
+test("témoin vert : une entrée fabriquée qui dit tout passe toutes les lectures", () => {
   assert.deepEqual(notionsManquantes(TEMOIN_COMPLET), []);
 });
 
