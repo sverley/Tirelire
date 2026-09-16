@@ -1,21 +1,21 @@
 /**
  * Amorçage de #121, écrit par la session d'audit du 16 septembre 2026.
  *
- * #121 veut que la livraison soit jugée sur l'état commis, en moins de 30 s, et que le harnais du
- * besoin la bloque :
+ * #121 veut que la livraison soit jugée sur l'état commis, et que le harnais du besoin la bloque :
  * - `pre-merge-commit` juge l'arbre fusionné (l'index), et `pre-commit` aussi pendant une fusion ;
  * - le pré-push juge ce qu'il pousse, sauf un arbre déjà vérifié à la fusion ;
  * - un push vers `<branche>--codeur` ou `<branche>--auditeur` ne joue que la non-régression ;
  * - le harnais du besoin (les fichiers de harnais que la branche ajoute ou modifie par rapport à
- *   `main`) est toujours joué, et bloque quand arrivent des commits absents de `main` qui touchent
- *   autre chose que le harnais et la documentation ;
- * - la sélection dépend du côté touché (`packages/gardes/chemins-ignores`), et le registre
- *   `packages/gardes/durees-harnais` classe les fichiers rapides ou lents, avec des marges (Q1 et Q2
- *   de l'audit) ; `pnpm durees` le tient à jour.
+ *   `main`) est toujours joué, quelle que soit sa finalité, et bloque quand arrivent des commits
+ *   absents de `main` qui touchent autre chose que le harnais et la documentation ;
+ * - la sélection dépend de la nature du besoin (`packages/gardes/chemins-ignores`) et de la finalité
+ *   des tests : fonctionnel, typecheck et tests headless ; organisationnel, garde et amorçages ; les
+ *   tests navigateur (`apps/web/test/navigateur/`) restent à la CI ;
+ * - aucun seuil ne bloque ; un dépassement de l'objectif de plus de 20 % s'affiche.
  *
  * L'amorçage juge en boîte noire, comme ceux de #120 et #127 :
  * - il copie le dépôt, retire les tests réels des paquets qu'il sonde pour rester rapide, pose ses
- *   sentinelles et son propre registre, en fait un dépôt git, et active les crochets par
+ *   sentinelles, en fait un dépôt git, et active les crochets par
  *   `pnpm crochets` ;
  * - `origin` est un dépôt nu local (rien ne sort de la machine, D71), la branche de la PR s'appelle
  *   `essai-121` ;
@@ -40,7 +40,6 @@ import { performance } from 'node:perf_hooks';
 import { after, test } from 'node:test';
 import { copieDuDepot, DEPOT, lire } from './test/copie-du-depot.mjs';
 
-const BUDGET_MS = 30_000;
 const SORTIE = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 };
 const RACINE = copieDuDepot();
 const DIVERS = mkdtempSync(join(tmpdir(), 'tirelire-amorcage-121-'));
@@ -84,47 +83,26 @@ const sentinelleNode = (nom, corps = '') =>
   `test('${MARQUE} : ${nom}', async () => {\n  ${trace(nom)}\n  assert.ok(true);\n${corps}});\n`;
 const sentinelleVitest = (nom, entetes = '', corps = '') =>
   `import { appendFileSync } from 'node:fs';\nimport { expect, it } from 'vitest';\n${entetes}` +
-  `it('${MARQUE} : ${nom}', () => {\n  ${trace(nom)}\n  expect(true).toBe(true);\n${corps}});\n`;
+  `it('${MARQUE} : ${nom}', async () => {\n  ${trace(nom)}\n  expect(true).toBe(true);\n${corps}}, 60_000);\n`;
 
 const S = {
   garde: 'packages/gardes/sentinelle-121.test.mjs',
   gardeEtat: 'packages/gardes/sentinelle-121.txt',
   coeur: 'packages/core/test/sentinelle-121.test.ts',
   coeurEtat: 'packages/core/src/sentinelle-121.ts',
+  lenteur: 'packages/core/src/lenteur-121.txt',
   besoin: 'packages/core/src/besoin-121.ts',
   harnais: 'packages/core/test/harnais-121.test.ts',
   outil: 'packages/core/src/outil-121.ts',
   usage: 'packages/core/src/usage-121.ts',
-  webRapide: 'apps/web/test/rapide-121.test.ts',
-  webLent: 'apps/web/test/lent-121.test.ts',
-  amoRapide: 'amorcage/rapide-121.test.mjs',
-  amoLent: 'amorcage/lent-121.test.mjs',
-  amoAbsent: 'amorcage/absent-121.test.mjs',
-  budgetA: 'amorcage/budget-a-121.test.mjs',
-  budgetB: 'amorcage/budget-b-121.test.mjs',
-  budgetC: 'amorcage/budget-c-121.test.mjs',
-  registre: 'packages/gardes/durees-harnais',
+  headless: 'apps/web/test/headless-121.test.ts',
+  navigateur: 'apps/web/test/navigateur/sentinelle-121.test.ts',
+  harnaisNav: 'apps/web/test/navigateur/harnais-121.test.ts',
+  amorcage: 'amorcage/sentinelle-121.test.mjs',
 };
 const NOM_HARNAIS = 'harnais du besoin';
-
-const registre = ({ budget = 30, margeBudget = 10 } = {}) => `# Registre de l'amorçage 121
-seuil 2
-marge 1
-budget ${budget}
-marge-budget ${margeBudget}
-rapide 0.25 ${S.garde}
-rapide 0.25 ${S.coeur}
-rapide 0.25 ${S.webRapide}
-lent 20 ${S.webLent}
-rapide 0.25 ${S.amoRapide}
-lent 50 ${S.amoLent}
-rapide 0.25 ${S.budgetA}
-rapide 0.125 ${S.budgetB}
-rapide 0.5 ${S.budgetC}
-`;
-// Budget réduit : 1 s planifiée. Passent b (0,125), puis a, la sentinelle de la garde et l'amorçage
-// rapide (0,25 chacun) : 0,875 s. c (0,5) dépasse, et l'absent (planifié pour le seuil) aussi.
-const REGISTRE_ETROIT = registre({ budget: 2, margeBudget: 1 });
+// Au-delà de 36 s, la livraison d'un besoin fonctionnel dépasse son objectif (30 s) de plus de 20 %.
+const LENTEUR_MS = 37_000;
 
 const harnais = (supplement = '') =>
   sentinelleVitest(NOM_HARNAIS, `import { FAIT } from '../src/besoin-121.js';\n`, `  expect(FAIT).toBe(true);\n${supplement}`);
@@ -134,12 +112,16 @@ const code = (fait, note) => `export const FAIT: boolean = ${fait}; // ${note}\n
 
 // Les tests réels des paquets sondés sont retirés : seules les sentinelles comptent, et l'amorçage
 // reste assez rapide pour la CI. Les modules auxiliaires restent.
-for (const dossier of ['amorcage', 'packages/gardes', 'packages/core/test', 'apps/web/test']) {
-  for (const nom of readdirSync(join(RACINE, dossier))) {
-    const chemin = join(RACINE, dossier, nom);
-    if (/\.test\.[^/]+$/.test(nom) && statSync(chemin).isFile()) rmSync(chemin);
+function retireTests(dossier) {
+  const racine = join(RACINE, dossier);
+  if (!existsSync(racine)) return;
+  for (const nom of readdirSync(racine)) {
+    const chemin = join(racine, nom);
+    if (statSync(chemin).isDirectory()) retireTests(`${dossier}/${nom}`);
+    else if (/\.test\.[^/]+$/.test(nom)) rmSync(chemin);
   }
 }
+for (const dossier of ['amorcage', 'packages/gardes', 'packages/core/test', 'apps/web/test']) retireTests(dossier);
 const paquets = ['packages', 'apps'].flatMap((p) => (existsSync(join(DEPOT, p)) ? readdirSync(join(DEPOT, p)).map((n) => `${p}/${n}`) : []));
 for (const dossier of ['.', ...paquets]) {
   const source = join(DEPOT, dossier, 'node_modules');
@@ -148,15 +130,20 @@ for (const dossier of ['.', ...paquets]) {
 
 ecrit(S.garde, sentinelleNode(S.garde, `  assert.doesNotMatch(readFileSync(new URL('./sentinelle-121.txt', import.meta.url), 'utf8'), /cassé/);\n`));
 ecrit(S.gardeEtat, 'intact\n');
-ecrit(S.coeur, sentinelleVitest(S.coeur, `import { ETAT } from '../src/sentinelle-121.js';\n`, `  expect(ETAT).not.toBe('cassé');\n`));
+ecrit(S.coeur, sentinelleVitest(
+  S.coeur,
+  `import { readFileSync } from 'node:fs';\nimport { ETAT } from '../src/sentinelle-121.js';\n`,
+  `  expect(ETAT).not.toBe('cassé');\n` +
+  `  if (readFileSync(new URL('../src/lenteur-121.txt', import.meta.url), 'utf8').includes('lent')) await new Promise((r) => setTimeout(r, ${LENTEUR_MS}));\n`,
+));
 ecrit(S.coeurEtat, `export const ETAT: string = 'intact';\n`);
+ecrit(S.lenteur, 'rapide\n');
 ecrit(S.besoin, code(false, 'base'));
 ecrit(S.outil, `export function double(n: number): number {\n  return 2 * n;\n}\n`);
 ecrit(S.usage, `import { double } from './outil-121.js';\nexport const QUATRE = double(2);\n`);
-ecrit(S.webRapide, sentinelleVitest(S.webRapide));
-ecrit(S.webLent, sentinelleVitest(S.webLent));
-for (const f of [S.amoRapide, S.amoLent, S.amoAbsent, S.budgetA, S.budgetB, S.budgetC]) ecrit(f, sentinelleNode(f));
-ecrit(S.registre, registre());
+ecrit(S.headless, sentinelleVitest(S.headless));
+ecrit(S.navigateur, sentinelleVitest(S.navigateur));
+ecrit(S.amorcage, sentinelleNode(S.amorcage));
 
 exige(lance('git', ['init', '-q', '--bare', '-b', 'main', ORIGINE], DIVERS), 'git init --bare');
 exige(git('init', '-q', '-b', 'main'), 'git init');
@@ -247,8 +234,6 @@ function naPasJoue(ensemble, exclus, quoi) {
   const joue = exclus.filter((f) => ensemble.has(f));
   assert.deepEqual(joue, [], `${quoi} : joués à tort : ${joue.join(', ')}`);
 }
-
-const durees = [];
 
 // --- État commis (constats 1 et 2 de #119) -------------------------------------------------------
 
@@ -424,46 +409,33 @@ test('#121 · un arbre jamais vérifié (rebase) est rejoué au push, avec la m�
 
 // --- Sélection ----------------------------------------------------------------------------------
 
-test('#121 · une branche organisationnelle joue la garde et les amorçages rapides, et nomme les lents', () => {
+const outilDeLaGarde = { 'packages/gardes/outil-121.mjs': 'export const OUTIL = 1;\n' };
+
+test('#121 · besoin fonctionnel : tests headless du cœur et de l’interface, ni garde, ni amorçages, ni navigateur', () => {
   depart();
   branche(PR, `origin/${PR}`);
-  pose({ 'packages/gardes/outil-121.mjs': 'export const OUTIL = 1;\n' }, 'outil de la garde');
+  pose({ [S.besoin]: code(false, 'fonctionnel') });
+  const r = pousse(PR, PR);
+  const ensemble = joues();
+  remet();
+  accepte(r, 'livraison fonctionnelle');
+  aJoue(ensemble, [S.coeur, S.headless], 'besoin fonctionnel');
+  naPasJoue(ensemble, [S.garde, S.amorcage, S.navigateur], 'besoin fonctionnel');
+});
+
+test('#121 · besoin organisationnel : garde et amorçages, ni cœur, ni interface, ni navigateur', () => {
+  depart();
+  branche(PR, `origin/${PR}`);
+  pose(outilDeLaGarde, 'outil de la garde');
   const r = pousse(PR, PR);
   const ensemble = joues();
   remet();
   accepte(r, 'livraison organisationnelle');
-  aJoue(ensemble, [S.garde, S.amoRapide, S.amoAbsent, S.budgetA, S.budgetB, S.budgetC], 'branche organisationnelle');
-  naPasJoue(ensemble, [S.amoLent, S.coeur, S.webRapide, S.webLent], 'branche organisationnelle');
-  affiche(r, 'amorçage lent laissé à la CI', S.amoLent);
+  aJoue(ensemble, [S.garde, S.amorcage], 'besoin organisationnel');
+  naPasJoue(ensemble, [S.coeur, S.headless, S.navigateur], 'besoin organisationnel');
 });
 
-test('#121 · une branche fonctionnelle du cœur joue le cœur, sans la garde ni les amorçages', () => {
-  depart();
-  branche(PR, `origin/${PR}`);
-  pose({ [S.besoin]: code(false, 'fonctionnelle') });
-  const r = pousse(PR, PR);
-  const ensemble = joues();
-  remet();
-  durees.push(['livraison fonctionnelle du cœur', r.duree]);
-  accepte(r, 'livraison fonctionnelle du cœur');
-  aJoue(ensemble, [S.coeur], 'branche fonctionnelle du cœur');
-  naPasJoue(ensemble, [S.garde, S.amoRapide, S.amoAbsent, S.amoLent, S.webLent], 'branche fonctionnelle du cœur');
-});
-
-test('#121 · une branche fonctionnelle de l’interface joue ses tests rapides et nomme les lents', () => {
-  depart();
-  branche(PR, `origin/${PR}`);
-  pose({ 'apps/web/src/lib/note-121.ts': 'export const NOTE = 1;\n' }, 'interface');
-  const r = pousse(PR, PR);
-  const ensemble = joues();
-  remet();
-  accepte(r, 'livraison fonctionnelle de l’interface');
-  aJoue(ensemble, [S.webRapide], 'branche fonctionnelle de l’interface');
-  naPasJoue(ensemble, [S.webLent, S.garde, S.amoRapide], 'branche fonctionnelle de l’interface');
-  affiche(r, 'test d’interface lent laissé à la CI', S.webLent);
-});
-
-test('#121 · un chemin absent de chemins-ignores est organisationnel, et une branche des deux côtés joue les deux', () => {
+test('#121 · un chemin absent de chemins-ignores est organisationnel, et une branche des deux côtés joue les deux sélections', () => {
   depart();
   branche(PR, `origin/${PR}`);
   pose({ 'outils-121/note.mjs': 'export const NOTE = 1;\n', [S.besoin]: code(false, 'mixte') }, 'deux côtés');
@@ -471,105 +443,51 @@ test('#121 · un chemin absent de chemins-ignores est organisationnel, et une br
   const ensemble = joues();
   remet();
   accepte(r, 'livraison des deux côtés');
-  aJoue(ensemble, [S.garde, S.amoRapide, S.coeur], 'branche des deux côtés');
+  aJoue(ensemble, [S.garde, S.amorcage, S.coeur, S.headless], 'branche des deux côtés');
+  naPasJoue(ensemble, [S.navigateur], 'branche des deux côtés');
 });
 
-test('#121 · le budget du registre arrête la sélection, du plus court au plus long, et nomme le reste', () => {
+test('#121 · un test navigateur du harnais du besoin est joué à la livraison, les autres restent à la CI', () => {
   depart();
   branche(PR, `origin/${PR}`);
-  pose({ [S.registre]: REGISTRE_ETROIT, 'packages/gardes/outil-121.mjs': 'export const OUTIL = 2;\n' }, 'budget réduit');
+  pose({ [S.harnaisNav]: sentinelleVitest(S.harnaisNav) }, 'harnais navigateur');
+  pose({ 'apps/web/src/lib/note-121.ts': 'export const NOTE = 1;\n' }, 'interface');
   const r = pousse(PR, PR);
   const ensemble = joues();
   remet();
-  accepte(r, 'livraison sous budget réduit');
-  aJoue(ensemble, [S.budgetB, S.budgetA, S.garde, S.amoRapide], 'budget réduit');
-  naPasJoue(ensemble, [S.budgetC, S.amoAbsent], 'budget réduit');
-  affiche(r, 'fichier laissé à la CI par le budget', S.budgetC);
-  affiche(r, 'fichier absent du registre laissé à la CI par le budget', S.amoAbsent);
+  accepte(r, 'livraison de l’interface avec un harnais navigateur');
+  aJoue(ensemble, [S.harnaisNav, S.headless], 'harnais navigateur');
+  naPasJoue(ensemble, [S.navigateur, S.garde, S.amorcage], 'harnais navigateur');
 });
 
-test('#121 · une livraison fonctionnelle du cœur tient en 30 s', () => {
-  assert.equal(durees.length, 1, 'durée non relevée : le cas fonctionnel du cœur a échoué avant la mesure');
-  const lents = durees.filter(([, d]) => d >= BUDGET_MS);
-  assert.deepEqual(lents, [], `livraison au-delà de ${BUDGET_MS} ms : ${lents.map(([q, d]) => `${q} ${d} ms`).join(', ')}`);
+test('#121 · une sélection qui dépasse son objectif de plus de 20 % le signale, sans bloquer', () => {
+  depart();
+  branche(PR, `origin/${PR}`);
+  pose({ [S.lenteur]: 'lent\n' }, 'non-régression lente');
+  const r = pousse(PR, PR);
+  const ensemble = joues();
+  remet();
+  accepte(r, `livraison fonctionnelle de plus de ${LENTEUR_MS} ms`);
+  aJoue(ensemble, [S.coeur], 'livraison lente');
+  assert.match(r.sortie, /objectif/i, `aucun message ne signale le dépassement de l’objectif (${r.duree} ms) :\n${fin(r.sortie)}`);
 });
 
-// --- Registre des durées et commande ------------------------------------------------------------
+// --- Tri et liste des chemins ------------------------------------------------------------------
 
 const lignesUtiles = (texte) => texte.replace(/\r\n?/g, '\n').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 
-test('#121 · chemins-ignores et le registre des durées sont en place dans le dépôt', () => {
+test('#121 · chemins-ignores est en place, et les tests navigateur sont rangés à part', () => {
   const ignores = join(DEPOT, 'packages/gardes/chemins-ignores');
   assert.ok(existsSync(ignores), 'packages/gardes/chemins-ignores manque');
   const chemins = lignesUtiles(readFileSync(ignores, 'utf8'));
   for (const c of ['apps/', 'packages/core/']) assert.ok(chemins.includes(c), `chemins-ignores ne liste pas ${c}`);
-  const fichier = join(DEPOT, S.registre);
-  assert.ok(existsSync(fichier), `${S.registre} manque`);
-  const lignes = lignesUtiles(readFileSync(fichier, 'utf8'));
-  for (const reglage of ['seuil', 'marge', 'budget', 'marge-budget']) {
-    assert.ok(lignes.some((l) => new RegExp(`^${reglage} \\d+(\\.\\d+)?$`).test(l)), `le registre n'a pas de réglage « ${reglage} <s> »`);
-  }
-  const fautives = lignes.filter((l) => !/^(seuil|marge|budget|marge-budget) \d+(\.\d+)?$/.test(l) && !/^(rapide|lent) \d+(\.\d+)? \S/.test(l));
-  assert.deepEqual(fautives, [], 'lignes du registre hors format');
-  assert.ok(lignes.some((l) => /^(rapide|lent) /.test(l)), 'le registre ne classe aucun fichier');
-});
-
-const DUREE = {
-  nouveauCourt: ['packages/gardes/duree-121-nouveau-court.test.mjs', 0],
-  nouveauLong: ['packages/gardes/duree-121-nouveau-long.test.mjs', 2500],
-  rapideMarge: ['packages/gardes/duree-121-rapide-marge.test.mjs', 1300],
-  lentMarge: ['packages/gardes/duree-121-lent-marge.test.mjs', 500],
-  rapideLong: ['packages/gardes/duree-121-rapide-long.test.mjs', 2600],
-};
-// seuil 1, marge 0,8 : rapide jusqu'à 1 s pour un nouveau, lent au-delà de 1,8 s, rapide en deçà de 0,2 s.
-const REGISTRE_DUREES = `# Registre de l'amorçage 121, commande
-seuil 1
-marge 0.8
-budget 30
-marge-budget 10
-rapide 0.25 ${S.amoRapide}
-rapide 0.5 ${DUREE.rapideMarge[0]}
-lent 5 ${DUREE.lentMarge[0]}
-rapide 0.5 ${DUREE.rapideLong[0]}
-`;
-const classes = (texte) => new Map(lignesUtiles(texte).map((l) => l.match(/^(rapide|lent) (\S+) (.+)$/)).filter(Boolean).map((m) => [m[3], [m[1], Number(m[2])]]));
-
-test('#121 · pnpm durees mesure chaque fichier et le classe, avec les marges', () => {
-  depart();
-  for (const [fichier, ms] of Object.values(DUREE)) {
-    ecrit(fichier, sentinelleNode(fichier, `  await new Promise((r) => setTimeout(r, ${ms}));\n`));
-  }
-  ecrit(S.registre, REGISTRE_DUREES);
-  const cibles = Object.values(DUREE).map(([f]) => f);
-  const r = lance('pnpm', ['durees', ...cibles]);
-  const apres = lire(RACINE, S.registre);
-  ecrit(S.registre, REGISTRE_DUREES);
-  const verif = lance('pnpm', ['durees', '--verifier', DUREE.nouveauLong[0], DUREE.rapideMarge[0]]);
-  const intact = lire(RACINE, S.registre) === REGISTRE_DUREES;
-  remet();
-  assert.equal(r.code, 0, `pnpm durees échoue :\n${fin(r.sortie)}`);
-  const lu = classes(apres);
-  const attendu = {
-    nouveauCourt: 'rapide', nouveauLong: 'lent', rapideMarge: 'rapide', lentMarge: 'lent', rapideLong: 'lent',
-  };
-  const ecarts = Object.entries(attendu).filter(([cle, classe]) => lu.get(DUREE[cle][0])?.[0] !== classe)
-    .map(([cle, classe]) => `${DUREE[cle][0]} : ${lu.get(DUREE[cle][0])?.[0] ?? 'absent'} au lieu de ${classe}`);
-  assert.deepEqual(ecarts, [], `classes écrites par pnpm durees :\n${apres}`);
-  assert.ok(lu.get(DUREE.nouveauLong[0])[1] >= 2, `durée écrite pour un fichier de 2,5 s : ${lu.get(DUREE.nouveauLong[0])[1]}`);
-  assert.deepEqual(lu.get(S.amoRapide), ['rapide', 0.25], 'pnpm durees a réécrit un fichier qu’on ne lui demandait pas de mesurer');
-  assert.equal(verif.code, 0, `pnpm durees --verifier ne sort pas en 0 :\n${fin(verif.sortie)}`);
-  assert.ok(intact, 'pnpm durees --verifier a réécrit le registre');
-  affiche(verif, 'pnpm durees --verifier, fichier absent du registre', DUREE.nouveauLong[0]);
-  assert.ok(!verif.sortie.includes(DUREE.rapideMarge[0]), `pnpm durees --verifier signale un fichier resté dans sa marge :\n${fin(verif.sortie)}`);
-});
-
-test('#121 · la CI vérifie le registre sur chaque PR', () => {
-  const dossier = join(DEPOT, '.github/workflows');
-  const flux = readdirSync(dossier).filter((f) => /\.ya?ml$/.test(f)).map((f) => readFileSync(join(dossier, f), 'utf8'));
-  assert.ok(
-    flux.some((t) => /^\s*pull_request\s*:?/m.test(t) && /pnpm durees --verifier/.test(t)),
-    'aucun workflow déclenché sur les PR ne joue « pnpm durees --verifier »',
-  );
+  const tests = join(DEPOT, 'apps/web/test');
+  const nav = join(tests, 'navigateur');
+  assert.ok(existsSync(nav) && readdirSync(nav).some((f) => /\.test\.ts$/.test(f)), 'apps/web/test/navigateur/ ne contient aucun test');
+  const horsRang = readdirSync(tests)
+    .filter((f) => /\.test\.ts$/.test(f))
+    .filter((f) => /ouvrirLeSite\s*\(/.test(readFileSync(join(tests, f), 'utf8')));
+  assert.deepEqual(horsRang, [], 'des tests qui ouvrent le navigateur restent hors de apps/web/test/navigateur/');
 });
 
 // --- Documentation -----------------------------------------------------------------------------
