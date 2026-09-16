@@ -22,8 +22,8 @@
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas (D73).
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font une part,
   sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
-  les fichiers indexés — cœur, garde ou règles qu'elle lit, relais, hébergement —, et rien pour la
-  seule documentation. Au push : typecheck complet et build, en attendant #121. La CI joue tout ce
+  les fichiers indexés — cœur ; garde ou règles (celles de `VM-regles-primaires`, ce fichier
+  compris) ; relais ; hébergement —, et rien pour la seule documentation. Au push : typecheck complet et build, en attendant #121. La CI joue tout ce
   qui garde un comportement ; les amorçages s'appellent par `pnpm amorcage` (D62, D65).
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
   boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans

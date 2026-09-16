@@ -1563,10 +1563,13 @@ commis, les crochets s'exécutant par git directement.
   avance rapide ne joue aucun crochet.
 - **Le pré-commit choisit ses tests d'après l'index**, et les joue en parallèle sur la copie de
   travail : le cœur (sans isolation des fichiers de test, 3,9 s mesurées contre 11,8 s) ; la garde
-  quand le commit touche sa famille (`packages/gardes`, `amorcage`, `docs/gardes.md`, `.github`)
-  ou les règles qu'elle lit et vérifie (`docs/invariants.md`, `docs/contraintes.md`) ; le relais ;
-  l'hébergement. La documentation seule ne joue rien, pas plus que l'interface (185 s de tests) ou
-  la configuration : le pré-push et la CI les jugent. Le typecheck du cœur sort du pré-commit.
+  quand le commit touche la garde elle-même (`packages/gardes`, `amorcage`, `docs/gardes.md`,
+  `.github`) ou les règles que nomme `VM-regles-primaires` (`docs/decisions.md`,
+  `docs/description-projet.md`, `docs/invariants.md`, `docs/contraintes.md`, `CLAUDE.md`), qu'elle
+  lit toutes ; le relais ; l'hébergement. La documentation seule ne joue rien, pas plus que l'interface (185 s de tests) ou
+  la configuration : le pré-push et la CI les jugent. Le typecheck du cœur sort du pré-commit. Un commit qui ne touche
+  que les `package.json` ou les configurations vitest, que la garde lit aussi, ne la joue pas : la
+  CI le rattrape.
 - **Pas d'échec silencieux.** Un script de test absent fait échouer le crochet (`pnpm run`, et non
   `pnpm --filter`, qui l'avale). Un outil manquant fait sauter le test qui en a besoin, et le
   crochet le signale ; `TIRELIRE_STRICT` le rend obligatoire, comme en CI.
