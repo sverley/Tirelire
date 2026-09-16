@@ -31,6 +31,11 @@
  * Plus rien ici ne lit l'historique git : l'amorçage rend le même verdict sur un clone court, et
  * `TIRELIRE_STRICT` ne change plus rien à ce qu'il dit.
  *
+ * Allégé par l'audit de #122 (D70) : la lecture du workflow renommé ne lit plus le filtre `paths` ni
+ * la présence du dossier dans ses chemins, et son titre le dit. #122 retire ce filtre pour jouer les
+ * amorçages sur chaque PR ; le renommage, fusionné, n'a plus de chemins à vérifier, et l'amorçage de
+ * #122 garde le déclenchement.
+ *
  * Périmètre. La sortie des quatre tests de besoins produit hors de `packages/gardes` a été sortie de
  * #107 par le porteur : elle retirerait ces tests du crochet de pré-commit, donc elle changerait un
  * comportement. La dernière lecture garde cette frontière.
@@ -164,14 +169,11 @@ test('#107 · « pnpm amorcage » joue le dossier, toujours hors du chemin coura
   assert.ok(!lancement.test(crochet), `le crochet de pré-commit joue les amorçages, que D65 en sort : ${crochet}`);
 });
 
-test('#107 · le workflow renommé garde son déclenchement', () => {
+test('#107 · le workflow renommé se lance toujours à la main et lance les amorçages', () => {
   assert.ok(existsSync(join(DEPOT, WORKFLOW)), `${WORKFLOW} n'existe pas`);
   assert.ok(!existsSync(join(DEPOT, ANCIEN_WORKFLOW)), "l'ancien workflow est toujours là");
   const texte = lire(WORKFLOW);
   assert.match(texte, /workflow_dispatch/, "le workflow n'est plus appelable à la main");
-  const declenchement = texte.match(/pull_request:\s*\n\s*paths:\s*\n(?:\s*-\s*.+\n?)+/);
-  assert.notEqual(declenchement, null, "le workflow n'a plus de « paths » sous « pull_request » : il tournerait sur toute PR");
-  assert.match(declenchement[0], new RegExp(`${DOSSIER}/`), "les chemins qui déclenchent le workflow ne citent plus le dossier des amorçages");
   assert.match(texte, new RegExp(`pnpm ${DOSSIER}|node --test ${DOSSIER}/`), "le workflow ne lance plus les amorçages sous leur nouveau nom");
 });
 

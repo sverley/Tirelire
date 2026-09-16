@@ -22,8 +22,8 @@ Ce que l'objectif 0 doit produire, en attendant que les catalogues existent :
 - `packages/gardes` — la garde de l'objectif primaire (#58) : chaque invariant et chaque
   contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et chaque PR demande les siennes.
 - `amorcage` — les amorçages (#82, D65) : ce qu'une session d'audit écrit pour vérifier que le
-  codeur a bien livré une règle du projet. Hors du workspace, joués par `pnpm amorcage`, jamais par
-  `pnpm test`.
+  codeur a bien livré une règle du projet. Hors du workspace, joués par `pnpm amorcage` et en CI sur
+  chaque PR, jamais par `pnpm test`.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
 - `docs` — description du projet, invariants du produit, contraintes du projet, analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
@@ -96,7 +96,7 @@ niveau (D73) :
   documentation, l'interface ou la configuration. Un script de test absent fait échouer le crochet ;
   un outil manquant (PHP, `lftp`…) fait sauter le test qui en a besoin, avec un message.
 - **pré-push** : typecheck complet et build, en attendant que #121 juge l'état commis.
-- **CI** : typecheck, tests et build, en mode strict (`TIRELIRE_STRICT`) ; les amorçages tournent
-  sur les PR qui touchent aux règles, ou à la demande.
+- **CI** : sur chaque PR, typecheck, tests, build et amorçages, en mode strict
+  (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job (D74).
 
 Pour passer outre ponctuellement : `git commit --no-verify`.

@@ -45,8 +45,7 @@ modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeu
 comportement de la garde : son codage a quand même son amorçage.
 
 Un amorçage ne se confond pas avec la garde : la garde tient les catalogues dans la durée,
-l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages n'ont pas
-à être joués autrement qu'en cas de codage dans la garde, ou dans ce qu'elle garde.
+l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages sont joués en CI sur chaque PR, et en local à la demande (`pnpm amorcage`).
 
 ## Documentation simple
 

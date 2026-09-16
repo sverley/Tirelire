@@ -11,7 +11,7 @@ que la garde emploie ne peuvent pas changer de sens sans qu'elle le voie.
 
 Ce document ne porte que les besoins du produit. Ce qu'une session d'audit écrit pour vérifier la
 livraison d'une règle du projet est un amorçage : il vit dans `amorcage/`, n'entre pas dans
-une entrée et ne tourne pas dans `pnpm test` (#82, D65).
+une entrée et ne tourne pas dans `pnpm test`, mais en CI sur chaque PR (#82, D65, D74).
 
 ## Ce qui est vérifié
 
