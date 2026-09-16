@@ -26,8 +26,12 @@
   compris) ; relais ; hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
   commit ; le harnais du besoin (les fichiers de test que la branche ajoute ou modifie depuis sa base
   commune avec `origin/main`) est joué, et le pré-commit ne fait qu'en afficher le verdict, sans
-  bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le bloque (#121, D75). `--no-verify` est un contournement, qu'aucune
-  consigne ne propose. Au push : typecheck complet et build, en attendant #121. La CI joue sur
+  bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le bloque (D75, D76). `--no-verify` est un contournement, qu'aucune
+  consigne ne propose. À la livraison (pré-fusion et pré-push, D76), sur l'état commis : la nature du
+  besoin se lit par `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests headless des
+  paquets touchés et de l'interface, 30 s) ou organisationnel (garde et amorçages, 45 s) —, les tests
+  navigateur (`apps/web/test/navigateur/`) restent à la CI, et le harnais du besoin est joué à part et
+  bloque quand du code arrive. La CI joue sur
   chaque PR, en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build et
   `pnpm amorcage` ; un outil manquant y fait échouer le job (D74).
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
@@ -41,6 +45,17 @@
 - **Le vocabulaire est celui de [`docs/glossaire.md`](docs/glossaire.md)** : besoin, harnais,
   garde, tests, amorçages. Il commande qui écrit un harnais, où il vit et quand il est joué.
 - **L'issue définit le besoin, la PR définit la solution.**
+- **Branches et livraison (D76).** Une seule branche par PR. Le travail en cours se pousse sur une
+  sous-branche `<branche>--codeur` ou `<branche>--auditeur` : le pré-push n'y joue que la
+  non-régression, et #124 les range à la fusion de la PR. Livrer, c'est fusionner sa sous-branche
+  dans la branche de la PR, puis pousser celle-ci : la pré-fusion juge l'arbre fusionné, et le
+  pré-push ne rejoue pas un arbre déjà vérifié.
+  - **Un harnais faux** se corrige dans le worktree de l'auditeur (sa sous-branche), puis se fusionne
+    dans la branche de la PR : cette livraison n'apporte pas de code, le harnais s'y affiche sans
+    bloquer.
+  - **Le codeur** rebase ou fusionne ensuite la branche de la PR dans la sienne, puis livre par
+    fusion. Sa mise à jour n'apporte pas de code et passe ; sa livraison en apporte, et le harnais
+    du besoin la bloque tant qu'il est rouge.
 - **Deux agents par besoin, et l'auditeur passe en premier (D68).** La confiance envers le codeur
   n'est pas présumée : un agent écrit le harnais du besoin, un autre code le besoin.
   - **L'auditeur d'abord.** Il juge si le besoin tient en une tâche ou se décline en sous-tâches,

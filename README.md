@@ -96,13 +96,24 @@ niveau (D73) :
   documentation, l'interface ou la configuration. Parmi ces tests, la **non-régression** bloque :
   un test existant en échec refuse le commit. Le **harnais du besoin** — les fichiers de test que la
   branche ajoute ou modifie depuis sa base commune avec `origin/main` — est joué, et le crochet en
-  affiche le verdict sans bloquer ; c'est la livraison qui le bloque (#121). Seule une erreur de
+  affiche le verdict sans bloquer ; c'est la livraison qui le bloque (D76). Seule une erreur de
   syntaxe dans un harnais refuse le commit ; un import introuvable est affiché à part, avec le module
   qui manque. Sur `main`, ou sans `origin/main`, tout test est non-régression (D75). Un script de
   test absent fait échouer le crochet ; un outil manquant (PHP, `lftp`…) fait sauter le test qui en
   a besoin, avec un message.
-- **pré-push** : typecheck complet et build, en attendant que #121 juge l'état commis.
-- **CI** : sur chaque PR, typecheck, tests, build et amorçages, en mode strict
+- **pré-fusion** (`pre-merge-commit`, et le pré-commit pendant un conflit) et **pré-push** : la
+  livraison (D76), jugée sur l'état commis — l'index ou le commit poussé, jamais la copie de travail.
+  - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
+    `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
+    touchés, tests headless de l'interface ; objectif 30 s) ou **organisationnel** (garde et tous les
+    amorçages ; objectif 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
+    restent à la CI. Un dépassement de plus de 20 % s'affiche, sans bloquer.
+  - Le harnais du besoin est toujours joué, à part et hors objectif. Il **bloque** quand ce qui arrive
+    apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
+    son verdict s'affiche. La non-régression bloque toujours.
+  - Le pré-push ne rejoue pas un arbre déjà vérifié à la fusion. Un push vers une sous-branche
+    (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la non-régression.
+- **CI** : sur chaque PR, typecheck, tests (navigateur compris), build et amorçages, en mode strict
   (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job (D74).
 
 `git commit --no-verify` est un contournement (D62) : il fait sauter la non-régression avec le
