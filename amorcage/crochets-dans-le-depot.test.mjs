@@ -3,7 +3,8 @@
  *
  * #120 veut des crochets suivis dans le dépôt (`.githooks/`), activés par `pnpm crochets`, qui pose
  * aussi `merge.ff false`, et un pré-commit sous 5 s. Le pré-push garde le typecheck en attendant #121. Ce pré-commit choisit ses tests d'après les
- * fichiers du commit (l'index) et les joue sur la copie de travail.
+ * fichiers du commit (l'index) et les joue sur la copie de travail. Les règles sont celles que
+ * `CLAUDE.md` nomme pour `VM-regles-primaires`.
  *
  * L'amorçage juge en boîte noire :
  * - il copie le dépôt et en fait un dépôt git ;
@@ -146,12 +147,12 @@ test('#120 · le crochet joué est celui de la branche extraite', () => {
   git('add', '.githooks/pre-commit');
   const preparation = git('commit', '-q', '--no-verify', '-m', 'crochet propre à la branche');
   assert.equal(preparation.code, 0, fin(preparation.sortie));
-  ecrit('docs/glossaire.md', ajoutCommentaire);
-  git('add', 'docs/glossaire.md');
+  ecrit('docs/architecture.md', ajoutCommentaire);
+  git('add', 'docs/architecture.md');
   const surEssai = git('commit', '-q', '-m', 'documentation sur essai-120');
   assert.notEqual(surEssai.code, 0, 'le crochet de la branche essai-120 n’a pas été joué');
   assert.match(surEssai.sortie, /crochet de la branche essai-120/);
-  const surBase = commet({ 'docs/glossaire.md': ajoutCommentaire });
+  const surBase = commet({ 'docs/architecture.md': ajoutCommentaire });
   git('branch', '-q', '-D', 'essai-120');
   assert.equal(surBase.code, 0, `revenu sur la base, le commit est refusé :\n${fin(surBase.sortie)}`);
   assert.doesNotMatch(surBase.sortie, /essai-120/, 'le crochet de essai-120 est encore joué sur la base');
@@ -160,8 +161,8 @@ test('#120 · le crochet joué est celui de la branche extraite', () => {
 test('#120 · un commit de documentation seule ne joue aucun test, même si la copie de travail casse le cœur', () => {
   exigeActivation();
   const r = commet(
-    { 'docs/glossaire.md': ajoutCommentaire, 'packages/core/test/amorcage-120.test.ts': testRougeVitest('du cœur') },
-    { indexer: ['docs/glossaire.md'] },
+    { 'docs/architecture.md': ajoutCommentaire, 'packages/core/test/amorcage-120.test.ts': testRougeVitest('du cœur') },
+    { indexer: ['docs/architecture.md'] },
   );
   assert.equal(r.code, 0, `un commit de documentation seule est refusé :\n${fin(r.sortie)}`);
   assert.ok(r.duree < BUDGET_MS, `le crochet a pris ${r.duree} ms pour de la documentation (budget ${BUDGET_MS} ms)`);
@@ -178,6 +179,20 @@ for (const [lieu, fichier, contenu] of [
     const r = commet({ [fichier]: contenu });
     assert.notEqual(r.code, 0, `le commit passe malgré un test rouge ${lieu}`);
     assert.ok(r.sortie.includes(`${ROUGE} ${lieu}`), `le refus ne nomme pas le test rouge ${lieu} :\n${fin(r.sortie)}`);
+  });
+}
+
+// Les règles, au sens de `CLAUDE.md` (VM-regles-primaires) : la garde les lit, un commit qui en touche
+// une joue ses tests. Le test rouge de la garde reste dans la copie de travail, hors du commit.
+for (const regle of ['CLAUDE.md', 'docs/decisions.md', 'docs/description-projet.md', 'docs/invariants.md', 'docs/contraintes.md', 'docs/gardes.md']) {
+  test(`#120 · un commit qui touche ${regle} joue les tests de la garde`, () => {
+    exigeActivation();
+    const r = commet(
+      { [regle]: (t) => `${t}\n`, 'packages/gardes/amorcage-120.test.mjs': testRougeNode('de la garde') },
+      { indexer: [regle] },
+    );
+    assert.notEqual(r.code, 0, `un commit sur ${regle} ne joue pas les tests de la garde :\n${fin(r.sortie)}`);
+    assert.ok(r.sortie.includes(`${ROUGE} de la garde`), `le refus ne nomme pas le test rouge de la garde :\n${fin(r.sortie)}`);
   });
 }
 

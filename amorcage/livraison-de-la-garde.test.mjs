@@ -374,7 +374,11 @@ test('D61 · un harnais seulement prévu ne garde rien, un renvoi en boucle non 
 test('#59 · la couverture tourne dans les tests du paquet, donc au commit et dans la CI', () => {
   const racineJson = JSON.parse(lire(DEPOT, 'package.json'));
   assert.match(racineJson.scripts.test, /pnpm -r test|@tirelire\/gardes/, 'pnpm test ne lance pas les tests de la garde');
-  assert.match(racineJson['simple-git-hooks']?.['pre-commit'] ?? '', /@tirelire\/gardes test|pnpm -r test|pnpm test/, 'le crochet de pré-commit ne lance pas la garde');
+  // Depuis #120 (D73), le crochet est suivi dans .githooks et lance la garde quand le commit touche la
+  // garde ou les règles ; l'amorçage de #120 le vérifie en le jouant.
+  const preCommit = join(DEPOT, '.githooks', 'pre-commit');
+  const crochet = existsSync(preCommit) ? readFileSync(preCommit, 'utf8') : '';
+  assert.match(crochet, /@tirelire\/gardes|packages\/gardes/, 'le crochet de pré-commit ne lance pas la garde');
   const ci = lire(DEPOT, '.github/workflows/ci.yml');
   assert.match(ci, /^\s+push:/m, 'la CI ne tourne pas sur les push');
   assert.match(ci, /^\s+pull_request:/m, 'la CI ne tourne pas sur les PR');

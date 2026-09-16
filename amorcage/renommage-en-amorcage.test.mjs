@@ -155,9 +155,13 @@ test('#107 · « pnpm amorcage » joue le dossier, toujours hors du chemin coura
   const fautif = globs.find((glob) => glob === DOSSIER || glob.startsWith(`${DOSSIER}/`) || ['*', '**', '**/*'].includes(glob));
   assert.equal(fautif, undefined, `le glob « ${fautif} » du workspace atteindrait ${DOSSIER}/, qui rentrerait dans « pnpm test »`);
 
-  const crochet = paquet['simple-git-hooks']?.['pre-commit'] ?? '';
-  assert.ok(crochet, `aucun crochet de pré-commit dans package.json : ${RELIRE}`);
-  assert.ok(!new RegExp(`\\bpnpm ${DOSSIER}\\b|${DOSSIER}/`).test(crochet), `le crochet de pré-commit joue les amorçages, que D65 en sort : ${crochet}`);
+  // Depuis #120 (D73), le crochet est suivi dans .githooks ; un motif de chemin qui cite le dossier pour
+  // choisir les tests de la garde n'est pas un lancement.
+  const preCommit = join(DEPOT, '.githooks', 'pre-commit');
+  const crochet = existsSync(preCommit) ? readFileSync(preCommit, 'utf8') : '';
+  assert.ok(crochet, `aucun crochet de pré-commit dans .githooks : ${RELIRE}`);
+  const lancement = new RegExp(`\\bpnpm\\s+(run\\s+)?${DOSSIER}\\b|\\bnode\\b[^\\n]*--test[^\\n]*\\b${DOSSIER}/`);
+  assert.ok(!lancement.test(crochet), `le crochet de pré-commit joue les amorçages, que D65 en sort : ${crochet}`);
 });
 
 test('#107 · le workflow renommé garde son déclenchement', () => {
