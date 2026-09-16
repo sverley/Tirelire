@@ -1578,3 +1578,28 @@ commis, les crochets s'exécutant par git directement.
   Elle commence par `pnpm install && pnpm crochets` dans son clone.
 - **Ce que le budget protège ne change pas** (D66) : un crochet trop long se contourne. Un
   dépassement se traite en allégeant le crochet, pas en relevant le seuil.
+
+## D74 · 2026-09-16 · La CI joue tous les harnais et la garde sur chaque PR, en mode strict
+
+Besoin #122, issu de #119 ; phrase du glossaire validée mot pour mot par le porteur le
+16 septembre (Q1 de #122). Remplace deux passages sans les réécrire (D64) : dans D65, la fin du
+point « Moment » (les amorçages tournent sur une PR qui touche aux règles, « ailleurs, jamais ») ;
+dans D72, la fin du point « L'amorçage ne se confond pas avec la garde » (l'amorçage « ne tourne
+d'office que sur une PR qui touche aux règles »).
+
+- **Chaque PR.** `amorcage.yml` n'a plus de filtre de chemins : `pnpm amorcage` tourne sur chaque
+  PR, produit ou documentation comprise, avec `TIRELIRE_STRICT`. `ci.yml` (typecheck, `pnpm test`,
+  build) et `verifications.yml` tournaient déjà sur chaque PR.
+- **Un outil manquant fait échouer le job.** `TIRELIRE_STRICT` est posé pour `pnpm test` et
+  `pnpm amorcage` ; un amorçage qui se saute sous condition le lit, et échoue en CI au lieu de se
+  taire (D54).
+- **Périmètre.** Tout ce qui lit des fichiers suivis tourne sur la PR. Ce qui lit hors des fichiers
+  suivis et ne peut pas tourner sur une PR — l'alerte de fusion, `verifier.sh` — reste hors du
+  périmètre (D71).
+- **Ce qui ne change pas.** Les amorçages restent hors de `pnpm test` et des crochets (D65, D73) ;
+  la distinction entre garde et amorçage de D72 tient. Le glossaire dit : « Les amorçages sont
+  joués en CI sur chaque PR, et en local à la demande (`pnpm amorcage`). »
+- **Coût.** Environ 190 s d'amorçages de plus sur chaque PR, accepté par le porteur (#119).
+- **Ce qui suit.** Les lectures d'amorçage qui exigeaient le filtre (#82, #107) sont retirées
+  (D70). #121 ne peut plus lire « les chemins de `amorcage.yml` » : sa liste de chemins
+  organisationnels est une question ouverte (Q2 de #122). #117 devient sans objet.

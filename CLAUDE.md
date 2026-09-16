@@ -23,8 +23,9 @@
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font une part,
   sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
   les fichiers indexés — cœur ; garde ou règles (celles de `VM-regles-primaires`, ce fichier
-  compris) ; relais ; hébergement —, et rien pour la seule documentation. Au push : typecheck complet et build, en attendant #121. La CI joue tout ce
-  qui garde un comportement ; les amorçages s'appellent par `pnpm amorcage` (D62, D65).
+  compris) ; relais ; hébergement —, et rien pour la seule documentation. Au push : typecheck complet et build, en attendant #121. La CI joue sur
+  chaque PR, en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build et
+  `pnpm amorcage` ; un outil manquant y fait échouer le job (D74).
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
   boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans
   son en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
@@ -103,8 +104,8 @@
   `apps/relay`, `apps/hebergement`), ou dans `packages/gardes` s'il n'appartient à aucune
   application. Le harnais que le codeur écrit sur la garde va dans `packages/gardes/gardes.test.mjs`.
   Le harnais qu'un auditeur écrit sur une règle est un **amorçage** : il va dans `amorcage/`,
-  hors du workspace, s'appelle par `pnpm amorcage`, et ne tourne de lui-même que sur une PR qui touche
-  aux règles. Il ne va jamais dans `pnpm test`.
+  hors du workspace, s'appelle par `pnpm amorcage`, et tourne en CI sur chaque PR (D74). Il ne va
+  jamais dans `pnpm test`.
 - **Codage d'un besoin.** Le harnais est déjà là et rouge ; le travail consiste à le faire passer
   au vert sans le modifier. Les questions de développement et les décisions techniques se consignent
   en commentaires dans la discussion de la PR, jamais dans sa description.

@@ -2,7 +2,7 @@ name: Amorçages
 
 # Les amorçages (#82, D63) jugent le travail du codeur sur une règle du projet : ils constatent
 # une livraison, ils ne gardent pas un comportement. Ils restent donc hors de `pnpm test` et des
-# crochets, et ne tournent que sur une PR qui touche aux règles, ou à la demande.
+# crochets, mais tournent sur chaque PR, en mode strict, et à la demande (#122, D74).
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
 # - `amorcage` lit des fichiers suivis : il rejoue ici `pnpm amorcage`, tel qu'en local.
@@ -10,18 +10,6 @@ name: Amorçages
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - 'amorcage/**'
-      - 'packages/gardes/**'
-      - 'docs/gardes.md'
-      - 'docs/invariants.md'
-      - 'docs/contraintes.md'
-      - 'docs/decisions.md'
-      - 'docs/description-projet.md'
-      - 'CLAUDE.md'
-      - '.github/workflows/**'
-      - '.github/pull_request_template.md'
-      - 'package.json'
 
 permissions:
   contents: read
