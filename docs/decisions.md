@@ -1634,5 +1634,12 @@ non-régression.
   `.githooks/verdict.mjs` trie. Deux passes par paquet ne tiennent pas les 5 s sur une machine à un
   processeur (6,0 s mesurées à l'audit). Un paquet en échec sans rapport lisible par fichier (script
   absent, configuration cassée) bloque.
+- **Rejet différé (Q3 de #127).** Les tests du cœur tournent dans un seul processus
+  (`--no-isolate`), et vitest attribue une erreur non attrapée au fichier qui tourne à cet instant.
+  Une erreur différée (minuteur, nouvel essai) qui tombe pendant un harnais du besoin est donc
+  affichée sans bloquer, même si elle vient du code ou d'un test existant. Limite acceptée par le
+  porteur : bloquer toute erreur non attrapée gênerait l'auditeur dont le harnais en produit une,
+  deux lancements par paquet dépassent le budget, et la CI, qui rejoue tout, rattrape le faux
+  passage.
 - **`--no-verify` reste un contournement** (D62) : aucune consigne ne le propose, et la ligne du
   README qui le proposait est retirée.
