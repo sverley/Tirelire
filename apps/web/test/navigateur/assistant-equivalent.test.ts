@@ -22,7 +22,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BrowserContext, Page } from 'puppeteer-core';
-import { allerÀ, cliquer, navigateur, ouvrirLeSite, type Site } from './harnais.js';
+import { allerÀ, cliquer, navigateur, ouvrirLeSite, type Site } from '../harnais.js';
 
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 

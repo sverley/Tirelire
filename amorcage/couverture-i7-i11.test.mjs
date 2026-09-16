@@ -11,11 +11,11 @@
  * des deux harnais de #72 — retour à la seule vérification manuelle d'avant — resterait donc
  * invisible pour `pnpm amorcage`. Ce fichier verrouille spécifiquement ce que #72 a promis :
  *
- * 1. I7 cite au moins deux harnais sur `apps/web/test/donnees-locales.test.ts` (parcours sans
+ * 1. I7 cite au moins deux harnais sur `apps/web/test/navigateur/donnees-locales.test.ts` (parcours sans
  *    synchronisation ; relais chiffré après accord explicite), chacun avec un témoin rouge nommé,
  *    et ce témoin est déclaré `it.fails` dans le fichier réel — pas un test ordinaire qui passerait
  *    sans rien prouver (#66, #69).
- * 2. I11 cite au moins un harnais sur `apps/web/test/assistant-equivalent.test.ts`, avec son témoin
+ * 2. I11 cite au moins un harnais sur `apps/web/test/navigateur/assistant-equivalent.test.ts`, avec son témoin
  *    rouge nommé, déclaré `it.fails`.
  *
  * Chaque vérification a son témoin rouge ici même : les mêmes assertions rejouées sur un registre
@@ -70,9 +70,9 @@ function verifierHarnaisAutomatise(id, fichier, minimum, texteDuRegistre, source
   }
 }
 
-// ─── I7 · apps/web/test/donnees-locales.test.ts ──────────────────────────────────────────────────
+// ─── I7 · apps/web/test/navigateur/donnees-locales.test.ts ──────────────────────────────────────────────────
 
-const FICHIER_I7 = 'apps/web/test/donnees-locales.test.ts';
+const FICHIER_I7 = 'apps/web/test/navigateur/donnees-locales.test.ts';
 
 test('#72 · I7 a bien ses deux harnais automatisés sur donnees-locales.test.ts, témoins rouges à l’appui', () => {
   verifierHarnaisAutomatise('I7', FICHIER_I7, 2, registre(), lire(FICHIER_I7));
@@ -89,9 +89,9 @@ test('#72 · témoin rouge — un témoin d’I7 réécrit comme un test ordinai
   assert.throws(() => verifierHarnaisAutomatise('I7', FICHIER_I7, 2, registre(), source), /n'est pas déclaré avec `it\.fails`/);
 });
 
-// ─── I11 · apps/web/test/assistant-equivalent.test.ts ────────────────────────────────────────────
+// ─── I11 · apps/web/test/navigateur/assistant-equivalent.test.ts ────────────────────────────────────────────
 
-const FICHIER_I11 = 'apps/web/test/assistant-equivalent.test.ts';
+const FICHIER_I11 = 'apps/web/test/navigateur/assistant-equivalent.test.ts';
 
 test('#72 · I11 a bien son harnais automatisé sur assistant-equivalent.test.ts, témoin rouge à l’appui', () => {
   verifierHarnaisAutomatise('I11', FICHIER_I11, 1, registre(), lire(FICHIER_I11));

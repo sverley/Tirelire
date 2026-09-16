@@ -229,7 +229,7 @@ test('#71 · I4 et I5 sont gardés par un harnais, ou par une renonciation écri
 });
 
 test('#71 · témoin vert — I4 gardé par un harnais, I5 par une renonciation, sont acceptés', () => {
-  const tenu = avecRenonciation(avecHarnais(registre(), 'I4', 'apps/web/test/assistant-simple.test.ts'), 'I5');
+  const tenu = avecRenonciation(avecHarnais(registre(), 'I4', 'apps/web/test/navigateur/assistant-simple.test.ts'), 'I5');
   garderOuRenoncer(tenu);
 });
 

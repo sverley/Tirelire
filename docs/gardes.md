@@ -167,7 +167,7 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
   le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le budget se
   signale sans rien réécrire (#14, D60).
   Témoin rouge : « témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer »
-- **Harnais** · `apps/web/test/flux-derives-plan.test.ts` — à 375 px, l'écran Plan enregistre
+- **Harnais** · `apps/web/test/navigateur/flux-derives-plan.test.ts` — à 375 px, l'écran Plan enregistre
   l'ordre, qui survit au rechargement.
   Témoin rouge : « témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire »
 - **Harnais** · `packages/core/test/parcours-u2.test.ts` — « parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation » :
@@ -220,7 +220,7 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 
 Chemins : `apps/web/src/views/Wizard.svelte`
 
-- **Harnais** · `apps/web/test/assistant-simple.test.ts` — « parcours simple · de la base vide au plan, sans un seul réglage avancé » :
+- **Harnais** · `apps/web/test/navigateur/assistant-simple.test.ts` — « parcours simple · de la base vide au plan, sans un seul réglage avancé » :
   d'une base vide, l'assistant s'ouvre depuis l'accueil en deux gestes au plus, chaque étape se
   franchit par son seul bouton primaire — aucun champ rempli, aucune liste dépliée, aucun détour par
   la Configuration — et le Plan qui suit dote des tirelires et réserve un montant non nul.
@@ -233,7 +233,7 @@ Chemins : `apps/web/src/views/Wizard.svelte`
 
 Chemins : `apps/web/src/App.svelte`, `apps/web/src/views/More.svelte`
 
-- **Harnais** · `apps/web/test/acces-fonctions.test.ts` — « inventaire des fonctions · chacune atteinte, nommée, et amorcée à vide » :
+- **Harnais** · `apps/web/test/navigateur/acces-fonctions.test.ts` — « inventaire des fonctions · chacune atteinte, nommée, et amorcée à vide » :
   l'inventaire couvre tous les écrans que le shell sait afficher ; chacun s'atteint depuis l'accueil
   en deux gestes au plus, par un point d'entrée qui le nomme et dit à quoi il sert ; et, sur une base
   vide, chaque écran porte son amorce — le bouton qui le remplit, ou l'écran par où commencer.
@@ -258,7 +258,7 @@ devant le produit, et le seuil interdit la hausse.
 - **Harnais** · `packages/core/test/automations.test.ts` — une règle classe toutes les opérations
   semblables, se rejoue sans effet de bord, et son aperçu ne modifie rien.
   Témoin rouge : « témoin rouge · un aperçu de règle qui enregistre la règle d’essai »
-- **Harnais** · `apps/web/test/gestes-classement.test.ts` — « gestes de classement · catégoriser une opération, puis toutes les semblables » :
+- **Harnais** · `apps/web/test/navigateur/gestes-classement.test.ts` — « gestes de classement · catégoriser une opération, puis toutes les semblables » :
   le compte des gestes mesuré dans le navigateur, sur les quatre cas de l'objectif ci-dessus, chacun
   comparé à son seuil ; une opération remise à zéro par le harnais avant chaque mesure, et la
   sous-catégorie créée par l'interface.
@@ -271,12 +271,12 @@ devant le produit, et le seuil interdit la hausse.
 
 Chemins : `packages/core/src/sync.ts`, `apps/web/src/lib/db.ts`, `apps/web/src/lib/relay.ts`, `apps/web/src/lib/webrtc.ts`, `apps/relay/**`, `apps/hebergement/serveur/**`
 
-- **Harnais** · `apps/web/test/donnees-locales.test.ts` — « un parcours complet sans synchronisation
+- **Harnais** · `apps/web/test/navigateur/donnees-locales.test.ts` — « un parcours complet sans synchronisation
   ne fait sortir aucune donnée de l’appareil » : l'exemple chargé, un aller-retour par Opérations,
   Bilan, l'import d'un relevé inventé et l'export du fichier SQLite ne fait partir aucune requête
   réseau.
   Témoin rouge : « témoin rouge · une requête réseau partie pendant un parcours sans synchronisation »
-- **Harnais** · `apps/web/test/donnees-locales.test.ts` — « avec un relais renseigné, seuls des
+- **Harnais** · `apps/web/test/navigateur/donnees-locales.test.ts` — « avec un relais renseigné, seuls des
   paquets chiffrés partent, et seulement après le remplissage et le clic explicites » : remplir
   l'adresse, le salon et la phrase puis cliquer sur « Synchroniser maintenant » vaut l'acceptation,
   avertissement compris (tranché avec le porteur le 13 septembre 2026) ; rien ne part avant, et ce
@@ -340,7 +340,7 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
 `apps/web/src/views/Flows.svelte`, `apps/web/src/views/Accounts.svelte`,
 `packages/core/src/suggestions.ts`
 
-- **Harnais** · `apps/web/test/assistant-equivalent.test.ts` — sur un projet vierge, chaque étape de
+- **Harnais** · `apps/web/test/navigateur/assistant-equivalent.test.ts` — sur un projet vierge, chaque étape de
   l'assistant qui sème une ligne (compte, revenu, charge fixe, budget courant, échéance, épargne) a
   cette ligne retrouvée dans l'écran de configuration ordinaire correspondant (Comptes, Flux
   prévus, Tirelires), avec un bouton d'édition (« Modifier », ou « Placer » pour une tirelire semée
@@ -477,16 +477,16 @@ Chemins : `packages/core/src/schema.ts`, `packages/core/src/migration.ts`, `pack
 
 Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/app.css`
 
-- **Harnais** · `apps/web/test/mise-en-page.test.ts` — à 320 et 375 px, le document ne défile pas
+- **Harnais** · `apps/web/test/navigateur/mise-en-page.test.ts` — à 320 et 375 px, le document ne défile pas
   en largeur et aucun libellé ne recouvre son montant (D54).
   Témoin rouge : « témoin rouge · une page dont une ligne insécable déborde de l’écran »
-- **Harnais** · `apps/web/test/ergonomie.test.ts` — cibles de 44 px, texte de 12 px, contraste de
+- **Harnais** · `apps/web/test/navigateur/ergonomie.test.ts` — cibles de 44 px, texte de 12 px, contraste de
   4,5:1, aucun champ caché sous la barre d'onglets (D55).
   Témoin rouge : « témoin rouge · un écran aux cibles de 20 px et au texte gris pâle »
 - **Harnais** · `apps/web/test/panneaux-edition.test.ts`, `apps/web/test/revealed.test.ts` — un
   formulaire s'ouvre sous la ligne qu'il modifie et vient dans le champ de vision.
   Témoin rouge : « témoin rouge · un panneau écrit en tête de document, hors extrait et sans titre »
-- **Harnais** · `apps/web/test/panneaux-nommes.test.ts` — un panneau d'édition nomme ce qu'il
+- **Harnais** · `apps/web/test/navigateur/panneaux-nommes.test.ts` — un panneau d'édition nomme ce qu'il
   modifie, lisible à 375 px (D59).
   Témoin rouge : « témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe »
 - **Vérification manuelle** · `VM-C9-telephone` — Sur un vrai téléphone, dans l'application
