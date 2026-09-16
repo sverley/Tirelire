@@ -19,7 +19,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { accessSync, appendFileSync, chmodSync, constants, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -97,10 +97,17 @@ const testRougeVitest = (lieu) => `import { expect, it } from 'vitest';\nit('${R
 const testRougeNode = (lieu) =>
   `import assert from 'node:assert/strict';\nimport { test } from 'node:test';\ntest('${ROUGE} ${lieu}', () => assert.equal(1, 2));\n`;
 
-/** Un PATH où tout est présent sauf les outils nommés. */
+/**
+ * Un PATH où tout est présent sauf les outils nommés. Les dossiers qui ne les fournissent pas restent
+ * tels quels. Ceux qui les fournissent sont remplacés par des relais qui appellent chaque autre
+ * commande par son chemin d'origine : un lien symbolique casserait les scripts qui se situent par
+ * `$0`, comme le `pnpm` qu'installe `pnpm/action-setup` en CI.
+ */
 function cheminSans(outils) {
   const bin = mkdtempSync(join(tmpdir(), 'tirelire-120-bin-'));
   after(() => rmSync(bin, { recursive: true, force: true }));
+  const cache = (nom) => outils.some((o) => nom.startsWith(o));
+  const dossiers = [];
   for (const dossier of (process.env.PATH ?? '').split(delimiter)) {
     let noms = [];
     try {
@@ -108,16 +115,26 @@ function cheminSans(outils) {
     } catch {
       continue;
     }
-    for (const nom of noms) {
-      if (outils.some((o) => nom.startsWith(o)) || existsSync(join(bin, nom))) continue;
-      try {
-        symlinkSync(join(dossier, nom), join(bin, nom));
-      } catch {
-        // nom déjà pris par un dossier précédent du PATH
-      }
+    if (!noms.some(cache)) {
+      dossiers.push(dossier);
+      continue;
     }
+    const relais = join(bin, String(dossiers.length));
+    mkdirSync(relais);
+    for (const nom of noms) {
+      const cible = join(dossier, nom);
+      if (cache(nom)) continue;
+      try {
+        if (!statSync(cible).isFile()) continue;
+        accessSync(cible, constants.X_OK);
+      } catch {
+        continue;
+      }
+      writeFileSync(join(relais, nom), `#!/bin/sh\nexec '${cible.replace(/'/g, "'\\''")}' "$@"\n`, { mode: 0o755 });
+    }
+    dossiers.push(relais);
   }
-  return bin;
+  return dossiers.join(delimiter);
 }
 
 test('#120 · les crochets sont des scripts suivis dans .githooks, et simple-git-hooks est retiré', () => {
