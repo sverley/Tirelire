@@ -12,7 +12,9 @@
  *
  * « Par construction » se lit à quatre endroits : le workspace pnpm n'inclut aucun glob qui
  * atteindrait `amorcage/` (donc `pnpm -r test` ne peut pas y entrer, quel que soit son contenu) ;
- * `scripts.amorcage` de la racine appelle `node --test` directement sur ce dossier, hors du workspace ;
+ * `scripts.amorcage` de la racine appelle `node --test` directement sur ce dossier, hors du workspace
+ * (l'audit de #113 y admet un préchargement `--import`, par où passe la garde de D71, et rien
+ * d'autre) ;
  * le crochet de pré-commit ne le cite pas ; le workflow dédié ne tourne que sur `workflow_dispatch`
  * ou une PR dont les chemins touchent aux règles, jamais sur toute PR. Chaque assertion structurelle
  * a son témoin : une mutation qui réintroduirait amorcage dans le chemin courant, et que
@@ -25,7 +27,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { copieDuDepot, lire, lignesDe, modifie } from './test/copie-du-depot.mjs';
+import { appelleDirectementLesAmorcages, copieDuDepot, lire, lignesDe, modifie } from './test/copie-du-depot.mjs';
 
 const RACINE = copieDuDepot();
 
@@ -65,7 +67,27 @@ test('#82 · « pnpm test » reste une récursion sur le workspace, qui ne peut 
 
 test('#82 · « pnpm amorcage » appelle node --test directement sur amorcage/, hors du workspace', () => {
   const { scripts } = packageJson(RACINE);
-  assert.equal(scripts.amorcage, 'node --test amorcage/*.test.mjs', `scripts.amorcage n'appelle plus amorcage/*.test.mjs directement : ${scripts.amorcage}`);
+  assert.ok(
+    appelleDirectementLesAmorcages(scripts.amorcage),
+    `scripts.amorcage n'appelle plus node --test directement sur amorcage/*.test.mjs, avec pour seules options des préchargements : ${scripts.amorcage}`,
+  );
+});
+
+test('#82 · témoin : l’appel direct admet un préchargement (#113), rien qui saute ou chaîne des amorçages', () => {
+  for (const script of [
+    'node --test amorcage/*.test.mjs',
+    'node --import ./packages/gardes/sans-sortie.mjs --test amorcage/*.test.mjs',
+    'node --import=./a.mjs --require ./b.cjs --test amorcage/*.test.mjs',
+  ]) assert.ok(appelleDirectementLesAmorcages(script), `refusé à tort : ${script}`);
+  for (const script of [
+    'node --test --test-name-pattern=x amorcage/*.test.mjs',
+    'node --test-only --test amorcage/*.test.mjs',
+    'node --import --test-name-pattern=x --test amorcage/*.test.mjs',
+    'node --test amorcage/*.test.mjs && echo',
+    'pnpm -r exec node --test amorcage/*.test.mjs',
+    'node --test packages/*/test',
+    'node --import ./x.mjs --test amorcage/a.test.mjs',
+  ]) assert.ok(!appelleDirectementLesAmorcages(script), `accepté à tort : ${script}`);
 });
 
 test('#82 · le crochet de pré-commit ne joue pas les amorçages', () => {

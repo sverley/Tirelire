@@ -77,3 +77,17 @@ export async function problemes(racine) {
   const garde = await import(`${pathToFileURL(join(DEPOT, 'packages/gardes/gardes.mjs')).href}?audit-59=${++chargements}`);
   return garde.verifierCouverture(racine).problemes;
 }
+
+/**
+ * Le script `amorcage` appelle-t-il `node --test` directement sur `dossier/*.test.mjs`, et sur lui
+ * seul ? Lu par les amorçages de #82 et de #107, assoupli par l'audit de #113 : la garde de D71 se
+ * précharge par `--import`, et un préchargement ne change ni ce qui est joué, ni d'où. Seuls
+ * `--import` et `--require` sont admis devant `--test` : une option du lanceur de tests
+ * (`--test-name-pattern`, `--test-only`, `--test-shard`…) ferait sauter des amorçages, et une
+ * commande chaînée sortirait de l'appel direct.
+ */
+export function appelleDirectementLesAmorcages(script, dossier = 'amorcage') {
+  const prechargement = String.raw`\s+--(?:import|require)(?:=|\s+)(?!-)\S+`;
+  const echappe = dossier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^node(?:${prechargement})*\\s+--test\\s+${echappe}/\\*\\.test\\.mjs$`).test(String(script ?? '').trim());
+}
