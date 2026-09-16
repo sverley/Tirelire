@@ -72,7 +72,7 @@ dans D68 et n'est pas repris ici.
 > La garde est un outil qui garde la description projet, les principes, les invariants, les usages, les cibles, les règles. tous les catalogues hormis les cibles, qu'en penses-tu ? C'est un ensemble de harnais qui garantit qu'un besoin organisationnel qui a été codé ne sera pas trahi. Elle peut se garder elle-meme : un harnais de la garde ne doit pas produire un résultat qui contredit la garde.
 > Les tests sont les harnais des besoins fonctionnels et d'outils
 > La documentation simple (au sens non organisationnelle) n'a pas besoin de harnais
-> Les harnais qui verifient le codage des harnais de la garde sont nommées "amorçages". Ils n'ont pas besoin d'etre joués autrement qu'en cas de codage dans la garde et ce qu'elle garde.
+> Les harnais qui verifient le codage d'un besoin organisationnel, qu'il ait produit une garde ou non, sont nommées "amorçages". Ils n'ont pas besoin d'etre joués autrement qu'en cas de codage dans la garde et ce qu'elle garde.
 
 ### Les catalogues, et ce qui les distingue
 
