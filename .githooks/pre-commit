@@ -1,5 +1,5 @@
 #!/bin/sh
-# Pré-commit de Tirelire (#120, D73) : moins de 5 s.
+# Pré-commit de Tirelire (#120, #127, D73, D75) : moins de 5 s.
 #
 # Les tests se choisissent d'après les fichiers du commit (l'index) et se jouent sur la copie de
 # travail, en parallèle :
@@ -10,6 +10,12 @@
 #   apps/relay/**                                      → tests du relais
 #   apps/hebergement/**                                → tests de l'hébergement
 #   le reste (documentation, interface, configuration) → rien ; typecheck et build au pré-push, tout en CI.
+# Parmi les tests joués, le harnais du besoin (`harnais-du-besoin.sh`) est l'ensemble des fichiers de
+# test que la branche ajoute ou modifie depuis sa base commune avec origin/main ; le reste est la
+# non-régression. Chaque paquet est joué une fois, et `verdict.mjs` trie ses échecs par fichier :
+#   - un échec de la non-régression refuse le commit ;
+#   - le harnais du besoin est affiché sans bloquer (la livraison le bloque, #121), sauf une erreur de
+#     syntaxe, qui refuse le commit ; un import introuvable est signalé à part (Q2 de #127).
 # Un script de test absent fait échouer le crochet. Un outil manquant fait sauter le test qui en a
 # besoin, avec un message, sauf si TIRELIRE_STRICT est posé.
 set -u
@@ -41,46 +47,35 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
-# L'index est lu : les tests ne doivent plus rien hériter de git.
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
-
 journaux=$(mktemp -d) || exit 1
 trap 'rm -rf "$journaux"' EXIT
 trap 'exit 130' INT TERM
 debut=$(date +%s)
+
+# Le harnais du besoin se lit dans l'index : avant de retirer GIT_INDEX_FILE.
+. "$racine/.githooks/harnais-du-besoin.sh"
+harnais_du_besoin "$journaux/harnais.txt" >"$journaux/harnais.note" || exit 1
+
+# L'index est lu : les tests ne doivent plus rien hériter de git.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 
 lance() {
   nom=$1 dossier=$2
   shift 2
   (pnpm --dir "$dossier" run test "$@" >"$journaux/$nom.log" 2>&1; echo $? >"$journaux/$nom.code") &
 }
+# Un lanceur node:test écrit aussi un rapport par fichier ; vitest, un rapport JSON.
+lance_node() {
+  lance "$1" "$2" --test-reporter=tap --test-reporter-destination=stdout \
+    "--test-reporter=$racine/.githooks/rapport-node.mjs" "--test-reporter-destination=$journaux/$1.rapport"
+}
 
-noms=''
-[ -n "$coeur" ] && { lance cœur packages/core --no-isolate; noms="$noms cœur"; }
-[ -n "$garde" ] && { lance garde packages/gardes; noms="$noms garde"; }
-[ -n "$relais" ] && { lance relais apps/relay; noms="$noms relais"; }
-[ -n "$hebergement" ] && { lance hébergement apps/hebergement; noms="$noms hébergement"; }
+lances=''
+[ -n "$coeur" ] && { lance cœur packages/core --no-isolate --reporter=default --reporter=json "--outputFile.json=$journaux/cœur.rapport"; lances="$lances cœur:packages/core:vitest"; }
+[ -n "$garde" ] && { lance_node garde packages/gardes; lances="$lances garde:packages/gardes:node"; }
+[ -n "$relais" ] && { lance_node relais apps/relay; lances="$lances relais:apps/relay:node"; }
+[ -n "$hebergement" ] && { lance_node hébergement apps/hebergement; lances="$lances hébergement:apps/hebergement:node"; }
 wait
 
-echecs=''
-for nom in $noms; do
-  journal="$journaux/$nom.log"
-  code=$(cat "$journaux/$nom.code" 2>/dev/null || echo 1)
-  grep -E '# SKIP' "$journal" | sed "s/^[[:space:]]*/pré-commit : test sauté ($nom) : /"
-  if [ "$code" != 0 ]; then
-    echecs="$echecs $nom"
-    echo "" >&2
-    echo "✗ tests $nom (code $code) :" >&2
-    grep -E '^[[:space:]]*not ok|FAIL|✗|×|AssertionError|ERR_PNPM' "$journal" | head -n 40 >&2
-    echo "  … fin du journal :" >&2
-    tail -n 30 "$journal" >&2
-  fi
-done
-
-duree=$(( $(date +%s) - debut ))
-if [ -n "$echecs" ]; then
-  echo "" >&2
-  echo "pré-commit refusé : tests en échec —$echecs (${duree} s)." >&2
-  exit 1
-fi
-echo "pré-commit : tests verts —$noms (${duree} s)."
+# shellcheck disable=SC2086 # les lancements n'ont pas d'espace
+node "$racine/.githooks/verdict.mjs" "$racine" "$journaux" "$debut" $lances
