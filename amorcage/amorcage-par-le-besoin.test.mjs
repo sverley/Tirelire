@@ -24,7 +24,7 @@
  *      sans garde, ne se réduit plus aux harnais de la garde et ne porte aucune source ; elle
  *      porte, au blanc près, le texte validé par le porteur le 16 septembre ;
  *   2. « Garde » reste l'outil des catalogues, et les titres du glossaire restent en place ;
- *   3. une décision nouvelle, et une seule, nomme #111 et porte source, occasion, exemple et
+ *   3. la première décision qui nomme #111 est nouvelle et porte source, occasion, exemple et
  *      l'accord avec D65 ; les numéros du journal restent uniques et croissants — #113 ajoute
  *      aussi une entrée, le rang se prend au rebasage ;
  *   4. D65 est intacte : sa case auditeur × règle est toujours l'amorçage ;
@@ -32,7 +32,8 @@
  *   6. la parole conservée porte la phrase validée, et garde sa seconde phrase.
  *
  * L'entrée se cherche par son contenu (#111), jamais par son numéro : il n'est pas connu à
- * l'écriture de ce fichier.
+ * l'écriture de ce fichier. C'est la **première** qui le nomme : une décision future pourra citer
+ * #111 sans rougir cet amorçage, qui continue de tourner après la fusion (D70).
  *
  * Témoins. Les lectures de texte sont des fonctions pures, éprouvées sur des textes fabriqués :
  * l'ancienne définition doit être vue, une définition qui cite une source aussi, et chaque notion
@@ -176,20 +177,21 @@ test('#111 · les numéros du journal des décisions restent uniques et croissan
   assert.deepEqual(fautes, [], `rang en double ou hors ordre dans ${DECISIONS} : rebaser et renuméroter l'entrée de #111`);
 });
 
-const entreesDuBesoin = () => entrees(lire(DECISIONS)).filter((e) => /#111\b/.test(e.corps));
+/** La première entrée du journal qui nomme #111 : celle du besoin, les suivantes ne font que la citer. */
+const entreeDuBesoin = () => entrees(lire(DECISIONS)).find((e) => /#111\b/.test(e.corps));
 
-test('#111 · une décision nouvelle, et une seule, nomme #111', () => {
-  const trouvees = entreesDuBesoin();
-  assert.equal(trouvees.length, 1, `attendu une entrée de ${DECISIONS} qui nomme #111, trouvé ${trouvees.length} (${trouvees.map((e) => `D${e.numero}`).join(', ') || 'aucune'})`);
-  assert.ok(trouvees[0].numero > 65, `l'entrée de #111 doit être nouvelle, pas une réécriture de D${trouvees[0].numero}`);
-  assert.ok(trouvees[0].date >= '2026-09-15', `l'entrée de #111 est datée du ${trouvees[0].date}, avant l'arbitrage`);
+test('#111 · la première décision qui nomme #111 est une entrée nouvelle', () => {
+  const entree = entreeDuBesoin();
+  assert.ok(entree, `aucune entrée de ${DECISIONS} ne nomme #111`);
+  assert.ok(entree.numero > 65, `l'entrée de #111 doit être nouvelle, pas une réécriture de D${entree.numero}`);
+  assert.ok(entree.date >= '2026-09-15', `l'entrée de #111 est datée du ${entree.date}, avant l'arbitrage`);
 });
 
 for (const notion of NOTIONS.slice(1)) {
   test(`#111 · l'entrée dit : ${notion.quoi}`, () => {
-    const trouvees = entreesDuBesoin();
-    assert.equal(trouvees.length, 1, `entrée de #111 introuvable ou ambiguë (${RELIRE})`);
-    assert.ok(!notionsManquantes(trouvees[0].corps).includes(notion.quoi), `l'entrée ne dit pas : ${notion.quoi}\n--- entrée lue ---\n${trouvees[0].corps.trim()}`);
+    const entree = entreeDuBesoin();
+    assert.ok(entree, `entrée de #111 introuvable (${RELIRE})`);
+    assert.ok(!notionsManquantes(entree.corps).includes(notion.quoi), `l'entrée ne dit pas : ${notion.quoi}\n--- entrée lue ---\n${entree.corps.trim()}`);
   });
 }
 
