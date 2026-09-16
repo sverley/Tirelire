@@ -5,7 +5,8 @@
 # travail, en parallèle :
 #   packages/core/**                                   → tests du cœur (sans isolation, pour tenir le budget)
 #   la garde (packages/gardes/**, amorcage/**, docs/gardes.md, .github/**)
-#   ou les règles qu'elle lit (docs/invariants.md, docs/contraintes.md) → tests de la garde
+#   ou les règles (docs/decisions.md, docs/description-projet.md, docs/invariants.md,
+#   docs/contraintes.md, CLAUDE.md)                     → tests de la garde
 #   apps/relay/**                                      → tests du relais
 #   apps/hebergement/**                                → tests de l'hébergement
 #   le reste (documentation, interface, configuration) → rien ; typecheck et build au pré-push, tout en CI.
@@ -21,7 +22,8 @@ coeur='' garde='' relais='' hebergement=''
 while IFS= read -r f; do
   case $f in
     packages/core/*) coeur=1 ;;
-    packages/gardes/* | amorcage/* | .github/* | docs/gardes.md | docs/invariants.md | docs/contraintes.md) garde=1 ;;
+    packages/gardes/* | amorcage/* | .github/* | docs/gardes.md) garde=1 ;;
+    docs/decisions.md | docs/description-projet.md | docs/invariants.md | docs/contraintes.md | CLAUDE.md) garde=1 ;;
     apps/relay/*) relais=1 ;;
     apps/hebergement/*) hebergement=1 ;;
   esac

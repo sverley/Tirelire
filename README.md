@@ -91,10 +91,12 @@ Les crochets joués sont alors ceux de la branche extraite, dans chaque worktree
 niveau (D73) :
 
 - **pré-commit**, moins de 5 s, sur la copie de travail : les tests des paquets que touchent les
-  fichiers du commit — cœur ; garde ou règles qu'elle lit ; relais ; hébergement. Rien pour la seule
+  fichiers du commit — cœur ; garde ou règles (décisions, description du projet, invariants,
+  contraintes, `CLAUDE.md`) ; relais ; hébergement. Rien pour la seule
   documentation, l'interface ou la configuration. Un script de test absent fait échouer le crochet ;
   un outil manquant (PHP, `lftp`…) fait sauter le test qui en a besoin, avec un message.
 - **pré-push** : typecheck complet et build, en attendant que #121 juge l'état commis.
-- **CI** : tout, en mode strict (`TIRELIRE_STRICT`), amorçages compris.
+- **CI** : typecheck, tests et build, en mode strict (`TIRELIRE_STRICT`) ; les amorçages tournent
+  sur les PR qui touchent aux règles, ou à la demande.
 
 Pour passer outre ponctuellement : `git commit --no-verify`.
