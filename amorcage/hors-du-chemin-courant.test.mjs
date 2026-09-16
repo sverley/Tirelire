@@ -90,18 +90,30 @@ test('#82 · témoin : l’appel direct admet un préchargement (#113), rien qui
   ]) assert.ok(!appelleDirectementLesAmorcages(script), `accepté à tort : ${script}`);
 });
 
+/** Le crochet lance-t-il les amorçages ? Depuis #120 (D73), il vit dans `.githooks/pre-commit`, et un
+ * motif de chemin qui cite amorcage/ pour choisir les tests de la garde n'est pas un lancement. */
+const lanceLesAmorcages = (crochet) => /\bpnpm\s+(run\s+)?amorcage\b|\bnode\b[^\n]*--test[^\n]*\bamorcage\//.test(crochet);
+const crochetDePreCommit = (racine) => {
+  try {
+    return lire(racine, '.githooks/pre-commit');
+  } catch {
+    return '';
+  }
+};
+
 test('#82 · le crochet de pré-commit ne joue pas les amorçages', () => {
-  const pkg = packageJson(RACINE);
-  const crochet = pkg['simple-git-hooks']?.['pre-commit'] ?? '';
-  assert.ok(crochet, `aucun crochet de pré-commit dans package.json : ${RACINE}`);
-  assert.ok(!/\bpnpm amorcage\b|amorcage/.test(crochet), `le crochet de pré-commit joue les amorçages, que D65 en sort pourtant : ${crochet}`);
+  const crochet = crochetDePreCommit(RACINE);
+  assert.ok(crochet.trim(), `aucun crochet de pré-commit dans .githooks : ${RACINE}`);
+  assert.ok(!lanceLesAmorcages(crochet), `le crochet de pré-commit joue les amorçages, que D65 en sort pourtant : ${crochet}`);
 });
 
-test('#82 · témoin : ajouter les amorçages au crochet de pré-commit est détecté', async () => {
-  await modifie(RACINE, 'package.json', (t) => t.replace('"pre-commit":', '"pre-commit-avec-amorcage":').replace('"pre-commit-avec-amorcage": "', '"pre-commit-avec-amorcage": "pnpm amorcage && '), async () => {
-    const pkg = packageJson(RACINE);
-    const crochet = pkg['simple-git-hooks']?.['pre-commit-avec-amorcage'] ?? '';
-    assert.ok(/\bpnpm amorcage\b/.test(crochet), "le témoin ne mord pas sur l'ajout de pnpm amorcage au crochet");
+test('#82 · témoin : ajouter les amorçages au crochet de pré-commit est détecté, un motif de chemin non', async () => {
+  assert.ok(!lanceLesAmorcages('    packages/gardes/* | amorcage/*) garde=1 ;;'), 'un motif de chemin passe pour un lancement');
+  await modifie(RACINE, '.githooks/pre-commit', (t) => `${t}\npnpm amorcage\n`, async () => {
+    assert.ok(lanceLesAmorcages(crochetDePreCommit(RACINE)), "le témoin ne mord pas sur l'ajout de pnpm amorcage au crochet");
+  });
+  await modifie(RACINE, '.githooks/pre-commit', (t) => `${t}\nnode --import ./x.mjs --test amorcage/*.test.mjs\n`, async () => {
+    assert.ok(lanceLesAmorcages(crochetDePreCommit(RACINE)), "le témoin ne mord pas sur l'ajout de node --test amorcage/ au crochet");
   });
 });
 

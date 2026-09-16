@@ -1,0 +1,86 @@
+#!/bin/sh
+# Pré-commit de Tirelire (#120, D73) : moins de 5 s.
+#
+# Les tests se choisissent d'après les fichiers du commit (l'index) et se jouent sur la copie de
+# travail, en parallèle :
+#   packages/core/**                                   → tests du cœur (sans isolation, pour tenir le budget)
+#   la garde (packages/gardes/**, amorcage/**, docs/gardes.md, .github/**)
+#   ou les règles (docs/decisions.md, docs/description-projet.md, docs/invariants.md,
+#   docs/contraintes.md, CLAUDE.md)                     → tests de la garde
+#   apps/relay/**                                      → tests du relais
+#   apps/hebergement/**                                → tests de l'hébergement
+#   le reste (documentation, interface, configuration) → rien ; typecheck et build au pré-push, tout en CI.
+# Un script de test absent fait échouer le crochet. Un outil manquant fait sauter le test qui en a
+# besoin, avec un message, sauf si TIRELIRE_STRICT est posé.
+set -u
+
+racine=$(git rev-parse --show-toplevel) || exit 1
+cd "$racine" || exit 1
+fichiers=$(git -c core.quotePath=false diff --cached --name-only --no-renames) || exit 1
+
+coeur='' garde='' relais='' hebergement=''
+while IFS= read -r f; do
+  case $f in
+    packages/core/*) coeur=1 ;;
+    packages/gardes/* | amorcage/* | .github/* | docs/gardes.md) garde=1 ;;
+    docs/decisions.md | docs/description-projet.md | docs/invariants.md | docs/contraintes.md | CLAUDE.md) garde=1 ;;
+    apps/relay/*) relais=1 ;;
+    apps/hebergement/*) hebergement=1 ;;
+  esac
+done <<FIN
+$fichiers
+FIN
+
+if [ -z "$coeur$garde$relais$hebergement" ]; then
+  echo "pré-commit : aucun test concerné par ces fichiers (le pré-push et la CI jugent le reste)."
+  exit 0
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pré-commit : pnpm introuvable, les tests ne peuvent pas être joués." >&2
+  exit 1
+fi
+
+# L'index est lu : les tests ne doivent plus rien hériter de git.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+
+journaux=$(mktemp -d) || exit 1
+trap 'rm -rf "$journaux"' EXIT
+trap 'exit 130' INT TERM
+debut=$(date +%s)
+
+lance() {
+  nom=$1 dossier=$2
+  shift 2
+  (pnpm --dir "$dossier" run test "$@" >"$journaux/$nom.log" 2>&1; echo $? >"$journaux/$nom.code") &
+}
+
+noms=''
+[ -n "$coeur" ] && { lance cœur packages/core --no-isolate; noms="$noms cœur"; }
+[ -n "$garde" ] && { lance garde packages/gardes; noms="$noms garde"; }
+[ -n "$relais" ] && { lance relais apps/relay; noms="$noms relais"; }
+[ -n "$hebergement" ] && { lance hébergement apps/hebergement; noms="$noms hébergement"; }
+wait
+
+echecs=''
+for nom in $noms; do
+  journal="$journaux/$nom.log"
+  code=$(cat "$journaux/$nom.code" 2>/dev/null || echo 1)
+  grep -E '# SKIP' "$journal" | sed "s/^[[:space:]]*/pré-commit : test sauté ($nom) : /"
+  if [ "$code" != 0 ]; then
+    echecs="$echecs $nom"
+    echo "" >&2
+    echo "✗ tests $nom (code $code) :" >&2
+    grep -E '^[[:space:]]*not ok|FAIL|✗|×|AssertionError|ERR_PNPM' "$journal" | head -n 40 >&2
+    echo "  … fin du journal :" >&2
+    tail -n 30 "$journal" >&2
+  fi
+done
+
+duree=$(( $(date +%s) - debut ))
+if [ -n "$echecs" ]; then
+  echo "" >&2
+  echo "pré-commit refusé : tests en échec —$echecs (${duree} s)." >&2
+  exit 1
+fi
+echo "pré-commit : tests verts —$noms (${duree} s)."
