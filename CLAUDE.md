@@ -23,10 +23,10 @@
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font une part,
   sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
   les fichiers indexés — cœur ; garde ou règles (celles de `VM-regles-primaires`, ce fichier
-  compris) ; relais ; hébergement —, et rien pour la seule documentation. Parmi ces tests, la non-régression bloque le
+  compris) ; relais ; hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
   commit ; le harnais du besoin (les fichiers de test que la branche ajoute ou modifie depuis sa base
-  commune avec `origin/main`) est joué, et le crochet en affiche le verdict sans bloquer, sauf une
-  erreur de syntaxe ; la livraison le bloque (#121, D75). `--no-verify` est un contournement, qu'aucune
+  commune avec `origin/main`) est joué, et le pré-commit ne fait qu'en afficher le verdict, sans
+  bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le bloque (#121, D75). `--no-verify` est un contournement, qu'aucune
   consigne ne propose. Au push : typecheck complet et build, en attendant #121. La CI joue sur
   chaque PR, en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build et
   `pnpm amorcage` ; un outil manquant y fait échouer le job (D74).
