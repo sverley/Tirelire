@@ -55,7 +55,12 @@ git rev-parse -q --verify 'refs/remotes/origin/main^{commit}' >/dev/null && main
 sous=''
 case $mode in
   fusion)
-    tetes=$(git rev-parse -q --verify MERGE_HEAD >/dev/null && cat "$(git rev-parse --git-path MERGE_HEAD)") || tetes=''
+    # Têtes fusionnées : MERGE_HEAD pendant un conflit ; pendant `pre-merge-commit`, git ne l'a pas
+    # encore écrit et les nomme dans l'environnement (`GITHEAD_<sha>`).
+    tetes=$(env | sed -n 's/^GITHEAD_\([0-9a-f]\{40,64\}\)=.*/\1/p')
+    if [ -z "$tetes" ] && git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+      tetes=$(cat "$(git rev-parse --git-path MERGE_HEAD)")
+    fi
     [ -n "$tetes" ] || { dit "aucune fusion en cours"; exit 0; }
     arbre=$(git write-tree) || exit 1
     # shellcheck disable=SC2086 # une tête par mot
