@@ -5,6 +5,10 @@ name: Vérifications manuelles
 # validée par un développeur humain. Cocher « Validée » l'enregistre ; un commit qui modifie le
 # code, ou un changement de branche cible, l'annule et décoche la case ; documentation et harnais,
 # non (#61). Tourne aussi quand la description change, sans rejouer tests ni build.
+#
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# - `verifications` lit hors des fichiers suivis : la description de la PR, ses analyses et ses cases
+#   sont un jugement humain qui ne vit que sur GitHub (`cli.mjs pr --github`).
 
 on:
   pull_request:

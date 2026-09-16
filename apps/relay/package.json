@@ -6,7 +6,7 @@
   "description": "Relais minimal pour synchroniser Tirelire entre appareils via un serveur privé. Ne voit que des paquets chiffrés.",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test",
+    "test": "node --import ../../packages/gardes/sans-sortie.mjs --test",
     "typecheck": "echo ok",
     "build": "echo ok"
   }

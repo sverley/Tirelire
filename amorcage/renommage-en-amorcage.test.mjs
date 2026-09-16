@@ -23,8 +23,10 @@
  *
  * Témoin. La lecture qui juge — le balayage du mot — est une fonction pure, éprouvée sur des textes
  * fabriqués : une prose qui garde l'ancien mot doit être vue, une prose renommée doit passer. Les
- * autres vérifications lisent une configuration exacte — un script mot pour mot, un fichier présent
- * ou absent : un témoin n'y ajouterait rien (D62, garder la garde simple).
+ * autres vérifications lisent une configuration exacte — un script, un fichier présent ou absent :
+ * un témoin n'y ajouterait rien (D62, garder la garde simple). Seule exception, depuis l'audit de
+ * #113 : le script `amorcage` n'est plus lu mot pour mot, un préchargement y étant admis (D71) ; le
+ * prédicat partagé qui le lit a ses témoins dans l'amorçage de #82.
  *
  * Plus rien ici ne lit l'historique git : l'amorçage rend le même verdict sur un clone court, et
  * `TIRELIRE_STRICT` ne change plus rien à ce qu'il dit.
@@ -39,6 +41,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { appelleDirectementLesAmorcages } from './test/copie-du-depot.mjs';
 
 const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RELIRE = "l'amorçage de #107 est à relire";
@@ -139,7 +142,9 @@ test('#107 · le dossier des amorçages est en place', () => {
 
 test('#107 · « pnpm amorcage » joue le dossier, toujours hors du chemin courant', () => {
   const paquet = JSON.parse(lire('package.json'));
-  assert.equal(paquet.scripts.amorcage, `node --test ${DOSSIER}/*.test.mjs`, "le script « amorcage » n'appelle pas node --test sur le dossier");
+  // Assoupli par l'audit de #113 : un préchargement `--import` est admis (D71) ; le prédicat a ses
+  // témoins dans l'amorçage de #82.
+  assert.ok(appelleDirectementLesAmorcages(paquet.scripts.amorcage, DOSSIER), `le script « amorcage » n'appelle pas node --test sur le dossier : ${paquet.scripts.amorcage}`);
   assert.equal(paquet.scripts.meta, undefined, 'le script « meta » est toujours là : le renommage est à moitié fait');
   assert.equal(paquet.scripts.test, 'pnpm -r test', `scripts.test a changé de forme, alors que #107 ne touche à rien : ${paquet.scripts.test}`);
 

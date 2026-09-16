@@ -21,6 +21,9 @@
   typecheck et tests du cœur, puis tests de la garde, au commit (moins de 30 s, D66) ;
   typecheck complet et build au push. La CI joue tout ce qui garde un comportement ; les
   amorçages s'appellent par `pnpm amorcage` (D62, D65).
+- Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
+  boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans
+  son en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
 - Simon lit surtout sur téléphone : réponses courtes, en prose, une question à la fois.
 

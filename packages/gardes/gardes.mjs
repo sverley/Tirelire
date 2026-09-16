@@ -1153,3 +1153,68 @@ export function resumePr({ aCorriger, enAttente, validees, declares, imposes, re
   }
   return l.join('\n');
 }
+
+// ── Lanceurs locaux sans sortie (#113, D71) ─────────────────────────────────────────────────────
+
+/** Le préchargement de la garde, et son branchement sur vitest, relatifs à la racine. */
+export const SANS_SORTIE = 'packages/gardes/sans-sortie.mjs';
+export const SANS_SORTIE_VITEST = 'packages/gardes/sans-sortie-vitest.mjs';
+
+const CONFIGS_VITEST = ['vitest.config.ts', 'vitest.config.mts', 'vitest.config.js', 'vitest.config.mjs'];
+
+/** Paquets du workspace (`pnpm-workspace.yaml`, motifs `dossier/*` ou chemins simples). */
+export function paquetsDuWorkspace(racine = RACINE) {
+  const texte = readFileSync(join(racine, 'pnpm-workspace.yaml'), 'utf8');
+  const bloc = /^packages:\s*\n((?:[ \t]+.*\n?|\s*\n)*)/m.exec(texte)?.[1] ?? '';
+  const motifs = [...bloc.matchAll(/^\s*-\s*['"]?([^'"#\s]+)['"]?/gm)].map((m) => m[1]);
+  const paquets = [];
+  for (const motif of motifs) {
+    const dossiers = motif.endsWith('/*')
+      ? readdirSync(join(racine, motif.slice(0, -2)), { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => posix.join(motif.slice(0, -2), d.name))
+      : [motif];
+    for (const d of dossiers.sort()) if (estFichier(join(racine, d, 'package.json'))) paquets.push(d);
+  }
+  return paquets;
+}
+
+/** Le script `node … --test` précharge-t-il, depuis `dossier`, le fichier attendu ? */
+function precharge(script, racine, dossier, attendu) {
+  return [...script.matchAll(/--import(?:=|\s+)(['"]?)([^'"\s]+)\1/g)].some((m) => resolve(racine, dossier, m[2]) === resolve(racine, attendu));
+}
+
+/**
+ * Chaque lanceur local — le script `test` de chaque paquet du workspace et `pnpm amorcage` — est
+ * branché sur la garde : `node --test` précharge `sans-sortie.mjs`, vitest le prend en `setupFiles`
+ * par `sans-sortie-vitest.mjs`. Rend la liste des manques, chacun nommant son lanceur.
+ */
+export function verifierLanceursLocaux(racine = RACINE) {
+  const problemes = [];
+  const lanceur = (nom, script, dossier) => {
+    if (/(^|[\s;&|])node\b[^;&|]*--test\b/.test(script)) {
+      if (!precharge(script, racine, dossier, SANS_SORTIE)) {
+        problemes.push(`${nom} : \`${script}\` ne précharge pas \`${SANS_SORTIE}\` (\`node --import … --test\`) ; une connexion hors de la machine y passerait inaperçue (#113).`);
+      }
+    } else if (/(^|[\s;&|])vitest\b/.test(script)) {
+      const config = CONFIGS_VITEST.find((c) => estFichier(join(racine, dossier, c)));
+      const texte = config ? readFileSync(join(racine, dossier, config), 'utf8').replace(/\/\/.*$/gm, '') : '';
+      const bloc = /setupFiles\s*:\s*\[([^\]]*)\]/.exec(texte)?.[1] ?? '';
+      const branche = [...bloc.matchAll(/['"]([^'"]+)['"]/g)].some((m) => resolve(racine, dossier, m[1]) === resolve(racine, SANS_SORTIE_VITEST));
+      if (!branche) {
+        problemes.push(`${nom} : vitest ne prend pas \`${SANS_SORTIE_VITEST}\` dans les \`setupFiles\` de ${config ? `\`${posix.join(dossier, config)}\`` : 'sa configuration (absente)'} ; une connexion hors de la machine y passerait inaperçue (#113).`);
+      }
+    } else {
+      problemes.push(`${nom} : lanceur \`${script}\` inconnu de la garde de #113 ; le brancher sur \`${SANS_SORTIE}\` et l'apprendre à \`verifierLanceursLocaux\`.`);
+    }
+  };
+  const lirePaquet = (d) => JSON.parse(readFileSync(join(racine, d, 'package.json'), 'utf8'));
+  for (const d of paquetsDuWorkspace(racine)) {
+    const { name = d, scripts = {} } = lirePaquet(d);
+    if (scripts.test) lanceur(`\`${name}\` (script test)`, scripts.test, d);
+  }
+  const { scripts = {} } = lirePaquet('.');
+  if (scripts.amorcage) lanceur('`pnpm amorcage`', scripts.amorcage, '.');
+  else problemes.push('`pnpm amorcage` : le script a disparu de `package.json`.');
+  return problemes;
+}
