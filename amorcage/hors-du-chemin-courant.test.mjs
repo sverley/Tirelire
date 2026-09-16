@@ -15,8 +15,8 @@
  * `scripts.amorcage` de la racine appelle `node --test` directement sur ce dossier, hors du workspace
  * (l'audit de #113 y admet un préchargement `--import`, par où passe la garde de D71, et rien
  * d'autre) ;
- * le crochet de pré-commit ne le cite pas ; le workflow dédié ne tourne que sur `workflow_dispatch`
- * ou une PR dont les chemins touchent aux règles, jamais sur toute PR. Chaque assertion structurelle
+ * le crochet de pré-commit ne le cite pas ; `ci.yml` et `verifications.yml` ne l'appellent pas.
+ * Chaque assertion structurelle
  * a son témoin : une mutation qui réintroduirait amorcage dans le chemin courant, et que
  * l'assertion doit alors refuser de laisser passer.
  *
@@ -24,6 +24,12 @@
  * détection mord, puis le rétablissent (`modifie`). Les deux dernières vérifications portent sur le
  * vocabulaire écrit une fois pour toutes (CLAUDE.md, docs/gardes.md) : une présence textuelle suffit,
  * sans mutation, pour ne pas multiplier les harnais sur de la prose (D62 : garder la garde simple).
+ *
+ * Allégé par l'audit de #122 (D70) : la lecture « le workflow des amorçages ne tourne pas sur toute
+ * PR » et son témoin sont retirés. Ils exigeaient un filtre `paths` sous `pull_request` dans
+ * `amorcage.yml`, alors que #122 veut tous les amorçages sur chaque PR (porteur, 16 septembre, dans
+ * #119). Ce qu'ils vérifiaient n'est plus une règle : l'amorçage de #122 garde le déclenchement
+ * inverse. « Hors du chemin courant » garde son sens pour `pnpm test` et les crochets.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -115,29 +121,6 @@ test('#82 · témoin : ajouter les amorçages au crochet de pré-commit est dét
   await modifie(RACINE, '.githooks/pre-commit', (t) => `${t}\nnode --import ./x.mjs --test amorcage/*.test.mjs\n`, async () => {
     assert.ok(lanceLesAmorcages(crochetDePreCommit(RACINE)), "le témoin ne mord pas sur l'ajout de node --test amorcage/ au crochet");
   });
-});
-
-test('#82 · le workflow des amorçages ne tourne pas sur toute PR, seulement sur les règles ou à la demande', () => {
-  const texte = lire(RACINE, '.github/workflows/amorcage.yml');
-  assert.match(texte, /workflow_dispatch/, "le workflow n'est plus appelable à la main");
-  assert.match(
-    texte,
-    /pull_request:\s*\n\s*paths:\s*\n(?:\s*-\s*.+\n?)+/,
-    "le workflow n'a pas de « paths » sous « pull_request » : il tournerait sur toute PR, pas seulement sur celles qui touchent aux règles",
-  );
-});
-
-test('#82 · témoin : un déclenchement « pull_request » sans « paths » est détecté', async () => {
-  await modifie(
-    RACINE,
-    '.github/workflows/amorcage.yml',
-    (t) => t.replace(/pull_request:\s*\n\s*paths:\s*\n(?:\s*-\s*.+\n?)+/, 'pull_request:\n'),
-    async () => {
-      const texte = lire(RACINE, '.github/workflows/amorcage.yml');
-      const m = texte.match(/pull_request:\s*\n\s*paths:\s*\n(?:\s*-\s*.+\n?)+/);
-      assert.equal(m, null, "le témoin ne mord pas : un « pull_request » sans « paths » passerait toujours");
-    },
-  );
 });
 
 test('#82 · les workflows du chemin courant n’appellent pas « pnpm amorcage »', () => {

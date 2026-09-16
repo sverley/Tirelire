@@ -25,6 +25,10 @@
  *   - D72 ne caractérise plus la règle codée sans garde par `packages/gardes`, mais par le
  *     comportement de la garde : écrire dans un catalogue, c'est ajouter de la donnée (#96).
  *
+ * Retouché par l'audit de #122 : la dernière phrase du texte validé devient celle que le porteur a
+ * validée mot pour mot le 16 septembre (Q1 de #122), les amorçages étant désormais joués sur chaque
+ * PR. Le reste de la section ne change pas.
+ *
  * Les lectures, toutes sur des fichiers suivis, sans réseau ni comparaison à la base (D70) :
  *
  *   1. la section « Amorçages » du glossaire définit par le besoin organisationnel, couvre le cas
@@ -160,8 +164,8 @@ modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeu
 de la garde : son codage a quand même son amorçage.
 
 Un amorçage ne se confond pas avec la garde : la garde tient les catalogues dans la durée,
-l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages n'ont pas
-à être joués autrement qu'en cas de codage dans la garde, ou dans ce qu'elle garde.`;
+l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages sont joués
+en CI sur chaque PR, et en local à la demande (\`pnpm amorcage\`).`;
 
 /** Un texte ramené à ses mots : les retours à la ligne et les blancs ne comptent pas. */
 const auBlancPres = (texte) => texte.replace(/\s+/g, ' ').trim();
