@@ -17,10 +17,14 @@
   jamais stocker ce qui se recalcule (soldes, plan, soldes à régler).
 - Écritures uniquement via `LedgerStore.upsert/remove/setSetting` (journal de changements).
 - Aucune donnée bancaire réelle dans le dépôt ; exemples et tests sur données inventées.
-- Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font l'essentiel :
-  typecheck et tests du cœur, puis tests de la garde, au commit (moins de 30 s, D66) ;
-  typecheck complet et build au push. La CI joue tout ce qui garde un comportement ; les
-  amorçages s'appellent par `pnpm amorcage` (D62, D65).
+- **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
+  `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
+  crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas (D73).
+- Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font une part,
+  sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
+  les fichiers indexés — cœur, garde ou règles qu'elle lit, relais, hébergement —, et rien pour la
+  seule documentation. Au push : typecheck complet et build, en attendant #121. La CI joue tout ce
+  qui garde un comportement ; les amorçages s'appellent par `pnpm amorcage` (D62, D65).
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
   boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans
   son en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
@@ -104,8 +108,6 @@
 - **Codage d'un besoin.** Le harnais est déjà là et rouge ; le travail consiste à le faire passer
   au vert sans le modifier. Les questions de développement et les décisions techniques se consignent
   en commentaires dans la discussion de la PR, jamais dans sa description.
-- **Un `git worktree` par session** (audit, codage), pour que deux sessions ne partagent jamais un
-  répertoire de travail (voir #22).
 - **Sessions Claude Chat.** Regrouper les commandes en peu d'appels d'outils, pour ne pas atteindre
   trop vite les limites d'usage.
 - **Choix techniques.** Une cible de distribution, une technologie ou un outil est un choix
@@ -170,8 +172,8 @@
     pas. Un témoin rouge qui se met à passer fait échouer `pnpm test`, l'outil de test tenant
     l'échec attendu (`test.fails` avec vitest, une assertion qui attend l'échec avec `node:test`) —
     la couverture ne le voit pas (#66).
-  - Le crochet de pré-commit tient en moins de 30 s (D66) : les amorçages (D65) tournent en
-    CI, pas au commit (D62).
+  - Le crochet de pré-commit tient en moins de 5 s (D73) : les amorçages (D65) et les tests de
+    l'interface tournent en CI, pas au commit (D62).
   - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
     branche cible, l'annule et la vérification décoche la case ; documentation et harnais se
     modifient sans l'annuler. Une case décochée par la vérification ne se recoche qu'aux mêmes

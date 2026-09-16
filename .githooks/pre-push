@@ -1,0 +1,8 @@
+#!/bin/sh
+# Pré-push de Tirelire (#120, D73) : typecheck complet puis build, sur la copie de travail,
+# en attendant que #121 juge l'état commis.
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+pnpm -r typecheck
+pnpm build

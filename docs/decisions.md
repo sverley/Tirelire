@@ -1547,3 +1547,31 @@ codeur ait écrit une garde. Les deux textes divergeaient dès qu'une règle se 
 - **Rien d'autre ne change.** Aucun terme n'entre au glossaire ni n'en sort, « garde » reste l'outil
   des catalogues : aucun balayage. Aucun harnais permanent n'est ajouté — ni entrée au registre
   `gardes.md`, ni test dans `pnpm test`.
+
+## D73 · 2026-09-16 · Les crochets vivent dans le dépôt, et le pré-commit tient en 5 s
+
+Remplace le budget de D66 : le crochet de pré-commit tient désormais en **moins de 5 s**, et non
+plus 30 s. Besoin #120, issu de #119 ; tranché par le porteur le 16 septembre : réduire au maximum
+le pré-commit sous la barre des 5 s, en acceptant qu'il juge la copie de travail plutôt que l'état
+commis, les crochets s'exécutant par git directement.
+
+- **Des crochets suivis.** `.githooks/pre-commit` et `.githooks/pre-push` sont des scripts du dépôt,
+  activés par `pnpm crochets` (`core.hooksPath = .githooks`, `merge.ff = false`), une fois par
+  clone. Les crochets joués sont ceux de la branche extraite, dans chaque worktree, et aucun
+  `pnpm install` ne les réécrit : `simple-git-hooks` est retiré, et `pnpm crochets` efface les
+  crochets qu'il avait écrits dans `.git/hooks`. `merge.ff = false` prépare #121 : une fusion en
+  avance rapide ne joue aucun crochet.
+- **Le pré-commit choisit ses tests d'après l'index**, et les joue en parallèle sur la copie de
+  travail : le cœur (sans isolation des fichiers de test, 3,9 s mesurées contre 11,8 s) ; la garde
+  quand le commit touche sa famille (`packages/gardes`, `amorcage`, `docs/gardes.md`, `.github`)
+  ou les règles qu'elle lit et vérifie (`docs/invariants.md`, `docs/contraintes.md`) ; le relais ;
+  l'hébergement. La documentation seule ne joue rien, pas plus que l'interface (185 s de tests) ou
+  la configuration : le pré-push et la CI les jugent. Le typecheck du cœur sort du pré-commit.
+- **Pas d'échec silencieux.** Un script de test absent fait échouer le crochet (`pnpm run`, et non
+  `pnpm --filter`, qui l'avale). Un outil manquant fait sauter le test qui en a besoin, et le
+  crochet le signale ; `TIRELIRE_STRICT` le rend obligatoire, comme en CI.
+- **Le pré-push garde le typecheck complet**, et le build, en attendant que #121 juge l'état commis.
+- **Plus de règle « un worktree par session »** (#22) : chaque session a déjà sa propre machine.
+  Elle commence par `pnpm install && pnpm crochets` dans son clone.
+- **Ce que le budget protège ne change pas** (D66) : un crochet trop long se contourne. Un
+  dépassement se traite en allégeant le crochet, pas en relevant le seuil.

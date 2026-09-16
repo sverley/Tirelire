@@ -78,8 +78,23 @@ L'application Android est le même code web emballé avec Capacitor (`apps/web/a
 
 En local (Android Studio ou SDK installé) : `pnpm build && cd apps/web && npx cap sync android && npx cap open android`.
 
-## Hooks git
+## Crochets git
 
-`pnpm install` installe les hooks (simple-git-hooks) : `pre-commit` vérifie les types et lance
-les tests du cœur ; `pre-push` construit l'application. Pour passer outre ponctuellement :
-`git commit --no-verify`.
+Les crochets sont des scripts suivis dans `.githooks/`. Ils s'activent une fois par clone, après
+`pnpm install` (qui n'y touche pas) :
+
+```sh
+pnpm crochets   # core.hooksPath = .githooks, merge.ff = false
+```
+
+Les crochets joués sont alors ceux de la branche extraite, dans chaque worktree. Ce que joue chaque
+niveau (D73) :
+
+- **pré-commit**, moins de 5 s, sur la copie de travail : les tests des paquets que touchent les
+  fichiers du commit — cœur ; garde ou règles qu'elle lit ; relais ; hébergement. Rien pour la seule
+  documentation, l'interface ou la configuration. Un script de test absent fait échouer le crochet ;
+  un outil manquant (PHP, `lftp`…) fait sauter le test qui en a besoin, avec un message.
+- **pré-push** : typecheck complet et build, en attendant que #121 juge l'état commis.
+- **CI** : tout, en mode strict (`TIRELIRE_STRICT`), amorçages compris.
+
+Pour passer outre ponctuellement : `git commit --no-verify`.
