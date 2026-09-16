@@ -1514,3 +1514,36 @@ et le second ne change ni « garde » ni « workflow ». Aucun mot nouveau n'ent
   pas préchargé. Les processus qu'un test démarre (serveur du relais, PHP, navigateur) ne sont pas
   préchargés, et ni un datagramme ni une résolution DNS ne sont des connexions. Ce sont des pistes,
   pas des erreurs par accident.
+
+## D72 · 2026-09-16 · Un amorçage vérifie le codage d'un besoin organisationnel, garde codée, modifiée ou non
+
+Besoin #111, tranché par le porteur le 15 septembre 2026 (voie 1 de l'issue) et précisé le
+16 septembre. L'occasion : l'audit de #109, dont la PR #110 juge un codage qui ne livre qu'une
+entrée de ce journal. Le glossaire définissait les amorçages comme les harnais qui vérifient « le
+codage des harnais de la garde » ; D65 les range dans la case *auditeur × règle*, sans exiger que le
+codeur ait écrit une garde. Les deux textes divergeaient dès qu'une règle se code sans garde.
+
+- **La définition s'élargit.** Un amorçage vérifie le codage d'un **besoin organisationnel**,
+  qu'une garde ait été codée, modifiée ou non. Le glossaire le dit désormais, sans source ni date :
+  il fixe le sens des mots, et les sources restent dans ce journal.
+- **Le cas d'une règle codée sans garde.** « Sans garde » se lit, selon le porteur le 16 septembre :
+  **ni garde nouvelle, ni garde modifiée**. Un tel besoin se code par la seule prose — une entrée de
+  ce journal, une puce de `CLAUDE.md` — sans changer le comportement de la garde : écrire dans un
+  catalogue, c'est ajouter de la donnée (#96). Son codage a quand même un amorçage, écrit par
+  l'auditeur : sans lui, rien ne vérifierait le codeur (#82).
+  Exemple : **#109**, codé par une seule entrée de ce journal, que son amorçage (PR #110) juge.
+- **#107 n'est pas un exemple de ce cas.** Son codage (PR #108) a modifié la garde : motif de
+  chemin, consignes et tests renommés. Il montre autre chose, que la définition couvre aussi : un
+  amorçage qui a jugé un renommage, et non les harnais de la garde.
+- **L'amorçage ne se confond pas avec la garde.** La garde tient les catalogues dans la durée ;
+  l'amorçage juge un codage donné, celui d'un besoin organisationnel précis, et ne tourne d'office
+  que sur une PR qui touche aux règles.
+- **D65 n'est pas contredite** et ne se réécrit pas : sa case *auditeur × règle* était la lecture
+  juste, le glossaire la rejoint au lieu d'être plus étroit qu'elle.
+- **Ce qui suit.** `CLAUDE.md` écrit le cas sans garde dans sa puce « Si le besoin est une règle ».
+  La parole conservée de [`description-projet.md`](description-projet.md) est amendée, première
+  phrase seulement, au texte que le porteur a validé mot pour mot le 15 septembre (D69) ; la seconde
+  ne change pas.
+- **Rien d'autre ne change.** Aucun terme n'entre au glossaire ni n'en sort, « garde » reste l'outil
+  des catalogues : aucun balayage. Aucun harnais permanent n'est ajouté — ni entrée au registre
+  `gardes.md`, ni test dans `pnpm test`.

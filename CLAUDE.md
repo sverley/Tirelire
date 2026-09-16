@@ -59,8 +59,11 @@
   - **Un harnais n'est exigible que sur une tâche atomique**, celle qu'une session peut mener
     entièrement. Une tâche qui a des sous-tâches est vérifiée par les leurs ; son harnais global
     s'écrit quand elles sont vertes, jamais avant. Un rouge qui dure cesse d'être un signal.
-  - **Si le besoin est une règle**, le codeur code la garde et le harnais de la garde ; l'auditeur
-    code l'**amorçage** qui juge ce travail (D65).
+  - **Si le besoin est une règle**, le codeur la code : avec une garde nouvelle ou modifiée et son
+    harnais (`gardes.test.mjs`) quand elle en appelle une, ou sans garde, par la seule prose — une
+    décision, comme #109. Dans les deux cas, l'auditeur code l'**amorçage** qui juge ce travail : un
+    amorçage vérifie le codage d'un besoin organisationnel, qu'une garde ait été codée, modifiée ou
+    non (D65, D72).
   - **L'intervention humaine fait partie du harnais**, ce n'est pas un niveau de plus : c'est la part
     que le codage ne peut pas trancher. L'auditeur l'écrit, le porteur la valide.
 - **Découpage et fusion (D63).** Un objectif se découpe en sous-issues avant tout codage ; l'issue
