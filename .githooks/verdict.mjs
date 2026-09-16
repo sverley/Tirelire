@@ -64,7 +64,10 @@ function echecsNode(texte) {
     if (e.type === 'stderr') ajoute(sorties, e.file, e.message);
     else if (e.type === 'diagnostic') ajoute(diagnostics, e.file, `${e.message}\n`);
     else if (e.type === 'passe') charges.add(e.file);
-    else if (!e.file) orphelins++;
+    else if (!e.file) {
+      orphelins++;
+      refus.push(`✗ non-régression (${nomCourant}) — échec hors de tout fichier : « ${e.name} »${e.message ? ` (${ligne(e.message)})` : ''}`);
+    }
     else if (e.fichier) {
       niveauFichier.add(e.file);
       entree(chemin(e.file));
@@ -162,6 +165,8 @@ function extrait(journal) {
 }
 
 const refus = [];
+// Un échec compté comme régression bloque, même si aucun motif n'a été écrit pour lui.
+let bloque = false;
 const affiches = [];
 const journauxRefuses = [];
 const joues = [];
@@ -192,6 +197,7 @@ for (const lance of lances) {
     else if (n) affiches.push(`◦ harnais du besoin (${nom}), ne se charge pas — ${f} : ${n.detail}`);
     if (e.tests.length || hors.length) affiches.push(`◦ harnais du besoin (${nom}), rouge — ${f} : ${[...e.tests, ...hors].join(' ; ')}`);
   }
+  if (regression) bloque = true;
   if (regression) journauxRefuses.push(`\n✗ tests ${nom} (code ${code}) :\n${extrait(journal)}`);
 }
 
@@ -204,7 +210,8 @@ if (affiches.length) {
   for (const a of affiches) console.log(`  ${a}`);
 }
 if (horsJeu.length) console.log(`pré-commit : harnais du besoin non joué au commit (CI) : ${horsJeu.join(', ')}.`);
-if (refus.length) {
+if (refus.length || bloque) {
+  if (!refus.length) refus.push('✗ non-régression : échec sans motif lisible (voir le journal ci-dessus).');
   for (const j of journauxRefuses) console.error(j);
   console.error('');
   for (const r of refus) console.error(r);
