@@ -1599,6 +1599,10 @@ d'office que sur une PR qui touche aux règles »).
 - **Ce qui ne change pas.** Les amorçages restent hors de `pnpm test` et des crochets (D65, D73) ;
   la distinction entre garde et amorçage de D72 tient. Le glossaire dit : « Les amorçages sont
   joués en CI sur chaque PR, et en local à la demande (`pnpm amorcage`). »
+- **La parole conservée tient.** Dans [`description-projet.md`](description-projet.md), « Ils
+  n'ont pas besoin d'etre joués autrement qu'en cas de codage dans la garde et ce qu'elle garde »
+  fixe un minimum, pas une interdiction : jouer les amorçages sur chaque PR ne la contredit pas, et
+  elle ne change pas (porteur, 16 septembre, option A de la Q3 de #122).
 - **Coût.** Environ 190 s d'amorçages de plus sur chaque PR, accepté par le porteur (#119).
 - **Ce qui suit.** Les lectures d'amorçage qui exigeaient le filtre (#82, #107) sont retirées
   (D70). #121 ne peut plus lire « les chemins de `amorcage.yml` » : sa liste de chemins
