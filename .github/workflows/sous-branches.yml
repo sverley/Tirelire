@@ -1,0 +1,117 @@
+name: Sous-branches d'une PR fusionnée
+
+# Besoin #124. À la fusion d'une PR, ses sous-branches `<tête>--codeur` et `<tête>--auditeur` sont
+# examinées sur `origin`, par leur nom exact (jamais par préfixe) :
+# - si tout leur contenu est dans la tête fusionnée, elles sont supprimées ; le résumé du job note
+#   leur dernier commit, pour pouvoir les recréer ;
+# - sinon, la sous-branche est gardée, et une PR s'ouvre depuis elle vers la base de la PR fusionnée,
+#   pour la partie non intégrée ; cette PR nomme la PR fusionnée (Q1, porteur, 16 septembre).
+# « Contenu intégré » : le dernier commit de la sous-branche est un ancêtre du dernier commit de la
+# tête au moment de la fusion (`head.sha`), ce qui vaut aussi quand la tête a déjà été supprimée.
+#
+# Une sous-branche absente, ou disparue entre son examen et sa suppression, n'est pas une erreur. Une
+# PR fermée sans fusion garde ses sous-branches (le job est ignoré). Toute autre erreur de l'API fait
+# échouer le job, y compris un refus d'ouvrir la PR de reste.
+#
+# Prérequis (porteur) : « Allow GitHub Actions to create and approve pull requests » doit être activé,
+# sinon l'ouverture de la PR de reste échoue. Une PR ouverte avec le jeton du workflow ne déclenche pas
+# la CI : il faut la relancer à la main (fermer puis rouvrir la PR).
+#
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# - `ranger` est hors harnais : il range des branches, ne garde rien, ne juge rien et ne fait échouer
+#   aucune PR.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ranger:
+    name: Ranger les sous-branches de la PR fusionnée
+    # Fermée sans fusion : les sous-branches restent, le job est ignoré.
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Examiner et ranger les sous-branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMERO: ${{ github.event.pull_request.number }}
+          TETE: ${{ github.event.pull_request.head.ref }}
+          TETE_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          resume="${GITHUB_STEP_SUMMARY:-/dev/stderr}"
+
+          # PR venue d'un fork : ses sous-branches ne sont pas sur ce dépôt, un nom voisin n'est pas à elle.
+          if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ] && command -v jq >/dev/null 2>&1; then
+            depot_tete=$(jq -r '.pull_request.head.repo.full_name // empty' "$GITHUB_EVENT_PATH")
+            if [ -n "$depot_tete" ] && [ "$depot_tete" != "$GITHUB_REPOSITORY" ]; then
+              echo "PR #$NUMERO venue de $depot_tete : aucune sous-branche à ranger ici." >> "$resume"
+              exit 0
+            fi
+          fi
+
+          # Encode ce qu'une adresse de l'API ne laisse pas passer tel quel ; `/` reste un séparateur.
+          encoder() {
+            local s=${1//%/%25}
+            s=${s//#/%23}
+            printf '%s' "${s//\?/%3F}"
+          }
+
+          echo "### Sous-branches de #$NUMERO (\`$TETE\`)" >> "$resume"
+          for suffixe in codeur auditeur; do
+            branche="$TETE--$suffixe"
+            chemin=$(encoder "$branche")
+
+            # Examen : la référence exacte, sinon rien à faire.
+            if ! sortie=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$chemin" --jq '.object.sha' 2>&1); then
+              if grep -q 'HTTP 404' <<< "$sortie"; then
+                echo "- \`$branche\` : absente" >> "$resume"
+                continue
+              fi
+              echo "$sortie" >&2
+              exit 1
+            fi
+            sha=$sortie
+
+            # Commits de la sous-branche absents de la tête fusionnée.
+            if ! avance=$(gh api "repos/$GITHUB_REPOSITORY/compare/$TETE_SHA...$sha" --jq '.ahead_by' 2>&1); then
+              echo "$avance" >&2
+              exit 1
+            fi
+
+            if [ "$avance" = "0" ]; then
+              # Intégrée : suppression. 404 ou 422 : disparue entre-temps, ce n'est pas une erreur.
+              if sortie=$(gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$chemin" 2>&1); then
+                echo "- \`$branche\` : supprimée, dernier commit \`$sha\`" >> "$resume"
+              elif grep -qE 'HTTP (404|422)' <<< "$sortie"; then
+                echo "- \`$branche\` : disparue avant sa suppression, dernier commit \`$sha\`" >> "$resume"
+              else
+                echo "$sortie" >&2
+                exit 1
+              fi
+            else
+              # Non intégrée : la branche reste, une PR porte le reste vers la base de la PR fusionnée.
+              corps="Reste de #$NUMERO : la sous-branche \`$branche\` porte $avance commit(s) absent(s) de \`$TETE\` au moment de sa fusion vers \`$BASE\`.
+
+          Ouverte par le workflow « Sous-branches d'une PR fusionnée » (#124). Son rattachement à une issue est à décider (D63). Une PR ouverte par ce workflow ne déclenche pas la CI : la fermer puis la rouvrir."
+              if ! adresse=$(gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
+                -f title="Reste de #$NUMERO : $branche" \
+                -f head="$branche" \
+                -f base="$BASE" \
+                -f body="$corps" \
+                --jq '.html_url' 2>&1); then
+                echo "$adresse" >&2
+                exit 1
+              fi
+              echo "- \`$branche\` : gardée ($avance commit(s) non intégré(s), dernier \`$sha\`), PR de reste : $adresse" >> "$resume"
+            fi
+          done
