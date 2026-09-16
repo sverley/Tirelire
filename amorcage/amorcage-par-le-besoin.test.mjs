@@ -12,12 +12,19 @@
  *   - Q1 : la parole conservée de `docs/description-projet.md` est amendée, première phrase
  *     seulement, au texte validé mot pour mot par le porteur.
  *
+ * Arbitrages rendus le 16 septembre, à l'audit du codage (fil de la PR #116) :
+ *   - « sans garde » se lit « sans garde nouvelle ou modifiée ». #109 est l'exemple ; #107 n'en
+ *     est pas un, son codage ayant modifié la garde (PR #108). L'entrée n'est donc plus tenue de
+ *     citer #107, et l'exactitude de ce qu'elle en dit se lit (D62) ;
+ *   - la section « Amorçages » du glossaire est validée mot pour mot par le porteur.
+ *
  * Les lectures, toutes sur des fichiers suivis, sans réseau ni comparaison à la base (D70) :
  *
  *   1. la section « Amorçages » du glossaire définit par le besoin organisationnel, couvre le cas
- *      sans garde, ne se réduit plus aux harnais de la garde et ne porte aucune source ;
+ *      sans garde, ne se réduit plus aux harnais de la garde et ne porte aucune source ; elle
+ *      porte, au blanc près, le texte validé par le porteur le 16 septembre ;
  *   2. « Garde » reste l'outil des catalogues, et les titres du glossaire restent en place ;
- *   3. une décision nouvelle, et une seule, nomme #111 et porte source, occasion, exemples et
+ *   3. une décision nouvelle, et une seule, nomme #111 et porte source, occasion, exemple et
  *      l'accord avec D65 ; les numéros du journal restent uniques et croissants — #113 ajoute
  *      aussi une entrée, le rang se prend au rebasage ;
  *   4. D65 est intacte : sa case auditeur × règle est toujours l'amorçage ;
@@ -86,7 +93,7 @@ const NOTIONS = Object.freeze([
   { quoi: 'le besoin : #111', formes: [/#111\b/] },
   { quoi: "l'amorçage vérifie le codage d'un besoin organisationnel", formes: [/amor[çc]age/i, /besoins?\s+organisationnels?/i] },
   { quoi: "le cas d'une règle codée sans garde", formes: [SANS_GARDE] },
-  { quoi: 'les exemples : #107 et #109', formes: [/#107\b/, /#109\b/] },
+  { quoi: "l'exemple d'une règle codée sans garde : #109", formes: [/#109\b/] },
   { quoi: "l'occasion : la PR #110", formes: [/#110\b/] },
   { quoi: "D65 n'est pas contredite", formes: [/\bD65\b/, /contredi|rejoin|concord|align|m[êe]me\s+(d[ée]finition|lecture)|lecture\s+juste/i] },
   { quoi: 'la source : le porteur, le 15 septembre', formes: [/porteur/i, /15\s+septembre|2026-09-15/i] },
@@ -134,6 +141,23 @@ test('#111 · témoin : l’ancienne définition est vue, une définition sourc�
   }
 });
 
+const DEFINITION_VALIDEE = `Les harnais qui vérifient le codage d'un besoin organisationnel, qu'une garde ait été codée,
+modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeur touche à la garde :
+son codage a quand même son amorçage.
+
+Un amorçage ne se confond pas avec la garde : la garde tient les catalogues dans la durée,
+l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages n'ont pas
+à être joués autrement qu'en cas de codage dans la garde, ou dans ce qu'elle garde.`;
+
+/** Un texte ramené à ses mots : les retours à la ligne et les blancs ne comptent pas. */
+const auBlancPres = (texte) => texte.replace(/\s+/g, ' ').trim();
+
+test('#111 · la section « Amorçages » porte, au blanc près, le texte validé par le porteur le 16 septembre', () => {
+  const corps = section(lire(GLOSSAIRE), 'Amorçages') ?? '';
+  assert.equal(auBlancPres(corps), auBlancPres(DEFINITION_VALIDEE), `la section doit porter mot pour mot le texte validé (fil de la PR #116) :\n${DEFINITION_VALIDEE}`);
+  assert.deepEqual(ecartsDeDefinition(DEFINITION_VALIDEE), [], `le texte validé ne passe plus la lecture 1 (${RELIRE})`);
+});
+
 // ─── 2 · Le reste du glossaire ne bouge pas ──────────────────────────────────────────────────
 
 test('#111 · « Garde » reste l’outil des catalogues, et les titres du glossaire sont en place', () => {
@@ -173,7 +197,7 @@ const TEMOIN = `## D99 · 2026-09-16 · L'amorçage se définit par le besoin or
 
 Besoin #111, tranché par le porteur le 15 septembre : le glossaire s'élargit. Un amorçage vérifie
 le codage d'un besoin organisationnel, qu'une garde ait été codée ou non. Le cas d'une règle codée
-sans garde existait déjà : #107 jugeait un renommage, #109 une entrée du journal. D65 n'est pas
+sans garde existait déjà : l'amorçage de #109 juge une entrée du journal. D65 n'est pas
 contredite, sa case auditeur × règle en était la lecture juste. Occasion : l'audit de la PR #110.
 `;
 
