@@ -128,11 +128,11 @@ function echecsVitest(texte, journal, dossier) {
       const m = lignes[j].match(/This error originated in "([^"]+)" test file/);
       if (m) origine = m[1];
     }
-    const texteErreur = `erreur non attrapée : ${erreur || 'sans message'}`;
+    const texteErreur = `${erreur || 'erreur sans message'} (non attrapée)`;
     if (origine) entree(chemin(resolve(racine, dossier, origine))).horsTest.push(texteErreur);
     else {
       orphelins++;
-      refus.push(`✗ non-régression (${nomCourant}), ${texteErreur}, sans fichier d'origine`);
+      refus.push(`✗ non-régression (${nomCourant}) — erreur hors d'un test, sans fichier d'origine : ${texteErreur}`);
     }
   }
   const annoncees = Number(journal.match(/Vitest caught (\d+) unhandled error/)?.[1] ?? 0);
