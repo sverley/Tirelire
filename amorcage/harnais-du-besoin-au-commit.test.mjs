@@ -14,7 +14,9 @@
  * - il copie le dépôt, en fait un dépôt git et active les crochets par `pnpm crochets` ;
  * - la base porte deux sentinelles, une par lanceur (`node:test` dans la garde, vitest dans le cœur).
  *   Chacune rougit quand un fichier voisin, qui n'est pas un test, contient « cassé » : c'est une
- *   régression causée par du code, sans toucher au fichier de test ;
+ *   régression causée par du code, sans toucher au fichier de test. Quand il contient « rejet », elle
+ *   passe mais laisse une promesse rejetée sans la rattraper : le lanceur échoue sans que ce soit un
+ *   test rouge (un `await` oublié) ;
  * - `origin/main` est une référence posée sur la base, et chaque cas part d'une branche `essai-127`.
  * Un test rouge injecté porte un nom propre à l'amorçage : un verdict qui ne le nomme pas ne compte
  * pas comme affiché.
@@ -69,6 +71,8 @@ const HARNAIS_GARDE = 'packages/gardes/harnais-127.test.mjs';
 const HARNAIS_COEUR = 'packages/core/test/harnais-127.test.ts';
 const DOC = { 'docs/notes-127.md': '# Notes de l’amorçage 127\n' };
 const CASSE = 'cassé\n';
+const REJET = 'rejet\n';
+const REJET_MSG = 'amorçage 127 : rejet non attrapé';
 
 const testRougeNode = (nom) =>
   `import assert from 'node:assert/strict';\nimport { test } from 'node:test';\ntest('${ROUGE} ${nom}', () => assert.equal(1, 2));\n`;
@@ -85,14 +89,18 @@ ecrit(SENT_GARDE, `import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 test('${SENTINELLE} garde', () => {
-  assert.doesNotMatch(readFileSync(new URL('./sentinelle-127.txt', import.meta.url), 'utf8'), /cassé/);
+  const etat = readFileSync(new URL('./sentinelle-127.txt', import.meta.url), 'utf8');
+  if (/rejet/.test(etat)) Promise.reject(new Error('${REJET_MSG}'));
+  assert.doesNotMatch(etat, /cassé/);
 });
 `);
 ecrit(ETAT_GARDE, 'intact\n');
 ecrit(SENT_COEUR, `import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 it('${SENTINELLE} cœur', () => {
-  expect(readFileSync(new URL('../src/sentinelle-127.txt', import.meta.url), 'utf8')).not.toMatch(/cassé/);
+  const etat = readFileSync(new URL('../src/sentinelle-127.txt', import.meta.url), 'utf8');
+  if (/rejet/.test(etat)) Promise.reject(new Error('${REJET_MSG}'));
+  expect(etat).not.toMatch(/cassé/);
 });
 `);
 ecrit(ETAT_COEUR, 'intact\n');
@@ -191,6 +199,20 @@ test('#127 · une régression refuse le commit, même s’il ajoute un harnais r
   durees.push(['régression et harnais du cœur', coeur.duree]);
   refuse(garde, 'régression de la garde avec harnais', `${SENTINELLE} garde`);
   refuse(coeur, 'régression du cœur avec harnais', `${SENTINELLE} cœur`);
+});
+
+test('#127 · une erreur non attrapée dans la non-régression refuse le commit, même avec un harnais rouge', () => {
+  depart();
+  const garde = commet({ [ETAT_GARDE]: REJET, [HARNAIS_GARDE]: testRougeNode('garde') });
+  depart();
+  const coeur = commet({ [ETAT_COEUR]: REJET, [HARNAIS_COEUR]: testRougeVitest('cœur') });
+  remet();
+  const fautes = [];
+  for (const [r, quoi] of [[garde, 'garde'], [coeur, 'cœur']]) {
+    if (r.code === 0) fautes.push(`${quoi} : commit accepté :\n${fin(r.sortie)}`);
+    else if (!r.sortie.includes(REJET_MSG)) fautes.push(`${quoi} : le refus ne nomme pas l'erreur « ${REJET_MSG} » :\n${fin(r.sortie)}`);
+  }
+  assert.deepEqual(fautes, [], `rejet non attrapé dans la non-régression, avec un harnais rouge :\n${fautes.join('\n\n')}`);
 });
 
 test('#127 · un test existant que la branche modifie compte dans le harnais du besoin (Q1)', () => {
