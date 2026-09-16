@@ -18,11 +18,18 @@
  *     citer #107, et l'exactitude de ce qu'elle en dit se lit (D62) ;
  *   - la section « Amorçages » du glossaire est validée mot pour mot par le porteur.
  *
+ * Arbitrages rendus plus tard le 16 septembre (fil de la PR #116) :
+ *   - la garde comprend les catalogues et les descriptions du projet ; #96 porte leur édition par
+ *     l'outil. Le glossaire dit donc « sans que le codeur change le comportement de la garde »,
+ *     et non plus « sans que le codeur touche à la garde » ;
+ *   - D72 ne caractérise plus la règle codée sans garde par `packages/gardes`, mais par le
+ *     comportement de la garde : écrire dans un catalogue, c'est ajouter de la donnée (#96).
+ *
  * Les lectures, toutes sur des fichiers suivis, sans réseau ni comparaison à la base (D70) :
  *
  *   1. la section « Amorçages » du glossaire définit par le besoin organisationnel, couvre le cas
  *      sans garde, ne se réduit plus aux harnais de la garde et ne porte aucune source ; elle
- *      porte, au blanc près, le texte validé par le porteur le 16 septembre ;
+ *      porte, au blanc près, le texte validé par le porteur le 16 septembre, retouché le même jour ;
  *   2. « Garde » reste l'outil des catalogues, et les titres du glossaire restent en place ;
  *   3. la première décision qui nomme #111 est nouvelle et porte source, occasion, exemple et
  *      l'accord avec D65 ; les numéros du journal restent uniques et croissants — #113 ajoute
@@ -99,11 +106,17 @@ const NOTIONS = Object.freeze([
   { quoi: "D65 n'est pas contredite", formes: [/\bD65\b/, /contredi|rejoin|concord|align|m[êe]me\s+(d[ée]finition|lecture)|lecture\s+juste/i] },
   { quoi: 'la source : le porteur, le 15 septembre', formes: [/porteur/i, /15\s+septembre|2026-09-15/i] },
   { quoi: 'le texte élargi : le glossaire', formes: [/glossaire/i] },
+  { quoi: 'sans garde se lit par le comportement de la garde, un catalogue étant de la donnée (#96)', formes: [/comportement/i, /donn[ée]es?\b/i, /#96\b/] },
 ].map((n) => Object.freeze({ ...n, formes: Object.freeze(n.formes) })));
 
 /** Les notions de #111 que ce texte ne porte pas. */
 export function notionsManquantes(texte) {
   return NOTIONS.filter((n) => !n.formes.every((f) => f.test(texte))).map((n) => n.quoi);
+}
+
+/** Vrai si le texte réduit la règle codée sans garde à un codage qui ne touche pas `packages/gardes`. */
+export function caracteriseParLeCode(texte) {
+  return /sans\s+que\s+le\s+codeur\s+touche\s+[àa]\s+`?packages\/gardes/i.test(texte);
 }
 
 /** Les puces d'un document, lignes de suite comprises. */
@@ -143,8 +156,8 @@ test('#111 · témoin : l’ancienne définition est vue, une définition sourc�
 });
 
 const DEFINITION_VALIDEE = `Les harnais qui vérifient le codage d'un besoin organisationnel, qu'une garde ait été codée,
-modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeur touche à la garde :
-son codage a quand même son amorçage.
+modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeur change le comportement
+de la garde : son codage a quand même son amorçage.
 
 Un amorçage ne se confond pas avec la garde : la garde tient les catalogues dans la durée,
 l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages n'ont pas
@@ -201,6 +214,7 @@ Besoin #111, tranché par le porteur le 15 septembre : le glossaire s'élargit. 
 le codage d'un besoin organisationnel, qu'une garde ait été codée ou non. Le cas d'une règle codée
 sans garde existait déjà : l'amorçage de #109 juge une entrée du journal. D65 n'est pas
 contredite, sa case auditeur × règle en était la lecture juste. Occasion : l'audit de la PR #110.
+Sans garde veut dire sans changer le comportement de la garde : un catalogue, c'est de la donnée (#96).
 `;
 
 test('#111 · témoin : une entrée complète passe, chaque notion retirée manque seule', () => {
@@ -210,6 +224,18 @@ test('#111 · témoin : une entrée complète passe, chaque notion retirée manq
     const abime = TEMOIN.replace(new RegExp(forme.source, `g${forme.flags.replace('g', '')}`), '…');
     assert.deepEqual(notionsManquantes(abime), [notion.quoi], `effacer « ${notion.quoi} » doit être vu, et seul (${RELIRE})`);
   }
+});
+
+test('#111 · l’entrée ne réduit plus la règle codée sans garde à un codage hors de packages/gardes', () => {
+  const entree = entreeDuBesoin();
+  assert.ok(entree, `entrée de #111 introuvable (${RELIRE})`);
+  assert.ok(!caracteriseParLeCode(entree.corps), "l'entrée dit encore « sans que le codeur touche à `packages/gardes` » : la garde comprend aussi les catalogues, c'est son comportement qui ne change pas (#96)");
+});
+
+test('#111 · témoin : la caractérisation par le code est vue, coupée ou non, et celle par le comportement passe', () => {
+  assert.equal(caracteriseParLeCode("une puce de `CLAUDE.md` — sans que le codeur touche à `packages/gardes`. Son codage"), true, RELIRE);
+  assert.equal(caracteriseParLeCode('sans que le codeur\n  touche à packages/gardes'), true, RELIRE);
+  assert.equal(caracteriseParLeCode(TEMOIN), false, RELIRE);
 });
 
 // ─── 4 · D65 intacte ─────────────────────────────────────────────────────────────────────────
