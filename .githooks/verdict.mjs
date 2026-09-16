@@ -4,8 +4,10 @@
  * - un fichier du harnais du besoin (`harnais-du-besoin.sh`) est joué et affiché sans bloquer, sauf
  *   une erreur de syntaxe, qui bloque ; un import introuvable est signalé à part, en nommant le
  *   module (Q2 de #127) ;
- * - tout autre échec est une régression et refuse le commit, comme un paquet en échec sans rapport
- *   lisible (script absent, configuration cassée).
+ * - tout autre échec est une régression et refuse le commit, en citant l'erreur : test rouge, fichier
+ *   qui ne se charge pas, ou erreur hors de tout test (promesse rejetée non rattrapée, sortie en
+ *   échec). Une erreur non attrapée sans fichier d'origine, ou un paquet en échec sans rapport lisible
+ *   (script absent, configuration cassée), refuse aussi le commit.
  * Usage : node verdict.mjs <racine> <journaux> <début en s> <nom:dossier:lanceur>…
  * Sortie : 0 si le commit passe, 1 sinon.
  */
@@ -34,11 +36,23 @@ const ligne = (t) => String(t ?? '').split('\n').map((l) => l.trim()).find(Boole
 const harnais = new Set((lire(join(journaux, 'harnais.txt')) ?? '').split('\n').filter(Boolean));
 const note = (lire(join(journaux, 'harnais.note')) ?? '').trim();
 
-/** Échecs d'un rapport `node --test` : Map fichier → { tests, chargement }, ou null. */
+/**
+ * Échecs d'un rapport `node --test` : { echecs: Map fichier → entrée, orphelins }, ou null.
+ * Entrée : { tests, chargement, horsTest } — tests rouges ; texte d'un fichier qui ne s'est pas
+ * chargé ; erreurs survenues hors de tout test dans un fichier chargé.
+ */
 function echecsNode(texte) {
   const echecs = new Map();
-  const stderr = new Map();
+  const sorties = new Map();
+  const diagnostics = new Map();
+  const charges = new Set();
+  const niveauFichier = new Set();
   let orphelins = 0;
+  const ajoute = (m, cle, t) => m.set(cle, (m.get(cle) ?? '') + t);
+  const entree = (f) => {
+    if (!echecs.has(f)) echecs.set(f, { tests: [], chargement: null, horsTest: [] });
+    return echecs.get(f);
+  };
   for (const l of texte.split('\n')) {
     if (!l) continue;
     let e;
@@ -47,26 +61,37 @@ function echecsNode(texte) {
     } catch {
       return null;
     }
-    if (e.type === 'stderr') {
-      stderr.set(e.file, (stderr.get(e.file) ?? '') + e.message);
-      continue;
+    if (e.type === 'stderr') ajoute(sorties, e.file, e.message);
+    else if (e.type === 'diagnostic') ajoute(diagnostics, e.file, `${e.message}\n`);
+    else if (e.type === 'passe') charges.add(e.file);
+    else if (!e.file) orphelins++;
+    else if (e.fichier) {
+      niveauFichier.add(e.file);
+      entree(chemin(e.file));
+    } else {
+      charges.add(e.file);
+      if (e.sorte !== 'subtestsFailed') entree(chemin(e.file)).tests.push(`« ${e.name} »${e.message ? ` (${ligne(e.message)})` : ''}`);
     }
-    if (!e.file) {
-      orphelins++;
-      continue;
-    }
-    const f = chemin(e.file);
-    const entree = echecs.get(f) ?? { tests: [], chargement: null, absolu: e.file };
-    if (e.fichier) entree.chargement = 'échec au chargement';
-    else if (e.sorte !== 'subtestsFailed') entree.tests.push(`« ${e.name} »${e.message ? ` (${ligne(e.message)})` : ''}`);
-    echecs.set(f, entree);
   }
-  for (const e of echecs.values()) if (e.chargement) e.chargement = stderr.get(e.absolu) || e.chargement;
+  for (const absolu of niveauFichier) {
+    const e = entree(chemin(absolu));
+    const diag = diagnostics.get(absolu) ?? '';
+    const sortie = sorties.get(absolu) ?? '';
+    if (charges.has(absolu)) e.horsTest.push(erreurHorsTest(diag) ?? (ligne(sortie.split('\n').find((l) => /Error|erreur|refus/i.test(l)) ?? sortie) || 'le fichier sort en échec'));
+    else e.chargement = sortie || diag || 'échec au chargement';
+  }
   return { echecs, orphelins };
 }
 
-/** Échecs d'un rapport JSON de vitest, même forme. */
-function echecsVitest(texte) {
+/** L'erreur que Node rattache à un test après sa fin, ou le premier diagnostic. */
+function erreurHorsTest(diag) {
+  const m = diag.match(/Test "(.+?)" at .*? generated asynchronous activity after the test ended\. This activity created the error "(.+?)"/s);
+  if (m) return `${m[2]} (après la fin du test « ${m[1]} »)`;
+  return diag.trim() ? ligne(diag).slice(0, 300) : null;
+}
+
+/** Échecs d'un rapport JSON de vitest, même forme ; le journal donne les erreurs non attrapées. */
+function echecsVitest(texte, journal, dossier) {
   let d;
   try {
     d = JSON.parse(texte);
@@ -74,16 +99,48 @@ function echecsVitest(texte) {
     return null;
   }
   const echecs = new Map();
+  const entree = (f) => {
+    if (!echecs.has(f)) echecs.set(f, { tests: [], chargement: null, horsTest: [] });
+    return echecs.get(f);
+  };
   for (const r of d.testResults ?? []) {
     const rouges = (r.assertionResults ?? []).filter((a) => a.status === 'failed');
     if (rouges.length) {
-      const tests = rouges.map((a) => `« ${a.fullName ?? a.title} »${a.failureMessages?.length ? ` (${ligne(a.failureMessages[0])})` : ''}`);
-      echecs.set(chemin(r.name), { tests, chargement: null });
+      entree(chemin(r.name)).tests.push(
+        ...rouges.map((a) => `« ${a.fullName ?? a.title} »${a.failureMessages?.length ? ` (${ligne(a.failureMessages[0])})` : ''}`),
+      );
     } else if (r.status === 'failed') {
-      echecs.set(chemin(r.name), { tests: [], chargement: r.message || 'échec au chargement' });
+      entree(chemin(r.name)).chargement = r.message || 'échec au chargement';
     }
   }
-  return { echecs, orphelins: 0 };
+  // Vitest ne met pas les erreurs non attrapées dans son rapport JSON : son journal les liste, chacune
+  // avec le fichier de test qui tournait. Une erreur sans fichier d'origine compte comme orpheline.
+  const lignes = journal.split('\n');
+  let orphelins = 0;
+  let trouvees = 0;
+  for (let i = 0; i < lignes.length; i++) {
+    if (!/^⎯+ Unhandled (Rejection|Error) ⎯+/.test(lignes[i].trim())) continue;
+    trouvees++;
+    let erreur = '';
+    let origine = null;
+    for (let j = i + 1; j < lignes.length && !/^⎯+( Unhandled .*⎯+)?$/.test(lignes[j].trim()); j++) {
+      if (!erreur && lignes[j].trim()) erreur = lignes[j].trim();
+      const m = lignes[j].match(/This error originated in "([^"]+)" test file/);
+      if (m) origine = m[1];
+    }
+    const texteErreur = `erreur non attrapée : ${erreur || 'sans message'}`;
+    if (origine) entree(chemin(resolve(racine, dossier, origine))).horsTest.push(texteErreur);
+    else {
+      orphelins++;
+      refus.push(`✗ non-régression (${nomCourant}), ${texteErreur}, sans fichier d'origine`);
+    }
+  }
+  const annoncees = Number(journal.match(/Vitest caught (\d+) unhandled error/)?.[1] ?? 0);
+  if (annoncees > trouvees) {
+    orphelins++;
+    refus.push(`✗ non-régression (${nomCourant}) : ${annoncees} erreur(s) non attrapée(s) annoncée(s), ${trouvees} lue(s) dans le journal`);
+  }
+  return { echecs, orphelins };
 }
 
 /** Nature d'un échec de chargement : import introuvable, syntaxe, ou autre. */
@@ -108,31 +165,32 @@ const refus = [];
 const affiches = [];
 const journauxRefuses = [];
 const joues = [];
+let nomCourant = '';
 for (const lance of lances) {
   const [nom, dossier, lanceur] = lance.split(':');
+  nomCourant = nom;
   joues.push({ nom, dossier });
   const journal = lire(join(journaux, `${nom}.log`)) ?? '';
   for (const l of journal.split('\n')) if (/# SKIP/.test(l)) console.log(`pré-commit : test sauté (${nom}) : ${l.trim()}`);
   const code = (lire(join(journaux, `${nom}.code`)) ?? '1').trim();
   if (code === '0') continue;
   const rapport = lire(join(journaux, `${nom}.rapport`));
-  const lu = rapport === null ? null : lanceur === 'vitest' ? echecsVitest(rapport) : echecsNode(rapport);
+  const lu = rapport === null ? null : lanceur === 'vitest' ? echecsVitest(rapport, journal, dossier) : echecsNode(rapport);
   let regression = !lu || lu.orphelins > 0 || lu.echecs.size === 0;
-  if (regression) refus.push(`✗ ${nom} : échec sans rapport lisible par fichier (code ${code}).`);
+  if (!lu || (lu.orphelins === 0 && lu.echecs.size === 0)) refus.push(`✗ ${nom} : échec sans rapport lisible par fichier (code ${code}).`);
   for (const [f, e] of lu?.echecs ?? []) {
     const n = e.chargement ? nature(e.chargement) : null;
+    const hors = e.horsTest.map((t) => `erreur hors d'un test : ${t}`);
     if (!harnais.has(f)) {
       regression = true;
-      refus.push(`✗ non-régression (${nom}) — ${f} : ${n ? `ne s'exécute pas : ${n.module ?? n.detail}` : e.tests.join(' ; ')}`);
-    } else if (n?.sorte === 'syntaxe') {
-      refus.push(`✗ harnais du besoin (${nom}), erreur de syntaxe — ${f} : ${n.detail}`);
-    } else if (n?.sorte === 'import') {
-      affiches.push(`◦ harnais du besoin (${nom}), import introuvable — module ${n.module}, importé par ${f}`);
-    } else if (n) {
-      affiches.push(`◦ harnais du besoin (${nom}), ne s'exécute pas — ${f} : ${n.detail}`);
-    } else {
-      affiches.push(`◦ harnais du besoin (${nom}), rouge — ${f} : ${e.tests.join(' ; ')}`);
+      const causes = [...e.tests, ...hors, ...(n ? [`ne se charge pas : ${n.module ?? n.detail}`] : [])];
+      refus.push(`✗ non-régression (${nom}) — ${f} : ${causes.join(' ; ')}`);
+      continue;
     }
+    if (n?.sorte === 'syntaxe') refus.push(`✗ harnais du besoin (${nom}), erreur de syntaxe — ${f} : ${n.detail}`);
+    else if (n?.sorte === 'import') affiches.push(`◦ harnais du besoin (${nom}), import introuvable — module ${n.module}, importé par ${f}`);
+    else if (n) affiches.push(`◦ harnais du besoin (${nom}), ne se charge pas — ${f} : ${n.detail}`);
+    if (e.tests.length || hors.length) affiches.push(`◦ harnais du besoin (${nom}), rouge — ${f} : ${[...e.tests, ...hors].join(' ; ')}`);
   }
   if (regression) journauxRefuses.push(`\n✗ tests ${nom} (code ${code}) :\n${extrait(journal)}`);
 }
