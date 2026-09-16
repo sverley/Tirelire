@@ -1528,8 +1528,9 @@ codeur ait écrit une garde. Les deux textes divergeaient dès qu'une règle se 
   il fixe le sens des mots, et les sources restent dans ce journal.
 - **Le cas d'une règle codée sans garde.** « Sans garde » se lit, selon le porteur le 16 septembre :
   **ni garde nouvelle, ni garde modifiée**. Un tel besoin se code par la seule prose — une entrée de
-  ce journal, une puce de `CLAUDE.md` — sans que le codeur touche à `packages/gardes`. Son codage a
-  quand même un amorçage, écrit par l'auditeur : sans lui, rien ne vérifierait le codeur (#82).
+  ce journal, une puce de `CLAUDE.md` — sans changer le comportement de la garde : écrire dans un
+  catalogue, c'est ajouter de la donnée (#96). Son codage a quand même un amorçage, écrit par
+  l'auditeur : sans lui, rien ne vérifierait le codeur (#82).
   Exemple : **#109**, codé par une seule entrée de ce journal, que son amorçage (PR #110) juge.
 - **#107 n'est pas un exemple de ce cas.** Son codage (PR #108) a modifié la garde : motif de
   chemin, consignes et tests renommés. Il montre autre chose, que la définition couvre aussi : un

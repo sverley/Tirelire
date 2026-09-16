@@ -41,8 +41,8 @@ Les harnais des besoins fonctionnels et d'outil.
 ## Amorçages
 
 Les harnais qui vérifient le codage d'un besoin organisationnel, qu'une garde ait été codée,
-modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeur touche à la garde :
-son codage a quand même son amorçage.
+modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeur change le
+comportement de la garde : son codage a quand même son amorçage.
 
 Un amorçage ne se confond pas avec la garde : la garde tient les catalogues dans la durée,
 l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages n'ont pas
