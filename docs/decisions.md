@@ -1607,3 +1607,32 @@ d'office que sur une PR qui touche aux règles »).
 - **Ce qui suit.** Les lectures d'amorçage qui exigeaient le filtre (#82, #107) sont retirées
   (D70). #121 ne peut plus lire « les chemins de `amorcage.yml` » : sa liste de chemins
   organisationnels est une question ouverte (Q2 de #122). #117 devient sans objet.
+
+## D75 · 2026-09-16 · Au pré-commit, la non-régression bloque et le harnais du besoin s'affiche
+
+Besoin #127, issu de #119 (constat de la PR #126). Complète D73 sans la réécrire : l'auditeur
+commet son harnais avant le code, rouge par construction, et le pré-commit de D73 le refusait,
+ce qui ne laissait que `--no-verify`, un contournement (D62) qui fait aussi sauter la
+non-régression.
+
+- **Deux ensembles.** Parmi les tests que le pré-commit choisit (D73), le **harnais du besoin** est
+  l'ensemble des fichiers `*.test.*` que la branche ajoute ou modifie depuis sa base commune avec
+  `origin/main`, index compris (Q1 de #127) ; le reste est la **non-régression**. Un module
+  auxiliaire modifié laisse les tests qui l'utilisent dans la non-régression. La définition vit dans
+  `.githooks/harnais-du-besoin.sh`, que #121 reprend.
+- **Verdicts.** La non-régression bloque. Le harnais du besoin est joué dans les paquets que le
+  commit fait déjà jouer, et son verdict s'affiche sans bloquer : le blocage revient à la livraison
+  (#121). Une erreur de syntaxe dans un harnais bloque : c'est une faute de l'auditeur, que le
+  codeur ne peut pas corriger. Un import introuvable s'affiche à part, en nommant le module : un
+  harnais écrit avant le code importe souvent ce qui n'existe pas encore (Q2 de #127). Un export
+  absent d'un module existant, que Node signale par une `SyntaxError`, compte comme un import
+  introuvable.
+- **Repli.** Sur `main`, sans `origin/main` ou sans base commune, tout test est non-régression, et
+  le crochet le dit : un oubli fait jouer plus de vérifications, jamais moins.
+- **Un lancement par paquet.** Chaque paquet est joué une fois, avec un rapport par fichier (le
+  rapport JSON de vitest, le rapporteur `.githooks/rapport-node.mjs` pour `node:test`), que
+  `.githooks/verdict.mjs` trie. Deux passes par paquet ne tiennent pas les 5 s sur une machine à un
+  processeur (6,0 s mesurées à l'audit). Un paquet en échec sans rapport lisible par fichier (script
+  absent, configuration cassée) bloque.
+- **`--no-verify` reste un contournement** (D62) : aucune consigne ne le propose, et la ligne du
+  README qui le proposait est retirée.
