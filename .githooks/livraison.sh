@@ -57,7 +57,9 @@ case $mode in
   fusion)
     # Têtes fusionnées : MERGE_HEAD pendant un conflit ; pendant `pre-merge-commit`, git ne l'a pas
     # encore écrit et les nomme dans l'environnement (`GITHEAD_<sha>`).
-    tetes=$(env | sed -n 's/^GITHEAD_\([0-9a-f]\{40,64\}\)=.*/\1/p')
+    tetes=$(env | sed -n 's/^GITHEAD_\([0-9a-f]\{40,64\}\)=.*/\1/p' | while read -r t; do
+      git cat-file -e "$t^{commit}" 2>/dev/null && echo "$t"
+    done)
     if [ -z "$tetes" ] && git rev-parse -q --verify MERGE_HEAD >/dev/null; then
       tetes=$(cat "$(git rev-parse --git-path MERGE_HEAD)")
     fi
@@ -152,7 +154,9 @@ else
 fi
 
 # Git est lu : les tests ne doivent plus rien en hériter.
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR GIT_QUARANTINE_PATH
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR GIT_QUARANTINE_PATH GIT_REFLOG_ACTION
+# Les têtes de cette fusion ne doivent pas passer pour celles d'une fusion lancée par un test.
+for v in $(env | sed -n 's/^\(GITHEAD_[0-9a-f]*\)=.*/\1/p'); do unset "$v"; done
 
 if [ "$juge" != "$racine" ]; then
   node "$crochets/extraire.mjs" "$racine" "$juge" || exit 1
