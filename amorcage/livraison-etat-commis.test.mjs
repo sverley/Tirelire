@@ -81,9 +81,9 @@ const trace = (nom) => `if (process.env.COMPTEUR_121) appendFileSync(process.env
 const sentinelleNode = (nom, corps = '') =>
   `import assert from 'node:assert/strict';\nimport { appendFileSync, readFileSync } from 'node:fs';\nimport { test } from 'node:test';\n` +
   `test('${MARQUE} : ${nom}', async () => {\n  ${trace(nom)}\n  assert.ok(true);\n${corps}});\n`;
-const sentinelleVitest = (nom, entetes = '', corps = '') =>
+const sentinelleVitest = (nom, entetes = '', corps = '', titre = nom) =>
   `import { appendFileSync } from 'node:fs';\nimport { expect, it } from 'vitest';\n${entetes}` +
-  `it('${MARQUE} : ${nom}', async () => {\n  ${trace(nom)}\n  expect(true).toBe(true);\n${corps}}, 60_000);\n`;
+  `it('${MARQUE} : ${titre}', async () => {\n  ${trace(nom)}\n  expect(true).toBe(true);\n${corps}}, 60_000);\n`;
 
 const S = {
   garde: 'packages/gardes/sentinelle-121.test.mjs',
@@ -100,12 +100,14 @@ const S = {
   harnaisNav: 'apps/web/test/navigateur/harnais-121.test.ts',
   amorcage: 'amorcage/sentinelle-121.test.mjs',
 };
-const NOM_HARNAIS = 'harnais du besoin';
+// Le compteur reçoit le chemin du fichier ; les messages se lisent au nom du fichier, que les
+// crochets ne peuvent pas écrire d'eux-mêmes, contrairement à « harnais du besoin ».
+const NOM_HARNAIS = 'harnais-121';
 // Au-delà de 36 s, la livraison d'un besoin fonctionnel dépasse son objectif (30 s) de plus de 20 %.
 const LENTEUR_MS = 37_000;
 
 const harnais = (supplement = '') =>
-  sentinelleVitest(NOM_HARNAIS, `import { FAIT } from '../src/besoin-121.js';\n`, `  expect(FAIT).toBe(true);\n${supplement}`);
+  sentinelleVitest(S.harnais, `import { FAIT } from '../src/besoin-121.js';\n`, `  expect(FAIT).toBe(true);\n${supplement}`, 'essai harnais-121');
 const code = (fait, note) => `export const FAIT: boolean = ${fait}; // ${note}\n`;
 
 // --- Copie ------------------------------------------------------------------------------------
