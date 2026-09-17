@@ -177,11 +177,17 @@ fi
 # Garde-fou : un amorçage qui pousse dans une copie du dépôt relance une livraison, qui rejouerait les
 # amorçages, dont lui-même. Une livraison ne rejoue donc pas un amorçage qu'un processus parent est
 # déjà en train de jouer (son nom figure dans la ligne de commande d'un ancêtre).
+# `set -f` : un motif resté littéral dans une ligne de commande (`sh -c "… amorcage/*.test.mjs"`)
+# ne doit pas se développer ici, sinon il désignerait tous les amorçages du dossier courant.
 ps -o args= -p $$ >/dev/null 2>&1 && {
+  set -f
   pid=$$
   while [ "${pid:-0}" -gt 1 ]; do
     for mot in $(ps -o args= -p "$pid" 2>/dev/null); do
-      case $mot in amorcage/*.test.mjs | */amorcage/*.test.mjs) echo "amorcage/${mot##*/}" ;; esac
+      case $mot in
+        *'*'* | *'?'* | *'['*) ;;
+        amorcage/*.test.mjs | */amorcage/*.test.mjs) echo "amorcage/${mot##*/}" ;;
+      esac
     done
     pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
   done
