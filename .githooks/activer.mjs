@@ -30,4 +30,4 @@ for (const nom of existsSync(dossier) ? readdirSync(dossier) : []) {
     console.log(`crochets : ${chemin} n'est plus joué (core.hooksPath vaut .githooks)`);
   }
 }
-console.log('crochets : .githooks actif (pré-commit < 5 s, pré-push : typecheck et build) ; merge.ff = false');
+console.log('crochets : .githooks actif (pré-commit < 5 s ; pré-fusion et pré-push : livraison sur l’état commis, D76) ; merge.ff = false');

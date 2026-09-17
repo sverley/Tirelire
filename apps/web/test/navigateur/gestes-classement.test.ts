@@ -20,7 +20,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BrowserContext, Page } from 'puppeteer-core';
-import { allerÀ, navigateur, ouvrirLeSite, type Site } from './harnais.js';
+import { allerÀ, navigateur, ouvrirLeSite, type Site } from '../harnais.js';
 
 /** Objectif du porteur (#71, 13 septembre 2026), en gestes, depuis l'écran Opérations. */
 const OBJECTIF = {

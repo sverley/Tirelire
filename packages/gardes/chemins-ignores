@@ -1,0 +1,5 @@
+# Chemins qui ne sont pas organisationnels (#121, D76), dans la syntaxe de .gitignore.
+# Un fichier listé est fonctionnel : la livraison joue le typecheck et les tests headless de son
+# paquet. Tout chemin absent est organisationnel : un oubli fait jouer plus, jamais moins.
+apps/
+packages/core/

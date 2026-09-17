@@ -8,13 +8,20 @@
  *   qui ne se charge pas, ou erreur hors de tout test (promesse rejetée non rattrapée, sortie en
  *   échec). Une erreur non attrapée sans fichier d'origine, ou un paquet en échec sans rapport lisible
  *   (script absent, configuration cassée), refuse aussi le commit.
+ * À la livraison (#121, D76), `livraison.sh` le réutilise : `TIRELIRE_NIVEAU` nomme le crochet
+ * (`pré-fusion`, `pré-push`), et `TIRELIRE_HARNAIS=bloque` fait bloquer tout échec du harnais du
+ * besoin. Le lanceur `typecheck` n'a pas de rapport par fichier : son échec est une régression.
+ * L'état du harnais (`vert` ou `rouge`) est écrit dans `<journaux>/harnais.etat`.
  * Usage : node verdict.mjs <racine> <journaux> <début en s> <nom:dossier:lanceur>…
  * Sortie : 0 si le commit passe, 1 sinon.
  */
-import { readFileSync, realpathSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const [racineBrute, journaux, debut, ...lances] = process.argv.slice(2);
+const niveau = process.env.TIRELIRE_NIVEAU || 'pré-commit';
+const commit = niveau === 'pré-commit';
+const harnaisBloque = process.env.TIRELIRE_HARNAIS === 'bloque';
 const reel = (p) => {
   try {
     return realpathSync(p);
@@ -160,7 +167,7 @@ function nature(texte) {
 
 function extrait(journal) {
   const lignes = journal.split('\n');
-  const utiles = lignes.filter((l) => /^\s*not ok|FAIL|✗|×|AssertionError|ERR_PNPM/.test(l)).slice(0, 40);
+  const utiles = lignes.filter((l) => /^\s*not ok|FAIL|✗|×|AssertionError|ERR_PNPM|error TS\d|^Error/.test(l)).slice(0, 40);
   return [...utiles, '  … fin du journal :', ...lignes.slice(-30)].join('\n');
 }
 
@@ -171,14 +178,21 @@ const affiches = [];
 const journauxRefuses = [];
 const joues = [];
 let nomCourant = '';
+let harnaisRouge = false;
 for (const lance of lances) {
   const [nom, dossier, lanceur] = lance.split(':');
   nomCourant = nom;
   joues.push({ nom, dossier });
   const journal = lire(join(journaux, `${nom}.log`)) ?? '';
-  for (const l of journal.split('\n')) if (/# SKIP/.test(l)) console.log(`pré-commit : test sauté (${nom}) : ${l.trim()}`);
+  for (const l of journal.split('\n')) if (/# SKIP/.test(l)) console.log(`${niveau} : test sauté (${nom}) : ${l.trim()}`);
   const code = (lire(join(journaux, `${nom}.code`)) ?? '1').trim();
   if (code === '0') continue;
+  if (lanceur === 'typecheck') {
+    bloque = true;
+    refus.push(`✗ non-régression (${nom}) : le typecheck est en échec (code ${code}).`);
+    journauxRefuses.push(`\n✗ ${nom} (code ${code}) :\n${extrait(journal)}`);
+    continue;
+  }
   const rapport = lire(join(journaux, `${nom}.rapport`));
   const lu = rapport === null ? null : lanceur === 'vitest' ? echecsVitest(rapport, journal, dossier) : echecsNode(rapport);
   let regression = !lu || lu.orphelins > 0 || lu.echecs.size === 0;
@@ -190,6 +204,13 @@ for (const lance of lances) {
       regression = true;
       const causes = [...e.tests, ...hors, ...(n ? [`ne se charge pas : ${n.module ?? n.detail}`] : [])];
       refus.push(`✗ non-régression (${nom}) — ${f} : ${causes.join(' ; ')}`);
+      continue;
+    }
+    harnaisRouge = true;
+    if (harnaisBloque) {
+      regression = true;
+      const causes = [...e.tests, ...hors, ...(n ? [`ne se charge pas : ${n.module ?? n.detail}`] : [])];
+      refus.push(`✗ harnais du besoin (${nom}) — ${f} : ${causes.join(' ; ')}`);
       continue;
     }
     if (n?.sorte === 'syntaxe') refus.push(`✗ harnais du besoin (${nom}), erreur de syntaxe — ${f} : ${n.detail}`);
@@ -204,18 +225,31 @@ for (const lance of lances) {
 const duree = Math.max(0, Math.round(Date.now() / 1000) - Number(debut));
 const noms = joues.map((j) => j.nom).join(' ');
 const horsJeu = [...harnais].filter((f) => !joues.some((j) => f.startsWith(`${j.dossier}/`)));
-if (note) console.log(`pré-commit : ${note}.`);
+try {
+  writeFileSync(join(journaux, 'harnais.etat'), harnaisRouge ? 'rouge' : 'vert');
+} catch {
+  // l'état ne sert qu'au registre des arbres vérifiés
+}
+if (note) console.log(`${niveau} : ${note}.`);
 if (affiches.length) {
-  console.log('pré-commit : harnais du besoin en échec, affiché sans bloquer (la livraison le bloquera, #121) :');
+  console.log(
+    commit
+      ? 'pré-commit : harnais du besoin en échec, affiché sans bloquer (la livraison le bloquera, #121) :'
+      : `${niveau} : harnais du besoin en échec, affiché sans bloquer (ce qui arrive n'apporte pas de code) :`,
+  );
   for (const a of affiches) console.log(`  ${a}`);
 }
-if (horsJeu.length) console.log(`pré-commit : harnais du besoin non joué au commit (CI) : ${horsJeu.join(', ')}.`);
+if (commit && horsJeu.length) console.log(`pré-commit : harnais du besoin non joué au commit (CI) : ${horsJeu.join(', ')}.`);
 if (refus.length || bloque) {
   if (!refus.length) refus.push('✗ non-régression : échec sans motif lisible (voir le journal ci-dessus).');
   for (const j of journauxRefuses) console.error(j);
   console.error('');
   for (const r of refus) console.error(r);
-  console.error(`pré-commit refusé : la non-régression ou la syntaxe d'un harnais est en échec — ${noms} (${duree} s).`);
+  console.error(
+    commit
+      ? `pré-commit refusé : la non-régression ou la syntaxe d'un harnais est en échec — ${noms} (${duree} s).`
+      : `${niveau} refusé${harnaisBloque ? ' : la non-régression ou le harnais du besoin est en échec' : ' : la non-régression est en échec'} — ${noms} (${duree} s).`,
+  );
   process.exit(1);
 }
-console.log(`pré-commit : non-régression verte — ${noms} (${duree} s)${affiches.length ? ` ; harnais du besoin : ${affiches.length} fichier(s) en échec, non bloquant(s)` : ''}.`);
+console.log(`${niveau} : non-régression verte — ${noms || 'rien à jouer'} (${duree} s)${affiches.length ? ` ; harnais du besoin : ${affiches.length} fichier(s) en échec, non bloquant(s)` : ''}.`);

@@ -15,7 +15,7 @@
  * qu'une garde muette ne passe pas pour une garde verte.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from './harnais.js';
+import { navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
 
 /** Ce que le test mesure dans la page, exécuté dans le navigateur. */
 function mesurer() {
