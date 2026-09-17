@@ -1679,6 +1679,10 @@ Q1 à Q6 de l'audit de #121, Q1 de la PR #129). Complète D73 et D75 sans les r�
   que la non-régression. Le typecheck complet et le build quittent le pré-push : la CI les fait (D74).
 - **Outil manquant.** Il fait sauter le test concerné, avec un message ; `pnpm` absent fait échouer
   le crochet, comme au pré-commit.
+- **Pas de récursion.** Un amorçage qui pousse ou fusionne dans une copie du dépôt relance une
+  livraison, qui rejouerait les amorçages, dont lui-même (constaté avec celui de #120, dont la copie
+  n'a pas d'`origin/main`). Une livraison ne rejoue donc pas un amorçage dont le nom figure dans la
+  ligne de commande d'un processus parent, et le dit.
 - **Limites acceptées.**
   - Une résolution de fusion qui ajoute du code ne compte pas comme code qui arrive.
   - Une règle codée par la seule prose n'arrive pas comme du code : son harnais ne bloque pas en
