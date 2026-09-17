@@ -1643,3 +1643,48 @@ non-régression.
   passage.
 - **`--no-verify` reste un contournement** (D62) : aucune consigne ne le propose, et la ligne du
   README qui le proposait est retirée.
+
+## D76 · 2026-09-16 · La livraison est jugée sur l'état commis, et le harnais du besoin la bloque
+
+Besoin #121, issu de #119 ; décisions du porteur du 16 septembre (Q3 à Q7 de #119, Q2 de #122,
+Q1 à Q6 de l'audit de #121, Q1 de la PR #129). Complète D73 et D75 sans les réécrire : le pré-push
+« en attendant #121 » de D73 est remplacé, et le blocage que D75 renvoyait à la livraison est posé.
+
+- **Livraison par push.** Une seule branche par PR. Le travail en cours se pousse sur une
+  sous-branche `<branche>--codeur` ou `<branche>--auditeur` ; livrer, c'est fusionner sa
+  sous-branche dans la branche de la PR puis pousser celle-ci. La pré-fusion (`pre-merge-commit`,
+  et le pré-commit pendant un conflit) juge l'index ; le pré-push juge le commit poussé. Aucun des
+  deux ne juge la copie de travail : les tests tournent sur place si elle est identique à l'arbre
+  jugé, sinon dans une extraction dont les dépendances pointent vers celles du clone et les paquets
+  du workspace vers leur copie extraite (`.githooks/livraison.sh`, `.githooks/extraire.mjs`).
+- **Nature du besoin.** Les fichiers modifiés des deux côtés depuis la base commune sont comparés à
+  `packages/gardes/chemins-ignores` (syntaxe de `.gitignore`, au départ `apps/` et
+  `packages/core/`) : listés, ils sont fonctionnels ; absents, organisationnels. Un oubli fait jouer
+  plus, jamais moins. Une branche des deux côtés joue les deux sélections.
+- **Sélection par finalité.** Fonctionnel : typecheck et tests headless des paquets touchés, tests
+  headless de l'interface, objectif 30 s. Organisationnel : tests de la garde et tous les amorçages,
+  objectif 45 s (#130 suit l'accélération des amorçages lents). Les tests navigateur, rangés dans
+  `apps/web/test/navigateur/`, restent à la CI. Aucun temps ne bloque : un dépassement de plus de
+  20 % s'affiche.
+- **Harnais du besoin.** Défini par D75, il est toujours joué à la livraison, à part, hors objectif.
+  Il bloque quand ce qui arrive — les commits absents de `main` et de la branche d'arrivée, hors
+  commits de fusion — touche autre chose que `**/test/**`, `**/*.test.*`, `docs/**` et `**/*.md`
+  (lecture retenue de la PR #129). Sinon son verdict s'affiche : correction de harnais de
+  l'auditeur, mise à jour du codeur après cette correction, mise à jour depuis `main`. La règle ne
+  dépend ni du nom ni du rôle de la branche. La non-régression bloque toujours.
+- **Pré-push.** Il ne rejoue pas un arbre déjà vérifié : la pré-fusion note chaque arbre accepté,
+  avec l'état de son harnais, dans `tirelire-arbres-verifies` sous le dossier commun de git. Un arbre
+  noté avec un harnais rouge est refusé si le push apporte du code. Un arbre jamais vérifié (clone
+  séparé, rebase, cherry-pick) est rejoué avec la même règle. Un push vers une sous-branche ne joue
+  que la non-régression. Le typecheck complet et le build quittent le pré-push : la CI les fait (D74).
+- **Outil manquant.** Il fait sauter le test concerné, avec un message ; `pnpm` absent fait échouer
+  le crochet, comme au pré-commit.
+- **Pas de récursion.** Un amorçage qui pousse ou fusionne dans une copie du dépôt relance une
+  livraison, qui rejouerait les amorçages, dont lui-même (constaté avec celui de #120, dont la copie
+  n'a pas d'`origin/main`). Une livraison ne rejoue donc pas un amorçage dont le nom figure dans la
+  ligne de commande d'un processus parent, et le dit.
+- **Limites acceptées.**
+  - Une résolution de fusion qui ajoute du code ne compte pas comme code qui arrive.
+  - Une règle codée par la seule prose n'arrive pas comme du code : son harnais ne bloque pas en
+    local, et la CI le juge (D74).
+  - Un test déplacé compte comme ajouté : il rejoint le harnais du besoin de sa branche.

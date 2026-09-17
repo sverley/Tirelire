@@ -1,0 +1,4 @@
+#!/bin/sh
+# Pré-fusion de Tirelire (#121, D76) : juge l'arbre fusionné (l'index), jamais la copie de travail.
+# Le détail est dans livraison.sh.
+exec sh "$(dirname "$0")/livraison.sh" fusion

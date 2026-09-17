@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BrowserContext, Page } from 'puppeteer-core';
-import { allerÀ, navigateur, ouvrirLeSite, RACINE, type Site } from './harnais.js';
+import { allerÀ, navigateur, ouvrirLeSite, RACINE, type Site } from '../harnais.js';
 
 /** Au plus deux gestes depuis l'accueil : un onglet, ou Configuration puis la fonction. */
 const GESTES_MAX = 2;

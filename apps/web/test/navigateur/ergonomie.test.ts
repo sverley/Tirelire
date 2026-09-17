@@ -14,7 +14,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
-import { allerÀ, cliquer, navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from './harnais.js';
+import { allerÀ, cliquer, navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
 
 /** Le plus petit côté acceptable pour une cible tactile, en pixels CSS. */
 const CIBLE = 44;

@@ -85,7 +85,7 @@ const entreesDesUsages = (texte, ids = USAGES) => {
 const HARNAIS_DU_JOUR = new Set([
   "U1 · packages/core/test/assistant.test.ts · budget construit par l'assistant (D40)",
   'U2 · packages/core/test/flux-derives-besoin.test.ts · —',
-  'U2 · apps/web/test/flux-derives-plan.test.ts · —',
+  'U2 · apps/web/test/navigateur/flux-derives-plan.test.ts · —',
   'U3 · packages/core/test/import.test.ts · rapprochement',
   'U4 · packages/core/test/review.test.ts · —',
   'U5 · packages/core/test/import.test.ts · —',

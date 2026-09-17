@@ -24,7 +24,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BrowserContext, Page } from 'puppeteer-core';
-import { allerÀ, cliquer, navigateur, ouvrirLeSite, type Site } from './harnais.js';
+import { allerÀ, cliquer, navigateur, ouvrirLeSite, type Site } from '../harnais.js';
 
 const TEXTE_MIN = 12;
 const CONTRASTE_MIN = 4.5;

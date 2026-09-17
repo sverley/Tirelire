@@ -16,7 +16,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BrowserContext, Page } from 'puppeteer-core';
-import { allerÀ, navigateur, ouvrirLeSite, type Site } from './harnais.js';
+import { allerÀ, navigateur, ouvrirLeSite, type Site } from '../harnais.js';
 
 /** Ce que le chemin simple s'autorise, de l'accueil au plan, en gestes. */
 const BUDGET_DE_GESTES = 12;
