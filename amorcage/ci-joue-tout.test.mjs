@@ -38,6 +38,13 @@
  *
  * Hors harnais (D62) : un `if:` écrit sous une forme exotique, un workflow retiré par la PR même, un
  * filtre `branches` (toutes les PR visent `main`).
+ *
+ * Retouché par l'audit de #131 (17 septembre 2026) : le porteur a remplacé la phrase du glossaire
+ * par « Les amorçages ne sont joués que si on touche à la garde et à ce qui est gardé » (Q4 de
+ * #131). La présence de la phrase de #122 n'est plus exigée ; l'amorçage de #131 juge la nouvelle.
+ * Ce fichier garde le reste : les workflows se déclenchent sur les PR, le mode strict, et l'absence
+ * de la phrase que #122 avait retirée. Qu'un brouillon ou une PR fonctionnelle ne joue pas tout est
+ * jugé par `ci-filet-final.test.mjs`.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -56,8 +63,6 @@ const DOSSIER = 'amorcage';
 /** La dernière décision écrite avant #122 : l'entrée attendue vient après. */
 const DERNIERE_DECISION = 73;
 
-/** Validée mot pour mot par le porteur le 16 septembre 2026 (Q1 de #122). */
-const PHRASE_VALIDEE = 'Les amorçages sont joués en CI sur chaque PR, et en local à la demande (`pnpm amorcage`).';
 const PHRASE_RETIREE = "Les amorçages n'ont pas à être joués autrement qu'en cas de codage dans la garde";
 
 const lire = (fichier) => readFileSync(join(DEPOT, fichier), 'utf8');
@@ -371,9 +376,8 @@ test("#122 · un amorçage qui se saute faute d'outil lit TIRELIRE_STRICT", () =
   assert.deepEqual(fautifs, [], "ces amorçages se sautent sous condition sans lire TIRELIRE_STRICT : en CI, l'outil manquant passerait pour vert");
 });
 
-test('#122 · le glossaire porte la phrase validée par le porteur, et plus l’ancienne', () => {
+test('#122 · le glossaire ne porte plus la phrase que #122 a retirée', () => {
   const texte = aplatir(lire(GLOSSAIRE));
-  assert.ok(texte.includes(PHRASE_VALIDEE), `${GLOSSAIRE} ne porte pas, mot pour mot, la phrase validée le 16 septembre : « ${PHRASE_VALIDEE} »`);
   assert.ok(!texte.includes(PHRASE_RETIREE), `${GLOSSAIRE} dit encore que les amorçages ne se jouent qu'en cas de codage dans la garde`);
 });
 

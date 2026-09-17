@@ -60,6 +60,7 @@ function depotCopie() {
  * GitHub simulé. Trois libertés de plus que dans le premier harnais : une tête porte une liste
  * d'exécutions, rendue du plus récent au plus ancien comme le fait l'API ; les issues se paginent
  * pour de bon ; et GitHub peut refuser une étiquette inconnue, comme il le fait sur un dépôt neuf.
+ * Depuis l'audit de #131, la CI de chaque tête y est verte : l'alerte juge aussi les tests.
  */
 const FAUX_GITHUB = `
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -80,13 +81,23 @@ globalThis.fetch = async (adresse, options = {}) => {
   if (bouts[0] !== 'repos' || bouts[1] + '/' + bouts[2] !== etat.depot) return repondre(404, { message: 'Not Found' });
   const reste = bouts.slice(3);
   const courses = (sha) => etat.courses[sha] || [];
-
+  // La CI de la tête, toujours verte (#131) : l'alerte la lit par workflow ou par job, comme GitHub
+  // les nomme — « CI et livraison » pour le workflow, « Tests et build web » pour le job.
+  const TESTS = { name: 'Tests et build web', status: 'completed', conclusion: 'success' };
+  if (reste[0] === 'actions' && reste[1] === 'runs' && reste[3] === 'jobs') {
+    const id = Number(reste[2]);
+    if (id === 7001) return repondre(200, { total_count: 1, jobs: [{ ...TESTS, run_id: id }] });
+    const course = Object.values(etat.courses).flat().find((c) => c.id === id);
+    if (!course) return repondre(404, { message: 'Not Found' });
+    return repondre(200, { total_count: 1, jobs: [{ name: course.name, status: course.status, conclusion: course.conclusion, run_id: id, head_sha: course.head_sha }] });
+  }
   if (reste[0] === 'actions' && reste[1] === 'runs') {
-    const liste = courses(url.searchParams.get('head_sha'));
+    const sha = url.searchParams.get('head_sha');
+    const liste = [...courses(sha), { id: 7001, name: 'CI et livraison', status: 'completed', conclusion: 'success', event: 'pull_request', head_sha: sha }];
     return repondre(200, { total_count: liste.length, workflow_runs: liste });
   }
   if (reste[0] === 'commits' && reste[2] === 'check-runs') {
-    const liste = courses(reste[1]);
+    const liste = [...courses(reste[1]), { ...TESTS, head_sha: reste[1] }];
     return repondre(200, { total_count: liste.length, check_runs: liste });
   }
   if (reste[0] === 'commits' && reste[2] === 'pulls') {
@@ -159,7 +170,7 @@ function scene({ etiquettes = ['alerte', 'primaire'], issues = [] } = {}) {
         base: { ref: 'main' },
         html_url: 'https://github.com/' + CIBLE + '/pull/' + numero,
       };
-      e.courses[tete] = executions.map((c) => ({ ...c, head_sha: tete }));
+      e.courses[tete] = executions.map((c, k) => ({ ...c, id: 8000 + numero * 10 + k, head_sha: tete }));
       e.commits[fusion] = { pulls: [numero] };
     });
     const chemin = join(dossier, `evenement-${++n}.json`);

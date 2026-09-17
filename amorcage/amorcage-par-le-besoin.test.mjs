@@ -29,11 +29,14 @@
  * validée mot pour mot le 16 septembre (Q1 de #122), les amorçages étant désormais joués sur chaque
  * PR. Le reste de la section ne change pas.
  *
+ * Retouché par l'audit de #131 (17 septembre 2026) : cette dernière phrase devient, mot pour mot,
+ * celle du porteur (Q4 de #131). Le reste de la section ne change pas.
+ *
  * Les lectures, toutes sur des fichiers suivis, sans réseau ni comparaison à la base (D70) :
  *
  *   1. la section « Amorçages » du glossaire définit par le besoin organisationnel, couvre le cas
  *      sans garde, ne se réduit plus aux harnais de la garde et ne porte aucune source ; elle
- *      porte, au blanc près, le texte validé par le porteur le 16 septembre, retouché le même jour ;
+ *      porte, au blanc près, le texte validé par le porteur (16 et 17 septembre), retouché le même jour ;
  *   2. « Garde » reste l'outil des catalogues, et les titres du glossaire restent en place ;
  *   3. la première décision qui nomme #111 est nouvelle et porte source, occasion, exemple et
  *      l'accord avec D65 ; les numéros du journal restent uniques et croissants — #113 ajoute
@@ -164,13 +167,13 @@ modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeu
 de la garde : son codage a quand même son amorçage.
 
 Un amorçage ne se confond pas avec la garde : la garde tient les catalogues dans la durée,
-l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages sont joués
-en CI sur chaque PR, et en local à la demande (\`pnpm amorcage\`).`;
+l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages ne sont
+joués que si on touche à la garde et à ce qui est gardé.`;
 
 /** Un texte ramené à ses mots : les retours à la ligne et les blancs ne comptent pas. */
 const auBlancPres = (texte) => texte.replace(/\s+/g, ' ').trim();
 
-test('#111 · la section « Amorçages » porte, au blanc près, le texte validé par le porteur le 16 septembre', () => {
+test('#111 · la section « Amorçages » porte, au blanc près, le texte validé par le porteur (16 et 17 septembre)', () => {
   const corps = section(lire(GLOSSAIRE), 'Amorçages') ?? '';
   assert.equal(auBlancPres(corps), auBlancPres(DEFINITION_VALIDEE), `la section doit porter mot pour mot le texte validé (fil de la PR #116) :\n${DEFINITION_VALIDEE}`);
   assert.deepEqual(ecartsDeDefinition(DEFINITION_VALIDEE), [], `le texte validé ne passe plus la lecture 1 (${RELIRE})`);

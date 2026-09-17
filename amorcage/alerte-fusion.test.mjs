@@ -18,6 +18,12 @@
  *
  * Tant que la garde n'existe pas, ce harnais est rouge, et c'est la PR de codage de #62 qui doit le
  * faire passer. Il tourne en CI, pas au commit (D62).
+ *
+ * Retouché par l'audit de #131 (17 septembre 2026) : la protection de `main` restant impossible, le
+ * porteur veut que l'alerte s'ouvre aussi quand « Tests et build web » n'était pas vert sur la tête
+ * fusionnée (Q2 de #131). Le GitHub simulé rend donc ce que rend GitHub : `/actions/runs` nomme les
+ * workflows (« CI et livraison », « Vérifications manuelles »), `/actions/runs/{id}/jobs` et
+ * `check-runs` nomment les jobs (« Tests et build web »…). La CI est verte sauf mention contraire.
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -96,13 +102,27 @@ globalThis.fetch = async (adresse, options = {}) => {
   if (bouts[0] !== 'repos' || bouts[1] + '/' + bouts[2] !== etat.depot) return repondre(404, { message: 'Not Found' });
   const reste = bouts.slice(3);
 
-  // Couleur d'une vérification : « Vérifications manuelles » absente, verte ou rouge ; la CI toujours verte.
+  // Couleur d'une vérification : « Vérifications manuelles » absente, verte ou rouge ; la CI verte sauf
+  // mention contraire (#131) : absente (null), rouge ou en cours.
   const couleur = (sha) => etat.verification[sha] ?? null;
-  const courses = (sha) => {
-    const liste = [{ name: 'Tests et build web', status: 'completed', conclusion: 'success' }];
-    if (couleur(sha)) liste.push({ name: 'Vérifications manuelles', status: 'completed', conclusion: couleur(sha) });
-    return liste;
+  const ci = (sha) => (etat.tests && sha in etat.tests ? etat.tests[sha] : 'success');
+  const execution = (name, c) => (c === 'in_progress' ? { name, status: 'in_progress', conclusion: null } : { name, status: 'completed', conclusion: c });
+  const JOBS = { 'CI et livraison': ['Tests et build web', 'Site pour hébergement mutualisé'], 'Vérifications manuelles': ['Vérifications manuelles'] };
+  const couleurDe = (sha, workflow) => (workflow === 'CI et livraison' ? ci(sha) : couleur(sha));
+  const workflows = (sha) => Object.keys(JOBS).filter((w) => couleurDe(sha, w));
+  const idDe = (sha, workflow) => {
+    etat.executions = etat.executions || [];
+    const cle = sha + '|' + workflow;
+    if (!etat.executions.includes(cle)) etat.executions.push(cle);
+    return 7000 + etat.executions.indexOf(cle);
   };
+  const courses = (sha) => workflows(sha).flatMap((w) => JOBS[w].map((j) => execution(j, couleurDe(sha, w))));
+  if (reste[0] === 'actions' && reste[1] === 'runs' && reste[3] === 'jobs') {
+    const [sha, workflow] = (etat.executions || [])[Number(reste[2]) - 7000]?.split('|') ?? [];
+    if (!sha) return repondre(404, { message: 'Not Found' });
+    const jobs = JOBS[workflow].map((j) => ({ ...execution(j, couleurDe(sha, workflow)), run_id: Number(reste[2]), head_sha: sha }));
+    return repondre(200, { total_count: jobs.length, jobs });
+  }
   if (reste[0] === 'commits' && reste[2] === 'check-runs') {
     const liste = courses(reste[1]);
     return repondre(200, { total_count: liste.length, check_runs: liste });
@@ -113,7 +133,7 @@ globalThis.fetch = async (adresse, options = {}) => {
   }
   if (reste[0] === 'actions' && reste[1] === 'runs') {
     const sha = url.searchParams.get('head_sha');
-    const liste = courses(sha).map((c) => ({ name: c.name, event: 'pull_request', status: c.status, conclusion: c.conclusion, head_sha: sha }));
+    const liste = workflows(sha).map((w) => ({ id: idDe(sha, w), ...execution(w, couleurDe(sha, w)), event: 'pull_request', head_sha: sha }));
     return repondre(200, { total_count: liste.length, workflow_runs: liste });
   }
   if (reste[0] === 'commits' && reste[2] === 'pulls') {
@@ -179,7 +199,7 @@ function scene() {
    * Une PR fusionnée (ou seulement fermée), avec la couleur de sa vérification sur la tête fusionnée ;
    * `base` dit dans quelle branche elle est fusionnée.
    */
-  const pr = ({ numero = 63, tete = 'aaa1111', fusion = 'mmm1111', verification = 'success', fusionnee = true, auteur = 'sverley', base = 'main' } = {}) => {
+  const pr = ({ numero = 63, tete = 'aaa1111', fusion = 'mmm1111', verification = 'success', tests = 'success', fusionnee = true, auteur = 'sverley', base = 'main' } = {}) => {
     modifier((e) => {
       e.pulls[numero] = {
         number: numero,
@@ -194,6 +214,7 @@ function scene() {
         html_url: 'https://github.com/' + CIBLE + '/pull/' + numero,
       };
       if (verification) e.verification[tete] = verification;
+      e.tests = { ...(e.tests || {}), [tete]: tests };
       if (fusionnee) e.commits[fusion] = { pulls: [numero], auteur, message: 'Merge pull request #' + numero };
     });
     return { numero, tete, fusion };
@@ -284,6 +305,24 @@ test('#62 · une PR fermée sans être fusionnée n’ouvre rien, même au rouge
   const s = scene();
   const { numero } = s.pr({ verification: 'failure', fusionnee: false });
   silence(s.fermeture(numero), 'PR fermée sans fusion');
+});
+
+// ─── #131 · l'alerte juge aussi les tests (Q2 de #131) ─────────────────────────────────────────
+
+for (const [cas, tests] of [['rouges', 'failure'], ['en cours', 'in_progress'], ['absents', null], ['annulés', 'cancelled']]) {
+  test(`#131 · une PR fusionnée aux vérifications vertes mais aux tests ${cas} ouvre une issue qui nomme les tests`, () => {
+    const s = scene();
+    const { numero } = s.pr({ verification: 'success', tests });
+    const issue = alerte(s.fermeture(numero), `PR fusionnée, tests ${cas}`);
+    dit(issue, `#${numero}`);
+    assert.match(`${issue.title}\n${issue.body}`, /Tests et build web/, `l'alerte ne dit pas que « Tests et build web » n'était pas vert :\n${issue.title}\n${issue.body}`);
+  });
+}
+
+test('#131 · une PR fusionnée aux tests et aux vérifications rouges ouvre une seule issue', () => {
+  const s = scene();
+  const { numero } = s.pr({ verification: 'failure', tests: 'failure' });
+  alerte(s.fermeture(numero), 'PR fusionnée, tests et vérifications rouges');
 });
 
 // ─── #62, point 1 · un push direct sur main vaut fusion non vérifiée ─────────────────────────
