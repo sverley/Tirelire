@@ -301,7 +301,9 @@ elif [ -n "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
 fi
 
 bloque=affiche
-if [ -n "$code" ]; then
+if [ -n "$sous" ]; then
+  :
+elif [ -n "$code" ]; then
   bloque=bloque
   dit "ce qui arrive apporte du code ($code) : le harnais du besoin bloque"
 else
