@@ -14,6 +14,7 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
     inputs:
       deploiement:
@@ -25,9 +26,16 @@ on:
 permissions:
   contents: write
 
+# Un seul passage par push : un push qui suit annule celui d'avant. Rien sur un brouillon. Une
+# édition de la description ne rejoue que la validation, pas les tests.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     name: Tests et build web
+    if: github.event.action != 'edited' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,9 +69,26 @@ jobs:
           path: apps/web/dist
           retention-days: 30
 
+  validation:
+    name: Validation
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # La garde lit la description : entrées déclarées, vérifications demandées, et l'unique case
+      # « Validée », que le porteur coche. Sans dépendance : pas d'installation.
+      - env:
+          CORPS: ${{ github.event.pull_request.body }}
+        run: node packages/gardes/cli.mjs pr --base ${{ github.event.pull_request.base.sha }} --tete ${{ github.event.pull_request.head.sha }}
   hebergement:
     name: Site pour hébergement mutualisé
     needs: test
+    if: github.event.action != 'edited' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -234,7 +259,8 @@ jobs:
   android:
     name: APK Android
     needs: test
-    if: github.event_name != 'pull_request'
+    # Le job le plus lourd : seulement à un tag, plus à chaque fusion.
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.name }}
@@ -324,7 +350,7 @@ jobs:
   publication:
     name: Publication des releases
     needs: [hebergement, android]
-    if: github.event_name != 'pull_request'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -340,29 +366,6 @@ jobs:
         with:
           name: tirelire-hebergement
           path: ${{ runner.temp }}/publication
-
-      - name: Déplacer le tag « latest » sur ce commit
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git tag -f latest
-          git push -f origin latest
-          cp "$RUNNER_TEMP"/publication/tirelire-*.apk "$RUNNER_TEMP/publication/tirelire-latest.apk"
-
-      - name: Version de test « latest » (à chaque push sur main)
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Dernière version de test (${{ needs.android.outputs.version }})
-          body: |
-            Version de test construite automatiquement depuis `main` (${{ github.sha }}).
-            Signée avec la clé de test : les mises à jour s'installent par-dessus la précédente.
-            Fichier : `tirelire-latest.apk` (toujours le plus récent).
-            `tirelire-hebergement.zip` : le site à déposer sur un hébergement web mutualisé (voir `docs/hebergement-web.md`).
-          prerelease: true
-          files: |
-            ${{ runner.temp }}/publication/tirelire-latest.apk
-            ${{ runner.temp }}/publication/tirelire-hebergement.zip
 
       - name: Release taguée
         if: startsWith(github.ref, 'refs/tags/v')

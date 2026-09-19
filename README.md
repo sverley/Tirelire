@@ -8,9 +8,7 @@ Nom de code. Description du projet, qui fait foi : [`docs/description-projet.md`
 ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md) ;
 ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md) ;
 ce qui les garde : [`docs/gardes.md`](docs/gardes.md) ;
-le vocabulaire : [`docs/glossaire.md`](docs/glossaire.md).
-Ce que l'objectif 0 doit produire, en attendant que les catalogues existent :
-[`docs/objectif-0.md`](docs/objectif-0.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
+le vocabulaire : [`docs/glossaire.md`](docs/glossaire.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
 
 ## Structure
 
@@ -21,9 +19,6 @@ Ce que l'objectif 0 doit produire, en attendant que les catalogues existent :
   (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
 - `packages/gardes` — la garde de l'objectif primaire (#58) : chaque invariant et chaque
   contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et chaque PR demande les siennes.
-- `amorcage` — les amorçages (#82, D65) : ce qu'une session d'audit écrit pour vérifier que le
-  codeur a bien livré une règle du projet. Hors du workspace, joués par `pnpm amorcage` et en CI sur
-  chaque PR, jamais par `pnpm test`.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
 - `docs` — description du projet, invariants du produit, contraintes du projet, analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
@@ -106,14 +101,14 @@ niveau (D73) :
   - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
     `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
     touchés, tests headless de l'interface ; objectif 30 s) ou **organisationnel** (garde et tous les
-    amorçages ; objectif 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
+    garde ; objectif 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
     restent à la CI. Un dépassement de plus de 20 % s'affiche, sans bloquer.
   - Le harnais du besoin est toujours joué, à part et hors objectif. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.
   - Le pré-push ne rejoue pas un arbre déjà vérifié à la fusion. Un push vers une sous-branche
     (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la non-régression.
-- **CI** : sur chaque PR, typecheck, tests (navigateur compris), build et amorçages, en mode strict
+- **CI** : sur chaque PR, typecheck, tests (navigateur compris), build, en mode strict
   (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job (D74).
 
 `git commit --no-verify` est un contournement (D62) : il fait sauter la non-régression avec le

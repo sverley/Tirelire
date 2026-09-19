@@ -20,32 +20,21 @@ joué.
 ## Harnais
 
 Terme générique : l'ensemble de tests qui vérifie que le code produit répond au besoin. Selon le
-besoin qu'il garde, un harnais est une **garde**, des **tests**, ou un **amorçage**.
+besoin qu'il garde, un harnais est la **garde** ou des **tests**.
 
 ## Garde
 
-L'outil qui garde les catalogues : description du projet, principes, invariants, usages, contraintes,
-cibles, règles et décisions. C'est un ensemble de harnais qui garantit qu'un besoin organisationnel,
-une fois codé, ne sera pas trahi.
+L'outil qui aide à ne pas dévier des documents fondateurs : description du projet, glossaire,
+invariants, contraintes, décisions, registre. Elle vérifie trois choses (`CLAUDE.md`) et rien de plus.
 
 Elle a deux emplois, à ne pas confondre : garantir que ce qu'elle garde n'est pas altéré, et garantir
 que le contenu de ce qu'elle garde est respecté.
 
-Elle se garde elle-même : un harnais de la garde ne doit pas produire un résultat qui contredit la
-garde.
+Elle est testée par des tests ordinaires, dans `pnpm test`, comme tout code.
 
 ## Tests
 
 Les harnais des besoins fonctionnels et d'outil.
-
-## Amorçages
-
-Les harnais qui vérifient le codage d'un besoin organisationnel, qu'une garde ait été codée,
-modifiée ou non. Une règle peut se coder par la seule prose, sans que le codeur change le
-comportement de la garde : son codage a quand même son amorçage.
-
-Un amorçage ne se confond pas avec la garde : la garde tient les catalogues dans la durée,
-l'amorçage juge un codage donné, celui d'un besoin organisationnel précis. Les amorçages sont joués en CI sur chaque PR, et en local à la demande (`pnpm amorcage`).
 
 ## Documentation simple
 

@@ -1,99 +1,37 @@
 # Gardes des invariants et des contraintes
 
-Objectif primaire (#58, D61). Chaque invariant ([`invariants.md`](invariants.md)) et chaque
-contrainte ([`contraintes.md`](contraintes.md)) est gardé par un harnais tant que c'est possible. Ce
-qui ne se programme pas devient une vérification manuelle : demandée dans la PR, analysée par un
-développeur ou un agent, validée par un développeur humain avant la fusion. Ce document tient la
-correspondance ; `packages/gardes` le relit.
+Chaque invariant ([`invariants.md`](invariants.md)) et chaque contrainte
+([`contraintes.md`](contraintes.md)) est gardé par un harnais tant que c'est possible. Ce qui ne se
+programme pas devient une vérification manuelle : demandée dans la PR, constatée puis validée par le
+porteur avant la fusion. Ce document tient la correspondance ; `packages/gardes` le relit.
 
-Le vocabulaire employé ici est celui de [`glossaire.md`](glossaire.md), lui-même gardé : les termes
-que la garde emploie ne peuvent pas changer de sens sans qu'elle le voie.
-
-Ce document ne porte que les besoins du produit. Ce qu'une session d'audit écrit pour vérifier la
-livraison d'une règle du projet est un amorçage : il vit dans `amorcage/`, n'entre pas dans
-une entrée et ne tourne pas dans `pnpm test`, mais en CI sur chaque PR (#82, D65, D74).
+Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
 
 ## Ce qui est vérifié
 
-- **À chaque `pnpm test`**, donc avant chaque commit et dans la CI : chaque identifiant des deux
-  documents a son entrée ici, gardée par un harnais qui existe, une vérification manuelle décrite
-  ou un renvoi vers des entrées elles-mêmes gardées. Un invariant, un usage ou une contrainte ajouté
-  sans garde fait échouer les tests, un harnais renommé aussi. Un titre, ou un élément de liste en
-  gras ou en italique, qui s'ouvre sur un identifiant sans en avoir la forme (`## I7 · …`,
-  `- **U1 · ….**`, `## C3 · …`) est refusé plutôt qu'ignoré. Un test que nomme une ligne `Harnais`
-  doit exister et tourner dans l'un des fichiers cités : mis en commentaire, désactivé (`.skip`),
-  seulement prévu (`.todo`), dans une suite désactivée, ou suite sans test actif, il compte comme
-  absent (#59).
-  Chaque ligne `Harnais` cite aussi son témoin rouge — les mêmes assertions rejouées sur une version
-  volontairement cassée du besoin, qui doit échouer — ou porte « à faire » avec le numéro de son
-  issue ; sans l'un ou l'autre, ou pour un témoin rouge cité qui n'existe pas ou ne tourne pas, la
-  couverture échoue en le nommant. Un témoin rouge qui se met à passer, lui, n'est pas vu par la
-  couverture : c'est `pnpm test` qui rougit, l'outil de test tenant l'échec attendu (`test.fails`
-  avec vitest, une assertion qui attend l'échec avec `node:test`) (#66).
-  Un test qui se saute faute d'outil compte comme un test qui tourne, parce qu'en CI
-  `TIRELIRE_STRICT` rend l'outil obligatoire : un harnais du registre qui se saute sous condition
-  sans lire cette variable est refusé, comme une CI dont l'étape `pnpm test` ne la pose plus.
-- **Dans chaque lanceur local**, à chaque `pnpm test` comme à chaque `pnpm amorcage` : un harnais
-  joué en local ne sort pas de la machine (#113, D71). Le script `test` de chaque paquet précharge
-  `packages/gardes/sans-sortie.mjs` (vitest par `sans-sortie-vitest.mjs`) ; une connexion hors de la
-  boucle locale fait échouer le lanceur en nommant l'hôte, même interceptée. `gardes.test.mjs` tient
-  le blocage et vérifie que chaque lanceur y est branché.
-- **Sur chaque PR**, par la vérification « Vérifications manuelles » : la description déclare les
-  identifiants touchés et ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux
-  `Chemins` d'une entrée impose de la déclarer ; chaque vérification manuelle des entrées déclarées,
-  et chaque garde retirée de ce document, figure dans la description avec son analyse et une case
-  « Validée » cochée par un développeur humain. Une vérification manuelle y recopie sa consigne, mot
-  pour mot, après le tiret cadratin : qui valide la lit dans la PR (#60). Tant qu'il en manque une, ou
-  qu'une consigne diffère, la vérification est rouge.
-- **La déclaration se lit comme GitHub l'affiche** (#60). Les blocs de code et les commentaires HTML
-  ne comptent pas ; une déclaration se poursuit à la ligne jusqu'à une ligne vide, une puce, un titre
-  ou l'autre étiquette ; les identifiants se lisent sans tenir compte de la casse, et une plage
-  (`U1 à U3`, `U1–U3`) déclare chacun de ceux qu'elle couvre. Une section ou une ligne en double, ou
-  une plage qui mêle deux familles, est refusée plutôt que devinée.
-- **Une règle nouvelle ne contredit pas les règles primaires** (#64). Les **règles primaires** sont
-  les invariants et usages ([`invariants.md`](invariants.md)), les contraintes
-  ([`contraintes.md`](contraintes.md)) et la garde de l'objectif primaire (#58, D61). Changer une
-  règle reste libre ; ce qui se vérifie, c'est qu'elle ne les contredit pas. Une PR qui modifie
-  `docs/decisions.md`, `docs/description-projet.md`, `docs/invariants.md`, `docs/contraintes.md`,
-  `CLAUDE.md`, ou la garde (`packages/gardes/**`, ce document, `.github/workflows/verifications.yml`,
-  `.github/pull_request_template.md`) se voit demander `VM-regles-primaires`, à analyser puis à
-  faire valider comme toute vérification manuelle : l'analyse nomme les règles primaires que la
-  règle nouvelle touche et dit pourquoi elle ne les contredit pas. Une contradiction ne se tranche
-  pas dans la PR : elle devient une question dans une issue. Cette vérification ne tient pas dans une
-  entrée de ce document — une entrée porte un invariant ou une contrainte, et ni une décision ni la
-  garde n'en sont un : elle vient d'une table de chemins tenue dans `packages/gardes/gardes.mjs`.
-  Ce document y figure lui aussi (accord du porteur du 12 septembre) : la comparaison des deux
-  registres voit une garde retirée, pas une consigne affaiblie.
-  Une PR qui modifie `amorcage/**` s'y voit demander la même vérification (#82) : affaiblir un
-  amorçage, c'est affaiblir la garde par l'autre bout.
-  La garde est jugée par la version que porte la PR (piste 2 de #58) : c'est l'amorçage
-  (`amorcage/livraison-de-la-garde.test.mjs`) qui empêche de l'affaiblir en silence.
-- **Une modification de la garde dit ce qui la couvre** (#89). Une PR qui touche la garde
-  (`packages/gardes/**`, `amorcage/**`, ce document, `.github/workflows/verifications.yml`,
-  `.github/pull_request_template.md`) se voit demander `VM-garde-couverture`, sans condition et en
-  plus de `VM-regles-primaires` : l'analyse nomme ce que la PR change dans la garde et, pour chaque
-  changement, le harnais qui le couvre (`packages/gardes/gardes.test.mjs`, un amorçage) ou la
-  raison pour laquelle il ne se programme pas ; un développeur humain valide. Elle ferme une brèche
-  mesurée : une fonction neuve dans `gardes.mjs`, sans un seul test, laissait tout vert, parce que
-  `VM-regles-primaires` demande si la règle nouvelle contredit les règles primaires, jamais si elle
-  est gardée. Comme celle de #64, elle ne tient pas dans une entrée de ce document et vient de la
-  table de chemins de `packages/gardes/gardes.mjs` ; la consigne se proportionne à la PR (D62), une
-  PR qui n'ajoute qu'un test le dit, et c'est tout.
-- **Ce qui vient du porteur ne change qu'à sa demande** (#64). Une PR qui modifie
-  [`description-projet.md`](description-projet.md) — son texte, mot pour mot, qui fait foi — ou
-  [`invariants.md`](invariants.md) porte dans sa section une ligne « Accord du porteur : … », paragraphe à part,
-  avec le lien ou la citation datée de son accord explicite. `demander` la prépare pour ces PR et
-  pour elles seules ; laissée vide ou en attente (« à écrire », « à analyser », « … »), elle compte
-  comme absente et la vérification reste rouge.
-- **Une validation vaut pour le code validé** (#61). Cocher « Validée » l'enregistre, dans un
-  commentaire que seule la vérification écrit, avec la tête de la PR et sa branche cible. Un commit
-  qui modifie le code, y compris en résolvant un conflit, ou un changement de branche cible l'annulent :
-  la case se décoche, un commentaire dit pourquoi, et la vérification redevient rouge. La
-  documentation (`docs/**`, `**/*.md`) et les harnais (`**/test/**`, `**/*.test.*`) se modifient sans
-  l'annuler, comme l'analyse ; une fusion de la branche cible sans conflit non plus.
-
-Préparer la section d'une PR : `node packages/gardes/cli.mjs demander --base origin/main`, puis
-écrire l'analyse. Faire le point : `node packages/gardes/cli.mjs couverture`.
+- **À chaque `pnpm test`**, donc dans la CI : chaque identifiant des deux documents a son entrée ici,
+  gardée par un harnais qui existe et tourne, une vérification manuelle décrite, ou un renvoi vers
+  des entrées elles-mêmes gardées. Un identifiant ajouté sans garde fait échouer les tests, un
+  harnais renommé aussi. Un titre ou un élément de liste qui s'ouvre sur un identifiant sans en avoir
+  la forme est refusé plutôt qu'ignoré. Un test que nomme une ligne `Harnais` doit tourner dans l'un
+  des fichiers cités : mis en commentaire, désactivé, seulement prévu, ou dans une suite désactivée,
+  il compte comme absent. Chaque ligne `Harnais` cite son témoin rouge, ou porte « à faire » avec
+  son issue. Un test qui se saute faute d'outil compte comme un test qui tourne, parce qu'en CI
+  `TIRELIRE_STRICT` rend l'outil obligatoire.
+- **Dans chaque lanceur local** : un harnais joué en local ne sort pas de la machine (D71). Le script
+  `test` de chaque paquet précharge `packages/gardes/sans-sortie.mjs`.
+- **Sur chaque PR**, par le job « Validation » : la description déclare les identifiants touchés et
+  ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux `Chemins` d'une entrée
+  impose de la déclarer ; chaque vérification manuelle des entrées déclarées, et chaque garde retirée
+  de ce document, figure dans la description avec sa consigne recopiée ; et **une seule case
+  « Validée par le porteur »**, en pied de section, que le porteur coche après avoir constaté. Tant
+  qu'une vérification manque, ou que la case n'est pas cochée, le job est rouge. Une édition de la
+  description ne rejoue que ce job. La case cochée fait foi : rien ne l'enregistre, rien ne l'annule.
+- **La déclaration se lit comme GitHub l'affiche.** Les blocs de code et les commentaires HTML ne
+  comptent pas ; les identifiants se lisent sans tenir compte de la casse ; une plage (`U1 à U3`)
+  déclare chacun de ceux qu'elle couvre.
+- **Ce que la garde ne vérifie pas** : qu'une règle ou une décision nouvelle ne contredit ni les
+  autres, ni les documents fondateurs. C'est un jugement, et il revient à l'auditeur (`CLAUDE.md`).
 
 ## Écrire une entrée
 

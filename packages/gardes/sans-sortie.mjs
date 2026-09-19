@@ -2,7 +2,7 @@
  * Garde de #113 (D71) : un harnais joué en local ne sort pas de la machine.
  *
  * Ce module se précharge dans les lanceurs locaux : `node --import …/sans-sortie.mjs --test` pour
- * les paquets qui testent avec `node:test` et pour `pnpm amorcage`, `sans-sortie-vitest.mjs` en
+ * les paquets qui testent avec `node:test`, `sans-sortie-vitest.mjs` en
  * `setupFiles` pour ceux qui testent avec vitest. Il intercepte `net.Socket.prototype.connect`, par
  * où passent `fetch`, `node:http`, `node:https` et `node:tls` :
  *
