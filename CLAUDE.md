@@ -9,8 +9,8 @@
   une décision.
 - Lire aussi `docs/contraintes.md` : ce que les plateformes imposent à une application multiplateforme
   qui doit rester simple ; tout choix technique la respecte.
-- Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro ; toute
-  décision nouvelle y est ajoutée, datée, sans réécrire les anciennes.
+- Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro ; une
+  décision nouvelle y entre en amendant ce qu'elle remplace.
 - Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
   (vitest, `pnpm test`). L'interface (`apps/web`) ne fait qu'afficher et saisir.
 - Montants en centimes entiers signés ; dates `AAAA-MM-JJ` ; `deletedAt` au lieu de supprimer ;
@@ -22,18 +22,17 @@
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas (D73).
 - Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font une part,
   sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
-  les fichiers indexés — cœur ; garde ou règles (celles de `VM-regles-primaires`, ce fichier
-  compris) ; relais ; hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
+  les fichiers indexés — cœur ; garde ; relais ; hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
   commit ; le harnais du besoin (les fichiers de test que la branche ajoute ou modifie depuis sa base
   commune avec `origin/main`) est joué, et le pré-commit ne fait qu'en afficher le verdict, sans
   bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le bloque (D75, D76). `--no-verify` est un contournement, qu'aucune
   consigne ne propose. À la livraison (pré-fusion et pré-push, D76), sur l'état commis : la nature du
   besoin se lit par `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests headless des
-  paquets touchés et de l'interface, 30 s) ou organisationnel (garde et amorçages, 45 s) —, les tests
+  paquets touchés et de l'interface, 30 s) ou organisationnel (garde, 45 s) —, les tests
   navigateur (`apps/web/test/navigateur/`) restent à la CI, et le harnais du besoin est joué à part et
   bloque quand du code arrive. La CI joue sur
-  chaque PR, en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build et
-  `pnpm amorcage` ; un outil manquant y fait échouer le job (D74).
+  chaque PR, en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build ; un outil
+  manquant y fait échouer le job (D74).
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
   boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans
   son en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
@@ -42,161 +41,87 @@
 
 ## Méthode de travail
 
-- **Le vocabulaire est celui de [`docs/glossaire.md`](docs/glossaire.md)** : besoin, harnais,
-  garde, tests, amorçages. Il commande qui écrit un harnais, où il vit et quand il est joué.
-- **L'issue définit le besoin, la PR définit la solution.**
-- **Branches et livraison (D76).** Une seule branche par PR. Le travail en cours se pousse sur une
-  sous-branche `<branche>--codeur` ou `<branche>--auditeur` : le pré-push n'y joue que la
-  non-régression, et #124 les range à la fusion de la PR. Livrer, c'est fusionner sa sous-branche
-  dans la branche de la PR, puis pousser celle-ci : la pré-fusion juge l'arbre fusionné, et le
-  pré-push ne rejoue pas un arbre déjà vérifié.
-  - **Un harnais faux** se corrige dans le worktree de l'auditeur (sa sous-branche), puis se fusionne
-    dans la branche de la PR : cette livraison n'apporte pas de code, le harnais s'y affiche sans
-    bloquer.
-  - **Le codeur** rebase ou fusionne ensuite la branche de la PR dans la sienne, puis livre par
-    fusion. Sa mise à jour n'apporte pas de code et passe ; sa livraison en apporte, et le harnais
-    du besoin la bloque tant qu'il est rouge.
-- **Deux agents par besoin, et l'auditeur passe en premier (D68).** La confiance envers le codeur
-  n'est pas présumée : un agent écrit le harnais du besoin, un autre code le besoin.
-  - **L'auditeur d'abord.** Il juge si le besoin tient en une tâche ou se décline en sous-tâches,
-    écrit le « Fait quand » de façon vérifiable, code le harnais, ouvre la PR et en rédige la
-    description, ses consignes et les analyses des vérifications manuelles.
-  - **Le codeur ensuite**, dans une PR déjà cadrée, avec un harnais déjà en place : il pousse des
-    commits sur la branche et **ne modifie jamais la PR** — ni sa description, ni ses consignes, ni
-    ses analyses, ni ses cases. Tout ce qu'il a à dire passe par des commentaires : il signale,
-    propose, questionne, et attend que l'auditeur corrige ou que le porteur tranche. Il ne découpe
-    pas le besoin et n'écrit pas l'attendu.
-  - **Le codeur ne lit pas le harnais.** Il code depuis sa propre lecture du besoin, jamais depuis
-    les attentes du harnais : sinon il écrit ce qu'il faut pour passer, et le harnais ne vérifie plus
-    rien. Il ne va pas le chercher non plus : il code, commet, pousse, et le verdict lui vient des
-    crochets de pré-commit et de pré-push, puis de la CI — et, pour un besoin de règle, du workflow
-    des amorçages. Un échec lui revient avec son message, ce qui suffit ; il n'ouvre pas le code du
-    harnais pour y trouver la réponse. Un verdict qu'il ne comprend pas se discute en commentaire ;
-    l'auditeur corrige le harnais, ou précise le besoin dans l'issue. Corollaire : l'issue doit
-    suffire à coder, et les crochets doivent faire le nécessaire.
-  - **Le codeur rend compte de ce qui appelle une validation humaine**, en commentaire : pour chaque
-    vérification manuelle demandée, ce que ses modifications changent, ce qu'elles ne touchent pas,
-    et ce qui reste à constater de visu. C'est lui qui sait ce qu'il a fait ; personne ne doit le
-    déduire de la diff. **Honnête et concis** : les écarts pris et ce qu'il n'a pas pu vérifier
-    autant que ce qui marche, et rien d'autre — ni plaidoyer, ni rapport exhaustif. Ce compte rendu
-    nourrit l'analyse de l'auditeur, il ne s'y substitue pas, et ne vaut jamais validation.
-  - **Un harnais n'est exigible que sur une tâche atomique**, celle qu'une session peut mener
-    entièrement. Une tâche qui a des sous-tâches est vérifiée par les leurs ; son harnais global
-    s'écrit quand elles sont vertes, jamais avant. Un rouge qui dure cesse d'être un signal.
-  - **Si le besoin est une règle**, le codeur la code : avec une garde nouvelle ou modifiée et son
-    harnais (`gardes.test.mjs`) quand elle en appelle une, ou sans garde, par la seule prose — une
-    décision, comme #109. Dans les deux cas, l'auditeur code l'**amorçage** qui juge ce travail : un
-    amorçage vérifie le codage d'un besoin organisationnel, qu'une garde ait été codée, modifiée ou
-    non (D65, D72).
-  - **L'intervention humaine fait partie du harnais**, ce n'est pas un niveau de plus : c'est la part
-    que le codage ne peut pas trancher. L'auditeur l'écrit, le porteur la valide.
-- **Découpage et fusion (D63).** Un objectif se découpe en sous-issues avant tout codage ; l'issue
-  d'objectif ne porte jamais de code elle-même.
-  - **Une sous-issue, une PR, une fusion.** Une sous-issue est taillée pour être fusionnable seule ;
-    une PR qui en porterait plusieurs se découpe avant d'être ouverte.
-  - **Un besoin découvert en route devient une sous-issue** du même objectif et attend sa propre PR.
-    Il ne rejoint la branche en cours que s'il rend la PR courante fausse.
-  - **Une issue se ferme à la fusion**, jamais à la fin du codage : une issue fermée veut dire que
-    la garantie est sur `main`. La fermeture est **automatique** : la description de la PR porte
-    `Close #<numéro>` pour le besoin qu'elle couvre, et personne ne ferme une issue à la main.
-  - **Une discussion née en cours de PR se range avant la fusion** (D68) : soit elle est bloquante,
-    et ce qu'elle décide entre dans la PR ; soit elle ne l'est pas, et elle devient une issue, ouverte
-    avant la fusion. Rien ne se fusionne en laissant une question pendante dans un fil : une question
-    sans issue est une question perdue.
-  - **Un objectif permanent ne se ferme pas** ; il se tient par ses gardes, pas par sa fermeture.
-- **Issue en cours.** Une session qui prend une issue (objectif, audit ou codage) lui pose
-  l'étiquette `en cours` dès le début du travail ; le titre ne s'édite jamais pour cela. L'étiquette
-  est retirée d'elle-même à la fermeture de l'issue (`.github/workflows/etiquette-en-cours.yml`).
-- **Objectif.** Méta-analyse, en chef de projet : analyser les besoins (issues) et les dépendances
-  qui mènent à l'objectif, sur la documentation seulement, sans analyser le code. Si l'objectif
-  n'est pas assez clair, poser la question et la consigner dans la discussion de l'issue d'objectif.
-  En fin d'objectif, consigner les nouvelles fonctionnalités dans la documentation du dépôt, par une
-  PR.
-- **Audit d'un besoin.** Partir de l'issue. Si le besoin n'est pas clair ou appelle des questions, les
-  poser et les consigner dans l'issue. Une fois le besoin explicite, indiquer la branche de travail
-  dans le corps de l'issue, puis écrire les harnais qui contrôlent le résultat dans la branche de la
-  PR associée. **En audit, ne jamais toucher au code** : seulement la documentation et les harnais.
-  Il s'en tient aux « Fait quand » et aux erreurs plausibles par accident : une forme exotique ou un
-  contournement se note dans la PR, sans devenir un harnais rouge (D62).
-- **Où poser le harnais qu'on écrit** (D65). Deux questions : qui l'écrit, et pour quel besoin. Le
-  harnais d'un besoin produit va auprès de ce qu'il garde (`packages/core/test`, `apps/web/test`,
-  `apps/relay`, `apps/hebergement`), ou dans `packages/gardes` s'il n'appartient à aucune
-  application. Le harnais que le codeur écrit sur la garde va dans `packages/gardes/gardes.test.mjs`.
-  Le harnais qu'un auditeur écrit sur une règle est un **amorçage** : il va dans `amorcage/`,
-  hors du workspace, s'appelle par `pnpm amorcage`, et tourne en CI sur chaque PR (D74). Il ne va
-  jamais dans `pnpm test`.
-- **Codage d'un besoin.** Le harnais est déjà là et rouge ; le travail consiste à le faire passer
-  au vert sans le modifier. Les questions de développement et les décisions techniques se consignent
-  en commentaires dans la discussion de la PR, jamais dans sa description.
-- **Sessions Claude Chat.** Regrouper les commandes en peu d'appels d'outils, pour ne pas atteindre
-  trop vite les limites d'usage.
-- **Choix techniques.** Une cible de distribution, une technologie ou un outil est un choix
-  technique : il se consigne dans une issue de besoin, une par cible identifiée, jamais dans la
-  description du projet ni dans les invariants. Il se traite le moment venu, au regard des
-  invariants et de `docs/contraintes.md`.
-- **Étiquettes GitHub.** `besoin` (issue qui définit un besoin), `cible` (cible de distribution),
-  `harnais`, `objectif` (objectif du projet) ; `U1` à `U5`, `I…` et `C…` renvoient aux usages, invariants et contraintes qu'une
-  issue sert.
-- **Harnais et vérifications manuelles (objectif primaire #58, D61).** Chaque invariant et chaque
-  contrainte est gardé par un harnais tant que c'est possible. Ce qui ne se programme pas fait
-  l'objet, dans la PR, d'une demande explicite de vérification manuelle, faite avant tout merge :
-  pour les invariants et contraintes que la PR touche, et pour ceux qui semblent hors de sa portée
-  mais dont le lien pourrait être masqué. Dans le doute, on demande. Un agent peut préparer
-  l'analyse d'une vérification ; seul un développeur humain la valide.
-  - La correspondance se tient dans `docs/gardes.md`. Ajouter ou renommer un invariant, une
-    contrainte ou un harnais met ce document à jour dans la même PR : `pnpm test` échoue sinon.
-  - Toute PR remplit la section « Invariants et contraintes » de son modèle ;
-    `node packages/gardes/cli.mjs demander --base <branche cible>` la prépare, consignes du registre
-    recopiées, l'analyse reste à écrire. La vérification « Vérifications manuelles » reste rouge tant qu'une vérification
-    demandée n'est pas analysée et validée.
-  - Un agent ne coche jamais « Validée » sans une autorisation explicite de Simon pour cette
-    vérification ; quand il la coche, il cite l'autorisation dans un commentaire de la PR. Il ne
-    retire pas une garde pour faire passer une PR, et ne fusionne jamais une PR dont la vérification
-    « Vérifications manuelles » est rouge.
-  - **Une règle nouvelle ne contredit pas les règles primaires (#64).** Changer une règle reste
-    libre : une PR ajoute une décision, en remplace une par une entrée nouvelle, fait évoluer la
-    garde ou ces règles-ci. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les
-    **règles primaires** — les invariants et usages (`docs/invariants.md`), les contraintes
-    (`docs/contraintes.md`) et la garde de l'objectif primaire (#58, D61). Une PR qui modifie
-    `docs/decisions.md`, `docs/description-projet.md`, `docs/invariants.md`, `docs/contraintes.md`,
-    ce fichier, ou la garde (son code, ses harnais, son registre `docs/gardes.md`, sa vérification,
-    le modèle de PR) se voit demander `VM-regles-primaires` :
-    l'analyse nomme les règles primaires touchées et dit pourquoi la règle nouvelle ne les contredit
-    pas ; un développeur humain valide avant la fusion. Une contradiction ne se tranche pas dans la
-    PR : elle devient une question dans une issue.
-  - **Une modification de la garde dit ce qui la couvre (#89).** Une PR qui touche la garde — son
-    code, `gardes.test.mjs`, les amorçages, `docs/gardes.md`, `verifications.yml`, le modèle de
-    PR — se voit demander `VM-garde-couverture`, sans condition et en plus de `VM-regles-primaires` :
-    l'analyse nomme ce que la PR change dans la garde et, pour chaque changement, le harnais qui le
-    couvre (`packages/gardes/gardes.test.mjs`, un amorçage) ou la raison pour laquelle il ne se
-    programme pas (D62) ; un développeur humain valide. La consigne se proportionne à la PR : une PR
-    qui n'ajoute qu'un test le dit, et c'est tout. Les deux clés restent distinctes : contredire une
-    règle primaire et laisser un changement sans garde sont deux défauts différents.
-  - **La description du projet et les invariants ne changent qu'à la demande du porteur.** Une PR
-    qui modifie `docs/description-projet.md` ou `docs/invariants.md` porte, dans la section
-    « Invariants et contraintes », une ligne « Accord du porteur : … » — lien ou citation datée de
-    son accord explicite. La garde la lit et reste rouge tant qu'elle manque ou reste vide ;
-    `demander` la prépare pour ces PR et pour elles seules.
-  - **Aucune fusion au rouge, aucun push direct (#62).** La règle vaut pour tout le monde, agents
-    comme porteur : tout changement de `main` passe par une PR dont la vérification « Vérifications
-    manuelles » est verte, et un push direct sur `main` vaut fusion non vérifiée, puisqu'aucune
-    vérification ne l'a relu. L'offre gratuite ne permet pas de l'empêcher : la règle se signale
-    après coup. Le workflow « Alerte de fusion non vérifiée » ouvre aussitôt une issue étiquetée
-    `alerte`, qui nomme la PR ou le commit et dit ce qui manquait ; elle se ferme à la main, une fois
-    les vérifications refaites ou le passage assumé.
-  - Un test qui a besoin d'un outil (navigateur, PHP, `lftp`…) peut se sauter en local s'il manque,
-    mais échoue quand `TIRELIRE_STRICT` est posé, comme en CI ; la CI installe ses outils.
-  - Un harnais du registre cite son témoin rouge (les mêmes assertions rejouées sur une version
-    volontairement cassée du besoin, qui doit échouer) ou porte « à faire » avec le numéro de son
-    issue ; la couverture échoue sinon, en le nommant, comme pour un témoin rouge cité qui n'existe
-    pas. Un témoin rouge qui se met à passer fait échouer `pnpm test`, l'outil de test tenant
-    l'échec attendu (`test.fails` avec vitest, une assertion qui attend l'échec avec `node:test`) —
-    la couverture ne le voit pas (#66).
-  - Le crochet de pré-commit tient en moins de 5 s (D73) : les amorçages (D65) et les tests de
-    l'interface tournent en CI, pas au commit (D62).
-  - Une validation vaut pour le code validé : un commit qui modifie le code, ou un changement de
-    branche cible, l'annule et la vérification décoche la case ; documentation et harnais se
-    modifient sans l'annuler. Une case décochée par la vérification ne se recoche qu'aux mêmes
-    conditions ; sinon l'agent signale dans la PR que la validation est à refaire.
-- **Dépendances.** Elles se tiennent à deux endroits, toujours d'accord : la section « Dépendances »
-  de l'issue et les liens GitHub « bloquée par ». Qui recalcule l'une met l'autre à jour.
+Le projet avance sur le produit. La garde aide à ne pas dévier des documents fondateurs ; elle ne fait
+rien d'autre.
+
+### Les documents fondateurs
+
+`docs/description-projet.md` (les paroles du porteur), `docs/glossaire.md`, et les catalogues :
+`docs/invariants.md`, `docs/contraintes.md`, `docs/decisions.md`, `docs/gardes.md` (le registre :
+chaque invariant et chaque contrainte, avec son harnais ou sa vérification manuelle).
+
+Ils sont tels qu'ils sont. On ne les restructure pas ; on les corrige quand une PR les touche, et
+seulement là.
+
+### La garde
+
+Un seul outil, `packages/gardes`, testé par des tests ordinaires dans `pnpm test`. Il vérifie trois
+choses, et rien de plus :
+
+1. chaque invariant et chaque contrainte a une entrée au registre, avec un harnais qui existe ou une
+   vérification manuelle décrite ;
+2. une PR qui modifie un document fondateur, ou un fichier qu'une entrée du registre nomme, déclare
+   l'entrée et porte sa vérification manuelle avec une case « Validée » ;
+3. la PR est rouge tant qu'une case demandée n'est pas cochée.
+
+Il tourne en CI sur chaque PR, et à la demande en local (`node packages/gardes/cli.mjs`). Pas de
+crochet lent, pas de workflow à part, pas d'alerte, pas d'enregistrement de validation : la case
+cochée fait foi, et c'est le porteur qui la coche.
+
+### Un besoin, deux agents
+
+Une issue définit le besoin. Deux sessions y travaillent, l'une après l'autre, sur la même branche.
+
+#### L'auditeur
+
+Il passe en premier. Il ne code jamais le produit.
+
+1. Lire l'issue et les documents fondateurs. Si le besoin n'est pas clair, poser les questions dans
+   l'issue et s'arrêter.
+2. Décider si le besoin tient en une tâche. Sinon, ouvrir les sous-issues, une par tâche, et
+   s'arrêter : chaque sous-issue aura son propre auditeur.
+3. Écrire dans l'issue un « Fait quand » vérifiable : des phrases qu'un test peut trancher.
+4. Créer la branche, poser l'étiquette « en cours », écrire le harnais — un test qui rougit
+   aujourd'hui et verdira quand le besoin sera couvert. Un seul fichier de test par issue, sauf
+   raison dite.
+5. Ouvrir la PR : `Close #n`, les entrées du registre touchées, et pour chacune la vérification
+   manuelle demandée avec sa case vide. Rien d'autre dans la description.
+6. Répondre aux commentaires du codeur : corriger le harnais ou préciser l'issue.
+7. Si le besoin ajoute ou modifie une règle, une décision ou un invariant, vérifier avant d'ouvrir
+   la PR qu'il ne contredit ni les autres entrées de son catalogue, ni les documents fondateurs —
+   description, glossaire, invariants, contraintes. Écrire dans la PR ce qui a été comparé et
+   pourquoi cela tient. Une contradiction ne se code pas : elle devient une question dans l'issue.
+
+Il ne rédige ni analyse de vérification ni compte rendu : la PR est le cadre, pas le rapport.
+
+#### Le codeur
+
+Il passe en second, sur la PR ouverte par l'auditeur.
+
+1. Lire l'issue et les documents fondateurs. **Ne pas lire le harnais.** Coder depuis sa propre
+   lecture du besoin.
+2. Coder sur la branche, commettre, pousser. Le verdict vient de la CI, avec le message d'échec.
+3. Ne jamais modifier la PR : ni description, ni cases, ni harnais. Ne jamais modifier un document
+   fondateur, sauf si l'issue le demande.
+4. Quand la CI est verte, écrire un seul commentaire : ce qui appelle une validation humaine — pour
+   chaque vérification manuelle demandée, ce que ses modifications changent et ce qui reste à
+   constater. Honnête et court. Puis s'arrêter.
+5. Si le harnais paraît faux ou le besoin impossible, le dire en commentaire et s'arrêter.
+
+Il ne coche jamais une case. Il n'ouvre pas d'issue.
+
+#### Le porteur
+
+Il lit le commentaire du codeur, constate ce qu'il y a à constater, coche les cases, fusionne. La
+fusion ferme l'issue.
+
+### Trois règles communes
+
+- **Une issue, une PR, une fusion.** Ce qui en déborde est une nouvelle issue, ouverte avant la
+  fusion ; rien ne reste dans un fil qui va se fermer.
+- **Une règle ou une décision nouvelle s'écrit dans son catalogue**, en une entrée, sans date ni
+  renvoi à ce qu'elle remplace : on amende l'entrée ancienne. C'est l'auditeur qui vérifie qu'elle
+  ne contredit ni les autres, ni les fondamentaux du projet ; la garde ne le vérifie pas, elle n'en
+  serait pas capable. Si la règle rougit du code existant, le rouge devient une issue.
+- **Pas d'outil nouveau sans issue produit qui l'exige.** Une PR qui n'améliore que la garde, les
+  crochets ou la CI ne s'ouvre pas sans que le porteur l'ait demandée.

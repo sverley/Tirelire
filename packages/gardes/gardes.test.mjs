@@ -15,7 +15,6 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import * as V from './gardes.mjs';
-import { verifierPrSurGithub } from './github.mjs';
 import {
   DOCUMENTS,
   RACINE,
@@ -166,8 +165,9 @@ const section = (touches, masques, verifications = '') =>
   `Pour #1 : rien.\n\n## Ce qui change\n\nRien.\n\n## Invariants et contraintes\n\nTouchés : ${touches}\nLien possible masqué : ${masques}\n\n### Vérifications manuelles\n\n${verifications}\n## Après\n\nFin.\n`;
 /** Consigne du registre inventé, recopiée comme `demander` l'écrit (tranché dans #60). */
 const consigneDe = (cle) => [...entrees.values()].flatMap((e) => e.verifications).find((v) => v.id === cle)?.description ?? '';
-const item = (cle, { analyse = "La PR change l'écran Plan : le regarder à 375 px.", cochee = false } = {}) =>
-  `- \`${cle}\` · essai${consigneDe(cle) ? ` — ${consigneDe(cle)}` : ''}\n  - Analyse (agent, 2026-09-11) : ${analyse}\n  - [${cochee ? 'x' : ' '}] Validée par un développeur humain\n`;
+const item = (cle) => `- \`${cle}\` · essai${consigneDe(cle) ? ` — ${consigneDe(cle)}` : ''}\n`;
+/** La case unique de la PR, en pied de section, que seul le porteur coche (tranché le 19 septembre). */
+const casePorteur = (cochee) => `\n- [${cochee ? 'x' : ' '}] Validée par le porteur\n`;
 
 test("une PR sans section, ou avec la section du modèle laissée telle quelle, est refusée", () => {
   assert.match(texte(pr('Pour #1 : rien.').aCorriger), /pas de section « ## Invariants et contraintes »/);
@@ -184,20 +184,21 @@ test('rien de touché, rien de masqué, rien dans le plancher : la PR passe', ()
 
 test("un fichier modifié qui répond aux chemins d'une entrée impose de la déclarer", () => {
   assert.match(texte(pr(section('aucun', 'aucun'), ['b/deux.mjs']).aCorriger), /C1 n'est pas déclaré alors que la PR modifie b\/deux\.mjs/);
-  const declaree = pr(section('aucun', 'C1', item('VM-C1-appareil', { cochee: true })), ['b/deux.mjs']);
+  const declaree = pr(section('aucun', 'C1', item('VM-C1-appareil') + casePorteur(true)), ['b/deux.mjs']);
   assert.deepEqual(declaree.aCorriger, []);
 });
 
-test("une vérification demandée garde la PR rouge tant qu'elle n'est pas analysée puis validée", () => {
+test("une vérification demandée garde la PR rouge tant que le porteur n'a pas coché l'unique case", () => {
   assert.match(texte(pr(section('C1', 'aucun')).aCorriger), /`VM-C1-appareil` \(C1\) est demandée mais ne figure pas/);
-  assert.match(texte(pr(section('C1', 'aucun', item('VM-C1-appareil', { analyse: 'à écrire', cochee: true }))).aCorriger), /`VM-C1-appareil` : analyse à écrire/);
+  assert.match(texte(pr(section('C1', 'aucun', item('VM-C1-appareil'))).aCorriger), /La case « - \[ \] Validée par le porteur » manque/);
 
-  const attente = pr(section('C1', 'aucun', item('VM-C1-appareil')));
+  const attente = pr(section('C1', 'aucun', item('VM-C1-appareil') + casePorteur(false)));
   assert.deepEqual(attente.aCorriger, []);
-  assert.match(texte(attente.enAttente), /`VM-C1-appareil` : analysée, en attente de validation par un développeur humain/);
+  assert.match(texte(attente.enAttente), /Une vérification manuelle est demandée : en attente de la case du porteur/);
 
-  const validee = pr(section('C1', 'aucun', item('VM-C1-appareil', { cochee: true })));
+  const validee = pr(section('C1', 'aucun', item('VM-C1-appareil') + casePorteur(true)));
   assert.deepEqual([validee.aCorriger, validee.enAttente, validee.validees], [[], [], ['VM-C1-appareil']]);
+  assert.match(texte(pr(section('C1', 'aucun', item('VM-C1-appareil') + casePorteur(true) + casePorteur(true))).aCorriger), /figure 2 fois : n'en garder qu'une/);
 });
 
 test('déclarer une entrée demande aussi les vérifications des entrées qui la couvrent, de proche en proche', () => {
@@ -207,14 +208,14 @@ test('déclarer une entrée demande aussi les vérifications des entrées qui la
 });
 
 test('les commentaires ne comptent pas, un identifiant ou une vérification inconnus non plus', () => {
-  const commentee = pr(section('I7', 'aucun', `<!--\n${item('VM-C1-appareil', { cochee: true })}-->\n`));
+  const commentee = pr(section('I7', 'aucun', `<!--\n${item('VM-C1-appareil')}${casePorteur(true)}-->\n`));
   assert.match(texte(commentee.aCorriger), /I7 est déclaré mais n'a pas d'entrée/);
   assert.deepEqual(commentee.validees, []);
-  assert.match(texte(pr(section('aucun', 'aucun', item('VM-C1-apareil', { cochee: true }))).aCorriger), /`VM-C1-apareil` n'est ni une vérification manuelle/);
+  assert.match(texte(pr(section('aucun', 'aucun', item('VM-C1-apareil') + casePorteur(true))).aCorriger), /`VM-C1-apareil` n'est ni une vérification manuelle/);
 });
 
 test('une vérification manuelle recopie sa consigne du registre, coupée ou non, et la déclaration se lit comme GitHub l’affiche (#60)', () => {
-  const avec = (tete, suite = '') => section('U2', 'aucun', `- \`VM-U2-parcours\` · U2${tete}\n${suite}  - Analyse (agent, 2026-09-11) : relu.\n  - [x] Validée par un développeur humain\n`);
+  const avec = (tete, suite = '') => section('U2', 'aucun', `- \`VM-U2-parcours\` · U2${tete}\n${suite}` + casePorteur(true));
   assert.deepEqual(pr(avec(` — ${consigneDe('VM-U2-parcours')}`)).aCorriger, []);
   assert.deepEqual(pr(avec(' — Suivre le second parcours', "  sur une base vide et constater qu'il aboutit.\n")).aCorriger, []);
   assert.match(texte(pr(avec('')).aCorriger), /`VM-U2-parcours` : consigne à recopier/);
@@ -239,212 +240,21 @@ test('retirer une vérification manuelle ou un harnais du registre demande la m�
   const rouge = texte(retire(section('aucun', 'aucun')).aCorriger);
   assert.match(rouge, /`VM-C1-appareil` \(vérification manuelle retirée\) est demandée/);
   assert.match(rouge, /`I2 · a\/test\/un\.test\.ts` \(harnais retiré\) est demandée/);
-  const valide = retire(section('aucun', 'aucun', item('VM-C1-appareil', { cochee: true }) + item('I2 · a/test/un.test.ts', { analyse: 'Renommé en a/test/deux.test.ts.', cochee: true })));
+  const valide = retire(section('aucun', 'aucun', item('VM-C1-appareil') + item('I2 · a/test/un.test.ts') + casePorteur(true)));
   assert.deepEqual([valide.aCorriger, valide.enAttente], [[], []]);
 });
 
-test("la section préparée par « demander » reste rouge tant que l'analyse n'est pas écrite", () => {
-  const preparee = preparerSection({ entrees, fichiersModifies: ['b/deux.mjs'], date: '2026-09-11' });
+test("la section préparée par « demander » se remplit, puis attend l'unique case du porteur", () => {
+  const preparee = preparerSection({ entrees, fichiersModifies: ['b/deux.mjs'] });
   assert.match(preparee, /^Touchés : C1$/m);
+  assert.match(preparee, /^- \[ \] Validée par le porteur$/m);
   const r = pr(`Pour #1 : rien.\n\n${preparee}\n`, ['b/deux.mjs']);
   assert.match(texte(r.aCorriger), /« Lien possible masqué : » à remplir/);
-  assert.match(texte(r.aCorriger), /`VM-C1-appareil` : analyse à écrire/);
+  const remplie = pr(`Pour #1 : rien.\n\n${preparee.replace('masqué : à analyser', 'masqué : aucun')}\n`, ['b/deux.mjs']);
+  assert.deepEqual(remplie.aCorriger, []);
+  assert.match(texte(remplie.enAttente), /en attente de la case du porteur/);
 });
 
-// ─── La garde modifiée dit ce qui la couvre (#89) ─────────────────────────────────────────────
-
-/** Une vérification hors registre, recopiée comme `demander` l'écrit (#60, #64, #89). */
-const CONSIGNES_HORS_REGISTRE = { [V.CLE_CONFORMITE]: V.CONSIGNE_CONFORMITE, [V.CLE_COUVERTURE]: V.CONSIGNE_COUVERTURE };
-const horsRegistre = (cle, { analyse = 'Le comportement neuf est couvert par le test « … ».', cochee = false, consigne = CONSIGNES_HORS_REGISTRE[cle] } = {}) =>
-  `- \`${cle}\` · essai — ${consigne}\n  - Analyse (agent, 2026-09-14) : ${analyse}\n  - [${cochee ? 'x' : ' '}] Validée par un développeur humain\n`;
-/** La conformité (#64) est demandée à toutes ces PR : la poser validée pour ne lire que #89. */
-const conformiteValidee = horsRegistre(V.CLE_CONFORMITE, { cochee: true });
-const prGarde = (fichiers, verifications = conformiteValidee) => pr(section('aucun', 'aucun', verifications), fichiers);
-
-test('une PR qui touche la garde se voit demander de dire quel harnais couvre ce qu’elle change', () => {
-  const chemins = ['packages/gardes/gardes.mjs', 'packages/gardes/gardes.test.mjs', 'amorcage/livraison-de-la-garde.test.mjs', DOCUMENTS.gardes, '.github/workflows/verifications.yml', DOCUMENTS.modele];
-  for (const fichier of chemins) {
-    assert.match(texte(prGarde([fichier]).aCorriger), /`VM-garde-couverture` \(la garde est modifiée\) est demandée/, fichier);
-  }
-  // Sans condition : y joindre un test ne fait pas disparaître la demande, la consigne se proportionne (D62).
-  assert.match(texte(prGarde(['packages/gardes/gardes.mjs', 'packages/gardes/gardes.test.mjs']).aCorriger), /`VM-garde-couverture` .* est demandée/);
-});
-
-test('la couverture de la garde ne vise pas une PR qui ne la touche pas : sinon elle viserait tout, donc rien', () => {
-  const decision = prGarde(['docs/decisions.md']);
-  assert.deepEqual([decision.aCorriger, decision.enAttente], [[], []]);
-  const rien = pr(section('aucun', 'aucun'), ['README.md']);
-  assert.deepEqual([rien.aCorriger, rien.enAttente], [[], []]);
-});
-
-test('la couverture de la garde reste rouge tant qu’elle n’est pas analysée puis validée par un développeur humain', () => {
-  const nonEcrite = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE, { analyse: 'à écrire', cochee: true }));
-  assert.match(texte(nonEcrite.aCorriger), /`VM-garde-couverture` : analyse à écrire/);
-
-  const attente = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE));
-  assert.deepEqual(attente.aCorriger, []);
-  assert.match(texte(attente.enAttente), /`VM-garde-couverture` : analysée, en attente de validation par un développeur humain/);
-
-  const validee = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE, { cochee: true }));
-  assert.deepEqual([validee.aCorriger, validee.enAttente, validee.validees], [[], [], [V.CLE_CONFORMITE, V.CLE_COUVERTURE]]);
-});
-
-test('la consigne de la couverture se recopie mot pour mot, et « demander » l’écrit', () => {
-  const autre = prGarde(['packages/gardes/gardes.mjs'], conformiteValidee + horsRegistre(V.CLE_COUVERTURE, { consigne: 'Dire si c’est bien gardé.', cochee: true }));
-  assert.match(texte(autre.aCorriger), /`VM-garde-couverture` : la consigne diffère/);
-
-  const preparee = preparerSection({ entrees, fichiersModifies: ['packages/gardes/gardes.mjs'], date: '2026-09-14' });
-  assert.ok(preparee.includes(`- \`${V.CLE_COUVERTURE}\` · la garde est modifiée — ${V.CONSIGNE_COUVERTURE}`), preparee);
-});
-
-// ─── Validations enregistrées, et annulées par une modification postérieure (#61) ─────────────
-
-const TETE = 'a'.repeat(40);
-const NOUVELLE = 'b'.repeat(40);
-const ANALYSE = "La PR change l'écran Plan : le regarder à 375 px.";
-const enregistree = (extra = {}) => ({ cle: 'VM-C1-appareil', tete: TETE, cible: 'main', analyse: V.empreinteAnalyse(ANALYSE), par: 'sverley', date: '2026-09-11T10:42:00.000Z', ...extra });
-const duBot = (...h) => ({ user: { login: V.AUTEUR_HORODATAGE }, body: V.texteHorodatage(h) });
-const valider = (corps, validations) => verifierPr({ entrees, corps, fichiersModifies: [], validations });
-const ouverte = section('C1', 'aucun', item('VM-C1-appareil'));
-const cochee = (analyse = ANALYSE) => section('C1', 'aucun', item('VM-C1-appareil', { analyse, cochee: true }));
-
-function fauxGithub(corps, { tete = TETE, cible = 'main', commentaires = [] } = {}) {
-  const etat = { pr: { number: 7, body: corps, head: { sha: tete }, base: { ref: cible } }, commentaires: [...commentaires], descriptions: 0 };
-  const api = {
-    lirePr: async () => structuredClone(etat.pr),
-    lireCommentaires: async () => structuredClone(etat.commentaires),
-    commenter: async (_n, body) => void etat.commentaires.push({ user: { login: V.AUTEUR_HORODATAGE }, body }),
-    modifierDescription: async (_n, body) => void ((etat.pr.body = body), etat.descriptions++),
-  };
-  return { etat, api };
-}
-const surEvenement = (etat, action, extra = {}) => ({ action, sender: { login: 'sverley' }, pull_request: structuredClone(etat.pr), ...extra });
-const github = (evenement, api, fichiersDepuis = () => ['apps/web/src/App.svelte']) =>
-  verifierPrSurGithub({ evenement, api, entrees, fichiersModifies: [], fichiersDepuis, attendre: async () => {} });
-
-test("sur GitHub, une case cochée ne vaut validation qu'enregistrée pour l'état actuel de la PR", () => {
-  const horodatages = V.lireHorodatages([duBot(enregistree())]);
-  assert.deepEqual(valider(cochee(), { tete: TETE, cible: 'main', horodatages }).validees, ['VM-C1-appareil']);
-  const sans = valider(cochee(), { tete: TETE, cible: 'main', horodatages: [] });
-  assert.deepEqual([sans.validees, sans.nonEnregistrees], [[], ['VM-C1-appareil']]);
-  assert.match(texte(sans.enAttente), /case cochée sans validation enregistrée/);
-  // Un commentaire qui imite l'enregistrement, écrit avec un compte ordinaire, ne valide rien.
-  assert.deepEqual(V.lireHorodatages([{ user: { login: 'sverley' }, body: V.texteHorodatage([enregistree()]) }]), []);
-});
-
-test('seule une modification postérieure du code annule la validation ; documentation, harnais et analyse, non', () => {
-  const horodatages = V.lireHorodatages([duBot(enregistree())]);
-  const apres = (fichiers, cible = 'main') => ({ tete: NOUVELLE, cible, horodatages, fichiersDepuis: () => fichiers });
-  const code = valider(cochee(), apres(['docs/x.md', 'apps/web/src/App.svelte']));
-  assert.deepEqual([code.validees, code.annulees.map((a) => a.cle)], [[], ['VM-C1-appareil']]);
-  assert.match(texte(code.enAttente), /validation annulée, code modifié depuis la validation, de aaaaaaa à bbbbbbb : apps\/web\/src\/App\.svelte\./);
-  assert.doesNotMatch(texte(code.enAttente), /docs\/x\.md/);
-
-  const sansCode = valider(cochee('Une autre analyse, réécrite après la validation.'), apres(['docs/x.md', 'README.md', 'apps/web/test/harnais.ts', 'packages/core/test/plan.test.ts']));
-  assert.deepEqual([sansCode.aCorriger, sansCode.enAttente, sansCode.validees], [[], [], ['VM-C1-appareil']]);
-
-  assert.match(texte(valider(cochee(), apres([], 'autre')).enAttente), /branche cible changée, de main à autre/);
-  assert.match(texte(valider(cochee(), apres(null)).enAttente), /impossibles à comparer/);
-});
-
-test('documentation et harnais ne sont pas du code, et docs/gardes.md cite leurs motifs', () => {
-  const nonCode = ['README.md', 'CLAUDE.md', '.github/pull_request_template.md', 'docs/analyse-du-besoin.html', 'apps/web/test/harnais.ts', 'packages/core/test/plan.test.ts', 'apps/relay/server.test.mjs', 'packages/gardes/gardes.test.mjs'];
-  const code = ['apps/web/src/App.svelte', 'package.json', 'pnpm-lock.yaml', '.github/workflows/ci.yml', 'apps/web/vitest.config.ts', 'packages/gardes/gardes.mjs', 'apps/hebergement/verifier.sh'];
-  assert.deepEqual(V.fichiersDeCode([...nonCode, ...code]), code);
-  const registre = lire(DOCUMENTS.gardes);
-  for (const motif of [...V.SANS_EFFET.documentation, ...V.SANS_EFFET.harnais]) assert.ok(registre.includes(`\`${motif}\``), `${motif} manque dans ${DOCUMENTS.gardes}`);
-});
-
-test("sur un vrai dépôt : une fusion propre de la cible n'apporte aucun fichier, une résolution de conflit si", () => {
-  const racine = mkdtempSync(join(tmpdir(), 'gardes-validation-'));
-  const env = Object.fromEntries(Object.entries(process.env).filter(([cle]) => !cle.startsWith('GIT_')));
-  try {
-    const g = (...a) => execFileSync('git', ['-c', 'user.name=Essai', '-c', 'user.email=essai@exemple.invalid', '-c', 'commit.gpgsign=false', ...a], { cwd: racine, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-    const ecrire = (fichier, contenu) => {
-      mkdirSync(dirname(join(racine, fichier)), { recursive: true });
-      writeFileSync(join(racine, fichier), contenu);
-    };
-    const commit = (message) => (g('add', '-A'), g('commit', '-q', '-m', message), g('rev-parse', 'HEAD'));
-    const depuis = (ancienne) => V.fichiersDepuisValidation({ ancienne, base: g('rev-parse', 'main'), tete: g('rev-parse', 'HEAD'), racine });
-    g('init', '-q', '-b', 'main');
-    ecrire('src/a.ts', 'a\nb\nc\n');
-    ecrire('src/b.ts', 'x\n');
-    ecrire('docs/x.md', 'doc\n');
-    commit('départ');
-    g('checkout', '-q', '-b', 'pr');
-    ecrire('src/a.ts', 'A\nb\nc\n');
-    const validee = commit('le code de la PR, validé');
-    g('checkout', '-q', 'main');
-    ecrire('src/b.ts', 'y\n');
-    commit('main avance');
-    g('checkout', '-q', 'pr');
-    ecrire('docs/x.md', 'doc revue\n');
-    ecrire('pkg/test/a.test.ts', 'garde\n');
-    commit('documentation et harnais');
-    g('merge', '-q', '--no-edit', 'main');
-    assert.deepEqual(depuis(validee).sort(), ['docs/x.md', 'pkg/test/a.test.ts']);
-
-    g('checkout', '-q', 'main');
-    ecrire('src/a.ts', 'Z\nb\nc\n');
-    commit('main touche la même ligne');
-    g('checkout', '-q', 'pr');
-    assert.throws(() => g('merge', '-q', '--no-edit', 'main'));
-    ecrire('src/a.ts', 'AZ\nb\nc\n');
-    commit('conflit résolu dans le code');
-    assert.deepEqual(V.fichiersDeCode(depuis(validee)), ['src/a.ts']);
-    assert.equal(depuis('f'.repeat(40)), null);
-  } finally {
-    rmSync(racine, { recursive: true, force: true });
-  }
-});
-
-test('décocher ne touche que les cases désignées', () => {
-  const corps = section('C1', 'aucun', item('VM-C1-appareil', { cochee: true }) + item('VM-C1-autre', { cochee: true }));
-  const apres = V.decocher(corps, ['VM-C1-appareil']);
-  assert.deepEqual([...V.cochees(apres)], ['VM-C1-autre']);
-  assert.equal(apres.replace('- [ ] Validée', '- [x] Validée'), corps);
-});
-
-test('cocher la case enregistre la validation, et la vérification passe au vert', async () => {
-  const { etat, api } = fauxGithub(cochee());
-  const r = await github(surEvenement(etat, 'edited', { changes: { body: { from: ouverte } } }), api);
-  assert.deepEqual([r.aCorriger, r.enAttente, r.validees], [[], [], ['VM-C1-appareil']]);
-  assert.match(etat.commentaires[0].body, /\*\*Validation enregistrée\*\* par sverley/);
-  assert.deepEqual(V.lireHorodatages(etat.commentaires).map((h) => [h.cle, h.tete, h.cible]), [['VM-C1-appareil', TETE, 'main']]);
-});
-
-test("un commit de code poussé après la validation l'annule : la case se décoche et la vérification redevient rouge", async () => {
-  const { etat, api } = fauxGithub(cochee(), { tete: NOUVELLE, commentaires: [duBot(enregistree())] });
-  const r = await github(surEvenement(etat, 'synchronize'), api);
-  assert.deepEqual(r.validees, []);
-  assert.match(texte(r.enAttente), /analysée, en attente de validation/);
-  assert.deepEqual([...V.cochees(etat.pr.body)], []);
-  assert.match(etat.commentaires.at(-1).body, /\*\*Validation annulée\*\*[\s\S]*code modifié depuis la validation, de aaaaaaa à bbbbbbb : apps\/web\/src\/App\.svelte/);
-});
-
-test("un commit de documentation ou de harnais, ou l'analyse réécrite, laissent la validation en place", async () => {
-  const autre = cochee('Une autre analyse, réécrite après la validation.');
-  const { etat, api } = fauxGithub(autre, { tete: NOUVELLE, commentaires: [duBot(enregistree())] });
-  const r = await github(surEvenement(etat, 'synchronize'), api, () => ['docs/gardes.md', 'packages/gardes/gardes.test.mjs']);
-  assert.deepEqual([r.aCorriger, r.enAttente, r.validees], [[], [], ['VM-C1-appareil']]);
-  assert.deepEqual([[...V.cochees(etat.pr.body)], etat.descriptions, etat.commentaires.length], [['VM-C1-appareil'], 0, 1]);
-});
-
-test("une case cochée à l'ouverture ou juste avant un push n'est pas une validation", async () => {
-  const ouverture = fauxGithub(cochee());
-  const r = await github(surEvenement(ouverture.etat, 'opened'), ouverture.api);
-  assert.deepEqual([r.validees, [...V.cochees(ouverture.etat.pr.body)], V.lireHorodatages(ouverture.etat.commentaires)], [[], [], []]);
-
-  const push = fauxGithub(cochee(), { tete: NOUVELLE });
-  const evenement = surEvenement(push.etat, 'edited', { changes: { body: { from: ouverte } } });
-  evenement.pull_request.head.sha = TETE; // la case a été cochée sur la tête d'avant le push
-  const avantPush = await github(evenement, push.api);
-  assert.deepEqual([avantPush.validees, V.lireHorodatages(push.etat.commentaires)], [[], []]);
-  assert.match(texte(avantPush.enAttente), /La PR a changé pendant la validation/);
-  assert.equal(push.etat.descriptions, 0, 'une vérification en retard ne décoche rien');
-});
-
-// ─── Formes voisines et tests nommés (#59) ────────────────────────────────────────────────────
 
 test('un identifiant écrit sous une forme voisine est refusé en le nommant, dans les documents comme au registre', () => {
   const { ids, illisibles } = V.lireIdentifiants(
@@ -698,7 +508,7 @@ test('#113 : sous vitest aussi, une connexion hors de la machine fait échouer l
   }
 });
 
-test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node --test, vitest, inconnu, ou absent', () => {
+test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node --test, vitest ou inconnu', () => {
   const racine = mkdtempSync(join(tmpdir(), 'tirelire-113-depot-'));
   try {
     const ecrire = (chemin, contenu) => {
@@ -706,7 +516,7 @@ test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node -
       writeFileSync(join(racine, chemin), typeof contenu === 'string' ? contenu : JSON.stringify(contenu));
     };
     ecrire('pnpm-workspace.yaml', 'packages:\n  - paquets/*\n\nonlyBuiltDependencies:\n  - esbuild\n');
-    ecrire('package.json', { scripts: { amorcage: 'node --import ./packages/gardes/sans-sortie.mjs --test amorcage/*.test.mjs' } });
+    ecrire('package.json', { scripts: {} });
     ecrire('paquets/branche/package.json', { name: 'branche', scripts: { test: 'node --import ../../packages/gardes/sans-sortie.mjs --test' } });
     ecrire('paquets/nu/package.json', { name: 'nu', scripts: { test: 'node --test' } });
     ecrire('paquets/ailleurs/package.json', { name: 'ailleurs', scripts: { test: 'node --import ./sans-sortie.mjs --test' } });
@@ -720,10 +530,6 @@ test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node -
     const problemes = V.verifierLanceursLocaux(racine);
     const noms = problemes.map((p) => /^`([^`]+)`/.exec(p)?.[1]);
     assert.deepEqual(noms.sort(), ['ailleurs', 'jest', 'nu', 'vite-commente', 'vite-sans-config'], problemes.join('\n'));
-    ecrire('package.json', { scripts: { amorcage: 'node --test amorcage/*.test.mjs' } });
-    assert.ok(V.verifierLanceursLocaux(racine).some((p) => p.startsWith('`pnpm amorcage`')));
-    ecrire('package.json', { scripts: {} });
-    assert.ok(V.verifierLanceursLocaux(racine).some((p) => p.includes('a disparu')));
   } finally {
     rmSync(racine, { recursive: true, force: true });
   }

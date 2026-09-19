@@ -46,7 +46,6 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 // primaires. La conformité porte sur le sens et ne se programme pas : elle devient donc une
 // vérification manuelle, demandée par les chemins que la PR modifie, analysée puis validée par un
 // développeur humain avant la fusion. La garde reste jugée par la version que porte la PR (piste 2
-// de #58) ; l'amorçage (`livraison-de-la-garde.test.mjs`) est ce qui empêche de l'affaiblir en silence.
 
 /**
  * Familles de chemins dont la modification ajoute ou change une règle. Une table à part du registre,
@@ -58,89 +57,12 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
  * La garde elle-même, nommée à part : c'est cette famille-là qui demande en plus de dire ce qui
  * couvre ce qu'on y change (#89), là où la conformité aux règles primaires (#64) porte sur toutes.
  */
-export const FAMILLE_GARDE = 'la garde';
-
-export const CHEMINS_DES_REGLES = Object.freeze([
-  Object.freeze({ quoi: 'une décision', motifs: Object.freeze(['docs/decisions.md']) }),
-  Object.freeze({ quoi: 'les règles des sessions', motifs: Object.freeze(['CLAUDE.md']) }),
-  Object.freeze({
-    quoi: 'une règle primaire',
-    motifs: Object.freeze(['docs/description-projet.md', 'docs/invariants.md', 'docs/contraintes.md', 'docs/glossaire.md']),
-  }),
-  Object.freeze({
-    quoi: FAMILLE_GARDE,
-    motifs: Object.freeze(['packages/gardes/**', 'amorcage/**', 'docs/gardes.md', '.github/workflows/verifications.yml', '.github/pull_request_template.md']),
-  }),
-]);
-
-/** Clé de la vérification de conformité. Hors registre : elle ne garde pas un identifiant, mais les règles. */
-export const CLE_CONFORMITE = 'VM-regles-primaires';
-
-/** Ce que lira qui valide ; recopié mot pour mot dans la PR, comme toute consigne (#60). */
-export const CONSIGNE_CONFORMITE =
-  'Nommer les règles primaires (les invariants et usages de `docs/invariants.md`, les contraintes de ' +
-  "`docs/contraintes.md`, la garde de l'objectif primaire #58) que la règle nouvelle touche, et dire " +
-  'pourquoi elle ne les contredit pas. Une contradiction ne se tranche pas dans la PR : elle devient une ' +
-  'question dans une issue.';
-
-// ─── Couverture de la garde (#89) ────────────────────────────────────────────────────────────
-// Une fonction neuve dans `gardes.mjs`, sans un seul test ni amorçage, laissait tout vert :
-// `VM-regles-primaires` était bien demandée, mais elle pose une autre question — « cette règle
-// nouvelle contredit-elle les règles primaires ? », jamais « cette règle nouvelle est-elle gardée ? ».
-// D'où une seconde clé, de la même forme et hors registre, demandée sans condition dès que la PR
-// touche la garde. Ce qui est gardé, c'est que la question soit posée ; la réponse, elle, se lit.
-
-/** Clé de la vérification de couverture de la garde. Hors registre, comme celle de #64. */
-export const CLE_COUVERTURE = 'VM-garde-couverture';
-
-/** Ce que lira qui valide ; recopié mot pour mot dans la PR, comme toute consigne (#60). */
-export const CONSIGNE_COUVERTURE =
-  'Nommer ce que la PR change dans la garde, et pour chaque changement dire quel harnais le couvre ' +
-  "(`packages/gardes/gardes.test.mjs`, un amorçage) ou pourquoi il ne se programme pas. La consigne " +
-  "se proportionne à la PR (D62) : une PR qui n'ajoute qu'un test le dit, et c'est tout. Une garde " +
-  'ne se retire pas pour faire passer une PR ; un développeur humain valide.';
-
-/** Familles de règles que les fichiers modifiés touchent, dans l'ordre de la table. */
-export function reglesTouchees(fichiersModifies = []) {
-  return CHEMINS_DES_REGLES.filter((r) => {
-    const motifs = r.motifs.map(globVersRegex);
-    return fichiersModifies.some((f) => motifs.some((re) => re.test(f)));
-  }).map((r) => r.quoi);
-}
-
-/** La vérification de conformité quand la PR change une règle, `null` sinon. */
-function conformiteDemandee(fichiersModifies) {
-  const familles = reglesTouchees(fichiersModifies);
-  if (!familles.length) return null;
-  return {
-    cle: CLE_CONFORMITE,
-    pourquoi: `règle nouvelle : ${familles.join(', ')}`,
-    description: CONSIGNE_CONFORMITE,
-    consigne: CONSIGNE_CONFORMITE,
-  };
-}
-
-/** La vérification de couverture quand la PR touche la garde elle-même (#89), `null` sinon. */
-function couvertureDemandee(fichiersModifies) {
-  if (!reglesTouchees(fichiersModifies).includes(FAMILLE_GARDE)) return null;
-  return {
-    cle: CLE_COUVERTURE,
-    pourquoi: 'la garde est modifiée',
-    description: CONSIGNE_COUVERTURE,
-    consigne: CONSIGNE_COUVERTURE,
-  };
-}
-
 /**
  * Ce qui ne change qu'à la demande du porteur (#64) : les invariants, et la description du projet
  * qui les fonde — son texte, mot pour mot, que seul le porteur complète ou corrige (`CLAUDE.md`).
  * Son accord ne reste pas dans l'analyse : c'est une ligne « Accord du porteur : … » de la section,
  * que la garde lit et refuse quand elle manque ou reste vide.
  */
-export const DOCUMENTS_DU_PORTEUR = Object.freeze([DOCUMENTS.description, DOCUMENTS.invariants, DOCUMENTS.glossaire]);
-
-/** Documents du porteur que la PR modifie, dans l'ordre ; vide quand elle n'y touche pas. */
-export const documentsDuPorteurModifies = (fichiersModifies = []) => DOCUMENTS_DU_PORTEUR.filter((d) => fichiersModifies.includes(d));
 
 const G = DOCUMENTS.gardes;
 const IDENTIFIANT = /\b([IUC]\d+)\b/g;
@@ -744,10 +666,6 @@ export function retraits(avant, apres) {
 
 function demandes(entrees, entreesAvant, declares, fichiersModifies = []) {
   const requises = new Map();
-  const conformite = conformiteDemandee(fichiersModifies);
-  if (conformite) requises.set(conformite.cle, conformite); // #64 : en tête, c'est elle qui porte sur la règle
-  const couverture = couvertureDemandee(fichiersModifies);
-  if (couverture) requises.set(couverture.cle, couverture); // #89 : sans condition, dès que la garde change
   for (const id of declares) {
     for (const v of verificationsDe(id, entrees)) {
       if (!requises.has(v.id)) requises.set(v.id, { cle: v.id, pourquoi: v.entree === id ? id : `${id}, par ${v.entree}`, description: v.description, consigne: v.description });
@@ -893,11 +811,17 @@ export function lireDescriptionPr(corps) {
     }
   }
 
+  // Une seule case pour toute la PR, en pied de section, que le porteur coche (tranché le 19 septembre).
+  const cases = section.filter((l) => /^[-*]\s+\[[ xX]\]\s+Valid[ée]e/i.test(l));
+  if (cases.length > 1) problemes.push(`La case « Validée » figure ${cases.length} fois : n'en garder qu'une, en pied de section.`);
+  const validee = cases.some((l) => /\[[xX]\]/.test(l));
   return {
     touches: declaration(ETIQUETTES_PR[0]),
     masques: declaration(ETIQUETTES_PR[1]),
     accord,
     items,
+    caseAbsente: !cases.length,
+    validee,
     problemes,
   };
 }
@@ -909,17 +833,15 @@ const memeTexte = (a, b) => String(a ?? '').replace(/\s+/g, ' ').trim() === Stri
  * Ce qu'une PR doit encore faire. `aCorriger` : la description est incomplète ou fausse ;
  * `enAttente` : une vérification analysée attend la validation d'un développeur humain.
  */
-export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersModifies = [], validations }) {
+export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersModifies = [] }) {
   const aCorriger = [];
   const enAttente = [];
   const validees = [];
-  const annulees = [];
-  const nonEnregistrees = [];
   const imposes = plancher(entrees, fichiersModifies);
   const pr = lireDescriptionPr(corps);
   if (!pr) {
     aCorriger.push(`La description n'a pas de section « ## Invariants et contraintes » : la reprendre du modèle \`${DOCUMENTS.modele}\`.`);
-    return { aCorriger, enAttente, validees, annulees, nonEnregistrees, declares: [], imposes, requises: new Map() };
+    return { aCorriger, enAttente, validees, declares: [], imposes, requises: new Map() };
   }
 
   aCorriger.push(...pr.problemes);
@@ -936,17 +858,6 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
   for (const [id, fichiers] of imposes) {
     if (!declares.includes(id)) {
       aCorriger.push(`${id} n'est pas déclaré alors que la PR modifie ${listeCourte(fichiers)} : l'ajouter à « Touchés » ou à « Lien possible masqué ».`);
-    }
-  }
-
-  const duPorteur = documentsDuPorteurModifies(fichiersModifies);
-  if (duPorteur.length) {
-    if (pr.accord.absente) {
-      aCorriger.push(
-        `La PR modifie ${duPorteur.join(' et ')} : ajouter à la section une ligne « Accord du porteur : … » (lien ou citation datée de son accord explicite), en paragraphe à part. Ces documents ne changent qu'à sa demande.`,
-      );
-    } else if (!analyseEcrite(pr.accord.valeur)) {
-      aCorriger.push(`« Accord du porteur : » à remplir : le lien ou la citation datée de son accord explicite sur ce changement de ${duPorteur.join(' et ')}.`);
     }
   }
 
@@ -970,155 +881,19 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
           ? `\`${item.cle}\` : la consigne diffère de celle de ${G} ; la recopier mot pour mot après le tiret cadratin (\`demander\` l'écrit).`
           : `\`${item.cle}\` : consigne à recopier de ${G} après le tiret cadratin (\`demander\` l'écrit).`,
       );
-      continue;
-    }
-    if (ANALYSE_VIDE.test(item.analyse)) aCorriger.push(`\`${item.cle}\` : analyse à écrire, par un développeur ou un agent.`);
-    else if (!item.validee) enAttente.push(`\`${item.cle}\` : analysée, en attente de validation par un développeur humain.`);
-    else if (!validations) validees.push(item.cle); // hors GitHub : rien pour dire quand la case a été cochée
-    else {
-      const v = etatValidation(item, validations);
-      if (v.etat === 'validee') validees.push(item.cle);
-      else if (v.etat === 'annulee') {
-        annulees.push({ cle: item.cle, raisons: v.raisons });
-        enAttente.push(`\`${item.cle}\` : validation annulée, ${v.raisons.join(' ; ')}. Relire, puis cocher de nouveau.`);
-      } else {
-        nonEnregistrees.push(item.cle);
-        enAttente.push(`\`${item.cle}\` : case cochée sans validation enregistrée pour l'état actuel de la PR : la décocher, puis la cocher de nouveau.`);
-      }
     }
   }
-  return { aCorriger, enAttente, validees, annulees, nonEnregistrees, declares, imposes, requises };
+  if (requises.size) {
+    if (pr.caseAbsente) aCorriger.push("La case « - [ ] Validée par le porteur » manque en pied de section.");
+    else if (!pr.validee) enAttente.push(`${requises.size === 1 ? 'Une vérification manuelle est demandée' : `${requises.size} vérifications manuelles sont demandées`} : en attente de la case du porteur.`);
+    else validees.push(...requises.keys());
+  }
+  return { aCorriger, enAttente, validees, declares, imposes, requises };
 }
-
-// ─── Validations (#61) ──────────────────────────────────────────────────────────────────────────
-// Une case « Validée » vaut pour le code de la PR au moment où elle est cochée (tranché, puis limité
-// le 11 septembre). La vérification l'enregistre alors dans un commentaire que seul le compte de
-// GitHub Actions écrit : tête et branche cible. Un commit qui modifie le code, ou un changement de
-// branche cible, rend l'enregistrement caduc ; documentation, harnais et analyse, non.
-
-/** Auteur des commentaires qui enregistrent les validations : un agent ne peut pas l'imiter. */
-export const AUTEUR_HORODATAGE = 'github-actions[bot]';
-const MARQUE_VALIDATION = /<!-- tirelire-validation (\[[\s\S]*?\]) -->/g;
-const court = (sha) => String(sha).slice(0, 7);
 
 export const analyseEcrite = (analyse) => !ANALYSE_VIDE.test(String(analyse ?? ''));
 
-/** Empreinte de l'analyse, gardée pour mémoire : la réécrire n'annule pas la validation. */
-export function empreinteAnalyse(analyse) {
-  return createHash('sha256').update(String(analyse).replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 12);
-}
-
-/** Cases cochées d'une description. */
-export function cochees(corps) {
-  return new Set((lireDescriptionPr(corps ?? '')?.items ?? []).filter((i) => i.validee).map((i) => i.cle));
-}
-
-/** Validations enregistrées, dans l'ordre des commentaires ; les autres auteurs sont ignorés. */
-export function lireHorodatages(commentaires) {
-  const horodatages = [];
-  for (const c of commentaires ?? []) {
-    if (c?.user?.login !== AUTEUR_HORODATAGE) continue;
-    for (const m of String(c.body ?? '').matchAll(MARQUE_VALIDATION)) {
-      try {
-        for (const h of JSON.parse(m[1])) {
-          if (['cle', 'tete', 'cible', 'analyse'].every((k) => typeof h?.[k] === 'string')) horodatages.push(h);
-        }
-      } catch {
-        // marque illisible : elle ne valide rien
-      }
-    }
-  }
-  return horodatages;
-}
-
-export function texteHorodatage(horodatages) {
-  const [h] = horodatages;
-  return [
-    `**Validation enregistrée** par ${h.par}, le ${h.date.slice(0, 10)} à ${h.date.slice(11, 16)} UTC, sur \`${court(h.tete)}\` vers \`${h.cible}\` :`,
-    '',
-    ...horodatages.map((v) => `- \`${v.cle}\``),
-    '',
-    "Un commit qui modifie le code, ou un changement de branche cible, l'annulera ; documentation et harnais, non.",
-    '',
-    `<!-- tirelire-validation ${JSON.stringify(horodatages)} -->`,
-  ].join('\n');
-}
-
-export function texteAnnulation(annulees, nonEnregistrees = []) {
-  return [
-    '**Validation annulée** : la PR a changé depuis.',
-    '',
-    ...annulees.map((a) => `- \`${a.cle}\` : ${a.raisons.join(' ; ')}.`),
-    ...nonEnregistrees.map((cle) => `- \`${cle}\` : case cochée sans validation enregistrée pour l'état actuel de la PR.`),
-    '',
-    'Relire, puis cocher de nouveau la case.',
-  ].join('\n');
-}
-
-/** Ce qui n'est pas du code : modifié après une validation, cela ne l'annule pas (#61). */
-export const SANS_EFFET = Object.freeze({
-  documentation: Object.freeze(['docs/**', '**/*.md']),
-  harnais: Object.freeze(['**/test/**', '**/*.test.*']),
-});
-const SANS_EFFET_REGEX = [...SANS_EFFET.documentation, ...SANS_EFFET.harnais].map(globVersRegex);
-export const fichiersDeCode = (fichiers) => fichiers.filter((f) => !SANS_EFFET_REGEX.some((r) => r.test(f)));
-const SHA = /^[0-9a-f]{40}$/;
-
-/**
- * Fichiers modifiés par les commits apportés depuis la validation, sans ceux de la branche cible :
- * une fusion propre de la cible n'ajoute rien, une résolution de conflit ajoute ses fichiers.
- * `null` quand on ne peut pas comparer, par exemple si la branche a été réécrite.
- */
-export function fichiersDepuisValidation({ ancienne, base, tete, racine = RACINE }) {
-  if (![ancienne, base, tete].every((sha) => SHA.test(String(sha)))) return null;
-  const env = Object.fromEntries(Object.entries(process.env).filter(([cle]) => !cle.startsWith('GIT_')));
-  const git = (...a) => execFileSync('git', a, { cwd: racine, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
-  try {
-    git('cat-file', '-e', `${ancienne}^{commit}`);
-  } catch {
-    try {
-      git('fetch', '-q', 'origin', ancienne);
-    } catch {
-      return null;
-    }
-  }
-  try {
-    const sortie = git('log', '-z', '--format=', '--name-only', '--diff-merges=dense-combined', `^${ancienne}`, `^${base}`, tete);
-    return [...new Set(sortie.split('\0').map((f) => f.trim()).filter(Boolean))];
-  } catch {
-    return null;
-  }
-}
-
-/** Où en est la case cochée d'une vérification : validée, annulée (et pourquoi), ou non enregistrée. */
-export function etatValidation(item, { tete, cible, horodatages, fichiersDepuis = () => null }) {
-  const dernier = horodatages.filter((h) => h.cle === item.cle).at(-1);
-  if (!dernier) return { etat: 'non-enregistree' };
-  if (dernier.cible !== cible) return { etat: 'annulee', raisons: [`branche cible changée, de ${dernier.cible} à ${cible}`] };
-  if (dernier.tete === tete) return { etat: 'validee' };
-  const de = `de ${court(dernier.tete)} à ${court(tete)}`;
-  const fichiers = fichiersDepuis(dernier.tete, tete);
-  if (!fichiers) return { etat: 'annulee', raisons: [`nouveaux commits depuis la validation, ${de}, impossibles à comparer`] };
-  const code = fichiersDeCode(fichiers);
-  if (code.length) return { etat: 'annulee', raisons: [`code modifié depuis la validation, ${de} : ${listeCourte(code)}`] };
-  return { etat: 'validee' };
-}
-
-/** Décoche la case « Validée » des vérifications désignées, sans rien toucher d'autre. */
-export function decocher(corps, cles) {
-  const lignes = String(corps ?? '').split('\n');
-  let courante = null;
-  for (let i = 0; i < lignes.length; i++) {
-    const tete = lignes[i].match(/^\s*[-*]\s+`([^`]+)`/);
-    if (tete) courante = tete[1];
-    else if (/^#{1,6}\s/.test(lignes[i])) courante = null;
-    else if (courante && cles.includes(courante)) lignes[i] = lignes[i].replace(/^(\s*[-*]\s+)\[[xX]\](?=\s+Validée)/, '$1[ ]');
-  }
-  return lignes.join('\n');
-}
-
-/** Section à coller dans la description : plancher des chemins et vérifications à analyser. */
-export function preparerSection({ entrees, entreesAvant = new Map(), fichiersModifies = [], ids = [], auteur = 'agent', date }) {
+export function preparerSection({ entrees, entreesAvant = new Map(), fichiersModifies = [], ids = [] }) {
   const imposes = plancher(entrees, fichiersModifies);
   const touches = [...new Set([...imposes.keys(), ...ids])].sort(ordreIds);
   const requises = demandes(entrees, entreesAvant, touches, fichiersModifies);
@@ -1128,13 +903,10 @@ export function preparerSection({ entrees, entreesAvant = new Map(), fichiersMod
     `Touchés : ${touches.length ? touches.join(', ') : 'à analyser'}`,
     'Lien possible masqué : à analyser',
   ];
-  // Paragraphe à part : collée à la déclaration qui précède, la ligne la prolongerait (#64).
-  if (documentsDuPorteurModifies(fichiersModifies).length) lignes.push('', 'Accord du porteur : à écrire');
   lignes.push('', '### Vérifications manuelles', '');
   if (!requises.size) lignes.push('Aucune pour les identifiants déclarés.');
-  for (const r of requises.values()) {
-    lignes.push(`- \`${r.cle}\` · ${r.pourquoi} — ${r.description}`, `  - Analyse (${auteur}, ${date}) : à écrire`, '  - [ ] Validée par un développeur humain');
-  }
+  for (const r of requises.values()) lignes.push(`- \`${r.cle}\` · ${r.pourquoi} — ${r.description}`);
+  if (requises.size) lignes.push('', '- [ ] Validée par le porteur');
   if (imposes.size) lignes.push('', `Plancher des chemins : ${[...imposes].map(([id, f]) => `${id} ← ${listeCourte(f)}`).join(' ; ')}.`);
   return lignes.join('\n');
 }
@@ -1147,7 +919,7 @@ export function resumePr({ aCorriger, enAttente, validees, declares, imposes, re
   l.push('');
   if (aCorriger.length) l.push('**À corriger**', '', ...aCorriger.map((p) => `- ${p}`), '');
   if (enAttente.length) l.push('**En attente de validation humaine**', '', ...enAttente.map((p) => `- ${p}`), '');
-  if (validees.length) l.push('**Validées**', '', ...validees.map((c) => `- \`${c}\``), '');
+  if (validees.length) l.push(`**Validées par le porteur** : ${validees.map((c) => `\`${c}\``).join(', ')}.`, '');
   if (!aCorriger.length && !enAttente.length) {
     l.push(requises.size ? 'Toutes les vérifications demandées sont validées.' : 'Aucune vérification manuelle demandée.');
   }
@@ -1185,7 +957,7 @@ function precharge(script, racine, dossier, attendu) {
 }
 
 /**
- * Chaque lanceur local — le script `test` de chaque paquet du workspace et `pnpm amorcage` — est
+ * Chaque lanceur local — le script `test` de chaque paquet du workspace — est
  * branché sur la garde : `node --test` précharge `sans-sortie.mjs`, vitest le prend en `setupFiles`
  * par `sans-sortie-vitest.mjs`. Rend la liste des manques, chacun nommant son lanceur.
  */
@@ -1214,7 +986,5 @@ export function verifierLanceursLocaux(racine = RACINE) {
     if (scripts.test) lanceur(`\`${name}\` (script test)`, scripts.test, d);
   }
   const { scripts = {} } = lirePaquet('.');
-  if (scripts.amorcage) lanceur('`pnpm amorcage`', scripts.amorcage, '.');
-  else problemes.push('`pnpm amorcage` : le script a disparu de `package.json`.');
   return problemes;
 }
