@@ -27,10 +27,11 @@ permissions:
   contents: write
 
 # Un seul passage par push : un push qui suit annule celui d'avant. Rien sur un brouillon. Une
-# édition de la description ne rejoue que la validation, pas les tests.
+# édition de la description ne rejoue que la validation, et n'annule pas les tests en cours : seul
+# un push (synchronize) annule, puisque seul lui rend l'ancien passage caduc.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'validation' || 'code' }}
+  cancel-in-progress: ${{ github.event.action == 'synchronize' }}
 
 jobs:
   test:
