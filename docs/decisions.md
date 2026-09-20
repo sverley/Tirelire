@@ -39,7 +39,7 @@ avec le compte principal, présenté comme virement ponctuel dans le plan (`sett
 compte tiers : seuil de règlement, sens autorisé.
 
 Ce que l'hypothèse du relevé unique cachait : un budget placé sur un autre compte, avec sa propre
-carte, dépense hors du relevé du pivot ; et sans le relevé d'un livret, rien ne dit que le virement
+carte, dépense hors du relevé du principal ; et sans le relevé d'un livret, rien ne dit que le virement
 est arrivé ni que l'échéance a été payée depuis le bon compte.
 
 ## D05 · 2026-09-06 · Report des budgets au cas par cas

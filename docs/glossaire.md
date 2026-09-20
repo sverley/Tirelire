@@ -13,7 +13,7 @@ parlent.
 Ces définitions viennent de l'analyse du besoin du 6 septembre 2026, corrigées du modèle d'aujourd'hui
 (D19, I2 : une tirelire se répartit sur plusieurs comptes).
 
-## Compte pivot
+## Compte principal
 
 Le compte bancaire réel par lequel transitent tous les flux : revenus en entrée, prélèvements,
 dépenses courantes et virements sortants.
@@ -21,13 +21,13 @@ dépenses courantes et virements sortants.
 ## Compte d'accueil
 
 Tout autre compte réel — livret, compte secondaire, PEL, assurance-vie — qui reçoit des virements du
-compte pivot et héberge une ou plusieurs composantes de tirelires.
+compte principal et héberge une ou plusieurs composantes de tirelires.
 
 ## Compte tiers
 
 Compte réel dont on n'importe pas le relevé : compte secondaire, compte personnel d'un membre du
 foyer, espèces. Ses opérations utiles au plan sont saisies à la main et créent un solde à régler avec
-le compte pivot (D04).
+le compte principal (D04).
 
 ## Tirelire
 
