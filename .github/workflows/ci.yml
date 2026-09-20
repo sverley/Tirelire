@@ -144,8 +144,9 @@ jobs:
               echo "### Dépôt FTP ignoré"
               echo
               echo "Les secrets \`OVH_FTP_HOST\`, \`OVH_FTP_USER\` et \`OVH_FTP_PASSWORD\` ne sont pas tous"
-              echo "renseignés dans le dépôt. Le site reste téléchargeable dans la release \`latest\`"
-              echo "(\`tirelire-hebergement.zip\`). Voir \`docs/hebergement-web.md\`."
+              echo "renseignés dans le dépôt. Le site reste téléchargeable dans l'artefact"
+              echo "\`tirelire-hebergement\` de ce passage (\`tirelire-hebergement.zip\`, gardé 30 jours),"
+              echo "déposé par le job « Site pour hébergement mutualisé ». Voir \`docs/hebergement-web.md\`."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
