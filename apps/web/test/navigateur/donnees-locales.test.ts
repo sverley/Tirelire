@@ -35,7 +35,7 @@ import { allerÀ, cliquer, navigateur, ouvrirLExemple, ouvrirLeSite, type Site }
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 
 /**
- * Relevé inventé (D17), écrit dans un répertoire temporaire plutôt que versionné : `*.csv` est
+ * Relevé inventé, écrit dans un répertoire temporaire plutôt que versionné : `*.csv` est
  * ignoré du dépôt, même inventé, pour qu'aucun réflexe n'y range un jour un vrai relevé.
  */
 function écrireCsvInventé(): string {

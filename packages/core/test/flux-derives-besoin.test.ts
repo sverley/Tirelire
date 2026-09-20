@@ -2,7 +2,7 @@
  * Harnais de vérification de la PR #19 contre le besoin de l'issue #14 (D57).
  *
  * Il ne relit pas la solution : il rejoue les phrases de l'issue, une par une, sur le jeu d'exemple
- * (données inventées, D17). Aucune valeur n'est figée : ce que le budget demande est toujours relu
+ * (données inventées : aucune donnée réelle dans le dépôt). Aucune valeur n'est figée : ce que le budget demande est toujours relu
  * dans le plan, pour que le harnais survive aux évolutions de l'exemple.
  *
  * Le cycle mensuel complet est simulé comme dans la vraie vie : le plan propose, Simon enregistre
