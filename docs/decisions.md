@@ -21,6 +21,10 @@ d'après le mois qui contient son milieu (28 août → 27 septembre = « septemb
 redonne le mois calendaire. Conséquence vérifiée par les tests : une échéance du 15 octobre a deux
 virements devant elle (28 août et 28 septembre), donc le rattrapage se lisse sur deux périodes.
 
+Ce que l'hypothèse du mois calendaire cachait : beaucoup de salaires tombent entre le 27 et le
+dernier jour du mois, et les prélèvements du début de mois suivent. Un budget calé sur le mois civil
+compte alors deux salaires certains mois, et zéro le mois suivant.
+
 ## D03 · 2026-09-06 · Année budgétaire à date configurable
 
 `settings.budgetYearStart = { month, day }`. Sert aux budgets annuels et aux bilans. Les provisions
@@ -34,17 +38,30 @@ non importé ; ses opérations utiles au plan sont saisies à la main et créent
 avec le compte principal, présenté comme virement ponctuel dans le plan (`settlementBalance`). Réglages par
 compte tiers : seuil de règlement, sens autorisé.
 
+Ce que l'hypothèse du relevé unique cachait : un budget placé sur un autre compte, avec sa propre
+carte, dépense hors du relevé du pivot ; et sans le relevé d'un livret, rien ne dit que le virement
+est arrivé ni que l'échéance a été payée depuis le bon compte.
+
 ## D05 · 2026-09-06 · Report des budgets au cas par cas
 
 `tirelire.rollover` : `none` (remise à zéro), `unlimited`, `capped { months }`. Défaut proposé
 dans l'interface : remise à zéro sur le compte principal, report ailleurs (l'argent y est physiquement).
 Un budget hébergé sur le compte principal est « financé virtuellement » (réservation, pas de virement).
 
+Ce que l'hypothèse de la remise à zéro cachait : deux philosophies. Budget strict, le non-dépensé
+retourne au non affecté ; budget cumulatif, le reliquat reste dans la tirelire et le dépassement se
+rattrape. Pour une tirelire hébergée ailleurs, seul le cumulatif est cohérent : l'argent est
+physiquement là.
+
 ## D06 · 2026-09-06 · Ordre de financement quand la marge est négative
 
 Chaque tirelire a une `priority` (petit = financé d'abord ; défauts : provision 10, budget 20,
 objectif 30). Les planchers (rattrapage d'une provision) sont servis avant tout le reste, puis le
 demandé dans l'ordre des priorités. Le plan dit quelles lignes sont réduites ou non financées.
+
+Ce que l'hypothèse « il y a toujours assez » cachait : le mois où les revenus ne couvrent pas les
+charges, les provisions, l'épargne et les budgets, quelqu'un doit céder. L'épargne se décale ; une
+échéance de provision, non.
 
 ## D07 · 2026-09-06 · Application JavaScript portable : PWA Svelte + Capacitor
 
@@ -60,8 +77,7 @@ sont la vérité. Chaque écriture laisse une trace *(table, ligne, colonne, val
 logique hybride, appareil)* dans `changes`, chaînée par empreinte SHA-256 par appareil
 (`store.ts`). Fusion colonne par colonne, la plus récente gagne ; suppressions logiques
 (`deletedAt`) ; ce qui se recalcule ne se stocke pas. Le journal d'événements comme *stockage*
-(option B), les CRDT génériques (C) et la blockchain ont été examinés et écartés (voir
-`analyse-du-besoin.html` §11).
+(option B), les CRDT génériques (C) et la blockchain ont été examinés et écartés (voir `docs/synchronisation.md`).
 
 ## D09 · 2026-09-06 · Deux familles d'identifiants
 
@@ -72,6 +88,10 @@ identifiant de transaction, un **détecteur de doublons probables** (même compt
 ±3 jours, libellé proche) compense les changements de libellé ou de date entre sources
 (Linxo ↔ banque, attente ↔ comptabilisé).
 
+Ce que l'hypothèse de l'import propre cachait : les exports bancaires se chevauchent, les libellés
+changent d'un export à l'autre, certaines banques exportent les opérations en attente. Sans
+déduplication, chaque import double les dépenses.
+
 ## D10 · 2026-09-06 · Ventilation : lignes catégorie + tirelire
 
 Une opération est ventilée en une ou plusieurs lignes (`Allocation`), chacune portant **une
@@ -79,6 +99,9 @@ catégorie et une tirelire** ; l'opération simple a une seule ligne. `allocatio
 une part du montant de l'opération, dans son signe. Effet sur la tirelire : le montant pour une
 dépense ou un revenu ; pour un virement interne, +montant côté compte hôte de la tirelire,
 −montant côté compte de départ (`allocationEffect`).
+
+Ce que l'hypothèse d'une catégorie par opération cachait : un passage en grande surface mêle
+alimentation, vêtements et cadeau ; un virement à un livret alimente trois provisions à la fois.
 
 ## D11 · 2026-09-06 · Un virement permanent par tirelire, libellé « TIRELIRE … »
 
@@ -93,6 +116,11 @@ Un flux prévu est pointé automatiquement seulement si le montant est exact (ou
 avec libellé reconnu) et que le flux n'est pas marqué variable ; sinon c'est une proposition à
 confirmer. Une occurrence d'un flux n'est pointée qu'une fois. Les flux dont la fenêtre est
 passée sans opération remontent en « attendus, non reçus ».
+
+Ce que l'hypothèse du pointage exact cachait : un prélèvement du 5 passe le 7 quand le 5 tombe un
+samedi, une facture varie, un salaire varie avec les heures supplémentaires, et deux abonnements
+peuvent avoir le même montant. Trop strict, rien n'est reconnu ; trop lâche, c'est la mauvaise
+opération qui est pointée.
 
 ## D13 · 2026-09-06 · Nom de code « Tirelire »
 
@@ -142,6 +170,9 @@ provisionnée sur le livret). Un virement interne au sein d'une même tirelire d
 vers une autre sans changer le solde. Remplace l'hébergement de D01 et de D05 : `balances.ts` rend
 un vecteur, plus un scalaire, et `Tirelire.accountId` disparaît au profit d'un placement voulu (D20).
 
+Ce que l'hypothèse « une tirelire vit sur un compte » cachait : une même réserve peut dormir sur
+plusieurs comptes, et le suivi par objectif doit rester indépendant du compte qui héberge l'argent.
+
 ## D20 · 2026-09-07 · Placement voulu et écart
 
 Chaque tirelire déclare **où son argent devrait dormir**. L'écart entre position réelle et position
@@ -169,6 +200,10 @@ c'est la modification qui change l'état, pas l'ouverture de l'éditeur. Seul l'
 déverrouille, à l'unité ou par action groupée (D26). Renomme le pointage de D12 en **rapprochement
 de flux**, qui reste la mise en correspondance avec une échéance attendue et ne change aucun état
 à lui seul ; les deux sens du mot ne doivent plus cohabiter dans le code ni dans l'interface.
+
+Ce que l'hypothèse de la donnée propre cachait : une opération importée, une opération saisie et une
+opération corrigée n'ont pas la même autorité ; sans état, la synchronisation écrase la correction
+par l'import.
 
 ## D23 · 2026-09-07 · Règles : sélection, action, rang
 
@@ -444,7 +479,7 @@ s'il faut aussi changer la donnée.**
 
 **Sur la réécriture du journal.** D41 et D42 sont les seules décisions dont l'application a consisté à
 retoucher les entrées antérieures : le vocabulaire y a été remplacé partout, ainsi que dans
-`analyse-du-besoin.html`. La règle « ajouter une entrée plutôt que réécrire l'ancienne » porte sur le
+l'analyse du besoin du 6 septembre. La règle « ajouter une entrée plutôt que réécrire l'ancienne » porte sur le
 *contenu* d'une décision, et aucun contenu n'a changé — laisser deux vocabulaires cohabiter aurait
 rendu le journal illisible, ce qu'aucune décision ne gagne. Le détail des mots remplacés se lit dans
 le commit de renommage.

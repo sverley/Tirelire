@@ -8,7 +8,10 @@ Nom de code. Description du projet, qui fait foi : [`docs/description-projet.md`
 ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md) ;
 ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md) ;
 ce qui les garde : [`docs/gardes.md`](docs/gardes.md) ;
-le vocabulaire : [`docs/glossaire.md`](docs/glossaire.md). Analyse du besoin et décisions : [`docs/analyse-du-besoin.html`](docs/analyse-du-besoin.html).
+le vocabulaire, du produit comme du travail : [`docs/glossaire.md`](docs/glossaire.md) ;
+les choix de mise en œuvre : [`docs/decisions.md`](docs/decisions.md).
+
+Seuls les fichiers Markdown de `docs/` sont fondateurs.
 
 ## Structure
 
