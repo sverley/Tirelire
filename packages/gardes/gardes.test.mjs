@@ -407,6 +407,14 @@ test('#113 : la boucle locale est la machine, le reste non', () => {
   for (const h of [undefined, '', 'localhost', 'LOCALHOST.', 'app.localhost', '127.0.0.1', '127.8.0.3', '::1', '[::1]', '::ffff:127.0.0.1', '0.0.0.0', '::']) {
     assert.equal(estLocal(h), true, String(h));
   }
+  // #118 : la même adresse écrite autrement reste la machine — l'analyseur d'URL réécrit
+  // `[::ffff:127.0.0.1]` en `[::ffff:7f00:1]`, et `::1` s'écrit de plusieurs façons.
+  for (const h of ['::ffff:7f00:1', '0:0:0:0:0:ffff:7f00:1', '[::ffff:7f00:1]', '0::1', '::0:1', '0:0:0:0:0:0:0:1', '::ffff:127.255.255.254']) {
+    assert.equal(estLocal(h), true, h);
+  }
+  for (const h of ['::ffff:c000:20a', '::ffff:128.0.0.1', '2001:db8::1', 'ffff::1', '::1:0', ':::1', '1:2:3:4:5:6:7']) {
+    assert.equal(estLocal(h), false, h);
+  }
   for (const h of ['exemple.com', 'api.github.com', '10.0.0.1', '192.168.1.2', '128.0.0.1', '::2', 'localhost.exemple.com', '127.0.0.1.nip.io']) {
     assert.equal(estLocal(h), false, h);
   }

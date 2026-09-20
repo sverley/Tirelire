@@ -20,16 +20,50 @@ import net from 'node:net';
 
 const ETAT = Symbol.for('tirelire.gardes.sans-sortie');
 
+/**
+ * Les seize octets d'une adresse IPv6, ou `null` si l'écriture n'en est pas une. Toutes les
+ * écritures d'une même adresse donnent les mêmes octets : `::1`, `0::1` et `0:0:0:0:0:0:0:1` ;
+ * `::ffff:127.0.0.1` et `::ffff:7f00:1` (#118).
+ */
+function octetsIPv6(h) {
+  if (!net.isIPv6(h)) return null;
+  const [avant, apres = null] = h.split('::');
+  const groupes = (p) => (p ? p.split(':').filter(Boolean) : []);
+  const tete = groupes(avant);
+  const queue = groupes(apres);
+  const derniers = [];
+  const pointee = queue.length ? queue.at(-1) : tete.at(-1);
+  if (pointee && pointee.includes('.')) {
+    if (!net.isIPv4(pointee)) return null;
+    (queue.length ? queue : tete).pop();
+    for (const n of pointee.split('.')) derniers.push(Number(n));
+  }
+  const octets = [];
+  for (const g of tete) octets.push(parseInt(g, 16) >> 8, parseInt(g, 16) & 0xff);
+  const restants = 16 - octets.length - queue.length * 2 - derniers.length;
+  if (apres === null && restants !== 0) return null;
+  if (restants < 0) return null;
+  for (let i = 0; i < restants; i++) octets.push(0);
+  for (const g of queue) octets.push(parseInt(g, 16) >> 8, parseInt(g, 16) & 0xff);
+  octets.push(...derniers);
+  return octets.length === 16 ? octets : null;
+}
+
 /** Vrai si l'hôte désigne la machine elle-même. Un hôte absent vaut `localhost` pour Node. */
 export function estLocal(hote) {
   if (hote === undefined || hote === null || hote === '') return true;
   const h = String(hote).trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   if (h === 'localhost' || h.endsWith('.localhost')) return true;
-  if (h === '::1' || h === '0:0:0:0:0:0:0:1') return true;
   // « Toutes les adresses » désigne la machine quand on s'y connecte.
   if (h === '0.0.0.0' || h === '::') return true;
-  const v4 = h.replace(/^::ffff:/, '');
-  return net.isIPv4(v4) && v4.startsWith('127.');
+  if (net.isIPv4(h)) return h.startsWith('127.');
+  const o = octetsIPv6(h);
+  if (!o) return false;
+  // `::1`, sous toutes ses écritures.
+  if (o.every((n, i) => n === (i === 15 ? 1 : 0))) return true;
+  // IPv4 mappée (`::ffff:a.b.c.d`) : la boucle locale est `127.0.0.0/8`.
+  const mappee = o.slice(0, 10).every((n) => n === 0) && o[10] === 0xff && o[11] === 0xff;
+  return mappee && o[12] === 127;
 }
 
 /**
