@@ -7,6 +7,25 @@ ses retours à la ligne sont devenus des paragraphes. **Il fait foi.** Les invar
 Ce texte ne se reformule pas. Seul le porteur le complète ou le corrige, avec ses propres mots,
 datés ; ce qu'il retire reste visible, barré.
 
+## 6 septembre 2026 · le besoin d'origine
+
+Repris de l'analyse du besoin du 6 septembre, supprimée depuis : seuls les documents Markdown de
+`docs/` font foi. Ces deux passages sont les seuls qu'aucun autre document ne portait.
+
+> Tu veux un outil qui fasse trois choses, dans cet ordre : **planifier** (à partir des revenus, des
+> charges périodiques, des objectifs d'épargne et des budgets, en déduire combien virer chaque mois
+> vers chaque compte), **tenir des soldes par objectif** (chaque provision, chaque objectif
+> d'épargne, chaque budget a son propre compteur, indépendamment du compte bancaire qui l'héberge),
+> et **vérifier** (importer les relevés, reconnaître automatiquement les opérations prévues, classer
+> le reste par catégorie et comparer au budget).
+
+Une partie de cela existe déjà : Actual Budget fait les tirelires, le report, l'import CSV avec règles
+et dédoublonnage ; Firefly III couvre le multi-comptes et les règles de catégorisation ; YNAB est la
+référence payante de la méthode. Ce qu'aucun ne fait, et qui est le cœur du projet :
+
+> **déduire les virements permanents par compte réel à partir des tirelires qui y sont hébergées**,
+> avec le rattrapage d'échéance, et vérifier au pointage que le virement a bien eu lieu.
+
 ## 11 septembre 2026
 
 Donné à l'ouverture de l'issue #29.
