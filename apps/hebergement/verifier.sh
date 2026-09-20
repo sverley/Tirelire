@@ -83,8 +83,26 @@ echo
 
 if [ "${base#https://}" != "$base" ]; then
   echo "Redirection HTTPS"
-  redirection="$(curl -sS -o /dev/null --max-time 20 -w '%{http_code} → %{redirect_url}' "http://${base#https://}/" 2>&1 || echo 'indisponible')"
+  # Sans -L : on veut le premier code, pas la page finale. Un site qui ne redirige plus répond 200
+  # en clair, ce qui contredit C3 ; le script doit alors échouer comme les autres vérifications.
+  redirection="$(curl -sS -o /dev/null --max-time 20 --retry 2 --retry-delay 3 -w '%{http_code} %{redirect_url}' "http://${base#https://}/" 2>"$tmp/redirection.err" || echo "000 (connexion impossible : $(tr -d '\n' <"$tmp/redirection.err"))")"
   echo "  réponse : $redirection"
+  code_redirection="${redirection%% *}"
+  cible_redirection="${redirection#* }"
+  case "$code_redirection" in
+    30[1278])
+      if [ "${cible_redirection#https://}" != "$cible_redirection" ]; then
+        echo "  ✓ redirige vers HTTPS"
+      else
+        echo "  ✗ redirige ailleurs qu'en HTTPS — « $cible_redirection »"
+        echecs=$((echecs + 1))
+      fi
+      ;;
+    *)
+      echo "  ✗ ne redirige pas HTTP vers HTTPS — code « $code_redirection »"
+      echecs=$((echecs + 1))
+      ;;
+  esac
   echo
 fi
 
