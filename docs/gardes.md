@@ -333,9 +333,10 @@ Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`
 Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**`, `apps/hebergement/**`
 
 - **Harnais** · `apps/hebergement/verifier.sh`, `apps/hebergement/verifier.test.mjs` — après chaque
-  dépôt depuis `main`, le site en ligne redirige HTTP vers HTTPS. La redirection se constate sur le
-  site réel, par le script ; le harnais garde ce dont ce constat dépend — que le script sonde bien
-  l'adresse en `http://` et relève où elle mène (tranché dans #69).
+  dépôt depuis `main`, le site en ligne redirige HTTP vers HTTPS, et le script échoue sinon (#78).
+  La redirection se constate sur le site réel, par le script ; le harnais garde ce dont ce constat
+  dépend — que le script sonde bien l'adresse en `http://`, relève où elle mène, et compte son échec
+  (tranché dans #69, complété par #78).
   Témoin rouge : « témoin rouge · un script de vérification qui ne sonde plus l’adresse en http:// »
 - **Vérification manuelle** · `VM-C3-https` — Si la PR touche l'application ou le relais : donner à
   l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,

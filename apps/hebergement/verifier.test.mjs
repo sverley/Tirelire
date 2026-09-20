@@ -39,10 +39,21 @@ function relèveLaRedirectionHttps(script) {
   assert.match(bloc, /curl[^\n]*"http:\/\/\$\{base#https:\/\/\}/, `${SCRIPT} : la redirection n'est pas sondée depuis une adresse en http://`);
   assert.match(bloc, /redirect_url/, `${SCRIPT} : le script ne relève pas vers où la réponse redirige`);
   assert.match(bloc, /echo\s+"\s*réponse : \$redirection"/, `${SCRIPT} : ce qu'il trouve n'est pas affiché dans le bilan`);
+  // #78 : sonder ne suffit pas — une adresse qui ne redirige pas doit compter son échec, comme les
+  // quatre autres vérifications, sinon la garde annoncée par le registre ne mord pas.
+  assert.match(bloc, /echecs=\$\(\(echecs \+ 1\)\)/, `${SCRIPT} : une redirection absente ne compte pas son échec`);
 }
 
 test('C3 · le script de vérification sonde l’adresse en http:// et relève la redirection', () => {
   relèveLaRedirectionHttps(lire());
+});
+
+/** Le script volontairement cassé : il sonde la redirection, mais n'en compte jamais l'échec (#78). */
+const sansEchec = (script) =>
+  script.replace(/\nif \[ "\$\{base#https:\/\/\}" != "\$base" \];[\s\S]*?\nfi\n/, (bloc) => bloc.replace(/\n\s*echecs=\$\(\(echecs \+ 1\)\)/g, ''));
+
+test('C3 · témoin rouge — un script qui sonde la redirection sans compter son échec', () => {
+  assert.throws(() => relèveLaRedirectionHttps(sansEchec(lire())), /ne compte pas son échec/);
 });
 
 /** Le script volontairement cassé : la redirection HTTPS n'est plus sondée du tout. */
