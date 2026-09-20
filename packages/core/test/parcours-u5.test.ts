@@ -2,7 +2,7 @@
  * Parcours de bout en bout de **U5 · import seul** (#39, #70).
  *
  * L'usage : importer des opérations pour les classer et analyser les catégories, **sans tirelire ni
- * budget**. Le parcours part d'une base vide, importe un relevé inventé (D17), crée les catégories
+ * budget**. Le parcours part d'une base vide, importe un relevé inventé, crée les catégories
  * et les automatismes, applique le classement, relit la base après redémarrage et lit le bilan par
  * catégorie — sans qu'aucune tirelire, aucun besoin, aucun flux prévu n'existe jamais.
  *
@@ -31,7 +31,7 @@ import { AS_OF, DEBUT, PAIE, baseVide, ecrire, relire } from './parcours.js';
 const COMPTE = 'cpt-courant';
 const NUMÉRO = '00099999999';
 
-/** Relevé inventé, dans la forme des exports bancaires français (D17 : aucune donnée réelle). */
+/** Relevé inventé, dans la forme des exports bancaires français (aucune donnée réelle). */
 const RELEVÉ = [
   'Date transaction;Date comptabilisation;Num Compte;Libellé Compte;Libellé opération;Libellé complet;Catégorie;Sous-Catégorie;Montant;Pointée;',
   "28/08/2026;28/08/2026;00099999999;Compte Courant;VIR RECU DE: EMPLOYEUR SA;VIR RECU DE: EMPLOYEUR SA MOTIF: SALAIRE AOUT;Revenus du travail;Salaires;3400,00;Non;",

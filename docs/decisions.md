@@ -1,20 +1,26 @@
-# Journal des décisions
+# Décisions du produit
 
-Chaque décision est datée, motivée, et dit ce qu'elle implique dans le code. Pour en changer une,
-ajouter une entrée qui la remplace plutôt que réécrire l'ancienne.
+Comment le produit est fait. Chaque décision dit ce qu'elle implique dans le code, et pourquoi
+l'hypothèse qu'elle écarte ne tenait pas. Pour en changer une, on l'amende : pas d'entrée qui en
+remplace une autre, pas de renvoi à ce qu'elle remplace.
 
-Les décisions se prennent au regard des invariants du produit ([`invariants.md`](invariants.md))
-et des contraintes du projet ([`contraintes.md`](contraintes.md)) : les invariants disent quoi, les décisions disent comment. Une décision ne contredit pas un
-invariant ; si le besoin semble l'exiger, la question se pose d'abord dans une issue.
+Une décision se conforme aux invariants ([`invariants.md`](invariants.md)) et aux contraintes
+([`contraintes.md`](contraintes.md)) : les invariants disent quoi, les décisions disent comment.
+Une décision ne peut pas amender un invariant ; si le besoin semble l'exiger, la question se pose
+d'abord dans une issue. Elle se conforme aussi aux règles de travail (`CLAUDE.md`), qui ne sont pas
+ici : ce document ne parle que du produit.
 
-## D01 · 2026-09-06 · Deux niveaux de comptabilité
+Les identifiants sont ceux des entrées, sans date ; l'historique appartient à git. Les numéros
+retirés ne se réemploient pas.
+
+## D01 · Deux niveaux de comptabilité
 
 Les **comptes** sont le réel bancaire (solde importé) ; les **tirelires** sont des sous-comptes
 comptables hébergés sur un compte. Invariant : pour chaque compte, solde bancaire = somme des
 tirelires hébergées + non affecté. Les soldes de tirelires ne sont jamais stockés, toujours
 reconstruits (`balances.ts`).
 
-## D02 · 2026-09-06 · Période budgétaire de paie à paie
+## D02 · Période budgétaire de paie à paie
 
 Le compte principal porte un `payDay` ; la période va de ce jour au jour précédent du mois suivant, nommée
 d'après le mois qui contient son milieu (28 août → 27 septembre = « septembre »). `payDay = 1`
@@ -25,12 +31,12 @@ Ce que l'hypothèse du mois calendaire cachait : beaucoup de salaires tombent en
 dernier jour du mois, et les prélèvements du début de mois suivent. Un budget calé sur le mois civil
 compte alors deux salaires certains mois, et zéro le mois suivant.
 
-## D03 · 2026-09-06 · Année budgétaire à date configurable
+## D03 · Année budgétaire à date configurable
 
 `settings.budgetYearStart = { month, day }`. Sert aux budgets annuels et aux bilans. Les provisions
 gardent leur propre ancrage (`periodicity.anchorDate`), indépendant.
 
-## D04 · 2026-09-06 · Relevé du compte principal seul, comptes tiers saisis à la main
+## D04 · Relevé du compte principal seul, comptes tiers saisis à la main
 
 Seul le compte principal est importé au départ (les autres comptes peuvent l'être plus tard sans changer le
 modèle : un compte passe de `third` à `holding`/`principal`). Un **compte tiers** est un compte réel
@@ -42,7 +48,7 @@ Ce que l'hypothèse du relevé unique cachait : un budget placé sur un autre co
 carte, dépense hors du relevé du principal ; et sans le relevé d'un livret, rien ne dit que le virement
 est arrivé ni que l'échéance a été payée depuis le bon compte.
 
-## D05 · 2026-09-06 · Report des budgets au cas par cas
+## D05 · Report des budgets au cas par cas
 
 `tirelire.rollover` : `none` (remise à zéro), `unlimited`, `capped { months }`. Défaut proposé
 dans l'interface : remise à zéro sur le compte principal, report ailleurs (l'argent y est physiquement).
@@ -53,7 +59,7 @@ retourne au non affecté ; budget cumulatif, le reliquat reste dans la tirelire 
 rattrape. Pour une tirelire hébergée ailleurs, seul le cumulatif est cohérent : l'argent est
 physiquement là.
 
-## D06 · 2026-09-06 · Ordre de financement quand la marge est négative
+## D06 · Ordre de financement quand la marge est négative
 
 Chaque tirelire a une `priority` (petit = financé d'abord ; défauts : provision 10, budget 20,
 objectif 30). Les planchers (rattrapage d'une provision) sont servis avant tout le reste, puis le
@@ -63,14 +69,14 @@ Ce que l'hypothèse « il y a toujours assez » cachait : le mois où les revenu
 charges, les provisions, l'épargne et les budgets, quelqu'un doit céder. L'épargne se décale ; une
 échéance de provision, non.
 
-## D07 · 2026-09-06 · Application JavaScript portable : PWA Svelte + Capacitor
+## D07 · Application JavaScript portable : PWA Svelte + Capacitor
 
 Un seul code : PWA (installable, servie comme fichiers statiques par un serveur privé) emballée
 avec Capacitor pour Android. Cœur en TypeScript pur (`packages/core`) sans dépendance à
 l'interface. Interface Svelte 5 (`apps/web`). Choix du framework jugé secondaire tant que le
 cœur reste indépendant.
 
-## D08 · 2026-09-06 · Stockage option D : tables SQLite + journal de changements
+## D08 · Stockage option D : tables SQLite + journal de changements
 
 Les tables SQLite (sql.js en WebAssembly, persisté dans IndexedDB, exportable en un fichier)
 sont la vérité. Chaque écriture laisse une trace *(table, ligne, colonne, valeur, horloge
@@ -79,7 +85,7 @@ logique hybride, appareil)* dans `changes`, chaînée par empreinte SHA-256 par 
 (`deletedAt`) ; ce qui se recalcule ne se stocke pas. Le journal d'événements comme *stockage*
 (option B), les CRDT génériques (C) et la blockchain ont été examinés et écartés (voir `docs/synchronisation.md`).
 
-## D09 · 2026-09-06 · Deux familles d'identifiants
+## D09 · Deux familles d'identifiants
 
 Opérations importées : clé déterministe `op_` + SHA-256(compte, date, montant, libellé
 normalisé, rang parmi les identiques du jour) → identiques sur tous les appareils, fusion sans
@@ -92,7 +98,7 @@ Ce que l'hypothèse de l'import propre cachait : les exports bancaires se chevau
 changent d'un export à l'autre, certaines banques exportent les opérations en attente. Sans
 déduplication, chaque import double les dépenses.
 
-## D10 · 2026-09-06 · Ventilation : lignes catégorie + tirelire
+## D10 · Ventilation : lignes catégorie + tirelire
 
 Une opération est ventilée en une ou plusieurs lignes (`Allocation`), chacune portant **une
 catégorie et une tirelire** ; l'opération simple a une seule ligne. `allocation.amount` est
@@ -103,14 +109,14 @@ dépense ou un revenu ; pour un virement interne, +montant côté compte hôte d
 Ce que l'hypothèse d'une catégorie par opération cachait : un passage en grande surface mêle
 alimentation, vêtements et cadeau ; un virement à un livret alimente trois provisions à la fois.
 
-## D11 · 2026-09-06 · Un virement permanent par tirelire, libellé « TIRELIRE … »
+## D11 · Un virement permanent par tirelire, libellé « TIRELIRE … »
 
 Le plan propose un ordre permanent par tirelire hébergée hors principal, avec un libellé dérivé du
 nom de la tirelire (`transferLabel`). À l'import, une opération dont le libellé contient ce
 libellé est reconnue comme virement vers cette tirelire (`matchTirelireTransfers`). Un virement
 groupé reste possible : il se ventile à la main sur plusieurs tirelires.
 
-## D12 · 2026-09-06 · Pointage prudent
+## D12 · Pointage prudent
 
 Un flux prévu est pointé automatiquement seulement si le montant est exact (ou dans la tolérance
 avec libellé reconnu) et que le flux n'est pas marqué variable ; sinon c'est une proposition à
@@ -122,33 +128,17 @@ samedi, une facture varie, un salaire varie avec les heures supplémentaires, et
 peuvent avoir le même montant. Trop strict, rien n'est reconnu ; trop lâche, c'est la mauvaise
 opération qui est pointée.
 
-## D13 · 2026-09-06 · Nom de code « Tirelire »
+## D13 · Nom de code « Tirelire »
 
 Une tirelire par objectif, chacune avec son solde. Le nom public se décidera plus tard.
 
-## D14 · 2026-09-06 · Clé de signature de test versionnée
-
-`apps/web/android/keystore/tirelire-test.jks` (mot de passe `tirelire-test`) signe les APK de
-test pour que les mises à jour s'installent par-dessus. Jamais pour un store ; des secrets
-`ANDROID_KEYSTORE_*` la remplacent en CI.
-
-## D15 · 2026-09-06 · Livraison automatique
-
-À chaque push sur `main` : tests, build web, APK publié dans la release `latest`. Tag `v*` :
-release nommée. Hooks git : typecheck + tests du cœur avant commit, build avant push.
-
-## D16 · 2026-09-06 · Synchronisation : protocole unique, transports interchangeables
+## D16 · Synchronisation : protocole unique, transports interchangeables
 
 `sync.ts` : hello / request / changes / done / bye, curseur par pair, relais des changements de
 tiers. Transports : fichier (main), WebRTC à signalisation manuelle et relais privé chiffré
 (branche `feature/sync-p2p`). Wi‑Fi Direct et Bluetooth demanderaient un module natif Capacitor.
 
-## D17 · 2026-09-06 · Aucune donnée réelle dans le dépôt
-
-Les fichiers bancaires servent à vérifier l'import localement et ne sont jamais versionnés
-(`*.csv`, `*.sqlite` ignorés). Les exemples et tests utilisent des données inventées.
-
-## D18 · 2026-09-07 · Numéro de compte mémorisé sur le compte, indépendant du profil d'import
+## D18 · Numéro de compte mémorisé sur le compte, indépendant du profil d'import
 
 `Account.accountNumber` (facultatif, saisi dans le panneau Comptes ou mémorisé depuis l'import)
 porte le numéro de compte ou l'IBAN, comparé après normalisation (espaces et ponctuation
@@ -159,7 +149,7 @@ y compris avec un profil nouvellement détecté, contrairement à `profile.accou
 que pour ce profil. Une case à cocher propose de mémoriser une nouvelle valeur sur le compte
 choisi ; décision explicite, jamais un écrasement silencieux.
 
-## D19 · 2026-09-07 · Tirelire répartie sur plusieurs comptes
+## D19 · Tirelire répartie sur plusieurs comptes
 
 Une tirelire n'est plus hébergée par un compte : elle porte une **répartition par compte**,
 reconstruite depuis les ventilations, jamais stockée. Deux invariants au lieu d'un : la somme des
@@ -173,7 +163,7 @@ un vecteur, plus un scalaire, et `Tirelire.accountId` disparaît au profit d'un 
 Ce que l'hypothèse « une tirelire vit sur un compte » cachait : une même réserve peut dormir sur
 plusieurs comptes, et le suivi par objectif doit rester indépendant du compte qui héberge l'argent.
 
-## D20 · 2026-09-07 · Placement voulu et écart
+## D20 · Placement voulu et écart
 
 Chaque tirelire déclare **où son argent devrait dormir**. L'écart entre position réelle et position
 voulue produit des propositions de virement dans le plan : jamais une correction d'office, jamais un
@@ -181,7 +171,7 @@ blocage. Laisser un écart est légitime — un revenu arrive, on provisionnera 
 doit pouvoir présenter un écart comme « à surveiller » plutôt que « à faire ». Le compte principal est un lieu
 de stockage comme un autre, à durée de séjour courte : aucune règle particulière ne lui est attachée.
 
-## D21 · 2026-09-07 · Virement groupé à ventilation prévue
+## D21 · Virement groupé à ventilation prévue
 
 Les écarts vers un même compte cible donnent un **virement permanent unique**, avec sa ventilation
 calculée d'avance et enregistrée comme flux attendu. À l'import, la ligne bancaire est reconnue par
@@ -191,7 +181,7 @@ planchers d'abord puis priorités, plutôt qu'un prorata qui saupoudrerait. L'é
 positions de tirelires et se represente au tour suivant. Le libellé de D11 devient un libellé par
 couple de comptes, plus un libellé par tirelire.
 
-## D22 · 2026-09-07 · Trois états d'une opération, la vérité est ce qui est verrouillé
+## D22 · Trois états d'une opération, la vérité est ce qui est verrouillé
 
 *Non traitée* (aucune règle ne l'a vue), *rapprochée* (classée par une règle, reprise à chaque
 passage, malléable), *verrouillée* (plus aucune règle ne l'atteint). Est vérité — donc stocké et
@@ -205,7 +195,7 @@ Ce que l'hypothèse de la donnée propre cachait : une opération importée, une
 opération corrigée n'ont pas la même autorité ; sans état, la synchronisation écrase la correction
 par l'import.
 
-## D23 · 2026-09-07 · Règles : sélection, action, rang
+## D23 · Règles : sélection, action, rang
 
 Une règle a une **sélection** (libellé, montant, compte, date, période de validité) et une **action**
 dont chaque champ est facultatif : catégorie, tirelire, ventilation, état. L'état prend quatre
@@ -221,13 +211,13 @@ les rend rejouables dans l'ordre chronologique sur un historique importé. Cons�
 l'interface : avec *Ne rien faire*, une opération peut porter une classification tout en restant non
 traitée — « rien dessus » et « quelque chose que personne n'a regardé » doivent se distinguer.
 
-## D24 · 2026-09-07 · Un flux peut engendrer une règle
+## D24 · Un flux peut engendrer une règle
 
 Un flux prévu engendre optionnellement une règle déterministe. Modifier le flux **archive** la règle
 en lui posant une fin de validité et en crée une nouvelle : les opérations déjà classées ne sont pas
 réécrites, puisqu'aucune règle nouvelle ne les sélectionne.
 
-## D25 · 2026-09-07 · Abandon de l'année budgétaire
+## D25 · Abandon de l'année budgétaire
 
 Remplace D03. Pour un particulier, le budget évolue au fil de la vie — salaire, activité en cours
 d'année, achat, investissement — et aucune date d'arrêté n'a de sens. Les provisions gardent leur
@@ -235,7 +225,7 @@ ancrage propre (`periodicity.anchorDate`) ; les bilans se lisent sur un horizon 
 comparaison entre deux périodes doit signaler quand la profondeur d'historique disponible diffère,
 plutôt que de laisser croire à une baisse de dépenses.
 
-## D26 · 2026-09-07 · Action groupée
+## D26 · Action groupée
 
 Un filtre de recherche, une sélection ajustable à la main — tout sélectionner ou désélectionner sur
 les opérations visibles, plus la sélection individuelle — et les mêmes actions qu'une règle **plus
@@ -244,7 +234,7 @@ opérations. Aperçu avant application, avec l'avant et l'après. Chemin inverse
 sélection manuelle peut proposer un filtre qui tente de la reproduire, et donc engendrer une règle.
 C'est la porte d'entrée vers les règles pour qui n'en écrirait jamais.
 
-## D27 · 2026-09-07 · Ventilation à parts, dont une part variable
+## D27 · Ventilation à parts, dont une part variable
 
 Une ligne de ventilation porte un **montant fixe**, un **pourcentage** du montant de l'opération, ou
 la part **variable** — calculée, égale au montant de l'opération moins les autres lignes. Toute
@@ -256,7 +246,7 @@ ventilation qui dépendrait du contexte — solde d'une tirelire, état du plan 
 elle est une aide, et son résultat doit être figé sur l'opération au moment où il est produit.
 Remplace la ventilation de D10, dont « une catégorie et une tirelire par ligne » reste valable.
 
-## D28 · 2026-09-07 · Tirelire sans type, besoins multiples
+## D28 · Tirelire sans type, besoins multiples
 
 Une tirelire est un pot à **solde unique** portant un ou plusieurs **besoins** : récurrent (tant par
 période, avec le report de D05), à échéance (un montant pour une date, rattrapage lissé sur les
@@ -268,7 +258,7 @@ besoins, et `Tirelire.kind` disparaît. Le **regroupement de tirelires est écar
 passent par l'arbre des catégories, et le seul apport propre d'un groupe — arbitrer une masse commune
 entre ses membres — s'obtient en fusionnant les tirelires plutôt qu'en les coiffant.
 
-## D29 · 2026-09-07 · Dotation calculée, virements neutres, report par libération
+## D29 · Dotation calculée, virements neutres, report par libération
 
 Précise D06, D19 et D20 et remplace la part de D05 sur le « financement virtuel ». Chaque besoin
 (D28) est **doté** au début de chaque période de ce qu'il demande — croisière ou rattrapage —
@@ -287,7 +277,7 @@ Le solde d'une tirelire s'attribue à ses besoins dans l'ordre des priorités (u
 retient jusqu'à sa cible, un objectif jusqu'à la sienne, le récurrent prend le reste) ; un déficit
 pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin.
 
-## D30 · 2026-09-07 · Colonnes dépréciées et version de modèle
+## D30 · Colonnes dépréciées et version de modèle
 
 Une colonne retirée du modèle n'est jamais supprimée du schéma : elle est marquée **dépréciée**
 dans `schema.ts`, ignorée à la lecture et à l'écriture locale, mais toujours acceptée par
@@ -297,7 +287,7 @@ idempotente qui lit les colonnes dépréciées et écrit les nouvelles via `upse
 et propagées ; deux appareils qui migrent chacun produisent les mêmes valeurs, la fusion colonne par
 colonne converge. Le compactage du journal, plus tard, purgera les colonnes dépréciées.
 
-## D31 · 2026-09-07 · Rang d'une règle = clé triable
+## D31 · Rang d'une règle = clé triable
 
 Précise D23. Le rang est stocké comme **chaîne triable** (`rank`, ordre lexicographique, générée
 entre deux voisins à l'insertion ou au déplacement), pas comme index entier : deux appareils qui
@@ -305,13 +295,13 @@ réordonnent en même temps ne produisent pas de doublons destructeurs, et une �
 l'identifiant. L'interface montre une liste ordonnée, rang 1 en tête, sans exposer la clé. Les
 règles s'appliquent de la fin de la liste vers le rang 1.
 
-## D32 · 2026-09-07 · Tirelire par défaut d'une catégorie
+## D32 · Tirelire par défaut d'une catégorie
 
 `Category.tirelireId` survit à D28 comme **tirelire par défaut** : quand une règle ou une action
 pose une catégorie sans tirelire, la ventilation prend la tirelire par défaut de la catégorie. Ce
 n'est qu'un raccourci de saisie, pas un lien comptable.
 
-## D33 · 2026-09-07 · Le moteur de règles part de ce que l'import a établi
+## D33 · Le moteur de règles part de ce que l'import a établi
 
 D23 fait repartir les règles de zéro à chaque passage sur les opérations non verrouillées, pour
 que retirer une règle défasse ce qu'elle avait posé. Mais le rapprochement de flux (D12, D22) et
@@ -327,7 +317,7 @@ Conséquence : un flux qui engendre une règle (D24) et le rapprochement de ce m
 même chose, ce qui est cohérent — la règle verrouille et gagne, le rapprochement reste la trace
 de l'échéance servie.
 
-## D34 · 2026-09-07 · Une classification que rien ne reproduit est verrouillée d'office à la migration
+## D34 · Une classification que rien ne reproduit est verrouillée d'office à la migration
 
 Corrige la migration 2 → 3 décidée au lot 2. Puisque le moteur de D23 recalcule tout ce qui n'est
 pas verrouillé, une opération *rapprochée* que plus aucune règle ne sélectionne perd sa
@@ -342,7 +332,7 @@ portaient pas gardent leur état de traitement. Verrouiller de trop se défait e
 
 Vaut pour la migration seule. Une opération classée par une règle après D23 reste rapprochée et
 donc reprise à chaque passage, comme D22 le prévoit.
-## D35 · 2026-09-07 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
+## D35 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
 
 Pour être utilisable depuis un hébergement web mutualisé (OVHcloud sans VPS : Apache, PHP,
 pas de Node ni de processus persistant), l'application ne change pas de modèle : les données
@@ -353,9 +343,9 @@ assembleur qui construit la PWA avec un préfixe d'adresse (`vite --base`). L'ad
 est proposée d'office comme relais. Une version « serveur de vérité » (comptes utilisateurs,
 base MySQL, logique côté serveur) a été écartée : elle contredirait D07/D08, imposerait une
 authentification et retirerait le fonctionnement hors ligne. Livraison : archive jointe aux
-releases, dépôt FTPS automatique si des secrets `OVH_FTP_*` existent (D15).
+releases, dépôt FTPS automatique si des secrets `OVH_FTP_*` existent.
 
-## D36 · 2026-09-07 · Le filtre de recherche est la sélection d'une règle
+## D36 · Le filtre de recherche est la sélection d'une règle
 
 L'écran Opérations offrait un filtre pauvre (état, compte, période, texte libre) sans rapport avec
 la sélection d'une règle, et proposait de *deviner* un filtre à partir des lignes cochées. C'est le
@@ -372,7 +362,7 @@ le filtre retourne, ou en faire une règle — auquel cas le filtre est repris t
 inférence. L'inférence de D26 sert le chemin inverse, quand on part de lignes cochées sans avoir
 su écrire le filtre : elle propose un filtre, qui reste modifiable avant d'être enregistré.
 
-## D37 · 2026-09-07 · Dépôt du site par lftp, sans supprimer ce qui vit sur le serveur
+## D37 · Dépôt du site par lftp, sans supprimer ce qui vit sur le serveur
 
 Le dépôt sur l'hébergement (D35) se fait avec `lftp` dans `apps/hebergement/deposer.sh`, appelé
 par la CI et utilisable à la main, plutôt qu'avec une action tierce : un seul outil pour FTPS et
@@ -383,7 +373,7 @@ ne charge jamais une page pointant vers des ressources absentes ; `donnees/*.jso
 `relais.config.php` sont exclus de l'envoi **et** du nettoyage, car ils appartiennent au serveur.
 Le nettoyage des anciens fichiers est facultatif (`TIRELIRE_FTP_NETTOYER`) et désactivé par
 défaut : un appareil pas encore rechargé demande encore les fragments de la version précédente.
-## D38 · 2026-09-07 · Le placement voulu est une répartition, pas un compte
+## D38 · Le placement voulu est une répartition, pas un compte
 
 Corrige une simplification faite au lot 1 : D20 avait été implémentée avec un compte de placement
 unique, ce qui contredit l'esprit de D19 — une tirelire est répartie sur plusieurs comptes, donc
@@ -399,7 +389,7 @@ Les mêmes règles qu'avant s'appliquent ensuite : l'écart entre position réel
 nourrit le plan, « à faire » au-dessus du seuil, « à surveiller » en dessous, jamais corrigé
 d'office. Une tirelire sans placement déclaré ne produit aucun écart : elle est bien là où elle est.
 
-## D39 · 2026-09-07 · Une règle s'appelle un automatisme, et se crée depuis la recherche
+## D39 · Une règle s'appelle un automatisme, et se crée depuis la recherche
 
 Le mot « règle » laissait croire à une contrainte ; ce sont des automatismes, qu'on ajoute et
 retire sans cérémonie. Renommage dans l'interface comme dans le code (`Automation`, table
@@ -411,7 +401,7 @@ actions à appliquer à ce que la recherche retourne, on applique tout de suite 
 « Enregistrer » transforme le couple recherche + actions en automatisme. Créer un automatisme
 n'est donc jamais un geste à part : c'est garder une recherche qu'on vient de faire.
 
-## D40 · 2026-09-08 · L'assistant construit un budget, il ne configure pas des objets
+## D40 · L'assistant construit un budget, il ne configure pas des objets
 
 Le premier assistant reprenait les écrans de configuration étape par étape : créer un compte, puis
 une tirelire, puis un besoin. Il demandait donc de connaître le modèle avant de pouvoir s'en
@@ -441,7 +431,7 @@ entièrement postérieure à l'ouverture) et un flux est ancré sur sa **derniè
 passée** (`nextOccurrence` ne remonte jamais avant l'ancrage). Sans cela, un budget tout juste saisi
 s'affiche vide, ce qui était le cas de la première version.
 
-## D41 · 2026-09-08 · Le compte pivot s'appelle le compte principal
+## D41 · Le compte pivot s'appelle le compte principal
 
 « Pivot » décrivait un rôle dans un raisonnement comptable, pas un objet que quelqu'un possède.
 Personne n'a de compte pivot ; tout le monde a un compte principal. Renommage partout où un humain
@@ -457,7 +447,7 @@ Deux valeurs stockées portaient le mot — le genre du compte et la clé du cou
 pour qu'un appareil resté en arrière, qui réécrirait l'ancienne valeur, ne rende pas le compte
 méconnaissable (D08, D30).
 
-## D42 · 2026-09-08 · Une enveloppe s'appelle une tirelire ; le stockage garde ses noms
+## D42 · Une enveloppe s'appelle une tirelire ; le stockage garde ses noms
 
 Le mot « enveloppe » venait de la méthode budgétaire dont l'application s'inspire ; il ne disait rien
 à qui découvrait l'écran, et l'application s'appelle déjà Tirelire (D13). Une tirelire, tout le monde
@@ -484,7 +474,7 @@ l'analyse du besoin du 6 septembre. La règle « ajouter une entrée plutôt que
 rendu le journal illisible, ce qu'aucune décision ne gagne. Le détail des mots remplacés se lit dans
 le commit de renommage.
 
-## D43 · 2026-09-08 · L'assistant propose, et ce qu'il propose vient de l'exemple
+## D43 · L'assistant propose, et ce qu'il propose vient de l'exemple
 
 D40 a remplacé les écrans de configuration par des questions, mais laissait devant chaque question un
 formulaire vide. « Qu'est-ce qui ne tombe pas tous les mois ? » est une bonne question à laquelle on
@@ -523,7 +513,7 @@ enregistrement, avec ses champs modifiables sur place (nom, banque, numéro ou I
 qui rend inutile la question du solde posée plus loin ; et le bandeau de totaux du budget — revenus,
 charges, reste à vivre — disparaît de cette étape, qui ne parle pas du budget.
 
-## D44 · 2026-09-08 · La date de paie appartient au flux ; le début de période est un choix
+## D44 · La date de paie appartient au flux ; le début de période est un choix
 
 D02 faisait porter un `payDay` au compte principal. C'était deux erreurs en une.
 
@@ -548,7 +538,7 @@ périodes ne se décalent pas au premier lancement.
 Remplace la partie de D02 qui situait le jour de paie sur le compte ; tout le reste de D02 — la
 période de paie à paie, son nom pris au mois de son milieu, le lissage du rattrapage — est inchangé.
 
-## D45 · 2026-09-08 · Le genre d'un compte dit sa nature, pas comment on le remplit
+## D45 · Le genre d'un compte dit sa nature, pas comment on le remplit
 
 `AccountKind` mélangeait deux choses : ce qu'est le compte, et la façon dont ses opérations y
 entrent. `third` — « compte tiers, saisi à la main » — refusait de fait l'import à un compte, alors
@@ -585,7 +575,7 @@ genre casse désormais la compilation. Et la lecture d'un compte **traduit les a
 (`pivot`, `holding`, `third`), comme D41 le faisait déjà pour le seul `pivot` — sauf en lecture
 brute, sinon les migrations ne verraient plus la valeur qu'elles doivent interpréter.
 
-## D46 · 2026-09-08 · Des lignes déjà là, pas des pastilles à cliquer
+## D46 · Des lignes déjà là, pas des pastilles à cliquer
 
 D43 offrait les propositions sous forme de pastilles qui remplissaient un formulaire vide : il fallait
 en toucher une, relire le formulaire, valider, recommencer. Un geste par ligne, pour un budget qui en
@@ -613,7 +603,7 @@ L'écran des comptes suit la même forme : une ligne par compte au lieu d'une ca
 étiquetés, le type devenant un menu modifiable sur la ligne. Cinq comptes tenaient sur deux écrans ;
 ils tiennent dans un tiers.
 
-## D47 · 2026-09-08 · Un rythme se compte dans l'unité qui lui convient
+## D47 · Un rythme se compte dans l'unité qui lui convient
 
 `Periodicity` ne connaissait que `intervalMonths`. Le mois va bien à un loyer ou à une taxe, mais
 il ne sait pas dire « toutes les deux semaines » — or beaucoup de revenus tombent ainsi, et aucune
@@ -637,7 +627,7 @@ et rien ne demandait autre chose.
 besoins et flux. Un rythme envoyé par un appareil non migré garde donc son sens, ce qu'un test
 vérifie.
 
-## D48 · 2026-09-08 · Une tirelire peut verser au budget au lieu de le consommer
+## D48 · Une tirelire peut verser au budget au lieu de le consommer
 
 Certains revenus tombent par à-coups sur trois ou quatre mois puis cessent — une saison touristique,
 une récolte — alors que le foyer, lui, dépense toute l'année. Les prévoir comme des flux datés est
@@ -675,7 +665,7 @@ donc un quantième pour un rythme mensuel, et la date entière sinon — l'ancra
 occurrence, tout le reste s'en déduit — avec un rappel de la prochaine occurrence, qu'une date
 d'ancrage seule ne donne pas.
 
-## D49 · 2026-09-08 · Un renflouement est un symptôme, pas un mouvement à ranger
+## D49 · Un renflouement est un symptôme, pas un mouvement à ranger
 
 Ramener de l'argent dans une tirelire est **par définition ce que le plan sert à éviter** : si tout
 est correctement provisionné, l'argent n'a pas besoin d'être ramené. Un renflouement dit donc quelque
@@ -708,7 +698,7 @@ Reste à voir sur des données réelles si la distinction interne/externe mérit
 différents dans le calibrage ; elle est enregistrée dès maintenant pour que l'historique existe le
 jour où l'on tranchera.
 
-## D50 · 2026-09-08 · Un besoin a une période de validité
+## D50 · Un besoin a une période de validité
 
 Un flux prévu sait déjà se dater (`activeFrom` / `activeTo`, D23, D24) ; un besoin, non. Or c'est le
 besoin qui porte le budget, et un budget change au fil de la vie — c'est exactement ce que D25
@@ -743,7 +733,7 @@ Ce que cela ne couvre pas encore : l'interface n'expose pas ces dates, et l'assi
 des besoins sans bornes. Tant que ce n'est pas fait, seule une reprise de données peut versionner un
 budget — ce qui suffit au premier import, pas à l'usage courant.
 
-## D51 · 2026-09-08 · Les dates de validité se voient, et l'exemple les porte
+## D51 · Les dates de validité se voient, et l'exemple les porte
 
 D50 a donné aux besoins une période de validité, et se terminait en constatant ce qui manquait :
 « l'interface n'expose pas ces dates », si bien que seule une reprise de données pouvait versionner
@@ -806,7 +796,7 @@ que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parco
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.
 
-## D52 · 2026-09-08 · Une période à venir suppose exécuté le plan des périodes précédentes
+## D52 · Une période à venir suppose exécuté le plan des périodes précédentes
 
 Précise D20 et D29. Le plan a maintenant deux dates : `asOf`, la période qu'on regarde, et
 `today`, la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf`, donc
@@ -845,7 +835,7 @@ déclenche donc plus sur une position simulée, où elle finissait par apparaît
 périodes lointaines. Projeter le solde du compte principal demanderait de dérouler revenus et
 charges période après période : ce n'est pas ce que le plan fait, et il ne le prétend plus.
 
-## D53 · 2026-09-08 · Une échéance montre sa provision, et l'exemple garde ses besoins
+## D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
 Reprise du signalement « le jeu d'exemple ne contient aucun besoin » (8 septembre). Le défaut
 principal n'existe plus : depuis D50 et D51, `example.ts` porte treize besoins, chacune des neuf
@@ -873,7 +863,7 @@ disent aussi le manque : « aucune tirelire ne la provisionne », « aucun flux 
 
 Au passage, trois restes du renommage de D42 (« l'tirelire ») dans deux libellés d'interface et un
 titre de test.
-## D54 · 2026-09-08 · Un nombre garde sa police, pas son insécabilité
+## D54 · Un nombre garde sa police, pas son insécabilité
 
 La classe `.num` de l'interface faisait deux choses à la fois : donner aux chiffres la police à
 chasse fixe et les tabular figures, et **interdire le retour à la ligne**. Le second rôle était
@@ -913,7 +903,7 @@ son propre navigateur : il n'y en avait pas moyen dans la session où le défaut
 test s'abstient faute de navigateur, sauf si `TIRELIRE_NAV_STRICT` est posé — ce que fait la CI,
 pour qu'une garde muette ne passe pas pour une garde verte.
 
-## D55 · 2026-09-09 · Des seuils tactiles mesurés, pas relus
+## D55 · Des seuils tactiles mesurés, pas relus
 
 Un audit d'ergonomie relit des feuilles de style et donne un avis. Ces quatre-là se mesurent, donc
 elles deviennent des gardes plutôt que des avis, dans le harnais posé par D54.
@@ -949,7 +939,7 @@ de fichier. Cela reste à vérifier sur l'appareil.
 La plomberie commune — trouver un navigateur, construire et servir le site, ouvrir l'exemple — passe
 dans `apps/web/test/harnais.ts`, dont la garde de D54 se sert désormais aussi.
 
-## D56 · 2026-09-09 · Un écran de cartes se filtre par état
+## D56 · Un écran de cartes se filtre par état
 
 Trois écrans de Configuration listent des cartes : Comptes, Tirelires, Flux prévus. Depuis D50 et
 D51, ces listes portent des lignes qui ne concernent pas le jour même — la version close d'un budget
@@ -1028,7 +1018,7 @@ sans que son bouton disparaisse, et que chaque interrupteur montre ou masque ce 
 toucher aux autres — même harnais que la garde de mise en page (D54), et même abstention faute de
 Chrome, sauf en intégration continue.
 
-## D57 · 2026-09-09 · Deux sens de lecture, et le budget d'abord
+## D57 · Deux sens de lecture, et le budget d'abord
 
 L'application est **d'abord une aide à la construction d'un budget**, et doit rester entièrement
 utile sans jamais importer un relevé. Le lien avec la banque vient ensuite, et sert à confronter le
@@ -1051,7 +1041,7 @@ Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé �
 de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
 fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
 
-## D58 · 2026-09-09 · Le fichier est un état : pas de journal, une horloge par ligne
+## D58 · Le fichier est un état : pas de journal, une horloge par ligne
 
 Le journal de changements de D08 (`changes`, `cell_versions`, chaîne d'empreintes) ne servait qu'à
 la synchronisation, et il faisait grossir le fichier avec les gestes et non avec les données : une
@@ -1086,7 +1076,7 @@ autres invariants sont vérifiés par une fonction du cœur, qui sert aussi à l
 fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` pour pouvoir être
 fabriqué depuis l'extérieur.
 
-## D59 · 2026-09-10 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
+## D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
 
 Écrite le 8 septembre en parallèle d'autres chantiers, et numérotée D52 à l'époque ; le numéro
 ayant servi ailleurs entre-temps, elle arrive ici en D59 sans autre changement que celui-ci et les
@@ -1140,7 +1130,7 @@ tranché : le panneau s'ouvre *sous* sa ligne, donc tout ce qui est au-dessus �
 le bouton qu'on vient de presser — ne bouge pas d'un pixel à la fermeture. Seule la suite de la
 liste remonte, et on ne la regardait pas. Il n'y a rien à corriger de ce côté.
 
-## D60 · 2026-09-10 · Deux montants pour un virement permanent, un seul se stocke
+## D60 · Deux montants pour un virement permanent, un seul se stocke
 
 Applique D57 au virement permanent — le seul flux dérivé du budget, et le seul endroit où une photo
 du plan était enregistrée (D21, lot 4).
@@ -1199,527 +1189,3 @@ demande, alors que ce plan est celui de l'analyse au centime près.
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
 (virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
 budget, pas une ligne de budget à offrir (D43).
-
-## D61 · 2026-09-11 · Les gardes se tiennent dans un registre, et chaque PR demande les siennes
-
-Objectif primaire #58. `docs/gardes.md` relie chaque invariant (I…, et les usages U… d'I3) et
-chaque contrainte (C…) à ses harnais, à ses vérifications manuelles (`VM-<entrée>-<nom>`) ou aux
-entrées qui le couvrent. C'est un document et non un fichier de données : Simon le lit sur
-téléphone, et `packages/gardes` le relit sans dépendance.
-
-- **Couverture**, dans `pnpm test`, donc au commit et en CI : un identifiant sans entrée, une entrée
-  sans garde, un renvoi en boucle, un harnais ou un motif de chemin qui ne désigne plus rien font
-  échouer les tests. Un harnais seulement prévu ne garde rien : une vérification manuelle tient sa
-  place. Un identifiant écrit sous une forme voisine est refusé plutôt qu'ignoré, et un harnais qui
-  nomme un test désigne ce test, titre d'un `describe`, d'un `it` ou d'un `test`, et non son seul
-  fichier ; un test qui ne tourne pas, mis en commentaire, désactivé ou seulement prévu, compte comme
-  absent (tranché le 11 septembre dans #59).
-  Un test qui se saute faute d'outil compte comme un test qui tourne : l'outil est requis en CI, où
-  `TIRELIRE_STRICT` fait échouer au lieu de sauter, et l'abstention reste permise en local (tranché le
-  même jour). `TIRELIRE_NAV_STRICT`, de D54, reste lu.
-- **Demandes**, sur chaque PR, par la vérification « Vérifications manuelles » : la description
-  déclare les identifiants touchés et ceux dont le lien pourrait être masqué ; les motifs `Chemins`
-  du registre imposent un plancher, volontairement étroit ; chaque vérification manuelle des
-  entrées déclarées, et des entrées qui les couvrent, figure avec sa consigne recopiée du registre,
-  son analyse et une case « Validée » (tranché le 11 septembre dans #60 : « explicite vaut mieux
-  qu'implicite »). La description se lit comme GitHub l'affiche : ni les blocs de code ni les
-  commentaires ne déclarent, et ce qui se lirait de deux façons est refusé. Retirer une vérification manuelle ou un harnais du registre demande la même
-  validation. Cette vérification tourne à part de la CI et se relance quand la description change :
-  cocher une case ne rejoue ni tests ni build.
-- **Vert veut dire validé.** Sur un dépôt privé de l'offre gratuite, GitHub ne peut pas rendre une
-  vérification obligatoire avant fusion, et le porteur a choisi le 11 septembre d'y rester (#58) :
-  une fusion reste possible, #62 la fera signaler aussitôt. La couleur de la vérification est donc
-  le seul signal avant de fusionner : elle ne passe au vert que lorsque chaque vérification demandée
-  est analysée et validée, jamais sur leur seule présence.
-- **Une validation tient au code qu'elle a validé.** Tranché le 11 septembre (#61), puis limité le
-  même jour : seule une modification du code annule la validation. La vérification enregistre chaque
-  case cochée dans un commentaire du compte de GitHub Actions, avec la tête de la PR et sa branche
-  cible. Un commit qui modifie le code, y compris une résolution de conflit, ou un changement de
-  branche cible rendent l'enregistrement caduc : la case se décoche, un commentaire dit pourquoi, la
-  vérification repasse au rouge. Documentation, harnais et analyse se modifient sans l'annuler, et
-  une fusion propre de la branche cible non plus. Une case cochée sans enregistrement, à l'ouverture
-  ou juste avant un push, ne vaut rien.
-- **Qui coche.** Toutes les sessions écrivent avec le compte du porteur : rien ne distingue une case
-  cochée par un agent. Tranché le 11 septembre (#58) : une instruction interdit aux agents de cocher
-  sans autorisation explicite du porteur ; elle est écrite dans `CLAUDE.md`, et l'agent qui coche sur
-  autorisation la cite dans la PR.
-
-## D62 · 2026-09-11 · Des gardes à la mesure du projet : les erreurs plausibles, pas les contournements
-
-Tranché par le porteur dans l'audit de #59, consigné dans #58 : les gardes de #58 à #61 coûtaient
-plus qu'elles ne rapportaient pendant le développement. Les tests de la garde prenaient 95 s, dont
-61 s pour l'amorçage ; le crochet de pré-commit dépassait le temps d'une session et se contournait ;
-chaque tour d'audit ajoutait une forme à refuser ; deux vérifications manuelles demandaient une APK
-et un essai de relais pour une PR qui ne touchait pas l'application, dont le produit n'a pas encore
-d'utilisateur. Le registre, la vérification simple de la couverture, la déclaration des PR et le
-mode strict de la CI restent : ils attrapent des erreurs réelles, comme un test qui, vraisemblablement,
-ne tournait jamais en CI.
-
-- **Critère.** Une garde protège des erreurs plausibles par accident, pas des contournements : un
-  test mis en commentaire pour tromper la garde se voit dans le diff, et la relecture l'attrape.
-- **Budget.** Le crochet de pré-commit tient en moins de 20 s — relevé à 30 s par D66. Les amorçages (D65)
-  tournent en CI, pas au commit ; la couverture reste dans `pnpm test`.
-- **Audit.** Il contrôle les « Fait quand » et les erreurs plausibles. Une forme exotique ou un
-  contournement se note dans la PR, sans devenir un harnais rouge.
-- **#59 figée.** Il reste à vérifier que la CI pose `TIRELIRE_STRICT` sur `pnpm test`. Le
-  demi-cadratin, le point, le gras souligné et le gras italique sortent du harnais d'audit ; la garde
-  conserve ce qu'elle refuse déjà, sans qu'on lui demande davantage.
-- **Consignes proportionnées.** Une PR qui ne touche que des tests, de l'outillage ou de la
-  documentation ne déclenche ni manipulation de l'application ni construction de l'APK.
-- **Retour au produit.** Les harnais « À bâtir » d'U1 à U5 passent avant la robustesse de la garde.
-
-Dans le code : le crochet de pré-commit laisse les amorçages à `pnpm amorcage` (D65) ; la
-couverture vérifie que l'étape `pnpm test` de la CI pose `TIRELIRE_STRICT` ; les demandes d'une PR,
-ou les consignes du registre, épargnent les PR qui ne touchent que tests, outillage ou documentation.
-
-Mis en œuvre dans la PR #63 : le crochet de pré-commit lance le typecheck et les tests du cœur, puis
-les tests unitaires de la garde, couverture comprise (17 s mesurées) ; le typecheck complet et le
-build passent au push, et `pnpm test` joue en CI tout ce qui garde un comportement. La
-couverture lit l'étape `pnpm test` de `ci.yml` et refuse qu'elle cesse de poser `TIRELIRE_STRICT`.
-La règle d'« Écrire une entrée » et les consignes de `VM-I9-apk` et `VM-C3-https` épargnent les PR de
-tests, d'outillage ou de documentation ; la garde ne classe pas elle-même les fichiers : l'analyse le
-dit, et qui valide le contrôle.
-
-## D63 · 2026-09-12 · Une sous-issue, une PR, une fusion
-
-L'objectif primaire (#58) a été découpé en sept sous-issues, mais une seule PR (#63) en portait
-trois et a absorbé les deux besoins découverts pendant son audit : une branche qui s'élargit à
-chaque découverte n'atteint jamais son terme, et #59 comme #60 ont été fermées alors que rien
-n'était fusionné. D'où la règle : une sous-issue, une PR, une fusion ; un besoin découvert en route
-devient une sous-issue et attend sa propre PR, sauf s'il rend la PR courante fausse ; une issue se
-ferme à la fusion ; un objectif permanent ne se ferme pas. Le découpage d'un objectif en sous-issues
-précède le codage (`CLAUDE.md`).
-
-## D64 · 2026-09-12 · Une règle nouvelle se vérifie contre les règles primaires
-
-Changer une règle doit rester possible : une PR ajoute une décision, en remplace une par une entrée
-nouvelle, fait évoluer la garde ou les règles des sessions. Ce qui se vérifie avant la fusion, c'est
-que la règle nouvelle ne contredit pas les **règles primaires** — les invariants et usages
-(`docs/invariants.md`), les contraintes (`docs/contraintes.md`) et la garde de l'objectif primaire
-(#58, D61). La conformité porte sur le sens et ne se programme pas : elle devient une vérification
-manuelle, `VM-regles-primaires`, demandée par les chemins que la PR modifie (D61, #61).
-
-Elle ne tient pas dans une entrée de `docs/gardes.md` : une entrée y porte un invariant ou une
-contrainte, et ni une décision, ni `CLAUDE.md`, ni la garde n'en sont un. D'où une table de chemins
-à part, dans `packages/gardes/gardes.mjs`. Le porteur l'a étendue le 12 septembre à `docs/gardes.md`
-— la comparaison des deux registres voit une garde retirée, pas une consigne affaiblie — et à
-`docs/description-projet.md`, qui fonde les invariants.
-
-La garde reste jugée par la version que porte la PR (piste 2 de #58, tranché le 11 septembre) :
-retirer cette demande en modifiant la garde reste donc possible, mais c'est une modification de la
-garde, donc une règle nouvelle, et l'amorçage (`amorcage/livraison-de-la-garde.test.mjs`) rougit quand la
-garde s'affaiblit. Piste 1 en réserve — faire juger chaque PR par la garde de `main` — si elle est
-contournée.
-
-La description du projet et les invariants ne changent qu'à la demande du porteur (tranché le
-12 septembre) : son accord explicite n'est pas laissé à l'analyse, c'est une ligne « Accord du
-porteur : … » de la section « Invariants et contraintes », posée en paragraphe à part, que la garde
-lit et refuse quand elle manque ou reste en attente (vide, « … », « à écrire », « à analyser »).
-Lien ou citation datée : la garde accepte l'un comme l'autre, elle ne juge pas la forme de l'accord.
-`demander` la prépare pour une PR qui modifie `docs/description-projet.md` ou `docs/invariants.md`,
-et pour elle seule.
-
-## D65 · 2026-09-12 · Deux questions classent un harnais ; seuls les amorçages sortent du jeu courant
-
-Besoin #82, posé par le porteur : « je ne fais pas confiance au codeur ». Pour chaque besoin, deux
-sessions : l'une code le besoin, l'autre code le harnais qui vérifiera que le codeur y a répondu.
-Deux questions suffisent alors à classer un harnais — **qui l'a écrit** (le codeur, avec le besoin ;
-l'auditeur, contre le besoin) et **quel besoin** (une fonctionnalité du produit, ou une règle du
-projet) :
-
-| | Fonctionnalité | Règle |
-|---|---|---|
-| **Codeur** | le produit et ses tests | la garde et `gardes.test.mjs` |
-| **Auditeur** | harnais du besoin | **amorçage** |
-
-Une seule case sort du jeu courant : **auditeur × règle**, l'amorçage. Il contrôle le travail du
-codeur sur une règle ; il n'a rien à dire quand on code une fonctionnalité. Les trois autres gardent
-un comportement qui doit continuer de tenir.
-
-- **Lieu.** Les amorçages vivent dans `amorcage/`, hors du workspace pnpm : `pnpm test` ne peut
-  pas les atteindre, par construction et non par convention. `packages/gardes` garde la règle livrée
-  (`gardes.mjs`, `github.mjs`, `alerte.mjs`, `cli.mjs`), le harnais que le codeur en a écrit
-  (`gardes.test.mjs`) et les harnais de besoins produit qui n'appartiennent à aucune application
-  (`distributions`, `simplicite-acces-gestes`, `usages-de-bout-en-bout`).
-- **Moment.** Les trois cases qui tiennent un comportement tournent au crochet de pré-commit et dans
-  `pnpm test`, donc en CI. Les amorçages s'appellent par `pnpm amorcage`, et tournent d'eux-mêmes sur
-  une PR qui touche aux règles (`.github/workflows/amorcage.yml`) : ailleurs, jamais.
-- **Vocabulaire.** « Harnais d'audit » reste le mode de travail, « amorçage » la technique de
-  `amorcage/livraison-de-la-garde.test.mjs` — écrire depuis le besoin, juger en boîte noire. Ni l'un ni l'autre
-  ne nomme la case : un audit sur une PR du plan écrit des harnais de produit, qui restent dans
-  `pnpm test`.
-- **L'intervention humaine n'est pas un niveau de plus** : c'est la part d'un harnais ou d'un
-  amorçage que le codage ne peut pas couvrir. Pour un besoin produit, les `VM-…` du registre ;
-  pour un besoin de règle, la case « Validée » de la PR.
-- **Une PR qui touche `amorcage/**` se voit demander `VM-regles-primaires`** (D64) : affaiblir un
-  amorçage, c'est affaiblir la garde par l'autre bout.
-
-## D66 · 2026-09-13 · Le budget du crochet de pré-commit passe à 30 s
-
-Remplace le budget de D62. Mesuré sur la branche de #82 : le crochet prend 20,5 s, dont 13,8 s pour
-les tests du cœur, 5,5 s pour son typecheck et 1,3 s pour le paquet de la garde. D62 l'avait mesuré à
-17 s ; l'écart vient des tests du cœur, passés de 220 à 241 depuis.
-
-Tranché par le porteur le 13 septembre (« On peut augmenter un peu le seuil »). Ce que le budget
-protège ne change pas : un crochet qui dépasse le temps d'une session se contourne, et un crochet
-contourné ne garde rien. Trente secondes laissent la place aux tests du cœur pour continuer de
-grossir un peu, sans rouvrir la question à chaque PR.
-
-Ce qui reste hors du crochet ne change pas : typecheck complet et build au push, amorçages à
-`pnpm amorcage` (D65), le reste en CI. Si les 30 s sont à leur tour dépassées, la réponse ne sera pas de
-relever encore le seuil : ce sera d'alléger le crochet.
-
-## D67 · 2026-09-14 · Une modification de la garde dit ce qui la couvre
-
-Besoin #89, tranché par le porteur le 14 septembre : le plus simple suffit. Une fonction neuve
-ajoutée à `packages/gardes/gardes.mjs`, sans un seul test ni amorçage, laissait tout vert —
-`pnpm test`, `pnpm amorcage`, la couverture du registre. `VM-regles-primaires` (D64) était bien demandée
-à cette PR, mais elle pose une autre question : « cette règle nouvelle contredit-elle les règles
-primaires ? », jamais « cette règle nouvelle est-elle gardée ? ».
-
-D'où une seconde clé hors registre, `VM-garde-couverture`, de la même forme que celle de D64 :
-demandée **sans condition** dès que la PR touche la famille « la garde » de `CHEMINS_DES_REGLES`,
-elle demande de nommer ce que la PR change dans la garde et, pour chaque changement, le harnais qui
-le couvre ou la raison pour laquelle il ne se programme pas. Un développeur humain valide, comme
-toute vérification manuelle.
-
-Deux clés plutôt qu'une consigne allongée (piste de #89, tranchée ici) : le validateur répond à
-chaque question par une case, et une contradiction avec une règle primaire ne se confond pas avec
-une couverture manquante. Elle est demandée à la garde seule, et non à tous les chemins des règles :
-la question « quel harnais couvre ce changement ? » n'a pas de sens pour une décision ou une ligne
-de `CLAUDE.md`, et une vérification qui vise tout ne vise rien.
-
-Ce qui est gardé, c'est que la question soit posée et que la PR reste rouge tant qu'elle n'est pas
-analysée puis validée (`gardes.test.mjs`) ; la réponse, elle, se lit — la proportion de l'analyse ne
-se programme pas (D62).
-
-## D68 · 2026-09-14 · Deux agents par besoin : l'auditeur écrit le harnais et la PR, le codeur ne fait que coder
-
-Le porteur, en discussion le 14 septembre :
-
-> je ne fais pas confiance au codeur. Aussi, quand un besoin est défini (que ce soit une règle ou une
-> fonctionnalité), je veux un agent qui code le harnais du besoin pour vérifier que le codeur va bien
-> répondre au besoin et un agent qui code le besoin.
-
-> c'est l'auditeur qui ouvre une PR. C'est donc l'auditeur d'un besoin qui évalue si le besoin doit se
-> décliner en une ou plusieurs taches. Le codeur ne fait que coder le besoin dont le harnais est déjà
-> en place
-
-> le codeur ne doit pas modifier une PR. Mais il peut mettre des commentaires
-
-> Le codeur doit aussi justifier dans un commentaire ce qu'il a fait comme modification qui
-> nécessitent un validation humaine
-
-> le codeur doit être honnête et concis dans son rapport de modifications nécessitant une validation
-> humaine
-
-> il faut ajouter que le codeur ne doit pas regarder le harnais (ou amorçage) pour coder le
-> besoin. il doit le faire depuis sa propre interprétation depuis le besoin
-
-> oui, le codeur s'en remet à la CI. il est censé y avoir des hook-precommit et pre-push pour faire
-> le nécessaire
-
-> une PR fusionnée doit fermer automatiquement l'issue (le besoin) qu'elle couvre. Si une discussion
-> née, soit cette discussion est bloquante pour la PR et elle fait partie de la PR, soit elle est
-> non-bloquante et fait l'objet d'une nouvelle issue avant la fusion
-
-> un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches,
-> on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
-
-- **L'ordre.** Auditeur, puis codeur. Le découpage en sous-tâches, le « Fait quand » vérifiable, le
-  harnais et la PR sont de l'auditeur. Le codeur reçoit une PR cadrée et un harnais rouge.
-- **La PR appartient à l'auditeur.** Le codeur n'en modifie ni la description, ni les consignes, ni
-  les analyses, ni les cases ; il pousse des commits et commente. Un codeur qui pourrait réécrire
-  l'attendu l'alignerait, sans même le vouloir, sur ce qu'il a produit.
-- **Le codeur code à l'aveugle du harnais.** Il part de sa lecture du besoin, jamais des attentes du
-  harnais : les lire reviendrait à écrire ce qu'il faut pour passer, et le harnais ne vérifierait plus
-  que lui-même. Il ne le lance pas non plus : le verdict lui vient des crochets de pré-commit et de
-  pré-push, puis de la CI, et du workflow des amorçages pour un besoin de règle. Ce que les
-  crochets ne portent pas, le codeur ne l'apprend qu'à la CI : c'est aux crochets de faire le
-  nécessaire, pas au codeur d'aller voir. Deux lectures indépendantes du
-  même besoin se confrontent ainsi : un écart signale que le besoin est ambigu, que le harnais est
-  faux, ou que le codage manque — et cela se tranche en commentaire, pas en recopiant les attentes.
-  Corollaire : l'issue doit suffire à coder ; un codeur qui ne peut pas avancer sans lire le harnais
-  le dit, et l'auditeur précise le besoin.
-- **Le harnais suit l'atomicité.** Exigible sur une tâche qu'une session mène entièrement ; au-dessus,
-  la vérification est celle des sous-tâches. Le harnais global s'écrit quand elles sont vertes. Reste
-  à trancher : vertes, ou fermées (#93).
-- **La part humaine appartient au harnais** (D61) : l'auditeur écrit ce que le codage ne peut pas
-  trancher, le porteur valide. Mais la matière vient du codeur : pour chaque vérification manuelle
-  demandée, il justifie en commentaire ce que ses modifications changent, ce qu'elles ne touchent pas,
-  et ce qui reste à constater de visu. Sans cela, le porteur validerait sur une lecture de la diff.
-  Ce compte rendu est honnête et concis : les écarts pris et ce qu'il n'a pas pu vérifier autant que
-  ce qui marche, et rien d'autre. Il nourrit l'analyse de l'auditeur, ne s'y substitue pas, et ne vaut
-  jamais validation.
-- **La PR ferme son besoin, et rien ne reste en suspens.** La description porte `Close #<numéro>` :
-  la fusion ferme l'issue d'elle-même, personne ne la ferme à la main. Une discussion née en cours de
-  route se range avant la fusion, sans troisième voie : bloquante, ce qu'elle décide entre dans la
-  PR ; non bloquante, elle devient une issue, ouverte avant la fusion. Un fil de PR n'est pas un
-  endroit où une question peut dormir : la PR fermée, plus personne ne la relit.
-- **Conséquence.** Une partie de D61 devient sans objet : l'annulation d'une validation par une
-  analyse réécrite ne peut plus venir du codeur, qui ne touche plus à la description.
-
-## D69 · 2026-09-15 · Le vocabulaire arrêté vaut aussi dans les paroles conservées
-
-Le glossaire ([`glossaire.md`](glossaire.md)), arrêté par le porteur le 14 septembre 2026, pose
-qu'un terme employé vaut partout ailleurs : issues, PR, code, documentation. Il ne disait pas ce
-qu'il advient des **paroles conservées** — le texte du porteur gardé mot pour mot dans
-[`description-projet.md`](description-projet.md) et repris en blocs de citation dans ce journal.
-
-L'occasion est venue de #107 et de sa PR #108, qui a donné aux **amorçages** leur nom d'aujourd'hui
-en retirant celui qu'ils portaient avant : elle réécrivait au passage deux phrases du porteur à
-l'intérieur de blocs de citation. La session
-d'audit proposait de les rétablir mot pour mot, au motif qu'un témoignage n'est pas du vocabulaire.
-Le porteur a tranché l'inverse :
-
-> je préfère amender mes paroles afin de maintenir un glossaire cohérent
-
-- **Ce qui décrit le projet et sa structure suit le terme arrêté, paroles conservées comprises.**
-  Quand un terme du glossaire change, la citation est **amendée** au terme nouveau. Elle ne reste
-  pas au mot d'avant : un texte conservé n'est pas une exception au glossaire, et « partout
-  ailleurs » inclut les paroles du porteur.
-- **Conséquence : le balayage d'un renommage porte sur le dépôt entier**, sans réserve et
-  rétroactivement. L'issue de renommage ne garde aucune zone ; `description-projet.md`, ce journal
-  et tout autre texte conservé entrent dans son périmètre au même titre que le code.
-- **Il s'arrête à ce que la garde locale ne sait pas lire.** Son périmètre, ce sont les fichiers
-  suivis par git : les fils GitHub et les messages de commit en sont dehors, et ne se balaient pas.
-  Le vocabulaire arrêté s'y emploie quand même, mais comme règle de conduite — aucun harnais ne
-  viendra le vérifier, et un terme retiré qui y subsiste n'est pas une incohérence à remonter.
-- **Une citation ne s'amende que sous couvert de son auteur.** L'amendement silencieux est écarté :
-  l'accord du porteur se demande **à chaque issue de renommage**, et non une fois pour toutes. Cela
-  prolonge D64 : `description-projet.md` ne change qu'à la demande du porteur, ligne « Accord du
-  porteur : … » à l'appui dans la PR.
-- **Une incohérence constatée se remonte dans une issue**, nouvelle ou existante ; elle ne se
-  corrige pas au fil de l'eau, au détour d'une PR qui portait autre chose. Le rattrapage des termes
-  déjà retirés qui subsistent reste à #95.
-- **Rien d'autre ne change avec cette entrée** : elle ne fait aucun renommage et n'ajoute aucun
-  harnais permanent — ni entrée au registre `gardes.md`, ni test dans `pnpm test`.
-
-Ce qui n'entre pas ici. Mesurer cette règle en continu suppose que le glossaire garde **trace des
-termes qu'il a remplacés** : sans cette liste, rien ne dit quoi balayer. Cela relève de #106, où la
-question est posée. Au critère du même #106 — un invariant se mesure et nomme sa source — cette
-règle est un invariant ; le catalogue qui l'accueillerait n'existe pas encore, la promotion se fera
-au tri.
-
-## D70 · 2026-09-15 · Une lecture d'amorçage qui compare à la base ne survit pas à la fusion de sa PR
-
-Besoin #112. Une lecture d'amorçage qui a besoin de la base de la PR se retire à la fusion : la base
-devenue `main`, elle compare l'arbre à lui-même et ne dit plus rien, ou elle échoue faute de
-retrouver ce qu'elle cherchait. Un retrait dit, en commentaire du fichier ou dans une entrée, ce
-qu'il cesse de vérifier et pourquoi ce n'est plus utile.
-
-Comparer à la base **pendant** la PR qu'on juge reste légitime : c'est souvent la seule façon de
-constater qu'un codage n'a pas débordé de son besoin. Ce qui est proscrit, c'est de laisser cette
-lecture derrière soi.
-
-## D71 · 2026-09-15 · Un harnais se situe aussi par ce qu'il lit, et celui qu'on joue en local ne sort pas de la machine
-
-Besoin #113, tranché par le porteur le 15 septembre (Q1 à Q6 de l'issue). Le glossaire trie les
-harnais sur un axe, **ce qu'un harnais garde** : garde, tests, amorçages. Un second axe existait dans
-les faits sans être écrit nulle part : **ce qu'un harnais lit, et donc où il peut s'exécuter**. Les
-deux sont orthogonaux — `verifications.yml` est une garde au sens plein et ne vit que sur GitHub —
-et le second ne change ni « garde » ni « workflow ». Aucun mot nouveau n'entre au glossaire.
-
-- **L'axe.** Un harnais se situe par ce qu'il lit, avec deux valeurs : il **lit des fichiers
-  suivis** par git, ou il **lit hors des fichiers suivis** — GitHub (description d'une PR, cases,
-  événement de fusion), le site en ligne. GitHub n'est qu'un cas de la seconde valeur.
-- **L'axe situe une commande, pas un fichier.** `node packages/gardes/cli.mjs demander` lit des
-  fichiers suivis ; `cli.mjs pr --github` et `cli.mjs alerte --github` lisent hors d'eux. Le même
-  fichier porte les deux.
-- **Le local est prioritaire.** Une vérification se fait en local dès que ce qu'elle lit le permet ;
-  elle ne passe par GitHub que si son objet n'existe pas dans les fichiers suivis. C'est le harnais
-  qui porte ce choix. Rejouer un harnais local en CI ne change pas sa place sur l'axe.
-- **Règle du travail local.** Aucun harnais joué en local ne sort de la machine : ni les crochets de
-  pré-commit et de pré-push, ni `pnpm test`, ni `pnpm amorcage` n'ouvrent de connexion hors de la
-  machine — ni réseau, ni API GitHub. La boucle locale (`localhost`, `127.0.0.1`, `::1`) reste
-  permise : les tests du relais, du relais PHP et de l'interface y démarrent leurs serveurs.
-- **Chaque workflow est situé**, job par job, dans son commentaire de tête : « lit des fichiers
-  suivis », « lit hors des fichiers suivis » ou « hors harnais ». Un job qui mêle livraison et
-  vérification se situe par sa vérification (`deploiement` de `ci.yml`, par « Vérifier le site en
-  ligne »). `etiquette-en-cours.yml` est hors harnais : il ne garde rien, ne juge rien et ne fait
-  échouer aucune PR ; ce n'est pas une troisième famille, c'est un non-membre.
-- **La garde tient la règle en continu.** `packages/gardes/sans-sortie.mjs` intercepte les
-  connexions (`net.Socket`, par où passent `fetch` et `node:http`) : hors de la boucle locale, la
-  connexion est refusée, et le lanceur échoue en nommant l'hôte, même si le harnais ou le code testé
-  a intercepté l'erreur. Il est préchargé par chaque lanceur local — `node --import … --test` pour
-  les paquets en `node:test` et pour `pnpm amorcage`, `sans-sortie-vitest.mjs` en `setupFiles` pour
-  ceux en vitest — sans variable d'environnement. `verifierLanceursLocaux` refuse un script `test`
-  du workspace, ou un `pnpm amorcage`, qui ne serait pas branché. Harnais : `gardes.test.mjs`.
-- **Limites** (D62). Le crochet de pré-push ne joue aucun harnais (typecheck et build) et n'est donc
-  pas préchargé. Les processus qu'un test démarre (serveur du relais, PHP, navigateur) ne sont pas
-  préchargés, et ni un datagramme ni une résolution DNS ne sont des connexions. Ce sont des pistes,
-  pas des erreurs par accident.
-
-## D72 · 2026-09-16 · Un amorçage vérifie le codage d'un besoin organisationnel, garde codée, modifiée ou non
-
-Besoin #111, tranché par le porteur le 15 septembre 2026 (voie 1 de l'issue) et précisé le
-16 septembre. L'occasion : l'audit de #109, dont la PR #110 juge un codage qui ne livre qu'une
-entrée de ce journal. Le glossaire définissait les amorçages comme les harnais qui vérifient « le
-codage des harnais de la garde » ; D65 les range dans la case *auditeur × règle*, sans exiger que le
-codeur ait écrit une garde. Les deux textes divergeaient dès qu'une règle se code sans garde.
-
-- **La définition s'élargit.** Un amorçage vérifie le codage d'un **besoin organisationnel**,
-  qu'une garde ait été codée, modifiée ou non. Le glossaire le dit désormais, sans source ni date :
-  il fixe le sens des mots, et les sources restent dans ce journal.
-- **Le cas d'une règle codée sans garde.** « Sans garde » se lit, selon le porteur le 16 septembre :
-  **ni garde nouvelle, ni garde modifiée**. Un tel besoin se code par la seule prose — une entrée de
-  ce journal, une puce de `CLAUDE.md` — sans changer le comportement de la garde : écrire dans un
-  catalogue, c'est ajouter de la donnée (#96). Son codage a quand même un amorçage, écrit par
-  l'auditeur : sans lui, rien ne vérifierait le codeur (#82).
-  Exemple : **#109**, codé par une seule entrée de ce journal, que son amorçage (PR #110) juge.
-- **#107 n'est pas un exemple de ce cas.** Son codage (PR #108) a modifié la garde : motif de
-  chemin, consignes et tests renommés. Il montre autre chose, que la définition couvre aussi : un
-  amorçage qui a jugé un renommage, et non les harnais de la garde.
-- **L'amorçage ne se confond pas avec la garde.** La garde tient les catalogues dans la durée ;
-  l'amorçage juge un codage donné, celui d'un besoin organisationnel précis, et ne tourne d'office
-  que sur une PR qui touche aux règles.
-- **D65 n'est pas contredite** et ne se réécrit pas : sa case *auditeur × règle* était la lecture
-  juste, le glossaire la rejoint au lieu d'être plus étroit qu'elle.
-- **Ce qui suit.** `CLAUDE.md` écrit le cas sans garde dans sa puce « Si le besoin est une règle ».
-  La parole conservée de [`description-projet.md`](description-projet.md) est amendée, première
-  phrase seulement, au texte que le porteur a validé mot pour mot le 15 septembre (D69) ; la seconde
-  ne change pas.
-- **Rien d'autre ne change.** Aucun terme n'entre au glossaire ni n'en sort, « garde » reste l'outil
-  des catalogues : aucun balayage. Aucun harnais permanent n'est ajouté — ni entrée au registre
-  `gardes.md`, ni test dans `pnpm test`.
-
-## D73 · 2026-09-16 · Les crochets vivent dans le dépôt, et le pré-commit tient en 5 s
-
-Remplace le budget de D66 : le crochet de pré-commit tient désormais en **moins de 5 s**, et non
-plus 30 s. Besoin #120, issu de #119 ; tranché par le porteur le 16 septembre : réduire au maximum
-le pré-commit sous la barre des 5 s, en acceptant qu'il juge la copie de travail plutôt que l'état
-commis, les crochets s'exécutant par git directement.
-
-- **Des crochets suivis.** `.githooks/pre-commit` et `.githooks/pre-push` sont des scripts du dépôt,
-  activés par `pnpm crochets` (`core.hooksPath = .githooks`, `merge.ff = false`), une fois par
-  clone. Les crochets joués sont ceux de la branche extraite, dans chaque worktree, et aucun
-  `pnpm install` ne les réécrit : `simple-git-hooks` est retiré, et `pnpm crochets` efface les
-  crochets qu'il avait écrits dans `.git/hooks`. `merge.ff = false` prépare #121 : une fusion en
-  avance rapide ne joue aucun crochet.
-- **Le pré-commit choisit ses tests d'après l'index**, et les joue en parallèle sur la copie de
-  travail : le cœur (sans isolation des fichiers de test, 3,9 s mesurées contre 11,8 s) ; la garde
-  quand le commit touche la garde elle-même (`packages/gardes`, `amorcage`, `docs/gardes.md`,
-  `.github`) ou les règles que nomme `VM-regles-primaires` (`docs/decisions.md`,
-  `docs/description-projet.md`, `docs/invariants.md`, `docs/contraintes.md`, `CLAUDE.md`), qu'elle
-  lit toutes ; le relais ; l'hébergement. La documentation seule ne joue rien, pas plus que l'interface (185 s de tests) ou
-  la configuration : le pré-push et la CI les jugent. Le typecheck du cœur sort du pré-commit. Un commit qui ne touche
-  que les `package.json` ou les configurations vitest, que la garde lit aussi, ne la joue pas : la
-  CI le rattrape.
-- **Pas d'échec silencieux.** Un script de test absent fait échouer le crochet (`pnpm run`, et non
-  `pnpm --filter`, qui l'avale). Un outil manquant fait sauter le test qui en a besoin, et le
-  crochet le signale ; `TIRELIRE_STRICT` le rend obligatoire, comme en CI.
-- **Le pré-push garde le typecheck complet**, et le build, en attendant que #121 juge l'état commis.
-- **Plus de règle « un worktree par session »** (#22) : chaque session a déjà sa propre machine.
-  Elle commence par `pnpm install && pnpm crochets` dans son clone.
-- **Ce que le budget protège ne change pas** (D66) : un crochet trop long se contourne. Un
-  dépassement se traite en allégeant le crochet, pas en relevant le seuil.
-
-## D74 · 2026-09-16 · La CI joue tous les harnais et la garde sur chaque PR, en mode strict
-
-Besoin #122, issu de #119 ; phrase du glossaire validée mot pour mot par le porteur le
-16 septembre (Q1 de #122). Remplace deux passages sans les réécrire (D64) : dans D65, la fin du
-point « Moment » (les amorçages tournent sur une PR qui touche aux règles, « ailleurs, jamais ») ;
-dans D72, la fin du point « L'amorçage ne se confond pas avec la garde » (l'amorçage « ne tourne
-d'office que sur une PR qui touche aux règles »).
-
-- **Chaque PR.** `amorcage.yml` n'a plus de filtre de chemins : `pnpm amorcage` tourne sur chaque
-  PR, produit ou documentation comprise, avec `TIRELIRE_STRICT`. `ci.yml` (typecheck, `pnpm test`,
-  build) et `verifications.yml` tournaient déjà sur chaque PR.
-- **Un outil manquant fait échouer le job.** `TIRELIRE_STRICT` est posé pour `pnpm test` et
-  `pnpm amorcage` ; un amorçage qui se saute sous condition le lit, et échoue en CI au lieu de se
-  taire (D54).
-- **Périmètre.** Tout ce qui lit des fichiers suivis tourne sur la PR. Ce qui lit hors des fichiers
-  suivis et ne peut pas tourner sur une PR — l'alerte de fusion, `verifier.sh` — reste hors du
-  périmètre (D71).
-- **Ce qui ne change pas.** Les amorçages restent hors de `pnpm test` et des crochets (D65, D73) ;
-  la distinction entre garde et amorçage de D72 tient. Le glossaire dit : « Les amorçages sont
-  joués en CI sur chaque PR, et en local à la demande (`pnpm amorcage`). »
-- **La parole conservée tient.** Dans [`description-projet.md`](description-projet.md), « Ils
-  n'ont pas besoin d'etre joués autrement qu'en cas de codage dans la garde et ce qu'elle garde »
-  fixe un minimum, pas une interdiction : jouer les amorçages sur chaque PR ne la contredit pas, et
-  elle ne change pas (porteur, 16 septembre, option A de la Q3 de #122).
-- **Coût.** Environ 190 s d'amorçages de plus sur chaque PR, accepté par le porteur (#119).
-- **Ce qui suit.** Les lectures d'amorçage qui exigeaient le filtre (#82, #107) sont retirées
-  (D70). #121 ne peut plus lire « les chemins de `amorcage.yml` » : sa liste de chemins
-  organisationnels est une question ouverte (Q2 de #122). #117 devient sans objet.
-
-## D75 · 2026-09-16 · Au pré-commit, la non-régression bloque et le harnais du besoin s'affiche
-
-Besoin #127, issu de #119 (constat de la PR #126). Complète D73 sans la réécrire : l'auditeur
-commet son harnais avant le code, rouge par construction, et le pré-commit de D73 le refusait,
-ce qui ne laissait que `--no-verify`, un contournement (D62) qui fait aussi sauter la
-non-régression.
-
-- **Deux ensembles.** Parmi les tests que le pré-commit choisit (D73), le **harnais du besoin** est
-  l'ensemble des fichiers `*.test.*` que la branche ajoute ou modifie depuis sa base commune avec
-  `origin/main`, index compris (Q1 de #127) ; le reste est la **non-régression**. Un module
-  auxiliaire modifié laisse les tests qui l'utilisent dans la non-régression. La définition vit dans
-  `.githooks/harnais-du-besoin.sh`, que #121 reprend.
-- **Verdicts.** La non-régression bloque. Le harnais du besoin est joué dans les paquets que le
-  commit fait déjà jouer, et son verdict s'affiche sans bloquer : le blocage revient à la livraison
-  (#121). Une erreur de syntaxe dans un harnais bloque : c'est une faute de l'auditeur, que le
-  codeur ne peut pas corriger. Un import introuvable s'affiche à part, en nommant le module : un
-  harnais écrit avant le code importe souvent ce qui n'existe pas encore (Q2 de #127). Un export
-  absent d'un module existant, que Node signale par une `SyntaxError`, compte comme un import
-  introuvable.
-- **Repli.** Sur `main`, sans `origin/main` ou sans base commune, tout test est non-régression, et
-  le crochet le dit : un oubli fait jouer plus de vérifications, jamais moins.
-- **Un lancement par paquet.** Chaque paquet est joué une fois, avec un rapport par fichier (le
-  rapport JSON de vitest, le rapporteur `.githooks/rapport-node.mjs` pour `node:test`), que
-  `.githooks/verdict.mjs` trie. Deux passes par paquet ne tiennent pas les 5 s sur une machine à un
-  processeur (6,0 s mesurées à l'audit). Un paquet en échec sans rapport lisible par fichier (script
-  absent, configuration cassée) bloque.
-- **Rejet différé (Q3 de #127).** Les tests du cœur tournent dans un seul processus
-  (`--no-isolate`), et vitest attribue une erreur non attrapée au fichier qui tourne à cet instant.
-  Une erreur différée (minuteur, nouvel essai) qui tombe pendant un harnais du besoin est donc
-  affichée sans bloquer, même si elle vient du code ou d'un test existant. Limite acceptée par le
-  porteur : bloquer toute erreur non attrapée gênerait l'auditeur dont le harnais en produit une,
-  deux lancements par paquet dépassent le budget, et la CI, qui rejoue tout, rattrape le faux
-  passage.
-- **`--no-verify` reste un contournement** (D62) : aucune consigne ne le propose, et la ligne du
-  README qui le proposait est retirée.
-
-## D76 · 2026-09-16 · La livraison est jugée sur l'état commis, et le harnais du besoin la bloque
-
-Besoin #121, issu de #119 ; décisions du porteur du 16 septembre (Q3 à Q7 de #119, Q2 de #122,
-Q1 à Q6 de l'audit de #121, Q1 de la PR #129). Complète D73 et D75 sans les réécrire : le pré-push
-« en attendant #121 » de D73 est remplacé, et le blocage que D75 renvoyait à la livraison est posé.
-
-- **Livraison par push.** Une seule branche par PR. Le travail en cours se pousse sur une
-  sous-branche `<branche>--codeur` ou `<branche>--auditeur` ; livrer, c'est fusionner sa
-  sous-branche dans la branche de la PR puis pousser celle-ci. La pré-fusion (`pre-merge-commit`,
-  et le pré-commit pendant un conflit) juge l'index ; le pré-push juge le commit poussé. Aucun des
-  deux ne juge la copie de travail : les tests tournent sur place si elle est identique à l'arbre
-  jugé, sinon dans une extraction dont les dépendances pointent vers celles du clone et les paquets
-  du workspace vers leur copie extraite (`.githooks/livraison.sh`, `.githooks/extraire.mjs`).
-- **Nature du besoin.** Les fichiers modifiés des deux côtés depuis la base commune sont comparés à
-  `packages/gardes/chemins-ignores` (syntaxe de `.gitignore`, au départ `apps/` et
-  `packages/core/`) : listés, ils sont fonctionnels ; absents, organisationnels. Un oubli fait jouer
-  plus, jamais moins. Une branche des deux côtés joue les deux sélections.
-- **Sélection par finalité.** Fonctionnel : typecheck et tests headless des paquets touchés, tests
-  headless de l'interface, objectif 30 s. Organisationnel : tests de la garde et tous les amorçages,
-  objectif 45 s (#130 suit l'accélération des amorçages lents). Les tests navigateur, rangés dans
-  `apps/web/test/navigateur/`, restent à la CI. Aucun temps ne bloque : un dépassement de plus de
-  20 % s'affiche.
-- **Harnais du besoin.** Défini par D75, il est toujours joué à la livraison, à part, hors objectif.
-  Il bloque quand ce qui arrive — les commits absents de `main` et de la branche d'arrivée, hors
-  commits de fusion — touche autre chose que `**/test/**`, `**/*.test.*`, `docs/**` et `**/*.md`
-  (lecture retenue de la PR #129). Sinon son verdict s'affiche : correction de harnais de
-  l'auditeur, mise à jour du codeur après cette correction, mise à jour depuis `main`. La règle ne
-  dépend ni du nom ni du rôle de la branche. La non-régression bloque toujours.
-- **Pré-push.** Il ne rejoue pas un arbre déjà vérifié : la pré-fusion note chaque arbre accepté,
-  avec l'état de son harnais, dans `tirelire-arbres-verifies` sous le dossier commun de git. Un arbre
-  noté avec un harnais rouge est refusé si le push apporte du code. Un arbre jamais vérifié (clone
-  séparé, rebase, cherry-pick) est rejoué avec la même règle. Un push vers une sous-branche ne joue
-  que la non-régression. Le typecheck complet et le build quittent le pré-push : la CI les fait (D74).
-- **Outil manquant.** Il fait sauter le test concerné, avec un message ; `pnpm` absent fait échouer
-  le crochet, comme au pré-commit.
-- **Pas de récursion.** Un amorçage qui pousse ou fusionne dans une copie du dépôt relance une
-  livraison, qui rejouerait les amorçages, dont lui-même (constaté avec celui de #120, dont la copie
-  n'a pas d'`origin/main`). Une livraison ne rejoue donc pas un amorçage dont le nom figure dans la
-  ligne de commande d'un processus parent, et le dit.
-- **Limites acceptées.**
-  - Une résolution de fusion qui ajoute du code ne compte pas comme code qui arrive.
-  - Une règle codée par la seule prose n'arrive pas comme du code : son harnais ne bloque pas en
-    local, et la CI le juge (D74).
-  - Un test déplacé compte comme ajouté : il rejoint le harnais du besoin de sa branche.

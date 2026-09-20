@@ -9,14 +9,22 @@
   une décision.
 - Lire aussi `docs/contraintes.md` : ce que les plateformes imposent à une application multiplateforme
   qui doit rester simple ; tout choix technique la respecte.
-- Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro ; une
-  décision nouvelle y entre en amendant ce qu'elle remplace.
+- Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro : comment le
+  produit est fait, et pourquoi. Une décision nouvelle y entre en amendant ce qu'elle remplace, sans
+  date ni renvoi ; les règles de travail ne s'y écrivent pas, elles sont ici.
 - Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
   (vitest, `pnpm test`). L'interface (`apps/web`) ne fait qu'afficher et saisir.
 - Montants en centimes entiers signés ; dates `AAAA-MM-JJ` ; `deletedAt` au lieu de supprimer ;
   jamais stocker ce qui se recalcule (soldes, plan, soldes à régler).
 - Écritures uniquement via `LedgerStore.upsert/remove/setSetting` (journal de changements).
-- Aucune donnée bancaire réelle dans le dépôt ; exemples et tests sur données inventées.
+- **Aucune donnée bancaire réelle dans le dépôt.** Les fichiers bancaires servent à vérifier l'import
+  en local et ne se versionnent jamais (`*.csv`, `*.sqlite` ignorés) ; exemples et tests sur données
+  inventées.
+- **Signature des APK de test** : `apps/web/android/keystore/tirelire-test.jks` (mot de passe
+  `tirelire-test`) signe les APK de test, pour que les mises à jour s'installent par-dessus. Jamais
+  pour un magasin ; des secrets `ANDROID_KEYSTORE_*` la remplacent en CI.
+- **Livraison.** Un push sur `main` construit et dépose le site. L'APK et les releases ne sortent
+  qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas (D73).
