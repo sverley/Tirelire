@@ -246,8 +246,9 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
 Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/capacitor.config.ts`, `apps/web/android/**`, `apps/hebergement/assembler.mjs`
 
 - **Harnais** · `.github/workflows/ci.yml`, `packages/gardes/distributions.test.mjs` — sur chaque
-  PR, le web et le site d'hébergement se construisent ; l'APK Android ne se construit qu'après
-  fusion sur `main`. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
+  PR, le web et le site d'hébergement se construisent ; l'APK Android ne se construit qu'à un tag
+  `v*`, jamais sur une PR ni à une fusion : l'application web est la distribution prioritaire
+  (#45), et rien d'une autre distribution ne la bloque. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
   (tranché dans #69).
   Témoin rouge : « témoin rouge · une CI qui construit l'APK sur chaque PR et le site d'hébergement seulement après fusion »
 - **Vérification manuelle** · `VM-I9-apk` — Si la PR touche la construction de l'application (ses
@@ -255,9 +256,9 @@ Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/we
   construire l'APK depuis la branche en local (`pnpm build`, `npx cap sync android`, puis
   `./gradlew assembleRelease` dans `apps/web/android`). Sinon, et notamment si elle ne touche que des
   tests, de l'outillage ou de la documentation (D62) : dire dans l'analyse pourquoi la construction
-  n'est pas atteinte, et ce qui dépend de ce qu'elle change. Ne pas lancer « CI et livraison » à la
-  main sur la branche : sa publication déplacerait la release `latest`.
-- **À bâtir** · construire l'APK sur chaque PR, sans rien publier (#38).
+  n'est pas atteinte, et ce qui dépend de ce qu'elle change. L'APK n'est vérifié que par sa
+  construction : son comportement réel n'est pas analysé tant que la priorité va à l'application
+  web (#45). Ne pas poser de tag `v*` depuis la branche : il publierait une release.
 
 ## I10 · Proposer, et ne jamais faire de manière cachée
 
@@ -428,8 +429,9 @@ Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/app.css`
 - **Harnais** · `apps/web/test/navigateur/panneaux-nommes.test.ts` — un panneau d'édition nomme ce qu'il
   modifie, lisible à 375 px (D59).
   Témoin rouge : « témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe »
-- **Vérification manuelle** · `VM-C9-telephone` — Sur un vrai téléphone, dans l'application
-  installée : les écrans que la PR touche restent lisibles et atteignables au pouce, bord à bord,
+- **Vérification manuelle** · `VM-C9-telephone` — Sur un vrai téléphone, dans l'application web
+  ouverte ou installée depuis Chrome sur Android (la distribution prioritaire, #45 ; l'APK ne se
+  vérifie pas) : les écrans que la PR touche restent lisibles et atteignables au pouce, bord à bord,
   clavier logiciel ouvert, avec les polices du système.
 - **Vérification manuelle** · `VM-C9-ordinateur` — Sur un ordinateur à grand écran, à la souris
   puis au clavier seul : les écrans que la PR touche s'utilisent sans geste tactile.

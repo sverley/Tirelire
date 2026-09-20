@@ -29,7 +29,7 @@ Cloud Web et les VPS) ; le relais est donc réécrit en PHP, sans dépendance.
 
 ## Installer
 
-1. Récupérer `tirelire-hebergement.zip` dans la release `latest` (construite pour la racine
+1. Récupérer `tirelire-hebergement.zip` dans la dernière release (tag `v*`, construite pour la racine
    d'un domaine ou sous-domaine), ou l'assembler soi-même pour un sous-dossier :
    `TIRELIRE_BASE=/tirelire/ pnpm --filter @tirelire/hebergement assembler`.
 2. Déposer le contenu de `dist/` par FTP/SFTP dans `www/` (ou `www/tirelire/`). Les fichiers
@@ -46,9 +46,8 @@ qu'avec le serveur intégré de PHP.
 
 ## Mises à jour et dépôt automatique
 
-À chaque push sur `main`, la CI assemble le site, le **dépose par FTP** si les secrets sont
-renseignés, et joint `tirelire-hebergement.zip` à la release `latest` (par le job de publication,
-qui attend aussi l'APK). Sans secrets, le job de dépôt le dit dans son résumé et ne fait rien
+À chaque push sur `main`, la CI assemble le site et le **dépose par FTP** si les secrets sont
+renseignés ; à un tag `v*`, elle joint `tirelire-hebergement.zip` à la release, avec l'APK. Sans secrets, le job de dépôt le dit dans son résumé et ne fait rien
 d'autre : l'archive reste téléchargeable.
 
 ### Secrets à créer (Paramètres du dépôt → Secrets and variables → Actions → *Secrets*)
