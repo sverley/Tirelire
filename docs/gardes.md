@@ -358,10 +358,12 @@ n'est pas fusionnée, la vérification manuelle gardant la part déjà en place 
 
 Chemins : `apps/web/src/lib/db.ts`, `apps/web/vite.config.ts`, `apps/hebergement/assembler.mjs`
 
-- **Vérification manuelle** · `VM-C4-effacement` — Ouvrir la version de la branche là où celle de
-  `main` a des données, même adresse et même navigateur : elles sont toujours là. Si la PR change
-  l'adresse, le chemin de base ou le nom de la base locale, l'utilisateur est prévenu et guidé pour
-  les reprendre. Sur Safari iPhone, noter si le stockage est déclaré persistant.
+- **Vérification manuelle** · `VM-C4-effacement` — Dans l'application web sur Chromium (la
+  distribution vérifiée, #45 ; ni l'APK ni Safari ne se vérifient ici) : ouvrir la version de la
+  branche là où celle de `main` a des données, même adresse et même navigateur, et constater
+  qu'elles sont toujours là. Si la PR change l'adresse, le chemin de base ou le nom de la base
+  locale, l'utilisateur est prévenu et guidé pour les reprendre. Ce que Safari efface après sept
+  jours sans visite ne se constate pas ici : #37 le porte, avec le reste de la cible Apple.
 - **À bâtir** · la demande de persistance du stockage (#42).
 
 ## C5 · Sans serveur, aucune sauvegarde n'est implicite
