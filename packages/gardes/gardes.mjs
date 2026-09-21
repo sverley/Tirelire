@@ -45,7 +45,8 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 // règles des sessions. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les règles
 // primaires. La conformité porte sur le sens et ne se programme pas : elle devient donc une
 // vérification manuelle, demandée par les chemins que la PR modifie, analysée puis validée par un
-// développeur humain avant la fusion. La garde reste jugée par la version que porte la PR (piste 2
+// développeur humain avant la fusion. Sur une PR, la garde qui juge est celle de la base, appliquée au
+// contenu de la PR, qu'elle lit par git sans l'extraire (#159, `verifierCouvertureA`).
 
 /**
  * Familles de chemins dont la modification ajoute ou change une règle. Une table à part du registre,
@@ -597,21 +598,31 @@ export function titresDeTests(source) {
   return analyserTests(source).actifs;
 }
 
-/** Couverture des documents du dépôt. */
-export function verifierCouverture(racine = RACINE) {
+/**
+ * Couverture à partir d'une liste de fichiers et d'un lecteur, qui rend `null` pour un fichier absent.
+ * `ou` situe ce qui est lu dans les messages : rien pour la copie de travail, le commit sinon.
+ */
+function couvertureDe({ fichiers, lireFichier, ou = '' }) {
   const manquants = [];
   const lire = (chemin) => {
-    try {
-      return readFileSync(join(racine, chemin), 'utf8');
-    } catch {
-      manquants.push(`${chemin} est introuvable.`);
-      return '';
-    }
+    const texte = lireFichier(chemin);
+    if (texte == null) manquants.push(`${chemin} est introuvable${ou}.`);
+    return texte ?? '';
   };
-  const resultat = verifierCouvertureTextes({
-    invariants: lire(DOCUMENTS.invariants),
-    contraintes: lire(DOCUMENTS.contraintes),
-    gardes: lire(DOCUMENTS.gardes),
+  const gardes = lire(DOCUMENTS.gardes);
+  const resultat = verifierCouvertureTextes({ invariants: lire(DOCUMENTS.invariants), contraintes: lire(DOCUMENTS.contraintes), gardes, fichiers, lireFichier });
+  // Un registre présent dont cette version de la garde ne reconnaît aucune entrée : son format a changé,
+  // ou il est illisible. Sur une PR, c'est la garde de la base qui ne sait pas lire ce que la PR propose (#159).
+  if (gardes.trim() && !resultat.entrees.size) {
+    manquants.push(`${DOCUMENTS.gardes}${ou} ne se lit pas : cette version de la garde n'y reconnaît aucune entrée. Si la PR change le format du registre, la garde de la base ne sait pas la juger : c'est au porteur de trancher.`);
+  }
+  resultat.problemes.unshift(...manquants);
+  return resultat;
+}
+
+/** Couverture des documents du dépôt, tels que la copie de travail les porte. */
+export function verifierCouverture(racine = RACINE) {
+  return couvertureDe({
     fichiers: fichiersDuDepot(racine),
     lireFichier: (chemin) => {
       try {
@@ -621,8 +632,28 @@ export function verifierCouverture(racine = RACINE) {
       }
     },
   });
-  resultat.problemes.unshift(...manquants);
-  return resultat;
+}
+
+/**
+ * Couverture des documents d'un commit (#159) : registre, invariants, contraintes, harnais et workflow
+ * se lisent par git dans `ref`, sans extraire l'arbre ni rien exécuter. La garde juge ainsi un arbre
+ * qui n'est pas le sien : en CI, la garde de la base juge le commit de la PR.
+ */
+export function verifierCouvertureA(ref, depot = RACINE) {
+  const git = (...a) => execFileSync('git', a, { cwd: depot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+  const fichiers = git('ls-tree', '-r', '-z', '--full-tree', ref)
+    .split('\0')
+    .filter(Boolean)
+    .filter((ligne) => ligne.split('\t')[0].split(' ')[1] === 'blob')
+    .map((ligne) => ligne.slice(ligne.indexOf('\t') + 1));
+  const existe = new Set(fichiers);
+  const lus = new Map();
+  const lireFichier = (chemin) => {
+    if (!existe.has(chemin)) return null;
+    if (!lus.has(chemin)) lus.set(chemin, git('show', `${ref}:${chemin}`));
+    return lus.get(chemin);
+  };
+  return couvertureDe({ fichiers, lireFichier, ou: ` dans le commit jugé (${ref.slice(0, 12)})` });
 }
 
 // ─── Demandes d'une PR ───────────────────────────────────────────────────────────────────────
