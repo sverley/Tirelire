@@ -7,7 +7,8 @@
  * qui s'est passé : c'est ce qui a rendu illisible l'échec de `main` en CI le 21 septembre 2026.
  *
  * Le site construit n'est pas nécessaire : deux pages minimales, servies en `data:`, jouent les
- * deux pannes. Seul le message est tenu, pas la durée : attendre le bouton un moment avant de
+ * deux pannes, une fois l'application montée (`<main>` présent) : base déjà remplie, sans bouton,
+ * puis clic sans effet. Seul le message est tenu, pas la durée : attendre le bouton un moment avant de
  * conclure reste permis, pourvu que l'échec dise ce qui manque.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -15,7 +16,7 @@ import puppeteer, { type Browser } from 'puppeteer-core';
 import { navigateur, ouvrirLExemple, type Site } from '../harnais.js';
 
 const pageDe = (corps: string) =>
-  'data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><title>Tirelire</title>${corps}`);
+  'data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><title>Tirelire</title><main>${corps}</main>`);
 
 describe.skipIf(!navigateur)('chargement de l’exemple · une panne se dit', () => {
   let chrome: Browser;
@@ -45,7 +46,7 @@ describe.skipIf(!navigateur)('chargement de l’exemple · une panne se dit', ()
   }
 
   it('sans bouton « Charger l’exemple », l’échec le nomme', async () => {
-    const message = await échecSur(pageDe('<p>L’application n’a pas monté.</p>'));
+    const message = await échecSur(pageDe('<p>Une base déjà remplie : rien à charger.</p>'));
     expect(message, 'ouvrirLExemple doit échouer quand il n’y a rien à charger').not.toBeNull();
     expect(message, 'le message doit nommer l’exemple, pas seulement un délai').toMatch(/exemple/i);
   }, 90_000);
