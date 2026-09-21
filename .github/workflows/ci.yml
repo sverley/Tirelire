@@ -1,6 +1,9 @@
 name: CI et livraison
 
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# - `validation` lit des fichiers suivis : ceux du commit de la PR, par git, sans les extraire, avec sa
+#   description. Déclenché par `pull_request_target`, il exécute la garde et ce workflow tels que
+#   `main` les porte ; rien de la PR ne s'y installe ni ne s'y exécute (#159).
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
 #   l'archive du site qu'il dépose ensuite ne juge rien.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
@@ -22,7 +25,10 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited, closed]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
+  # La validation seule : GitHub lit alors ce workflow sur la branche par défaut, jamais dans la PR (#159).
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
     inputs:
       deploiement:
@@ -34,18 +40,18 @@ on:
 permissions:
   contents: write
 
-# Un seul passage par push : un push qui suit annule celui d'avant. Rien sur un brouillon. Une
-# édition de la description ne rejoue que la validation, et n'annule pas les tests en cours : seul
-# un push (synchronize) annule, puisque seul lui rend l'ancien passage caduc. La fermeture ne joue que
-# le retrait de l'aperçu, dans son propre groupe.
+# Un seul passage par push : un push qui suit annule celui d'avant. Rien sur un brouillon. La
+# validation a son propre groupe, pour que la validation et les tests d'un même push ne s'annulent
+# pas : chaque push ou édition de la description la rejoue et rend caduque la précédente. Seul un push
+# (synchronize) annule les tests. La fermeture ne joue que le retrait de l'aperçu, dans son groupe.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'validation' || github.event.action == 'closed' && 'fermeture' || 'code' }}
-  cancel-in-progress: ${{ github.event.action == 'synchronize' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'pull_request_target' && 'validation' || github.event.action == 'closed' && 'fermeture' || 'code' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' || github.event.action == 'synchronize' }}
 
 jobs:
   test:
     name: Tests et build web
-    if: github.event.action != 'edited' && github.event.action != 'closed' && github.event.pull_request.draft != true
+    if: github.event_name != 'pull_request_target' && github.event.action != 'closed' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,10 +85,18 @@ jobs:
           path: apps/web/dist
           retention-days: 30
 
+  # La garde de `main` juge le contenu de la PR (#159) : ce job extrait `main`, jamais la PR, et ne
+  # lance que la garde, qui lit par git le commit de la PR (registre, documents, fichiers modifiés).
+  # Une PR qui change la garde ou ce workflow ne change donc pas le verdict rendu sur elle-même. Rien
+  # de la PR ne s'exécute, aucun secret n'est lu : c'est ce qui rend sûr `pull_request_target`. Seul
+  # le jeton du job, en lecture seule, reste à git, pour que la garde récupère la tête de la PR quand
+  # `main` ne la porte pas, dépôt public ou privé.
   validation:
     name: Validation
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && !github.event.pull_request.draft
+    if: github.event_name == 'pull_request_target' && github.event.action != 'closed' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -91,7 +105,8 @@ jobs:
         with:
           node-version: 22
       # La garde lit la description : entrées déclarées, vérifications demandées, et l'unique case
-      # « Validée », que le porteur coche. Sans dépendance : pas d'installation.
+      # « Validée », que le porteur coche. Sans dépendance : pas d'installation. Quand elle ne sait pas
+      # lire ce que la PR propose (registre absent ou d'un autre format), le job est rouge et le dit.
       - env:
           CORPS: ${{ github.event.pull_request.body }}
         run: node packages/gardes/cli.mjs pr --base ${{ github.event.pull_request.base.sha }} --tete ${{ github.event.pull_request.head.sha }}
@@ -100,7 +115,7 @@ jobs:
     needs: test
     # Pour la racine, à déposer et publier : sur `main`, à un tag `v*` et à la main. Sur une PR, le
     # site ne s'assemble qu'une fois, dans `apercu`, pour son sous-dossier de recette (#153).
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -124,7 +139,7 @@ jobs:
   deploiement:
     name: Dépôt FTP sur l'hébergement
     needs: hebergement
-    if: github.event_name != 'pull_request' && inputs.deploiement != 'ignorer'
+    if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && inputs.deploiement != 'ignorer'
     runs-on: ubuntu-latest
     # Un seul dépôt à la fois : deux transferts simultanés laisseraient le site à moitié à jour.
     concurrency:
@@ -373,7 +388,7 @@ jobs:
     name: APK Android
     needs: test
     # Le job le plus lourd : seulement à un tag, plus à chaque fusion.
-    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.name }}

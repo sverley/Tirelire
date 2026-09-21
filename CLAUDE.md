@@ -72,7 +72,11 @@ choses, et rien de plus :
    l'entrée et porte sa vérification manuelle avec une case « Validée » ;
 3. la PR est rouge tant qu'une case demandée n'est pas cochée.
 
-Il tourne en CI sur chaque PR, et à la demande en local (`node packages/gardes/cli.mjs`). Pas de
+Il tourne en CI sur chaque PR, et à la demande en local (`node packages/gardes/cli.mjs`). En CI, la
+garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'elle juge
+est le contenu de la PR — registre, documents, fichiers modifiés, description —, qu'elle lit par git
+sans rien exécuter de la PR. Une PR qui modifie la garde ne change donc pas son propre verdict ; ses
+tests, eux, jouent la garde qu'elle propose. Pas de
 crochet lent, pas de workflow à part, pas d'alerte, pas d'enregistrement de validation : la case
 cochée fait foi, et c'est le porteur qui la coche.
 
