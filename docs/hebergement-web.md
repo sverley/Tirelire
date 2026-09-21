@@ -25,7 +25,8 @@ Cloud Web et les VPS) ; le relais est donc réécrit en PHP, sans dépendance.
 | `relais.test.mjs` | vérifie le relais PHP avec le serveur intégré de PHP (sauté si `php` est absent) |
 | `deposer.sh` | dépôt du site par FTPS ou SFTP (`lftp`), utilisé par la CI et à la main |
 | `deposer.test.mjs` | vérifie le dépôt contre un vrai serveur FTP local (sauté si `lftp` ou `pyftpdlib` manquent) |
-| `verifier.sh` | vérifie un site en ligne (accueil, relais, protections) et publie son diagnostic |
+| `verifier.sh` | vérifie un site en ligne (accueil, relais, protections, commit servi) ; la CI de production publie son diagnostic |
+| `apercu.sh` | aperçu d'une PR sur l'instance de recette : dépôt dans `<dossier>/pr-<numéro>`, retrait à la fermeture |
 
 ## Installer
 
@@ -71,7 +72,7 @@ principal.
 | `TIRELIRE_FTP_PROTOCOLE` | `ftps` | `ftps` (FTP chiffré, port 21) ou `sftp` (port 22) |
 | `TIRELIRE_FTP_VERIFIER_CERTIFICAT` | `oui` | passer à `non` seulement si le certificat du serveur FTP ne correspond pas à son nom |
 | `TIRELIRE_FTP_NETTOYER` | `non` | `oui` supprime du serveur les fichiers absents du site (les anciens fragments restent utiles aux appareils pas encore rechargés) |
-| `TIRELIRE_SITE_URL` | `https://tirelire.sim-dev.eu` | adresse publique vérifiée après chaque dépôt ; à changer pour une autre installation |
+| `TIRELIRE_SITE_URL` | aucun | adresse publique vérifiée après chaque dépôt ; sans elle, le site est déposé mais pas vérifié en ligne |
 
 Le dossier visé (`TIRELIRE_FTP_DOSSIER`) doit être celui qu'un domaine sert vraiment. Chez
 OVHcloud, la racine FTP contient `www`, racine du domaine principal ; tout autre dossier n'est
@@ -91,7 +92,9 @@ nettoyage : `donnees/*.jsonl` (les paquets de synchronisation des appareils) et
 La CI vérifie ensuite le site en ligne avec `apps/hebergement/verifier.sh` : la page d'accueil
 répond et parle bien de Tirelire, `/r/<salon>` répond `200` en JSON (donc la réécriture
 `.htaccess` fonctionne et PHP s'exécute), un salon invalide est refusé (`400`), le dossier
-`donnees/` n'est pas servi, et `http://` redirige vers `https://`. Toutes les vérifications sont
+`donnees/` n'est pas servi, et `http://` redirige vers `https://`. Avec `COMMIT_ATTENDU`, il
+vérifie aussi que la page d'accueil porte ce commit (`<meta name="tirelire-commit">`, posée par
+l'assembleur quand `TIRELIRE_COMMIT` est donnée). Toutes les vérifications sont
 jouées, jamais interrompues à la première : en cas d'échec, le diagnostic complet (codes HTTP,
 types de contenu, début des réponses) est publié en commentaire du commit, lisible depuis un
 téléphone. Le même script se lance à la main :
@@ -112,6 +115,33 @@ HOTE=ftp.clusterXXX.hosting.ovh.net UTILISATEUR=moncompte MOTDEPASSE=… \
 ```
 
 Le service worker met les appareils à jour au chargement suivant.
+
+## Aperçu de chaque PR sur l'instance de recette
+
+Une PR prête (pas un brouillon) dont les tests passent a son aperçu : le site de sa branche,
+construit pour le sous-dossier `pr-<numéro>` d'une instance de recette, déposé par
+`apercu.sh deposer` dans `<TIRELIRE_DEV_FTP_DOSSIER>/pr-<numéro>`, puis vérifié en ligne par
+`verifier.sh`, commit servi compris. La fermeture de la PR (fusion ou abandon) supprime ce
+sous-dossier entier, paquets du relais compris (`apercu.sh retirer`), sans tests ni build. Aucun de
+ces jobs ne publie de commentaire : l'adresse de recette ne s'écrit nulle part en clair dans le dépôt,
+et le diagnostic d'un aperçu reste dans le journal de la CI.
+
+La recette est une origine distincte de la production (un sous-domaine, en HTTPS) : les aperçus y
+partagent un même stockage navigateur, jamais celui de la production. Chaque aperçu enregistre son
+service worker sur la portée de son sous-dossier. Le `robots.txt` de la racine de la recette se pose à
+la main ; aucun job n'y touche.
+
+Mêmes secrets `OVH_FTP_*` que la production, et deux variables (onglet *Variables*), sans valeur par
+défaut :
+
+| Variable | Rôle |
+|---|---|
+| `TIRELIRE_DEV_SITE_URL` | adresse de la recette, en `https://`, racine d'un sous-domaine ; chaque aperçu est servi à `<adresse>/pr-<numéro>/` |
+| `TIRELIRE_DEV_FTP_DOSSIER` | dossier FTP que la recette sert (sa racine déclarée dans *Multisite*) |
+
+Si l'une manque, ou vaut son équivalent de production (`TIRELIRE_FTP_DOSSIER`, `www` par défaut ;
+`TIRELIRE_SITE_URL`, adresse ou origine), `apercu.sh` s'arrête avant tout transfert et nomme la
+variable en cause. Il ne dépose ni ne supprime rien ailleurs que dans `<dossier>/pr-<numéro>`.
 
 ## Sécurité et limites
 

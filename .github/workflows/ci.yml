@@ -8,13 +8,18 @@ name: CI et livraison
 #   ligne » (`verifier.sh`) lit le site déployé.
 # - `android` est hors harnais : il construit l'APK, sans rien vérifier.
 # - `publication` est hors harnais : il publie les releases.
+# - `apercu` lit hors des fichiers suivis : il assemble le site de la PR pour son sous-dossier de
+#   recette, l'y dépose (`apercu.sh deposer`), puis l'étape « Vérifier l'aperçu en ligne »
+#   (`verifier.sh`) lit l'aperçu déployé et le commit qu'il sert (#141).
+# - `retrait-apercu` est hors harnais : à la fermeture de la PR, il supprime son sous-dossier de
+#   recette (`apercu.sh retirer`), sans tests ni build (#131).
 
 on:
   push:
     branches: [main]
     tags: ['v*']
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, synchronize, reopened, ready_for_review, edited, closed]
   workflow_dispatch:
     inputs:
       deploiement:
@@ -28,15 +33,16 @@ permissions:
 
 # Un seul passage par push : un push qui suit annule celui d'avant. Rien sur un brouillon. Une
 # édition de la description ne rejoue que la validation, et n'annule pas les tests en cours : seul
-# un push (synchronize) annule, puisque seul lui rend l'ancien passage caduc.
+# un push (synchronize) annule, puisque seul lui rend l'ancien passage caduc. La fermeture ne joue que
+# le retrait de l'aperçu, dans son propre groupe.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'validation' || 'code' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'edited' && 'validation' || github.event.action == 'closed' && 'fermeture' || 'code' }}
   cancel-in-progress: ${{ github.event.action == 'synchronize' }}
 
 jobs:
   test:
     name: Tests et build web
-    if: github.event.action != 'edited' && github.event.pull_request.draft != true
+    if: github.event.action != 'edited' && github.event.action != 'closed' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +78,7 @@ jobs:
 
   validation:
     name: Validation
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,7 +95,7 @@ jobs:
   hebergement:
     name: Site pour hébergement mutualisé
     needs: test
-    if: github.event.action != 'edited' && github.event.pull_request.draft != true
+    if: github.event.action != 'edited' && github.event.action != 'closed' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,9 +134,9 @@ jobs:
       PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
       VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
       NETTOYER: ${{ vars.TIRELIRE_FTP_NETTOYER || 'non' }}
-      # Adresse publique du site, vérifiée après chaque dépôt. Une variable de dépôt
-      # TIRELIRE_SITE_URL remplace cette valeur (utile pour une autre installation).
-      ADRESSE_SITE: ${{ vars.TIRELIRE_SITE_URL || 'https://tirelire.sim-dev.eu' }}
+      # Adresse publique du site, vérifiée après chaque dépôt. La variable fait foi : aucune adresse
+      # de repli ; sans elle, le résumé dit que le site n'est pas vérifié en ligne.
+      ADRESSE_SITE: ${{ vars.TIRELIRE_SITE_URL }}
     steps:
       - uses: actions/checkout@v4
       - name: Secrets présents ?
@@ -257,6 +263,104 @@ jobs:
               echo "  réécriture \`/r/<salon>\` et la protection du dossier \`donnees/\` après chaque dépôt."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  apercu:
+    name: Aperçu de la PR sur l'instance de recette
+    needs: test
+    # Seulement une PR prête (jamais un brouillon), après ses tests ; ni à l'édition ni à la fermeture.
+    if: github.event_name == 'pull_request' && github.event.action != 'edited' && github.event.action != 'closed' && github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    # Dépôt et retrait d'un même aperçu, l'un après l'autre.
+    concurrency:
+      group: apercu-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    env:
+      NUMERO: ${{ github.event.pull_request.number }}
+      # Recette : aucune valeur par défaut, apercu.sh arrête tout si l'une manque ou vaut la production.
+      TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
+      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
+      TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
+      TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
+      # Mêmes identifiants FTP que la production (#141).
+      HOTE: ${{ secrets.OVH_FTP_HOST }}
+      UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
+      MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
+      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
+      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
+      COMMIT: ${{ github.event.pull_request.head.sha }}
+    steps:
+      # La version de la branche, telle que la PR la montre : son dernier commit.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Réglages de l'aperçu
+        id: reglages
+        run: bash apps/hebergement/apercu.sh reglages >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v4 # version lue dans package.json (packageManager)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Assembler pour le sous-dossier de l'aperçu
+        env:
+          TIRELIRE_BASE: /pr-${{ github.event.pull_request.number }}/
+          TIRELIRE_COMMIT: ${{ github.event.pull_request.head.sha }}
+        run: pnpm --filter @tirelire/hebergement assembler
+      - name: Installer lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+      - name: Déposer l'aperçu
+        env:
+          SOURCE: apps/hebergement/dist
+        run: bash apps/hebergement/apercu.sh deposer
+      # Le diagnostic reste dans ce journal : aucun commentaire, l'adresse de recette ne s'affiche
+      # pas en clair dans le dépôt.
+      - name: Vérifier l'aperçu en ligne
+        env:
+          ADRESSE_SITE: ${{ steps.reglages.outputs.adresse }}
+          COMMIT_ATTENDU: ${{ github.event.pull_request.head.sha }}
+        run: bash apps/hebergement/verifier.sh
+      - name: Résumé
+        if: always()
+        run: |
+          {
+            echo "### Aperçu de la PR #$NUMERO"
+            echo
+            if [ "${{ job.status }}" = success ]; then
+              echo "Déposé dans le sous-dossier \`pr-$NUMERO\` de la recette, et vérifié en ligne : il sert le commit \`${COMMIT::7}\`."
+            else
+              echo "Pas d'aperçu à jour : le diagnostic est dans le journal de ce job."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  retrait-apercu:
+    name: Retrait de l'aperçu de la PR
+    # À la fermeture seulement (fusion ou abandon) : ni tests ni build (#131).
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: apercu-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    env:
+      NUMERO: ${{ github.event.pull_request.number }}
+      TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
+      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
+      TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
+      TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
+      HOTE: ${{ secrets.OVH_FTP_HOST }}
+      UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
+      MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
+      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
+      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          sparse-checkout: apps/hebergement
+      - name: Installer lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+      - name: Retirer l'aperçu
+        run: bash apps/hebergement/apercu.sh retirer
 
   android:
     name: APK Android

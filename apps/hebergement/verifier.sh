@@ -4,6 +4,10 @@
 # Toutes les vérifications sont jouées, puis le bilan ; sortie non nulle si l'une a échoué.
 #
 #   ADRESSE_SITE=https://exemple.tld bash apps/hebergement/verifier.sh
+#
+# COMMIT_ATTENDU (facultatif) : l'empreinte du commit que la page d'accueil doit porter dans
+# <meta name="tirelire-commit" content="…"> (posée par l'assembleur, TIRELIRE_COMMIT) ; absente ou
+# différente, c'est un échec.
 set -uo pipefail
 
 : "${ADRESSE_SITE:?adresse du site manquante}"
@@ -47,6 +51,12 @@ if [ -s "$tmp/accueil.html" ]; then
     echo "  ✗ la page ne parle pas de Tirelire (page de parking ou mauvais dossier ?)"
     echecs=$((echecs + 1))
   fi
+fi
+if [ -n "${COMMIT_ATTENDU:-}" ]; then
+  # La balise, quel que soit l'ordre de ses attributs, puis son contenu.
+  commit_servi="$(grep -oi '<meta[^>]*tirelire-commit[^>]*>' "$tmp/accueil.html" 2>/dev/null | head -n 1 \
+    | sed -n 's/.*content="\([^"]*\)".*/\1/p')"
+  verifier "commit servi" "$COMMIT_ATTENDU" "${commit_servi:-(absent)}"
 fi
 echo
 
