@@ -38,7 +38,9 @@ const assemblages = (partie) => partie.flatMap((job) => job.joués.filter(assemb
 const liste = (a) => a.map(({ job }) => `« ${job.nom} »`).join(', ') || 'aucun job';
 
 const NUMÉRO = 153;
-const ACTIONS_PR = ['opened', 'synchronize', 'reopened', 'ready_for_review'];
+// Les passages en Ready (#150) : `ready_for_review`, et une PR ouverte ou rouverte hors brouillon. Un
+// push sur une PR prête ne rejoue plus rien : il la renvoie en brouillon.
+const ACTIONS_PR = ['opened', 'reopened', 'ready_for_review'];
 const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette', TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
 const pr = (action, recette) => ({
   github: {
@@ -203,19 +205,20 @@ test('#153 · sur main et au tag v*, le site pour la racine se construit, se dé
 // ─── #159 · La garde qui juge une PR est celle de main ───────────────────────────────────────────
 //
 // GitHub lit le workflow dans la PR pour `pull_request`, et sur `main` pour `pull_request_target` :
-// seul ce second déclencheur rend le verdict indépendant de ce que la PR propose. Le job reste dans
-// ci.yml (« pas de workflow à part », CLAUDE.md). La garde de main lit la tête de la PR sans
+// seul ce second déclencheur rend le verdict indépendant de ce que la PR propose. Le job vit dans le
+// workflow de son choix, seul à y porter ce nom : partagé avec les tests, un même workflow montrerait
+// chacun sauté dans l'exécution de l'autre (#150, B1). La garde de main lit la tête de la PR sans
 // l'exécuter ni l'extraire : `cli.mjs pr --base <b> --tete <t>` juge le commit <t>, quel que soit
 // l'arbre d'où elle s'exécute.
 
 const VALIDATION = 'Validation';
-// Sans `edited` : modifier la description invalide toute validation, la PR repasse en brouillon (#150).
+// Au seul passage en Ready (#150) : tout changement d'une PR prête la renvoie en brouillon.
 const ACTIONS_VALIDATION = ACTIONS_PR;
 const NOM_WORKFLOW = 'CI et livraison';
-const cible = (action, draft = false) => ({
+const cible = (action, draft = false, workflow = NOM_WORKFLOW) => ({
   github: {
     event_name: 'pull_request_target',
-    workflow: NOM_WORKFLOW,
+    workflow,
     ref: 'refs/heads/main',
     event: { action, pull_request: { number: NUMÉRO, draft, head: { sha: 'a'.repeat(40) }, base: { sha: 'b'.repeat(40) } } },
   },
@@ -229,6 +232,18 @@ function jobValidation(yaml) {
   assert.equal(trouvés.length, 1, `${CI} : il faut un seul job nommé « ${VALIDATION} », il y en a ${trouvés.length}`);
   return trouvés[0];
 }
+
+/** Le workflow qui porte « Validation », `ci.yml` ou un autre (#150) : un seul. */
+function workflowDeValidation() {
+  const dossier = '.github/workflows';
+  const où = readdirSync(join(RACINE, dossier))
+    .filter((f) => /\.ya?ml$/.test(f))
+    .map((f) => `${dossier}/${f}`)
+    .filter((f) => [...jobs(lire(f)).values()].some((j) => nomAffiché(j) === VALIDATION));
+  assert.equal(où.length, 1, `un seul workflow doit porter le job « ${VALIDATION} » ; le portent : ${où.join(', ') || 'aucun'}`);
+  return où[0];
+}
+const nomDuWorkflow = (yaml) => (yaml.match(/^name:\s*(.+)$/m)?.[1] ?? '').trim().replace(/^(['"])(.*)\1$/, '$2');
 
 /** Les types d'activité d'un déclencheur, ceux de GitHub par défaut s'il n'en dit rien, `null` s'il manque. */
 function typesDe(yaml, déclencheur) {
@@ -313,26 +328,26 @@ function groupeDuWorkflow(yaml, ctx) {
 }
 
 test('#159 · sur pull_request_target, seul « Validation » tourne ; sur pull_request, il ne tourne plus', () => {
-  validationDepuisMain(lire(CI));
+  validationDepuisMain(lire(workflowDeValidation()));
 });
 
 test('#159 · « Validation » ne lance rien de la PR : lecture seule, aucun secret, aucun pnpm, aucune extraction de la tête', () => {
-  validationSansRienDeLaPR(lire(CI));
+  validationSansRienDeLaPR(lire(workflowDeValidation()));
 });
 
 test('#159 · un push ne range pas la validation et les tests dans le même groupe de concurrence', () => {
-  const yaml = lire(CI);
-  const nommé = (ctx) => ({ ...ctx, github: { ...ctx.github, workflow: NOM_WORKFLOW } });
+  const yV = lire(workflowDeValidation());
+  const yT = lire(CI);
+  const nommé = (ctx, yaml) => ({ ...ctx, github: { ...ctx.github, workflow: nomDuWorkflow(yaml) } });
   for (const a of ACTIONS_VALIDATION) {
-    const tests = groupeDuWorkflow(yaml, nommé(pr(a, true)));
-    if (tests !== null) assert.notEqual(groupeDuWorkflow(yaml, cible(a)), tests, `${CI} : sur « ${a} », la validation et les tests partagent le groupe « ${tests} » et s'annuleraient`);
+    const tests = groupeDuWorkflow(yT, nommé(pr(a, true), yT));
+    if (tests !== null) assert.notEqual(groupeDuWorkflow(yV, cible(a, false, nomDuWorkflow(yV))), tests, `${CI} : sur « ${a} », la validation et les tests partagent le groupe « ${tests} » et s'annuleraient`);
   }
 });
 
 test('#159 · témoin rouge · des jobs sans condition tourneraient aussi sur pull_request_target', () => {
-  const yaml = lire(CI);
-  const cassé = réécrire(yaml, (job) => (nomAffiché(job) === VALIDATION ? undefined : sansCondition(job.lignes)));
-  assert.notEqual(cassé, yaml, 'le workflow n’a pas pu être cassé : le harnais de #159 est à relire');
+  // Un job sans condition ajouté au workflow de la validation : il tournerait avec elle.
+  const cassé = `${lire(workflowDeValidation()).replace(/\s*$/, '')}\n  intrus:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo intrus\n`;
   assert.throws(() => validationDepuisMain(cassé), /seul le job « Validation » doit tourner/);
 });
 
