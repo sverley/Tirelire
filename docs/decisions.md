@@ -373,6 +373,9 @@ ne charge jamais une page pointant vers des ressources absentes ; `donnees/*.jso
 `relais.config.php` sont exclus de l'envoi **et** du nettoyage, car ils appartiennent au serveur.
 Le nettoyage des anciens fichiers est facultatif (`TIRELIRE_FTP_NETTOYER`) et désactivé par
 défaut : un appareil pas encore rechargé demande encore les fragments de la version précédente.
+Un aperçu de PR fait exception, et lui seul (`apercu.sh`) : son sous-dossier de recette se supprime
+entier à la fermeture de la PR, paquets du relais compris, et seul un chemin
+`<dossier>/pr-<numéro>` peut l'être ; la production ne change pas.
 ## D38 · Le placement voulu est une répartition, pas un compte
 
 Corrige une simplification faite au lot 1 : D20 avait été implémentée avec un compte de placement
