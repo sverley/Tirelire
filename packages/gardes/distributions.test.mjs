@@ -17,8 +17,10 @@
  * (docs/gardes.md, #66).
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { RACINE } from './gardes.mjs';
 
@@ -397,4 +399,205 @@ test('#153 · sur main et au tag v*, le site pour la racine se construit, se dé
       assert.ok(amonts(partie, receveur.nom).has(job.nom), `${CI} : sur ${où}, le job « ${receveur.nom} » n'attend plus « ${job.nom} », qui assemble le site`);
     }
   }
+});
+
+// ─── #159 · La garde qui juge une PR est celle de main ───────────────────────────────────────────
+//
+// GitHub lit le workflow dans la PR pour `pull_request`, et sur `main` pour `pull_request_target` :
+// seul ce second déclencheur rend le verdict indépendant de ce que la PR propose. Le job reste dans
+// ci.yml (« pas de workflow à part », CLAUDE.md). La garde de main lit la tête de la PR sans
+// l'exécuter ni l'extraire : `cli.mjs pr --base <b> --tete <t>` juge le commit <t>, quel que soit
+// l'arbre d'où elle s'exécute.
+
+const VALIDATION = 'Validation';
+const ACTIONS_VALIDATION = [...ACTIONS_PR, 'edited'];
+const NOM_WORKFLOW = 'CI et livraison';
+const cible = (action, draft = false) => ({
+  github: {
+    event_name: 'pull_request_target',
+    workflow: NOM_WORKFLOW,
+    ref: 'refs/heads/main',
+    event: { action, pull_request: { number: NUMÉRO, draft, head: { sha: 'a'.repeat(40) }, base: { sha: 'b'.repeat(40) } } },
+  },
+  vars: { ...RECETTE },
+  secrets: {},
+  inputs: {},
+});
+const nomAffiché = (job) => scalaire(job.lignes, /^ {4}name:/).replace(/^(['"])(.*)\1$/, '$2');
+function jobValidation(yaml) {
+  const trouvés = [...jobs(yaml).values()].filter((j) => nomAffiché(j) === VALIDATION);
+  assert.equal(trouvés.length, 1, `${CI} : il faut un seul job nommé « ${VALIDATION} », il y en a ${trouvés.length}`);
+  return trouvés[0];
+}
+
+/** Les types d'activité d'un déclencheur, ceux de GitHub par défaut s'il n'en dit rien, `null` s'il manque. */
+function typesDe(yaml, déclencheur) {
+  const lignes = yaml.split('\njobs:')[0].split('\n');
+  const i = lignes.findIndex((l) => new RegExp(`^ {2}${déclencheur}:`).test(l));
+  if (i < 0) return null;
+  const bloc = [];
+  for (const l of lignes.slice(i + 1)) {
+    if (l.trim() && l.search(/\S/) <= 2) break;
+    bloc.push(l);
+  }
+  const k = bloc.findIndex((l) => /^\s*types:/.test(l));
+  if (k < 0) return ['opened', 'synchronize', 'reopened'];
+  const enLigne = bloc[k].match(/types:\s*\[([^\]]*)\]/);
+  if (enLigne) return enLigne[1].split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+  const liste = [];
+  for (const l of bloc.slice(k + 1)) {
+    const m = l.match(/^\s*-\s*['"]?([a-z_]+)/);
+    if (!m) break;
+    liste.push(m[1]);
+  }
+  return liste;
+}
+
+function validationDepuisMain(yaml) {
+  const types = typesDe(yaml, 'pull_request_target');
+  assert.ok(types, `${CI} : aucun déclencheur \`pull_request_target\`, le seul pour lequel GitHub lit le workflow sur main et non dans la PR`);
+  for (const a of ACTIONS_VALIDATION) assert.ok(types.includes(a), `${CI} : \`pull_request_target\` ne se déclenche pas sur « ${a} »`);
+  const v = jobValidation(yaml);
+  const tournent = (ctx) => jouer(yaml, ctx).filter((j) => j.tourne).map((j) => j.nom);
+  for (const a of ACTIONS_VALIDATION) {
+    const t = tournent(cible(a));
+    assert.deepEqual(t, [v.nom], `${CI} : sur pull_request_target (${a}), seul le job « ${VALIDATION} » doit tourner ; tournent : ${t.join(', ') || 'aucun'}`);
+    const b = tournent(cible(a, true));
+    assert.deepEqual(b, [], `${CI} : sur un brouillon (${a}), rien ne doit tourner par pull_request_target ; tournent : ${b.join(', ')}`);
+  }
+  for (const a of [...ACTIONS_VALIDATION, 'closed']) {
+    assert.ok(!jouer(yaml, pr(a, true)).find((j) => j.nom === v.nom).tourne, `${CI} : sur pull_request (${a}), le job « ${VALIDATION} » tourne encore, avec le workflow et la garde de la PR`);
+  }
+}
+
+function validationSansRienDeLaPR(yaml) {
+  const v = jobValidation(yaml);
+  const où = `${CI}, job « ${VALIDATION} »`;
+  const i = v.lignes.findIndex((l) => /^ {4}permissions:/.test(l));
+  assert.ok(i >= 0, `${où} : ses permissions ne sont pas déclarées ; celles du workflow, en écriture, s'appliqueraient`);
+  const permissions = [v.lignes[i].replace(/^ {4}permissions:/, '').trim()];
+  for (const l of v.lignes.slice(i + 1)) {
+    if (l.trim() && l.search(/\S/) <= 4) break;
+    if (l.trim() && !l.trim().startsWith('#')) permissions.push(l.trim());
+  }
+  const écrites = permissions.filter((p) => /write/.test(p));
+  assert.deepEqual(écrites, [], `${où} : permissions en écriture`);
+  assert.ok(!/\bsecrets\./.test(v.lignes.join('\n')), `${où} : un secret est lu`);
+  let juge = false;
+  for (const é of étapes(v.lignes)) {
+    const c = commande(é);
+    const outil = c.match(/\b(pnpm|npm|npx|yarn|corepack|bun)\b/);
+    assert.ok(!outil, `${où} : « ${outil?.[1]} » lancerait des scripts`);
+    const g = c.match(/\bgit\s+(checkout|switch|restore|reset|merge|pull|worktree|stash|apply|am|cherry-pick|rebase)\b/);
+    assert.ok(!g, `${où} : « git ${g?.[1]} » mettrait l'arbre de la PR à la place de celui de main`);
+    if (/uses:\s*actions\/checkout@/.test(c)) {
+      assert.ok(!/pull_request\.head|head_ref|refs\/pull|\bmerge\b/.test(c), `${où} : actions/checkout extrait la PR ; il doit extraire main`);
+    }
+    for (const n of c.matchAll(/(?:^|[\s;&|(])node\s+((?:-\S+\s+)*)(\S+)/g)) {
+      assert.equal(n[2], 'packages/gardes/cli.mjs', `${où} : « node ${n[1]}${n[2]} » : seule la garde de main s'exécute`);
+    }
+    if (/\bnode\s+(?:-\S+\s+)*packages\/gardes\/cli\.mjs\s+pr\b[\s\S]*--tete\b/.test(c) && /pull_request\.head\.sha/.test(é.texte)) juge = true;
+  }
+  assert.ok(juge, `${où} : aucune étape ne lance \`node packages/gardes/cli.mjs pr … --tete\` sur la tête de la PR`);
+}
+
+/** Le groupe de concurrence du workflow pour cet événement, ou `null` s'il n'en a pas. */
+function groupeDuWorkflow(yaml, ctx) {
+  const lignes = yaml.split('\njobs:')[0].split('\n');
+  const i = lignes.findIndex((l) => /^concurrency:/.test(l));
+  if (i < 0) return null;
+  const enLigne = lignes[i].replace(/^concurrency:/, '').trim();
+  if (enLigne) return interpoler(enLigne, ctx);
+  const g = lignes.slice(i + 1).find((l, k, suite) => /^ {2}group:/.test(l) && suite.slice(0, k).every((x) => !x.trim() || /^\s/.test(x)));
+  return g ? interpoler(g.replace(/^ {2}group:/, ''), ctx) : null;
+}
+
+test('#159 · sur pull_request_target, seul « Validation » tourne ; sur pull_request, il ne tourne plus', () => {
+  validationDepuisMain(lire(CI));
+});
+
+test('#159 · « Validation » ne lance rien de la PR : lecture seule, aucun secret, aucun pnpm, aucune extraction de la tête', () => {
+  validationSansRienDeLaPR(lire(CI));
+});
+
+test('#159 · un push ne range pas la validation et les tests dans le même groupe de concurrence', () => {
+  const yaml = lire(CI);
+  const nommé = (ctx) => ({ ...ctx, github: { ...ctx.github, workflow: NOM_WORKFLOW } });
+  for (const a of ACTIONS_VALIDATION) {
+    const tests = groupeDuWorkflow(yaml, nommé(pr(a, true)));
+    if (tests !== null) assert.notEqual(groupeDuWorkflow(yaml, cible(a)), tests, `${CI} : sur « ${a} », la validation et les tests partagent le groupe « ${tests} » et s'annuleraient`);
+  }
+});
+
+test('#159 · témoin rouge · des jobs sans condition tourneraient aussi sur pull_request_target', () => {
+  const yaml = lire(CI);
+  const cassé = réécrire(yaml, (job) => (nomAffiché(job) === VALIDATION ? undefined : sansCondition(job.lignes)));
+  assert.notEqual(cassé, yaml, 'le workflow n’a pas pu être cassé : le harnais de #159 est à relire');
+  assert.throws(() => validationDepuisMain(cassé), /seul le job « Validation » doit tourner/);
+});
+
+// La garde de main devant une PR : un dépôt jetable, la garde de cette branche et des documents
+// inventés sur la base, puis la tête d'une PR ; la garde s'exécute depuis l'arbre de la base.
+
+const REGISTRE_159 = (chemins) =>
+  `# Gardes\n\n## I1 · Premier\n\n${chemins ? `Chemins : \`${chemins}\`\n\n` : ''}- **Vérification manuelle** · \`VM-I1-parcours\` — Suivre le parcours complet sur une base vide et constater qu'il aboutit.\n`;
+const CORPS_159 = 'Close #1\n\n## Invariants et contraintes\n\nTouchés : aucun\nLien possible masqué : aucun\n\n### Vérifications manuelles\n\n';
+
+function dépôtDePR(changer) {
+  const d = mkdtempSync(join(tmpdir(), 'tirelire-159-'));
+  const git = (...a) =>
+    execFileSync('git', ['-c', 'user.name=Essai', '-c', 'user.email=essai@exemple.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...a], {
+      cwd: d,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  const écrire = (chemin, contenu) => {
+    mkdirSync(dirname(join(d, chemin)), { recursive: true });
+    writeFileSync(join(d, chemin), contenu);
+  };
+  const garde = join(RACINE, 'packages/gardes');
+  for (const f of readdirSync(garde)) if (f.endsWith('.mjs') && !f.endsWith('.test.mjs')) écrire(`packages/gardes/${f}`, readFileSync(join(garde, f)));
+  écrire('docs/invariants.md', '# Invariants\n\n## I1 · Premier\n\nTexte.\n');
+  écrire('docs/contraintes.md', '# Contraintes\n');
+  écrire('docs/gardes.md', REGISTRE_159());
+  écrire('src/a.txt', 'un\n');
+  git('init', '-q', '-b', 'main');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  const base = git('rev-parse', 'HEAD');
+  changer({ écrire, retirer: (chemin) => rmSync(join(d, chemin)) });
+  git('add', '-A');
+  git('commit', '-q', '-m', 'tête');
+  const tete = git('rev-parse', 'HEAD');
+  const juger = (extrait) => {
+    git('checkout', '-q', extrait);
+    const env = { ...process.env, CORPS: CORPS_159 };
+    delete env.GITHUB_ACTIONS;
+    delete env.GITHUB_STEP_SUMMARY;
+    const r = spawnSync(process.execPath, ['packages/gardes/cli.mjs', 'pr', '--base', base, '--tete', tete], { cwd: d, env, encoding: 'utf8' });
+    return { statut: r.status, sortie: `${r.stdout}${r.stderr}` };
+  };
+  return { base, tete, juger, fin: () => rmSync(d, { recursive: true, force: true }) };
+}
+
+test("#159 · la garde juge le registre de la PR, pas celui de l'arbre d'où elle s'exécute", (t) => {
+  const d = dépôtDePR(({ écrire }) => {
+    écrire('docs/gardes.md', REGISTRE_159('src/**'));
+    écrire('src/a.txt', 'deux\n');
+  });
+  t.after(d.fin);
+  const attendu = /I1 n'est pas déclaré alors que la PR modifie src\/a\.txt/;
+  const témoin = d.juger(d.tete);
+  assert.match(témoin.sortie, attendu, `témoin : tête extraite, la PR devrait être rouge\n${témoin.sortie}`);
+  const r = d.juger(d.base);
+  assert.equal(r.statut, 1, `depuis l'arbre de la base, la PR passe : la garde a lu son propre registre, pas celui de la PR\n${r.sortie}`);
+  assert.match(r.sortie, attendu);
+});
+
+test('#159 · un registre que la PR rend illisible fait échouer la validation, en le nommant', (t) => {
+  const d = dépôtDePR(({ retirer }) => retirer('docs/gardes.md'));
+  t.after(d.fin);
+  const r = d.juger(d.base);
+  assert.notEqual(r.statut, 0, `la PR retire le registre, et la garde de la base la laisse passer\n${r.sortie}`);
+  assert.match(r.sortie, /docs\/gardes\.md/);
 });
