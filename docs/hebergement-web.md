@@ -126,6 +126,11 @@ sous-dossier entier, paquets du relais compris (`apercu.sh retirer`), sans tests
 ces jobs ne publie de commentaire : l'adresse de recette ne s'écrit nulle part en clair dans le dépôt,
 et le diagnostic d'un aperçu reste dans le journal de la CI.
 
+Sur une PR, le site ne s'assemble qu'une fois par passage, dans le job de l'aperçu : pour le
+sous-dossier `pr-<numéro>`, et avant de lire les réglages de la recette. Il se construit donc même
+quand ces réglages manquent ; seul le dépôt n'a pas lieu. L'assemblage pour la racine, son artefact
+et sa publication restent à `main`, aux tags `v*` et au lancement manuel (#153).
+
 La recette est une origine distincte de la production (un sous-domaine, en HTTPS) : les aperçus y
 partagent un même stockage navigateur, jamais celui de la production. Chaque aperçu enregistre son
 service worker sur la portée de son sous-dossier. Le `robots.txt` de la racine de la recette se pose à
