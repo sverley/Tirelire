@@ -27,8 +27,8 @@ Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
   « Validée par le porteur »**, en pied de section, que le porteur coche après avoir constaté. Tant
   qu'une vérification manque, ou que la case n'est pas cochée, le job est rouge. Une édition de la
   description ne rejoue que ce job. La case cochée fait foi : rien ne l'enregistre, rien ne l'annule.
-- **La garde qui juge une PR est celle de la base.** Le job « Validation » exécute la garde et le
-  workflow de la branche de base (`main` pour une PR vers `main`) ; il juge le contenu de la PR : ce
+- **La garde qui juge une PR est celle de `main`.** Le job « Validation » exécute la garde et le
+  workflow de `main`, la branche par défaut, quelle que soit la base de la PR ; il juge le contenu de la PR : ce
   registre, les documents, les fichiers modifiés et la description, tels que la PR les porte. Il les
   lit par git dans le commit de la PR, sans l'extraire : rien de la PR ne s'installe ni ne
   s'exécute, et ses permissions sont en lecture seule. Une PR qui modifie `packages/gardes/**` ou

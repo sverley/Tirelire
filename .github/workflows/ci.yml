@@ -2,8 +2,8 @@ name: CI et livraison
 
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
 # - `validation` lit des fichiers suivis : ceux du commit de la PR, par git, sans les extraire, avec sa
-#   description. Déclenché par `pull_request_target`, il exécute la garde et ce workflow tels que la
-#   base les porte ; rien de la PR ne s'y installe ni ne s'y exécute (#159).
+#   description. Déclenché par `pull_request_target`, il exécute la garde et ce workflow tels que
+#   `main` les porte ; rien de la PR ne s'y installe ni ne s'y exécute (#159).
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
 #   l'archive du site qu'il dépose ensuite ne juge rien.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
@@ -85,12 +85,12 @@ jobs:
           path: apps/web/dist
           retention-days: 30
 
-  # La garde de la base juge le contenu de la PR (#159) : ce job extrait la base, jamais la PR, et ne
+  # La garde de `main` juge le contenu de la PR (#159) : ce job extrait `main`, jamais la PR, et ne
   # lance que la garde, qui lit par git le commit de la PR (registre, documents, fichiers modifiés).
   # Une PR qui change la garde ou ce workflow ne change donc pas le verdict rendu sur elle-même. Rien
   # de la PR ne s'exécute, aucun secret n'est lu : c'est ce qui rend sûr `pull_request_target`. Seul
   # le jeton du job, en lecture seule, reste à git, pour que la garde récupère la tête de la PR quand
-  # la base ne la porte pas, dépôt public ou privé.
+  # `main` ne la porte pas, dépôt public ou privé.
   validation:
     name: Validation
     if: github.event_name == 'pull_request_target' && github.event.action != 'closed' && github.event.pull_request.draft != true
@@ -100,7 +100,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
