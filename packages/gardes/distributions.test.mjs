@@ -491,7 +491,7 @@ function validationSansRienDeLaPR(yaml) {
     const g = c.match(/\bgit\s+(checkout|switch|restore|reset|merge|pull|worktree|stash|apply|am|cherry-pick|rebase)\b/);
     assert.ok(!g, `${où} : « git ${g?.[1]} » mettrait l'arbre de la PR à la place de celui de main`);
     if (/uses:\s*actions\/checkout@/.test(c)) {
-      assert.ok(!/pull_request\.head|head_ref|refs\/pull|\bmerge\b/.test(c), `${où} : actions/checkout extrait la PR ; il doit extraire main`);
+      assert.ok(!/pull_request\.|head_ref|base_ref|refs\/pull|\bmerge\b/.test(c), `${où} : actions/checkout extrait un commit que la PR désigne (sa tête ou sa base) ; sans \`ref\`, GitHub donne main, la version même du workflow`);
     }
     for (const n of c.matchAll(/(?:^|[\s;&|(])node\s+((?:-\S+\s+)*)(\S+)/g)) {
       assert.equal(n[2], 'packages/gardes/cli.mjs', `${où} : « node ${n[1]}${n[2]} » : seule la garde de main s'exécute`);
