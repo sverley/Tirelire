@@ -1,6 +1,7 @@
 /**
- * Harnais de #150 — le brouillon ne coûte rien, le passage en Ready joue toute la CI, et une édition
- * de la description ne masque plus le verdict du dernier commit.
+ * Harnais de #150 — le brouillon ne coûte rien, le passage en Ready joue toute la CI, et modifier la
+ * description de la PR ou de son issue invalide toute validation : la PR repasse en brouillon, avec un
+ * commentaire qui le dit (porteur, 21/09).
  *
  * Seule la CI a un harnais : la garde et la documentation se vérifient en relisant (complément du
  * porteur du 21/09 dans #150).
@@ -86,7 +87,7 @@ function déclencheurs(yaml) {
 const TYPES_PAR_DÉFAUT = ['opened', 'synchronize', 'reopened'];
 const lancé = (décl, événement, action) => {
   const e = décl.get(événement);
-  return !!e && (!action || (e.types ?? TYPES_PAR_DÉFAUT).includes(action));
+  return !!e && (!action || (e.types ?? (/^pull_request/.test(événement) ? TYPES_PAR_DÉFAUT : [action])).includes(action));
 };
 
 // ─── Contextes ───────────────────────────────────────────────────────────────────────────────────
@@ -94,13 +95,14 @@ const lancé = (décl, événement, action) => {
 const NUMÉRO = 150;
 const BRANCHE = 'outillage/150-brouillon-ready';
 const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette', TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
-const contextePR = (événement, action, draft) => ({
+const contextePR = (événement, action, draft, changes = {}) => ({
   github: {
     event_name: événement,
     ref: `refs/pull/${NUMÉRO}/merge`,
     ref_name: `${NUMÉRO}/merge`,
     event: {
       action,
+      changes,
       pull_request: {
         number: NUMÉRO,
         draft,
@@ -114,16 +116,35 @@ const contextePR = (événement, action, draft) => ({
   secrets: {},
   inputs: {},
 });
+/** L'issue citée par `Close #n` de la PR, modifiée : l'événement `issues`, lu sur main. */
+const contexteIssue = (action, changes) => ({
+  github: {
+    event_name: 'issues',
+    ref: 'refs/heads/main',
+    ref_name: 'main',
+    event: { action, changes, issue: { number: NUMÉRO, body: 'Le besoin.', pull_request: null } },
+  },
+  vars: { ...RECETTE },
+  secrets: {},
+  inputs: {},
+});
+
 const avecCommandes = (nom) => (j) => ({ ...j, workflow: nom, commandes: étapes(j.lignes).map(commande) });
 
 const ÉVÉNEMENTS_PR = ['pull_request', 'pull_request_target'];
 
 /** Les jobs lancés, tous workflows confondus, par cet événement de PR. */
-const lancésSurPR = (événement, action, draft) =>
+const lancésSurPR = (événement, action, draft, changes) =>
   workflows().flatMap(({ nom, yaml }) =>
     lancé(déclencheurs(yaml), événement, action)
-      ? jouer(yaml, contextePR(événement, action, draft)).filter((j) => j.tourne).map(avecCommandes(nom))
+      ? jouer(yaml, contextePR(événement, action, draft, changes)).filter((j) => j.tourne).map(avecCommandes(nom))
       : [],
+  );
+
+/** Les jobs lancés, tous workflows confondus, quand l'issue est modifiée. */
+const lancésSurIssue = (action, changes) =>
+  workflows().flatMap(({ nom, yaml }) =>
+    lancé(déclencheurs(yaml), 'issues', action) ? jouer(yaml, contexteIssue(action, changes)).filter((j) => j.tourne).map(avecCommandes(nom)) : [],
   );
 
 const nomDe = (j) => `${j.workflow} › ${j.nom}`;
@@ -135,6 +156,24 @@ const SUITE = /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test\s*$/m;
 const BUILD = /\bpnpm\s+(?:-r\s+)?(?:run\s+)?build\b/;
 const GARDE = /packages\/gardes\/cli\.mjs/;
 const DÉPÔT_DE_LA_VERSION_DE_DEV = /apercu\.sh\s+deposer/;
+const EN_BROUILLON = /convertPullRequestToDraft|\bgh\s+pr\s+ready\b[^\n]*--undo/;
+const COMMENTAIRE = /\bgh\s+(?:pr|issue)\s+comment\b|createComment|addComment|\/comments\b/;
+/** Ce qu'une modification de description ne doit pas lancer : c'est au prochain Ready de le faire. */
+const LOURDS = [
+  ['le typecheck', TYPECHECK],
+  ['toute la suite', SUITE],
+  ['le build', BUILD],
+  ['la garde', GARDE],
+  ['le dépôt de la version de dev', DÉPÔT_DE_LA_VERSION_DE_DEV],
+];
+const CORPS_MODIFIÉ = { body: { from: 'Avant.' } };
+
+/** Une modification invalide : un job repasse la PR en brouillon et le dit en commentaire, rien d'autre ne tourne. */
+function invalide(jobs, quoi) {
+  assert.ok(fait(jobs, EN_BROUILLON), `${quoi} : aucun job ne repasse la PR en brouillon ; tournent : ${jobs.map(nomDe).join(', ') || 'aucun'}`);
+  assert.ok(fait(jobs, COMMENTAIRE), `${quoi} : aucun job n'ajoute de commentaire pour dire le passage en brouillon`);
+  for (const [nom, motif] of LOURDS) assert.ok(!fait(jobs, motif), `${quoi} : un job joue ${nom}, qui attend le prochain Ready`);
+}
 
 // ─── Le circuit des PR ───────────────────────────────────────────────────────────────────────────
 
@@ -146,16 +185,20 @@ test('#150 · ouvrir un brouillon ou pousser dessus ne lance aucun job', () => {
   }
 });
 
-test("#150 · éditer la description d'une PR ne lance rien", () => {
-  for (const { nom, yaml } of workflows()) {
-    const d = déclencheurs(yaml);
-    for (const événement of ÉVÉNEMENTS_PR) {
-      assert.ok(
-        !lancé(d, événement, 'edited'),
-        `${nom} : ${événement} se déclenche sur « edited » ; des jobs sautés remplaceraient le verdict du dernier commit`,
-      );
-    }
-  }
+test('#150 · modifier la description d’une PR prête la repasse en brouillon, avec un commentaire, sans rien lancer d’autre', () => {
+  invalide(
+    ÉVÉNEMENTS_PR.flatMap((e) => lancésSurPR(e, 'edited', false, CORPS_MODIFIÉ)),
+    'description de la PR modifiée',
+  );
+});
+
+test('#150 · modifier la description de l’issue repasse sa PR en brouillon, avec un commentaire, sans rien lancer d’autre', () => {
+  invalide(lancésSurIssue('edited', CORPS_MODIFIÉ), 'description de l’issue modifiée');
+});
+
+test('#150 · sur un brouillon, modifier une description ne lance ni tests, ni garde, ni version de dev', () => {
+  const jobs = ÉVÉNEMENTS_PR.flatMap((e) => lancésSurPR(e, 'edited', true, CORPS_MODIFIÉ));
+  for (const [nom, motif] of LOURDS) assert.ok(!fait(jobs, motif), `brouillon modifié : un job joue ${nom}`);
 });
 
 test('#150 · le passage en Ready lance toute la CI, comme chaque push sur une PR prête', () => {

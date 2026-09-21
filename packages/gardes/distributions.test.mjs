@@ -209,7 +209,8 @@ test('#153 · sur main et au tag v*, le site pour la racine se construit, se dé
 // l'arbre d'où elle s'exécute.
 
 const VALIDATION = 'Validation';
-const ACTIONS_VALIDATION = [...ACTIONS_PR, 'edited'];
+// Sans `edited` : modifier la description invalide toute validation, la PR repasse en brouillon (#150).
+const ACTIONS_VALIDATION = ACTIONS_PR;
 const NOM_WORKFLOW = 'CI et livraison';
 const cible = (action, draft = false) => ({
   github: {
