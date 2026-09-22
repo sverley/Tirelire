@@ -23,223 +23,24 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { RACINE } from './gardes.mjs';
+import { CLÉ_ÉTAPE, STATUT, besoins, commande, expression, interpoler, jetons, jobs, jouer, nombre, scalaire, vrai, égal, étapes, évaluer } from './workflow-a-blanc.mjs';
 
 const CI = '.github/workflows/ci.yml';
 const ARCHIVE = 'tirelire-hebergement';
 
 const lire = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').replace(/\r\n?/g, '\n');
 
-// ─── Lecture du workflow ─────────────────────────────────────────────────────────────────────────
-
-/** Les jobs : nom → { début (ligne de l'en-tête), lignes }. `jobs:` est la dernière clé de premier niveau. */
-function jobs(yaml) {
-  const lignes = yaml.split('\n');
-  const début = lignes.findIndex((l) => /^jobs:\s*$/.test(l));
-  assert.ok(début >= 0, `${CI} : aucune section \`jobs:\``);
-  const blocs = new Map();
-  let courant;
-  for (let i = début + 1; i < lignes.length; i += 1) {
-    const m = lignes[i].match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
-    if (m) blocs.set((courant = m[1]), { nom: courant, début: i, lignes: [] });
-    else if (courant) blocs.get(courant).lignes.push(lignes[i]);
-  }
-  return blocs;
-}
-
-const CLÉ_ÉTAPE = (clé) => new RegExp(`^(?: {6}- | {8})${clé}:`);
-
-/** Valeur d'une clé : sur sa ligne, ou repliée sur les lignes plus indentées qui suivent (`>-`, `|`). */
-function scalaire(lignes, motif) {
-  const i = lignes.findIndex((l) => motif.test(l));
-  if (i < 0) return '';
-  const brut = lignes[i].replace(motif, '').trim();
-  if (!/^[>|][-+]?$/.test(brut)) return brut;
-  const colonne = lignes[i].search(/\S/) + (/^\s*- /.test(lignes[i]) ? 2 : 0);
-  const suite = [];
-  for (const l of lignes.slice(i + 1)) {
-    if (l.trim() && l.search(/\S/) <= colonne) break;
-    suite.push(l.trim());
-  }
-  return suite.join(' ');
-}
-
-/** Une condition, sans guillemets ni `${{ }}`. */
-const expression = (v) => v.trim().replace(/^(['"])(.*)\1$/, '$2').replace(/^\$\{\{([\s\S]*)\}\}$/, '$1').trim();
-
-function besoins(lignes) {
-  const i = lignes.findIndex((l) => /^ {4}needs:/.test(l));
-  if (i < 0) return [];
-  const v = lignes[i].replace(/^ {4}needs:/, '').trim();
-  if (v) return v.replace(/[[\]]/g, '').split(',').map((s) => s.trim()).filter(Boolean);
-  const liste = [];
-  for (const l of lignes.slice(i + 1)) {
-    const m = l.match(/^ {6}- \s*(\S+)/);
-    if (!m) break;
-    liste.push(m[1]);
-  }
-  return liste;
-}
-
-/** Les étapes d'un job, sans les commentaires ; `k` : indice de leur première ligne dans le job. */
-function étapes(lignes) {
-  const début = lignes.findIndex((l) => /^ {4}steps:\s*$/.test(l));
-  if (début < 0) return [];
-  const liste = [];
-  for (let k = début + 1; k < lignes.length; k += 1) {
-    const l = lignes[k];
-    if (/^ {0,4}\S/.test(l)) break;
-    if (/^ {6}- /.test(l)) liste.push({ k, lignes: [l] });
-    else if (liste.length && l.trim() && !l.trim().startsWith('#')) liste.at(-1).lignes.push(l);
-  }
-  return liste.map((é) => ({ ...é, texte: é.lignes.join('\n') }));
-}
-
-/** Ce que l'étape exécute : tout sauf son nom affiché. */
-const commande = (é) => é.lignes.filter((l) => !CLÉ_ÉTAPE('name').test(l)).join('\n');
 const assemble = (é) => /hebergement\b.*\bassembler\b|assembler\.mjs/.test(commande(é));
 const artefact = (é, sens) =>
   new RegExp(`uses:\\s*actions/${sens}-artifact@`).test(é.texte) ? é.texte.match(/^ {10}name:\s*(\S+)/m)?.[1] : undefined;
-
-// ─── Les expressions de GitHub Actions, le sous-ensemble utile ───────────────────────────────────
-
-function jetons(source) {
-  const motif = /\s*(?:'((?:[^']|'')*)'|(\d+(?:\.\d+)?)\b|(==|!=|&&|\|\||<=|>=|[!()<>,])|([A-Za-z_][\w.-]*))/y;
-  const liste = [];
-  let m;
-  while (motif.lastIndex < source.length && (m = motif.exec(source))) {
-    if (m[1] !== undefined) liste.push({ t: 'v', v: m[1].replace(/''/g, "'") });
-    else if (m[2] !== undefined) liste.push({ t: 'v', v: Number(m[2]) });
-    else if (m[3] !== undefined) liste.push({ t: m[3] });
-    else liste.push({ t: 'nom', v: m[4] });
-  }
-  assert.ok(m && motif.lastIndex === source.length, `${CI} : condition illisible par le harnais : ${source}`);
-  return liste;
-}
-
-const vrai = (x) => !(x === false || x === null || x === undefined || x === 0 || x === '' || Number.isNaN(x));
-const nombre = (x) =>
-  x == null ? 0 : typeof x === 'boolean' ? Number(x) : typeof x === 'number' ? x : typeof x === 'string' ? (x.trim() ? Number(x) : 0) : NaN;
-function égal(a, b) {
-  if (typeof a === 'string' && typeof b === 'string') return a.toLowerCase() === b.toLowerCase();
-  if (typeof a === typeof b && a !== null && b !== null) return a === b;
-  return nombre(a) === nombre(b);
-}
-const STATUT = /\b(always|success|failure|cancelled)\s*\(/;
-
-function évaluer(source, ctx, échec = false) {
-  const j = jetons(source.trim());
-  let i = 0;
-  const voit = (t) => j[i]?.t === t;
-  const prend = (t) => {
-    assert.ok(voit(t), `${CI} : « ${t} » attendu dans la condition ${source}`);
-    i += 1;
-  };
-  const ou = () => {
-    let a = et();
-    while (voit('||')) (i += 1), (a = ((b) => (vrai(a) ? a : b))(et()));
-    return a;
-  };
-  const et = () => {
-    let a = comparaison();
-    while (voit('&&')) (i += 1), (a = ((b) => (vrai(a) ? b : a))(comparaison()));
-    return a;
-  };
-  const comparaison = () => {
-    let a = unaire();
-    while (['==', '!=', '<', '>', '<=', '>='].some(voit)) {
-      const op = j[i++].t;
-      const b = unaire();
-      a = op === '==' ? égal(a, b) : op === '!=' ? !égal(a, b) : { '<': nombre(a) < nombre(b), '>': nombre(a) > nombre(b), '<=': nombre(a) <= nombre(b), '>=': nombre(a) >= nombre(b) }[op];
-    }
-    return a;
-  };
-  const unaire = () => (voit('!') ? ((i += 1), !vrai(unaire())) : primaire());
-  const primaire = () => {
-    const x = j[i++];
-    assert.ok(x, `${CI} : condition incomplète : ${source}`);
-    if (x.t === 'v') return x.v;
-    if (x.t === '(') {
-      const v = ou();
-      prend(')');
-      return v;
-    }
-    assert.equal(x.t, 'nom', `${CI} : condition illisible par le harnais : ${source}`);
-    if (voit('(')) {
-      i += 1;
-      const args = [];
-      while (!voit(')')) {
-        args.push(ou());
-        if (voit(',')) i += 1;
-      }
-      prend(')');
-      const [a, b] = args.map((v) => (v == null ? '' : v));
-      const f = {
-        always: () => true,
-        success: () => !échec,
-        failure: () => échec,
-        cancelled: () => false,
-        startsWith: () => String(a).toLowerCase().startsWith(String(b).toLowerCase()),
-        endsWith: () => String(a).toLowerCase().endsWith(String(b).toLowerCase()),
-        contains: () => (Array.isArray(a) ? a.some((v) => égal(v, b)) : String(a).toLowerCase().includes(String(b).toLowerCase())),
-      }[x.v];
-      assert.ok(f, `${CI} : fonction « ${x.v} » inconnue du harnais`);
-      return f();
-    }
-    if (['true', 'false', 'null'].includes(x.v)) return JSON.parse(x.v);
-    return x.v.split('.').reduce((o, k) => (o == null ? null : (o[k] ?? null)), ctx);
-  };
-  const v = ou();
-  assert.equal(i, j.length, `${CI} : condition illisible par le harnais : ${source}`);
-  return v;
-}
-
-const interpoler = (v, ctx) =>
-  v
-    .trim()
-    .replace(/^(['"])(.*)\1$/, '$2')
-    .replace(/\$\{\{([\s\S]*?)\}\}/g, (_, e) => {
-      const x = évaluer(e, ctx);
-      return x == null ? '' : String(x);
-    });
-
-// ─── Le workflow joué à blanc ────────────────────────────────────────────────────────────────────
-
-/** Les jobs qui tournent pour cet événement, et leurs étapes jouées. `échoue(étape)` : l'étape échoue. */
-function jouer(yaml, ctx, échoue = () => false) {
-  const blocs = jobs(yaml);
-  const états = new Map();
-  const état = (nom, pile = new Set()) => {
-    if (états.has(nom)) return états.get(nom);
-    assert.ok(blocs.has(nom), `${CI} : le job « ${nom} », attendu par un \`needs\`, n'existe pas`);
-    assert.ok(!pile.has(nom), `${CI} : dépendance circulaire autour du job « ${nom} »`);
-    pile.add(nom);
-    const { lignes } = blocs.get(nom);
-    const amont = besoins(lignes).map((n) => état(n, pile));
-    const si = expression(scalaire(lignes, /^ {4}if:/));
-    const amontOk = amont.every((a) => a.réussi);
-    const amontÉchec = amont.some((a) => a.tourne && !a.réussi);
-    const tourne = !si ? amontOk : STATUT.test(si) ? vrai(évaluer(si, ctx, amontÉchec)) : amontOk && vrai(évaluer(si, ctx));
-    const joués = [];
-    let échec = false;
-    for (const é of tourne ? étapes(lignes) : []) {
-      const c = expression(scalaire(é.lignes, CLÉ_ÉTAPE('if')));
-      const passe = !c ? !échec : STATUT.test(c) ? vrai(évaluer(c, ctx, échec)) : !échec && vrai(évaluer(c, ctx));
-      if (!passe) continue;
-      joués.push(é);
-      if (échoue(é) && !/^ +(?:- )?continue-on-error:\s*true/m.test(é.texte)) échec = true;
-    }
-    const r = { ...blocs.get(nom), besoins: amont.map((a) => a.nom), tourne, réussi: tourne && !échec, joués };
-    états.set(nom, r);
-    return r;
-  };
-  return [...blocs.keys()].map((n) => état(n));
-}
 
 const assemblages = (partie) => partie.flatMap((job) => job.joués.filter(assemble).map((étape) => ({ job, étape })));
 const liste = (a) => a.map(({ job }) => `« ${job.nom} »`).join(', ') || 'aucun job';
 
 const NUMÉRO = 153;
-const ACTIONS_PR = ['opened', 'synchronize', 'reopened', 'ready_for_review'];
+// Les passages en Ready (#150) : `ready_for_review`, et une PR ouverte ou rouverte hors brouillon. Un
+// push sur une PR prête ne rejoue plus rien : il la renvoie en brouillon.
+const ACTIONS_PR = ['opened', 'reopened', 'ready_for_review'];
 const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette', TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
 const pr = (action, recette) => ({
   github: {
@@ -404,18 +205,20 @@ test('#153 · sur main et au tag v*, le site pour la racine se construit, se dé
 // ─── #159 · La garde qui juge une PR est celle de main ───────────────────────────────────────────
 //
 // GitHub lit le workflow dans la PR pour `pull_request`, et sur `main` pour `pull_request_target` :
-// seul ce second déclencheur rend le verdict indépendant de ce que la PR propose. Le job reste dans
-// ci.yml (« pas de workflow à part », CLAUDE.md). La garde de main lit la tête de la PR sans
+// seul ce second déclencheur rend le verdict indépendant de ce que la PR propose. Le job vit dans le
+// workflow de son choix, seul à y porter ce nom : partagé avec les tests, un même workflow montrerait
+// chacun sauté dans l'exécution de l'autre (#150, B1). La garde de main lit la tête de la PR sans
 // l'exécuter ni l'extraire : `cli.mjs pr --base <b> --tete <t>` juge le commit <t>, quel que soit
 // l'arbre d'où elle s'exécute.
 
 const VALIDATION = 'Validation';
-const ACTIONS_VALIDATION = [...ACTIONS_PR, 'edited'];
+// Au seul passage en Ready (#150) : tout changement d'une PR prête la renvoie en brouillon.
+const ACTIONS_VALIDATION = ACTIONS_PR;
 const NOM_WORKFLOW = 'CI et livraison';
-const cible = (action, draft = false) => ({
+const cible = (action, draft = false, workflow = NOM_WORKFLOW) => ({
   github: {
     event_name: 'pull_request_target',
-    workflow: NOM_WORKFLOW,
+    workflow,
     ref: 'refs/heads/main',
     event: { action, pull_request: { number: NUMÉRO, draft, head: { sha: 'a'.repeat(40) }, base: { sha: 'b'.repeat(40) } } },
   },
@@ -429,6 +232,18 @@ function jobValidation(yaml) {
   assert.equal(trouvés.length, 1, `${CI} : il faut un seul job nommé « ${VALIDATION} », il y en a ${trouvés.length}`);
   return trouvés[0];
 }
+
+/** Le workflow qui porte « Validation », `ci.yml` ou un autre (#150) : un seul. */
+function workflowDeValidation() {
+  const dossier = '.github/workflows';
+  const où = readdirSync(join(RACINE, dossier))
+    .filter((f) => /\.ya?ml$/.test(f))
+    .map((f) => `${dossier}/${f}`)
+    .filter((f) => [...jobs(lire(f)).values()].some((j) => nomAffiché(j) === VALIDATION));
+  assert.equal(où.length, 1, `un seul workflow doit porter le job « ${VALIDATION} » ; le portent : ${où.join(', ') || 'aucun'}`);
+  return où[0];
+}
+const nomDuWorkflow = (yaml) => (yaml.match(/^name:\s*(.+)$/m)?.[1] ?? '').trim().replace(/^(['"])(.*)\1$/, '$2');
 
 /** Les types d'activité d'un déclencheur, ceux de GitHub par défaut s'il n'en dit rien, `null` s'il manque. */
 function typesDe(yaml, déclencheur) {
@@ -513,26 +328,26 @@ function groupeDuWorkflow(yaml, ctx) {
 }
 
 test('#159 · sur pull_request_target, seul « Validation » tourne ; sur pull_request, il ne tourne plus', () => {
-  validationDepuisMain(lire(CI));
+  validationDepuisMain(lire(workflowDeValidation()));
 });
 
 test('#159 · « Validation » ne lance rien de la PR : lecture seule, aucun secret, aucun pnpm, aucune extraction de la tête', () => {
-  validationSansRienDeLaPR(lire(CI));
+  validationSansRienDeLaPR(lire(workflowDeValidation()));
 });
 
 test('#159 · un push ne range pas la validation et les tests dans le même groupe de concurrence', () => {
-  const yaml = lire(CI);
-  const nommé = (ctx) => ({ ...ctx, github: { ...ctx.github, workflow: NOM_WORKFLOW } });
+  const yV = lire(workflowDeValidation());
+  const yT = lire(CI);
+  const nommé = (ctx, yaml) => ({ ...ctx, github: { ...ctx.github, workflow: nomDuWorkflow(yaml) } });
   for (const a of ACTIONS_VALIDATION) {
-    const tests = groupeDuWorkflow(yaml, nommé(pr(a, true)));
-    if (tests !== null) assert.notEqual(groupeDuWorkflow(yaml, cible(a)), tests, `${CI} : sur « ${a} », la validation et les tests partagent le groupe « ${tests} » et s'annuleraient`);
+    const tests = groupeDuWorkflow(yT, nommé(pr(a, true), yT));
+    if (tests !== null) assert.notEqual(groupeDuWorkflow(yV, cible(a, false, nomDuWorkflow(yV))), tests, `${CI} : sur « ${a} », la validation et les tests partagent le groupe « ${tests} » et s'annuleraient`);
   }
 });
 
 test('#159 · témoin rouge · des jobs sans condition tourneraient aussi sur pull_request_target', () => {
-  const yaml = lire(CI);
-  const cassé = réécrire(yaml, (job) => (nomAffiché(job) === VALIDATION ? undefined : sansCondition(job.lignes)));
-  assert.notEqual(cassé, yaml, 'le workflow n’a pas pu être cassé : le harnais de #159 est à relire');
+  // Un job sans condition ajouté au workflow de la validation : il tournerait avec elle.
+  const cassé = `${lire(workflowDeValidation()).replace(/\s*$/, '')}\n  intrus:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo intrus\n`;
   assert.throws(() => validationDepuisMain(cassé), /seul le job « Validation » doit tourner/);
 });
 

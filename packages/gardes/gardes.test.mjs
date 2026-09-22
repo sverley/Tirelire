@@ -166,7 +166,7 @@ const section = (touches, masques, verifications = '') =>
 /** Consigne du registre inventé, recopiée comme `demander` l'écrit (tranché dans #60). */
 const consigneDe = (cle) => [...entrees.values()].flatMap((e) => e.verifications).find((v) => v.id === cle)?.description ?? '';
 const item = (cle) => `- \`${cle}\` · essai${consigneDe(cle) ? ` — ${consigneDe(cle)}` : ''}\n`;
-/** La case unique de la PR, en pied de section, que seul le porteur coche (tranché le 19 septembre). */
+/** L'ancienne case « Validée » : le passage en Ready l'a remplacée (#150), elle ne compte plus pour rien. */
 const casePorteur = (cochee) => `\n- [${cochee ? 'x' : ' '}] Validée par le porteur\n`;
 
 test("une PR sans section, ou avec la section du modèle laissée telle quelle, est refusée", () => {
@@ -179,26 +179,28 @@ test("une PR sans section, ou avec la section du modèle laissée telle quelle, 
 
 test('rien de touché, rien de masqué, rien dans le plancher : la PR passe', () => {
   const r = pr(section('aucun', 'aucun'), ['docs/notes.md']);
-  assert.deepEqual([r.aCorriger, r.enAttente], [[], []]);
+  assert.deepEqual(r.aCorriger, []);
 });
 
 test("un fichier modifié qui répond aux chemins d'une entrée impose de la déclarer", () => {
   assert.match(texte(pr(section('aucun', 'aucun'), ['b/deux.mjs']).aCorriger), /C1 n'est pas déclaré alors que la PR modifie b\/deux\.mjs/);
-  const declaree = pr(section('aucun', 'C1', item('VM-C1-appareil') + casePorteur(true)), ['b/deux.mjs']);
+  const declaree = pr(section('aucun', 'C1', item('VM-C1-appareil')), ['b/deux.mjs']);
   assert.deepEqual(declaree.aCorriger, []);
 });
 
-test("une vérification demandée garde la PR rouge tant que le porteur n'a pas coché l'unique case", () => {
+test('une vérification demandée figure dans la section, sans case à cocher : le passage en Ready valide (#150)', () => {
   assert.match(texte(pr(section('C1', 'aucun')).aCorriger), /`VM-C1-appareil` \(C1\) est demandée mais ne figure pas/);
-  assert.match(texte(pr(section('C1', 'aucun', item('VM-C1-appareil'))).aCorriger), /La case « - \[ \] Validée par le porteur » manque/);
+  assert.deepEqual(pr(section('C1', 'aucun', item('VM-C1-appareil'))).aCorriger, []);
+  // Une case restée d'avant, vide, cochée ou en double, ne compte pour rien.
+  for (const reste of [casePorteur(false), casePorteur(true), casePorteur(true) + casePorteur(true)]) {
+    assert.deepEqual(pr(section('C1', 'aucun', item('VM-C1-appareil') + reste)).aCorriger, []);
+  }
+});
 
-  const attente = pr(section('C1', 'aucun', item('VM-C1-appareil') + casePorteur(false)));
-  assert.deepEqual(attente.aCorriger, []);
-  assert.match(texte(attente.enAttente), /Une vérification manuelle est demandée : en attente de la case du porteur/);
-
-  const validee = pr(section('C1', 'aucun', item('VM-C1-appareil') + casePorteur(true)));
-  assert.deepEqual([validee.aCorriger, validee.enAttente, validee.validees], [[], [], ['VM-C1-appareil']]);
-  assert.match(texte(pr(section('C1', 'aucun', item('VM-C1-appareil') + casePorteur(true) + casePorteur(true))).aCorriger), /figure 2 fois : n'en garder qu'une/);
+test('une PR ferme les issues qu’elle cite par « Close #n », hors code et commentaires (#150)', () => {
+  assert.deepEqual(V.issuesFermees('Close #150'), [150]);
+  assert.deepEqual(V.issuesFermees('closes: #3, Fixes #4 et resolved #3'), [3, 4]);
+  assert.deepEqual(V.issuesFermees('Close #…\n<!-- Close #8 -->\n~~~\nClose #9\n~~~\nVoir #10, disclose #11'), []);
 });
 
 test('déclarer une entrée demande aussi les vérifications des entrées qui la couvrent, de proche en proche', () => {
@@ -208,14 +210,13 @@ test('déclarer une entrée demande aussi les vérifications des entrées qui la
 });
 
 test('les commentaires ne comptent pas, un identifiant ou une vérification inconnus non plus', () => {
-  const commentee = pr(section('I7', 'aucun', `<!--\n${item('VM-C1-appareil')}${casePorteur(true)}-->\n`));
+  const commentee = pr(section('I7', 'aucun', `<!--\n${item('VM-C1-appareil')}-->\n`));
   assert.match(texte(commentee.aCorriger), /I7 est déclaré mais n'a pas d'entrée/);
-  assert.deepEqual(commentee.validees, []);
-  assert.match(texte(pr(section('aucun', 'aucun', item('VM-C1-apareil') + casePorteur(true))).aCorriger), /`VM-C1-apareil` n'est ni une vérification manuelle/);
+  assert.match(texte(pr(section('aucun', 'aucun', item('VM-C1-apareil'))).aCorriger), /`VM-C1-apareil` n'est ni une vérification manuelle/);
 });
 
 test('une vérification manuelle recopie sa consigne du registre, coupée ou non, et la déclaration se lit comme GitHub l’affiche (#60)', () => {
-  const avec = (tete, suite = '') => section('U2', 'aucun', `- \`VM-U2-parcours\` · U2${tete}\n${suite}` + casePorteur(true));
+  const avec = (tete, suite = '') => section('U2', 'aucun', `- \`VM-U2-parcours\` · U2${tete}\n${suite}`);
   assert.deepEqual(pr(avec(` — ${consigneDe('VM-U2-parcours')}`)).aCorriger, []);
   assert.deepEqual(pr(avec(' — Suivre le second parcours', "  sur une base vide et constater qu'il aboutit.\n")).aCorriger, []);
   assert.match(texte(pr(avec('')).aCorriger), /`VM-U2-parcours` : consigne à recopier/);
@@ -240,19 +241,18 @@ test('retirer une vérification manuelle ou un harnais du registre demande la m�
   const rouge = texte(retire(section('aucun', 'aucun')).aCorriger);
   assert.match(rouge, /`VM-C1-appareil` \(vérification manuelle retirée\) est demandée/);
   assert.match(rouge, /`I2 · a\/test\/un\.test\.ts` \(harnais retiré\) est demandée/);
-  const valide = retire(section('aucun', 'aucun', item('VM-C1-appareil') + item('I2 · a/test/un.test.ts') + casePorteur(true)));
-  assert.deepEqual([valide.aCorriger, valide.enAttente], [[], []]);
+  const valide = retire(section('aucun', 'aucun', item('VM-C1-appareil') + item('I2 · a/test/un.test.ts')));
+  assert.deepEqual(valide.aCorriger, []);
 });
 
-test("la section préparée par « demander » se remplit, puis attend l'unique case du porteur", () => {
+test('la section préparée par « demander » se remplit, sans case (#150)', () => {
   const preparee = preparerSection({ entrees, fichiersModifies: ['b/deux.mjs'] });
   assert.match(preparee, /^Touchés : C1$/m);
-  assert.match(preparee, /^- \[ \] Validée par le porteur$/m);
+  assert.doesNotMatch(preparee, /Validée/);
   const r = pr(`Pour #1 : rien.\n\n${preparee}\n`, ['b/deux.mjs']);
   assert.match(texte(r.aCorriger), /« Lien possible masqué : » à remplir/);
   const remplie = pr(`Pour #1 : rien.\n\n${preparee.replace('masqué : à analyser', 'masqué : aucun')}\n`, ['b/deux.mjs']);
   assert.deepEqual(remplie.aCorriger, []);
-  assert.match(texte(remplie.enAttente), /en attente de la case du porteur/);
 });
 
 

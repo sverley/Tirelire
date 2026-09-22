@@ -21,7 +21,7 @@ Seuls les fichiers Markdown de `docs/` sont fondateurs.
   tiers), positions reconstruites par compte, moteur de règles et actions groupées, dépôt SQLite
   (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
 - `packages/gardes` — la garde de l'objectif primaire (#58) : chaque invariant et chaque
-  contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et chaque PR demande les siennes.
+  contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et l'issue de chaque PR déclare les siennes.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
 - `docs` — description du projet, invariants du produit, contraintes du projet, analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
@@ -111,7 +111,7 @@ niveau (D73) :
     son verdict s'affiche. La non-régression bloque toujours.
   - Le pré-push ne rejoue pas un arbre déjà vérifié à la fusion. Un push vers une sous-branche
     (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la non-régression.
-- **CI** : sur chaque PR, typecheck, tests (navigateur compris), build, en mode strict
+- **CI** : au passage en Ready de chaque PR, jamais en brouillon, typecheck, tests (navigateur compris), build, en mode strict
   (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job (D74).
 
 `git commit --no-verify` est un contournement (D62) : il fait sauter la non-régression avec le

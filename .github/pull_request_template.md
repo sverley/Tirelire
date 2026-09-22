@@ -1,20 +1,7 @@
 Close #…
 
-## Ce qui change
-
-## Invariants et contraintes
-
 <!--
-Touchés : les identifiants (I…, U…, C…) que la PR modifie ou pourrait casser ; « aucun » sinon.
-Lien possible masqué : ceux qui semblent hors de sa portée mais pourraient être atteints.
-Sous « Vérifications manuelles » : les vérifications des identifiants déclarés, consigne recopiée
-(node packages/gardes/cli.mjs demander --base origin/main l'écrit), puis une seule case, que le
-porteur coche après avoir constaté.
+Rien d'autre. La section « Invariants et contraintes » s'écrit dans l'issue : la garde l'y lit au
+passage en Ready. Passer la PR en Ready est la validation du porteur ; toute modification ensuite, de
+la PR ou de l'issue, la renvoie en brouillon.
 -->
-
-Touchés : à analyser
-Lien possible masqué : à analyser
-
-### Vérifications manuelles
-
-- [ ] Validée par le porteur

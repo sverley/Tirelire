@@ -9,10 +9,11 @@
  *   elles-mêmes gardées. Chaque harnais cite en plus son témoin rouge — ou porte « à bâtir » avec
  *   l'issue qui le doit (#66) ; qu'un témoin rouge sache vraiment échouer n'est pas du ressort de
  *   la couverture, mais de l'outil de test qui le fait tourner.
- * - **Demandes d'une PR.** La description déclare les identifiants que la PR touche et ceux dont le
- *   lien pourrait être masqué ; les motifs `Chemins` du registre en imposent un plancher ; chaque
- *   vérification manuelle qui s'y rattache, et chaque garde retirée du registre, y figure avec une
- *   analyse et une case « Validée » cochée par un développeur humain.
+ * - **Demandes d'une PR.** L'issue qu'elle ferme (`Close #n`) déclare, dans sa section « Invariants
+ *   et contraintes », les identifiants que la PR touche et ceux dont le lien pourrait être masqué ;
+ *   les motifs `Chemins` du registre en imposent un plancher ; chaque vérification manuelle qui s'y
+ *   rattache, et chaque garde retirée du registre, y figure avec sa consigne recopiée. Aucune case :
+ *   le passage en Ready de la PR est la validation du porteur (#150).
  *
  * Tout travaille sur des textes et des listes de fichiers : les tests nourrissent ces fonctions de
  * documents inventés, `cli.mjs` de ceux du dépôt.
@@ -32,7 +33,7 @@ export const DOCUMENTS = Object.freeze({
   invariants: 'docs/invariants.md',
   contraintes: 'docs/contraintes.md',
   gardes: 'docs/gardes.md',
-  modele: '.github/pull_request_template.md',
+  modele: '.github/ISSUE_TEMPLATE/besoin.md',
   description: 'docs/description-projet.md',
   glossaire: 'docs/glossaire.md',
 });
@@ -812,7 +813,7 @@ export function lireDescriptionPr(corps) {
   for (const ligne of section) {
     const tete = ligne.match(/^[-*]\s+(?:\[[ xX]\]\s+)?`([^`]+)`(.*)$/);
     if (tete) {
-      item = { cle: tete[1].trim(), consigne: couper(tete[2])[1], analyse: '', validee: false };
+      item = { cle: tete[1].trim(), consigne: couper(tete[2])[1], analyse: '' };
       items.push(item);
       dansAnalyse = false;
       dansTete = true;
@@ -824,14 +825,9 @@ export function lireDescriptionPr(corps) {
       continue;
     }
     const analyse = ligne.match(/^\s+[-*]\s+Analyse\b[^:]*:\s*(.*)$/i);
-    const validation = ligne.match(/^\s+[-*]\s+\[([ xX])\]\s+Valid[ée]e/i);
     if (analyse) {
       item.analyse = analyse[1].trim();
       dansAnalyse = true;
-      dansTete = false;
-    } else if (validation) {
-      item.validee = validation[1] !== ' ';
-      dansAnalyse = false;
       dansTete = false;
     } else if (dansAnalyse && ligne.trim()) {
       item.analyse = `${item.analyse} ${ligne.trim()}`.trim();
@@ -842,17 +838,13 @@ export function lireDescriptionPr(corps) {
     }
   }
 
-  // Une seule case pour toute la PR, en pied de section, que le porteur coche (tranché le 19 septembre).
-  const cases = section.filter((l) => /^[-*]\s+\[[ xX]\]\s+Valid[ée]e/i.test(l));
-  if (cases.length > 1) problemes.push(`La case « Validée » figure ${cases.length} fois : n'en garder qu'une, en pied de section.`);
-  const validee = cases.some((l) => /\[[xX]\]/.test(l));
+  // Plus de case « Validée » (#150) : le passage en Ready est la validation ; une case restée là ne
+  // compte pour rien, cochée ou non.
   return {
     touches: declaration(ETIQUETTES_PR[0]),
     masques: declaration(ETIQUETTES_PR[1]),
     accord,
     items,
-    caseAbsente: !cases.length,
-    validee,
     problemes,
   };
 }
@@ -861,18 +853,16 @@ export function lireDescriptionPr(corps) {
 const memeTexte = (a, b) => String(a ?? '').replace(/\s+/g, ' ').trim() === String(b ?? '').replace(/\s+/g, ' ').trim();
 
 /**
- * Ce qu'une PR doit encore faire. `aCorriger` : la description est incomplète ou fausse ;
- * `enAttente` : une vérification analysée attend la validation d'un développeur humain.
+ * Ce qu'une PR doit encore faire : `aCorriger`, ce qui manque ou est faux dans la section que porte
+ * `corps` — l'issue que la PR ferme. Rien n'attend de case : la validation est le passage en Ready.
  */
 export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersModifies = [] }) {
   const aCorriger = [];
-  const enAttente = [];
-  const validees = [];
   const imposes = plancher(entrees, fichiersModifies);
   const pr = lireDescriptionPr(corps);
   if (!pr) {
-    aCorriger.push(`La description n'a pas de section « ## Invariants et contraintes » : la reprendre du modèle \`${DOCUMENTS.modele}\`.`);
-    return { aCorriger, enAttente, validees, declares: [], imposes, requises: new Map() };
+    aCorriger.push(`L'issue n'a pas de section « ## Invariants et contraintes » : la reprendre du modèle \`${DOCUMENTS.modele}\` (\`demander\` l'écrit).`);
+    return { aCorriger, declares: [], imposes, requises: new Map() };
   }
 
   aCorriger.push(...pr.problemes);
@@ -914,12 +904,16 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
       );
     }
   }
-  if (requises.size) {
-    if (pr.caseAbsente) aCorriger.push("La case « - [ ] Validée par le porteur » manque en pied de section.");
-    else if (!pr.validee) enAttente.push(`${requises.size === 1 ? 'Une vérification manuelle est demandée' : `${requises.size} vérifications manuelles sont demandées`} : en attente de la case du porteur.`);
-    else validees.push(...requises.keys());
-  }
-  return { aCorriger, enAttente, validees, declares, imposes, requises };
+  return { aCorriger, declares, imposes, requises };
+}
+
+/** Mots par lesquels GitHub fait fermer une issue par une PR (« Close #12 », « fixes: #12 »…). */
+const FERMETURE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)\b/gi;
+
+/** Les issues qu'une description de PR ferme, hors blocs de code et commentaires, sans doublon. */
+export function issuesFermees(corps) {
+  const texte = lignesHorsCode(corps).join('\n');
+  return [...new Set([...texte.matchAll(FERMETURE)].map((m) => Number(m[1])))];
 }
 
 export const analyseEcrite = (analyse) => !ANALYSE_VIDE.test(String(analyse ?? ''));
@@ -937,22 +931,23 @@ export function preparerSection({ entrees, entreesAvant = new Map(), fichiersMod
   lignes.push('', '### Vérifications manuelles', '');
   if (!requises.size) lignes.push('Aucune pour les identifiants déclarés.');
   for (const r of requises.values()) lignes.push(`- \`${r.cle}\` · ${r.pourquoi} — ${r.description}`);
-  if (requises.size) lignes.push('', '- [ ] Validée par le porteur');
   if (imposes.size) lignes.push('', `Plancher des chemins : ${[...imposes].map(([id, f]) => `${id} ← ${listeCourte(f)}`).join(' ; ')}.`);
   return lignes.join('\n');
 }
 
 /** Bilan lisible, pour la console et le résumé de GitHub Actions. */
-export function resumePr({ aCorriger, enAttente, validees, declares, imposes, requises }) {
+export function resumePr({ aCorriger, declares, imposes, requises }) {
   const l = ['### Invariants et contraintes', ''];
   l.push(`Déclarés : ${declares.length ? declares.join(', ') : 'aucun'}.`);
   if (imposes.size) l.push(`Imposés par les fichiers modifiés : ${[...imposes].map(([id, f]) => `${id} (${listeCourte(f)})`).join(' ; ')}.`);
   l.push('');
   if (aCorriger.length) l.push('**À corriger**', '', ...aCorriger.map((p) => `- ${p}`), '');
-  if (enAttente.length) l.push('**En attente de validation humaine**', '', ...enAttente.map((p) => `- ${p}`), '');
-  if (validees.length) l.push(`**Validées par le porteur** : ${validees.map((c) => `\`${c}\``).join(', ')}.`, '');
-  if (!aCorriger.length && !enAttente.length) {
-    l.push(requises.size ? 'Toutes les vérifications demandées sont validées.' : 'Aucune vérification manuelle demandée.');
+  if (!aCorriger.length) {
+    l.push(
+      requises.size
+        ? `À constater par le porteur sur la version de dev, après le passage en Ready : ${[...requises.keys()].map((c) => `\`${c}\``).join(', ')}.`
+        : 'Aucune vérification manuelle demandée.',
+    );
   }
   return l.join('\n');
 }

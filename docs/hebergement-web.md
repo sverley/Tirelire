@@ -118,7 +118,7 @@ Le service worker met les appareils à jour au chargement suivant.
 
 ## Aperçu de chaque PR sur l'instance de recette
 
-Une PR prête (pas un brouillon) dont les tests passent a son aperçu : le site de sa branche,
+Au passage en Ready d'une PR (jamais en brouillon), si ses tests passent, la PR a son aperçu : le site du dernier commit de sa branche,
 construit pour le sous-dossier `pr-<numéro>` d'une instance de recette, déposé par
 `apercu.sh deposer` dans `<TIRELIRE_DEV_FTP_DOSSIER>/pr-<numéro>`, puis vérifié en ligne par
 `verifier.sh`, commit servi compris. La fermeture de la PR (fusion ou abandon) supprime ce
