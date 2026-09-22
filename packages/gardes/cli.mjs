@@ -4,21 +4,24 @@
  *
  *   node packages/gardes/cli.mjs couverture
  *   node packages/gardes/cli.mjs demander [--base origin/main] [--ids I7,C3] [--auteur agent]
- *   node packages/gardes/cli.mjs pr --base <ref> [--tete <ref>] [--corps-fichier <chemin>]
+ *   node packages/gardes/cli.mjs pr [--base <ref>] [--tete <ref>] [--pr <n> | --issue <n> | --corps-fichier <chemin>]
  *
- * `demander` prépare la section « Invariants et contraintes » d'une PR d'après les fichiers modifiés
- * depuis la base ; l'analyse reste à écrire. `pr` lit la description dans la variable CORPS si aucun
- * fichier n'est donné ; une case cochée vaut validation.
+ * `demander` prépare la section « Invariants et contraintes » que l'auditeur écrit dans l'issue,
+ * d'après les fichiers modifiés depuis la base. `pr` lit cette section dans l'issue que la PR ferme
+ * (`--pr`, par « Close #n »), dans l'issue donnée (`--issue`), dans un fichier, ou dans la variable
+ * CORPS ; les deux premiers passent par `gh`, avec son jeton. Aucune case : le passage en Ready est la
+ * validation du porteur (#150). La base vaut `origin/main` quand elle n'est pas donnée et existe.
  *
  * Avec `--tete`, `pr` juge le contenu de ce commit — registre, documents, fichiers modifiés depuis la
  * base — quel que soit l'arbre d'où la garde s'exécute : elle le lit par git, sans l'extraire ni rien
  * en exécuter (#159). En CI, c'est ainsi que la garde de la base juge la PR. Le commit se cherche dans
  * le dépôt du répertoire courant, puis dans celui de la garde, où il est récupéré s'il manque. Sans
- * `--tete`, `pr` juge la copie de travail.
+ * `--tete`, `pr` juge la copie de travail, fichiers non commis compris : l'oubli se voit en local
+ * avant le passage en Ready.
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
-import { DOCUMENTS, RACINE, lireRegistre, preparerSection, resumePr, verifierCouverture, verifierCouvertureA, verifierPr } from './gardes.mjs';
+import { DOCUMENTS, RACINE, issuesFermees, lireRegistre, preparerSection, resumePr, verifierCouverture, verifierCouvertureA, verifierPr } from './gardes.mjs';
 
 const [commande, ...args] = process.argv.slice(2);
 const option = (nom) => {
@@ -78,9 +81,8 @@ function rendre(resultat) {
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${bilan}\n`);
   if (process.env.GITHUB_ACTIONS) {
     for (const p of resultat.aCorriger) console.log(`::error title=À corriger::${annotation(p)}`);
-    for (const p of resultat.enAttente) console.log(`::error title=Validation humaine attendue::${annotation(p)}`);
   }
-  process.exit(resultat.aCorriger.length || resultat.enAttente.length ? 1 : 0);
+  process.exit(resultat.aCorriger.length ? 1 : 0);
 }
 
 /** Le commit, résolu, et le dépôt qui le contient : celui du répertoire courant, sinon celui de la garde. */
@@ -104,18 +106,56 @@ function commitJuge(ref) {
   throw new Error(`le commit à juger (${ref}) est introuvable, même après \`git fetch origin ${ref}\` : la garde le lit par git, sans l'extraire.`);
 }
 
+/** Le corps d'une issue ou d'une PR, par `gh` : son jeton, son dépôt (`GH_REPO` ou le clone). */
+function corpsGitHub(genre, numero) {
+  try {
+    return execFileSync('gh', [genre, 'view', String(numero), '--json', 'body', '--jq', '.body'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    throw new Error(`lecture de ${genre === 'pr' ? 'la PR' : "l'issue"} #${numero} par \`gh\` impossible (${String(e.stderr || e.message).trim()}) ; donner la section par --corps-fichier.`);
+  }
+}
+
+/** La section à juger : celle de l'issue que la PR ferme, d'une issue donnée, d'un fichier, ou CORPS. */
+function sectionAJuger() {
+  const fichier = option('corps-fichier');
+  if (fichier) return readFileSync(fichier, 'utf8');
+  let issue = option('issue');
+  const numeroPr = option('pr');
+  if (!issue && numeroPr) {
+    const fermees = issuesFermees(corpsGitHub('pr', numeroPr));
+    if (fermees.length !== 1) {
+      throw new Error(`la PR #${numeroPr} ${fermees.length ? `ferme ${fermees.length} issues (${fermees.map((n) => `#${n}`).join(', ')})` : 'ne ferme aucune issue'} : une issue, une PR, citée par « Close #n ».`);
+    }
+    issue = fermees[0];
+  }
+  if (issue) {
+    console.log(`Section lue dans l'issue #${issue}.`);
+    return corpsGitHub('issue', issue);
+  }
+  return process.env.CORPS ?? '';
+}
+
 function pr() {
-  const base = option('base');
   const teteDonnee = option('tete');
   const juge = teteDonnee ? commitJuge(teteDonnee) : { depot: RACINE, sha: 'HEAD' };
+  const existe = (ref) => {
+    try {
+      gitDans(juge.depot, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const base = option('base') ?? (existe('origin/main') ? 'origin/main' : undefined);
   const couvert = teteDonnee ? verifierCouvertureA(juge.sha, juge.depot) : verifierCouverture();
-  const fichierCorps = option('corps-fichier');
-  const corps = fichierCorps ? readFileSync(fichierCorps, 'utf8') : (process.env.CORPS ?? '');
+  const corps = sectionAJuger();
+  const fichiers = base ? noms(gitDans(juge.depot, 'diff', '-z', '--name-only', `${base}...${juge.sha}`)) : [];
+  if (!teteDonnee) fichiers.push(...noms(git('diff', '-z', '--name-only', 'HEAD')), ...noms(git('ls-files', '-z', '--others', '--exclude-standard')));
   const resultat = verifierPr({
     entrees: couvert.entrees,
     entreesAvant: base ? registreA(base, juge.depot) : new Map(),
     corps,
-    fichiersModifies: base ? noms(gitDans(juge.depot, 'diff', '-z', '--name-only', `${base}...${juge.sha}`)) : [],
+    fichiersModifies: [...new Set(fichiers)],
   });
   resultat.aCorriger.unshift(...couvert.problemes.map((p) => `Couverture : ${p}`));
   rendre(resultat);
