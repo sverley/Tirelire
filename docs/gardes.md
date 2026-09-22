@@ -4,7 +4,7 @@ Chaque invariant ([`invariants.md`](invariants.md)) et chaque contrainte
 ([`contraintes.md`](contraintes.md)) est gardé par un harnais tant que c'est possible. Ce qui ne se
 programme pas devient une vérification manuelle : demandée dans l'issue du besoin, constatée par le
 porteur sur la version de dev après le passage en Ready de la PR, avant son « Validé », qui valide la
-PR et que la fusion exige. Ce document tient la correspondance ; `packages/gardes` le relit.
+PR et sans lequel le porteur ne la fusionne pas. Ce document tient la correspondance ; `packages/gardes` le relit.
 
 Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
 

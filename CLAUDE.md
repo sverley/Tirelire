@@ -104,7 +104,8 @@ Deux actes, qui ne se confondent pas :
 - **la validation**, par le porteur : il la donne par un commentaire « Validé » sur la PR, seul dans
   le commentaire. **Les agents n'écrivent jamais « Validé »**, ni sur une PR, ni ailleurs. La
   validation se lit dans le statut « Validé par le porteur » du dernier commit, qui n'est posé que si
-  toute la CI y a fini au vert ; la protection de `main` l'exige : une PR sans validation en cours ne se fusionne pas. Tout changement ensuite —
+  toute la CI y a fini au vert. C'est un signal : rien ne bloque techniquement la fusion, et le
+  porteur ne fusionne qu'une PR dont la validation est en cours. Tout changement ensuite —
   commit, édition, commentaire, revue, sur la PR ou sur l'issue qu'elle ferme, de qui que ce soit,
   porteur compris — l'annule : le statut passe en échec, l'étiquette « validée » quitte la PR et
   l'issue, et un commentaire sur la PR dit pourquoi. Un nouveau « Validé » la redonne.

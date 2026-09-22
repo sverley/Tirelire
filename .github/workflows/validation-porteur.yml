@@ -3,9 +3,11 @@ name: Validation du porteur
 # Le porteur valide une PR par un commentaire « Validé » sur la PR ; les agents ne l'écrivent jamais
 # (#168). Le brouillon ne joue plus aucun rôle dans la validation : il n'économise que la CI, et le
 # porteur le gère à la main. La validation se lit dans un statut de commit, « Validé par le porteur »,
-# posé sur la tête de la PR : la protection de `main` l'exige, si bien qu'une PR sans validation en
-# cours ne se fusionne pas. Un commit pousse une tête nouvelle, sans ce statut : il bloque déjà la
-# fusion.
+# posé sur la tête de la PR. C'est un signal, que le porteur respecte lui-même avant de fusionner :
+# rien ne bloque techniquement la fusion (dépôt privé sans offre payante, choix du porteur, #168).
+# Le statut dit où en est la PR : absent tant qu'elle n'a jamais été validée ; « en attente », avec la
+# raison, quand un commit arrive sur une PR prête ou que « Validé » est refusé ; « réussi » une fois
+# validée ; « échec », avec la cause, quand un changement annule la validation.
 #
 # Tout changement après « Validé » l'annule : un commit, une édition de la PR (description, titre,
 # base), un commentaire, une revue ou un commentaire de revue sur la PR, une édition ou un commentaire
@@ -23,8 +25,10 @@ name: Validation du porteur
 # leur dernière exécution sur ce commit — a fini au vert ; sinon le statut n'est pas posé et un
 # commentaire dit pourquoi. Un commit poussé sur une PR prête ne relance pas la CI : le job le dit en
 # commentaire, avec ce qu'il faut faire (repasser en brouillon puis en Ready, attendre le vert, puis
-# « Validé »). Ce commentaire ne coûte qu'aux commits sur une PR prête, jamais en brouillon. Le job ne porte pas le nom du statut : un job sauté s'affiche
-# « skipped », que GitHub compte réussi, et ne doit pas pouvoir tenir lieu de validation.
+# « Validé »). Ce commentaire ne coûte qu'aux commits sur une PR prête, jamais en brouillon.
+#
+# Le job ne porte pas le nom du statut : un job sauté s'affiche « skipped », que GitHub compte
+# réussi, et ne doit pas pouvoir tenir lieu de validation.
 #
 # Place du job sur le second axe des harnais (#113) :
 # - `suivi` est hors harnais : il ne vérifie rien, il pose ou annule la validation.
@@ -120,7 +124,7 @@ jobs:
             statut "$(tete "$1")" failure "Validation annulée : $2"
             retirer_etiquette "$1"
             for n in $(issues_de_pr "$1"); do retirer_etiquette "$n"; done
-            gh pr comment "$1" --body "Validation annulée : $2 (par $AUTEUR). La PR ne se fusionne plus : il faut un nouveau « Validé » du porteur.${3:+ $3}"
+            gh pr comment "$1" --body "Validation annulée : $2 (par $AUTEUR). Ne pas fusionner avant un nouveau « Validé » du porteur.${3:+ $3}"
             echo "PR #$1 : validation annulée, $2."
           }
           valider() {
@@ -128,6 +132,7 @@ jobs:
             sha="$(tete "$PR")"
             manque="$(ci_rouge "$sha")"
             if [ -n "$manque" ]; then
+              statut "$sha" pending "Pas validée : la CI n'a pas fini au vert sur ce commit"
               gh pr comment "$PR" --body "« Validé » non pris en compte sur ${sha::7} : toute la CI doit y avoir fini au vert."$'\n\n'"$manque"$'\n\n'"$RELANCE"
               echo "PR #$PR : CI pas verte sur ${sha::7}, validation refusée."; return 0
             fi
@@ -162,7 +167,8 @@ jobs:
               for n in $(issues_de_pr "$PR"); do retirer_etiquette "$n"; done ;;
             pull_request_target:synchronize)
               if etiquetee "$PR"; then annuler "$PR" "un commit a été poussé" "$RELANCE"
-              else gh pr comment "$PR" --body "Commit $(tete "$PR" | cut -c1-7) poussé sur une PR prête : la CI n'a pas tourné sur lui, et « Validé » n'y sera pas accepté. $RELANCE"; fi ;;
+              else statut "$(tete "$PR")" pending "Pas validée : commit poussé après le Ready, CI à rejouer"
+                gh pr comment "$PR" --body "Commit $(tete "$PR" | cut -c1-7) poussé sur une PR prête : la CI n'a pas tourné sur lui, et « Validé » n'y sera pas accepté. $RELANCE"; fi ;;
             pull_request_target:edited) annuler "$PR" "sa description, son titre ou sa base ont été modifiés" ;;
             pull_request_review:*) annuler "$PR" "une revue a été $(fait e)" ;;
             pull_request_review_comment:*) annuler "$PR" "un commentaire de revue a été $(fait '')" ;;
