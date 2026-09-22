@@ -21,11 +21,12 @@
  *    soit 3 et 4 ; et **le harnais mesure à l'objectif plus un geste de marge**, soit 3 et 4 pour
  *    catégoriser, 4 et 5 pour automatiser. L'entrée porte donc les quatre objectifs et la marge ;
  *    un harnais les mesure, ou une renonciation écrite le dit. Un objectif qui ne vit que dans
- *    l'analyse d'une PR ne se compare à rien au tour suivant.
+ *    le fil d'une PR ne se compare à rien au tour suivant.
  * 3. **Les gardes du jour ne disparaissent pas.** Le harnais d'I6 et les trois vérifications
  *    manuelles (`VM-I4-simple`, `VM-I5-acces`, `VM-I6-gestes`) sont figés ici : une dette se règle
  *    en bâtissant, pas en effaçant. Retirer une garde reste possible, mais par la section
- *    « Vérifications manuelles » de la PR, analysée et validée (docs/gardes.md).
+ *    « Invariants et contraintes » de l'issue, déclarée, puis validée par le passage en Ready
+ *    (`CLAUDE.md`).
  *
  * **Forme d'une renonciation**, lecture retenue sauf avis contraire du porteur (question posée dans
  * #71) : un paragraphe de prose dans l'entrée, qui dit « renonciation », ce qui a été essayé, et
