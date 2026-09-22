@@ -125,13 +125,20 @@ Le service worker met les appareils à jour au chargement suivant.
 
 ## Aperçu de chaque PR sur l'instance de recette
 
-Au passage en Ready d'une PR (jamais en brouillon), si ses tests passent, la PR a son aperçu : le site du dernier commit de sa branche,
+Au passage en Ready d'une PR (jamais en brouillon), si ses tests passent, la PR peut avoir son aperçu : le site du dernier commit de sa branche,
 construit pour le sous-dossier `pr-<numéro>` d'une instance de recette, déposé par
 `apercu.sh deposer` dans `<TIRELIRE_DEV_FTP_DOSSIER>/pr-<numéro>`, puis vérifié en ligne par
 `verifier.sh`, commit servi compris. La fermeture de la PR (fusion ou abandon) supprime ce
 sous-dossier entier, paquets du relais compris (`apercu.sh retirer`), sans tests ni build. Aucun de
 ces jobs ne publie de commentaire : l'adresse de recette ne s'écrit nulle part en clair dans le dépôt,
 et le diagnostic d'un aperçu reste dans le journal de la CI.
+
+Le dépôt est manuel. Au passage en Ready, le job « Déployer l'aperçu ? » d'`apercu.yml` attend
+l'approbation du porteur sur l'environnement `apercu` (réviseur requis, `main` seulement, aucun
+secret) : la PR affiche le bouton **Review deployments**, puis **Approve and deploy** lance le dépôt,
+**Reject** l'écarte. Sans approbation, rien n'est déposé ; l'attente expire au bout de 30 jours, et
+l'artefact du site au bout de 7 : au-delà, repasser la PR en brouillon puis en Ready. Le retrait à la
+fermeture reste automatique.
 
 Le code de la PR et les identifiants ne se croisent jamais (#155). `ci.yml`, lu dans la branche,
 assemble le site de la PR sans identifiant ni réglage de recette, et le garde en artefact

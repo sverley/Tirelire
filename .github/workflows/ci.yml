@@ -298,7 +298,8 @@ jobs:
           name: apercu-pr-${{ github.event.pull_request.number }}
           path: apps/hebergement/tirelire-hebergement.zip
           if-no-files-found: error
-          retention-days: 3
+          # Le dépôt attend l'approbation manuelle d'`apercu.yml` : l'artefact doit lui survivre.
+          retention-days: 7
 
   android:
     name: APK Android
