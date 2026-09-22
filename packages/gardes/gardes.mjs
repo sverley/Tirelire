@@ -62,14 +62,12 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 /**
  * Ce qui ne change qu'à la demande du porteur (#64) : les invariants, et la description du projet
  * qui les fonde — son texte, mot pour mot, que seul le porteur complète ou corrige (`CLAUDE.md`).
- * Son accord ne reste pas dans l'analyse : c'est une ligne « Accord du porteur : … » de la section,
- * que la garde lit et refuse quand elle manque ou reste vide.
+ * Son accord est une ligne « Accord du porteur : … » de la section, que la garde lit et refuse
+ * quand elle manque ou reste vide.
  */
 
 const G = DOCUMENTS.gardes;
 const IDENTIFIANT = /\b([IUC]\d+)\b/g;
-/** Ce que contient une analyse laissée telle que le modèle ou `demander` l'ont écrite. */
-const ANALYSE_VIDE = /^(?:…|\.\.\.|à écrire|à compléter|à analyser)?\.?$/i;
 const RANG = { I: 0, U: 1, C: 2 };
 
 /** Ordre de lecture : invariants, usages, contraintes, chacun par numéro. */
@@ -808,14 +806,12 @@ export function lireDescriptionPr(corps) {
 
   const items = [];
   let item = null;
-  let dansAnalyse = false;
   let dansTete = false;
   for (const ligne of section) {
     const tete = ligne.match(/^[-*]\s+(?:\[[ xX]\]\s+)?`([^`]+)`(.*)$/);
     if (tete) {
-      item = { cle: tete[1].trim(), consigne: couper(tete[2])[1], analyse: '' };
+      item = { cle: tete[1].trim(), consigne: couper(tete[2])[1] };
       items.push(item);
-      dansAnalyse = false;
       dansTete = true;
       continue;
     }
@@ -824,14 +820,7 @@ export function lireDescriptionPr(corps) {
       item = null;
       continue;
     }
-    const analyse = ligne.match(/^\s+[-*]\s+Analyse\b[^:]*:\s*(.*)$/i);
-    if (analyse) {
-      item.analyse = analyse[1].trim();
-      dansAnalyse = true;
-      dansTete = false;
-    } else if (dansAnalyse && ligne.trim()) {
-      item.analyse = `${item.analyse} ${ligne.trim()}`.trim();
-    } else if (dansTete && ligne.trim()) {
+    if (dansTete && ligne.trim()) {
       // La consigne recopiée peut être coupée comme dans le registre, avant la première sous-puce.
       if (/^\s+[-*+]\s/.test(ligne)) dansTete = false;
       else item.consigne = `${item.consigne} ${ligne.trim()}`.trim();
@@ -915,8 +904,6 @@ export function issuesFermees(corps) {
   const texte = lignesHorsCode(corps).join('\n');
   return [...new Set([...texte.matchAll(FERMETURE)].map((m) => Number(m[1])))];
 }
-
-export const analyseEcrite = (analyse) => !ANALYSE_VIDE.test(String(analyse ?? ''));
 
 export function preparerSection({ entrees, entreesAvant = new Map(), fichiersModifies = [], ids = [] }) {
   const imposes = plancher(entrees, fichiersModifies);

@@ -54,7 +54,7 @@ compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refu
 
 - `Chemins :` suivi de motifs entre accents graves (`*` dans un dossier, `**` à travers les
   dossiers) : modifier un fichier qui y répond impose de déclarer l'entrée. C'est un plancher,
-  volontairement étroit ; l'analyse ajoute ce qu'il ne voit pas.
+  volontairement étroit ; l'auditeur ajoute ce qu'il ne voit pas.
 - Une ligne `Harnais` : un ou plusieurs chemins entre accents graves, un tiret cadratin, puis ce que
   le harnais garde. Pour un test précis, son nom vient en tête, entre guillemets, comme « positions
   et soldes (D19, D29) » pour I2 : c'est alors ce test, titre d'un `describe`, d'un `it` ou d'un
@@ -66,7 +66,8 @@ compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refu
 - Une ligne `Vérification manuelle` : un identifiant `VM-<entrée>-<nom>`, un tiret cadratin, puis ce
   qu'on fait, sur quoi, et ce qu'on doit constater. La consigne se proportionne à la PR : une
   PR qui ne touche que des tests, de l'outillage ou de la documentation ne déclenche ni manipulation
-  de l'application ni construction de l'APK ; son analyse dit pourquoi l'application n'est pas atteinte.
+  de l'application ni construction de l'APK ; le compte rendu du codeur dit pourquoi l'application
+  n'est pas atteinte.
 - Une ligne `Couvert par` : des identifiants, un tiret cadratin, puis pourquoi. Déclarer l'entrée
   demande alors aussi les vérifications des entrées citées.
 - Une ligne `À bâtir` : un harnais prévu (#38). Il ne garde rien tant qu'il n'existe pas ; une
@@ -216,8 +217,8 @@ devant le produit, et le seuil interdit la hausse.
   sous-catégorie créée par l'interface.
   Témoin rouge : « témoin rouge · un classement qui coûte un geste de plus que le seuil »
 - **Vérification manuelle** · `VM-I6-gestes` — Compter les gestes pour classer une opération
-  importée, puis toutes les opérations semblables ; écrire les deux nombres dans l'analyse et
-  signaler toute hausse par rapport à `main`.
+  importée, puis toutes les opérations semblables ; écrire les deux nombres dans le compte rendu du
+  codeur et signaler toute hausse par rapport à `main`.
 
 ## I7 · Les données restent en local
 
