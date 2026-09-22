@@ -144,7 +144,7 @@ Il passe en premier. Il ne code jamais le produit.
    description, glossaire, invariants, contraintes. Écrire dans la PR ce qui a été comparé et
    pourquoi cela tient. Une contradiction ne se code pas : elle devient une question dans l'issue.
 
-Il ne rédige ni analyse de vérification ni compte rendu : la PR est le cadre, pas le rapport.
+Sa vérification s'écrit dans la PR, sans rapport à part : le compte rendu est celui du codeur.
 
 #### Le codeur
 

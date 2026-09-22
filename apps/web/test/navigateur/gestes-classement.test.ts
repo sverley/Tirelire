@@ -1,8 +1,8 @@
 /**
  * Harnais d'I6 — « Catégoriser en peu de clics » (issue #71, chantier de #38).
  *
- * `VM-I6-gestes` demandait de compter les gestes à la main et de les écrire dans l'analyse : aucun
- * nombre ne survivait d'une PR à l'autre. Ce harnais mesure le compte dans le navigateur, sur le
+ * `VM-I6-gestes` seule faisait compter les gestes à la main : aucun nombre ne survivait d'une PR
+ * à l'autre. Ce harnais mesure le compte dans le navigateur, sur le
  * jeu d'exemple, et le compare à l'objectif tranché par le porteur le 13 septembre 2026 (#71).
  *
  * **Un geste** = une action de l'utilisateur : une frappe sur un bouton ou une ligne, un choix dans

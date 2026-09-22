@@ -29,8 +29,8 @@
  *    dette disparaît aussi si l'on retire la ligne, et un usage paraît gardé de bout en bout si l'on
  *    remplace ses harnais unitaires au lieu d'en ajouter un. Les sept harnais et les six
  *    vérifications manuelles des usages sont figés ici : le registre ne peut plus en perdre un sans
- *    que ce harnais le dise. Retirer une garde reste possible, mais par la section « Vérifications
- *    manuelles » de la PR, analysée et validée (docs/gardes.md).
+ *    que ce harnais le dise. Retirer une garde reste possible, mais par la section « Invariants et
+ *    contraintes » de l'issue, déclarée, puis validée par le passage en Ready (`CLAUDE.md`).
  *
  * Ce fichier ne juge pas le contenu des parcours : ce qu'un parcours doit traverser est dit par
  * l'issue de chaque usage, et se relit en audit. Il garde ce qui se vérifie sans interpréter, et

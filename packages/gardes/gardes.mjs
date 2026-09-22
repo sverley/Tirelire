@@ -44,10 +44,10 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 // ─── Règles primaires (#64) ──────────────────────────────────────────────────────────────────
 // Changer une règle reste libre : toute PR peut ajouter une décision, faire évoluer la garde ou les
 // règles des sessions. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les règles
-// primaires. La conformité porte sur le sens et ne se programme pas : elle devient donc une
-// vérification manuelle, demandée par les chemins que la PR modifie, analysée puis validée par un
-// développeur humain avant la fusion. Sur une PR, la garde qui juge est celle de la base, appliquée au
-// contenu de la PR, qu'elle lit par git sans l'extraire (#159, `verifierCouvertureA`).
+// primaires. La conformité porte sur le sens et ne se programme pas : l'auditeur la vérifie en
+// relisant, et le porteur valide au passage en Ready (`CLAUDE.md`). Sur une PR, la garde qui juge
+// est celle de la base, appliquée au contenu de la PR, qu'elle lit par git sans l'extraire (#159,
+// `verifierCouvertureA`).
 
 /**
  * Familles de chemins dont la modification ajoute ou change une règle. Une table à part du registre,
