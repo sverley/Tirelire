@@ -1,0 +1,35 @@
+name: Fin de l'issue
+
+# À la fermeture d'une issue, par la fusion d'une PR ou à la main : l'étiquette « en cours » la
+# quitte (#157), pour que la liste des issues « en cours » dise ce qui l'est. Un workflow à lui, pour
+# qu'aucune exécution ne montre sauté un job qu'une autre joue (#149) : sur une issue sans
+# l'étiquette, le job est écarté par sa condition et rien ne tourne. GitHub lit ce workflow sur
+# `main` pour `issues`. Une PR fermée n'est pas visée : « en cours » ne se pose que sur les issues.
+#
+# Place du job sur le second axe des harnais (#113, D71) :
+# - `fin` est hors harnais : il ne vérifie rien ; il rougit s'il ne parvient pas à retirer
+#   l'étiquette. Ce que fait le jeton du job ne déclenche aucun workflow : le retrait de « en cours »
+#   ne réveille pas `brouillon.yml`.
+
+on:
+  issues:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  fin:
+    name: Fin de l'issue
+    if: contains(github.event.issue.labels.*.name, 'en cours')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMERO: ${{ github.event.issue.number }}
+    steps:
+      - name: Retirer « en cours » de l'issue fermée
+        run: |
+          gh issue edit "$NUMERO" --remove-label "en cours"
+          echo "Étiquette « en cours » retirée de l'issue #$NUMERO."
