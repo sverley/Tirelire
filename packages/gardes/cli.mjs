@@ -9,8 +9,8 @@
  * `demander` prépare la section « Invariants et contraintes » que l'auditeur écrit dans l'issue,
  * d'après les fichiers modifiés depuis la base. `pr` lit cette section dans l'issue que la PR ferme
  * (`--pr`, par « Close #n »), dans l'issue donnée (`--issue`), dans un fichier, ou dans la variable
- * CORPS ; les deux premiers passent par `gh`, avec son jeton. Aucune case : le porteur valide par un
- * commentaire « Validé » sur la PR (#168). La base vaut `origin/main` quand elle n'est pas donnée et existe.
+ * CORPS ; les deux premiers passent par `gh`, avec son jeton. Aucune case : la
+ * fusion vaut validation (#168). La base vaut `origin/main` quand elle n'est pas donnée et existe.
  *
  * Avec `--tete`, `pr` juge le contenu de ce commit — registre, documents, fichiers modifiés depuis la
  * base — quel que soit l'arbre d'où la garde s'exécute : elle le lit par git, sans l'extraire ni rien

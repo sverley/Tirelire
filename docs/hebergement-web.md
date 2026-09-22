@@ -138,7 +138,7 @@ vert de toute la CI » d'`apercu.yml` attend les deux workflows de la PR pour so
 `ci.yml` (tests, build, assemblage) et `validation.yml` (la garde). Tous verts, le
 dépôt suit. L'un rouge, annulé ou pas fini dans l'heure : rien n'est déposé, et un commentaire de la
 PR nomme le workflow en cause avec le lien de son exécution, sans l'adresse de la recette. Le
-porteur regarde l'aperçu déposé, puis valide la PR par un commentaire « Validé ». Le retrait à la fermeture est
+porteur regarde l'aperçu déposé, puis fusionne : la fusion vaut validation. Le retrait à la fermeture est
 automatique.
 
 Le code de la PR et les identifiants ne se croisent jamais (#155). `ci.yml`, lu dans la branche,

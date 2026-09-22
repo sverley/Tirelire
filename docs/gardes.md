@@ -3,8 +3,8 @@
 Chaque invariant ([`invariants.md`](invariants.md)) et chaque contrainte
 ([`contraintes.md`](contraintes.md)) est gardé par un harnais tant que c'est possible. Ce qui ne se
 programme pas devient une vérification manuelle : demandée dans l'issue du besoin, constatée par le
-porteur sur la version de dev après le passage en Ready de la PR, avant son « Validé », qui valide la
-PR et sans lequel le porteur ne la fusionne pas. Ce document tient la correspondance ; `packages/gardes` le relit.
+porteur sur la version de dev après le passage en Ready de la PR, avant sa fusion, qui vaut
+validation. Ce document tient la correspondance ; `packages/gardes` le relit.
 
 Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
 
@@ -26,8 +26,8 @@ Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
   le lien pourrait être masqué ; un fichier modifié qui répond aux `Chemins` d'une entrée impose de la
   déclarer, et la garde rougit en nommant l'entrée manquante ; chaque vérification manuelle des
   entrées déclarées, et chaque garde retirée de ce document, figure dans la section avec sa consigne
-  recopiée. Tant qu'il manque quelque chose, le job est rouge. Aucune case : le porteur valide par un
-  commentaire « Validé » sur la PR, et tout changement ensuite de la PR ou de l'issue l'annule. La même vérification se joue en local, avant le Ready :
+  recopiée. Tant qu'il manque quelque chose, le job est rouge. Aucune case : la fusion vaut validation, et
+  un changement de la PR ou de l'issue après le Ready est signalé en commentaire de la PR. La même vérification se joue en local, avant le Ready :
   `node packages/gardes/cli.mjs pr --issue <n>` (ou `--corps-fichier`), sur les fichiers modifiés
   depuis `origin/main`, copie de travail comprise.
 - **La garde qui juge une PR est celle de `main`.** Le job « Validation » exécute la garde et le
