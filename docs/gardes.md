@@ -216,9 +216,9 @@ devant le produit, et le seuil interdit la hausse.
   comparé à son seuil ; une opération remise à zéro par le harnais avant chaque mesure, et la
   sous-catégorie créée par l'interface.
   Témoin rouge : « témoin rouge · un classement qui coûte un geste de plus que le seuil »
-- **Vérification manuelle** · `VM-I6-gestes` — Compter les gestes pour classer une opération
-  importée, puis toutes les opérations semblables ; écrire les deux nombres dans le compte rendu du
-  codeur et signaler toute hausse par rapport à `main`.
+- **Vérification manuelle** · `VM-I6-gestes` — Sur la version de dev, compter les gestes pour classer une
+  opération importée, puis toutes les opérations semblables, et constater qu'aucun des deux nombres
+  ne dépasse celui de `main`.
 
 ## I7 · Les données restent en local
 
