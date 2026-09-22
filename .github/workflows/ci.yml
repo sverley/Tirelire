@@ -1,37 +1,38 @@
 name: CI et livraison
 
 # Sur une PR, rien ne tourne en brouillon ; tout tourne au passage en Ready, une fois par passage
-# (#150). Quatre workflows, pour qu'aucune exécution ne montre sautés les jobs qu'une autre joue (B1) :
-# celui-ci (tests, aperçu, livraison), `validation.yml` (la garde de `main`), `etiquette.yml`
-# (l'étiquette « en validation » de l'issue) et `brouillon.yml` (tout changement d'une PR prête la
-# renvoie en brouillon).
+# (#150). Cinq workflows, pour qu'aucune exécution ne montre sautés les jobs qu'une autre joue (B1) :
+# celui-ci (tests, assemblage de l'aperçu, livraison), `validation.yml` (la garde de `main`),
+# `etiquette.yml` (l'étiquette « en validation » de l'issue), `brouillon.yml` (tout changement d'une
+# PR prête la renvoie en brouillon) et `apercu.yml` (dépôt et retrait de l'aperçu, lus sur `main`).
+#
+# Les identifiants FTP (`OVH_FTP_*`) vivent dans l'environnement `depot-ftp`, qui n'admet que `main`
+# (#155) : ce workflow, lu dans la branche pour une PR, ne peut pas les obtenir. Seul `deploiement`
+# les lit ici, sur `main`.
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
 #   l'archive du site qu'il dépose ensuite ne juge rien.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
-#   `main`, à un tag `v*` et à la main ; jamais sur une PR, où `apercu` l'assemble (#153).
+#   `main`, à un tag `v*` et à la main ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).
 # - `deploiement` lit hors des fichiers suivis : après le dépôt FTP, l'étape « Vérifier le site en
 #   ligne » (`verifier.sh`) lit le site déployé.
 # - `android` est hors harnais : il construit l'APK, sans rien vérifier.
 # - `publication` est hors harnais : il publie les releases.
-# - `apercu` lit hors des fichiers suivis : il assemble le site de la PR pour son sous-dossier de
-#   recette — le seul assemblage d'une PR, fait avant de lire les réglages de la recette, pour que le
-#   site se construise même quand ils manquent (I9, #153) —, l'y dépose (`apercu.sh deposer`), puis
-#   l'étape « Vérifier l'aperçu en ligne » (`verifier.sh`) lit l'aperçu déployé et le commit qu'il
-#   sert (#141).
-# - `retrait-apercu` est hors harnais : à la fermeture de la PR, il supprime son sous-dossier de
-#   recette (`apercu.sh retirer`), sans tests ni build (#131).
+# - `assemblage-apercu` est hors harnais : il assemble le site de la PR pour son sous-dossier de
+#   recette — le seul assemblage d'une PR, sans réglage de recette ni identifiant, pour que le site
+#   se construise toujours (I9, #153) — et le passe en artefact (`apercu-pr-<numéro>`) au job de
+#   dépôt d'`apercu.yml`, qui n'exécute rien de la PR (#155).
 
 on:
   push:
     branches: [main]
     tags: ['v*']
   # Le passage en Ready : `ready_for_review`, ou une PR ouverte ou rouverte hors brouillon (#150). Un
-  # commit sur une PR prête ne rejoue rien ici : `brouillon.yml` la renvoie en brouillon. La fermeture
-  # ne joue que le retrait de l'aperçu.
+  # commit sur une PR prête ne rejoue rien ici : `brouillon.yml` la renvoie en brouillon. Le retrait
+  # de l'aperçu, à la fermeture, est dans `apercu.yml` (#155).
   pull_request:
-    types: [opened, reopened, ready_for_review, closed]
+    types: [opened, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       deploiement:
@@ -44,15 +45,15 @@ permissions:
   contents: write
 
 # Sur une PR, un passage en Ready rend caduc celui d'avant ; un push sur `main` ou un tag ne
-# s'annule pas. La fermeture ne joue que le retrait de l'aperçu, dans son groupe.
+# s'annule pas.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'closed' && 'fermeture' || 'code' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'closed' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     name: Tests et build web
-    if: github.event_name != 'pull_request' || (github.event.action != 'closed' && github.event.pull_request.draft != true)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +91,7 @@ jobs:
     name: Site pour hébergement mutualisé
     needs: test
     # Pour la racine, à déposer et publier : sur `main`, à un tag `v*` et à la main. Sur une PR, le
-    # site ne s'assemble qu'une fois, dans `apercu`, pour son sous-dossier de recette (#153).
+    # site ne s'assemble qu'une fois, dans `assemblage-apercu`, pour son sous-dossier de recette (#153).
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -115,8 +116,11 @@ jobs:
   deploiement:
     name: Dépôt FTP sur l'hébergement
     needs: hebergement
-    if: github.event_name != 'pull_request' && inputs.deploiement != 'ignorer'
+    # Depuis `main` seulement : l'environnement `depot-ftp`, qui porte les identifiants, n'admet que
+    # `main` (#155). Un tag `v*` publie la release sans redéposer le site, déjà déposé au push.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.deploiement != 'ignorer'
     runs-on: ubuntu-latest
+    environment: depot-ftp
     # Un seul dépôt à la fois : deux transferts simultanés laisseraient le site à moitié à jour.
     concurrency:
       group: deploiement-ftp
@@ -260,106 +264,41 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-  apercu:
-    name: Aperçu de la PR sur l'instance de recette
+  assemblage-apercu:
+    name: Assemblage de l'aperçu de la PR
     needs: test
-    # Au passage en Ready seulement, après ses tests : jamais sur un brouillon, ni à la fermeture. La
-    # version de dev est celle du dernier commit de la branche (#141, #150).
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true
+    # Au passage en Ready seulement, après ses tests : jamais sur un brouillon. La version de dev est
+    # celle du dernier commit de la branche (#141, #150). Aucun identifiant FTP, aucun réglage de
+    # recette, lecture seule : le dépôt se fait dans `apercu.yml`, lu sur `main`, qui reprend
+    # l'artefact (#155).
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
-    # Dépôt et retrait d'un même aperçu, l'un après l'autre.
-    concurrency:
-      group: apercu-${{ github.event.pull_request.number }}
-      cancel-in-progress: false
-    env:
-      NUMERO: ${{ github.event.pull_request.number }}
-      # Recette : aucune valeur par défaut, apercu.sh arrête tout si l'une manque ou vaut la production.
-      TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
-      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
-      TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
-      TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
-      # Mêmes identifiants FTP que la production (#141).
-      HOTE: ${{ secrets.OVH_FTP_HOST }}
-      UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
-      MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
-      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
-      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
-      COMMIT: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      contents: read
     steps:
       # La version de la branche, telle que la PR la montre : son dernier commit.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v4 # version lue dans package.json (packageManager)
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Le seul assemblage du site sur une PR (#153) : avant les réglages de la recette, qu'il ne lit
-      # pas, pour que le site se construise même quand ils manquent et que rien ne se dépose (I9).
+      # Le seul assemblage du site sur une PR (#153).
       - name: Assembler pour le sous-dossier de l'aperçu
         env:
           TIRELIRE_BASE: /pr-${{ github.event.pull_request.number }}/
           TIRELIRE_COMMIT: ${{ github.event.pull_request.head.sha }}
         run: pnpm --filter @tirelire/hebergement assembler
-      - name: Réglages de l'aperçu
-        id: reglages
-        run: bash apps/hebergement/apercu.sh reglages >> "$GITHUB_OUTPUT"
-      - name: Installer lftp
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-      - name: Déposer l'aperçu
-        env:
-          SOURCE: apps/hebergement/dist
-        run: bash apps/hebergement/apercu.sh deposer
-      # Le diagnostic reste dans ce journal : aucun commentaire, l'adresse de recette ne s'affiche
-      # pas en clair dans le dépôt.
-      - name: Vérifier l'aperçu en ligne
-        env:
-          ADRESSE_SITE: ${{ steps.reglages.outputs.adresse }}
-          COMMIT_ATTENDU: ${{ github.event.pull_request.head.sha }}
-        run: bash apps/hebergement/verifier.sh
-      - name: Résumé
-        if: always()
-        run: |
-          {
-            echo "### Aperçu de la PR #$NUMERO"
-            echo
-            if [ "${{ job.status }}" = success ]; then
-              echo "Déposé dans le sous-dossier \`pr-$NUMERO\` de la recette, et vérifié en ligne : il sert le commit \`${COMMIT::7}\`."
-            else
-              echo "Pas d'aperçu à jour : le diagnostic est dans le journal de ce job."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  retrait-apercu:
-    name: Retrait de l'aperçu de la PR
-    # À la fermeture seulement (fusion ou abandon) : ni tests ni build (#131).
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: apercu-${{ github.event.pull_request.number }}
-      cancel-in-progress: false
-    env:
-      NUMERO: ${{ github.event.pull_request.number }}
-      TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
-      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
-      TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
-      TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
-      HOTE: ${{ secrets.OVH_FTP_HOST }}
-      UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
-      MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
-      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
-      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
-    steps:
-      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          sparse-checkout: apps/hebergement
-      - name: Installer lftp
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-      - name: Retirer l'aperçu
-        run: bash apps/hebergement/apercu.sh retirer
+          name: apercu-pr-${{ github.event.pull_request.number }}
+          path: apps/hebergement/tirelire-hebergement.zip
+          if-no-files-found: error
+          retention-days: 3
 
   android:
     name: APK Android

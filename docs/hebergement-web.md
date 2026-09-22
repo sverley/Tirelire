@@ -51,7 +51,14 @@ qu'avec le serveur intégré de PHP.
 renseignés ; à un tag `v*`, elle joint `tirelire-hebergement.zip` à la release, avec l'APK. Sans secrets, le job de dépôt le dit dans son résumé et ne fait rien
 d'autre : l'archive reste téléchargeable.
 
-### Secrets à créer (Paramètres du dépôt → Secrets and variables → Actions → *Secrets*)
+### Secrets à créer (Paramètres du dépôt → Environments → `depot-ftp`)
+
+Les identifiants FTP vivent dans l'environnement `depot-ftp`, pas au niveau du dépôt : c'est ce qui
+les met hors de portée du code d'une PR (#155). Créer l'environnement ; dans *Deployment branches and
+tags*, choisir *Selected branches and tags* et n'ajouter que la branche `main` ; y créer les trois
+secrets ci-dessous (*Environment secrets*), puis supprimer ceux du même nom au niveau du dépôt. Tant
+que ce n'est pas fait, les jobs qui déclarent l'environnement tournent encore, mais sans cette
+protection.
 
 | Secret | Valeur | Où la trouver |
 |---|---|---|
@@ -126,9 +133,17 @@ sous-dossier entier, paquets du relais compris (`apercu.sh retirer`), sans tests
 ces jobs ne publie de commentaire : l'adresse de recette ne s'écrit nulle part en clair dans le dépôt,
 et le diagnostic d'un aperçu reste dans le journal de la CI.
 
-Sur une PR, le site ne s'assemble qu'une fois par passage, dans le job de l'aperçu : pour le
-sous-dossier `pr-<numéro>`, et avant de lire les réglages de la recette. Il se construit donc même
-quand ces réglages manquent ; seul le dépôt n'a pas lieu. L'assemblage pour la racine, son artefact
+Le code de la PR et les identifiants ne se croisent jamais (#155). `ci.yml`, lu dans la branche,
+assemble le site de la PR sans identifiant ni réglage de recette, et le garde en artefact
+(`apercu-pr-<numéro>`). `apercu.yml`, lu sur `main` (`pull_request_target`), attend cette exécution,
+reprend l'artefact et le dépose, dans un job de l'environnement `depot-ftp` qui n'extrait que `main`
+et n'exécute rien de la PR : les scripts de dépôt qui tournent, et donc le bornage à
+`<dossier>/pr-<numéro>`, sont ceux de `main`, que la PR les modifie ou non. Le retrait se fait de
+même. Une PR qui modifie `apercu.yml` ou ces scripts n'en voit l'effet qu'une fois fusionnée.
+
+Sur une PR, le site ne s'assemble qu'une fois par passage, dans `ci.yml` (job « Assemblage de
+l'aperçu de la PR ») : pour le sous-dossier `pr-<numéro>`, sans lire les réglages de la recette. Il
+se construit donc même quand ces réglages manquent ; seul le dépôt n'a pas lieu. L'assemblage pour la racine, son artefact
 et sa publication restent à `main`, aux tags `v*` et au lancement manuel (#153).
 
 La recette est une origine distincte de la production (un sous-domaine, en HTTPS) : les aperçus y
@@ -136,7 +151,7 @@ partagent un même stockage navigateur, jamais celui de la production. Chaque ap
 service worker sur la portée de son sous-dossier. Le `robots.txt` de la racine de la recette se pose à
 la main ; aucun job n'y touche.
 
-Mêmes secrets `OVH_FTP_*` que la production, et deux variables (onglet *Variables*), sans valeur par
+Mêmes secrets `OVH_FTP_*` que la production, dans le même environnement `depot-ftp`, et deux variables (onglet *Variables*), sans valeur par
 défaut :
 
 | Variable | Rôle |
