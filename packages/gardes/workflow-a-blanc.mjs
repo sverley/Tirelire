@@ -80,7 +80,7 @@ export const commande = (é) => é.lignes.filter((l) => !CLÉ_ÉTAPE('name').tes
 // ─── Les expressions de GitHub Actions, le sous-ensemble utile ───────────────────────────────────
 
 export function jetons(source) {
-  const motif = /\s*(?:'((?:[^']|'')*)'|(\d+(?:\.\d+)?)\b|(==|!=|&&|\|\||<=|>=|[!()<>,])|([A-Za-z_][\w.-]*))/y;
+  const motif = /\s*(?:'((?:[^']|'')*)'|(\d+(?:\.\d+)?)\b|(==|!=|&&|\|\||<=|>=|[!()<>,])|([A-Za-z_][\w-]*(?:\.(?:[\w-]+|\*))*))/y;
   const liste = [];
   let m;
   while (motif.lastIndex < source.length && (m = motif.exec(source))) {
@@ -101,6 +101,21 @@ export function égal(a, b) {
   if (typeof a === typeof b && a !== null && b !== null) return a === b;
   return nombre(a) === nombre(b);
 }
+/** Un chemin de propriétés ; `*` est le filtre d'objets de GitHub : `labels.*.name` donne la liste des noms. */
+export function chemin(o, segments) {
+  if (!segments.length) return o ?? null;
+  const [k, ...reste] = segments;
+  if (o == null) return null;
+  if (k === '*') {
+    const éléments = Array.isArray(o) ? o : typeof o === 'object' ? Object.values(o) : [];
+    return éléments.flatMap((e) => {
+      const v = chemin(e, reste);
+      return v == null ? [] : [v];
+    });
+  }
+  return chemin(o[k], reste);
+}
+
 export const STATUT = /\b(always|success|failure|cancelled)\s*\(/;
 
 export function évaluer(source, ctx, échec = false) {
@@ -163,7 +178,7 @@ export function évaluer(source, ctx, échec = false) {
       return f();
     }
     if (['true', 'false', 'null'].includes(x.v)) return JSON.parse(x.v);
-    return x.v.split('.').reduce((o, k) => (o == null ? null : (o[k] ?? null)), ctx);
+    return chemin(ctx, x.v.split('.'));
   };
   const v = ou();
   assert.equal(i, j.length, `${CI} : condition illisible par le harnais : ${source}`);

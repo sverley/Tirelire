@@ -187,7 +187,7 @@ const HORS_VALIDATION = [
   ['issues', { action: 'unlabeled', label: { name: 'besoin' }, issue: ISSUE_SEULE }],
 ];
 /** Ce qui arrive à une PR sans la changer : elle reste prête, rien ne doit s'afficher sauté (B1). */
-const SANS_CHANGEMENT = ['labeled', 'unlabeled', 'assigned', 'unassigned', 'review_requested', 'review_request_removed', 'converted_to_draft'];
+const SANS_CHANGEMENT = ['labeled', 'unlabeled', 'assigned', 'unassigned', 'review_requested', 'review_request_removed'];
 
 /** Les jobs qui tournent au passage en Ready, toutes exécutions confondues. */
 const jobsDuReady = () => new Set(PASSAGES.flatMap((a) => clés(tournent(exécutions(surLaPR(a, false))))));
@@ -196,7 +196,7 @@ const jobsDuReady = () => new Set(PASSAGES.flatMap((a) => clés(tournent(exécut
 
 test('#150 · B2 · sur un brouillon, ni ouverture, ni commit, ni édition, ni commentaire, ni revue ne lance un job', () => {
   const événements = [
-    ...['opened', 'synchronize', 'reopened', 'edited', 'converted_to_draft'].flatMap((a) => surLaPR(a, true)),
+    ...['opened', 'synchronize', 'reopened', 'edited'].flatMap((a) => surLaPR(a, true)),
     ...['submitted', 'edited'].map((a) => ['pull_request_review', { action: a, pull_request: PR(true), review: { state: 'commented', ...AVIS } }]),
     ...['created', 'edited', 'deleted'].map((a) => ['pull_request_review_comment', { action: a, pull_request: PR(true), comment: AVIS }]),
     // Un commentaire sur la PR arrive comme commentaire d'issue ; il dit si elle est en brouillon.
@@ -293,4 +293,18 @@ test('#150 · à la fermeture de la PR, fusionnée ou non, l’étiquette « en 
     const jobs = tournent(exécutions(surLaPR('closed', false, { pull_request: { ...PR(false), merged } })));
     assert.ok(surLÉtiquette(jobs, RETRAIT).length, `PR fermée (${merged ? 'fusionnée' : 'sans fusion'}) : aucun job ne retire l'étiquette`);
   }
+});
+
+test('#150 · repasser soi-même la PR en brouillon retire l’étiquette de l’issue, sans rien lancer de lourd', () => {
+  const jobs = tournent(exécutions(surLaPR('converted_to_draft', true)));
+  assert.ok(surLÉtiquette(jobs, RETRAIT).length, `retour en brouillon à la main : aucun job ne retire l'étiquette « ${ÉTIQUETTE} »`);
+  for (const [nom, motif] of LOURDS) assert.ok(!fait(jobs, motif), `retour en brouillon à la main : un job joue ${nom}`);
+});
+
+test('témoin · le lecteur de conditions suit le filtre d’objets `.*` comme GitHub', () => {
+  const yaml = `name: t\non: issues\njobs:\n  j:\n    if: contains(github.event.issue.labels.*.name, 'en validation')\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo j\n`;
+  const joue = (labels) => jouer(yaml, contexte(['issues', { action: 'edited', issue: { ...ISSUE_SEULE, labels } }]))[0].tourne;
+  assert.equal(joue([{ name: 'besoin' }, { name: ÉTIQUETTE }]), true);
+  assert.equal(joue([{ name: 'besoin' }]), false);
+  assert.equal(joue([]), false);
 });
