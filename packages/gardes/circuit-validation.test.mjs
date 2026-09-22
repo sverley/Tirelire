@@ -267,12 +267,22 @@ test('#168 · tout changement de l’issue d’une PR validée annule la validat
   annule("le retrait à la main de l'étiquette", [['issues', { action: 'unlabeled', label: { name: ÉTIQUETTE }, issue: ISSUE_SEULE() }]]);
 });
 
-test('#168 · sans validation en cours, changer une PR prête ou son issue ne lance rien', () => {
-  const événements = [...CHANGEMENTS_DE_LA_PR(false), ...CHANGEMENTS_DE_L_ISSUE(false)].flatMap(([, é]) => é);
+test('#168 · sans validation en cours, changer une PR prête ou son issue ne lance rien, sauf un commit', () => {
+  const événements = [...CHANGEMENTS_DE_LA_PR(false), ...CHANGEMENTS_DE_L_ISSUE(false)]
+    .flatMap(([, é]) => é)
+    .filter(([nom, { action }]) => !(nom === 'pull_request_target' && action === 'synchronize'));
   événements.push(['issues', { action: 'unlabeled', label: { name: 'besoin' }, issue: ISSUE_SEULE() }]);
   for (const é of événements) {
     const jobs = tournent(exécutions([é])).filter((j) => !jobsDuReady().has(j.clé));
     assert.deepEqual(clés(jobs), [], `sans validation, ${é[0]} (${é[1].action}) : ces jobs tournent`);
+  }
+});
+
+test('#168 · un commit sur une PR prête, validée ou non, le dit en commentaire, sans rien lancer de lourd', () => {
+  for (const validée of [false, true]) {
+    const jobs = tournent(exécutions(surLaPR('synchronize', false, validée)));
+    assert.ok(fait(jobs, COMMENTAIRE), `commit sur une PR prête (${validée ? 'validée' : 'non validée'}) : aucun commentaire ne dit quoi faire`);
+    for (const [nom, motif] of LOURDS) assert.ok(!fait(jobs, motif), `commit sur une PR prête : un job joue ${nom}`);
   }
 });
 

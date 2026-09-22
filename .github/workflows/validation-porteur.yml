@@ -17,7 +17,13 @@ name: Validation du porteur
 # L'étiquette « validée », posée sur la PR et son issue à la validation, dit sans démarrer de machine
 # qu'il y a quelque chose à annuler : sans elle, le job est écarté par sa condition, et seul un
 # commentaire du propriétaire du dépôt qui commence par « Validé » le lance. Modifier une issue sans
-# PR validée ne coûte donc rien. Le job ne porte pas le nom du statut : un job sauté s'affiche
+# PR validée ne coûte donc rien.
+#
+# « Validé » n'est accepté que sur un commit où toute la CI d'une PR — `ci.yml` et `validation.yml`,
+# leur dernière exécution sur ce commit — a fini au vert ; sinon le statut n'est pas posé et un
+# commentaire dit pourquoi. Un commit poussé sur une PR prête ne relance pas la CI : le job le dit en
+# commentaire, avec ce qu'il faut faire (repasser en brouillon puis en Ready, attendre le vert, puis
+# « Validé »). Ce commentaire ne coûte qu'aux commits sur une PR prête, jamais en brouillon. Le job ne porte pas le nom du statut : un job sauté s'affiche
 # « skipped », que GitHub compte réussi, et ne doit pas pouvoir tenir lieu de validation.
 #
 # Place du job sur le second axe des harnais (#113) :
@@ -56,8 +62,10 @@ jobs:
       || contains(github.event.pull_request.labels.*.name, 'validée')
       || contains(github.event.issue.labels.*.name, 'validée')
       || (github.event_name == 'issues' && github.event.action == 'unlabeled' && github.event.label.name == 'validée')
+      || (github.event_name == 'pull_request_target' && github.event.action == 'synchronize' && github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     permissions:
+      actions: read # les exécutions de la CI sur la tête de la PR
       issues: write
       pull-requests: write
       statuses: write
@@ -94,17 +102,35 @@ jobs:
           statut() { # $1 : commit ; $2 : état ; $3 : description (140 caractères au plus)
             gh api "repos/$GH_REPO/statuses/$1" -f state="$2" -f context="$CONTEXTE" -f description="${3:0:140}" > /dev/null
           }
-          annuler() { # $1 : la PR ; $2 : la cause
+          RELANCE="Pour que la CI tourne sur ce commit : repasser la PR en brouillon puis en Ready, attendre le vert, puis écrire « Validé »."
+          ci_rouge() { # $1 : commit → vide si ci.yml et validation.yml ont fini au vert, sinon ce qui manque
+            for w in ci.yml:pull_request validation.yml:pull_request_target; do
+              e="$(gh api "repos/$GH_REPO/actions/workflows/${w%%:*}/runs?event=${w#*:}&head_sha=$1&per_page=20" \
+                --jq '[.workflow_runs[]] | sort_by(.created_at) | last // empty | "\(.status) \(.conclusion // "-")"')"
+              case "$e" in
+                "completed success") ;;
+                "") echo "- \`${w%%:*}\` n'a pas tourné sur ce commit" ;;
+                completed*) echo "- \`${w%%:*}\` a fini en ${e#completed }" ;;
+                *) echo "- \`${w%%:*}\` n'a pas fini" ;;
+              esac
+            done
+          }
+          annuler() { # $1 : la PR ; $2 : la cause ; $3 : la suite à donner, facultative
             if ! etiquetee "$1"; then echo "PR #$1 sans validation en cours : rien à annuler."; return 0; fi
             statut "$(tete "$1")" failure "Validation annulée : $2"
             retirer_etiquette "$1"
             for n in $(issues_de_pr "$1"); do retirer_etiquette "$n"; done
-            gh pr comment "$1" --body "Validation annulée : $2 (par $AUTEUR). La PR ne se fusionne plus : il faut un nouveau « Validé » du porteur."
+            gh pr comment "$1" --body "Validation annulée : $2 (par $AUTEUR). La PR ne se fusionne plus : il faut un nouveau « Validé » du porteur.${3:+ $3}"
             echo "PR #$1 : validation annulée, $2."
           }
           valider() {
             if [ "$(gh pr view "$PR" --json state --jq .state)" != OPEN ]; then echo "PR #$PR fermée : rien à valider."; return 0; fi
             sha="$(tete "$PR")"
+            manque="$(ci_rouge "$sha")"
+            if [ -n "$manque" ]; then
+              gh pr comment "$PR" --body "« Validé » non pris en compte sur ${sha::7} : toute la CI doit y avoir fini au vert."$'\n\n'"$manque"$'\n\n'"$RELANCE"
+              echo "PR #$PR : CI pas verte sur ${sha::7}, validation refusée."; return 0
+            fi
             issues="$(issues_de_pr "$PR")"
             gh label create "$ETIQUETTE" --color 0E8A16 --description "Validée par le porteur ; tout changement l'annule (#168)" --force > /dev/null
             gh issue edit "$PR" --add-label "$ETIQUETTE" > /dev/null
@@ -134,7 +160,9 @@ jobs:
             pull_request_target:closed)
               retirer_etiquette "$PR"
               for n in $(issues_de_pr "$PR"); do retirer_etiquette "$n"; done ;;
-            pull_request_target:synchronize) annuler "$PR" "un commit a été poussé" ;;
+            pull_request_target:synchronize)
+              if etiquetee "$PR"; then annuler "$PR" "un commit a été poussé" "$RELANCE"
+              else gh pr comment "$PR" --body "Commit $(tete "$PR" | cut -c1-7) poussé sur une PR prête : la CI n'a pas tourné sur lui, et « Validé » n'y sera pas accepté. $RELANCE"; fi ;;
             pull_request_target:edited) annuler "$PR" "sa description, son titre ou sa base ont été modifiés" ;;
             pull_request_review:*) annuler "$PR" "une revue a été $(fait e)" ;;
             pull_request_review_comment:*) annuler "$PR" "un commentaire de revue a été $(fait '')" ;;
