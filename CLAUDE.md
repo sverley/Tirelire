@@ -27,22 +27,22 @@
   qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
-  crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas (D73).
+  crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
 - Avant de pousser, en brouillon : le codeur ne joue lui-même que `pnpm typecheck` et le harnais du
   besoin ; l'auditeur vérifie en local ce qu'il relit. Aucune CI ne tourne en brouillon. Les crochets
-  font leur part, sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
+  font leur part, sur la copie de travail. Au commit, en moins de 5 s : les tests des paquets que touchent
   les fichiers indexés — cœur ; garde ; relais ; hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
   commit ; le harnais du besoin (les fichiers de test que la branche ajoute ou modifie depuis sa base
   commune avec `origin/main`) est joué, et le pré-commit ne fait qu'en afficher le verdict, sans
-  bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le bloque (D75, D76). `--no-verify` est un contournement, qu'aucune
-  consigne ne propose. À la livraison (pré-fusion et pré-push, D76), sur l'état commis : la nature du
+  bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le bloque. `--no-verify` est un contournement, qu'aucune
+  consigne ne propose. À la livraison (pré-fusion et pré-push), sur l'état commis : la nature du
   besoin se lit par `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests headless des
   paquets touchés et de l'interface, 30 s) ou organisationnel (garde, 45 s) —, les tests
   navigateur (`apps/web/test/navigateur/`) restent à la CI, et le harnais du besoin est joué à part et
   bloque quand du code arrive. La CI ne joue qu'au passage en Ready d'une PR, une fois par passage,
   en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build, version de dev ; un
-  outil manquant y fait échouer le job (D74).
-- Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
+  outil manquant y fait échouer le job.
+- Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine : la
   boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans
   son en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
@@ -58,6 +58,13 @@ rien d'autre.
 `docs/description-projet.md` (les paroles du porteur), `docs/glossaire.md`, et les catalogues :
 `docs/invariants.md`, `docs/contraintes.md`, `docs/decisions.md`, `docs/gardes.md` (le registre :
 chaque invariant et chaque contrainte, avec son harnais ou sa vérification manuelle).
+
+Un document fondateur est forcément un fichier Markdown de `docs/` : un document d'un autre format
+(HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se reprend dans un Markdown. Tout
+Markdown de `docs/` n'est pas fondateur pour autant : la liste est celle ci-dessus.
+
+Les paroles conservées suivent le glossaire : quand un terme change, la citation de la description
+est amendée au terme nouveau, avec l'accord du porteur, demandé à chaque renommage.
 
 Ils sont tels qu'ils sont. On ne les restructure pas ; on les corrige quand une PR les touche, et
 seulement là.
@@ -100,6 +107,10 @@ Deux actes, qui ne se confondent pas :
   qu'elle ferme, de qui que ce soit, porteur compris — l'annule : la PR repasse en brouillon, avec un
   commentaire qui le dit, et le prochain Ready rejoue tout. Rien ne l'enregistre.
 
+Pour le produit, un harnais qui peut être codé doit l'être. La garde, elle, reste simple et peu
+coûteuse : ce qui peut se vérifier par analyse de code — une relecture, une recherche — n'y va pas ;
+seul y va ce qui le mérite, ce qu'une relecture ou une recherche ne suffit pas à tenir.
+
 La documentation et la garde se modifient sans harnais par défaut : l'auditeur vérifie en relisant.
 Un harnais dédié ne s'écrit que pour un cas de test complexe dans la garde. Un changement de
 comportement de la garde est expliqué et justifié en commentaire de la PR, par le compte rendu du
@@ -109,6 +120,7 @@ modifie ; la validation du porteur le couvre.
 ### Un besoin, deux agents
 
 Une issue définit le besoin. Deux sessions y travaillent, l'une après l'autre, sur la même branche.
+Le besoin s'analyse avant les solutions : une solution ne se discute qu'une fois le besoin écrit.
 
 #### L'auditeur
 
