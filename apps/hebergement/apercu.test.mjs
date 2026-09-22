@@ -376,6 +376,38 @@ test('#141 · workflows : aucune adresse en dur en repli', () => {
   }
 });
 
+// ─── #155 : les scripts de dépôt ne tournent jamais tels que la PR les propose ─────────────────────
+
+test('#155 · workflows : `apercu.sh` et `deposer.sh` viennent de `main`, jamais de la branche de la PR', () => {
+  // Que la PR les modifie ou non (c'est le point du besoin) : on cherche une source pinnée sur
+  // `main`, pas une absence de modification du fichier lui-même.
+  const sourceMain = /\bref:\s*['"]?main['"]?\b|\bgit\s+(?:show|checkout|fetch)\s+(?:origin\/)?main\b/;
+  for (const motif of [/apercu\.sh\s+deposer/, /apercu\.sh\s+retirer/]) {
+    const job = trouver(motif);
+    assert.ok(job, `aucun job ne lance ${motif}`);
+    assert.match(
+      job.bloc,
+      sourceMain,
+      `${job.w.fichier} : le job « ${job.nom} » ne source rien depuis \`main\` — \`apercu.sh\`/\`deposer.sh\` y tournent tels que la branche de la PR les contient`,
+    );
+  }
+});
+
+test('#155 · workflows : les identifiants FTP ne sont visibles que des étapes qui déposent', () => {
+  // Étendu à `apercu` seul : lui seul lance `pnpm install` et l'assemblage avec le code de la PR
+  // avant tout dépôt ; `retrait-apercu` n'a qu'une étape après le checkout.
+  const dépôt = trouver(/apercu\.sh\s+deposer/);
+  assert.ok(dépôt, 'aucun job ne lance `apercu.sh deposer`');
+  const envDeJob = dépôt.bloc.match(/^ {4}env:\n([\s\S]*?)\n {4}steps:/m)?.[1] ?? '';
+  for (const secret of ['HOTE', 'UTILISATEUR', 'MOTDEPASSE']) {
+    assert.doesNotMatch(
+      envDeJob,
+      new RegExp(`^\\s*${secret}:`, 'm'),
+      `${dépôt.w.fichier} : le job « ${dépôt.nom} » expose ${secret} à toutes ses étapes — y compris \`pnpm install\` et l'assemblage, qui tournent avec le code de la PR avant tout dépôt`,
+    );
+  }
+});
+
 // ─── L'adresse de recette ────────────────────────────────────────────────────────────────────────
 
 test('#141 · aucun fichier suivi ne nomme un autre hôte du domaine que la production', () => {

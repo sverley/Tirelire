@@ -353,10 +353,21 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
   dépend — que le script sonde bien l'adresse en `http://`, relève où elle mène, et compte son échec
   (tranché dans #69, complété par #78).
   Témoin rouge : « témoin rouge · un script de vérification qui ne sonde plus l’adresse en http:// »
+- **Harnais** · `apps/hebergement/apercu.test.mjs` — dans les jobs `apercu` et `retrait-apercu` de
+  `ci.yml`, `apercu.sh` et `deposer.sh` sont sourcés depuis `main`, jamais depuis la branche de la
+  PR ; et les identifiants FTP (`HOTE`, `UTILISATEUR`, `MOTDEPASSE`) ne sont déclarés qu'aux étapes
+  qui déposent, pas à celles qui tournent avec le code de la PR avant tout dépôt (`pnpm install`,
+  l'assemblage) (#155). Lit `ci.yml` comme le reste du fichier (#141) ; ne joue rien.
+  Témoin rouge : « témoin rouge · un job d'aperçu qui source ses scripts de dépôt de la branche de
+  la PR, ou qui expose les identifiants FTP à une étape antérieure au dépôt »
 - **Vérification manuelle** · `VM-C3-https` — Si la PR touche l'application ou le relais : donner à
   l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,
   et que la PR ne fait rien charger en HTTP. Si elle ne touche que des tests, de l'outillage ou de la
   documentation (D62) : dire dans l'analyse pourquoi ni l'application ni le relais ne sont atteints.
+- **Vérification manuelle** · `VM-C3-depot-main` — Si la PR touche `apps/hebergement/apercu.sh` ou
+  `apps/hebergement/deposer.sh` : sur l'aperçu de cette PR, constater que le dépôt a tourné avec la
+  version de `main` de ces scripts (pas celle proposée), et que le dépôt reste dans son dossier
+  `<dossier>/pr-<numéro>` malgré la modification (#155).
 - **À bâtir** · le refus ou le signalement d'un relais en HTTP (besoin #67, harnais #38).
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
