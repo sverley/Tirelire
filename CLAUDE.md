@@ -81,10 +81,10 @@ CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'el
 de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
 et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
 ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
-crochet lent, pas d'alerte, pas d'enregistrement de validation. Quatre workflows, pour qu'aucune
+crochet lent, pas d'alerte, pas d'enregistrement de validation. Cinq workflows, pour qu'aucune
 exécution ne montre sautés les jobs qu'une autre joue : `ci.yml` (tests, version de dev, livraison),
-`validation.yml` (la garde), `etiquette.yml` (l'étiquette « en validation » de l'issue, et « en cours »
-qui la quitte à sa fermeture) et `brouillon.yml` (le retour en brouillon).
+`validation.yml` (la garde), `etiquette.yml` (l'étiquette « en validation » de l'issue),
+`brouillon.yml` (le retour en brouillon) et `fin.yml` (« en cours » quitte l'issue fermée).
 
 ### Vérification et validation
 
