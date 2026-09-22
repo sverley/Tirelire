@@ -81,8 +81,7 @@ suivis en objectifs (#55, #56).
 ## 13 et 14 septembre 2026 · organisation, garde et catalogues
 
 Paroles du porteur en discussion, sur la conduite du projet plutôt que sur le produit. Elles fondent
-les catalogues (#96) et leur séparation (#95). Ce qui touche à l'ordre auditeur-codeur est déjà cité
-dans D68 et n'est pas repris ici.
+les catalogues (#96), leur séparation (#95) et l'ordre auditeur-codeur (#91).
 
 ### Le glossaire
 
@@ -91,7 +90,11 @@ dans D68 et n'est pas repris ici.
 > La garde est un outil qui garde la description projet, les principes, les invariants, les usages, les cibles, les règles. tous les catalogues hormis les cibles, qu'en penses-tu ? C'est un ensemble de harnais qui garantit qu'un besoin organisationnel qui a été codé ne sera pas trahi. Elle peut se garder elle-meme : un harnais de la garde ne doit pas produire un résultat qui contredit la garde.
 > Les tests sont les harnais des besoins fonctionnels et d'outils
 > La documentation simple (au sens non organisationnelle) n'a pas besoin de harnais
-> Les harnais qui verifient le codage d'un besoin organisationnel, qu'il ait produit une garde ou non, sont nommées "amorçages". Ils n'ont pas besoin d'etre joués autrement qu'en cas de codage dans la garde et ce qu'elle garde.
+> ~~Les harnais qui verifient le codage d'un besoin organisationnel, qu'il ait produit une garde ou non, sont nommées "amorçages". Ils n'ont pas besoin d'etre joués autrement qu'en cas de codage dans la garde et ce qu'elle garde.~~
+
+Retiré par le porteur le 19 septembre 2026 :
+
+> On retire tout le concept d'amorçage.
 
 ### Les catalogues, et ce qui les distingue
 
@@ -99,7 +102,13 @@ dans D68 et n'est pas repris ici.
 
 > Par contre, je vois que tu consignes des décisions concernant les règles comme les décisions qui concernent le produit. Elles n'ont pas le meme roles ni la meme valeur : une decision ne doit pas contrevenir aux regles. Une regle qui contrevient aux regles doit proposer des modifications des regles existantes. L'un travail au niveau organisationnel, l'autre au niveau produit
 
-> prends la définition au sens génie logiciel : un invariant est mesurable. Je pense qu'on se trompe de mot. Les invariants sont le produits d'une décision, d'une regles, d'un usage ou meme d'un principes qui alimente le résultat de harnais qui peuvent mesurer ces invariants. Je pense qu'il faut un catalogue de principes séparés du catalogue d'invariants. ll faut un catalogue de regles séparé du catalogue de decisions. il faut un catalogue d'usage et de contraintes.
+> prends la définition au sens génie logiciel : un invariant est mesurable. Je pense qu'on se trompe de mot. Les invariants sont le produits d'une décision, d'une regles, d'un usage ou meme d'un principes qui alimente le résultat de harnais qui peuvent mesurer ces invariants. ~~Je pense qu'il faut un catalogue de principes séparés du catalogue d'invariants.~~ ll faut un catalogue de regles séparé du catalogue de decisions. il faut un catalogue ~~d'usage et~~ de contraintes.
+
+Corrigé par le porteur le 22 septembre 2026 :
+
+> En effet, je me suis trompé. Les principes vivent dans la description, dans une section dédiée. Pas besoin de catalogue pour eux.
+
+> Non, les usages vont dans une section dédiée dans la description après les principes, mais les cibles sont dans un catalogues
 
 > Un invariant est la déclinaison chiffrée d'un principe ou d'une règle, pas d'une decision car il impacte tout le projet
 
@@ -111,7 +120,11 @@ dans D68 et n'est pas repris ici.
 
 > idem, l'application d'une décision doit être retroactivement. Les harnais de cette nouvelle regle peuvent d'ailleurs créer des voyants rouges sur le code actuel. Ces voyant nécessiteront une issue (ou plusieurs) pour être corrigés au regard de la nouvelle regle. Mais cette regle peut être posée meme si elle crée des voyants rouges
 
-> par contre, pour être fusionnée, la PR de codage de cette regle doit avoir ses amorçages verts, quand elle en a
+> ~~par contre, pour être fusionnée, la PR de codage de cette regle doit avoir ses amorçages verts, quand elle en a~~
+
+Retiré par le porteur le 19 septembre 2026 :
+
+> On retire tout le concept d'amorçage.
 
 > Et attention, une decision n'est pas "datée dans son intention". Une règle s'applique à tout moment. Si elle change, c'est rétroactif
 
@@ -125,13 +138,21 @@ dans D68 et n'est pas repris ici.
 
 ### La garde tient les catalogues
 
-> il est important qu'elle ne decide pas de sa propre evolution, mais est-il envisageable qu'elle propose une evolution en proposant des services de gestions des catalogues (plutot qu'une edition direct) afin de pouvoir detecter si une decision pourrait être une regle ?
+> ~~il est important qu'elle ne decide pas de sa propre evolution, mais est-il envisageable qu'elle propose une evolution en proposant des services de gestions des catalogues (plutot qu'une edition direct) afin de pouvoir detecter si une decision pourrait être une regle ?~~
 
-> quand je parle de service, je ne parle pas d'API. Le service peut-etre rendu par la garde elle-meme puisque qu'on lui demande dans tous le scas de s'assurer qu'une décision est conforme
+> ~~quand je parle de service, je ne parle pas d'API. Le service peut-etre rendu par la garde elle-meme puisque qu'on lui demande dans tous le scas de s'assurer qu'une décision est conforme~~
 
-> Je veux que ce soit la garde qui ajoute/edite/retire un item dans les catalogues, mais pas via un service web et API, seulement via l'appel à l'outil. Ainsi, les catalogues sont tous gardés (non altérables si on les compare à leur etat git), et les editions de chacun ne font pas forcément les memes chose : ajouter une decision ne fait que verifier que la decsion est conforme et proposer si besoin de la promouvoir comme regle ou usage ou invariant, tout en gérant les ID, ajouter une regles fera appliquer la garde sur la regle elle-meme et ainsi de suite. Si on modifie des choses qui modifie le resultat de la garde, alors on vérifie ses amorçages, s'il y en a, et on demande une validation humaine (mais ca, c'est un invariant de la garde, il va donc s'appliquer de facto sur tout appel à la garde)
+> ~~Je veux que ce soit la garde qui ajoute/edite/retire un item dans les catalogues, mais pas via un service web et API, seulement via l'appel à l'outil. Ainsi, les catalogues sont tous gardés (non altérables si on les compare à leur etat git), et les editions de chacun ne font pas forcément les memes chose : ajouter une decision ne fait que verifier que la decsion est conforme et proposer si besoin de la promouvoir comme regle ou usage ou invariant, tout en gérant les ID, ajouter une regles fera appliquer la garde sur la regle elle-meme et ainsi de suite. Si on modifie des choses qui modifie le resultat de la garde, alors on vérifie ses amorçages, s'il y en a, et on demande une validation humaine (mais ca, c'est un invariant de la garde, il va donc s'appliquer de facto sur tout appel à la garde)~~
 
-> en cas d'altération, on rejoue l'edition par l'outil. Bien sur, il faut aussi coder que la modification du contenu de la garde hormis les decisions doivent declencher dans le workflow une validation manuelle pour eviter un agent qui modifierait l'invariant garantissant ce comportement
+Retirées par le porteur le 22 septembre 2026, avec la simplification du 19 (les deux premières menaient à la troisième) :
+
+> Retiré par simplification
+
+> ~~en cas d'altération, on rejoue l'edition par l'outil.~~ Bien sur, il faut aussi coder que la modification du contenu de la garde hormis les decisions doivent declencher dans le workflow une validation manuelle pour eviter un agent qui modifierait l'invariant garantissant ce comportement
+
+Retiré par le porteur le 22 septembre 2026 (la première phrase seulement) :
+
+> Tombe de facto
 
 > donc la garde executer est celle de main (toujours) mais son résultat s'applique sur le code courant. Je préfere ce découpage
 
@@ -140,3 +161,92 @@ dans D68 et n'est pas repris ici.
 > soit modifier un comportement en place => KO => Validation manuelle avec détaille des harnais de la garde qui rougissent
 
 > dans tous les cas, un changement de comportement de la garde doit être validé manuellement (invariant) et le changement doit être expliqué et justifié en commentaire de la PR (invariant)
+
+### L'auditeur et le codeur
+
+Le 14 septembre, dans #91.
+
+> je ne fais pas confiance au codeur. Aussi, quand un besoin est défini (que ce soit une règle ou une fonctionnalité), je veux un agent qui code le harnais du besoin pour vérifier que le codeur va bien répondre au besoin et un agent qui code le besoin.
+
+> c'est l'auditeur qui ouvre une PR. C'est donc l'auditeur d'un besoin qui évalue si le besoin doit se décliner en une ou plusieurs taches. Le codeur ne fait que coder le besoin dont le harnais est déjà en place
+
+> le codeur ne doit pas modifier une PR. Mais il peut mettre des commentaires
+
+> Le codeur doit aussi justifier dans un commentaire ce qu'il a fait comme modification qui nécessitent un validation humaine
+
+> le codeur doit être honnête et concis dans son rapport de modifications nécessitant une validation humaine
+
+> il faut ajouter que le codeur ne doit pas regarder le harnais ~~(ou amorçage)~~ pour coder le besoin. il doit le faire depuis sa propre interprétation depuis le besoin
+
+Retiré par le porteur le 19 septembre 2026 :
+
+> On retire tout le concept d'amorçage.
+
+> oui, le codeur s'en remet à la CI. il est censé y avoir des hook-precommit et pre-push pour faire le nécessaire
+
+> une PR fusionnée doit fermer automatiquement l'issue (le besoin) qu'elle couvre. Si une discussion née, soit cette discussion est bloquante pour la PR et elle fait partie de la PR, soit elle est non-bloquante et fait l'objet d'une nouvelle issue avant la fusion
+
+> un harnais ne doit être codé que si on a une tache atomique. Si une tache contient des sous-taches, on ne peut pas imposer un harnais global tant que les sous-taches ne sont pas faites et vertes
+
+## 15 septembre 2026 · les paroles suivent le glossaire
+
+Tranché à l'occasion de #107 et de sa PR #108, qui réécrivait deux phrases du porteur à la suite d'un
+renommage.
+
+> je préfère amender mes paroles afin de maintenir un glossaire cohérent
+
+## Du 19 au 22 septembre 2026 · la simplification
+
+Paroles du porteur en discussion, du 19 au 22 septembre. Elles fondent la méthode de travail
+d'aujourd'hui (`CLAUDE.md`) : la simplification du 19 septembre, puis le circuit brouillon–Ready de
+#150.
+
+### Simplifier le processus
+
+> On est allé beaucoup trop loin. Il faut simplifier tout le processus. On retire tout le concept d'amorçage. On peut garder la garde mais elle ne doit pas alourdir trop, plutôt aider à ne pas dévier des documents fondateurs un projet (description, glossaire, catalogues). On va s'appuyer sur un processus de développement à 2 agents bien définis : l'auditeur et le codeur. On va mettre des instructions précises pour les cadrer afin de pouvoir avancer sur le projet et non pas sur des outils.
+
+> On peut terminer les restructurations si elles aident et vont vers la simplicité
+
+> 104 : l'ajout ou la modification d'une règle doit se faire en vérifiant (session auditeur) que ces modifications ne sont pas contraires ni aux autres, ni aux fondamentaux du projet
+
+> 131 et 133 sont dûes au manque de crédit github. Il faut vraiment simplifier et réduire le coût CI.
+
+### Le vocabulaire et les documents fondateurs
+
+> Non, on retient compte principal et non compte pivot
+
+> C'est un document HTML. Seul les md doivent être de la documentation fondatrice. Il faut réintégrer ce que ce document contient qui ne serait pas dans les doc fondateurs.
+
+> Il faut refaire l'analyse du besoin avant d'analyser les solutions.
+
+### Brouillon, Ready et validation
+
+Le 21 septembre, dans #150.
+
+> Oui, tout changement de la pr et issue revient en draft car l'analyse du besoin peut en être changé
+
+> La CI devient simple : tout changement (édit, comment, commit) fait passer en draft
+
+> Il faudra que le passage de Draft à Ready assemble une version web de dev
+
+> non, depuis la pr avant commit mais une fois en Ready. On economise la CI en etant en Draft.
+
+> Non. La garde peut être modifiée sans harnais (raison de l'abandon de l'amorçage). Seuls des cas complexes de test dans la garde pourraient nécessité un harnais dédié à la modification de la garde.
+> Il ne faut pas confondre la vérification que le travail demandé est conforme aux attentes et ne contrevient pas aux fondamentaux, et la validation des modifications dont la responsabilité revient au porteur en passant une pr en ready
+
+> Je en suis pas convaincu par une petite CI. Restons sur les tests locaux en mode auditeur/codeur
+
+> Non, malgré la disparition de la case, si la description de la PR ou de l'issue change, il faut invalider tout validation er repasse en draft
+
+> En ajoutant un commentaire pour indiquer le passage en draft pour nouvelle validation
+
+> Il y a un problème de dénomination : une validation au sens précédent du terme était une action manuelle (quand nécessaire) de la part de l'auteur pour indiquer qu'il était d'accord avec les modifications de la pr, notamment quand celles xi touchaient la garde ou les fichiers gardés.
+> Pour alléger le processus, je propose que l'action de validation soit le passage en ready d'une pr. Or, une fois ce passage en ready, qui déclenche la CI, il peut y avoir des modifications sur le fil de la PR (édition, commentaires, commit) ou de l'issue rattachée par "Close #ID". Je veux que n'importe quelles de ces modifications fasse repasser la pr en draft
+
+### La place des harnais
+
+La parole du 14 septembre (#58, #84), puis celle du 22 septembre qui la modère.
+
+> Non, si un harnais peut être codé, il doit l'être
+
+> il faut modéré le propos avec les evolutions méthodologiques récentes : « si un harnais peut être codé, il doit l'être » reste vrai pour le produit. La garde doit restée simple et peu couteuse et c'est le travers dans lequel nous sommes tombés précédemment. Bilan : beaucoup de temps perdu sur la création d'un outil dans l'outil. Au final, le concept reste bon, on doit en garder l'essentiel mais on doit réussir à juger ce qui mérite d'aller dans une garde de ce qui peut être vérifier par analyse de code. Dans tous les cas, les harnais de la garde (amorcage) n'ont plus leur place sauf si le codage du test allant dans la garde est complexe.
