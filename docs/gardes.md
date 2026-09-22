@@ -345,7 +345,7 @@ Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`
 
 ## C3 · Une application web se sert depuis une adresse sûre
 
-Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**`, `apps/hebergement/**`
+Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**`, `apps/hebergement/**`, `.github/workflows/**`
 
 - **Harnais** · `apps/hebergement/verifier.sh`, `apps/hebergement/verifier.test.mjs` — après chaque
   dépôt depuis `main`, le site en ligne redirige HTTP vers HTTPS, et le script échoue sinon (#78).
@@ -353,21 +353,24 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
   dépend — que le script sonde bien l'adresse en `http://`, relève où elle mène, et compte son échec
   (tranché dans #69, complété par #78).
   Témoin rouge : « témoin rouge · un script de vérification qui ne sonde plus l’adresse en http:// »
-- **Harnais** · `apps/hebergement/apercu.test.mjs` — dans les jobs `apercu` et `retrait-apercu` de
-  `ci.yml`, `apercu.sh` et `deposer.sh` sont sourcés depuis `main`, jamais depuis la branche de la
-  PR ; et les identifiants FTP (`HOTE`, `UTILISATEUR`, `MOTDEPASSE`) ne sont déclarés qu'aux étapes
-  qui déposent, pas à celles qui tournent avec le code de la PR avant tout dépôt (`pnpm install`,
-  l'assemblage) (#155). Lit `ci.yml` comme le reste du fichier (#141) ; ne joue rien.
-  Témoin rouge : « témoin rouge · un job d'aperçu qui source ses scripts de dépôt de la branche de
-  la PR, ou qui expose les identifiants FTP à une étape antérieure au dépôt »
+- **Harnais** · `apps/hebergement/apercu.test.mjs` — « #155 · les identifiants FTP restent hors de
+  portée du code des PR » : tout job qui lit `secrets.OVH_FTP_*` déclare un environnement ; s'il
+  peut tourner pour une PR, son workflow est lu sur `main` (`pull_request_target`), et il n'extrait
+  que `main`, n'installe ni n'assemble rien, et reçoit le site en artefact ; un job de
+  `pull_request_target` qui exécute le code de la PR n'a ni cache ni permission en écriture (#155).
+  Lit les workflows comme le reste du fichier (#141). Ne constate pas la règle de l'environnement
+  sur GitHub : c'est `VM-C3-depot-main`.
+  Témoin rouge : « témoin rouge · un aperçu qui dépose avec des identifiants que le code de la PR peut atteindre »
 - **Vérification manuelle** · `VM-C3-https` — Si la PR touche l'application ou le relais : donner à
   l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,
   et que la PR ne fait rien charger en HTTP. Si elle ne touche que des tests, de l'outillage ou de la
   documentation (D62) : dire dans l'analyse pourquoi ni l'application ni le relais ne sont atteints.
-- **Vérification manuelle** · `VM-C3-depot-main` — Si la PR touche `apps/hebergement/apercu.sh` ou
-  `apps/hebergement/deposer.sh` : sur l'aperçu de cette PR, constater que le dépôt a tourné avec la
-  version de `main` de ces scripts (pas celle proposée), et que le dépôt reste dans son dossier
-  `<dossier>/pr-<numéro>` malgré la modification (#155).
+- **Vérification manuelle** · `VM-C3-depot-main` — Si la PR touche un workflow qui lit
+  `secrets.OVH_FTP_*`, `apps/hebergement/apercu.sh` ou `apps/hebergement/deposer.sh` : dans
+  Settings → Environments, constater que l'environnement déclaré par ces jobs n'admet que `main` et
+  porte les secrets `OVH_FTP_*`, qu'ils n'existent plus au niveau du dépôt ; sur l'aperçu de la PR,
+  constater que le dépôt a tourné avec les scripts de `main` et reste dans `<dossier>/pr-<numéro>`
+  (#155).
 - **À bâtir** · le refus ou le signalement d'un relais en HTTP (besoin #67, harnais #38).
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer

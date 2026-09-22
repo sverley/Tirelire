@@ -292,16 +292,23 @@ function workflows() {
   return readdirSync(path.join(RACINE, WORKFLOWS))
     .filter((f) => /\.ya?ml$/.test(f))
     .map((f) => {
-      const texte = lire(`${WORKFLOWS}/${f}`);
-      const entête = texte.split('\njobs:')[0];
-      const liste = entête.match(/^ {2}pull_request:\s*\n\s+types:\s*\[([^\]]*)\]/m);
-      const types = liste
-        ? liste[1].split(',').map((s) => s.trim())
-        : /pull_request\b/.test(entête)
-          ? ['opened', 'synchronize', 'reopened']
-          : [];
-      return { fichier: `${WORKFLOWS}/${f}`, texte, entête, types, jobs: jobs(texte) };
+      return analyser(`${WORKFLOWS}/${f}`, lire(`${WORKFLOWS}/${f}`));
     });
+}
+
+/** Un workflow lu depuis son texte : déclencheurs, types d'événements de PR, jobs. */
+function analyser(fichier, texte) {
+  const entête = texte.split('\njobs:')[0];
+  const on = entête.match(/^on:\s*\n((?:(?: .*)?\n)*)/m)?.[1] ?? '';
+  const déclencheurs = new Set([...on.matchAll(/^ {2}([a-z_]+):/gm)].map((m) => m[1]));
+  // `pull_request` ou `pull_request_target` (#155) : le premier des deux qui liste ses types.
+  const liste = on.match(/^ {2}pull_request(?:_target)?:\s*\n\s+types:\s*\[([^\]]*)\]/m);
+  const types = liste
+    ? liste[1].split(',').map((s) => s.trim())
+    : déclencheurs.has('pull_request') || déclencheurs.has('pull_request_target')
+      ? ['opened', 'synchronize', 'reopened']
+      : [];
+  return { fichier, texte, entête, déclencheurs, types, jobs: jobs(texte) };
 }
 
 const condition = (bloc) => bloc.match(/^ {4}if:\s*(.+)$/m)?.[1] ?? '';
@@ -376,36 +383,100 @@ test('#141 · workflows : aucune adresse en dur en repli', () => {
   }
 });
 
-// ─── #155 : les scripts de dépôt ne tournent jamais tels que la PR les propose ─────────────────────
+// ─── #155 : les identifiants de production hors de portée du code des PR ──────────────────────────
+//
+// Les aperçus déposent avec les identifiants FTP de la production (#141). Aucun code qu'une PR
+// propose — scripts de dépôt, dépendances, assembleur, workflow lui-même — ne doit tourner là où ces
+// identifiants sont lisibles. D'où quatre écarts, lus dans les workflows :
+// 1. un job qui lit `secrets.OVH_FTP_*` déclare un `environment` (que le porteur restreint à `main`,
+//    ce que seule la vérification manuelle constate) ;
+// 2. s'il peut tourner pour une PR, son workflow n'est pas déclenché par `pull_request` (lu sur la
+//    branche) mais par `pull_request_target` (lu sur `main`, comme `validation.yml`, #160) ;
+// 3. s'il peut tourner pour une PR, il n'exécute rien de la PR : n'extrait que `main`, n'installe ni
+//    n'assemble ; le site lui arrive en artefact ;
+// 4. un job de `pull_request_target` qui exécute le code de la PR n'a ni cache (celui de `main`) ni
+//    permission en écriture, et ses permissions sont déclarées.
 
-test('#155 · workflows : `apercu.sh` et `deposer.sh` viennent de `main`, jamais de la branche de la PR', () => {
-  // Que la PR les modifie ou non (c'est le point du besoin) : on cherche une source pinnée sur
-  // `main`, pas une absence de modification du fichier lui-même.
-  const sourceMain = /\bref:\s*['"]?main['"]?\b|\bgit\s+(?:show|checkout|fetch)\s+(?:origin\/)?main\b/;
-  for (const motif of [/apercu\.sh\s+deposer/, /apercu\.sh\s+retirer/]) {
-    const job = trouver(motif);
-    assert.ok(job, `aucun job ne lance ${motif}`);
-    assert.match(
-      job.bloc,
-      sourceMain,
-      `${job.w.fichier} : le job « ${job.nom} » ne source rien depuis \`main\` — \`apercu.sh\`/\`deposer.sh\` y tournent tels que la branche de la PR les contient`,
-    );
+const SECRET_FTP = /secrets\.OVH_FTP_/;
+const CODE_DE_LA_PR = /pull_request\.head\.(?:sha|ref)|\bhead_(?:sha|branch)\b|\bpnpm\s+(?:i|install|run|exec|test|build|typecheck|--filter)\b|\bnpm\s+(?:ci|install|run|test)\b|hebergement\s+assembler/;
+
+function écartsDépôt(liste) {
+  const écarts = [];
+  for (const w of liste) {
+    const pourPR = (nom) => (w.déclencheurs.has('pull_request') || w.déclencheurs.has('pull_request_target')) && !horsDesPR(condition(w.jobs.get(nom)));
+    for (const [nom, bloc] of w.jobs) {
+      const ici = `${w.fichier} : le job « ${nom} »`;
+      if (SECRET_FTP.test(bloc) || SECRET_FTP.test(w.entête)) {
+        if (!/^ {4}environment:/m.test(bloc)) écarts.push(`${ici} lit les identifiants FTP sans déclarer d’environnement`);
+        if (pourPR(nom)) {
+          if (w.déclencheurs.has('pull_request')) écarts.push(`${ici} lit les identifiants FTP dans un workflow lu sur la branche de la PR (pull_request)`);
+          if (CODE_DE_LA_PR.test(bloc)) écarts.push(`${ici} lit les identifiants FTP et exécute du code de la PR`);
+          for (const [, ref] of bloc.matchAll(/^\s+ref:\s*(.+)$/gm)) {
+            if (!/^['"]?main['"]?\s*$/.test(ref)) écarts.push(`${ici} lit les identifiants FTP et extrait « ${ref.trim()} », pas main`);
+          }
+        }
+      }
+      if (w.déclencheurs.has('pull_request_target') && CODE_DE_LA_PR.test(bloc)) {
+        if (/^\s+cache:/m.test(bloc)) écarts.push(`${ici} exécute le code de la PR avec un cache, celui de main`);
+        if (/:\s*write\b/.test(bloc) || /:\s*write\b/.test(w.entête)) écarts.push(`${ici} exécute le code de la PR avec une permission en écriture`);
+        if (!/^\s*permissions:/m.test(bloc) && !/^permissions:/m.test(w.entête)) écarts.push(`${ici} exécute le code de la PR sans déclarer ses permissions`);
+      }
+    }
   }
+  return écarts;
+}
+
+test('#155 · les identifiants FTP restent hors de portée du code des PR', () => {
+  const liste = workflows();
+  assert.deepEqual(écartsDépôt(liste), [], 'des identifiants FTP sont à portée du code d’une PR');
+  const dépôt = trouver(/apercu\.sh\s+deposer/);
+  const retrait = trouver(/apercu\.sh\s+retirer/);
+  assert.ok(dépôt && retrait, 'le dépôt ou le retrait de l’aperçu a disparu');
+  for (const j of [dépôt, retrait]) {
+    assert.ok(j.w.déclencheurs.has('pull_request_target'), `${j.w.fichier} : le job « ${j.nom} » ne tourne pas depuis main (pull_request_target)`);
+  }
+  assert.match(dépôt.bloc, /download-artifact/, `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas le site en artefact`);
 });
 
-test('#155 · workflows : les identifiants FTP ne sont visibles que des étapes qui déposent', () => {
-  // Étendu à `apercu` seul : lui seul lance `pnpm install` et l'assemblage avec le code de la PR
-  // avant tout dépôt ; `retrait-apercu` n'a qu'une étape après le checkout.
-  const dépôt = trouver(/apercu\.sh\s+deposer/);
-  assert.ok(dépôt, 'aucun job ne lance `apercu.sh deposer`');
-  const envDeJob = dépôt.bloc.match(/^ {4}env:\n([\s\S]*?)\n {4}steps:/m)?.[1] ?? '';
-  for (const secret of ['HOTE', 'UTILISATEUR', 'MOTDEPASSE']) {
-    assert.doesNotMatch(
-      envDeJob,
-      new RegExp(`^\\s*${secret}:`, 'm'),
-      `${dépôt.w.fichier} : le job « ${dépôt.nom} » expose ${secret} à toutes ses étapes — y compris \`pnpm install\` et l'assemblage, qui tournent avec le code de la PR avant tout dépôt`,
-    );
-  }
+/** Un workflow d'essai, pour le témoin : `on` et `jobs` donnés en texte. */
+const essai = (on, jobsTexte) => analyser('essai.yml', `on:\n${on}\npermissions: {}\n\njobs:\n${jobsTexte}\n`);
+const JOB_DÉPÔT = (extra) => `  apercu:
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+${extra}
+    steps:
+      - uses: actions/download-artifact@v4
+      - run: bash apps/hebergement/apercu.sh deposer
+        env:
+          MOTDEPASSE: \${{ secrets.OVH_FTP_PASSWORD }}`;
+
+test('témoin rouge · un aperçu qui dépose avec des identifiants que le code de la PR peut atteindre', () => {
+  const cas = [
+    // Avant #155 : workflow de la branche, extraction de la PR, installation, sans environnement.
+    ['workflow lu sur la branche', essai('  pull_request:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}\n      - run: pnpm install --frozen-lockfile\n'))],
+    ['sans environnement', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT(''))],
+    ['code de la PR dans le job de dépôt', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - run: pnpm install\n'))],
+    ['extraction de la branche dans le job de dépôt', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: refs/pull/1/head\n'))],
+    ['assemblage avec le cache de main', essai('  pull_request_target:\n    types: [ready_for_review]', `  site:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+      - run: pnpm install`)],
+    ['assemblage avec un jeton en écriture', essai('  pull_request_target:\n    types: [ready_for_review]', `  site:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: pnpm install`)],
+  ];
+  for (const [nom, w] of cas) assert.notDeepEqual(écartsDépôt([w]), [], `écart non vu : ${nom}`);
+  // Le témoin vert du même lecteur : la forme attendue ne relève rien.
+  const sain = essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: main\n'));
+  assert.deepEqual(écartsDépôt([sain]), []);
 });
 
 // ─── L'adresse de recette ────────────────────────────────────────────────────────────────────────
