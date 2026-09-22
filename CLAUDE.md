@@ -83,8 +83,8 @@ et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR
 ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
 crochet lent, pas d'alerte, pas d'enregistrement de validation. Quatre workflows, pour qu'aucune
 exécution ne montre sautés les jobs qu'une autre joue : `ci.yml` (tests, version de dev, livraison),
-`validation.yml` (la garde), `etiquette.yml` (l'étiquette « en validation » de l'issue) et
-`brouillon.yml` (le retour en brouillon).
+`validation.yml` (la garde), `etiquette.yml` (l'étiquette « en validation » de l'issue, et « en cours »
+qui la quitte à sa fermeture) et `brouillon.yml` (le retour en brouillon).
 
 ### Vérification et validation
 
