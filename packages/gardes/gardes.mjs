@@ -62,8 +62,8 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 /**
  * Ce qui ne change qu'à la demande du porteur (#64) : les invariants, et la description du projet
  * qui les fonde — son texte, mot pour mot, que seul le porteur complète ou corrige (`CLAUDE.md`).
- * Son accord est une ligne « Accord du porteur : … » de la section, que la garde lit et refuse
- * quand elle manque ou reste vide.
+ * Son accord peut s'écrire dans une ligne « Accord du porteur : … » de la section : la garde la lit
+ * (une seule par section) mais ne l'exige pas ; l'auditeur le vérifie en relisant.
  */
 
 const G = DOCUMENTS.gardes;
