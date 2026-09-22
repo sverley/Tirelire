@@ -1,21 +1,27 @@
-name: Étiquette de l'issue au Ready
+name: Étiquettes de l'issue
 
+# À la fermeture d'une issue, par la fusion d'une PR ou à la main : l'étiquette « en cours » la
+# quitte (#157), pour que la liste des issues « en cours » dise ce qui l'est.
+#
 # Au passage en Ready d'une PR (#150) : l'étiquette « en validation » sur l'issue qu'elle ferme dit à
 # `brouillon.yml`, sans lancer de job, qu'une modification de cette issue annule la validation. Lu sur
 # `main` (`pull_request_target`) ; à part de `validation.yml`, où la garde tourne seule, en lecture.
 #
 # Place du job sur le second axe des harnais (#113, D71) :
-# - `etiquette` est hors harnais : il ne vérifie rien ; il rougit s'il ne parvient pas à poser
-#   l'étiquette. Ce que fait le jeton du job ne déclenche aucun workflow.
+# - `etiquette` et `fin` sont hors harnais : ils ne vérifient rien ; ils rougissent s'ils ne
+#   parviennent pas à poser ou retirer l'étiquette. Ce que fait le jeton d'un job ne déclenche aucun
+#   workflow : le retrait de « en cours » ne réveille pas `brouillon.yml`.
 
 on:
   pull_request_target:
     types: [opened, reopened, ready_for_review]
+  issues:
+    types: [closed]
 
 permissions: {}
 
 concurrency:
-  group: etiquette-${{ github.event.pull_request.number }}
+  group: etiquette-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
@@ -46,3 +52,19 @@ jobs:
             gh issue edit "$n" --add-label "$ETIQUETTE"
             echo "Étiquette « $ETIQUETTE » posée sur l'issue #$n."
           done
+
+  fin:
+    name: Fin de l'issue
+    if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'en cours')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMERO: ${{ github.event.issue.number }}
+    steps:
+      - name: Retirer « en cours » de l'issue fermée
+        run: |
+          gh issue edit "$NUMERO" --remove-label "en cours"
+          echo "Étiquette « en cours » retirée de l'issue #$NUMERO."
