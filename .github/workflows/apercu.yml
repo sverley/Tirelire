@@ -13,8 +13,8 @@ name: Aperçu
 # Dépôt au vert (#169) : rien ne se dépose tant que toute la CI de la PR n'est pas verte — `ci.yml`
 # (tests, build, assemblage), `validation.yml` (la garde) et `etiquette.yml`, pour le dernier commit
 # de la branche et ce passage en Ready. Le job `attente` les attend ; si l'une rougit, `raison` le dit en
-# commentaire de la PR, avec le lien de l'exécution en cause, et rien n'est déposé. Aucune
-# approbation manuelle : la validation du porteur se donne en regardant l'aperçu déposé (#168).
+# commentaire de la PR, avec le lien de l'exécution en cause, et rien n'est déposé. La validation du
+# porteur se donne en regardant l'aperçu déposé (#168).
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `attente` est hors harnais : il attend la fin de toute la CI de la PR et ne fait que lire leurs

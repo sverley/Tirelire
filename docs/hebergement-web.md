@@ -137,9 +137,9 @@ Le dépôt a lieu en fin de CI, et seulement au vert (#169). Au passage en Ready
 vert de toute la CI » d'`apercu.yml` attend les trois workflows de la PR pour son dernier commit :
 `ci.yml` (tests, build, assemblage), `validation.yml` (la garde) et `etiquette.yml`. Tous verts, le
 dépôt suit. L'un rouge, annulé ou pas fini dans l'heure : rien n'est déposé, et un commentaire de la
-PR nomme le workflow en cause avec le lien de son exécution, sans l'adresse de la recette. Aucune
-approbation manuelle : la validation du porteur se donne en regardant l'aperçu déposé. Le retrait à
-la fermeture reste automatique.
+PR nomme le workflow en cause avec le lien de son exécution, sans l'adresse de la recette. La
+validation du porteur se donne en regardant l'aperçu déposé. Le retrait à la fermeture est
+automatique.
 
 Le code de la PR et les identifiants ne se croisent jamais (#155). `ci.yml`, lu dans la branche,
 assemble le site de la PR sans identifiant ni réglage de recette, et le garde en artefact
