@@ -162,6 +162,11 @@ Retiré par le porteur le 22 septembre 2026 (la première phrase seulement) :
 
 > dans tous les cas, un changement de comportement de la garde doit être validé manuellement (invariant) et le changement doit être expliqué et justifié en commentaire de la PR (invariant)
 
+Modérées par le porteur le 21 septembre 2026, dans #150 : la validation manuelle que demandent
+« Si la garde doit être modifiée… », « dans tous les cas… » et la seconde phrase de « en cas
+d'altération… » est le passage en Ready. Voir, plus bas, « Il y a un problème de dénomination… » (section « Brouillon, Ready et
+validation »).
+
 ### L'auditeur et le codeur
 
 Le 14 septembre, dans #91.
@@ -169,6 +174,10 @@ Le 14 septembre, dans #91.
 > je ne fais pas confiance au codeur. Aussi, quand un besoin est défini (que ce soit une règle ou une fonctionnalité), je veux un agent qui code le harnais du besoin pour vérifier que le codeur va bien répondre au besoin et un agent qui code le besoin.
 
 > c'est l'auditeur qui ouvre une PR. C'est donc l'auditeur d'un besoin qui évalue si le besoin doit se décliner en une ou plusieurs taches. Le codeur ne fait que coder le besoin dont le harnais est déjà en place
+
+Modérées par le porteur les 21 et 22 septembre 2026 : ces deux paroles valent pour le produit ; la
+documentation et la garde n'ont pas de harnais par défaut. Voir, plus bas, « Non. La garde peut être
+modifiée sans harnais… » (#150) et « il faut modéré le propos… » (section « La place des harnais »).
 
 > le codeur ne doit pas modifier une PR. Mais il peut mettre des commentaires
 
@@ -182,7 +191,11 @@ Retiré par le porteur le 19 septembre 2026 :
 
 > On retire tout le concept d'amorçage.
 
-> oui, le codeur s'en remet à la CI. il est censé y avoir des hook-precommit et pre-push pour faire le nécessaire
+> ~~oui, le codeur s'en remet à la CI.~~ il est censé y avoir des hook-precommit et pre-push pour faire le nécessaire
+
+Retiré par le porteur le 21 septembre 2026, dans #150 (la première phrase seulement) :
+
+> Je en suis pas convaincu par une petite CI. Restons sur les tests locaux en mode auditeur/codeur
 
 > une PR fusionnée doit fermer automatiquement l'issue (le besoin) qu'elle couvre. Si une discussion née, soit cette discussion est bloquante pour la PR et elle fait partie de la PR, soit elle est non-bloquante et fait l'objet d'une nouvelle issue avant la fusion
 
