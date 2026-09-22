@@ -1,5 +1,5 @@
 /**
- * Garde de l'objectif primaire (#58, D61).
+ * Garde de l'objectif primaire (#58).
  *
  * Deux vérifications, sans dépendance :
  *
@@ -44,10 +44,10 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 // ─── Règles primaires (#64) ──────────────────────────────────────────────────────────────────
 // Changer une règle reste libre : toute PR peut ajouter une décision, faire évoluer la garde ou les
 // règles des sessions. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les règles
-// primaires. La conformité porte sur le sens et ne se programme pas : elle devient donc une
-// vérification manuelle, demandée par les chemins que la PR modifie, analysée puis validée par un
-// développeur humain avant la fusion. Sur une PR, la garde qui juge est celle de la base, appliquée au
-// contenu de la PR, qu'elle lit par git sans l'extraire (#159, `verifierCouvertureA`).
+// primaires. La conformité porte sur le sens et ne se programme pas : l'auditeur la vérifie en
+// relisant, et le porteur valide au passage en Ready (`CLAUDE.md`). Sur une PR, la garde qui juge
+// est celle de la base, appliquée au contenu de la PR, qu'elle lit par git sans l'extraire (#159,
+// `verifierCouvertureA`).
 
 /**
  * Familles de chemins dont la modification ajoute ou change une règle. Une table à part du registre,
@@ -62,14 +62,12 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 /**
  * Ce qui ne change qu'à la demande du porteur (#64) : les invariants, et la description du projet
  * qui les fonde — son texte, mot pour mot, que seul le porteur complète ou corrige (`CLAUDE.md`).
- * Son accord ne reste pas dans l'analyse : c'est une ligne « Accord du porteur : … » de la section,
- * que la garde lit et refuse quand elle manque ou reste vide.
+ * Son accord peut s'écrire dans une ligne « Accord du porteur : … » de la section : la garde la lit
+ * (une seule par section) mais ne l'exige pas ; l'auditeur le vérifie en relisant.
  */
 
 const G = DOCUMENTS.gardes;
 const IDENTIFIANT = /\b([IUC]\d+)\b/g;
-/** Ce que contient une analyse laissée telle que le modèle ou `demander` l'ont écrite. */
-const ANALYSE_VIDE = /^(?:…|\.\.\.|à écrire|à compléter|à analyser)?\.?$/i;
 const RANG = { I: 0, U: 1, C: 2 };
 
 /** Ordre de lecture : invariants, usages, contraintes, chacun par numéro. */
@@ -383,7 +381,7 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
     }
     if (!estGardee(e.id, entrees)) problemes.push(`${ou} : ni harnais, ni vérification manuelle, ni renvoi vers des entrées gardées.`);
   }
-  // Un harnais qui se saute faute d'outil ne compte que parce que la CI rend l'outil obligatoire (#59, D62).
+  // Un harnais qui se saute faute d'outil ne compte que parce que la CI rend l'outil obligatoire (#59).
   if (sautsSousCondition.size && !etapeTestsStricte(lireFichier(CI_WORKFLOW))) {
     problemes.push(
       `${CI_WORKFLOW} : l'étape « pnpm test » ne pose pas \`TIRELIRE_STRICT\`, alors que ${listeCourte([...sautsSousCondition].sort())} se sautent faute d'outil : ils passeraient pour verts en CI.`,
@@ -808,14 +806,12 @@ export function lireDescriptionPr(corps) {
 
   const items = [];
   let item = null;
-  let dansAnalyse = false;
   let dansTete = false;
   for (const ligne of section) {
     const tete = ligne.match(/^[-*]\s+(?:\[[ xX]\]\s+)?`([^`]+)`(.*)$/);
     if (tete) {
-      item = { cle: tete[1].trim(), consigne: couper(tete[2])[1], analyse: '' };
+      item = { cle: tete[1].trim(), consigne: couper(tete[2])[1] };
       items.push(item);
-      dansAnalyse = false;
       dansTete = true;
       continue;
     }
@@ -824,14 +820,7 @@ export function lireDescriptionPr(corps) {
       item = null;
       continue;
     }
-    const analyse = ligne.match(/^\s+[-*]\s+Analyse\b[^:]*:\s*(.*)$/i);
-    if (analyse) {
-      item.analyse = analyse[1].trim();
-      dansAnalyse = true;
-      dansTete = false;
-    } else if (dansAnalyse && ligne.trim()) {
-      item.analyse = `${item.analyse} ${ligne.trim()}`.trim();
-    } else if (dansTete && ligne.trim()) {
+    if (dansTete && ligne.trim()) {
       // La consigne recopiée peut être coupée comme dans le registre, avant la première sous-puce.
       if (/^\s+[-*+]\s/.test(ligne)) dansTete = false;
       else item.consigne = `${item.consigne} ${ligne.trim()}`.trim();
@@ -916,8 +905,6 @@ export function issuesFermees(corps) {
   return [...new Set([...texte.matchAll(FERMETURE)].map((m) => Number(m[1])))];
 }
 
-export const analyseEcrite = (analyse) => !ANALYSE_VIDE.test(String(analyse ?? ''));
-
 export function preparerSection({ entrees, entreesAvant = new Map(), fichiersModifies = [], ids = [] }) {
   const imposes = plancher(entrees, fichiersModifies);
   const touches = [...new Set([...imposes.keys(), ...ids])].sort(ordreIds);
@@ -952,7 +939,7 @@ export function resumePr({ aCorriger, declares, imposes, requises }) {
   return l.join('\n');
 }
 
-// ── Lanceurs locaux sans sortie (#113, D71) ─────────────────────────────────────────────────────
+// ── Lanceurs locaux sans sortie (#113) ─────────────────────────────────────────────────────
 
 /** Le préchargement de la garde, et son branchement sur vitest, relatifs à la racine. */
 export const SANS_SORTIE = 'packages/gardes/sans-sortie.mjs';

@@ -8,7 +8,7 @@ name: Retour en brouillon
 # passage en Ready rejoue tout. Au retour en brouillon fait à la main, et à la fermeture de la PR,
 # fusionnée ou non, l'étiquette quitte seulement l'issue.
 #
-# Place du job sur le second axe des harnais (#113, D71) :
+# Place du job sur le second axe des harnais (#113) :
 # - `brouillon` est hors harnais : il ne vérifie rien, il change l'état de la PR et de l'issue.
 #
 # Sur un brouillon, sur une issue sans l'étiquette, le job est écarté par sa condition : rien ne

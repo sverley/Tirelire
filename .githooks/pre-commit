@@ -1,10 +1,10 @@
 #!/bin/sh
-# Pré-commit de Tirelire (#120, #127, D73, D75) : moins de 5 s. Pendant une fusion, voir livraison.sh.
+# Pré-commit de Tirelire (#120, #127) : moins de 5 s. Pendant une fusion, voir livraison.sh.
 #
 # Les tests se choisissent d'après les fichiers du commit (l'index) et se jouent sur la copie de
 # travail, en parallèle :
 #   packages/core/**                                   → tests du cœur (sans isolation, pour tenir le budget)
-#   la garde (packages/gardes/**, amorcage/**, docs/gardes.md, .github/**)
+#   la garde (packages/gardes/**, docs/gardes.md, .github/**)
 #   ou les règles (docs/decisions.md, docs/description-projet.md, docs/invariants.md,
 #   docs/contraintes.md, CLAUDE.md)                     → tests de la garde
 #   apps/relay/**                                      → tests du relais
@@ -20,7 +20,7 @@
 # besoin, avec un message, sauf si TIRELIRE_STRICT est posé.
 set -u
 
-# Pendant une fusion (conflit), le pré-commit juge l'index comme la pré-fusion (#121, D76).
+# Pendant une fusion (conflit), le pré-commit juge l'index comme la pré-fusion (#121).
 if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
   exec sh "$(dirname "$0")/livraison.sh" fusion
 fi
@@ -33,7 +33,7 @@ coeur='' garde='' relais='' hebergement=''
 while IFS= read -r f; do
   case $f in
     packages/core/*) coeur=1 ;;
-    packages/gardes/* | amorcage/* | .github/* | docs/gardes.md) garde=1 ;;
+    packages/gardes/* | .github/* | docs/gardes.md) garde=1 ;;
     docs/decisions.md | docs/description-projet.md | docs/invariants.md | docs/contraintes.md | CLAUDE.md) garde=1 ;;
     apps/relay/*) relais=1 ;;
     apps/hebergement/*) hebergement=1 ;;

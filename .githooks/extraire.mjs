@@ -1,4 +1,4 @@
-// Dépendances d'une extraction (#121, D76). La livraison juge l'arbre commis dans un dossier à part ;
+// Dépendances d'une extraction (#121). La livraison juge l'arbre commis dans un dossier à part ;
 // ce script y recrée les `node_modules` du clone, entrée par entrée, en liens vers leurs cibles
 // réelles. Un lien vers un paquet du workspace (`@tirelire/core`…) pointe vers sa copie extraite,
 // jamais vers la copie de travail : sinon l'extraction importerait du code non commis.

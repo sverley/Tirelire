@@ -19,7 +19,7 @@ Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
   il compte comme absent. Chaque ligne `Harnais` cite son témoin rouge, ou porte « à faire » avec
   son issue. Un test qui se saute faute d'outil compte comme un test qui tourne, parce qu'en CI
   `TIRELIRE_STRICT` rend l'outil obligatoire.
-- **Dans chaque lanceur local** : un harnais joué en local ne sort pas de la machine (D71). Le script
+- **Dans chaque lanceur local** : un harnais joué en local ne sort pas de la machine. Le script
   `test` de chaque paquet précharge `packages/gardes/sans-sortie.mjs`.
 - **Au passage en Ready de chaque PR**, par le job « Validation » : la section « Invariants et
   contraintes » de l'issue que la PR ferme (`Close #n`) déclare les identifiants touchés et ceux dont
@@ -54,7 +54,7 @@ compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refu
 
 - `Chemins :` suivi de motifs entre accents graves (`*` dans un dossier, `**` à travers les
   dossiers) : modifier un fichier qui y répond impose de déclarer l'entrée. C'est un plancher,
-  volontairement étroit ; l'analyse ajoute ce qu'il ne voit pas.
+  volontairement étroit ; l'auditeur ajoute ce qu'il ne voit pas.
 - Une ligne `Harnais` : un ou plusieurs chemins entre accents graves, un tiret cadratin, puis ce que
   le harnais garde. Pour un test précis, son nom vient en tête, entre guillemets, comme « positions
   et soldes (D19, D29) » pour I2 : c'est alors ce test, titre d'un `describe`, d'un `it` ou d'un
@@ -64,9 +64,10 @@ compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refu
   version cassée du besoin ; `Témoin rouge : à bâtir (#123)` sinon, avec le numéro de l'issue qui le
   doit. Une ligne `Harnais` sans l'un ou l'autre est refusée (#66).
 - Une ligne `Vérification manuelle` : un identifiant `VM-<entrée>-<nom>`, un tiret cadratin, puis ce
-  qu'on fait, sur quoi, et ce qu'on doit constater. La consigne se proportionne à la PR (D62) : une
+  qu'on fait, sur quoi, et ce qu'on doit constater. La consigne se proportionne à la PR : une
   PR qui ne touche que des tests, de l'outillage ou de la documentation ne déclenche ni manipulation
-  de l'application ni construction de l'APK ; son analyse dit pourquoi l'application n'est pas atteinte.
+  de l'application ni construction de l'APK ; le compte rendu du codeur dit pourquoi l'application
+  n'est pas atteinte.
 - Une ligne `Couvert par` : des identifiants, un tiret cadratin, puis pourquoi. Déclarer l'entrée
   demande alors aussi les vérifications des entrées citées.
 - Une ligne `À bâtir` : un harnais prévu (#38). Il ne garde rien tant qu'il n'existe pas ; une
@@ -215,9 +216,9 @@ devant le produit, et le seuil interdit la hausse.
   comparé à son seuil ; une opération remise à zéro par le harnais avant chaque mesure, et la
   sous-catégorie créée par l'interface.
   Témoin rouge : « témoin rouge · un classement qui coûte un geste de plus que le seuil »
-- **Vérification manuelle** · `VM-I6-gestes` — Compter les gestes pour classer une opération
-  importée, puis toutes les opérations semblables ; écrire les deux nombres dans l'analyse et
-  signaler toute hausse par rapport à `main`.
+- **Vérification manuelle** · `VM-I6-gestes` — Sur la version de dev, compter les gestes pour classer une
+  opération importée, puis toutes les opérations semblables, et constater qu'aucun des deux nombres
+  ne dépasse celui de `main`.
 
 ## I7 · Les données restent en local
 
@@ -269,7 +270,7 @@ Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/we
   dépendances, Vite, Capacitor, le projet Android, les jobs de la CI qui construisent ou publient) :
   construire l'APK depuis la branche en local (`pnpm build`, `npx cap sync android`, puis
   `./gradlew assembleRelease` dans `apps/web/android`). Sinon, et notamment si elle ne touche que des
-  tests, de l'outillage ou de la documentation (D62) : dire dans l'analyse pourquoi la construction
+  tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi la construction
   n'est pas atteinte, et ce qui dépend de ce qu'elle change. L'APK n'est vérifié que par sa
   construction : son comportement réel n'est pas analysé tant que la priorité va à l'application
   web (#45). Ne pas poser de tag `v*` depuis la branche : il publierait une release.
@@ -364,7 +365,7 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
 - **Vérification manuelle** · `VM-C3-https` — Si la PR touche l'application ou le relais : donner à
   l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,
   et que la PR ne fait rien charger en HTTP. Si elle ne touche que des tests, de l'outillage ou de la
-  documentation (D62) : dire dans l'analyse pourquoi ni l'application ni le relais ne sont atteints.
+  documentation : dire dans le compte rendu du codeur pourquoi ni l'application ni le relais ne sont atteints.
 - **Vérification manuelle** · `VM-C3-depot-main` — Si la PR touche un workflow qui lit
   `secrets.OVH_FTP_*`, `apps/hebergement/apercu.sh` ou `apps/hebergement/deposer.sh` : dans
   Settings → Environments, constater que l'environnement déclaré par ces jobs n'admet que `main` et

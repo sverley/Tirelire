@@ -1,5 +1,5 @@
 /**
- * Harnais de l'objectif primaire (#58, D61) : la garde se vérifie elle-même.
+ * Harnais de l'objectif primaire (#58) : la garde se vérifie elle-même.
  *
  * Le premier test tient le dépôt réel : chaque invariant, usage et contrainte a son harnais, sa
  * vérification manuelle ou un renvoi gardé. Les autres tiennent la règle sur des documents
@@ -378,7 +378,7 @@ test('une liste de chemins trop longue pour une ligne se prolonge en dessous, et
   assert.deepEqual(problemes, []);
 });
 
-// ── #113 (D71) : un harnais joué en local ne sort pas de la machine ─────────────────────────────
+// ── #113 : un harnais joué en local ne sort pas de la machine ─────────────────────────────
 
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';

@@ -1,5 +1,5 @@
 /**
- * Garde de #113 (D71) : un harnais joué en local ne sort pas de la machine.
+ * Garde de #113 : un harnais joué en local ne sort pas de la machine.
  *
  * Ce module se précharge dans les lanceurs locaux : `node --import …/sans-sortie.mjs --test` pour
  * les paquets qui testent avec `node:test`, `sans-sortie-vitest.mjs` en
@@ -12,7 +12,7 @@
  *   nomme l'hôte, et la tentative est retenue. Le processus sort alors en échec en la nommant, même
  *   si le harnais ou le code testé a intercepté l'erreur : une sortie avalée reste une sortie.
  *
- * Limites, hors du périmètre de #113 (D62) : les processus enfants qui ne sont pas des lanceurs
+ * Limites, hors du périmètre de #113 : les processus enfants qui ne sont pas des lanceurs
  * (serveur du relais, PHP, navigateur) ne sont pas préchargés, et ni `dgram` ni les requêtes DNS
  * ne sont des connexions.
  */
@@ -93,7 +93,7 @@ export const designer = ({ hote, port }) => {
 export function message(tentatives) {
   const cibles = [...new Set(tentatives.map(designer))];
   return (
-    `Connexion hors de la machine tentée vers ${cibles.join(', ')} (#113, D71) : ` +
+    `Connexion hors de la machine tentée vers ${cibles.join(', ')} (#113) : ` +
     "un harnais joué en local ne lit que des fichiers suivis et n'ouvre de connexion que sur la boucle locale."
   );
 }

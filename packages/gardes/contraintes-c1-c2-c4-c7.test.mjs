@@ -1,18 +1,13 @@
 /**
  * Harnais d'audit de #73 (chantier de #38, objectif primaire #58), écrit par la session d'audit.
  *
- * **Où il vit, et pourquoi ici** (D65). Deux questions classent un harnais : qui l'a écrit, et
- * contre quel besoin. Celui-ci vient d'une session d'audit, mais le besoin de #73 est un besoin de
- * **produit** — quatre contraintes du produit reçoivent leur garde — et non une règle du projet :
- * #73 ne crée ni ne change aucune règle, il applique celle que #58 et D61 ont déjà posée. Case
- * auditeur × fonctionnalité, donc : un harnais du besoin, qui tient un comportement devant
- * continuer de tenir, et qui tourne dans `pnpm test`. Il rejoint ses deux frères de #38, écrits par
- * les sessions d'audit de #70 et #71 (`usages-de-bout-en-bout`, `simplicite-acces-gestes`), et non
- * `amorcage/`, réservé à la seule case auditeur × règle.
- *
- * Il a d'abord été écrit dans `amorcage/`, par un classement fait sur son objet — il lit le
- * registre, le registre appartient à la garde, donc une règle. C'est précisément ce que D65 écarte :
- * le classement vient de qui écrit et contre quel besoin, jamais de ce que le fichier regarde.
+ * **Où il vit, et pourquoi ici**. Le besoin de #73 est un besoin de **produit** — quatre
+ * contraintes du produit reçoivent leur garde — et non une règle du projet : #73 ne crée ni ne
+ * change aucune règle, il applique celle que #58 a déjà posée. C'est donc un harnais du besoin, qui
+ * tient un comportement devant continuer de tenir, et qui tourne dans `pnpm test`. Il rejoint ses
+ * deux frères de #38, écrits par les sessions d'audit de #70 et #71 (`usages-de-bout-en-bout`,
+ * `simplicite-acces-gestes`). Qu'il lise le registre n'en fait pas un test de la garde : un harnais
+ * se range selon le besoin qu'il vérifie, jamais selon ce que le fichier regarde.
  *
  * #73 demandait, pour C1, C2, C4 et C7, un harnais — ou une vérification manuelle assumée par écrit
  * qui dise pourquoi il n'y en a pas. C1 et C2 ont reçu le leur ; C4 et C7 gardent leur vérification

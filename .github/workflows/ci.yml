@@ -10,7 +10,7 @@ name: CI et livraison
 # (#155) : ce workflow, lu dans la branche pour une PR, ne peut pas les obtenir. Seul `deploiement`
 # les lit ici, sur `main`.
 #
-# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
 #   l'archive du site qu'il dépose ensuite ne juge rien.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur

@@ -1,7 +1,7 @@
 #!/bin/sh
-# Pré-push de Tirelire (#121, D76) : chaque référence poussée est jugée sur son commit, par
+# Pré-push de Tirelire (#121) : chaque référence poussée est jugée sur son commit, par
 # livraison.sh. Un arbre déjà vérifié à la fusion n'est pas rejoué ; un push vers une sous-branche
-# (`--codeur`, `--auditeur`) ne joue que la non-régression. Le build est laissé à la CI (D74).
+# (`--codeur`, `--auditeur`) ne joue que la non-régression. Le build est laissé à la CI.
 set -u
 code=0
 while read -r lref lsha rref rsha; do

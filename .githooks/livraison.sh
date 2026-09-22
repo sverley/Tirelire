@@ -1,5 +1,5 @@
 #!/bin/sh
-# Livraison de Tirelire (#121, D76) : la pré-fusion et le pré-push jugent l'état commis.
+# Livraison de Tirelire (#121) : la pré-fusion et le pré-push jugent l'état commis.
 #
 #   livraison.sh fusion
 #       `pre-merge-commit`, et `pre-commit` pendant une fusion (conflit) : juge l'index.
@@ -18,7 +18,7 @@
 #    - organisationnel : tests de la garde et tous les amorçages ; objectif 45 s.
 #    Une sélection qui dépasse son objectif de plus de 20 % le dit, sans bloquer.
 # 4. Harnais du besoin : les fichiers `*.test.*` que la branche ajoute ou modifie depuis sa base
-#    commune avec `origin/main` (D75). Joué à part, quelle que soit sa finalité, hors objectif.
+#    commune avec `origin/main`. Joué à part, quelle que soit sa finalité, hors objectif.
 #    Il bloque si ce qui arrive (commits absents de `main` et de la branche d'arrivée) touche autre
 #    chose que le harnais et la documentation (`**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ;
 #    sinon son verdict s'affiche. La non-régression bloque toujours.
@@ -128,7 +128,7 @@ if [ "$mode" = push ] && [ -n "$etat" ]; then
   exit 1
 fi
 
-# Harnais du besoin (D75).
+# Harnais du besoin.
 : >"$journaux/harnais.txt"
 if [ -n "$surmain" ]; then
   dit "sur main, tout test est non-régression (aucun harnais du besoin)"
@@ -177,31 +177,6 @@ if ! command -v pnpm >/dev/null 2>&1; then
   echo "$niveau : pnpm introuvable, les tests ne peuvent pas être joués." >&2
   exit 1
 fi
-
-# Garde-fou : un amorçage qui pousse dans une copie du dépôt relance une livraison, qui rejouerait les
-# amorçages, dont lui-même. Une livraison ne rejoue donc pas un amorçage qu'un processus parent est
-# déjà en train de jouer (son nom figure dans la ligne de commande d'un ancêtre).
-# `set -f` : un motif resté littéral dans une ligne de commande (`sh -c "… amorcage/*.test.mjs"`)
-# ne doit pas se développer ici, sinon il désignerait tous les amorçages du dossier courant.
-ps -o args= -p $$ >/dev/null 2>&1 && {
-  set -f
-  pid=$$
-  while [ "${pid:-0}" -gt 1 ]; do
-    for mot in $(ps -o args= -p "$pid" 2>/dev/null); do
-      case $mot in
-        *'*'* | *'?'* | *'['*) ;;
-        amorcage/*.test.mjs | */amorcage/*.test.mjs) echo "amorcage/${mot##*/}" ;;
-      esac
-    done
-    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
-  done
-} | sort -u >"$travail/amorcages-parents"
-[ -f "$travail/amorcages-parents" ] || : >"$travail/amorcages-parents"
-sans_parents() {
-  grep -vxF -f "$travail/amorcages-parents"
-}
-[ -s "$travail/amorcages-parents" ] &&
-  dit "livraison imbriquée : $(wc -l <"$travail/amorcages-parents" | tr -d ' ') amorçage(s) déjà joué(s) par un processus parent, non rejoué(s)"
 
 # ─── Lancements ────────────────────────────────────────────────────────────────────────────────────
 dans() { grep -E "^$1/" "$journaux/harnais.txt" | sed "s#^$1/##"; }
@@ -262,13 +237,7 @@ fi
 if [ -n "$org" ]; then
   objectif=$((objectif + 45))
   non_regression garde packages/gardes
-  liste=$(grep -E '^amorcage/[^/]*\.test\.mjs$' "$travail/fichiers" | grep -vxF -f "$journaux/harnais.txt" | sans_parents)
-  if [ -n "$liste" ]; then
-    # shellcheck disable=SC2046,SC2086
-    lance amorçages . node --import ./packages/gardes/sans-sortie.mjs --test $(rapports_node amorçages) $liste
-    ajoute "amorçages:amorcage:node"
-  fi
-  selection="${selection:+$selection + }organisationnel (garde, amorçages)"
+  selection="${selection:+$selection + }organisationnel (garde)"
 fi
 [ -n "$selection" ] || selection="aucun fichier modifié"
 dit "besoin $selection"
@@ -297,13 +266,7 @@ if [ -z "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
     lance "$n" "$d" pnpm run test $(rapports_node "$n") $(dans "$d")
     harnais_lances="$harnais_lances $n:$d:node"
   done
-  liste=$(grep -E '^amorcage/' "$journaux/harnais.txt" | sans_parents)
-  if [ -n "$liste" ]; then
-    # shellcheck disable=SC2046,SC2086
-    lance harnais-amorçages . node --import ./packages/gardes/sans-sortie.mjs --test $(rapports_node harnais-amorçages) $liste
-    harnais_lances="$harnais_lances harnais-amorçages:amorcage:node"
-  fi
-  autres=$(grep -Ev '^(apps|packages)/[^/]+/|^amorcage/' "$journaux/harnais.txt" | tr '\n' ' ')
+  autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | tr '\n' ' ')
   [ -z "$autres" ] || dit "harnais du besoin hors de tout paquet, non joué : $autres"
   wait
 elif [ -n "$sous" ] && [ -s "$journaux/harnais.txt" ]; then

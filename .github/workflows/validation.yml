@@ -5,7 +5,7 @@ name: Validation
 # la PR : la garde qui juge est celle de `main` (#159). À part de `ci.yml`, qui tourne sur
 # `pull_request`, pour qu'aucune des deux exécutions ne montre sautés les jobs de l'autre (#150, B1).
 #
-# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `validation` lit des fichiers suivis : ceux du commit de la PR, par git, sans les extraire, et la
 #   section « Invariants et contraintes » de l'issue que la PR ferme, lue par l'API. Rien de la PR ne
 #   s'installe ni ne s'exécute, et ses permissions sont en lecture seule : c'est ce qui rend sûr
