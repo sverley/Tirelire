@@ -25,7 +25,7 @@
  * 3. **Les gardes du jour ne disparaissent pas.** Le harnais d'I6 et les trois vérifications
  *    manuelles (`VM-I4-simple`, `VM-I5-acces`, `VM-I6-gestes`) sont figés ici : une dette se règle
  *    en bâtissant, pas en effaçant. Retirer une garde reste possible, mais par la section
- *    « Invariants et contraintes » de l'issue, déclarée, puis validée par le passage en Ready
+ *    « Invariants et contraintes » de l'issue, déclarée, puis validée par le « Validé » du porteur
  *    (`CLAUDE.md`).
  *
  * **Forme d'une renonciation**, lecture retenue sauf avis contraire du porteur (question posée dans

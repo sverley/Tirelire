@@ -39,7 +39,7 @@ const liste = (a) => a.map(({ job }) => `« ${job.nom} »`).join(', ') || 'aucun
 
 const NUMÉRO = 153;
 // Les passages en Ready (#150) : `ready_for_review`, et une PR ouverte ou rouverte hors brouillon. Un
-// push sur une PR prête ne rejoue plus rien : il la renvoie en brouillon.
+// push sur une PR prête ne rejoue plus rien : il annule la validation du porteur (#168).
 const ACTIONS_PR = ['opened', 'reopened', 'ready_for_review'];
 const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette', TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
 const pr = (action, recette) => ({
@@ -212,7 +212,7 @@ test('#153 · sur main et au tag v*, le site pour la racine se construit, se dé
 // l'arbre d'où elle s'exécute.
 
 const VALIDATION = 'Validation';
-// Au seul passage en Ready (#150) : tout changement d'une PR prête la renvoie en brouillon.
+// Au seul passage en Ready (#150).
 const ACTIONS_VALIDATION = ACTIONS_PR;
 const NOM_WORKFLOW = 'CI et livraison';
 const cible = (action, draft = false, workflow = NOM_WORKFLOW) => ({

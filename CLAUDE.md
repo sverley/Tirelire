@@ -80,7 +80,7 @@ choses, et rien de plus :
    déclarée dans la section « Invariants et contraintes » de l'issue qu'elle ferme (`Close #n`) ;
    sinon elle est rouge, et la garde nomme l'entrée manquante ;
 3. chaque vérification manuelle des entrées déclarées figure dans cette section, sa consigne
-   recopiée, sans case : le passage en Ready est la validation.
+   recopiée, sans case : la validation est le « Validé » du porteur.
 
 Il tourne en CI au passage en Ready de chaque PR, et à la demande en local
 (`node packages/gardes/cli.mjs pr --issue <n>`, sur les fichiers modifiés depuis `origin/main`). En
@@ -88,11 +88,11 @@ CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'el
 de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
 et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
 ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
-crochet lent, pas d'alerte, pas d'enregistrement de validation. Six workflows, pour qu'aucune
-exécution ne montre sautés les jobs qu'une autre joue : `ci.yml` (tests, version de dev, livraison),
-`validation.yml` (la garde), `etiquette.yml` (l'étiquette « en validation » de l'issue),
-`brouillon.yml` (le retour en brouillon), `apercu.yml` (dépôt de l'aperçu au vert de toute la CI, et retrait) et `fin.yml`
-(« en cours » quitte l'issue à sa fermeture).
+crochet lent, pas d'alerte. Cinq workflows, pour qu'aucune exécution ne montre sautés les jobs
+qu'une autre joue : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la garde),
+`apercu.yml` (dépôt de l'aperçu au vert de `ci.yml` et `validation.yml`, et retrait),
+`validation-porteur.yml` (le « Validé » du porteur et son annulation) et `fin.yml` (« en cours »
+quitte l'issue à sa fermeture).
 
 ### Vérification et validation
 
@@ -101,11 +101,18 @@ Deux actes, qui ne se confondent pas :
 - **la vérification**, par l'auditeur : le travail est conforme à ce que l'issue demande, et ne
   contrevient ni aux autres entrées de son catalogue, ni aux fondamentaux du projet. Il l'écrit dans
   la PR ;
-- **la validation**, par le porteur : il la donne en passant la PR en Ready, ce qui lance toute la CI
-  et assemble la version de dev depuis le dernier commit de la branche ; il la conclut en fusionnant.
-  Tout changement entre les deux — commit, édition, commentaire, revue, sur la PR ou sur l'issue
-  qu'elle ferme, de qui que ce soit, porteur compris — l'annule : la PR repasse en brouillon, avec un
-  commentaire qui le dit, et le prochain Ready rejoue tout. Rien ne l'enregistre.
+- **la validation**, par le porteur : il la donne par un commentaire « Validé » sur la PR, seul dans
+  le commentaire. **Les agents n'écrivent jamais « Validé »**, ni sur une PR, ni ailleurs. La
+  validation se lit dans le statut « Validé par le porteur » du dernier commit ; la protection de
+  `main` l'exige : une PR sans validation en cours ne se fusionne pas. Tout changement ensuite —
+  commit, édition, commentaire, revue, sur la PR ou sur l'issue qu'elle ferme, de qui que ce soit,
+  porteur compris — l'annule : le statut passe en échec, l'étiquette « validée » quitte la PR et
+  l'issue, et un commentaire sur la PR dit pourquoi. Un nouveau « Validé » la redonne.
+
+Le brouillon ne joue aucun rôle dans la validation : il n'économise que la CI. Une PR s'ouvre en
+brouillon ; le porteur la passe en Ready à la main, ce qui lance toute la CI et assemble la version de
+dev depuis le dernier commit de la branche. Un commit sur une PR prête ne relance pas la CI : le
+porteur la repasse en brouillon puis en Ready pour la rejouer.
 
 Pour le produit, un harnais qui peut être codé doit l'être. La garde, elle, reste simple et peu
 coûteuse : ce qui peut se vérifier par analyse de code — une relecture, une recherche — n'y va pas ;
@@ -162,15 +169,15 @@ Il passe en second, sur la PR ouverte par l'auditeur.
    constater. Honnête et court. Puis s'arrêter.
 5. Si le harnais paraît faux ou le besoin impossible, le dire en commentaire et s'arrêter.
 
-Il ne passe jamais la PR en Ready. Il n'ouvre pas d'issue.
+Il ne passe jamais la PR en Ready et n'écrit jamais « Validé ». Il n'ouvre pas d'issue.
 
 #### Le porteur
 
-Il lit le commentaire du codeur et passe la PR en Ready : c'est sa validation. Toute la CI tourne, et
-la version de dev s'assemble depuis le dernier commit de la branche. Il fait ses vérifications
-manuelles sur la version de dev, puis fusionne au vert ; la fusion ferme l'issue. Si la CI rougit ou
-si une vérification échoue, il renvoie la PR en brouillon avec le journal d'erreur ou son constat, et
-la boucle reprend.
+Il lit le commentaire du codeur et passe la PR en Ready. Toute la CI tourne, et la version de dev
+s'assemble depuis le dernier commit de la branche. Il fait ses vérifications manuelles sur la version
+de dev, écrit « Validé » sur la PR, puis fusionne au vert ; la fusion ferme l'issue. Si la CI rougit
+ou si une vérification échoue, il le dit en commentaire, avec le journal d'erreur ou son constat,
+repasse la PR en brouillon, et la boucle reprend.
 
 ### Trois règles communes
 

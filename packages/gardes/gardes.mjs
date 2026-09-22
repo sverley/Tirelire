@@ -13,7 +13,7 @@
  *   et contraintes », les identifiants que la PR touche et ceux dont le lien pourrait être masqué ;
  *   les motifs `Chemins` du registre en imposent un plancher ; chaque vérification manuelle qui s'y
  *   rattache, et chaque garde retirée du registre, y figure avec sa consigne recopiée. Aucune case :
- *   le passage en Ready de la PR est la validation du porteur (#150).
+ *   le porteur valide la PR par un commentaire « Validé » (#168).
  *
  * Tout travaille sur des textes et des listes de fichiers : les tests nourrissent ces fonctions de
  * documents inventés, `cli.mjs` de ceux du dépôt.
@@ -45,7 +45,7 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 // Changer une règle reste libre : toute PR peut ajouter une décision, faire évoluer la garde ou les
 // règles des sessions. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les règles
 // primaires. La conformité porte sur le sens et ne se programme pas : l'auditeur la vérifie en
-// relisant, et le porteur valide au passage en Ready (`CLAUDE.md`). Sur une PR, la garde qui juge
+// relisant, et le porteur valide par un commentaire « Validé » (`CLAUDE.md`). Sur une PR, la garde qui juge
 // est celle de la base, appliquée au contenu de la PR, qu'elle lit par git sans l'extraire (#159,
 // `verifierCouvertureA`).
 
@@ -827,7 +827,7 @@ export function lireDescriptionPr(corps) {
     }
   }
 
-  // Plus de case « Validée » (#150) : le passage en Ready est la validation ; une case restée là ne
+  // Plus de case « Validée » (#150) : le porteur valide par un commentaire « Validé » (#168) ; une case restée là ne
   // compte pour rien, cochée ou non.
   return {
     touches: declaration(ETIQUETTES_PR[0]),
@@ -843,7 +843,7 @@ const memeTexte = (a, b) => String(a ?? '').replace(/\s+/g, ' ').trim() === Stri
 
 /**
  * Ce qu'une PR doit encore faire : `aCorriger`, ce qui manque ou est faux dans la section que porte
- * `corps` — l'issue que la PR ferme. Rien n'attend de case : la validation est le passage en Ready.
+ * `corps` — l'issue que la PR ferme. Rien n'attend de case : la validation est le « Validé » du porteur.
  */
 export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersModifies = [] }) {
   const aCorriger = [];
@@ -932,7 +932,7 @@ export function resumePr({ aCorriger, declares, imposes, requises }) {
   if (!aCorriger.length) {
     l.push(
       requises.size
-        ? `À constater par le porteur sur la version de dev, après le passage en Ready : ${[...requises.keys()].map((c) => `\`${c}\``).join(', ')}.`
+        ? `À constater par le porteur sur la version de dev, après le passage en Ready, avant « Validé » : ${[...requises.keys()].map((c) => `\`${c}\``).join(', ')}.`
         : 'Aucune vérification manuelle demandée.',
     );
   }
