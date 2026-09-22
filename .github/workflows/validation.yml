@@ -42,7 +42,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Sans case à cocher : le porteur valide par un commentaire « Validé » (#168). Quand la garde
+      # Sans case à cocher : la fusion vaut validation (#168). Quand la garde
       # ne sait pas lire ce que la PR propose, ou que la PR ne ferme pas une issue, le job est rouge et
       # le dit.
       - env:

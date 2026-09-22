@@ -1,0 +1,66 @@
+name: PR prête
+
+# La fusion vaut validation (#168) : aucun geste « valider » en plus, et rien ne bloque techniquement
+# la fusion. Ce workflow tient seulement deux repères pendant qu'une PR est prête :
+# - l'étiquette « PR prête » sur l'issue qu'elle ferme (`Close #n`), posée au passage en Ready et
+#   retirée au retour en brouillon ou à la fermeture ; elle dit, sans démarrer de machine, que
+#   modifier cette issue doit être signalé (`suivi.yml`) : une issue sans elle ne coûte rien en CI ;
+# - le statut « Toute la CI sur ce commit », mis en attente au Ready ; `apercu.yml` le termine quand
+#   toute la CI a fini, `suivi.yml` le passe en échec quand un commit arrive sans CI.
+#
+# Un workflow à part de `suivi.yml`, pour qu'aucune exécution ne montre sauté un job qu'une autre
+# joue (B1). GitHub le lit sur `main` (`pull_request_target`) ; rien de la PR ne s'exécute.
+#
+# Place du job sur le second axe des harnais (#113) :
+# - `etiquette` est hors harnais : il ne vérifie rien, il pose ou retire des repères.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+
+permissions: {}
+
+concurrency:
+  group: pret-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  etiquette:
+    name: Repères de la PR prête
+    # Un brouillon ouvert ou fermé ne coûte rien ; le retour en brouillon retire l'étiquette.
+    if: >-
+      github.event_name == 'pull_request_target'
+      && (github.event.pull_request.draft != true || github.event.action == 'converted_to_draft')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ACTION: ${{ github.event.action }}
+      CORPS: ${{ github.event.pull_request.body }}
+      PR: ${{ github.event.pull_request.number }}
+      ETIQUETTE: PR prête
+      CONTEXTE: Toute la CI sur ce commit
+    steps:
+      - name: Poser ou retirer les repères
+        run: |
+          set -euo pipefail
+          # Les issues que la PR ferme, lues comme la garde les lit (`issuesFermees`).
+          issues="$(printf '%s' "$CORPS" | grep -oiP '\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#\K[0-9]+\b' | sort -u || true)"
+          case "$ACTION" in
+            opened|reopened|ready_for_review)
+              gh label create "$ETIQUETTE" --color FBCA04 --description "Sa PR est prête : une modification de l'issue y est signalée (#168)" --force > /dev/null
+              for n in $issues; do gh issue edit "$n" --add-label "$ETIQUETTE" > /dev/null; done
+              sha="$(gh pr view "$PR" --json headRefOid --jq .headRefOid)"
+              gh api "repos/$GH_REPO/statuses/$sha" -f state=pending -f context="$CONTEXTE" \
+                -f description="CI en cours sur ce commit" > /dev/null ;;
+            converted_to_draft|closed)
+              for n in $issues; do
+                if gh issue view "$n" --json labels --jq '.labels[].name' | grep -qxF "$ETIQUETTE"; then
+                  gh issue edit "$n" --remove-label "$ETIQUETTE" > /dev/null
+                fi
+              done ;;
+          esac

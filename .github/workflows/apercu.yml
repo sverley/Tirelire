@@ -13,13 +13,14 @@ name: Aperçu
 # Dépôt au vert (#169) : rien ne se dépose tant que toute la CI de la PR n'est pas verte — `ci.yml`
 # (tests, build, assemblage) et `validation.yml` (la garde), pour le dernier commit de la branche et
 # ce passage en Ready. Le job `attente` les attend ; si l'une rougit, `raison` le dit en commentaire de
-# la PR, avec le lien de l'exécution en cause, et rien n'est déposé. Le porteur regarde l'aperçu
-# déposé, puis valide par un commentaire « Validé » (`validation-porteur.yml`, #168), qui ne relance
-# rien ici.
+# la PR, avec le lien de l'exécution en cause, et rien n'est déposé. Le job `statut` termine le
+# statut « Toute la CI sur ce commit » (#168). Le porteur regarde l'aperçu déposé, puis fusionne : la
+# fusion vaut validation.
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `attente` est hors harnais : il attend la fin de toute la CI de la PR et ne fait que lire leurs
 #   conclusions, en lecture seule, sans secret ni code de la PR.
+# - `statut` est hors harnais : il reporte sur le commit le verdict d'`attente`, sans rien vérifier.
 # - `raison` est hors harnais : quand `attente` a vu une CI rouge, il le dit en commentaire de la PR.
 # - `depot` lit hors des fichiers suivis : l'étape « Vérifier l'aperçu en ligne » (`verifier.sh`) lit
 #   l'aperçu déployé et le commit qu'il sert (#141).
@@ -48,6 +49,7 @@ jobs:
     permissions:
       actions: read # les exécutions de la CI sur la tête de la PR, et l'artefact
     outputs:
+      sha: ${{ steps.ci.outputs.sha }}
       run: ${{ steps.ci.outputs.run }}
       message: ${{ steps.ci.outputs.message }}
     env:
@@ -63,6 +65,7 @@ jobs:
         id: ci
         run: |
           set -euo pipefail
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT" # le commit attendu, que `statut` termine
           cree="$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq .created_at)"
           depuis="$(date -u -d "$cree - 2 minutes" +%Y-%m-%dT%H:%M:%SZ)"
           # Fichier et événement de chaque workflow de la CI d'une PR.
@@ -120,6 +123,30 @@ jobs:
       MESSAGE: ${{ needs.attente.outputs.message }}
     steps:
       - run: gh pr comment "$NUMERO" --body "$MESSAGE"
+
+  statut:
+    name: Statut de toute la CI
+    # Termine le statut « Toute la CI sur ce commit », mis en attente au Ready par `pret.yml` (#168) :
+    # vert si `attente` a vu toute la CI verte, rouge sinon. Il se lit à côté du bouton de fusion. Un
+    # job à part, pour que l'attente reste en lecture seule.
+    needs: attente
+    if: >-
+      always() && github.event_name == 'pull_request_target' && github.event.action != 'closed'
+      && github.event.pull_request.draft != true && needs.attente.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SHA: ${{ needs.attente.outputs.sha }}
+      RESULTAT: ${{ needs.attente.result }}
+      CONTEXTE: Toute la CI sur ce commit
+    steps:
+      - run: |
+          if [ "$RESULTAT" = success ]; then etat=success; d="Toute la CI est verte sur ce commit"
+          else etat=failure; d="La CI n'est pas toute verte sur ce commit : voir le commentaire de la PR"; fi
+          gh api "repos/$GH_REPO/statuses/$SHA" -f state="$etat" -f context="$CONTEXTE" -f description="$d" > /dev/null
 
   depot:
     name: Aperçu de la PR sur l'instance de recette
