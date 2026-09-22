@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Ligne de commande de la garde (#58, D61).
+ * Ligne de commande de la garde (#58).
  *
  *   node packages/gardes/cli.mjs couverture
  *   node packages/gardes/cli.mjs demander [--base origin/main] [--ids I7,C3] [--auteur agent]

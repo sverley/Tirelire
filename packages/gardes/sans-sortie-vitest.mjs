@@ -1,5 +1,5 @@
 /**
- * Branchement de la garde de #113 (D71) sur vitest, en `setupFiles`.
+ * Branchement de la garde de #113 sur vitest, en `setupFiles`.
  *
  * Vitest ne donne pas le code de sortie d'un fichier de tests : la tentative retenue par
  * `sans-sortie.mjs` fait donc échouer le fichier qui l'a faite, à la fin de ses tests, en nommant

@@ -1,4 +1,4 @@
-# Harnais du besoin (#127, D75), définition commune avec #121 : les fichiers de test (`*.test.*`)
+# Harnais du besoin (#127), définition commune avec #121 : les fichiers de test (`*.test.*`)
 # que la branche ajoute ou modifie depuis sa base commune avec `origin/main`, index compris, pour
 # que le harnais pas encore commis en fasse partie. Tout autre test est la non-régression.
 #

@@ -1,4 +1,4 @@
-// Active les crochets suivis de `.githooks/` (#120, D73). Se lance par `pnpm crochets`, une fois
+// Active les crochets suivis de `.githooks/` (#120). Se lance par `pnpm crochets`, une fois
 // par clone : git ne les active jamais de lui-même, et `pnpm install` n'y touche pas.
 // Les crochets joués sont alors ceux de la branche extraite, dans chaque worktree.
 import { execFileSync } from 'node:child_process';
@@ -30,4 +30,4 @@ for (const nom of existsSync(dossier) ? readdirSync(dossier) : []) {
     console.log(`crochets : ${chemin} n'est plus joué (core.hooksPath vaut .githooks)`);
   }
 }
-console.log('crochets : .githooks actif (pré-commit < 5 s ; pré-fusion et pré-push : livraison sur l’état commis, D76) ; merge.ff = false');
+console.log('crochets : .githooks actif (pré-commit < 5 s ; pré-fusion et pré-push : livraison sur l’état commis) ; merge.ff = false');

@@ -1,5 +1,5 @@
 /**
- * Garde de l'objectif primaire (#58, D61).
+ * Garde de l'objectif primaire (#58).
  *
  * Deux vérifications, sans dépendance :
  *
@@ -383,7 +383,7 @@ export function verifierCouvertureTextes({ invariants, contraintes, gardes, fich
     }
     if (!estGardee(e.id, entrees)) problemes.push(`${ou} : ni harnais, ni vérification manuelle, ni renvoi vers des entrées gardées.`);
   }
-  // Un harnais qui se saute faute d'outil ne compte que parce que la CI rend l'outil obligatoire (#59, D62).
+  // Un harnais qui se saute faute d'outil ne compte que parce que la CI rend l'outil obligatoire (#59).
   if (sautsSousCondition.size && !etapeTestsStricte(lireFichier(CI_WORKFLOW))) {
     problemes.push(
       `${CI_WORKFLOW} : l'étape « pnpm test » ne pose pas \`TIRELIRE_STRICT\`, alors que ${listeCourte([...sautsSousCondition].sort())} se sautent faute d'outil : ils passeraient pour verts en CI.`,
@@ -952,7 +952,7 @@ export function resumePr({ aCorriger, declares, imposes, requises }) {
   return l.join('\n');
 }
 
-// ── Lanceurs locaux sans sortie (#113, D71) ─────────────────────────────────────────────────────
+// ── Lanceurs locaux sans sortie (#113) ─────────────────────────────────────────────────────
 
 /** Le préchargement de la garde, et son branchement sur vitest, relatifs à la racine. */
 export const SANS_SORTIE = 'packages/gardes/sans-sortie.mjs';

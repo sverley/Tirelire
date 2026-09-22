@@ -1,5 +1,5 @@
 #!/bin/sh
-# Livraison de Tirelire (#121, D76) : la pré-fusion et le pré-push jugent l'état commis.
+# Livraison de Tirelire (#121) : la pré-fusion et le pré-push jugent l'état commis.
 #
 #   livraison.sh fusion
 #       `pre-merge-commit`, et `pre-commit` pendant une fusion (conflit) : juge l'index.
@@ -18,7 +18,7 @@
 #    - organisationnel : tests de la garde et tous les amorçages ; objectif 45 s.
 #    Une sélection qui dépasse son objectif de plus de 20 % le dit, sans bloquer.
 # 4. Harnais du besoin : les fichiers `*.test.*` que la branche ajoute ou modifie depuis sa base
-#    commune avec `origin/main` (D75). Joué à part, quelle que soit sa finalité, hors objectif.
+#    commune avec `origin/main`. Joué à part, quelle que soit sa finalité, hors objectif.
 #    Il bloque si ce qui arrive (commits absents de `main` et de la branche d'arrivée) touche autre
 #    chose que le harnais et la documentation (`**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ;
 #    sinon son verdict s'affiche. La non-régression bloque toujours.
@@ -128,7 +128,7 @@ if [ "$mode" = push ] && [ -n "$etat" ]; then
   exit 1
 fi
 
-# Harnais du besoin (D75).
+# Harnais du besoin.
 : >"$journaux/harnais.txt"
 if [ -n "$surmain" ]; then
   dit "sur main, tout test est non-régression (aucun harnais du besoin)"

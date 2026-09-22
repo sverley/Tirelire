@@ -15,7 +15,7 @@ name: Aperçu
 # bouton « Review deployments » ; « Approve and deploy » lance le dépôt, « Reject » l'écarte. Un
 # nouveau passage en Ready annule l'attente précédente. Le retrait à la fermeture reste automatique.
 #
-# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113, D71) :
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `feu-vert` est hors harnais : il ne fait qu'attendre l'approbation manuelle du dépôt.
 # - `depot` lit hors des fichiers suivis : l'étape « Vérifier l'aperçu en ligne » (`verifier.sh`) lit
 #   l'aperçu déployé et le commit qu'il sert (#141).

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Garde de l'objectif primaire (#58, D61) : chaque invariant et chaque contrainte a son harnais ou sa vérification manuelle, et chaque PR demande les siennes.",
+  "description": "Garde de l'objectif primaire (#58) : chaque invariant et chaque contrainte a son harnais ou sa vérification manuelle, et chaque PR demande les siennes.",
   "scripts": {
     "test": "node --import ./sans-sortie.mjs --test",
     "typecheck": "echo ok",

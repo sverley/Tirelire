@@ -4,7 +4,7 @@ name: Étiquette de l'issue au Ready
 # `brouillon.yml`, sans lancer de job, qu'une modification de cette issue annule la validation. Lu sur
 # `main` (`pull_request_target`) ; à part de `validation.yml`, où la garde tourne seule, en lecture.
 #
-# Place du job sur le second axe des harnais (#113, D71) :
+# Place du job sur le second axe des harnais (#113) :
 # - `etiquette` est hors harnais : il ne vérifie rien ; il rougit s'il ne parvient pas à poser
 #   l'étiquette. Ce que fait le jeton du job ne déclenche aucun workflow.
 

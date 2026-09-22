@@ -1,5 +1,5 @@
 /**
- * Verdict du pré-commit (#127, D75). Chaque paquet a été joué une fois ; ce script trie ses échecs
+ * Verdict du pré-commit (#127). Chaque paquet a été joué une fois ; ce script trie ses échecs
  * par fichier :
  * - un fichier du harnais du besoin (`harnais-du-besoin.sh`) est joué et affiché sans bloquer, sauf
  *   une erreur de syntaxe, qui bloque ; un import introuvable est signalé à part, en nommant le
@@ -8,7 +8,7 @@
  *   qui ne se charge pas, ou erreur hors de tout test (promesse rejetée non rattrapée, sortie en
  *   échec). Une erreur non attrapée sans fichier d'origine, ou un paquet en échec sans rapport lisible
  *   (script absent, configuration cassée), refuse aussi le commit.
- * À la livraison (#121, D76), `livraison.sh` le réutilise : `TIRELIRE_NIVEAU` nomme le crochet
+ * À la livraison (#121), `livraison.sh` le réutilise : `TIRELIRE_NIVEAU` nomme le crochet
  * (`pré-fusion`, `pré-push`), et `TIRELIRE_HARNAIS=bloque` fait bloquer tout échec du harnais du
  * besoin. Le lanceur `typecheck` n'a pas de rapport par fichier : son échec est une régression.
  * L'état du harnais (`vert` ou `rouge`) est écrit dans `<journaux>/harnais.etat`.
