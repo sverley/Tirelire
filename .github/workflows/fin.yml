@@ -6,7 +6,7 @@ name: Fin de l'issue
 # l'étiquette, le job est écarté par sa condition et rien ne tourne. GitHub lit ce workflow sur
 # `main` pour `issues`. Une PR fermée n'est pas visée : « en cours » ne se pose que sur les issues.
 #
-# Place du job sur le second axe des harnais (#113, D71) :
+# Place du job sur le second axe des harnais (#113) :
 # - `fin` est hors harnais : il ne vérifie rien ; il rougit s'il ne parvient pas à retirer
 #   l'étiquette. Ce que fait le jeton du job ne déclenche aucun workflow : le retrait de « en cours »
 #   ne réveille pas `brouillon.yml`.
