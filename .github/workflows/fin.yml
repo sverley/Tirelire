@@ -8,8 +8,7 @@ name: Fin de l'issue
 #
 # Place du job sur le second axe des harnais (#113) :
 # - `fin` est hors harnais : il ne vérifie rien ; il rougit s'il ne parvient pas à retirer
-#   l'étiquette. Ce que fait le jeton du job ne déclenche aucun workflow : le retrait de « en cours »
-#   ne réveille pas `brouillon.yml`.
+#   l'étiquette. Ce que fait le jeton du job ne déclenche aucun workflow.
 
 on:
   issues:

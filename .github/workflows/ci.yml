@@ -3,8 +3,8 @@ name: CI et livraison
 # Sur une PR, rien ne tourne en brouillon ; tout tourne au passage en Ready, une fois par passage
 # (#150). Cinq workflows, pour qu'aucune exécution ne montre sautés les jobs qu'une autre joue (B1) :
 # celui-ci (tests, assemblage de l'aperçu, livraison), `validation.yml` (la garde de `main`),
-# `etiquette.yml` (l'étiquette « en validation » de l'issue), `brouillon.yml` (tout changement d'une
-# PR prête la renvoie en brouillon) et `apercu.yml` (dépôt et retrait de l'aperçu, lus sur `main`).
+# `apercu.yml` (dépôt et retrait de l'aperçu, lus sur `main`), `validation-porteur.yml` (le « Validé »
+# du porteur et son annulation, #168) et `fin.yml` (« en cours » quitte l'issue fermée).
 #
 # Les identifiants FTP (`OVH_FTP_*`) vivent dans l'environnement `depot-ftp`, qui n'admet que `main`
 # (#155) : ce workflow, lu dans la branche pour une PR, ne peut pas les obtenir. Seul `deploiement`
@@ -29,7 +29,9 @@ on:
     branches: [main]
     tags: ['v*']
   # Le passage en Ready : `ready_for_review`, ou une PR ouverte ou rouverte hors brouillon (#150). Un
-  # commit sur une PR prête ne rejoue rien ici : `brouillon.yml` la renvoie en brouillon. Le retrait
+  # commit sur une PR prête ne rejoue rien ici : le porteur la repasse en brouillon puis en Ready, ce
+  # que `validation-porteur.yml` lui rappelle en commentaire ; « Validé » n'est accepté que sur un
+  # commit où ce workflow et `validation.yml` ont fini au vert (#168). Le retrait
   # de l'aperçu, à la fermeture, est dans `apercu.yml` (#155).
   pull_request:
     types: [opened, reopened, ready_for_review]

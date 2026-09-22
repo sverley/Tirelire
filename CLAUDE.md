@@ -103,16 +103,16 @@ Deux actes, qui ne se confondent pas :
   la PR ;
 - **la validation**, par le porteur : il la donne par un commentaire « Validé » sur la PR, seul dans
   le commentaire. **Les agents n'écrivent jamais « Validé »**, ni sur une PR, ni ailleurs. La
-  validation se lit dans le statut « Validé par le porteur » du dernier commit ; la protection de
-  `main` l'exige : une PR sans validation en cours ne se fusionne pas. Tout changement ensuite —
+  validation se lit dans le statut « Validé par le porteur » du dernier commit, qui n'est posé que si
+  toute la CI y a fini au vert ; la protection de `main` l'exige : une PR sans validation en cours ne se fusionne pas. Tout changement ensuite —
   commit, édition, commentaire, revue, sur la PR ou sur l'issue qu'elle ferme, de qui que ce soit,
   porteur compris — l'annule : le statut passe en échec, l'étiquette « validée » quitte la PR et
   l'issue, et un commentaire sur la PR dit pourquoi. Un nouveau « Validé » la redonne.
 
 Le brouillon ne joue aucun rôle dans la validation : il n'économise que la CI. Une PR s'ouvre en
 brouillon ; le porteur la passe en Ready à la main, ce qui lance toute la CI et assemble la version de
-dev depuis le dernier commit de la branche. Un commit sur une PR prête ne relance pas la CI : le
-porteur la repasse en brouillon puis en Ready pour la rejouer.
+dev depuis le dernier commit de la branche. Un commit sur une PR prête ne relance pas la CI, et la PR le dit en
+commentaire : le porteur la repasse en brouillon puis en Ready pour la rejouer.
 
 Pour le produit, un harnais qui peut être codé doit l'être. La garde, elle, reste simple et peu
 coûteuse : ce qui peut se vérifier par analyse de code — une relecture, une recherche — n'y va pas ;
