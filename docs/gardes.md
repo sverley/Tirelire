@@ -2,8 +2,9 @@
 
 Chaque invariant ([`invariants.md`](invariants.md)) et chaque contrainte
 ([`contraintes.md`](contraintes.md)) est gardé par un harnais tant que c'est possible. Ce qui ne se
-programme pas devient une vérification manuelle : demandée dans la PR, constatée puis validée par le
-porteur avant la fusion. Ce document tient la correspondance ; `packages/gardes` le relit.
+programme pas devient une vérification manuelle : demandée dans l'issue du besoin, constatée par le
+porteur sur la version de dev après le passage en Ready de la PR, qui vaut validation, avant la
+fusion. Ce document tient la correspondance ; `packages/gardes` le relit.
 
 Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
 
@@ -20,19 +21,23 @@ Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
   `TIRELIRE_STRICT` rend l'outil obligatoire.
 - **Dans chaque lanceur local** : un harnais joué en local ne sort pas de la machine (D71). Le script
   `test` de chaque paquet précharge `packages/gardes/sans-sortie.mjs`.
-- **Sur chaque PR**, par le job « Validation » : la description déclare les identifiants touchés et
-  ceux dont le lien pourrait être masqué ; un fichier modifié qui répond aux `Chemins` d'une entrée
-  impose de la déclarer ; chaque vérification manuelle des entrées déclarées, et chaque garde retirée
-  de ce document, figure dans la description avec sa consigne recopiée ; et **une seule case
-  « Validée par le porteur »**, en pied de section, que le porteur coche après avoir constaté. Tant
-  qu'une vérification manque, ou que la case n'est pas cochée, le job est rouge. Une édition de la
-  description ne rejoue que ce job. La case cochée fait foi : rien ne l'enregistre, rien ne l'annule.
+- **Au passage en Ready de chaque PR**, par le job « Validation » : la section « Invariants et
+  contraintes » de l'issue que la PR ferme (`Close #n`) déclare les identifiants touchés et ceux dont
+  le lien pourrait être masqué ; un fichier modifié qui répond aux `Chemins` d'une entrée impose de la
+  déclarer, et la garde rougit en nommant l'entrée manquante ; chaque vérification manuelle des
+  entrées déclarées, et chaque garde retirée de ce document, figure dans la section avec sa consigne
+  recopiée. Tant qu'il manque quelque chose, le job est rouge. Aucune case : le passage en Ready est
+  la validation du porteur, rien ne l'enregistre, et tout changement ensuite de la PR ou de l'issue la
+  renvoie en brouillon. La même vérification se joue en local, avant le Ready :
+  `node packages/gardes/cli.mjs pr --issue <n>` (ou `--corps-fichier`), sur les fichiers modifiés
+  depuis `origin/main`, copie de travail comprise.
 - **La garde qui juge une PR est celle de `main`.** Le job « Validation » exécute la garde et le
   workflow de `main`, la branche par défaut, quelle que soit la base de la PR ; il juge le contenu de la PR : ce
-  registre, les documents, les fichiers modifiés et la description, tels que la PR les porte. Il les
-  lit par git dans le commit de la PR, sans l'extraire : rien de la PR ne s'installe ni ne
-  s'exécute, et ses permissions sont en lecture seule. Une PR qui modifie `packages/gardes/**` ou
-  `.github/workflows/ci.yml` ne change donc pas le verdict rendu sur elle-même. Quand la garde de la
+  registre, les documents et les fichiers modifiés, tels que la PR les porte, et la section de
+  l'issue qu'elle ferme. Il les lit par git dans le commit de la PR, sans l'extraire, et l'issue par
+  l'API, avec le jeton du job : rien de la PR ne s'installe ni ne s'exécute, et ses permissions sont
+  en lecture seule. Une PR qui modifie `packages/gardes/**` ou `.github/workflows/validation.yml` ne
+  change donc pas le verdict rendu sur elle-même. Quand la garde de la
   base ne sait pas lire ce que la PR propose — ce registre absent, ou d'un format qu'elle ne
   reconnaît pas —, le job est rouge et le dit : c'est au porteur de trancher. `pnpm test`, lui, joue
   la garde que la PR propose.
@@ -67,9 +72,9 @@ compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refu
 - Une ligne `À bâtir` : un harnais prévu (#38). Il ne garde rien tant qu'il n'existe pas ; une
   vérification manuelle tient sa place.
 
-Retirer une vérification manuelle ou un harnais reste possible, mais la PR qui le fait le liste sous
-« Vérifications manuelles » (`VM-…` pour une vérification, `C9 · chemin` pour un harnais), analysé
-et validé comme le reste.
+Retirer une vérification manuelle ou un harnais reste possible, mais l'issue de la PR qui le fait le
+liste sous « Vérifications manuelles » (`VM-…` pour une vérification, `C9 · chemin` pour un
+harnais), constaté et validé comme le reste.
 
 ## I1 · Aider un particulier à tenir un budget sur plusieurs comptes
 
@@ -254,8 +259,8 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
 
 Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/capacitor.config.ts`, `apps/web/android/**`, `apps/hebergement/assembler.mjs`
 
-- **Harnais** · `.github/workflows/ci.yml`, `packages/gardes/distributions.test.mjs` — sur chaque
-  PR, le web et le site d'hébergement se construisent ; l'APK Android ne se construit qu'à un tag
+- **Harnais** · `.github/workflows/ci.yml`, `packages/gardes/distributions.test.mjs` — au passage
+  en Ready de chaque PR, le web et le site d'hébergement se construisent ; l'APK Android ne se construit qu'à un tag
   `v*`, jamais sur une PR ni à une fusion : l'application web est la distribution prioritaire
   (#45), et rien d'une autre distribution ne la bloque. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
   (tranché dans #69).

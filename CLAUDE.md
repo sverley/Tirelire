@@ -28,8 +28,9 @@
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas (D73).
-- Avant de pousser : `pnpm typecheck && pnpm test && pnpm build`. Les crochets en font une part,
-  sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
+- Avant de pousser, en brouillon : le codeur ne joue lui-même que `pnpm typecheck` et le harnais du
+  besoin ; l'auditeur vérifie en local ce qu'il relit. Aucune CI ne tourne en brouillon. Les crochets
+  font leur part, sur la copie de travail. Au commit, en moins de 5 s (D73) : les tests des paquets que touchent
   les fichiers indexés — cœur ; garde ; relais ; hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
   commit ; le harnais du besoin (les fichiers de test que la branche ajoute ou modifie depuis sa base
   commune avec `origin/main`) est joué, et le pré-commit ne fait qu'en afficher le verdict, sans
@@ -38,9 +39,9 @@
   besoin se lit par `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests headless des
   paquets touchés et de l'interface, 30 s) ou organisationnel (garde, 45 s) —, les tests
   navigateur (`apps/web/test/navigateur/`) restent à la CI, et le harnais du besoin est joué à part et
-  bloque quand du code arrive. La CI joue sur
-  chaque PR, en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build ; un outil
-  manquant y fait échouer le job (D74).
+  bloque quand du code arrive. La CI ne joue qu'au passage en Ready d'une PR, une fois par passage,
+  en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build, version de dev ; un
+  outil manquant y fait échouer le job (D74).
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine (D71) : la
   boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans
   son en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
@@ -68,17 +69,41 @@ choses, et rien de plus :
 
 1. chaque invariant et chaque contrainte a une entrée au registre, avec un harnais qui existe ou une
    vérification manuelle décrite ;
-2. une PR qui modifie un document fondateur, ou un fichier qu'une entrée du registre nomme, déclare
-   l'entrée et porte sa vérification manuelle avec une case « Validée » ;
-3. la PR est rouge tant qu'une case demandée n'est pas cochée.
+2. une PR qui modifie un document fondateur, ou un fichier qu'une entrée du registre nomme, a l'entrée
+   déclarée dans la section « Invariants et contraintes » de l'issue qu'elle ferme (`Close #n`) ;
+   sinon elle est rouge, et la garde nomme l'entrée manquante ;
+3. chaque vérification manuelle des entrées déclarées figure dans cette section, sa consigne
+   recopiée, sans case : le passage en Ready est la validation.
 
-Il tourne en CI sur chaque PR, et à la demande en local (`node packages/gardes/cli.mjs`). En CI, la
-garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'elle juge
-est le contenu de la PR — registre, documents, fichiers modifiés, description —, qu'elle lit par git
-sans rien exécuter de la PR. Une PR qui modifie la garde ne change donc pas son propre verdict ; ses
-tests, eux, jouent la garde qu'elle propose. Pas de
-crochet lent, pas de workflow à part, pas d'alerte, pas d'enregistrement de validation : la case
-cochée fait foi, et c'est le porteur qui la coche.
+Il tourne en CI au passage en Ready de chaque PR, et à la demande en local
+(`node packages/gardes/cli.mjs pr --issue <n>`, sur les fichiers modifiés depuis `origin/main`). En
+CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'elle juge est le contenu
+de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
+et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
+ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
+crochet lent, pas d'alerte, pas d'enregistrement de validation. Quatre workflows, pour qu'aucune
+exécution ne montre sautés les jobs qu'une autre joue : `ci.yml` (tests, version de dev, livraison),
+`validation.yml` (la garde), `etiquette.yml` (l'étiquette « en validation » de l'issue) et
+`brouillon.yml` (le retour en brouillon).
+
+### Vérification et validation
+
+Deux actes, qui ne se confondent pas :
+
+- **la vérification**, par l'auditeur : le travail est conforme à ce que l'issue demande, et ne
+  contrevient ni aux autres entrées de son catalogue, ni aux fondamentaux du projet. Il l'écrit dans
+  la PR ;
+- **la validation**, par le porteur : il la donne en passant la PR en Ready, ce qui lance toute la CI
+  et assemble la version de dev depuis le dernier commit de la branche ; il la conclut en fusionnant.
+  Tout changement entre les deux — commit, édition, commentaire, revue, sur la PR ou sur l'issue
+  qu'elle ferme, de qui que ce soit, porteur compris — l'annule : la PR repasse en brouillon, avec un
+  commentaire qui le dit, et le prochain Ready rejoue tout. Rien ne l'enregistre.
+
+La documentation et la garde se modifient sans harnais par défaut : l'auditeur vérifie en relisant.
+Un harnais dédié ne s'écrit que pour un cas de test complexe dans la garde. Un changement de
+comportement de la garde est expliqué et justifié en commentaire de la PR, par le compte rendu du
+codeur : il nomme les tests de la garde de `main` qui rougissent avec la garde proposée, et ceux qu'il
+modifie ; la validation du porteur le couvre.
 
 ### Un besoin, deux agents
 
@@ -94,11 +119,13 @@ Il passe en premier. Il ne code jamais le produit.
    s'arrêter : chaque sous-issue aura son propre auditeur.
 3. Écrire dans l'issue un « Fait quand » vérifiable : des phrases qu'un test peut trancher.
 4. Créer la branche, poser l'étiquette « en cours », écrire le harnais — un test qui rougit
-   aujourd'hui et verdira quand le besoin sera couvert. Un seul fichier de test par issue, sauf
-   raison dite.
-5. Ouvrir la PR : `Close #n`, les entrées du registre touchées, et pour chacune la vérification
-   manuelle demandée avec sa case vide. Rien d'autre dans la description.
-6. Répondre aux commentaires du codeur : corriger le harnais ou préciser l'issue.
+   aujourd'hui et verdira quand le besoin sera couvert ; aucun par défaut pour la documentation ni
+   pour la garde. Un seul fichier de test par issue, sauf raison dite.
+5. Écrire dans l'issue la section « Invariants et contraintes » : les entrées du registre touchées,
+   et pour chacune la vérification manuelle attendue, sans case (`node packages/gardes/cli.mjs
+   demander` la prépare). Ouvrir la PR en brouillon : `Close #n`, rien d'autre.
+6. Répondre aux commentaires du codeur : corriger le harnais ou préciser l'issue. Vérifier son
+   travail en local, garde comprise (`node packages/gardes/cli.mjs pr --issue <n>`).
 7. Si le besoin ajoute ou modifie une règle, une décision ou un invariant, vérifier avant d'ouvrir
    la PR qu'il ne contredit ni les autres entrées de son catalogue, ni les documents fondateurs —
    description, glossaire, invariants, contraintes. Écrire dans la PR ce qui a été comparé et
@@ -112,20 +139,25 @@ Il passe en second, sur la PR ouverte par l'auditeur.
 
 1. Lire l'issue et les documents fondateurs. **Ne pas lire le harnais.** Coder depuis sa propre
    lecture du besoin.
-2. Coder sur la branche, commettre, pousser. Le verdict vient de la CI, avec le message d'échec.
-3. Ne jamais modifier la PR : ni description, ni cases, ni harnais. Ne jamais modifier un document
+2. Coder sur la branche, commettre, pousser. En brouillon, le verdict est local : `pnpm typecheck` et
+   le harnais du besoin, rien d'autre.
+3. Ne jamais modifier la PR : ni description, ni état de brouillon, ni harnais. Ne jamais modifier un document
    fondateur, sauf si l'issue le demande.
-4. Quand la CI est verte, écrire un seul commentaire : ce qui appelle une validation humaine — pour
+4. Quand le typecheck et le harnais sont verts, écrire un seul commentaire : ce qui appelle une
+   validation humaine — pour
    chaque vérification manuelle demandée, ce que ses modifications changent et ce qui reste à
    constater. Honnête et court. Puis s'arrêter.
 5. Si le harnais paraît faux ou le besoin impossible, le dire en commentaire et s'arrêter.
 
-Il ne coche jamais une case. Il n'ouvre pas d'issue.
+Il ne passe jamais la PR en Ready. Il n'ouvre pas d'issue.
 
 #### Le porteur
 
-Il lit le commentaire du codeur, constate ce qu'il y a à constater, coche les cases, fusionne. La
-fusion ferme l'issue.
+Il lit le commentaire du codeur et passe la PR en Ready : c'est sa validation. Toute la CI tourne, et
+la version de dev s'assemble depuis le dernier commit de la branche. Il fait ses vérifications
+manuelles sur la version de dev, puis fusionne au vert ; la fusion ferme l'issue. Si la CI rougit ou
+si une vérification échoue, il renvoie la PR en brouillon avec le journal d'erreur ou son constat, et
+la boucle reprend.
 
 ### Trois règles communes
 
