@@ -11,10 +11,11 @@ name: Aperçu
 # `apercu.sh`, `deposer.sh` et `verifier.sh`, donc le bornage à `<dossier>/pr-<numéro>`.
 #
 # Dépôt au vert (#169) : rien ne se dépose tant que toute la CI de la PR n'est pas verte — `ci.yml`
-# (tests, build, assemblage), `validation.yml` (la garde) et `etiquette.yml`, pour le dernier commit
-# de la branche et ce passage en Ready. Le job `attente` les attend ; si l'une rougit, `raison` le dit en
-# commentaire de la PR, avec le lien de l'exécution en cause, et rien n'est déposé. La validation du
-# porteur se donne en regardant l'aperçu déposé (#168).
+# (tests, build, assemblage) et `validation.yml` (la garde), pour le dernier commit de la branche et
+# ce passage en Ready. Le job `attente` les attend ; si l'une rougit, `raison` le dit en commentaire de
+# la PR, avec le lien de l'exécution en cause, et rien n'est déposé. Le porteur regarde l'aperçu
+# déposé, puis valide par un commentaire « Validé » (`validation-porteur.yml`, #168), qui ne relance
+# rien ici.
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `attente` est hors harnais : il attend la fin de toute la CI de la PR et ne fait que lire leurs
@@ -65,7 +66,7 @@ jobs:
           cree="$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq .created_at)"
           depuis="$(date -u -d "$cree - 2 minutes" +%Y-%m-%dT%H:%M:%SZ)"
           # Fichier et événement de chaque workflow de la CI d'une PR.
-          ci="ci.yml:pull_request validation.yml:pull_request_target etiquette.yml:pull_request_target"
+          ci="ci.yml:pull_request validation.yml:pull_request_target"
           dernier() { # $1 : fichier, $2 : événement → « id statut conclusion nom|lien »
             gh api "repos/$GH_REPO/actions/workflows/$1/runs?event=$2&head_sha=$SHA&per_page=20" \
               --jq "[.workflow_runs[] | select(.created_at >= \"$depuis\")] | sort_by(.created_at) | last // empty | \"\(.id) \(.status) \(.conclusion // \"-\") \(.name)|\(.html_url)\""
@@ -83,7 +84,7 @@ jobs:
               [ "$conclusion" = success ] || rouges+="- « ${reste%%|*} » : $conclusion — ${reste#*|}"$'\n'
             done
             [ -n "$rouges" ] && break
-            [ "$finies" -eq 3 ] && break
+            [ "$finies" -eq 2 ] && break
             if [ "$SECONDS" -ge "$fin" ]; then
               rouges="- la CI n'a pas fini dans l'heure"$'\n'
               break

@@ -1,0 +1,153 @@
+name: Validation du porteur
+
+# Le porteur valide une PR par un commentaire « Validé » sur la PR ; les agents ne l'écrivent jamais
+# (#168). Le brouillon ne joue plus aucun rôle dans la validation : il n'économise que la CI, et le
+# porteur le gère à la main. La validation se lit dans un statut de commit, « Validé par le porteur »,
+# posé sur la tête de la PR : la protection de `main` l'exige, si bien qu'une PR sans validation en
+# cours ne se fusionne pas. Un commit pousse une tête nouvelle, sans ce statut : il bloque déjà la
+# fusion.
+#
+# Tout changement après « Validé » l'annule : un commit, une édition de la PR (description, titre,
+# base), un commentaire, une revue ou un commentaire de revue sur la PR, une édition ou un commentaire
+# de l'issue qu'elle ferme (`Close #n`), ou le retrait à la main de l'étiquette « validée » de cette
+# issue ; de qui que ce soit, porteur compris. Le statut passe en échec, l'étiquette quitte la PR et
+# l'issue, et un commentaire sur la PR dit pourquoi. Un nouveau « Validé » valide à nouveau. À la
+# fermeture de la PR, l'étiquette quitte seulement la PR et l'issue.
+#
+# L'étiquette « validée », posée sur la PR et son issue à la validation, dit sans démarrer de machine
+# qu'il y a quelque chose à annuler : sans elle, le job est écarté par sa condition, et seul un
+# commentaire du propriétaire du dépôt qui commence par « Validé » le lance. Modifier une issue sans
+# PR validée ne coûte donc rien. Le job ne porte pas le nom du statut : un job sauté s'affiche
+# « skipped », que GitHub compte réussi, et ne doit pas pouvoir tenir lieu de validation.
+#
+# Place du job sur le second axe des harnais (#113) :
+# - `suivi` est hors harnais : il ne vérifie rien, il pose ou annule la validation.
+#
+# GitHub lit ce workflow sur `main` pour `pull_request_target`, `issue_comment` et `issues` ; pour les
+# revues, il le lit dans la PR, faute d'équivalent. Ce que fait le jeton du job — statut, étiquette,
+# commentaire — ne déclenche aucun workflow : il ne se relance jamais lui-même. Le passage en Ready
+# n'est pas écouté : il lance la CI (`ci.yml`, `validation.yml`, puis `apercu.yml`), pas la validation.
+
+on:
+  pull_request_target:
+    types: [synchronize, edited, closed]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  issue_comment:
+    types: [created, edited, deleted]
+  issues:
+    types: [edited, unlabeled]
+
+permissions: {}
+
+# Les événements d'une même PR ou d'une même issue, l'un après l'autre.
+concurrency:
+  group: validation-porteur-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  suivi:
+    name: Suivi de la validation
+    if: >-
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.action == 'created'
+        && github.event.comment.author_association == 'OWNER' && startsWith(github.event.comment.body, 'Validé'))
+      || contains(github.event.pull_request.labels.*.name, 'validée')
+      || contains(github.event.issue.labels.*.name, 'validée')
+      || (github.event_name == 'issues' && github.event.action == 'unlabeled' && github.event.label.name == 'validée')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      EVENEMENT: ${{ github.event_name }}
+      ACTION: ${{ github.event.action }}
+      AUTEUR: ${{ github.actor }}
+      ASSOCIATION: ${{ github.event.comment.author_association }}
+      CORPS: ${{ github.event.comment.body }}
+      COMMENTAIRE_ID: ${{ github.event.comment.id }}
+      DEPUIS: ${{ github.event.comment.created_at }}
+      PR: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) || '' }}
+      ISSUE: ${{ (!github.event.issue.pull_request && github.event.issue.number) || '' }}
+      ETIQUETTE: validée
+      CONTEXTE: Validé par le porteur
+      # Mots par lesquels une PR ferme une issue, comme les lit la garde (`issuesFermees`).
+      FERMETURE: '\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#([0-9]+)\b'
+    steps:
+      - name: Valider, ou annuler la validation
+        run: |
+          set -euo pipefail
+          issues_de_pr() {
+            gh pr view "$1" --json body | jq -r --arg m "$FERMETURE" '[(.body // "") | scan($m; "i")[0]] | unique[]'
+          }
+          prs_validees_de_issue() {
+            gh pr list --state open --label "$ETIQUETTE" --limit 200 --json number,body \
+              | jq -r --arg m "$FERMETURE" --arg n "$1" '.[] | select([(.body // "") | scan($m; "i")[0]] | any(. == $n)) | .number'
+          }
+          etiquetee() { gh issue view "$1" --json labels --jq '.labels[].name' | grep -qxF "$ETIQUETTE"; }
+          retirer_etiquette() { if etiquetee "$1"; then gh issue edit "$1" --remove-label "$ETIQUETTE" > /dev/null; fi; }
+          tete() { gh pr view "$1" --json headRefOid --jq .headRefOid; }
+          statut() { # $1 : commit ; $2 : état ; $3 : description (140 caractères au plus)
+            gh api "repos/$GH_REPO/statuses/$1" -f state="$2" -f context="$CONTEXTE" -f description="${3:0:140}" > /dev/null
+          }
+          annuler() { # $1 : la PR ; $2 : la cause
+            if ! etiquetee "$1"; then echo "PR #$1 sans validation en cours : rien à annuler."; return 0; fi
+            statut "$(tete "$1")" failure "Validation annulée : $2"
+            retirer_etiquette "$1"
+            for n in $(issues_de_pr "$1"); do retirer_etiquette "$n"; done
+            gh pr comment "$1" --body "Validation annulée : $2 (par $AUTEUR). La PR ne se fusionne plus : il faut un nouveau « Validé » du porteur."
+            echo "PR #$1 : validation annulée, $2."
+          }
+          valider() {
+            if [ "$(gh pr view "$PR" --json state --jq .state)" != OPEN ]; then echo "PR #$PR fermée : rien à valider."; return 0; fi
+            sha="$(tete "$PR")"
+            issues="$(issues_de_pr "$PR")"
+            gh label create "$ETIQUETTE" --color 0E8A16 --description "Validée par le porteur ; tout changement l'annule (#168)" --force > /dev/null
+            gh issue edit "$PR" --add-label "$ETIQUETTE" > /dev/null
+            for n in $issues; do gh issue edit "$n" --add-label "$ETIQUETTE" > /dev/null; done
+            statut "$sha" success "Validé par $AUTEUR"
+            echo "PR #$PR validée sur ${sha::7}."
+            # Ce qui est arrivé entre « Validé » et l'étiquette n'a pas vu l'étiquette : on le relit.
+            apres=0
+            for n in "$PR" $issues; do
+              k="$(gh api "repos/$GH_REPO/issues/$n/comments?since=$DEPUIS&per_page=100" --jq "[.[] | select(.id != $COMMENTAIRE_ID)] | length")"
+              apres=$((apres + k))
+            done
+            if [ "$(tete "$PR")" != "$sha" ]; then annuler "$PR" "un commit a été poussé pendant la validation"
+            elif [ "$apres" -gt 0 ]; then annuler "$PR" "un commentaire a été écrit pendant la validation"; fi
+          }
+          fait() { # accord du participe avec l'action
+            case "$ACTION" in
+              created) echo "écrit" ;; edited) echo "modifié$1" ;; deleted) echo "supprimé" ;;
+              submitted) echo "soumise" ;; dismissed) echo "écartée" ;; *) echo "$ACTION" ;;
+            esac
+          }
+          pour_l_issue() { # $1 : la cause
+            for p in $(prs_validees_de_issue "$ISSUE"); do annuler "$p" "$1"; done
+            retirer_etiquette "$ISSUE"
+          }
+          case "$EVENEMENT:$ACTION" in
+            pull_request_target:closed)
+              retirer_etiquette "$PR"
+              for n in $(issues_de_pr "$PR"); do retirer_etiquette "$n"; done ;;
+            pull_request_target:synchronize) annuler "$PR" "un commit a été poussé" ;;
+            pull_request_target:edited) annuler "$PR" "sa description, son titre ou sa base ont été modifiés" ;;
+            pull_request_review:*) annuler "$PR" "une revue a été $(fait e)" ;;
+            pull_request_review_comment:*) annuler "$PR" "un commentaire de revue a été $(fait '')" ;;
+            issue_comment:*)
+              if [ -n "$PR" ]; then
+                # « Validé », seul, du propriétaire du dépôt : la validation. Tout autre commentaire l'annule.
+                if [ "$ACTION" = created ] && [ "$ASSOCIATION" = OWNER ] \
+                  && printf '%s' "$CORPS" | tr -d '\r' | grep -Pzq '\A\s*(?i:valid)(?:é|É)\s*[.!]?\s*\z'; then
+                  valider
+                else
+                  annuler "$PR" "un commentaire a été $(fait '')"
+                fi
+              else pour_l_issue "un commentaire a été $(fait '') sur l'issue #$ISSUE"; fi ;;
+            issues:edited) pour_l_issue "l'issue #$ISSUE a été modifiée" ;;
+            issues:unlabeled) pour_l_issue "l'étiquette « $ETIQUETTE » a été retirée de l'issue #$ISSUE" ;;
+          esac
