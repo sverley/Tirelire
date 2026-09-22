@@ -91,7 +91,7 @@ ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle 
 crochet lent, pas d'alerte, pas d'enregistrement de validation. Six workflows, pour qu'aucune
 exécution ne montre sautés les jobs qu'une autre joue : `ci.yml` (tests, version de dev, livraison),
 `validation.yml` (la garde), `etiquette.yml` (l'étiquette « en validation » de l'issue),
-`brouillon.yml` (le retour en brouillon), `apercu.yml` (dépôt de l'aperçu, sur approbation manuelle, et retrait) et `fin.yml`
+`brouillon.yml` (le retour en brouillon), `apercu.yml` (dépôt de l'aperçu au vert de toute la CI, et retrait) et `fin.yml`
 (« en cours » quitte l'issue à sa fermeture).
 
 ### Vérification et validation

@@ -10,13 +10,16 @@ name: Aperçu
 # de la PR », sans identifiants, après ses tests) et arrive en artefact ; ne viennent de `main` que
 # `apercu.sh`, `deposer.sh` et `verifier.sh`, donc le bornage à `<dossier>/pr-<numéro>`.
 #
-# Dépôt manuel : au passage en Ready, le job `feu-vert` attend l'approbation du porteur sur
-# l'environnement `apercu` (réviseur requis, `main` seulement, sans secret). La PR affiche alors le
-# bouton « Review deployments » ; « Approve and deploy » lance le dépôt, « Reject » l'écarte. Un
-# nouveau passage en Ready annule l'attente précédente. Le retrait à la fermeture reste automatique.
+# Dépôt au vert (#169) : rien ne se dépose tant que toute la CI de la PR n'est pas verte — `ci.yml`
+# (tests, build, assemblage), `validation.yml` (la garde) et `etiquette.yml`, pour le dernier commit
+# de la branche et ce passage en Ready. Le job `attente` les attend ; si l'une rougit, `raison` le dit en
+# commentaire de la PR, avec le lien de l'exécution en cause, et rien n'est déposé. Aucune
+# approbation manuelle : la validation du porteur se donne en regardant l'aperçu déposé (#168).
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
-# - `feu-vert` est hors harnais : il ne fait qu'attendre l'approbation manuelle du dépôt.
+# - `attente` est hors harnais : il attend la fin de toute la CI de la PR et ne fait que lire leurs
+#   conclusions, en lecture seule, sans secret ni code de la PR.
+# - `raison` est hors harnais : quand `attente` a vu une CI rouge, il le dit en commentaire de la PR.
 # - `depot` lit hors des fichiers suivis : l'étape « Vérifier l'aperçu en ligne » (`verifier.sh`) lit
 #   l'aperçu déployé et le commit qu'il sert (#141).
 # - `retrait` est hors harnais : à la fermeture de la PR, il supprime son sous-dossier de recette
@@ -28,26 +31,98 @@ on:
 
 permissions: {}
 
-# Dépôt et retrait d'un même aperçu, l'un après l'autre ; un nouveau passage en Ready rend caduc le
-# dépôt d'avant, jamais un retrait.
+# Dépôt et retrait d'un même aperçu, l'un après l'autre ; un nouveau passage en Ready rend caducs
+# l'attente et le dépôt d'avant, jamais un retrait.
 concurrency:
   group: apercu-${{ github.event.pull_request.number }}
   cancel-in-progress: ${{ github.event.action != 'closed' }}
 
 jobs:
-  feu-vert:
-    name: Déployer l'aperçu ?
-    # Au passage en Ready seulement ; attend « Approve and deploy » sur l'environnement `apercu`.
+  attente:
+    name: Attente du vert de toute la CI
+    # Au passage en Ready seulement : jamais sur un brouillon, ni à la fermeture.
     if: github.event_name == 'pull_request_target' && github.event.action != 'closed' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
-    environment: apercu
-    permissions: {}
+    timeout-minutes: 75
+    permissions:
+      actions: read # les exécutions de la CI sur la tête de la PR, et l'artefact
+    outputs:
+      run: ${{ steps.ci.outputs.run }}
+      message: ${{ steps.ci.outputs.message }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMERO: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
     steps:
-      - run: echo "Dépôt de l'aperçu de la PR #${{ github.event.pull_request.number }} approuvé."
+      # Toute la CI de ce passage en Ready, sur le dernier commit de la branche : les exécutions créées
+      # au plus tôt deux minutes avant celle-ci. Chacune doit finir verte ; une seule rouge, annulée ou
+      # absente dans l'heure, et rien ne se dépose.
+      - name: Attendre la fin de toute la CI
+        id: ci
+        run: |
+          set -euo pipefail
+          cree="$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq .created_at)"
+          depuis="$(date -u -d "$cree - 2 minutes" +%Y-%m-%dT%H:%M:%SZ)"
+          # Fichier et événement de chaque workflow de la CI d'une PR.
+          ci="ci.yml:pull_request validation.yml:pull_request_target etiquette.yml:pull_request_target"
+          dernier() { # $1 : fichier, $2 : événement → « id statut conclusion nom|lien »
+            gh api "repos/$GH_REPO/actions/workflows/$1/runs?event=$2&head_sha=$SHA&per_page=20" \
+              --jq "[.workflow_runs[] | select(.created_at >= \"$depuis\")] | sort_by(.created_at) | last // empty | \"\(.id) \(.status) \(.conclusion // \"-\") \(.name)|\(.html_url)\""
+          }
+          fin=$((SECONDS + 3600))
+          while :; do
+            finies=0; rouges=""; run=""
+            for w in $ci; do
+              etat="$(dernier "${w%%:*}" "${w#*:}")"
+              [ -z "$etat" ] && continue
+              read -r id statut conclusion reste <<< "$etat"
+              [ "$statut" = completed ] || continue
+              finies=$((finies + 1))
+              [ "${w%%:*}" = ci.yml ] && run="$id"
+              [ "$conclusion" = success ] || rouges+="- « ${reste%%|*} » : $conclusion — ${reste#*|}"$'\n'
+            done
+            [ -n "$rouges" ] && break
+            [ "$finies" -eq 3 ] && break
+            if [ "$SECONDS" -ge "$fin" ]; then
+              rouges="- la CI n'a pas fini dans l'heure"$'\n'
+              break
+            fi
+            sleep 30
+          done
+          if [ -z "$rouges" ] && ! gh api "repos/$GH_REPO/actions/runs/$run/artifacts" --jq '.artifacts[].name' | grep -qxF "apercu-pr-$NUMERO"; then
+            rouges="- « CI et livraison » a fini sans laisser le site assemblé (apercu-pr-$NUMERO)"$'\n'
+          fi
+          if [ -n "$rouges" ]; then
+            message="Pas d'aperçu déposé pour ${SHA::7} : toute la CI de la PR doit être verte, et elle ne l'est pas."$'\n\n'"$rouges"
+            printf '### Aperçu de la PR #%s\n\n%s' "$NUMERO" "$message" >> "$GITHUB_STEP_SUMMARY"
+            { echo "message<<FIN_DU_MESSAGE"; echo "$message"; echo "FIN_DU_MESSAGE"; } >> "$GITHUB_OUTPUT"
+            echo "::error title=Pas d'aperçu::La CI de la PR n'est pas toute verte ; voir le commentaire de la PR."
+            exit 1
+          fi
+          echo "Toute la CI est verte ; site assemblé par l'exécution $run de ci.yml."
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+  raison:
+    name: Pourquoi rien n'est déposé
+    # Seulement quand `attente` a vu une CI rouge : le commentaire nomme le workflow en cause. Un job à
+    # part, pour que l'attente reste en lecture seule.
+    needs: attente
+    if: failure() && needs.attente.outputs.message != ''
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMERO: ${{ github.event.pull_request.number }}
+      MESSAGE: ${{ needs.attente.outputs.message }}
+    steps:
+      - run: gh pr comment "$NUMERO" --body "$MESSAGE"
 
   depot:
     name: Aperçu de la PR sur l'instance de recette
-    needs: feu-vert
+    needs: attente
     # Au passage en Ready seulement (#150) : jamais sur un brouillon, ni à la fermeture.
     if: github.event_name == 'pull_request_target' && github.event.action != 'closed' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
@@ -71,52 +146,16 @@ jobs:
           ref: main
           sparse-checkout: apps/hebergement
           persist-credentials: false
-      # Avant d'attendre quoi que ce soit : sans réglages de recette, rien ne se dépose.
+      # Avant tout transfert : sans réglages de recette, rien ne se dépose.
       - name: Réglages de l'aperçu
         id: reglages
         run: bash apps/hebergement/apercu.sh reglages >> "$GITHUB_OUTPUT"
-      # L'artefact `apercu-pr-<numéro>` que `ci.yml` dépose pour ce même passage en Ready : le plus
-      # récent, créé au plus tôt deux minutes avant cette exécution. Si l'exécution de `ci.yml` pour
-      # cette PR finit sans lui (tests rouges), pas d'aperçu, comme avant.
-      - name: Attendre l'assemblage de la PR
-        id: assemblage
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          cree="$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq .created_at)"
-          depuis="$(date -u -d "$cree - 2 minutes" +%Y-%m-%dT%H:%M:%SZ)"
-          artefact() {
-            gh api "repos/$GH_REPO/actions/artifacts?name=apercu-pr-$NUMERO&per_page=30" \
-              --jq "[.artifacts[] | select(.created_at >= \"$depuis\" and .expired == false)] | sort_by(.created_at) | last // empty | .workflow_run.id"
-          }
-          tests() {
-            gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?event=pull_request&per_page=30" \
-              --jq "[.workflow_runs[] | select(.created_at >= \"$depuis\" and any(.pull_requests[]; .number == $NUMERO))] | sort_by(.created_at) | last // empty | \"\\(.status) \\(.conclusion)\""
-          }
-          fin=$((SECONDS + 3600))
-          until run="$(artefact)" && [ -n "$run" ]; do
-            etat="$(tests)"
-            if [[ "$etat" == completed* ]]; then
-              run="$(artefact)"
-              [ -n "$run" ] && break
-              echo "Pas d'aperçu : l'exécution de ci.yml pour la PR #$NUMERO a fini (« ${etat#completed } ») sans assembler le site." >&2
-              exit 1
-            fi
-            if [ "$SECONDS" -ge "$fin" ]; then
-              echo "Pas d'aperçu : aucun site assemblé pour la PR #$NUMERO dans l'heure." >&2
-              exit 1
-            fi
-            sleep 20
-          done
-          echo "Site de la PR assemblé par l'exécution $run de ci.yml."
-          echo "run=$run" >> "$GITHUB_OUTPUT"
+      # L'artefact `apercu-pr-<numéro>` de l'exécution de `ci.yml` que le job `attente` a vue verte.
       - name: Récupérer le site assemblé
         uses: actions/download-artifact@v4
         with:
           name: apercu-pr-${{ github.event.pull_request.number }}
-          run-id: ${{ steps.assemblage.outputs.run }}
+          run-id: ${{ needs.attente.outputs.run }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/archive
       # Ce qui vient de la PR n'est que des données : on le vérifie avant de le confier au dépôt.
