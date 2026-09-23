@@ -3,12 +3,12 @@
 Ce que les plateformes imposent à Tirelire parce qu'elle est à la fois multiplateforme (I9), locale
 (I7), synchronisée de pair à pair (I8) et simple pour tout le monde (I4). Ce ne sont pas des
 invariants, puisque le produit ne les choisit pas, ni des décisions, puisqu'elles ne tranchent
-rien : ce sont des faits, que toute décision et tout choix technique respectent. Les choix qui en
-découlent, cibles de distribution comprises, se discutent dans des issues.
+rien : ce sont des faits, que toute décision et tout choix technique respectent. Les cibles de
+distribution ont leur catalogue ([`cibles.md`](cibles.md)).
 
-Les navigateurs et les systèmes évoluent : ce document décrit l'état connu au 11 septembre 2026.
-Une contrainte se revérifie avant de fonder une décision, et se corrige ici, datée, quand elle
-change.
+Une contrainte vaut pour toutes les cibles ; sa **portée**, quand elle en a une, cite par leur nom
+celles qu'elle concerne. Les navigateurs et les systèmes évoluent : une contrainte se revérifie avant
+de fonder une décision, et s'amende ici quand elle change.
 
 ## C1 · Aucun geste technique pour l'utilisateur
 
@@ -38,7 +38,7 @@ comme Edge y refusent les modules JavaScript et le WebAssembly chargés à part 
 ouvrir d'un double-clic devrait tout embarquer dans la page. Une page en HTTPS ne peut pas appeler
 un service en HTTP : un relais se sert en HTTPS.
 
-*Découle de I7, I8, I9.*
+*Portée : les webapps, le relais PHP seul, le relais Node.* *Découle de I7, I8, I9.*
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
 
@@ -48,7 +48,8 @@ navigateur ou désinstalle l'application, si le navigateur manque de place et qu
 n'a pas demandé à les rendre persistantes, et, sur Safari, après sept jours d'utilisation sans
 visite tant que l'application n'est pas ajoutée à l'écran d'accueil.
 
-*Découle de I7, I9.*
+*Portée : les webapps ; l'effacement après sept jours, Webapp · Safari sur ordinateur et Webapp ·
+Safari sur iPhone et iPad.* *Découle de I7, I9.*
 
 ## C5 · Sans serveur, aucune sauvegarde n'est implicite
 
@@ -64,7 +65,7 @@ Une application web ne peut pas compter sur un travail en arrière-plan : elle s
 qu'elle est ouverte. Deux instances ne se synchronisent en direct que si elles sont ouvertes en
 même temps ; c'est ce qui rend utile le relais temporaire d'I8.
 
-*Découle de I8, I9.*
+*Portée : les webapps.* *Découle de I8, I9.*
 
 ## C7 · Hors magasin, les systèmes alertent ou bloquent
 
@@ -76,7 +77,7 @@ européenne. Distribuer simplement une application native passe par un magasin (
 payant, revue) ou par une signature payante ; une application web installée depuis une instance
 n'a aucune de ces barrières.
 
-*Découle de I4, I9.*
+*Portée : APK Android, Application Apple, Application de bureau.* *Découle de I4, I9.*
 
 ## C8 · Les instances ne sont pas toutes à la même version
 

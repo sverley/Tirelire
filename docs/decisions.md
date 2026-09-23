@@ -4,8 +4,10 @@ Comment le produit est fait. Chaque décision dit ce qu'elle implique dans le co
 l'hypothèse qu'elle écarte ne tenait pas. Pour en changer une, on l'amende : pas d'entrée qui en
 remplace une autre, pas de renvoi à ce qu'elle remplace.
 
-Une décision se conforme aux invariants ([`invariants.md`](invariants.md)) et aux contraintes
-([`contraintes.md`](contraintes.md)) : les invariants disent quoi, les décisions disent comment.
+Une décision se conforme aux principes de la description ([`description-projet.md`](description-projet.md)),
+aux invariants ([`invariants.md`](invariants.md)) et aux contraintes ([`contraintes.md`](contraintes.md)) :
+les principes et les invariants disent quoi, les décisions disent comment. Une décision n'a pas
+d'invariant : elle se vérifie par les tests du produit.
 Une décision ne peut pas amender un invariant ; si le besoin semble l'exiger, la question se pose
 d'abord dans une issue. Elle se conforme aussi aux règles de travail (`CLAUDE.md`), qui ne sont pas
 ici : ce document ne parle que du produit.

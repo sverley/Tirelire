@@ -7,24 +7,81 @@ ses retours à la ligne sont devenus des paragraphes. **Il fait foi.** Les invar
 Ce texte ne se reformule pas. Seul le porteur le complète ou le corrige, avec ses propres mots,
 datés ; ce qu'il retire reste visible, barré.
 
+## Principes
+
+Validés par le porteur le 23 septembre 2026 (#162), tels quels : « oui ». Du plus général au plus
+précis. Les invariants ([`invariants.md`](invariants.md)) en sont les valeurs mesurables ; les
+décisions ([`decisions.md`](decisions.md)) ne les contredisent pas ; les règles de travail
+(`CLAUDE.md`) déclinent ceux du travail.
+
+### Le produit
+
+1. L'application aide les particuliers à gérer leur budget réparti sur plusieurs comptes.
+   1. Son cœur : établir sur le long terme, pour chaque compte, les virements permanents qui remplissent les tirelires qu'il héberge, puis vérifier au pointage qu'ils ont eu lieu.
+   2. Le plan n'évolue que sur un changement de fond.
+   3. Le plan s'appuie sur ce que les tirelires contiennent réellement : seules les données enregistrées servent, jamais une hypothèse. Il signale un risque à venir sans supposer ce qui n'est pas tracé.
+   4. Quand une dépense est enregistrée trop près de sa date pour être épargnée à temps, l'application avertit du montant qui manquera, en plus des virements permanents calculés sur la période complète.
+   5. Elle planifie, tient un solde par tirelire et vérifie.
+2. Chaque usage se suffit à lui-même : construire un budget sans import, importer et classer sans budget, reconstruire un budget depuis l'historique, rapprocher des opérations d'un budget.
+   1. L'usage prioritaire est la construction d'un budget ex nihilo.
+3. Elle reste simple pour tous, souple et configurable pour les usages avancés.
+   1. Chaque fonctionnalité est accessible et attrayante : claire et efficace.
+   2. Catégoriser une opération demande peu de clics.
+4. L'application propose, l'utilisateur décide : rien ne se fait de manière cachée.
+   1. L'utilisateur met en place ses virements lui-même, dans sa banque ; une fois validés dans l'application, ils sont enregistrés avec leur ventilation.
+   2. Quand le budget ou le train de vie évolue, elle propose d'adapter l'autre.
+   3. Ce qu'un assistant fait fait aussi partie de la vie de l'application.
+   4. Une opération n'est liée à un flux que si l'utilisateur le valide ; sans ventilation prévue, il l'arbitre.
+5. Les données restent chez l'utilisateur : en local, jamais stockées sur un serveur.
+   1. Elles se synchronisent entre sessions, plateformes et personnes qui partagent les clés de chiffrement.
+   2. Un relais ne garde que des paquets chiffrés, temporairement, et l'utilisateur en est averti à la première mise en lien.
+6. Elle se distribue sur plusieurs plateformes : web, Android, Apple à terme.
+
+### Le travail
+
+7. Les paroles du porteur font foi ; lui seul les complète ou les corrige.
+8. Le besoin s'analyse avant les solutions.
+9. Les catalogues sont des ensembles cohérents, sans date : une règle ou une décision s'applique à tout moment, rétroactivement.
+   1. Une décision ne contrevient jamais à un principe ni à une règle.
+   2. Un invariant est la valeur mesurable d'un principe ou d'une règle, à laquelle on se réfère pour valider une mesure.
+   3. Un changement peut rendre des tests rouges : ils deviennent une dette de cette évolution, suivie dans une issue.
+10. Ce qu'un test peut vérifier, un test le vérifie ; la documentation simple n'en a pas besoin.
+    1. La CI cherche le bon compromis entre son coût et la stabilité : assez de tests pour qu'un rouge ne se découvre pas après la fusion, pas au point de ralentir le travail.
+11. Celui qui vérifie n'est pas celui qui code ; le porteur valide, et la fusion vaut validation.
+    1. L'auditeur et le codeur lisent le besoin chacun de son côté : c'est la confrontation de leurs lectures qui fait avancer, pas le forçage de l'un par l'autre.
+12. La garde reste simple et peu coûteuse ; elle ne décide pas de sa propre évolution, et tout changement de son comportement est validé par le porteur.
+
+## Usages
+
+Les usages du principe 2, chacun dans les mots du porteur (11 septembre 2026, #29) ; U1 est
+prioritaire (principe 2.1). Aucun n'est le préalable d'un autre, aucun n'est le mode dégradé d'un
+autre. L'invariant I3 en mesure chacun ; le catalogue des cibles ([`cibles.md`](cibles.md)) dit sur
+quelles cibles chacun est prioritaire.
+
+- **U1 · Budget seul.** « L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation. » Et, les 13–14 septembre : « la priorité reste l'usage de construction d'un buget exnihilo ».
+- **U2 · Budget et virements permanents.** « on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires. »
+- **U3 · Budget sans virements validés, puis import.** « Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue. »
+- **U4 · Budget reconstruit depuis l'historique.** « l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée. »
+- **U5 · Import seul.** « Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget. »
+
 ## 6 septembre 2026 · le besoin d'origine
 
 Repris de l'analyse du besoin du 6 septembre, supprimée depuis : seuls les documents Markdown de
-`docs/` font foi. Ces deux passages sont les seuls qu'aucun autre document ne portait.
+`docs/` font foi. Ces deux passages sont les seuls qu'aucun autre document ne portait ; ils ne sont
+pas du porteur (voir ci-dessous).
 
-> Tu veux un outil qui fasse trois choses, dans cet ordre : **planifier** (à partir des revenus, des
-> charges périodiques, des objectifs d'épargne et des budgets, en déduire combien virer chaque mois
-> vers chaque compte), **tenir des soldes par objectif** (chaque provision, chaque objectif
-> d'épargne, chaque budget a son propre compteur, indépendamment du compte bancaire qui l'héberge),
-> et **vérifier** (importer les relevés, reconnaître automatiquement les opérations prévues, classer
-> le reste par catégorie et comparer au budget).
+> ~~Tu veux un outil qui fasse trois choses, dans cet ordre : **planifier** (à partir des revenus, des charges périodiques, des objectifs d'épargne et des budgets, en déduire combien virer chaque mois vers chaque compte), **tenir des soldes par objectif** (chaque provision, chaque objectif d'épargne, chaque budget a son propre compteur, indépendamment du compte bancaire qui l'héberge), et **vérifier** (importer les relevés, reconnaître automatiquement les opérations prévues, classer le reste par catégorie et comparer au budget).~~
 
 Une partie de cela existe déjà : Actual Budget fait les tirelires, le report, l'import CSV avec règles
 et dédoublonnage ; Firefly III couvre le multi-comptes et les règles de catégorisation ; YNAB est la
 référence payante de la méthode. Ce qu'aucun ne fait, et qui est le cœur du projet :
 
-> **déduire les virements permanents par compte réel à partir des tirelires qui y sont hébergées**,
-> avec le rattrapage d'échéance, et vérifier au pointage que le virement a bien eu lieu.
+> ~~**déduire les virements permanents par compte réel à partir des tirelires qui y sont hébergées**, avec le rattrapage d'échéance, et vérifier au pointage que le virement a bien eu lieu.~~
+
+Barrées par le porteur le 23 septembre 2026 (#162) : ces deux citations sont la reformulation d'un
+agent, pas ses paroles. Le principe 1 et ses déclinaisons les remplacent.
+
+> Cette phrase n'est pas de moi, il faut qu'elle soit claire pour etre validée
 
 ## 11 septembre 2026
 
@@ -275,3 +332,61 @@ Le 22 septembre, dans #170.
 Le 22 septembre, dans #173, repris par #170.
 
 > Il faut que le compromis reste bon entre coût de CI et stabilité du développement. Si sauter un test qui devient rouge après le merge oblige a relancer tout un tour de review/code, on est perdant. Mais si les tests sont trop lourds et lents, on n'avance pas
+
+## 22 et 23 septembre 2026 · principes, cibles, invariants, validation
+
+Paroles du porteur dans #162, #168, #175 et #176. Elles fondent les sections « Principes » et
+« Usages » ci-dessus, le catalogue des cibles ([`cibles.md`](cibles.md)), la forme des invariants et
+la validation par la fusion.
+
+### Les invariants
+
+> Oui, les invariants sont des valeurs mesurables auxquelles on doit pouvoir se référer pour valider une mesure
+
+> Est-ce que les invariants ne devraient pas permettre de mesurer les regles plutôt que les principes ? Et les principes sont décliner en 1 ou plusieurs regles ? Ou est-ce trop complexe ?
+
+> Alors faut-il des invariants pour les decisions ?
+
+> Ok on part la dessus
+
+> I5/I6 semblent optimistes, non ? Il faut peut-être acter un invariant plus lache et enregistrer l'objectif final pour la suite ?
+
+### Les cibles
+
+> Afin de rester simple et efficace, et sachant que le nombre de cibles sera faible (webapp, relai seul, apk, iPhone), quelle solution faut-il privilégier pour gérer les cibles qui croisées aux usages et aux contraintes devraient permettre de déterminer des objectifs à atteindre
+
+> Attention, il faudra sûrement faire une matrice de couverture mais tout ne doit pas être fait selon ce point de vue.
+
+> Non, je valide cette construction
+
+> non, traitons les navigateurs comme des cibles pour la webapp
+
+### Le plan
+
+> 1.1 : non, le plan peut soulever un risque à venir mais il est possible que la tirelire contienne de quoi payer. Le plan est établi sur le long terme. Il peut évoluer mais si des changements de fond se présentent. L'enregistrement d'une nouvelle dépense à une date "trop" proche pour être combler avertit l'utilisateur, qu'en plus des virements permanents à mettre en place sur la période complète, du montant non épargné par le manque de temps.
+
+> le plan peut utiliser les informations des tirelires mais ne doit pas faire d'hypothèses. Seules les données réellement tracées doivent servir
+
+> 9. un changement peut faire créer des tests rouges qu'il faudra traiter comme une dette de l'évolution
+
+### La validation et l'aperçu
+
+Dans #168, à la question d'un signal sans blocage plutôt que d'une protection payante : « 2 ». Puis :
+
+> Mais je ne veux pas écrire validé alors qu'il me suffit de cliquer sur merge
+
+Dans #175 :
+
+> Mais je voulais que la CI d'une pr ne déploie pas automatiquement sur le FTP. Je voulais que ce déploiement soit nécessairement une action manuelle
+
+> Une case dans la description ?
+
+Dans #176, sur le retour du dépôt en privé :
+
+> Non, le dépôt va repasser privé des que le quota sera revenu pour la CI
+
+Puis, parmi les voies proposées, la troisième (identifiants FTP au niveau du dépôt, risque accepté) : « 3 ».
+
+### La méthode
+
+> Consigner dans une pr ne sert a rien, elle est fermée au merge

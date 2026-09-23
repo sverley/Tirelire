@@ -1,12 +1,15 @@
 # Tirelire — conventions pour les sessions d'assistant
 
 - Langue : français partout (code, commentaires, commits, interface, docs).
-- Lire `docs/description-projet.md` avant tout : le texte du porteur, mot pour mot, qui fait foi.
-  Il ne se reformule pas ; seul le porteur le complète ou le corrige, avec ses mots, datés, ce qu'il
+- Lire `docs/description-projet.md` avant tout : le texte du porteur, mot pour mot, qui fait foi,
+  ouvert par ses sections « Principes » et « Usages ». Il ne se reformule pas ; seul le porteur le complète ou le corrige, avec ses mots, datés, ce qu'il
   retire restant barré.
-- Lire ensuite `docs/invariants.md` : ce que le produit doit rester, tiré de la description. Une décision se prend au
-  regard des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
+- Lire ensuite `docs/invariants.md` : les valeurs mesurables des principes et des règles, que les
+  harnais font échouer au-delà. Une décision se prend au regard des principes et des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
   une décision.
+- Lire `docs/cibles.md` : les cibles de distribution, leur état et la matrice usages × cibles. Le
+  travail se borne aux cibles actives ; une cible de côté ne se touche pas. Les étiquettes `cible:*`
+  d'une issue ou d'une PR nomment ses cibles ; sans étiquette, elle vaut pour toutes les actives.
 - Lire aussi `docs/contraintes.md` : ce que les plateformes imposent à une application multiplateforme
   qui doit rester simple ; tout choix technique la respecte.
 - Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro : comment le
@@ -61,7 +64,7 @@ rien d'autre.
 ### Les documents fondateurs
 
 `docs/description-projet.md` (les paroles du porteur), `docs/glossaire.md`, et les catalogues :
-`docs/invariants.md`, `docs/contraintes.md`, `docs/decisions.md`, `docs/gardes.md` (le registre :
+`docs/invariants.md`, `docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/gardes.md` (le registre :
 chaque invariant et chaque contrainte, avec son harnais ou sa vérification manuelle).
 
 Un document fondateur est forcément un fichier Markdown de `docs/` : un document d'un autre format
@@ -159,7 +162,7 @@ Il passe en premier. Il ne code jamais le produit.
    fichiers, ni jobs, ni mécanismes : le codeur code depuis sa propre lecture, et c'est la
    confrontation des lectures de l'auditeur et du codeur qui fait avancer, pas le forçage de l'une par
    l'autre. Une construction choisie par le porteur reste dans l'issue, comme sa parole : elle fait
-   partie du besoin.
+   partie du besoin. Le « Fait quand » se borne aux cibles actives (`docs/cibles.md`).
 4. Créer la branche, poser l'étiquette « en cours », écrire le harnais — un test qui rougit
    aujourd'hui et verdira quand le besoin sera couvert ; aucun par défaut pour la documentation ni
    pour la garde. Un seul fichier de test par issue, sauf raison dite.
@@ -185,7 +188,7 @@ Il passe en second, sur la PR ouverte par l'auditeur.
 2. Coder sur la branche, commettre, pousser. En brouillon, le verdict est local : `pnpm typecheck` et
    le harnais du besoin, rien d'autre.
 3. Ne jamais modifier la PR : ni description, ni état de brouillon, ni harnais. Ne jamais modifier un document
-   fondateur, sauf si l'issue le demande.
+   fondateur, sauf si l'issue le demande. Ne jamais toucher une cible de côté.
 4. Quand le typecheck et le harnais sont verts, écrire un seul commentaire : ce qui appelle une
    validation humaine — pour
    chaque vérification manuelle demandée, ce que ses modifications changent et ce qui reste à

@@ -92,6 +92,22 @@ Terme générique. Un besoin est :
 Le type du besoin commande tout le reste : qui écrit son harnais, où ce harnais vit, et quand il est
 joué.
 
+## Principe
+
+Ce que le porteur pose pour le produit ou pour le travail, dans la section « Principes » de la
+description, numéroté du plus général au plus précis. Il se décline en invariants, en règles
+(`CLAUDE.md`), ou les deux ; une décision ne le contredit pas.
+
+## Invariant
+
+La valeur mesurable d'un principe ou d'une règle, à laquelle on se réfère pour valider une mesure :
+son harnais échoue au-delà. Il peut écrire à côté un objectif, visé, sans harnais qui échoue dessus.
+
+## Cible
+
+Une forme sous laquelle l'application se distribue — une webapp sur tel navigateur, le relais seul,
+l'APK… —, active, de côté ou à venir, au catalogue `docs/cibles.md`.
+
 ## Harnais
 
 Terme générique : l'ensemble de tests qui vérifie que le code produit répond au besoin. Selon le
