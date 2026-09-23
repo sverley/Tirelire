@@ -42,6 +42,11 @@
   bloque quand du code arrive. La CI ne joue qu'au passage en Ready d'une PR, une fois par passage,
   en mode strict, tous les harnais et la garde : typecheck, `pnpm test`, build, version de dev ; un
   outil manquant y fait échouer le job.
+- **Workflows.** Un agent ne crée ni ne modifie aucun workflow (`.github/workflows/`,
+  `.github/actions/`), sauf quand l'issue le demande. Dépôt privé sur l'offre gratuite, les
+  identifiants FTP sont au niveau du dépôt : un workflow qu'une branche ajoute les lit dès son premier
+  `push`, avant toute PR (#176, risque accepté par le porteur). Au Ready, une PR qui en touche un porte
+  l'étiquette « touche un workflow » (`pret.yml`).
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine : la
   boucle locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans
   son en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
@@ -92,7 +97,7 @@ crochet lent, pas d'alerte. Sept workflows, pour qu'aucune exécution ne montre 
 qu'une autre joue : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la garde),
 `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu), `depot-apercu.yml`
 (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères d'une PR prête, case de
-l'aperçu comprise), `suivi.yml` (un changement après le Ready, signalé) et `fin.yml` (« en cours »
+l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un changement après le Ready, signalé) et `fin.yml` (« en cours »
 quitte l'issue à sa fermeture). Seul `depot-apercu.yml` y fait exception, accepté par le porteur :
 ses exécutions montrent des jobs sautés, et la case de l'aperçu dit ce qui est en ligne.
 

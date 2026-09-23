@@ -8,7 +8,11 @@ name: PR prête
 # - le statut « Toute la CI sur ce commit », mis en attente au Ready ; `apercu.yml` le termine quand
 #   toute la CI a fini, `suivi.yml` le passe en échec quand un commit arrive sans CI ;
 # - la case de l'aperçu dans la description (#175), ajoutée au Ready si elle manque, et décochée si
-#   l'aperçu en ligne n'est pas le dernier commit ; le porteur la coche pour déposer (`depot-apercu.yml`).
+#   l'aperçu en ligne n'est pas le dernier commit ; le porteur la coche pour déposer (`depot-apercu.yml`) ;
+# - l'étiquette « touche un workflow » sur la PR, posée au Ready si elle modifie `.github/workflows/`
+#   ou `.github/actions/`, retirée sinon (#176) : dépôt privé, les identifiants FTP sont lisibles par
+#   ces fichiers, et le porteur le voit avant de fusionner. Un commit après le Ready est signalé
+#   (`suivi.yml`) ; le Ready suivant recalcule l'étiquette.
 #
 # Un workflow à part de `suivi.yml`, pour qu'aucune exécution ne montre sauté un job qu'une autre
 # joue (B1). GitHub le lit sur `main` (`pull_request_target`) ; rien de la PR ne s'exécute.
@@ -46,6 +50,7 @@ jobs:
       CORPS: ${{ github.event.pull_request.body }}
       PR: ${{ github.event.pull_request.number }}
       ETIQUETTE: PR prête
+      ETIQUETTE_WORKFLOW: touche un workflow
       CONTEXTE: Toute la CI sur ce commit
     steps:
       - uses: actions/checkout@v4
@@ -67,7 +72,15 @@ jobs:
               gh api "repos/$GH_REPO/statuses/$sha" -f state=pending -f context="$CONTEXTE" \
                 -f description="CI en cours sur ce commit" > /dev/null
               gh pr view "$PR" --json body --jq .body | bash apps/hebergement/case-apercu.sh rafraichir "$sha" > "$RUNNER_TEMP/corps"
-              gh pr edit "$PR" --body-file "$RUNNER_TEMP/corps" > /dev/null ;;
+              gh pr edit "$PR" --body-file "$RUNNER_TEMP/corps" > /dev/null
+              # #176 : une PR qui touche un workflow le montre avant sa fusion.
+              if gh api --paginate "repos/$GH_REPO/pulls/$PR/files" --jq '.[].filename' \
+                  | grep -qE '^\.github/(workflows|actions)/'; then
+                gh label create "$ETIQUETTE_WORKFLOW" --color B60205 --description "La PR modifie un workflow : les identifiants FTP lui sont lisibles (#176)" --force > /dev/null
+                gh pr edit "$PR" --add-label "$ETIQUETTE_WORKFLOW" > /dev/null
+              elif gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qxF "$ETIQUETTE_WORKFLOW"; then
+                gh pr edit "$PR" --remove-label "$ETIQUETTE_WORKFLOW" > /dev/null
+              fi ;;
             converted_to_draft|closed)
               for n in $issues; do
                 if gh issue view "$n" --json labels --jq '.labels[].name' | grep -qxF "$ETIQUETTE"; then

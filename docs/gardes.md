@@ -359,18 +359,20 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
   que `main`, n'installe ni n'assemble rien, et reçoit le site en artefact ; un job de
   `pull_request_target` qui exécute le code de la PR n'a ni cache ni permission en écriture (#155).
   Lit les workflows comme le reste du fichier (#141). Ne constate pas la règle de l'environnement
-  sur GitHub : c'est `VM-C3-depot-main`.
+  sur GitHub : c'est `VM-C3-depot-main`. Dépôt privé sur l'offre gratuite, l'environnement reste
+  déclaré sans rien protéger, les identifiants sont au niveau du dépôt, et un workflow ajouté par une
+  branche échappe à ce harnais, qui ne lit que ceux de `main` : risque accepté (#176).
   Témoin rouge : « témoin rouge · un aperçu qui dépose avec des identifiants que le code de la PR peut atteindre »
 - **Vérification manuelle** · `VM-C3-https` — Si la PR touche l'application ou le relais : donner à
   l'application un relais en `http://` hors de `localhost`, constater qu'elle le refuse ou le signale,
   et que la PR ne fait rien charger en HTTP. Si elle ne touche que des tests, de l'outillage ou de la
   documentation : dire dans le compte rendu du codeur pourquoi ni l'application ni le relais ne sont atteints.
 - **Vérification manuelle** · `VM-C3-depot-main` — Si la PR touche un workflow qui lit
-  `secrets.OVH_FTP_*`, `apps/hebergement/apercu.sh` ou `apps/hebergement/deposer.sh` : dans
-  Settings → Environments, constater que l'environnement déclaré par ces jobs n'admet que `main` et
-  porte les secrets `OVH_FTP_*`, qu'ils n'existent plus au niveau du dépôt ; sur l'aperçu de la PR,
-  constater que le dépôt a tourné avec les scripts de `main` et reste dans `<dossier>/pr-<numéro>`
-  (#155).
+  `secrets.OVH_FTP_*`, `apps/hebergement/apercu.sh` ou `apps/hebergement/deposer.sh` : constater que
+  la PR porte l'étiquette « touche un workflow » ; dans Settings → Secrets and variables → Actions,
+  constater que les secrets `OVH_FTP_*` sont au niveau du dépôt (dépôt privé, offre gratuite, #176) ;
+  sur l'aperçu de la PR, constater que le dépôt a tourné avec les scripts de `main` et reste dans
+  `<dossier>/pr-<numéro>` (#155) ; après la fusion, constater que le dépôt de production a tourné.
 - **À bâtir** · le refus ou le signalement d'un relais en HTTP (besoin #67, harnais #38).
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
