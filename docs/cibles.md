@@ -3,7 +3,7 @@
 Les cibles de distribution de Tirelire (principe 6 de la
 [description du projet](description-projet.md)) : ce que chacune est, ce qui la construit et la
 livre, et son état. Ce catalogue est la référence : il tient sans les issues. Il borne le champ des
-agents de codage et de distribution (`CLAUDE.md`).
+agents de codage et de distribution (`docs/roles/`).
 
 ## Comment il sert
 

@@ -83,8 +83,8 @@ L'intervalle sur lequel se lit un budget : de date de paie à date de paie, ou l
 
 Terme générique. Un besoin est :
 
-- **organisationnel** — règles, invariants, usages, principes, description du projet, fichiers
-  d'agent comme `CLAUDE.md` ;
+- **organisationnel** — décisions du travail, invariants, usages, principes, description du
+  projet, descriptifs de rôle, fichiers d'agent comme `CLAUDE.md` ;
 - **fonctionnel** — le produit final ;
 - **d'outil** ;
 - **de documentation**.
@@ -105,7 +105,7 @@ besoin qu'il garde, un harnais est la **garde** ou des **tests**.
 ## Garde
 
 L'outil qui aide à ne pas dévier des documents fondateurs : description du projet, glossaire,
-invariants, contraintes, décisions, registre. Elle vérifie trois choses (`CLAUDE.md`) et rien de plus.
+invariants, contraintes, décisions, registre. Elle vérifie trois choses (D81) et rien de plus.
 
 Elle a deux emplois, à ne pas confondre : garantir que ce qu'elle garde n'est pas altéré, et garantir
 que le contenu de ce qu'elle garde est respecté.

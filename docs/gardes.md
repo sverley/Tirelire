@@ -47,7 +47,7 @@ recopier : son harnais échoue au-delà, ou sa vérification manuelle la constat
   comptent pas ; les identifiants se lisent sans tenir compte de la casse ; une plage (`C1 à C3`)
   déclare chacun de ceux qu'elle couvre.
 - **Ce que la garde ne vérifie pas** : qu'une règle ou une décision nouvelle ne contredit ni les
-  autres, ni les documents fondateurs. C'est un jugement, et il revient à l'auditeur (`CLAUDE.md`).
+  autres, ni les documents fondateurs. C'est un jugement, et il revient à l'architecte et à l'auditeur (D78).
 
 ## Écrire une entrée
 
@@ -56,7 +56,7 @@ compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refu
 
 - `Chemins :` suivi de motifs entre accents graves (`*` dans un dossier, `**` à travers les
   dossiers) : modifier un fichier qui y répond impose de déclarer l'entrée. C'est un plancher,
-  volontairement étroit ; l'auditeur ajoute ce qu'il ne voit pas.
+  volontairement étroit ; l'architecte ajoute ce qu'il ne voit pas.
 - Une ligne `Harnais` : un ou plusieurs chemins entre accents graves, un tiret cadratin, puis ce que
   le harnais garde. Pour un test précis, son nom vient en tête, entre guillemets, comme « positions
   et soldes (D19, D29) » pour I2 : c'est alors ce test, titre d'un `describe`, d'un `it` ou d'un

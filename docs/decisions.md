@@ -1,28 +1,27 @@
-# Décisions du produit
+# Décisions
 
-Comment le produit est fait. Chaque décision dit ce qu'elle implique dans le code, et pourquoi
-l'hypothèse qu'elle écarte ne tenait pas. Pour en changer une, on l'amende : pas d'entrée qui en
-remplace une autre, pas de renvoi à ce qu'elle remplace.
+Les décisions du porteur, en deux parties, comme les principes de la
+[description du projet](description-projet.md) : **le produit**, comment il est fait ; **le
+travail**, la méthode et les rôles. Même autorité, même cohérence : une décision ne contrevient
+jamais à un principe ni à une autre décision (principe 9.1), elle respecte les invariants
+([`invariants.md`](invariants.md)) et les contraintes ([`contraintes.md`](contraintes.md)). Si un
+besoin semble exiger le contraire, la question se pose d'abord dans une issue.
 
-Une décision se conforme aux principes de la description ([`description-projet.md`](description-projet.md)),
-aux invariants ([`invariants.md`](invariants.md)) et aux contraintes ([`contraintes.md`](contraintes.md)) :
-les principes et les invariants disent quoi, les décisions disent comment. Une décision n'a pas
-d'invariant : elle se vérifie par les tests du produit.
-Une décision ne peut pas amender un invariant ; si le besoin semble l'exiger, la question se pose
-d'abord dans une issue. Elle se conforme aussi aux règles de travail (`CLAUDE.md`), qui ne sont pas
-ici : ce document ne parle que du produit.
+Chaque décision dit ce qu'elle implique, et pourquoi l'hypothèse qu'elle écarte ne tenait pas. Pour
+en changer une, on l'amende : pas d'entrée qui en remplace une autre, pas de renvoi à ce qu'elle
+remplace. Les identifiants sont ceux des entrées, sans date ; l'historique appartient à git. Les
+numéros retirés ne se réemploient pas.
 
-Les identifiants sont ceux des entrées, sans date ; l'historique appartient à git. Les numéros
-retirés ne se réemploient pas.
+## Le produit
 
-## D01 · Deux niveaux de comptabilité
+### D01 · Deux niveaux de comptabilité
 
 Les **comptes** sont le réel bancaire (solde importé) ; les **tirelires** sont des sous-comptes
 comptables hébergés sur un compte. Invariant : pour chaque compte, solde bancaire = somme des
 tirelires hébergées + non affecté. Les soldes de tirelires ne sont jamais stockés, toujours
 reconstruits (`balances.ts`).
 
-## D02 · Période budgétaire de paie à paie
+### D02 · Période budgétaire de paie à paie
 
 Le compte principal porte un `payDay` ; la période va de ce jour au jour précédent du mois suivant, nommée
 d'après le mois qui contient son milieu (28 août → 27 septembre = « septembre »). `payDay = 1`
@@ -33,12 +32,12 @@ Ce que l'hypothèse du mois calendaire cachait : beaucoup de salaires tombent en
 dernier jour du mois, et les prélèvements du début de mois suivent. Un budget calé sur le mois civil
 compte alors deux salaires certains mois, et zéro le mois suivant.
 
-## D03 · Année budgétaire à date configurable
+### D03 · Année budgétaire à date configurable
 
 `settings.budgetYearStart = { month, day }`. Sert aux budgets annuels et aux bilans. Les provisions
 gardent leur propre ancrage (`periodicity.anchorDate`), indépendant.
 
-## D04 · Relevé du compte principal seul, comptes tiers saisis à la main
+### D04 · Relevé du compte principal seul, comptes tiers saisis à la main
 
 Seul le compte principal est importé au départ (les autres comptes peuvent l'être plus tard sans changer le
 modèle : un compte passe de `third` à `holding`/`principal`). Un **compte tiers** est un compte réel
@@ -50,7 +49,7 @@ Ce que l'hypothèse du relevé unique cachait : un budget placé sur un autre co
 carte, dépense hors du relevé du principal ; et sans le relevé d'un livret, rien ne dit que le virement
 est arrivé ni que l'échéance a été payée depuis le bon compte.
 
-## D05 · Report des budgets au cas par cas
+### D05 · Report des budgets au cas par cas
 
 `tirelire.rollover` : `none` (remise à zéro), `unlimited`, `capped { months }`. Défaut proposé
 dans l'interface : remise à zéro sur le compte principal, report ailleurs (l'argent y est physiquement).
@@ -61,7 +60,7 @@ retourne au non affecté ; budget cumulatif, le reliquat reste dans la tirelire 
 rattrape. Pour une tirelire hébergée ailleurs, seul le cumulatif est cohérent : l'argent est
 physiquement là.
 
-## D06 · Ordre de financement quand la marge est négative
+### D06 · Ordre de financement quand la marge est négative
 
 Chaque tirelire a une `priority` (petit = financé d'abord ; défauts : provision 10, budget 20,
 objectif 30). Les planchers (rattrapage d'une provision) sont servis avant tout le reste, puis le
@@ -71,14 +70,14 @@ Ce que l'hypothèse « il y a toujours assez » cachait : le mois où les revenu
 charges, les provisions, l'épargne et les budgets, quelqu'un doit céder. L'épargne se décale ; une
 échéance de provision, non.
 
-## D07 · Application JavaScript portable : PWA Svelte + Capacitor
+### D07 · Application JavaScript portable : PWA Svelte + Capacitor
 
 Un seul code : PWA (installable, servie comme fichiers statiques par un serveur privé) emballée
 avec Capacitor pour Android. Cœur en TypeScript pur (`packages/core`) sans dépendance à
 l'interface. Interface Svelte 5 (`apps/web`). Choix du framework jugé secondaire tant que le
 cœur reste indépendant.
 
-## D08 · Stockage option D : tables SQLite + journal de changements
+### D08 · Stockage option D : tables SQLite + journal de changements
 
 Les tables SQLite (sql.js en WebAssembly, persisté dans IndexedDB, exportable en un fichier)
 sont la vérité. Chaque écriture laisse une trace *(table, ligne, colonne, valeur, horloge
@@ -87,7 +86,7 @@ logique hybride, appareil)* dans `changes`, chaînée par empreinte SHA-256 par 
 (`deletedAt`) ; ce qui se recalcule ne se stocke pas. Le journal d'événements comme *stockage*
 (option B), les CRDT génériques (C) et la blockchain ont été examinés et écartés (voir `docs/synchronisation.md`).
 
-## D09 · Deux familles d'identifiants
+### D09 · Deux familles d'identifiants
 
 Opérations importées : clé déterministe `op_` + SHA-256(compte, date, montant, libellé
 normalisé, rang parmi les identiques du jour) → identiques sur tous les appareils, fusion sans
@@ -100,7 +99,7 @@ Ce que l'hypothèse de l'import propre cachait : les exports bancaires se chevau
 changent d'un export à l'autre, certaines banques exportent les opérations en attente. Sans
 déduplication, chaque import double les dépenses.
 
-## D10 · Ventilation : lignes catégorie + tirelire
+### D10 · Ventilation : lignes catégorie + tirelire
 
 Une opération est ventilée en une ou plusieurs lignes (`Allocation`), chacune portant **une
 catégorie et une tirelire** ; l'opération simple a une seule ligne. `allocation.amount` est
@@ -111,14 +110,14 @@ dépense ou un revenu ; pour un virement interne, +montant côté compte hôte d
 Ce que l'hypothèse d'une catégorie par opération cachait : un passage en grande surface mêle
 alimentation, vêtements et cadeau ; un virement à un livret alimente trois provisions à la fois.
 
-## D11 · Un virement permanent par tirelire, libellé « TIRELIRE … »
+### D11 · Un virement permanent par tirelire, libellé « TIRELIRE … »
 
 Le plan propose un ordre permanent par tirelire hébergée hors principal, avec un libellé dérivé du
 nom de la tirelire (`transferLabel`). À l'import, une opération dont le libellé contient ce
 libellé est reconnue comme virement vers cette tirelire (`matchTirelireTransfers`). Un virement
 groupé reste possible : il se ventile à la main sur plusieurs tirelires.
 
-## D12 · Pointage prudent
+### D12 · Pointage prudent
 
 Un flux prévu est pointé automatiquement seulement si le montant est exact (ou dans la tolérance
 avec libellé reconnu) et que le flux n'est pas marqué variable ; sinon c'est une proposition à
@@ -130,17 +129,17 @@ samedi, une facture varie, un salaire varie avec les heures supplémentaires, et
 peuvent avoir le même montant. Trop strict, rien n'est reconnu ; trop lâche, c'est la mauvaise
 opération qui est pointée.
 
-## D13 · Nom de code « Tirelire »
+### D13 · Nom de code « Tirelire »
 
 Une tirelire par objectif, chacune avec son solde. Le nom public se décidera plus tard.
 
-## D16 · Synchronisation : protocole unique, transports interchangeables
+### D16 · Synchronisation : protocole unique, transports interchangeables
 
 `sync.ts` : hello / request / changes / done / bye, curseur par pair, relais des changements de
 tiers. Transports : fichier (main), WebRTC à signalisation manuelle et relais privé chiffré
 (branche `feature/sync-p2p`). Wi‑Fi Direct et Bluetooth demanderaient un module natif Capacitor.
 
-## D18 · Numéro de compte mémorisé sur le compte, indépendant du profil d'import
+### D18 · Numéro de compte mémorisé sur le compte, indépendant du profil d'import
 
 `Account.accountNumber` (facultatif, saisi dans le panneau Comptes ou mémorisé depuis l'import)
 porte le numéro de compte ou l'IBAN, comparé après normalisation (espaces et ponctuation
@@ -151,7 +150,7 @@ y compris avec un profil nouvellement détecté, contrairement à `profile.accou
 que pour ce profil. Une case à cocher propose de mémoriser une nouvelle valeur sur le compte
 choisi ; décision explicite, jamais un écrasement silencieux.
 
-## D19 · Tirelire répartie sur plusieurs comptes
+### D19 · Tirelire répartie sur plusieurs comptes
 
 Une tirelire n'est plus hébergée par un compte : elle porte une **répartition par compte**,
 reconstruite depuis les ventilations, jamais stockée. Deux invariants au lieu d'un : la somme des
@@ -165,7 +164,7 @@ un vecteur, plus un scalaire, et `Tirelire.accountId` disparaît au profit d'un 
 Ce que l'hypothèse « une tirelire vit sur un compte » cachait : une même réserve peut dormir sur
 plusieurs comptes, et le suivi par objectif doit rester indépendant du compte qui héberge l'argent.
 
-## D20 · Placement voulu et écart
+### D20 · Placement voulu et écart
 
 Chaque tirelire déclare **où son argent devrait dormir**. L'écart entre position réelle et position
 voulue produit des propositions de virement dans le plan : jamais une correction d'office, jamais un
@@ -173,7 +172,7 @@ blocage. Laisser un écart est légitime — un revenu arrive, on provisionnera 
 doit pouvoir présenter un écart comme « à surveiller » plutôt que « à faire ». Le compte principal est un lieu
 de stockage comme un autre, à durée de séjour courte : aucune règle particulière ne lui est attachée.
 
-## D21 · Virement groupé à ventilation prévue
+### D21 · Virement groupé à ventilation prévue
 
 Les écarts vers un même compte cible donnent un **virement permanent unique**, avec sa ventilation
 calculée d'avance et enregistrée comme flux attendu. À l'import, la ligne bancaire est reconnue par
@@ -183,7 +182,7 @@ planchers d'abord puis priorités, plutôt qu'un prorata qui saupoudrerait. L'é
 positions de tirelires et se represente au tour suivant. Le libellé de D11 devient un libellé par
 couple de comptes, plus un libellé par tirelire.
 
-## D22 · Trois états d'une opération, la vérité est ce qui est verrouillé
+### D22 · Trois états d'une opération, la vérité est ce qui est verrouillé
 
 *Non traitée* (aucune règle ne l'a vue), *rapprochée* (classée par une règle, reprise à chaque
 passage, malléable), *verrouillée* (plus aucune règle ne l'atteint). Est vérité — donc stocké et
@@ -197,7 +196,7 @@ Ce que l'hypothèse de la donnée propre cachait : une opération importée, une
 opération corrigée n'ont pas la même autorité ; sans état, la synchronisation écrase la correction
 par l'import.
 
-## D23 · Règles : sélection, action, rang
+### D23 · Règles : sélection, action, rang
 
 Une règle a une **sélection** (libellé, montant, compte, date, période de validité) et une **action**
 dont chaque champ est facultatif : catégorie, tirelire, ventilation, état. L'état prend quatre
@@ -213,13 +212,13 @@ les rend rejouables dans l'ordre chronologique sur un historique importé. Cons�
 l'interface : avec *Ne rien faire*, une opération peut porter une classification tout en restant non
 traitée — « rien dessus » et « quelque chose que personne n'a regardé » doivent se distinguer.
 
-## D24 · Un flux peut engendrer une règle
+### D24 · Un flux peut engendrer une règle
 
 Un flux prévu engendre optionnellement une règle déterministe. Modifier le flux **archive** la règle
 en lui posant une fin de validité et en crée une nouvelle : les opérations déjà classées ne sont pas
 réécrites, puisqu'aucune règle nouvelle ne les sélectionne.
 
-## D25 · Abandon de l'année budgétaire
+### D25 · Abandon de l'année budgétaire
 
 Remplace D03. Pour un particulier, le budget évolue au fil de la vie — salaire, activité en cours
 d'année, achat, investissement — et aucune date d'arrêté n'a de sens. Les provisions gardent leur
@@ -227,7 +226,7 @@ ancrage propre (`periodicity.anchorDate`) ; les bilans se lisent sur un horizon 
 comparaison entre deux périodes doit signaler quand la profondeur d'historique disponible diffère,
 plutôt que de laisser croire à une baisse de dépenses.
 
-## D26 · Action groupée
+### D26 · Action groupée
 
 Un filtre de recherche, une sélection ajustable à la main — tout sélectionner ou désélectionner sur
 les opérations visibles, plus la sélection individuelle — et les mêmes actions qu'une règle **plus
@@ -236,7 +235,7 @@ opérations. Aperçu avant application, avec l'avant et l'après. Chemin inverse
 sélection manuelle peut proposer un filtre qui tente de la reproduire, et donc engendrer une règle.
 C'est la porte d'entrée vers les règles pour qui n'en écrirait jamais.
 
-## D27 · Ventilation à parts, dont une part variable
+### D27 · Ventilation à parts, dont une part variable
 
 Une ligne de ventilation porte un **montant fixe**, un **pourcentage** du montant de l'opération, ou
 la part **variable** — calculée, égale au montant de l'opération moins les autres lignes. Toute
@@ -248,7 +247,7 @@ ventilation qui dépendrait du contexte — solde d'une tirelire, état du plan 
 elle est une aide, et son résultat doit être figé sur l'opération au moment où il est produit.
 Remplace la ventilation de D10, dont « une catégorie et une tirelire par ligne » reste valable.
 
-## D28 · Tirelire sans type, besoins multiples
+### D28 · Tirelire sans type, besoins multiples
 
 Une tirelire est un pot à **solde unique** portant un ou plusieurs **besoins** : récurrent (tant par
 période, avec le report de D05), à échéance (un montant pour une date, rattrapage lissé sur les
@@ -260,7 +259,7 @@ besoins, et `Tirelire.kind` disparaît. Le **regroupement de tirelires est écar
 passent par l'arbre des catégories, et le seul apport propre d'un groupe — arbitrer une masse commune
 entre ses membres — s'obtient en fusionnant les tirelires plutôt qu'en les coiffant.
 
-## D29 · Dotation calculée, virements neutres, report par libération
+### D29 · Dotation calculée, virements neutres, report par libération
 
 Précise D06, D19 et D20 et remplace la part de D05 sur le « financement virtuel ». Chaque besoin
 (D28) est **doté** au début de chaque période de ce qu'il demande — croisière ou rattrapage —
@@ -279,7 +278,7 @@ Le solde d'une tirelire s'attribue à ses besoins dans l'ordre des priorités (u
 retient jusqu'à sa cible, un objectif jusqu'à la sienne, le récurrent prend le reste) ; un déficit
 pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin.
 
-## D30 · Colonnes dépréciées et version de modèle
+### D30 · Colonnes dépréciées et version de modèle
 
 Une colonne retirée du modèle n'est jamais supprimée du schéma : elle est marquée **dépréciée**
 dans `schema.ts`, ignorée à la lecture et à l'écriture locale, mais toujours acceptée par
@@ -289,7 +288,7 @@ idempotente qui lit les colonnes dépréciées et écrit les nouvelles via `upse
 et propagées ; deux appareils qui migrent chacun produisent les mêmes valeurs, la fusion colonne par
 colonne converge. Le compactage du journal, plus tard, purgera les colonnes dépréciées.
 
-## D31 · Rang d'une règle = clé triable
+### D31 · Rang d'une règle = clé triable
 
 Précise D23. Le rang est stocké comme **chaîne triable** (`rank`, ordre lexicographique, générée
 entre deux voisins à l'insertion ou au déplacement), pas comme index entier : deux appareils qui
@@ -297,13 +296,13 @@ réordonnent en même temps ne produisent pas de doublons destructeurs, et une �
 l'identifiant. L'interface montre une liste ordonnée, rang 1 en tête, sans exposer la clé. Les
 règles s'appliquent de la fin de la liste vers le rang 1.
 
-## D32 · Tirelire par défaut d'une catégorie
+### D32 · Tirelire par défaut d'une catégorie
 
 `Category.tirelireId` survit à D28 comme **tirelire par défaut** : quand une règle ou une action
 pose une catégorie sans tirelire, la ventilation prend la tirelire par défaut de la catégorie. Ce
 n'est qu'un raccourci de saisie, pas un lien comptable.
 
-## D33 · Le moteur de règles part de ce que l'import a établi
+### D33 · Le moteur de règles part de ce que l'import a établi
 
 D23 fait repartir les règles de zéro à chaque passage sur les opérations non verrouillées, pour
 que retirer une règle défasse ce qu'elle avait posé. Mais le rapprochement de flux (D12, D22) et
@@ -319,7 +318,7 @@ Conséquence : un flux qui engendre une règle (D24) et le rapprochement de ce m
 même chose, ce qui est cohérent — la règle verrouille et gagne, le rapprochement reste la trace
 de l'échéance servie.
 
-## D34 · Une classification que rien ne reproduit est verrouillée d'office à la migration
+### D34 · Une classification que rien ne reproduit est verrouillée d'office à la migration
 
 Corrige la migration 2 → 3 décidée au lot 2. Puisque le moteur de D23 recalcule tout ce qui n'est
 pas verrouillé, une opération *rapprochée* que plus aucune règle ne sélectionne perd sa
@@ -334,7 +333,7 @@ portaient pas gardent leur état de traitement. Verrouiller de trop se défait e
 
 Vaut pour la migration seule. Une opération classée par une règle après D23 reste rapprochée et
 donc reprise à chaque passage, comme D22 le prévoit.
-## D35 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
+### D35 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
 
 Pour être utilisable depuis un hébergement web mutualisé (OVHcloud sans VPS : Apache, PHP,
 pas de Node ni de processus persistant), l'application ne change pas de modèle : les données
@@ -347,7 +346,7 @@ base MySQL, logique côté serveur) a été écartée : elle contredirait D07/D0
 authentification et retirerait le fonctionnement hors ligne. Livraison : archive jointe aux
 releases, dépôt FTPS automatique si des secrets `OVH_FTP_*` existent.
 
-## D36 · Le filtre de recherche est la sélection d'une règle
+### D36 · Le filtre de recherche est la sélection d'une règle
 
 L'écran Opérations offrait un filtre pauvre (état, compte, période, texte libre) sans rapport avec
 la sélection d'une règle, et proposait de *deviner* un filtre à partir des lignes cochées. C'est le
@@ -364,7 +363,7 @@ le filtre retourne, ou en faire une règle — auquel cas le filtre est repris t
 inférence. L'inférence de D26 sert le chemin inverse, quand on part de lignes cochées sans avoir
 su écrire le filtre : elle propose un filtre, qui reste modifiable avant d'être enregistré.
 
-## D37 · Dépôt du site par lftp, sans supprimer ce qui vit sur le serveur
+### D37 · Dépôt du site par lftp, sans supprimer ce qui vit sur le serveur
 
 Le dépôt sur l'hébergement (D35) se fait avec `lftp` dans `apps/hebergement/deposer.sh`, appelé
 par la CI et utilisable à la main, plutôt qu'avec une action tierce : un seul outil pour FTPS et
@@ -378,7 +377,7 @@ défaut : un appareil pas encore rechargé demande encore les fragments de la ve
 Un aperçu de PR fait exception, et lui seul (`apercu.sh`) : son sous-dossier de recette se supprime
 entier à la fermeture de la PR, paquets du relais compris, et seul un chemin
 `<dossier>/pr-<numéro>` peut l'être ; la production ne change pas.
-## D38 · Le placement voulu est une répartition, pas un compte
+### D38 · Le placement voulu est une répartition, pas un compte
 
 Corrige une simplification faite au lot 1 : D20 avait été implémentée avec un compte de placement
 unique, ce qui contredit l'esprit de D19 — une tirelire est répartie sur plusieurs comptes, donc
@@ -394,7 +393,7 @@ Les mêmes règles qu'avant s'appliquent ensuite : l'écart entre position réel
 nourrit le plan, « à faire » au-dessus du seuil, « à surveiller » en dessous, jamais corrigé
 d'office. Une tirelire sans placement déclaré ne produit aucun écart : elle est bien là où elle est.
 
-## D39 · Une règle s'appelle un automatisme, et se crée depuis la recherche
+### D39 · Une règle s'appelle un automatisme, et se crée depuis la recherche
 
 Le mot « règle » laissait croire à une contrainte ; ce sont des automatismes, qu'on ajoute et
 retire sans cérémonie. Renommage dans l'interface comme dans le code (`Automation`, table
@@ -406,7 +405,7 @@ actions à appliquer à ce que la recherche retourne, on applique tout de suite 
 « Enregistrer » transforme le couple recherche + actions en automatisme. Créer un automatisme
 n'est donc jamais un geste à part : c'est garder une recherche qu'on vient de faire.
 
-## D40 · L'assistant construit un budget, il ne configure pas des objets
+### D40 · L'assistant construit un budget, il ne configure pas des objets
 
 Le premier assistant reprenait les écrans de configuration étape par étape : créer un compte, puis
 une tirelire, puis un besoin. Il demandait donc de connaître le modèle avant de pouvoir s'en
@@ -436,7 +435,7 @@ entièrement postérieure à l'ouverture) et un flux est ancré sur sa **derniè
 passée** (`nextOccurrence` ne remonte jamais avant l'ancrage). Sans cela, un budget tout juste saisi
 s'affiche vide, ce qui était le cas de la première version.
 
-## D41 · Le compte pivot s'appelle le compte principal
+### D41 · Le compte pivot s'appelle le compte principal
 
 « Pivot » décrivait un rôle dans un raisonnement comptable, pas un objet que quelqu'un possède.
 Personne n'a de compte pivot ; tout le monde a un compte principal. Renommage partout où un humain
@@ -452,7 +451,7 @@ Deux valeurs stockées portaient le mot — le genre du compte et la clé du cou
 pour qu'un appareil resté en arrière, qui réécrirait l'ancienne valeur, ne rende pas le compte
 méconnaissable (D08, D30).
 
-## D42 · Une enveloppe s'appelle une tirelire ; le stockage garde ses noms
+### D42 · Une enveloppe s'appelle une tirelire ; le stockage garde ses noms
 
 Le mot « enveloppe » venait de la méthode budgétaire dont l'application s'inspire ; il ne disait rien
 à qui découvrait l'écran, et l'application s'appelle déjà Tirelire (D13). Une tirelire, tout le monde
@@ -472,7 +471,7 @@ TypeScript du nom SQL (`cAs`), ce que le schéma permettait déjà sans que ce s
 La règle générale qui en découle : **le domaine se renomme librement, le stockage ne se renomme que
 s'il faut aussi changer la donnée.**
 
-## D43 · L'assistant propose, et ce qu'il propose vient de l'exemple
+### D43 · L'assistant propose, et ce qu'il propose vient de l'exemple
 
 D40 a remplacé les écrans de configuration par des questions, mais laissait devant chaque question un
 formulaire vide. « Qu'est-ce qui ne tombe pas tous les mois ? » est une bonne question à laquelle on
@@ -511,7 +510,7 @@ enregistrement, avec ses champs modifiables sur place (nom, banque, numéro ou I
 qui rend inutile la question du solde posée plus loin ; et le bandeau de totaux du budget — revenus,
 charges, reste à vivre — disparaît de cette étape, qui ne parle pas du budget.
 
-## D44 · La date de paie appartient au flux ; le début de période est un choix
+### D44 · La date de paie appartient au flux ; le début de période est un choix
 
 D02 faisait porter un `payDay` au compte principal. C'était deux erreurs en une.
 
@@ -536,7 +535,7 @@ périodes ne se décalent pas au premier lancement.
 Remplace la partie de D02 qui situait le jour de paie sur le compte ; tout le reste de D02 — la
 période de paie à paie, son nom pris au mois de son milieu, le lissage du rattrapage — est inchangé.
 
-## D45 · Le genre d'un compte dit sa nature, pas comment on le remplit
+### D45 · Le genre d'un compte dit sa nature, pas comment on le remplit
 
 `AccountKind` mélangeait deux choses : ce qu'est le compte, et la façon dont ses opérations y
 entrent. `third` — « compte tiers, saisi à la main » — refusait de fait l'import à un compte, alors
@@ -573,7 +572,7 @@ genre casse désormais la compilation. Et la lecture d'un compte **traduit les a
 (`pivot`, `holding`, `third`), comme D41 le faisait déjà pour le seul `pivot` — sauf en lecture
 brute, sinon les migrations ne verraient plus la valeur qu'elles doivent interpréter.
 
-## D46 · Des lignes déjà là, pas des pastilles à cliquer
+### D46 · Des lignes déjà là, pas des pastilles à cliquer
 
 D43 offrait les propositions sous forme de pastilles qui remplissaient un formulaire vide : il fallait
 en toucher une, relire le formulaire, valider, recommencer. Un geste par ligne, pour un budget qui en
@@ -601,7 +600,7 @@ L'écran des comptes suit la même forme : une ligne par compte au lieu d'une ca
 étiquetés, le type devenant un menu modifiable sur la ligne. Cinq comptes tenaient sur deux écrans ;
 ils tiennent dans un tiers.
 
-## D47 · Un rythme se compte dans l'unité qui lui convient
+### D47 · Un rythme se compte dans l'unité qui lui convient
 
 `Periodicity` ne connaissait que `intervalMonths`. Le mois va bien à un loyer ou à une taxe, mais
 il ne sait pas dire « toutes les deux semaines » — or beaucoup de revenus tombent ainsi, et aucune
@@ -625,7 +624,7 @@ et rien ne demandait autre chose.
 besoins et flux. Un rythme envoyé par un appareil non migré garde donc son sens, ce qu'un test
 vérifie.
 
-## D48 · Une tirelire peut verser au budget au lieu de le consommer
+### D48 · Une tirelire peut verser au budget au lieu de le consommer
 
 Certains revenus tombent par à-coups sur trois ou quatre mois puis cessent — une saison touristique,
 une récolte — alors que le foyer, lui, dépense toute l'année. Les prévoir comme des flux datés est
@@ -663,7 +662,7 @@ donc un quantième pour un rythme mensuel, et la date entière sinon — l'ancra
 occurrence, tout le reste s'en déduit — avec un rappel de la prochaine occurrence, qu'une date
 d'ancrage seule ne donne pas.
 
-## D49 · Un renflouement est un symptôme, pas un mouvement à ranger
+### D49 · Un renflouement est un symptôme, pas un mouvement à ranger
 
 Ramener de l'argent dans une tirelire est **par définition ce que le plan sert à éviter** : si tout
 est correctement provisionné, l'argent n'a pas besoin d'être ramené. Un renflouement dit donc quelque
@@ -696,7 +695,7 @@ Reste à voir sur des données réelles si la distinction interne/externe mérit
 différents dans le calibrage ; elle est enregistrée dès maintenant pour que l'historique existe le
 jour où l'on tranchera.
 
-## D50 · Un besoin a une période de validité
+### D50 · Un besoin a une période de validité
 
 Un flux prévu sait déjà se dater (`activeFrom` / `activeTo`, D23, D24) ; un besoin, non. Or c'est le
 besoin qui porte le budget, et un budget change au fil de la vie — c'est exactement ce que D25
@@ -731,7 +730,7 @@ Ce que cela ne couvre pas encore : l'interface n'expose pas ces dates, et l'assi
 des besoins sans bornes. Tant que ce n'est pas fait, seule une reprise de données peut versionner un
 budget — ce qui suffit au premier import, pas à l'usage courant.
 
-## D51 · Les dates de validité se voient, et l'exemple les porte
+### D51 · Les dates de validité se voient, et l'exemple les porte
 
 D50 a donné aux besoins une période de validité, et se terminait en constatant ce qui manquait :
 « l'interface n'expose pas ces dates », si bien que seule une reprise de données pouvait versionner
@@ -794,7 +793,7 @@ que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parco
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.
 
-## D52 · Une période à venir suppose exécuté le plan des périodes précédentes
+### D52 · Une période à venir suppose exécuté le plan des périodes précédentes
 
 Précise D20 et D29. Le plan a maintenant deux dates : `asOf`, la période qu'on regarde, et
 `today`, la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf`, donc
@@ -833,7 +832,7 @@ déclenche donc plus sur une position simulée, où elle finissait par apparaît
 périodes lointaines. Projeter le solde du compte principal demanderait de dérouler revenus et
 charges période après période : ce n'est pas ce que le plan fait, et il ne le prétend plus.
 
-## D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
+### D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
 Reprise du signalement « le jeu d'exemple ne contient aucun besoin ». Le défaut
 principal n'existe plus : depuis D50 et D51, `example.ts` porte treize besoins, chacune des neuf
@@ -861,7 +860,7 @@ disent aussi le manque : « aucune tirelire ne la provisionne », « aucun flux 
 
 Au passage, trois restes du renommage de D42 (« l'tirelire ») dans deux libellés d'interface et un
 titre de test.
-## D54 · Un nombre garde sa police, pas son insécabilité
+### D54 · Un nombre garde sa police, pas son insécabilité
 
 La classe `.num` de l'interface faisait deux choses à la fois : donner aux chiffres la police à
 chasse fixe et les tabular figures, et **interdire le retour à la ligne**. Le second rôle était
@@ -901,7 +900,7 @@ son propre navigateur : il n'y en avait pas moyen dans la session où le défaut
 test s'abstient faute de navigateur, sauf si `TIRELIRE_NAV_STRICT` est posé — ce que fait la CI,
 pour qu'une garde muette ne passe pas pour une garde verte.
 
-## D55 · Des seuils tactiles mesurés, pas relus
+### D55 · Des seuils tactiles mesurés, pas relus
 
 Un audit d'ergonomie relit des feuilles de style et donne un avis. Ces quatre-là se mesurent, donc
 elles deviennent des gardes plutôt que des avis, dans le harnais posé par D54.
@@ -937,7 +936,7 @@ de fichier. Cela reste à vérifier sur l'appareil.
 La plomberie commune — trouver un navigateur, construire et servir le site, ouvrir l'exemple — passe
 dans `apps/web/test/harnais.ts`, dont la garde de D54 se sert désormais aussi.
 
-## D56 · Un écran de cartes se filtre par état
+### D56 · Un écran de cartes se filtre par état
 
 Trois écrans de Configuration listent des cartes : Comptes, Tirelires, Flux prévus. Depuis D50 et
 D51, ces listes portent des lignes qui ne concernent pas le jour même — la version close d'un budget
@@ -1016,7 +1015,7 @@ sans que son bouton disparaisse, et que chaque interrupteur montre ou masque ce 
 toucher aux autres — même harnais que la garde de mise en page (D54), et même abstention faute de
 Chrome, sauf en intégration continue.
 
-## D57 · Deux sens de lecture, et le budget d'abord
+### D57 · Deux sens de lecture, et le budget d'abord
 
 L'application est **d'abord une aide à la construction d'un budget**, et doit rester entièrement
 utile sans jamais importer un relevé. Le lien avec la banque vient ensuite, et sert à confronter le
@@ -1039,7 +1038,7 @@ Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé �
 de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
 fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
 
-## D58 · Le fichier est un état : pas de journal, une horloge par ligne
+### D58 · Le fichier est un état : pas de journal, une horloge par ligne
 
 Le journal de changements de D08 (`changes`, `cell_versions`, chaîne d'empreintes) ne servait qu'à
 la synchronisation, et il faisait grossir le fichier avec les gestes et non avec les données : une
@@ -1074,7 +1073,7 @@ autres invariants sont vérifiés par une fonction du cœur, qui sert aussi à l
 fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` pour pouvoir être
 fabriqué depuis l'extérieur.
 
-## D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
+### D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
 
 Le correctif de placement avait laissé passer, sur les cinq écrans de Configuration, un formulaire écrit **avant** la
 liste : il s'insérait en haut du document, quel que soit l'endroit d'où l'on venait de cliquer.
@@ -1124,7 +1123,7 @@ tranché : le panneau s'ouvre *sous* sa ligne, donc tout ce qui est au-dessus �
 le bouton qu'on vient de presser — ne bouge pas d'un pixel à la fermeture. Seule la suite de la
 liste remonte, et on ne la regardait pas. Il n'y a rien à corriger de ce côté.
 
-## D60 · Deux montants pour un virement permanent, un seul se stocke
+### D60 · Deux montants pour un virement permanent, un seul se stocke
 
 Applique D57 au virement permanent — le seul flux dérivé du budget, et le seul endroit où une photo
 du plan était enregistrée (D21, lot 4).
@@ -1183,3 +1182,169 @@ demande, alors que ce plan est celui de l'analyse au centime près.
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
 (virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
 budget, pas une ligne de budget à offrir (D43).
+
+## Le travail
+
+### D77 · Les documents fondateurs, et ce qui fait foi
+
+Les documents fondateurs : `docs/description-projet.md` (les paroles du porteur, ouvertes par ses
+sections « Principes » et « Usages »), `docs/glossaire.md`, les catalogues — `docs/invariants.md`,
+`docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/gardes.md` (le registre : chaque
+invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — et les descriptifs
+des rôles, `docs/roles/`. Un document fondateur est forcément un fichier Markdown de `docs/` : un
+document d'un autre format (HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se
+reprend dans un Markdown. Tout Markdown de `docs/` n'est pas fondateur pour autant : la liste est
+celle-ci.
+
+La description fait foi (principe 7) : elle ne se reformule pas ; ce que le porteur y corrige est
+daté, et ce qu'il retire reste barré. Les principes et les usages y vivent, dans leurs
+sections dédiées, en listes numérotées du plus général au plus précis ; aucun autre document ne les
+recopie. Les paroles conservées suivent le glossaire : quand un terme change, la citation est amendée
+au terme nouveau, avec l'accord du porteur, demandé à chaque renommage.
+
+Les documents fondateurs sont tels qu'ils sont : on ne les restructure pas ; on les corrige quand une
+PR les touche, et seulement là. `CLAUDE.md` n'est pas source de vérité : il renvoie aux documents
+fondateurs et ne contredit jamais les fondamentaux.
+
+### D78 · Des ensembles cohérents, une information à un seul endroit
+
+- **Une décision nouvelle s'écrit ici**, en une entrée, sans date ni renvoi à ce qu'elle remplace :
+  on amende l'entrée ancienne. Qu'elle ne contredise ni les autres ni les fondamentaux se vérifie en
+  relisant (architecte, auditeur) ; la garde n'en serait pas capable. Les tests qu'elle rougit
+  suivent le principe 9.3.
+- **Une information ne se duplique pas.** Elle vit à un seul endroit ; les autres y renvoient.
+- **Le projet tient sans ses issues.** Elles servent à le conduire ; une issue reste ouverte tant
+  qu'elle est cohérente avec les catalogues, et c'est le catalogue qui fait référence.
+- **Une issue, une PR, une fusion.** Ce qui en déborde est une nouvelle issue, ouverte avant la
+  fusion ; rien ne reste dans un fil qui va se fermer.
+- **Pas d'outil nouveau sans issue produit qui l'exige.** Une PR qui n'améliore que la garde, les
+  crochets ou la CI ne s'ouvre pas sans que le porteur l'ait demandée.
+
+### D79 · Un invariant se prouve ; une décision n'en porte un que si sa valeur est permanente
+
+Un invariant quantifie une mesure (principe 9.2) et se prouve par un harnais ou, quand aucun test ne
+peut la trancher, par une vérification manuelle. Une décision ne porte un invariant que si elle pose
+une valeur que tout le projet doit respecter en permanence ; sinon elle se prouve par ses tests (le
+produit) ou par la relecture (le travail).
+
+### D80 · Quatre rôles
+
+Un besoin passe par quatre rôles, chacun décrit dans `docs/roles/`, en un texte qui sert de prompt :
+l'**architecte** analyse le besoin et pose ses spécifications ; l'**auditeur** code le harnais s'il
+le faut et vérifie le codage ; le **codeur** code ; le **porteur** valide. L'analyse du besoin est
+indépendante de l'audit : l'architecte et l'auditeur sont deux sessions distinctes. Un descriptif de
+rôle dit ce que le rôle fait, dans quel ordre ; il renvoie à ce catalogue pour les décisions qu'il
+applique.
+
+### D81 · La garde
+
+Un seul outil, `packages/gardes`, testé par des tests ordinaires dans `pnpm test`. Il vérifie trois
+choses, et rien de plus :
+
+1. chaque invariant et chaque contrainte a une entrée au registre, avec un harnais qui existe ou une
+   vérification manuelle décrite ;
+2. une PR qui modifie un document fondateur, ou un fichier qu'une entrée du registre nomme, a l'entrée
+   déclarée dans la section « Invariants et contraintes » de l'issue qu'elle ferme (`Close #n`) ;
+   sinon elle est rouge, et la garde nomme l'entrée manquante ;
+3. chaque vérification manuelle des entrées déclarées figure dans cette section, sa consigne
+   recopiée, sans case : la fusion vaut validation.
+
+Il tourne en CI au passage en Ready de chaque PR, et à la demande en local
+(`node packages/gardes/cli.mjs pr --issue <n>`, sur les fichiers modifiés depuis `origin/main`). En
+CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'elle juge est le contenu
+de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
+et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
+ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
+crochet lent, pas d'alerte.
+
+Pour le produit, un harnais qui peut être codé doit l'être (principe 10). Pour la garde (principe
+12), ce qui peut se vérifier par analyse de code — une relecture, une recherche — n'y va pas ; seul y
+va ce qui le mérite. La documentation et la garde se modifient sans harnais par
+défaut : l'auditeur vérifie en relisant. Un harnais dédié ne s'écrit que pour un cas de test complexe
+dans la garde. Un changement de comportement de la garde est expliqué et justifié dans le compte
+rendu du codeur : il nomme les tests de la garde de `main` qui rougissent avec la garde proposée, et
+ceux qu'il modifie ; la validation du porteur le couvre.
+
+### D82 · Vérifier, valider : brouillon, Ready, aperçu
+
+Deux actes, qui ne se confondent pas : **la vérification**, par l'auditeur — le travail est conforme à
+ce que l'issue demande, et ne contrevient ni aux autres entrées de son catalogue, ni aux
+fondamentaux ; il l'écrit dans la PR — et **la validation**, par le porteur, par la fusion, sans
+autre geste (principe 11). Rien ne la bloque techniquement (dépôt privé, offre gratuite) : c'est
+au porteur de ne fusionner qu'au vert.
+
+Une PR s'ouvre en brouillon ; le brouillon n'économise que la CI. Le porteur la passe en Ready à la
+main, ce qui lance toute la CI et assemble la version de dev depuis le dernier commit de la branche.
+À côté du bouton de fusion, le statut « Toute la CI sur ce commit » dit si toute la CI a tourné au
+vert sur le dernier commit. Un changement après le Ready est signalé par un commentaire de la PR,
+sans rien bloquer : un commit (la CI n'a pas tourné sur lui, le statut passe en échec, et le porteur
+repasse la PR en brouillon puis en Ready pour la rejouer), une édition de la PR, hors cases cochées
+ou décochées, ou une édition de l'issue qu'elle ferme. Les commentaires ne sont pas signalés.
+
+**La case de l'aperçu** (#175). Rien n'est déposé sur la recette sans une action du porteur : il
+coche, dans la description de la PR, la case « Aperçu du dernier commit en recette ». Le dépôt n'a
+lieu que si la PR est prête et toute sa CI verte sur le dernier commit ; sinon la case se décoche et
+un commentaire dit pourquoi ; de même si elle est cochée par un autre que le propriétaire du dépôt.
+Cochée, elle dit que l'aperçu en ligne est celui du dernier commit. **Les agents ne cochent jamais
+cette case**, et ne la décochent pas non plus : elle est au porteur et aux workflows.
+
+### D83 · Crochets, CI et workflows
+
+- **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
+  `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
+  crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
+- **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck` et le harnais du besoin ;
+  l'auditeur vérifie en local ce qu'il relit. Aucune CI ne tourne en brouillon. Les crochets font
+  leur part, sur la copie de travail. Au commit, en moins de 5 s : les tests des paquets que touchent
+  les fichiers indexés — cœur ; garde ; relais ; hébergement —, et rien pour la seule documentation.
+  Au pré-commit, la non-régression bloque le commit ; le harnais du besoin (les fichiers de test que
+  la branche ajoute ou modifie depuis sa base commune avec `origin/main`) est joué, et le pré-commit
+  ne fait qu'en afficher le verdict, sans bloquer, sauf une erreur de syntaxe ; c'est la livraison
+  qui le bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la livraison
+  (pré-fusion et pré-push), sur l'état commis : la nature du besoin se lit par
+  `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests headless des paquets touchés et
+  de l'interface, 30 s) ou organisationnel (garde, 45 s) —, les tests navigateur
+  (`apps/web/test/navigateur/`) restent à la CI, et le harnais du besoin est joué à part et bloque
+  quand du code arrive.
+- **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, tous les
+  harnais et la garde : typecheck, `pnpm test`, build, version de dev ; un outil manquant y fait
+  échouer le job. Sept workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
+  garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
+  `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
+  d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un
+  changement après le Ready, signalé) et `fin.yml` (« en cours » quitte l'issue à sa fermeture).
+- **Aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait rougi.** Un rouge découvert
+  après la fusion (#149) relance tout un tour de relecture et de code ; un job sauté qui ne décide pas
+  de la fusion, et dont le rouge éventuel reste visible ailleurs, ne coûte rien et reste permis (les
+  exécutions d'`apercu.yml` et de `depot-apercu.yml` en montrent). Ne rien sauter de ce qui décide de
+  la fusion, ne pas alourdir ce qui n'en décide pas (principe 10.1).
+- **Workflows.** Un agent ne crée ni ne modifie aucun workflow (`.github/workflows/`,
+  `.github/actions/`), sauf quand l'issue le demande. Dépôt privé sur l'offre gratuite, les
+  identifiants FTP sont au niveau du dépôt : un workflow qu'une branche ajoute les lit dès son premier
+  `push`, avant toute PR (#176, risque accepté par le porteur). Au Ready, une PR qui en touche un
+  porte l'étiquette « touche un workflow » (`pret.yml`).
+- Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine : la boucle
+  locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans son
+  en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
+- **Livraison.** Un push sur `main` construit et dépose le site. L'APK et les releases ne sortent
+  qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion.
+
+### D84 · Le code, les données et les commits
+
+- Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
+  (vitest, `pnpm test`). L'interface (`apps/web`) ne fait qu'afficher et saisir.
+- Montants en centimes entiers signés ; dates `AAAA-MM-JJ` ; `deletedAt` au lieu de supprimer ;
+  jamais stocker ce qui se recalcule (soldes, plan, soldes à régler). Écritures uniquement via
+  `LedgerStore.upsert/remove/setSetting` (journal de changements).
+- **Aucune donnée bancaire réelle dans le dépôt.** Les fichiers bancaires servent à vérifier l'import
+  en local et ne se versionnent jamais (`*.csv`, `*.sqlite` ignorés) ; exemples et tests sur données
+  inventées.
+- **Signature des APK de test** : `apps/web/android/keystore/tirelire-test.jks` (mot de passe
+  `tirelire-test`) signe les APK de test, pour que les mises à jour s'installent par-dessus. Jamais
+  pour un magasin ; des secrets `ANDROID_KEYSTORE_*` la remplacent en CI.
+- Commits : un lot ou une décision par commit, message en français, corps explicatif.
+
+### D85 · La langue, et la lecture sur téléphone
+
+Français partout : code, commentaires, commits, interface, documents. Le porteur lit surtout sur
+téléphone : réponses courtes, en prose, une question à la fois.
