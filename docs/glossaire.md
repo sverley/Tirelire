@@ -94,10 +94,11 @@ joué.
 
 ## Chantier
 
-Un besoin de haut niveau, qui ne tient pas en une tâche : son issue, étiquetée « chantier », le
-décompose en sous-issues, chacune un besoin. L'architecte le suit jusqu'à sa fermeture
-(`docs/roles/architecte.md`). À ne pas confondre avec l'**objectif**, une tirelire (partie « Le
-produit »).
+Un besoin de haut niveau, qui ne tient pas en une tâche, défini dans son document de
+`docs/chantiers/` — intentions globales, contraintes, hypothèses, cibles, usages —, sa seule vérité
+(D86). Sur GitHub, son issue, étiquetée « chantier », le reflète et porte ses sous-issues, chacune un
+besoin ; l'architecte le suit jusqu'à sa fermeture (`docs/roles/architecte.md`). À ne pas confondre
+avec l'**objectif**, une tirelire (partie « Le produit »).
 
 ## Cible
 
