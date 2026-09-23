@@ -1190,9 +1190,9 @@ budget, pas une ligne de budget à offrir (D43).
 Les documents fondateurs : `docs/description-projet.md` (les paroles du porteur, ouvertes par ses
 sections « Principes » et « Usages »), `docs/glossaire.md`, les catalogues — `docs/invariants.md`,
 `docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/gardes.md` (le registre : chaque
-invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — les documents des chantiers,
-`docs/chantiers/`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est forcément un fichier Markdown de `docs/` : un
-document d'un autre format (HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se
+invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — les documents des
+chantiers, `docs/chantiers/`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est
+forcément un fichier Markdown de `docs/` : un document d'un autre format (HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se
 reprend dans un Markdown. Tout Markdown de `docs/` n'est pas fondateur pour autant : la liste est
 celle-ci.
 
