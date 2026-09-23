@@ -9,7 +9,7 @@ name: Validation
 # - `validation` lit des fichiers suivis : ceux du commit de la PR, par git, sans les extraire, et la
 #   section « Invariants et contraintes » de l'issue que la PR ferme, lue par l'API. Rien de la PR ne
 #   s'installe ni ne s'exécute, et ses permissions sont en lecture seule : c'est ce qui rend sûr
-#   `pull_request_target`. Seul job de ce workflow : l'étiquette de l'issue a le sien (`etiquette.yml`).
+#   `pull_request_target`. Seul job de ce workflow.
 
 on:
   pull_request_target:
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Sans case à cocher : le passage en Ready est la validation du porteur (#150). Quand la garde
+      # Sans case à cocher : la fusion vaut validation (#168). Quand la garde
       # ne sait pas lire ce que la PR propose, ou que la PR ne ferme pas une issue, le job est rouge et
       # le dit.
       - env:

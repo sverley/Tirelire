@@ -1,0 +1,85 @@
+name: Suivi de la PR prête
+
+# La fusion vaut validation (#168) : rien ne bloque la fusion, mais un changement après le Ready se
+# signale par un commentaire de la PR, pour que le porteur sache, avant de fusionner, que ce qu'il a
+# vu n'est plus tout à fait ce qu'il fusionnerait :
+# - un commit : la CI n'a pas tourné sur lui (elle ne tourne qu'au Ready). Le statut « Toute la CI
+#   sur ce commit » passe en échec, à côté du bouton de fusion, et le commentaire dit quoi faire :
+#   repasser la PR en brouillon, puis en Ready ;
+# - une édition de la PR (titre, description, base). Cocher ou décocher une case de la description
+#   (le dépôt de l'aperçu, #175) n'est pas un changement : rien n'est signalé ;
+# - une édition de l'issue qu'elle ferme (titre, description). Seule une issue qui porte l'étiquette
+#   « PR prête » (`pret.yml`) lance le job : modifier une autre issue ne coûte rien.
+# Les commentaires ne changent ni la PR ni le besoin : ils ne sont pas signalés.
+#
+# GitHub lit ce workflow sur `main` (`pull_request_target`, `issues`) ; rien de la PR ne s'exécute.
+# Ce que fait le jeton du job ne déclenche aucun workflow.
+#
+# Place du job sur le second axe des harnais (#113) :
+# - `signal` est hors harnais : il ne vérifie rien, il signale.
+
+on:
+  pull_request_target:
+    types: [synchronize, edited]
+  issues:
+    types: [edited]
+
+permissions: {}
+
+concurrency:
+  group: suivi-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  signal:
+    name: Changement après le Ready
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.draft != true)
+      || (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'PR prête'))
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      EVENEMENT: ${{ github.event_name }}
+      ACTION: ${{ github.event.action }}
+      AUTEUR: ${{ github.actor }}
+      PR: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.after }}
+      ISSUE: ${{ github.event.issue.number }}
+      CHANGEMENTS: ${{ toJSON(github.event.changes) }}
+      APRES: ${{ github.event.pull_request.body }}
+      CONTEXTE: Toute la CI sur ce commit
+      RELANCE: "Pour que la CI tourne dessus : repasser la PR en brouillon, puis en Ready."
+    steps:
+      - name: Signaler le changement
+        run: |
+          set -euo pipefail
+          sans_cases() { sed -E 's/\[[ xX]\]/[ ]/g'; }
+          case "$EVENEMENT:$ACTION" in
+            pull_request_target:synchronize)
+              gh api "repos/$GH_REPO/statuses/$SHA" -f state=failure -f context="$CONTEXTE" \
+                -f description="Pas de CI sur ce commit : brouillon, puis Ready" > /dev/null
+              gh pr comment "$PR" --body "Commit ${SHA::7} poussé après le Ready, par $AUTEUR : la CI n'a pas tourné sur lui. $RELANCE" ;;
+            pull_request_target:edited)
+              quoi=()
+              [ "$(jq -r 'has("title")' <<< "$CHANGEMENTS")" = true ] && quoi+=("son titre")
+              [ "$(jq -r 'has("base")' <<< "$CHANGEMENTS")" = true ] && quoi+=("sa base")
+              if [ "$(jq -r 'has("body")' <<< "$CHANGEMENTS")" = true ]; then
+                avant="$(jq -r '.body.from // ""' <<< "$CHANGEMENTS" | sans_cases)"
+                [ "$avant" != "$(printf '%s' "$APRES" | sans_cases)" ] && quoi+=("sa description")
+              fi
+              if [ "${#quoi[@]}" -eq 0 ]; then echo "Seules des cases ont changé : rien à signaler."; exit 0; fi
+              liste="$(IFS=,; echo "${quoi[*]}" | sed 's/,/, /g')"
+              gh pr comment "$PR" --body "La PR a été modifiée après le Ready ($liste), par $AUTEUR. Rien n'est bloqué : relire ce changement avant de fusionner." ;;
+            issues:edited)
+              prs="$(gh pr list --state open --limit 200 --json number,body,isDraft \
+                | jq -r --arg n "$ISSUE" '.[] | select(.isDraft | not)
+                    | select([(.body // "") | scan("\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s+#([0-9]+)\\b"; "i")[0]] | any(. == $n))
+                    | .number')"
+              for p in $prs; do
+                gh pr comment "$p" --body "L'issue #$ISSUE a été modifiée après le Ready de cette PR, par $AUTEUR. Rien n'est bloqué : relire le besoin avant de fusionner."
+              done ;;
+          esac

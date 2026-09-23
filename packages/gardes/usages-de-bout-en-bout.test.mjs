@@ -30,7 +30,7 @@
  *    remplace ses harnais unitaires au lieu d'en ajouter un. Les sept harnais et les six
  *    vérifications manuelles des usages sont figés ici : le registre ne peut plus en perdre un sans
  *    que ce harnais le dise. Retirer une garde reste possible, mais par la section « Invariants et
- *    contraintes » de l'issue, déclarée, puis validée par le passage en Ready (`CLAUDE.md`).
+ *    contraintes » de l'issue, déclarée, puis validée par la fusion du porteur (`CLAUDE.md`).
  *
  * Ce fichier ne juge pas le contenu des parcours : ce qu'un parcours doit traverser est dit par
  * l'issue de chaque usage, et se relit en audit. Il garde ce qui se vérifie sans interpréter, et
