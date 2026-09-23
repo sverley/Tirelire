@@ -3,7 +3,7 @@
  * primaire #58).
  *
  * Un parcours ne part pas d'un grand livre écrit à la main : il part d'une **base vide**, écrit par
- * `upsert` / `setSetting` comme le fait l'application (CLAUDE.md), et relit ce qui a été persisté.
+ * `upsert` / `setSetting` comme le fait l'application (D84), et relit ce qui a été persisté.
  * C'est ce qui le distingue des harnais unitaires du cœur, qui éprouvent un calcul sur un grand
  * livre déjà constitué.
  *

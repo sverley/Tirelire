@@ -30,11 +30,16 @@
  *    remplace ses harnais unitaires au lieu d'en ajouter un. Les sept harnais et les six
  *    vérifications manuelles des usages sont figés ici : le registre ne peut plus en perdre un sans
  *    que ce harnais le dise. Retirer une garde reste possible, mais par la section « Invariants et
- *    contraintes » de l'issue, déclarée, puis validée par la fusion du porteur (`CLAUDE.md`).
+ *    contraintes » de l'issue, déclarée, puis validée par la fusion du porteur (D82).
  *
  * Ce fichier ne juge pas le contenu des parcours : ce qu'un parcours doit traverser est dit par
  * l'issue de chaque usage, et se relit en audit. Il garde ce qui se vérifie sans interpréter, et
  * laisse au registre le soin de nommer les tests.
+ *
+ * **Depuis #162**, les usages sont définis dans la description, et leurs gardes vivent dans
+ * l'entrée d'I3 du registre, qui les mesure : chaque ligne nomme son usage entre parenthèses
+ * (`(U1)`), ou dans le nom de son test. Ce fichier regroupe ces lignes par usage ; ce qu'il vérifie
+ * n'a pas changé.
  *
  * Chaque vérification a son témoin rouge ici même : les mêmes assertions rejouées sur une version
  * volontairement cassée — un usage laissé à ses seuls harnais unitaires, une dette effacée sans
@@ -75,10 +80,26 @@ const memeTexte = (t) => String(t ?? '').replace(/[\u2018\u2019]/g, "'").replace
 /** De quoi reconnaître une ligne `Harnais` d'une fois sur l'autre : son entrée, ses fichiers, son test nommé. */
 const identite = (id, h) => `${id} · ${h.chemins.join(', ')} · ${memeTexte(testNomme(h.description)) || '—'}`;
 
-/** Les entrées d'usages demandées, dans l'ordre ; une entrée disparue est une erreur de lecture. */
+/** L'usage d'une ligne de l'entrée d'I3 : le premier identifiant d'usage qu'elle cite. */
+const usageDe = (texte) => String(texte ?? '').match(/\b(U[1-9])\b/)?.[1];
+const usageDeVerification = (v) => v.id.match(/^VM-I3-(u\d)-/i)?.[1]?.toUpperCase();
+
+/** L'entrée d'I3, qui porte les gardes des usages. */
+const entreeI3 = (texte) => lireRegistre(texte).entrees.get('I3') ?? assert.fail(`I3 n'a plus d'entrée au registre : ${RELIRE}`);
+
+/** Les gardes de chaque usage demandé, lues dans l'entrée d'I3 ; un usage sans aucune garde est une erreur de lecture. */
 const entreesDesUsages = (texte, ids = USAGES) => {
-  const entrees = lireRegistre(texte).entrees;
-  return ids.map((id) => entrees.get(id) ?? assert.fail(`${id} n'a plus d'entrée au registre : ${RELIRE}`));
+  const i3 = entreeI3(texte);
+  return ids.map((id) => {
+    const e = {
+      id,
+      harnais: i3.harnais.filter((h) => usageDe(h.description) === id),
+      verifications: i3.verifications.filter((v) => usageDeVerification(v) === id),
+      aBatir: i3.aBatir.filter((a) => usageDe(a) === id),
+    };
+    if (!e.harnais.length && !e.verifications.length && !e.aBatir.length) assert.fail(`${id} n'a plus de garde dans l'entrée d'I3 : ${RELIRE}`);
+    return e;
+  });
 };
 
 /** Les lignes `Harnais` des usages au jour de l'audit (13 septembre 2026) : sept, unitaires. */
@@ -95,11 +116,11 @@ const HARNAIS_DU_JOUR = new Set([
 /** Les vérifications manuelles des usages au même jour, I3 comprise : six. */
 const VERIFICATIONS_DU_JOUR = Object.freeze({
   I3: ['VM-I3-independance'],
-  U1: ['VM-U1-parcours'],
-  U2: ['VM-U2-ordres'],
-  U3: ['VM-U3-rapprochement'],
-  U4: ['VM-U4-reconstruction'],
-  U5: ['VM-U5-sans-tirelire'],
+  U1: ['VM-I3-u1-parcours'],
+  U2: ['VM-I3-u2-ordres'],
+  U3: ['VM-I3-u3-rapprochement'],
+  U4: ['VM-I3-u4-reconstruction'],
+  U5: ['VM-I3-u5-sans-tirelire'],
 });
 
 /** Les harnais qu'une entrée porte en plus de ses harnais unitaires du 13 septembre. */
@@ -113,10 +134,14 @@ const porteUnParcours = (e) => ajoutes(e).some((h) => temoinRouge(h.description)
 /** La version « besoin tenu » : chaque usage reçoit un parcours inventé, témoin rouge cité. */
 const avecParcours = (texte) =>
   texte.replace(
-    /^### (U\d) · .*$/gm,
-    (ligne, id) =>
-      `${ligne}\n\n- **Harnais** · \`packages/core/test/parcours-${id.toLowerCase()}.test.ts\` — ` +
-      `« parcours ${id} inventé » : de bout en bout. Témoin rouge : « témoin inventé ${id} »`,
+    /^## I3 · .*$/m,
+    (ligne) =>
+      `${ligne}\n\n` +
+      USAGES.map(
+        (id) =>
+          `- **Harnais** · \`packages/core/test/parcours-${id.toLowerCase()}.test.ts\` — ` +
+          `« parcours ${id} inventé » : de bout en bout. Témoin rouge : « témoin inventé ${id} »`,
+      ).join('\n'),
   );
 
 /** Enlève des lignes (numéros à partir de 1) et la suite renfoncée qui les prolonge. */
@@ -145,14 +170,11 @@ const sansDette = (texte) => texte.replace(/^- \*\*À bâtir\*\* · .*\n(?:[ \t]
 
 /** La dette d'un seul usage, effacée. */
 const sansDetteDe = (texte, id) =>
-  texte
-    .split(/^(?=### U\d · )/m)
-    .map((section) => (section.startsWith(`### ${id} · `) ? section.replace(/^- \*\*À bâtir\*\* · .*\n(?:[ \t]+\S.*\n)*/m, '') : section))
-    .join('');
+  texte.replace(new RegExp(`^- \\*\\*À bâtir\\*\\* · \\(${id}\\).*\\n(?:[ \\t]+\\S.*\\n)*`, 'm'), '');
 
 /** La version volontairement cassée : U1 retombe en dette. */
 const enDette = (texte) =>
-  texte.replace(/^### U1 · .*$/m, (ligne) => `${ligne}\n\n- **À bâtir** · le parcours complet sans aucune opération (#15).`);
+  texte.replace(/^## I3 · .*$/m, (ligne) => `${ligne}\n\n- **À bâtir** · (U1) le parcours complet sans aucune opération (#15).`);
 
 // ─── 1. U1, U2 et U5 portent leur harnais de bout en bout ────────────────────────────────────────
 
@@ -238,11 +260,11 @@ test('#70 · témoin rouge — un usage remis « À bâtir » fait échouer « U
 });
 
 function gardesTenues(texte) {
-  const entrees = lireRegistre(texte).entrees;
-  const presents = new Set([...entrees.values()].flatMap((e) => e.harnais.map((h) => identite(e.id, h))));
+  const i3 = entreeI3(texte);
+  const presents = new Set(i3.harnais.map((h) => identite(usageDe(h.description), h)));
   const perdues = [...HARNAIS_DU_JOUR].filter((i) => !presents.has(i)).map((i) => `harnais disparu · ${i}`);
+  const vues = new Set(i3.verifications.map((v) => v.id));
   for (const [id, attendues] of Object.entries(VERIFICATIONS_DU_JOUR)) {
-    const vues = new Set((entrees.get(id)?.verifications ?? []).map((v) => v.id));
     for (const vm of attendues) if (!vues.has(vm)) perdues.push(`vérification manuelle disparue · ${id} · ${vm}`);
   }
   assert.deepEqual(perdues, [], `des gardes des usages ont disparu au lieu d'être complétées :\n${perdues.join('\n')}`);

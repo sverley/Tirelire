@@ -45,7 +45,7 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
 // Changer une règle reste libre : toute PR peut ajouter une décision, faire évoluer la garde ou les
 // règles des sessions. Ce qui se vérifie, c'est que la règle nouvelle ne contredit pas les règles
 // primaires. La conformité porte sur le sens et ne se programme pas : l'auditeur la vérifie en
-// relisant, et la fusion vaut validation (`CLAUDE.md`). Sur une PR, la garde qui juge
+// relisant, et la fusion vaut validation (D82). Sur une PR, la garde qui juge
 // est celle de la base, appliquée au contenu de la PR, qu'elle lit par git sans l'extraire (#159,
 // `verifierCouvertureA`).
 
@@ -61,7 +61,7 @@ export const ETIQUETTES = Object.freeze(['Harnais', 'Vérification manuelle', 'C
  */
 /**
  * Ce qui ne change qu'à la demande du porteur (#64) : les invariants, et la description du projet
- * qui les fonde — son texte, mot pour mot, que seul le porteur complète ou corrige (`CLAUDE.md`).
+ * qui les fonde — son texte, mot pour mot, que seul le porteur complète ou corrige (D77).
  * Son accord peut s'écrire dans une ligne « Accord du porteur : … » de la section : la garde la lit
  * (une seule par section) mais ne l'exige pas ; l'auditeur le vérifie en relisant.
  */

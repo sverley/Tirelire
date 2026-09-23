@@ -8,6 +8,9 @@ validation. Ce document tient la correspondance ; `packages/gardes` le relit.
 
 Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
 
+Une entrée d'invariant garde la valeur que [`invariants.md`](invariants.md) écrit, sans la
+recopier : son harnais échoue au-delà, ou sa vérification manuelle la constate.
+
 ## Ce qui est vérifié
 
 - **À chaque `pnpm test`**, donc dans la CI : chaque identifiant des deux documents a son entrée ici,
@@ -41,19 +44,19 @@ Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
   reconnaît pas —, le job est rouge et le dit : c'est au porteur de trancher. `pnpm test`, lui, joue
   la garde que la PR propose.
 - **La déclaration se lit comme GitHub l'affiche.** Les blocs de code et les commentaires HTML ne
-  comptent pas ; les identifiants se lisent sans tenir compte de la casse ; une plage (`U1 à U3`)
+  comptent pas ; les identifiants se lisent sans tenir compte de la casse ; une plage (`C1 à C3`)
   déclare chacun de ceux qu'elle couvre.
 - **Ce que la garde ne vérifie pas** : qu'une règle ou une décision nouvelle ne contredit ni les
-  autres, ni les documents fondateurs. C'est un jugement, et il revient à l'auditeur (`CLAUDE.md`).
+  autres, ni les documents fondateurs. C'est un jugement, et il revient à l'architecte et à l'auditeur (D78).
 
 ## Écrire une entrée
 
-Le titre commence par l'identifiant (`## I7 · …`, `### U1 · …`, `## C3 · …`) ; seul l'identifiant
+Le titre commence par l'identifiant (`## I7 · …`, `## C3 · …`) ; seul l'identifiant
 compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refusé. Viennent ensuite, au choix :
 
 - `Chemins :` suivi de motifs entre accents graves (`*` dans un dossier, `**` à travers les
   dossiers) : modifier un fichier qui y répond impose de déclarer l'entrée. C'est un plancher,
-  volontairement étroit ; l'auditeur ajoute ce qu'il ne voit pas.
+  volontairement étroit ; l'architecte ajoute ce qu'il ne voit pas.
 - Une ligne `Harnais` : un ou plusieurs chemins entre accents graves, un tiret cadratin, puis ce que
   le harnais garde. Pour un test précis, son nom vient en tête, entre guillemets, comme « positions
   et soldes (D19, D29) » pour I2 : c'est alors ce test, titre d'un `describe`, d'un `it` ou d'un
@@ -76,11 +79,6 @@ Retirer une vérification manuelle ou un harnais reste possible, mais l'issue de
 liste sous « Vérifications manuelles » (`VM-…` pour une vérification, `C9 · chemin` pour un
 harnais), constaté et validé comme le reste.
 
-## I1 · Aider un particulier à tenir un budget sur plusieurs comptes
-
-- **Couvert par** · I2, I3 — la raison d'être se garde à travers la tirelire tenue sur plusieurs
-  comptes et les cinq usages.
-
 ## I2 · Une tirelire est un livre de compte
 
 Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
@@ -94,79 +92,66 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 
 ## I3 · Chaque usage tient seul
 
-- **Couvert par** · U1, U2, U3, U4, U5 — chaque usage a sa garde, ci-dessous.
+Les usages sont ceux de la description ; chaque ligne nomme le sien entre parenthèses, après le nom
+de son test.
+
 - **Vérification manuelle** · `VM-I3-independance` — Relire ce que la PR rend obligatoire (étape,
   écran, donnée) : aucun usage n'en exige un autre, comme importer pour budgéter ou créer une
   tirelire pour classer, et aucun n'est présenté comme la version réduite d'un autre.
-
-### U1 · Budget seul
-
 - **Harnais** · `packages/core/test/assistant.test.ts` — « budget construit par l'assistant
-  (D40) » : sans aucune opération, le budget se voit dès la période en cours.
+  (D40) » (U1) : sans aucune opération, le budget se voit dès la période en cours.
   Témoin rouge : « témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir »
 - **Harnais** · `packages/core/test/parcours-u1.test.ts` — « parcours U1 · de la base vide au plan, sans une seule opération » :
   d'une base vide, le budget écrit comme l'application l'écrit puis relu après redémarrage ; le plan
   de la période en cours se lit en entier — dotations, lissage de l'échéance, marge, virement à
   faire — et le bilan ne fabrique aucun observé, sans une seule opération.
   Témoin rouge : « témoin rouge · un plan dont les dotations viennent de ce que les opérations montrent »
-- **Vérification manuelle** · `VM-U1-parcours` — Sur une base vide, construire un budget avec
-  l'assistant jusqu'au plan sans importer de relevé : aucun écran ne bloque ni n'insiste pour
+- **Vérification manuelle** · `VM-I3-u1-parcours` — (U1) Sur une base vide, construire un budget
+  avec l'assistant jusqu'au plan sans importer de relevé : aucun écran ne bloque ni n'insiste pour
   importer, et le plan se lit.
-
-### U2 · Budget et virements permanents
-
-- **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — le virement permanent enregistre
-  le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le budget se
-  signale sans rien réécrire (#14, D60).
+- **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — (U2) le virement permanent
+  enregistre le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le
+  budget se signale sans rien réécrire (#14, D60).
   Témoin rouge : « témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer »
-- **Harnais** · `apps/web/test/navigateur/flux-derives-plan.test.ts` — à 375 px, l'écran Plan enregistre
-  l'ordre, qui survit au rechargement.
+- **Harnais** · `apps/web/test/navigateur/flux-derives-plan.test.ts` — (U2) à 375 px, l'écran Plan
+  enregistre l'ordre, qui survit au rechargement.
   Témoin rouge : « témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire »
 - **Harnais** · `packages/core/test/parcours-u2.test.ts` — « parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation » :
   d'une base vide au plan, l'ordre proposé n'est écrit que si l'utilisateur le valide (I10), puis il
   survit au redémarrage comme fait bancaire — un par couple de comptes, libellé à recopier — et le
   plan lit sa ventilation sans jamais la figer.
   Témoin rouge : « témoin rouge · un ordre validé qui ne laisse aucune trace dans la base »
-- **Vérification manuelle** · `VM-U2-ordres` — Construire un budget, puis valider la mise en place
-  des virements permanents proposés : chaque ordre est enregistré, et sa ventilation sur les
-  tirelires se lit dans le plan.
-
-### U3 · Budget sans virements validés, puis import
-
-- **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » : virements « TIRELIRE … »
-  reconnus et répartis par l'ordre de financement (D21), flux rapprochés quand libellé et montant
-  concordent.
+- **Vérification manuelle** · `VM-I3-u2-ordres` — (U2) Construire un budget, puis valider la mise
+  en place des virements permanents proposés : chaque ordre est enregistré, et sa ventilation sur
+  les tirelires se lit dans le plan.
+- **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » (U3) : virements
+  « TIRELIRE … » reconnus et répartis par l'ordre de financement (D21), flux rapprochés quand
+  libellé et montant concordent.
   Témoin rouge : « témoin rouge · un virement reconnu versé en entier à une seule tirelire »
-- **Vérification manuelle** · `VM-U3-rapprochement` — Construire un budget sans valider les
-  virements, puis importer un relevé inventé qui les contient : l'application propose de les
+- **Vérification manuelle** · `VM-I3-u3-rapprochement` — (U3) Construire un budget sans valider
+  les virements, puis importer un relevé inventé qui les contient : l'application propose de les
   rapprocher et reprend la ventilation prévue par le budget.
-- **À bâtir** · le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
-
-### U4 · Budget reconstruit depuis l'historique
-
-- **Harnais** · `packages/core/test/review.test.ts` — bilans par catégorie et des provisions tirés
-  des opérations ; une proposition d'ajustement ne s'applique jamais seule.
+- **À bâtir** · (U3) le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
+- **Harnais** · `packages/core/test/review.test.ts` — (U4) bilans par catégorie et des provisions
+  tirés des opérations ; une proposition d'ajustement ne s'applique jamais seule.
   Témoin rouge : « témoin rouge · un bilan qui compte les dépenses ponctuelles dans la moyenne »
-- **Vérification manuelle** · `VM-U4-reconstruction` — Sans budget, importer un historique inventé
-  et reconstruire un budget depuis les opérations : chaque lien entre une opération et un flux se
-  valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
-- **À bâtir** · le parcours complet, des opérations importées au budget reconstruit (#16).
-
-### U5 · Import seul
-
-- **Harnais** · `packages/core/test/import.test.ts` — lecture des relevés, doublons exacts et
+- **Vérification manuelle** · `VM-I3-u4-reconstruction` — (U4) Sans budget, importer un historique
+  inventé et reconstruire un budget depuis les opérations : chaque lien entre une opération et un
+  flux se valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
+- **À bâtir** · (U4) le parcours complet, des opérations importées au budget reconstruit (#16).
+- **Harnais** · `packages/core/test/import.test.ts` — (U5) lecture des relevés, doublons exacts et
   probables.
   Témoin rouge : « témoin rouge · un import qui ne cherche les doublons que dans le fichier »
-- **Harnais** · `packages/core/test/automations.test.ts` — moteur de règles de classement.
+- **Harnais** · `packages/core/test/automations.test.ts` — (U5) moteur de règles de classement.
   Témoin rouge : « témoin rouge · un moteur de règles qui applique les rangs à l’envers »
 - **Harnais** · `packages/core/test/parcours-u5.test.ts` — « parcours U5 · du relevé importé au bilan par catégorie, sans aucune tirelire » :
   d'une base vide, un relevé inventé importé, des catégories et des automatismes, le classement
   appliqué et relu après redémarrage ; le bilan par catégorie se lit et le plan ne réclame rien,
   sans qu'aucune tirelire, aucun besoin ni aucun budget n'existe jamais.
   Témoin rouge : « témoin rouge · un bilan qui ne compte que les opérations rattachées à une tirelire »
-- **Vérification manuelle** · `VM-U5-sans-tirelire` — Sur une base vide, importer un relevé
-  inventé, classer ses opérations et lire l'analyse par catégorie sans jamais créer de tirelire ni
-  de budget : aucun écran ne l'exige, aucun ne reste vide faute d'en avoir.
+- **Vérification manuelle** · `VM-I3-u5-sans-tirelire` — (U5) Sur une base vide, importer un
+  relevé inventé, classer ses opérations et lire l'analyse par catégorie sans jamais créer de
+  tirelire ni de budget : aucun écran ne l'exige, aucun ne reste vide faute d'en avoir.
 
 ## I4 · Simple par défaut, souple sur demande
 
@@ -198,14 +183,14 @@ Chemins : `apps/web/src/App.svelte`, `apps/web/src/views/More.svelte`
 
 Chemins : `packages/core/src/automations.ts`, `apps/web/src/views/Operations.svelte`
 
-Objectif du porteur (#71, 13 septembre 2026), depuis l'écran Opérations, l'opération sous les yeux :
+Objectif du porteur (#71), depuis l'écran Opérations, l'opération sous les yeux :
 **2 gestes** pour catégoriser une opération et **3 gestes** avec une sous-catégorie ; automatiser
 toutes les opérations semblables coûte un geste de plus, soit **3 gestes** et **4 gestes**. Un geste
 est une frappe sur un bouton ou une ligne, un choix dans une liste, une case cochée.
 
 Le harnais mesure à l'objectif plus **1 geste** de marge, accordée par le porteur : il fait échouer
-à 4, 5, 5 et 6 gestes. Mesure du 13 septembre 2026 : 3, 3, 4 et 4 gestes — l'objectif de 2 reste
-devant le produit, et le seuil interdit la hausse.
+à 4, 5, 5 et 6 gestes : c'est la valeur d'I6. Mesure de #71 : 3, 3, 4 et 4 gestes — l'objectif de 2
+reste devant le produit, et le seuil interdit la hausse.
 
 - **Harnais** · `packages/core/test/automations.test.ts` — une règle classe toutes les opérations
   semblables, se rejoue sans effet de bord, et son aperçu ne modifie rien.
@@ -231,7 +216,7 @@ Chemins : `packages/core/src/sync.ts`, `apps/web/src/lib/db.ts`, `apps/web/src/l
 - **Harnais** · `apps/web/test/navigateur/donnees-locales.test.ts` — « avec un relais renseigné, seuls des
   paquets chiffrés partent, et seulement après le remplissage et le clic explicites » : remplir
   l'adresse, le salon et la phrase puis cliquer sur « Synchroniser maintenant » vaut l'acceptation,
-  avertissement compris (tranché avec le porteur le 13 septembre 2026) ; rien ne part avant, et ce
+  avertissement compris (tranché avec le porteur) ; rien ne part avant, et ce
   qui part ensuite ne porte que `site`, `upTo`, `iv`, `blob`, `blob` ne se relisant pas comme du
   JSON en clair.
   Témoin rouge : « témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair »
@@ -257,12 +242,16 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
 
 ## I9 · Plusieurs distributions
 
-Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/capacitor.config.ts`, `apps/web/android/**`, `apps/hebergement/assembler.mjs`
+Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/capacitor.config.ts`, `apps/web/android/**`, `apps/hebergement/assembler.mjs`, `docs/cibles.md`
 
+- **Harnais** · `packages/gardes/distributions.test.mjs` — « I9 · chaque cible active du catalogue se construit à chaque push sur main » :
+  la valeur d'I9. Pour chaque cible active de `docs/cibles.md`, chaque commande de sa ligne
+  « Construction » tourne quand le workflow est joué à blanc sur un push de `main`.
+  Témoin rouge : « témoin rouge · un catalogue qui active l'APK sans que main la construise »
 - **Harnais** · `.github/workflows/ci.yml`, `packages/gardes/distributions.test.mjs` — au passage
   en Ready de chaque PR, le web et le site d'hébergement se construisent ; l'APK Android ne se construit qu'à un tag
-  `v*`, jamais sur une PR ni à une fusion : l'application web est la distribution prioritaire
-  (#45), et rien d'une autre distribution ne la bloque. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
+  `v*`, jamais sur une PR ni à une fusion : les cibles actives sont des webapps
+  (`cibles.md`), et rien d'une autre distribution ne la bloque. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
   (tranché dans #69).
   Témoin rouge : « témoin rouge · une CI qui construit l'APK sur chaque PR et le site d'hébergement seulement après fusion »
 - **Vérification manuelle** · `VM-I9-apk` — Si la PR touche la construction de l'application (ses
@@ -271,13 +260,17 @@ Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/we
   `./gradlew assembleRelease` dans `apps/web/android`). Sinon, et notamment si elle ne touche que des
   tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi la construction
   n'est pas atteinte, et ce qui dépend de ce qu'elle change. L'APK n'est vérifié que par sa
-  construction : son comportement réel n'est pas analysé tant que la priorité va à l'application
-  web (#45). Ne pas poser de tag `v*` depuis la branche : il publierait une release.
+  construction : son comportement réel n'est pas analysé tant que l'APK est de côté au catalogue
+  des cibles (`cibles.md`). Ne pas poser de tag `v*` depuis la branche : il publierait une release.
 
 ## I10 · Proposer, et ne jamais faire de manière cachée
 
 Chemins : `packages/core/src/plan.ts`
 
+- **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — « I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base » :
+  le plan de trois périodes calculé sur le budget de l'assistant, le registre lu et la base
+  relue à l'identique ensuite.
+  Témoin rouge : « témoin rouge · un plan qui réécrit un besoin en se calculant »
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — un budget qui monte ou baisse
   fait dire au plan l'ancien montant de l'ordre et le nouveau ; un ordre qui diverge est signalé,
   jamais réécrit.
@@ -377,7 +370,7 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
 
-Analyse (audit #73, 13 septembre 2026) : la partie de C4 que #42 doit encore construire — demander
+Analyse (audit #73) : la partie de C4 que #42 doit encore construire — demander
 `navigator.storage.persist()` et dire si elle est obtenue — n'existe pas dans le code
 (`apps/web/src/lib/db.ts` ne l'appelle pas). Un harnais ne peut garder un comportement qui n'existe
 pas : coder son témoin rouge demanderait de coder le comportement lui-même, ce qui sort de l'audit
@@ -389,11 +382,12 @@ n'est pas fusionnée, la vérification manuelle gardant la part déjà en place 
 Chemins : `apps/web/src/lib/db.ts`, `apps/web/vite.config.ts`, `apps/hebergement/assembler.mjs`
 
 - **Vérification manuelle** · `VM-C4-effacement` — Dans l'application web sur Chromium (la
-  distribution vérifiée, #45 ; ni l'APK ni Safari ne se vérifient ici) : ouvrir la version de la
+  distribution vérifiée, une cible active de `cibles.md` ; ni l'APK ni Safari ne se vérifient ici) : ouvrir la version de la
   branche là où celle de `main` a des données, même adresse et même navigateur, et constater
   qu'elles sont toujours là. Si la PR change l'adresse, le chemin de base ou le nom de la base
   locale, l'utilisateur est prévenu et guidé pour les reprendre. Ce que Safari efface après sept
-  jours sans visite ne se constate pas ici : #37 le porte, avec le reste de la cible Apple.
+  jours sans visite ne se constate pas ici : Webapp · Safari sur iPhone et iPad n'est pas une cible
+  active ([`cibles.md`](cibles.md)).
 - **À bâtir** · la demande de persistance du stockage (#42).
 
 ## C5 · Sans serveur, aucune sauvegarde n'est implicite
@@ -414,13 +408,14 @@ Chemins : `apps/web/src/lib/db.ts`, `apps/web/src/views/Settings.svelte`
 
 ## C7 · Hors magasin, les systèmes alertent ou bloquent
 
-Analyse (audit #73, 13 septembre 2026) : ce que C7 garde — l'avertissement ou le blocage qu'un
+Analyse (audit #73) : ce que C7 garde — l'avertissement ou le blocage qu'un
 système affiche à l'installation d'une application native hors magasin — est un fait de l'appareil
 et du système d'exploitation de qui installe, pas du code du dépôt ; aucun test lancé en CI n'ouvre
 un vrai Android, Windows ou macOS pour constater l'écran qu'ils affichent. C'est pour cela que #38
 la range dans les contraintes gardées « à la revue, quand une cible native est traitée » plutôt que
-par un harnais : la revue reste manuelle tant qu'une cible native n'est pas traitée (#36, #37), et
-le redevient à chaque cible nouvelle.
+par un harnais : la revue reste manuelle tant qu'aucune cible native n'est active au catalogue des
+cibles (`cibles.md` : APK Android, Application Apple, Application de bureau), et le redevient à
+chaque cible native qui y devient active.
 
 Chemins : `apps/web/android/**`, `apps/web/capacitor.config.ts`
 
@@ -462,7 +457,7 @@ Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/app.css`
   modifie, lisible à 375 px (D59).
   Témoin rouge : « témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe »
 - **Vérification manuelle** · `VM-C9-telephone` — Sur un vrai téléphone, dans l'application web
-  ouverte ou installée depuis Chrome sur Android (la distribution prioritaire, #45 ; l'APK ne se
+  ouverte ou installée depuis Chrome sur Android (une cible active de `cibles.md` ; l'APK ne se
   vérifie pas) : les écrans que la PR touche restent lisibles et atteignables au pouce, bord à bord,
   clavier logiciel ouvert, avec les polices du système.
 - **Vérification manuelle** · `VM-C9-ordinateur` — Sur un ordinateur à grand écran, à la souris

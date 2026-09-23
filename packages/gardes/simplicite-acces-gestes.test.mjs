@@ -26,7 +26,7 @@
  *    manuelles (`VM-I4-simple`, `VM-I5-acces`, `VM-I6-gestes`) sont figés ici : une dette se règle
  *    en bâtissant, pas en effaçant. Retirer une garde reste possible, mais par la section
  *    « Invariants et contraintes » de l'issue, déclarée, puis validée par la fusion du porteur
- *    (`CLAUDE.md`).
+ *    (D82).
  *
  * **Forme d'une renonciation**, lecture retenue sauf avis contraire du porteur (question posée dans
  * #71) : un paragraphe de prose dans l'entrée, qui dit « renonciation », ce qui a été essayé, et

@@ -7,41 +7,86 @@ ses retours à la ligne sont devenus des paragraphes. **Il fait foi.** Les invar
 Ce texte ne se reformule pas. Seul le porteur le complète ou le corrige, avec ses propres mots,
 datés ; ce qu'il retire reste visible, barré.
 
+## Principes
+
+Validés par le porteur le 23 septembre 2026 (#162), tels quels : « oui » ; 9, 9.1, 9.2 et 11.1 dans
+les formulations qu'il a validées le même jour. Du plus général au plus précis.
+
+### Le produit
+
+1. L'application aide les particuliers à gérer leur budget réparti sur plusieurs comptes.
+   1. Son cœur : établir sur le long terme, pour chaque compte, les virements permanents qui remplissent les tirelires qu'il héberge, puis vérifier au pointage qu'ils ont eu lieu.
+   2. Le plan n'évolue que sur un changement de fond.
+   3. Le plan s'appuie sur ce que les tirelires contiennent réellement : seules les données enregistrées servent, jamais une hypothèse. Il signale un risque à venir sans supposer ce qui n'est pas tracé.
+   4. Quand une dépense est enregistrée trop près de sa date pour être épargnée à temps, l'application avertit du montant qui manquera, en plus des virements permanents calculés sur la période complète.
+   5. Elle planifie, tient un solde par tirelire et vérifie.
+2. Chaque usage se suffit à lui-même : construire un budget sans import, importer et classer sans budget, reconstruire un budget depuis l'historique, rapprocher des opérations d'un budget.
+   1. L'usage prioritaire est la construction d'un budget ex nihilo.
+3. Elle reste simple pour tous, souple et configurable pour les usages avancés.
+   1. Chaque fonctionnalité est accessible et attrayante : claire et efficace.
+   2. Catégoriser une opération demande peu de clics.
+4. L'application propose, l'utilisateur décide : rien ne se fait de manière cachée.
+   1. L'utilisateur met en place ses virements lui-même, dans sa banque ; une fois validés dans l'application, ils sont enregistrés avec leur ventilation.
+   2. Quand le budget ou le train de vie évolue, elle propose d'adapter l'autre.
+   3. Ce qu'un assistant fait fait aussi partie de la vie de l'application.
+   4. Une opération n'est liée à un flux que si l'utilisateur le valide ; sans ventilation prévue, il l'arbitre.
+5. Les données restent chez l'utilisateur : en local, jamais stockées sur un serveur.
+   1. Elles se synchronisent entre sessions, plateformes et personnes qui partagent les clés de chiffrement.
+   2. Un relais ne garde que des paquets chiffrés, temporairement, et l'utilisateur en est averti à la première mise en lien.
+6. Elle se distribue sur plusieurs plateformes : web, Android, Apple à terme.
+
+### Le travail
+
+7. Les paroles du porteur font foi ; lui seul les complète ou les corrige.
+8. Le besoin s'analyse avant les solutions.
+9. Les catalogues sont des ensembles cohérents, sans date : une décision s'applique à tout moment, rétroactivement.
+   1. Une décision ne contrevient jamais à un principe ni à une autre décision.
+   2. Un invariant est la valeur mesurable d'un principe ou d'une décision, à laquelle on se réfère pour valider une mesure.
+   3. Un changement peut rendre des tests rouges : ils deviennent une dette de cette évolution, suivie dans une issue.
+10. Ce qu'un test peut vérifier, un test le vérifie ; la documentation simple n'en a pas besoin.
+    1. La CI cherche le bon compromis entre son coût et la stabilité : assez de tests pour qu'un rouge ne se découvre pas après la fusion, pas au point de ralentir le travail.
+11. Celui qui vérifie n'est pas celui qui code ; le porteur valide, et la fusion vaut validation.
+    1. L'architecte, le codeur et l'auditeur lisent le besoin chacun de son côté : c'est la confrontation de leurs lectures qui fait avancer, pas le forçage de l'un par l'autre.
+12. La garde reste simple et peu coûteuse ; elle ne décide pas de sa propre évolution, et tout changement de son comportement est validé par le porteur.
+
+## Usages
+
+Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29) ; seuls
+l'identifiant et le titre sont ajoutés. U1, l'usage prioritaire (principe 2.1), vient en tête.
+
+1. **U1 · Budget seul.** « L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation. »
+2. **U2 · Budget et virements permanents.** « on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires. »
+3. **U3 · Budget sans virements validés, puis import.** « Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue. »
+4. **U4 · Budget reconstruit depuis l'historique.** « Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée. »
+5. **U5 · Import seul.** « Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget. »
+
 ## 6 septembre 2026 · le besoin d'origine
 
 Repris de l'analyse du besoin du 6 septembre, supprimée depuis : seuls les documents Markdown de
-`docs/` font foi. Ces deux passages sont les seuls qu'aucun autre document ne portait.
+`docs/` font foi. Ces deux passages sont les seuls qu'aucun autre document ne portait ; ils ne sont
+pas du porteur (voir ci-dessous).
 
-> Tu veux un outil qui fasse trois choses, dans cet ordre : **planifier** (à partir des revenus, des
-> charges périodiques, des objectifs d'épargne et des budgets, en déduire combien virer chaque mois
-> vers chaque compte), **tenir des soldes par objectif** (chaque provision, chaque objectif
-> d'épargne, chaque budget a son propre compteur, indépendamment du compte bancaire qui l'héberge),
-> et **vérifier** (importer les relevés, reconnaître automatiquement les opérations prévues, classer
-> le reste par catégorie et comparer au budget).
+> ~~Tu veux un outil qui fasse trois choses, dans cet ordre : **planifier** (à partir des revenus, des charges périodiques, des objectifs d'épargne et des budgets, en déduire combien virer chaque mois vers chaque compte), **tenir des soldes par objectif** (chaque provision, chaque objectif d'épargne, chaque budget a son propre compteur, indépendamment du compte bancaire qui l'héberge), et **vérifier** (importer les relevés, reconnaître automatiquement les opérations prévues, classer le reste par catégorie et comparer au budget).~~
 
 Une partie de cela existe déjà : Actual Budget fait les tirelires, le report, l'import CSV avec règles
 et dédoublonnage ; Firefly III couvre le multi-comptes et les règles de catégorisation ; YNAB est la
 référence payante de la méthode. Ce qu'aucun ne fait, et qui est le cœur du projet :
 
-> **déduire les virements permanents par compte réel à partir des tirelires qui y sont hébergées**,
-> avec le rattrapage d'échéance, et vérifier au pointage que le virement a bien eu lieu.
+> ~~**déduire les virements permanents par compte réel à partir des tirelires qui y sont hébergées**, avec le rattrapage d'échéance, et vérifier au pointage que le virement a bien eu lieu.~~
+
+Barrées par le porteur le 23 septembre 2026 (#162) : ces deux citations sont la reformulation d'un
+agent, pas ses paroles. Le principe 1 et ses déclinaisons les remplacent.
+
+> Cette phrase n'est pas de moi, il faut qu'elle soit claire pour etre validée
 
 ## 11 septembre 2026
 
 Donné à l'ouverture de l'issue #29.
 
 > L'esprit de l'application est d'aider les particuliers à gérer leur budget avec plusieurs comptes.
->
-> on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires.
->
-> Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée.
->
-> Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue.
->
-> L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation.
->
-> Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget.
->
+
+Les cinq paragraphes suivants, sur les usages, sont dans la section « Usages ».
+
 > Elle doit toujours rester simple pour les utilisateurs mais souple et configurable pour les usages avancée.
 >
 > Elle doit inciter à utiliser toutes les fonctionnalités en les rendant accessibles et attrayantes (claires et efficaces).
@@ -102,7 +147,7 @@ Retiré par le porteur le 19 septembre 2026 :
 
 > Par contre, je vois que tu consignes des décisions concernant les règles comme les décisions qui concernent le produit. Elles n'ont pas le meme roles ni la meme valeur : une decision ne doit pas contrevenir aux regles. Une regle qui contrevient aux regles doit proposer des modifications des regles existantes. L'un travail au niveau organisationnel, l'autre au niveau produit
 
-> prends la définition au sens génie logiciel : un invariant est mesurable. Je pense qu'on se trompe de mot. Les invariants sont le produits d'une décision, d'une regles, d'un usage ou meme d'un principes qui alimente le résultat de harnais qui peuvent mesurer ces invariants. ~~Je pense qu'il faut un catalogue de principes séparés du catalogue d'invariants.~~ ll faut un catalogue de regles séparé du catalogue de decisions. il faut un catalogue ~~d'usage et~~ de contraintes.
+> prends la définition au sens génie logiciel : un invariant est mesurable. Je pense qu'on se trompe de mot. Les invariants sont le produits d'une décision, d'une regles, d'un usage ou meme d'un principes qui alimente le résultat de harnais qui peuvent mesurer ces invariants. ~~Je pense qu'il faut un catalogue de principes séparés du catalogue d'invariants.~~ ~~ll faut un catalogue de regles séparé du catalogue de decisions.~~ il faut un catalogue ~~d'usage et~~ de contraintes.
 
 Corrigé par le porteur le 22 septembre 2026 :
 
@@ -110,9 +155,27 @@ Corrigé par le porteur le 22 septembre 2026 :
 
 > Non, les usages vont dans une section dédiée dans la description après les principes, mais les cibles sont dans un catalogues
 
-> Un invariant est la déclinaison chiffrée d'un principe ou d'une règle, pas d'une decision car il impacte tout le projet
+> ~~Un invariant est la déclinaison chiffrée d'un principe ou d'une règle, pas d'une decision car il impacte tout le projet~~
+
+Barré par le porteur le 23 septembre 2026 (#162), parce qu'elle contredit le principe 9.2 qu'il a
+validé le même jour, à la question « Veux-tu que je la barre ? » :
+
+> Oui
 
 > les principes font partie de la description du projet, il sont de moi.
+
+Sur le catalogue de règles séparé, le porteur avait répondu le 22 septembre 2026 (#161) :
+
+> ~~Toujours vrai~~
+
+Corrigé par le porteur le 23 septembre 2026 (#162) :
+
+> Non, j'ai fait une erreur. Les regles au sens actuel sont organisationnelles. Elles décrivent des méthodes à respecter. Les decisions sont fonctionnelles, elle décrivent le fonctionnement du produit. Le comportement décrit les rôles et ce qui est attendus de chaque rôle.
+> Il y a une réflexion structurelle à mener. Je souhaitait ce découpage pour que les decisions ne puissent pas être en contraction avec les regles. Mais puisque c'est aussi vrai pour les regles envers les regles (idem pour les decisions), je ne sais pas s'il est encore utile de faire cette différenciation. Est-ce qu'on ne décrit pas le concept sémantique des exigences d'un projet ? Où les exigences sont ailleurs ?
+
+> Je pense que décision et méthodes sont décidées par moi, elles suivent la meme autorité et ordonnent à tout le projet. Pourquoi les différencier ? Par contre, les rôles peuvent avoir un descriptif dédié qui servira de prompt. La question de savoir si toutes les decisions, fonctionnelles ou organisationnelles, ont un invariants se pose. Tout en sachant qu'un invariant quantifie une mesure mais cette mesure n'est pas nécessairement programmable (tous les invariants n'ont pas forcément un harnais autre qu'une validation manuelle)
+
+> Ok, le catalogue des decisions est docs/decisions.md
 
 ### Ni journal, ni date : des ensembles cohérents
 
@@ -275,3 +338,104 @@ Le 22 septembre, dans #170.
 Le 22 septembre, dans #173, repris par #170.
 
 > Il faut que le compromis reste bon entre coût de CI et stabilité du développement. Si sauter un test qui devient rouge après le merge oblige a relancer tout un tour de review/code, on est perdant. Mais si les tests sont trop lourds et lents, on n'avance pas
+
+## 22 et 23 septembre 2026 · principes, cibles, invariants, validation
+
+Paroles du porteur dans #162, #168, #175 et #176. Elles fondent les sections « Principes » et
+« Usages » ci-dessus, le catalogue des cibles ([`cibles.md`](cibles.md)), la forme des invariants et
+la validation par la fusion.
+
+### Les principes
+
+> Il faut en faire des points clairs, simples et explicites sous forme d'une liste. On peut les numéroter en esseyant de la faire par lien hiérarchique ou en tout cas des plus généraux aux plus précis
+
+### Les invariants
+
+> Oui, les invariants sont des valeurs mesurables auxquelles on doit pouvoir se référer pour valider une mesure
+
+> Est-ce que les invariants ne devraient pas permettre de mesurer les regles plutôt que les principes ? Et les principes sont décliner en 1 ou plusieurs regles ? Ou est-ce trop complexe ?
+
+> Alors faut-il des invariants pour les decisions ?
+
+> Ok on part la dessus
+
+> I5/I6 semblent optimistes, non ? Il faut peut-être acter un invariant plus lache et enregistrer l'objectif final pour la suite ?
+
+### Les cibles
+
+> Afin de rester simple et efficace, et sachant que le nombre de cibles sera faible (webapp, relai seul, apk, iPhone), quelle solution faut-il privilégier pour gérer les cibles qui croisées aux usages et aux contraintes devraient permettre de déterminer des objectifs à atteindre
+
+> Attention, il faudra sûrement faire une matrice de couverture mais tout ne doit pas être fait selon ce point de vue.
+
+> Non, je valide cette construction
+
+> non, traitons les navigateurs comme des cibles pour la webapp
+
+### Le plan
+
+> 1.1 : non, le plan peut soulever un risque à venir mais il est possible que la tirelire contienne de quoi payer. Le plan est établi sur le long terme. Il peut évoluer mais si des changements de fond se présentent. L'enregistrement d'une nouvelle dépense à une date "trop" proche pour être combler avertit l'utilisateur, qu'en plus des virements permanents à mettre en place sur la période complète, du montant non épargné par le manque de temps.
+
+> le plan peut utiliser les informations des tirelires mais ne doit pas faire d'hypothèses. Seules les données réellement tracées doivent servir
+
+> 9. un changement peut faire créer des tests rouges qu'il faudra traiter comme une dette de l'évolution
+
+### La validation et l'aperçu
+
+Dans #168, à la question d'un signal sans blocage plutôt que d'une protection payante : « 2 ». Puis :
+
+> Mais je ne veux pas écrire validé alors qu'il me suffit de cliquer sur merge
+
+Dans #175 :
+
+> Mais je voulais que la CI d'une pr ne déploie pas automatiquement sur le FTP. Je voulais que ce déploiement soit nécessairement une action manuelle
+
+> Une case dans la description ?
+
+Dans #176, sur le retour du dépôt en privé :
+
+> Non, le dépôt va repasser privé des que le quota sera revenu pour la CI
+
+Puis, parmi les voies proposées, la troisième (identifiants FTP au niveau du dépôt, risque accepté) : « 3 ».
+
+### La méthode
+
+> Consigner dans une pr ne sert a rien, elle est fermée au merge
+
+### Pendant le codage de #162
+
+Réponses du porteur aux questions du codeur, le 23 septembre.
+
+> La description est gardée normalement. La garde doit pouvoir constater un écart sur le fichier et donc possiblement les usages. pourquoi la garde aurait besoin de savoir lire les usages ?
+
+> #Regle : Il ne faut dupliquer d'informations
+
+> oui, le plan est un résultat. Le budget et les flux doivent nécessiter la validation de l'utilisateur.
+
+> Non, l'auditeur est là pour vérifier que le besoin et les fondamentaux sont respectés par la codeur. Le codeur a sa compréhension sa besoin et peut demander des modifications du besoin (issue) au porteur pour clairifer un point qui n'a pas ete traté pas le codeur
+
+> Les issues peuvent rester tant qu'elles sont en cohérences avec les catalogues. Elles servent à la gestion pratique du projet mais le projet doit tenir sans elles
+
+### Décisions, méthodes et rôles
+
+Paroles du porteur du 23 septembre, dans #162.
+
+> I11, on rétabli. Pour ce que j'ai demandé pour les principes et les usages qui vont dans la description, il faut en faire un invariant, non ?
+
+> Il faut stocker les regles de fonctionnement que j'ai pu enoncer dans le catalogue des regles. Mais il leur faut un invariants en face ?
+> #Regle: le document CLAUDE.md n'est pas source de vérité. Il ne doit jamais contrevenir aux fondamentaux.
+
+> Non, on reste dans la meme pr, on est en train de traiter les principes et les regles
+
+> ~~En fait, je veux différencier les regles (fonctionnel), les decisions (projet) et les comportement (agent).~~
+
+Les paroles qui corrigent le catalogue de règles séparé sont citées sous la parole du 13–14 septembre
+qu'elles barrent.
+
+> A moins que tu aies une bonne raison de garder séparée les decisions et méthodes
+
+> Il faut ajouter un rôle : architecte qui analyse un besoin et défini ses spécifications. C'est aujourd'hui réalisé par la première phase de l'auditeur mais je voudrais que l'auditeur soit vraiment réduit à coder le harnais si nécessaire et vérifier le codage. L'analyse du besoin doit être indépendante.
+> Pour le reste je valide les changements décidés maintenant qui vont engendrer un nouveau tour dans cette issue et pr
+
+> Il faudra aussi modifier les instructions dans le projet Claude.la pour se référer aux roles
+
+> En effet, il faut ajouter cette méthode au rôle de l'auditeur. Mais l'auditeur ajoute ses retours pour relancer un tour au codeur dans la PR si besoin.

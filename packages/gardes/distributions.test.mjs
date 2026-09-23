@@ -85,6 +85,50 @@ test("I9 · sur chaque PR, le web et le site d'hébergement se construisent ; l'
   distributionsSurChaquePR(lire(CI));
 });
 
+// ─── I9 · le catalogue des cibles (#162) ─────────────────────────────────────────────────────────
+
+const CIBLES = 'docs/cibles.md';
+
+/**
+ * Les cibles du catalogue : une entrée `## Nom`, sa ligne « État » et les commandes entre accents
+ * graves de sa ligne « Construction ». Une entrée qui ne dit pas son état n'est pas une cible.
+ */
+function lireCibles(texte) {
+  return texte
+    .split(/^(?=## )/m)
+    .map((bloc) => ({
+      nom: bloc.match(/^## (.+)$/m)?.[1]?.trim(),
+      état: bloc.match(/^- \*\*État\*\*\s*:\s*(.+?)\s*$/m)?.[1],
+      commandes: [...(bloc.match(/^- \*\*Construction\*\*\s*:\s*(.+)$/m)?.[1] ?? '').matchAll(/`([^`]+)`/g)].map((m) => m[1]),
+    }))
+    .filter((c) => c.nom && c.état);
+}
+
+/** La valeur d'I9 : chaque cible active se construit à chaque push sur `main`. */
+function ciblesActivesConstruitesSurMain(catalogue, yaml) {
+  const cibles = lireCibles(catalogue);
+  const actives = cibles.filter((c) => c.état === 'active');
+  assert.ok(actives.length, `${CIBLES} : aucune cible active lue`);
+  const joués = jouer(yaml, push('refs/heads/main')).flatMap((job) => job.joués.map((é) => commande(é)));
+  for (const c of actives) {
+    assert.ok(c.commandes.length, `${CIBLES} : la cible active « ${c.nom} » ne dit pas ce qui la construit`);
+    for (const cmd of c.commandes) {
+      assert.ok(joués.some((j) => j.includes(cmd)), `${CI} : sur un push de main, rien ne lance \`${cmd}\`, qui construit la cible active « ${c.nom} »`);
+    }
+  }
+}
+
+test('I9 · chaque cible active du catalogue se construit à chaque push sur main', () => {
+  ciblesActivesConstruitesSurMain(lire(CIBLES), lire(CI));
+});
+
+test("témoin rouge · un catalogue qui active l'APK sans que main la construise", () => {
+  const catalogue = lire(CIBLES);
+  const cassé = catalogue.replace(/(## APK Android\n[\s\S]*?- \*\*État\*\*\s*:\s*)de côté/, '$1active');
+  assert.notEqual(cassé, catalogue, 'le catalogue n’a pas pu être cassé : le harnais de I9 est à relire');
+  assert.throws(() => ciblesActivesConstruitesSurMain(cassé, lire(CI)), /assembleRelease.*APK Android/);
+});
+
 /** Réécrit les jobs choisis : `changer(job) → nouvelles lignes`, ou `undefined` pour le laisser. */
 function réécrire(yaml, changer) {
   const lignes = yaml.split('\n');

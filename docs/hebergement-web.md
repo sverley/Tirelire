@@ -66,7 +66,7 @@ premier `push`, avant toute PR ni relecture. Aucun harnais ne peut le garder : u
 workflows de `main`. La recette et la production partagent le même compte FTP : ce qui fuit donne
 accès aux deux. Ce qui borne le risque :
 
-- `CLAUDE.md` interdit aux agents de créer ou de modifier un workflow, sauf quand l'issue le demande ;
+- D83 interdit aux agents de créer ou de modifier un workflow, sauf quand l'issue le demande ;
 - au Ready, une PR qui modifie `.github/workflows/` ou `.github/actions/` porte l'étiquette « touche
   un workflow » (`pret.yml`, lu sur `main`) : le porteur le voit avant de fusionner ;
 - un utilisateur FTP dédié, limité au dossier des sites, réduit ce qu'une fuite ouvre.
