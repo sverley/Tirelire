@@ -1,5 +1,5 @@
 /**
- * Harnais d'audit de #70 (chantier de #38, objectif primaire #58), écrit par la session d'audit.
+ * Harnais d'audit de #70 (chantier de #38, chantier primaire #58), écrit par la session d'audit.
  *
  * #70 demande que chacun des cinq usages d'I3 — U1 budget seul, U2 budget et virements permanents,
  * U3 budget puis import, U4 budget reconstruit, U5 import seul — ait **son harnais de bout en bout

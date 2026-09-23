@@ -1,5 +1,5 @@
 /**
- * Harnais d'audit de #71 (chantier de #38, objectif primaire #58), écrit par la session d'audit.
+ * Harnais d'audit de #71 (chantier de #38, chantier primaire #58), écrit par la session d'audit.
  *
  * #71 demande trois choses : **I4** (simple par défaut) et **I5** (inciter à tout utiliser) reçoivent
  * un harnais, ou une renonciation assumée par écrit ; le **nombre de gestes d'I6** (catégoriser en
@@ -18,9 +18,9 @@
  * 2. **Le nombre de gestes d'I6 est fixé au registre, et mesuré.** Tranché par le porteur le
  *    13 septembre dans #71 : depuis l'écran Opérations, **2 gestes pour catégoriser, 3 avec une
  *    sous-catégorie** ; **un geste de plus pour automatiser** toutes les opérations semblables,
- *    soit 3 et 4 ; et **le harnais mesure à l'objectif plus un geste de marge**, soit 3 et 4 pour
- *    catégoriser, 4 et 5 pour automatiser. L'entrée porte donc les quatre objectifs et la marge ;
- *    un harnais les mesure, ou une renonciation écrite le dit. Un objectif qui ne vit que dans
+ *    soit 3 et 4 ; et **le harnais mesure à la visée plus un geste de marge**, soit 3 et 4 pour
+ *    catégoriser, 4 et 5 pour automatiser. L'entrée porte donc les quatre visées et la marge ;
+ *    un harnais les mesure, ou une renonciation écrite le dit. Une visée qui ne vit que dans
  *    le fil d'une PR ne se compare à rien au tour suivant.
  * 3. **Les gardes du jour ne disparaissent pas.** Le harnais d'I6 et les trois vérifications
  *    manuelles (`VM-I4-simple`, `VM-I5-acces`, `VM-I6-gestes`) sont figés ici : une dette se règle
@@ -37,7 +37,7 @@
  * par l'issue, et se relit en audit. Il garde ce qui se vérifie sans interpréter.
  *
  * **Reprise du 13 septembre 2026, session de codage.** Trois témoins rouges dérivaient le registre
- * cassé en *défaisant une injection* (ôter la dette d'I4, retirer l'objectif que le témoin venait
+ * cassé en *défaisant une injection* (ôter la dette d'I4, retirer la visée que le témoin venait
  * d'écrire) : une fois le besoin tenu, ils ne cassaient plus rien et passaient au vert à tort. Ils
  * s'en prennent désormais au contenu réel de l'entrée — les lignes `Harnais` d'I4 retirées, les
  * nombres de gestes d'I6 effacés, sa marge effacée — et redeviennent donc rouges quand la garde
@@ -69,17 +69,17 @@ const CHANTIER = new Set(['38', '71']);
 /**
  * Tranché par le porteur le 13 septembre 2026 (#71) : depuis l'écran Opérations, catégoriser demande
  * au plus deux gestes, trois avec une sous-catégorie ; automatiser toutes les opérations semblables
- * en demande un de plus. Ce sont des objectifs vers lesquels tendre ; le harnais qui les mesure
+ * en demande un de plus. Ce sont des visées vers lesquelles tendre ; le harnais qui les mesure
  * s'autorise un geste de marge — soit 3 et 4 pour catégoriser, 4 et 5 pour automatiser.
  */
-const OBJECTIF = Object.freeze({
+const VISÉE = Object.freeze({
   'catégoriser': 2,
   'catégoriser avec une sous-catégorie': 3,
   'automatiser les semblables': 3,
   'automatiser les semblables avec une sous-catégorie': 4,
 });
 
-/** La marge que le porteur accorde au harnais, en gestes, sur chacun des objectifs. */
+/** La marge que le porteur accorde au harnais, en gestes, sur chacune des visées. */
 const MARGE = 1;
 
 const registre = () => {
@@ -198,17 +198,17 @@ const avecRenonciation = (texte, id) =>
       ` la vérification manuelle ci-dessous en tient lieu. Accord du porteur du 2026-09-13 (#71).`,
   );
 
-/** L'objectif du porteur, écrit comme le registre l'attend : les quatre nombres et la marge. */
-const OBJECTIF_ECRIT =
-  `Objectif (porteur, #71) : au plus 2 gestes pour catégoriser une opération depuis l'écran ` +
+/** La visée du porteur, écrite comme le registre l'attend : les quatre nombres et la marge. */
+const VISÉE_ÉCRITE =
+  `Visée (porteur, #71) : au plus 2 gestes pour catégoriser une opération depuis l'écran ` +
   `Opérations, 3 gestes avec une sous-catégorie, et 1 geste de plus pour automatiser toutes les ` +
   `opérations semblables, soit 3 et 4 gestes ; le harnais mesure avec une marge de ${MARGE} geste. `;
 
-/** La version « besoin tenu » pour I6 : l'objectif écrit, et un harnais qui le mesure. */
+/** La version « besoin tenu » pour I6 : la visée écrite, et un harnais qui la mesure. */
 const avecLesNombres = (texte) =>
   avecHarnais(texte, 'I6', 'apps/web/test/gestes.test.ts').replace(
     /^(- \*\*Vérification manuelle\*\* · `VM-I6-gestes` — )/m,
-    `$1${OBJECTIF_ECRIT}`,
+    `$1${VISÉE_ÉCRITE}`,
   );
 
 // ─── 1. I4 et I5 : un harnais, ou une renonciation écrite ────────────────────────────────────────
@@ -246,8 +246,8 @@ function gestesFixesEtMesures(texte) {
   const manquants = [];
   const t = texteDeLEntree(texte, 'I6');
   const gestes = new Set(nombresDeGestes(texte, 'I6'));
-  for (const [cas, n] of Object.entries(OBJECTIF)) {
-    if (!gestes.has(String(n))) manquants.push(`I6 · l'objectif de ${n} gestes (${cas}) n'est écrit nulle part dans l'entrée`);
+  for (const [cas, n] of Object.entries(VISÉE)) {
+    if (!gestes.has(String(n))) manquants.push(`I6 · la visée de ${n} gestes (${cas}) n'est écrite nulle part dans l'entrée`);
   }
   if (!/marge|tolérance/i.test(t) || !new RegExp(`${MARGE}\\s*gestes?\\b`, 'i').test(t)) {
     manquants.push(`I6 · la marge de ${MARGE} geste accordée au harnais n'est pas écrite`);
@@ -267,14 +267,14 @@ test("#71 · le nombre de gestes d'I6 est fixé au registre et mesuré", () => {
   gestesFixesEtMesures(registre());
 });
 
-test("#71 · témoin vert — l'objectif du porteur écrit et un harnais qui le mesure sont acceptés", () => {
+test("#71 · témoin vert — la visée du porteur écrite et un harnais qui la mesure sont acceptés", () => {
   gestesFixesEtMesures(avecLesNombres(registre()));
 });
 
-test("#71 · témoin rouge — un objectif de gestes qui n'est écrit nulle part fait échouer « le nombre de gestes est fixé »", () => {
+test("#71 · témoin rouge — une visée de gestes qui n'est écrite nulle part fait échouer « le nombre de gestes est fixé »", () => {
   const casse = dansLEntree(registre(), 'I6', (t) => t.replace(/\d+\s*gestes?/gi, 'peu de gestes'));
   assert.notEqual(casse, registre(), `aucun nombre de gestes n'a pu être effacé : ${RELIRE}`);
-  assert.throws(() => gestesFixesEtMesures(casse), /l'objectif de 2 gestes/);
+  assert.throws(() => gestesFixesEtMesures(casse), /la visée de 2 gestes/);
 });
 
 test("#71 · témoin rouge — la marge effacée fait échouer « le nombre de gestes est fixé »", () => {

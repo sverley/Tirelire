@@ -1,5 +1,5 @@
 /**
- * Plomberie commune aux parcours de bout en bout des usages (#70, chantier de #38, objectif
+ * Plomberie commune aux parcours de bout en bout des usages (#70, chantier de #38, chantier
  * primaire #58).
  *
  * Un parcours ne part pas d'un grand livre écrit à la main : il part d'une **base vide**, écrit par

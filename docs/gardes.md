@@ -183,20 +183,20 @@ Chemins : `apps/web/src/App.svelte`, `apps/web/src/views/More.svelte`
 
 Chemins : `packages/core/src/automations.ts`, `apps/web/src/views/Operations.svelte`
 
-Objectif du porteur (#71), depuis l'écran Opérations, l'opération sous les yeux :
+Visée du porteur (#71), depuis l'écran Opérations, l'opération sous les yeux :
 **2 gestes** pour catégoriser une opération et **3 gestes** avec une sous-catégorie ; automatiser
 toutes les opérations semblables coûte un geste de plus, soit **3 gestes** et **4 gestes**. Un geste
 est une frappe sur un bouton ou une ligne, un choix dans une liste, une case cochée.
 
-Le harnais mesure à l'objectif plus **1 geste** de marge, accordée par le porteur : il fait échouer
-à 4, 5, 5 et 6 gestes : c'est la valeur d'I6. Mesure de #71 : 3, 3, 4 et 4 gestes — l'objectif de 2
+Le harnais mesure à la visée plus **1 geste** de marge, accordée par le porteur : il fait échouer
+à 4, 5, 5 et 6 gestes : c'est la valeur d'I6. Mesure de #71 : 3, 3, 4 et 4 gestes — la visée de 2
 reste devant le produit, et le seuil interdit la hausse.
 
 - **Harnais** · `packages/core/test/automations.test.ts` — une règle classe toutes les opérations
   semblables, se rejoue sans effet de bord, et son aperçu ne modifie rien.
   Témoin rouge : « témoin rouge · un aperçu de règle qui enregistre la règle d’essai »
 - **Harnais** · `apps/web/test/navigateur/gestes-classement.test.ts` — « gestes de classement · catégoriser une opération, puis toutes les semblables » :
-  le compte des gestes mesuré dans le navigateur, sur les quatre cas de l'objectif ci-dessus, chacun
+  le compte des gestes mesuré dans le navigateur, sur les quatre cas de la visée ci-dessus, chacun
   comparé à son seuil ; une opération remise à zéro par le harnais avant chaque mesure, et la
   sous-catégorie créée par l'interface.
   Témoin rouge : « témoin rouge · un classement qui coûte un geste de plus que le seuil »

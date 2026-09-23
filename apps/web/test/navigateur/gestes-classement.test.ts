@@ -3,16 +3,16 @@
  *
  * `VM-I6-gestes` seule faisait compter les gestes à la main : aucun nombre ne survivait d'une PR
  * à l'autre. Ce harnais mesure le compte dans le navigateur, sur le
- * jeu d'exemple, et le compare à l'objectif tranché par le porteur le 13 septembre 2026 (#71).
+ * jeu d'exemple, et le compare à la visée tranchée par le porteur le 13 septembre 2026 (#71).
  *
  * **Un geste** = une action de l'utilisateur : une frappe sur un bouton ou une ligne, un choix dans
  * une liste, une case cochée. Le compte part de l'écran Opérations, l'opération sous les yeux —
  * c'est le point de départ que le porteur a fixé.
  *
- * **Objectif et seuil.** L'objectif est celui du porteur : 2 gestes pour catégoriser, 3 avec une
+ * **Visée et seuil.** La visée est celle du porteur : 2 gestes pour catégoriser, 3 avec une
  * sous-catégorie, un geste de plus pour automatiser toutes les opérations semblables (3 et 4). Le
- * harnais mesure à l'objectif plus un geste de marge, accordée par le porteur : il fait donc échouer
- * à 4, 5, 5 et 6 gestes. L'objectif reste devant le produit ; le seuil interdit la hausse.
+ * harnais mesure à la visée plus un geste de marge, accordée par le porteur : il fait donc échouer
+ * à 4, 5, 5 et 6 gestes. La visée reste devant le produit ; le seuil interdit la hausse.
  *
  * **Indépendant de l'état de l'exemple.** Chaque mesure part d'une opération que le harnais remet
  * lui-même à zéro (bouton « Tout remettre à zéro »), pour mesurer un vrai classement et non une
@@ -22,19 +22,19 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BrowserContext, Page } from 'puppeteer-core';
 import { allerÀ, navigateur, ouvrirLeSite, type Site } from '../harnais.js';
 
-/** Objectif du porteur (#71, 13 septembre 2026), en gestes, depuis l'écran Opérations. */
-const OBJECTIF = {
+/** Visée du porteur (#71, 13 septembre 2026), en gestes, depuis l'écran Opérations. */
+const VISÉE = {
   catégoriser: 2,
   'catégoriser avec une sous-catégorie': 3,
   'automatiser les semblables': 3,
   'automatiser les semblables avec une sous-catégorie': 4,
 } as const;
 
-/** La marge accordée au harnais par le porteur : il mesure à l'objectif plus un geste. */
+/** La marge accordée au harnais par le porteur : il mesure à la visée plus un geste. */
 const MARGE = 1;
-const seuil = (objectif: number) => objectif + MARGE;
+const seuil = (visée: number) => visée + MARGE;
 
-type Cas = keyof typeof OBJECTIF;
+type Cas = keyof typeof VISÉE;
 
 /** Ce qu'une mesure relève : le compte, le détail des gestes, et ce que le classement a produit. */
 interface Mesure {
@@ -52,12 +52,12 @@ interface Mesure {
 // ---------------------------------------------------------------------------
 
 function vérifierUneMesure(m: Mesure) {
-  const objectif = OBJECTIF[m.cas];
+  const visée = VISÉE[m.cas];
   const où = `${m.cas} · ${m.gestes.length} geste(s) : ${m.gestes.join(' → ')}`;
   expect.soft(m.classée, `${où} : l'opération ne porte pas « ${m.catégorie} » après ces gestes`).toBe(true);
   expect
-    .soft(m.gestes.length, `${où} : objectif ${objectif}, seuil ${seuil(objectif)} (objectif + ${MARGE} de marge)`)
-    .toBeLessThanOrEqual(seuil(objectif));
+    .soft(m.gestes.length, `${où} : visée ${visée}, seuil ${seuil(visée)} (visée + ${MARGE} de marge)`)
+    .toBeLessThanOrEqual(seuil(visée));
   if (m.automatismeAttendu) {
     expect
       .soft(m.automatismesAprès - m.automatismesAvant, `${où} : aucun automatisme créé pour les opérations semblables`)
@@ -354,10 +354,10 @@ describe.skipIf(!navigateur)('I6 · catégoriser en peu de gestes (issue #71)', 
   });
 
   it('gestes de classement · catégoriser une opération, puis toutes les semblables', () => {
-    for (const cas of Object.keys(OBJECTIF) as Cas[]) {
+    for (const cas of Object.keys(VISÉE) as Cas[]) {
       const m = mesures.get(cas);
       expect(m, `le cas « ${cas} » n’a pas été mesuré`).toBeDefined();
-      console.log(`[gestes] ${cas} : ${m!.gestes.length} (objectif ${OBJECTIF[cas]}, seuil ${seuil(OBJECTIF[cas])}) — ${m!.gestes.join(' → ')}`);
+      console.log(`[gestes] ${cas} : ${m!.gestes.length} (visée ${VISÉE[cas]}, seuil ${seuil(VISÉE[cas])}) — ${m!.gestes.join(' → ')}`);
       vérifierUneMesure(m!);
     }
   }, 60_000);

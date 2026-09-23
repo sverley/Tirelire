@@ -1,5 +1,5 @@
 /**
- * Harnais d'audit de #73 (chantier de #38, objectif primaire #58), écrit par la session d'audit.
+ * Harnais d'audit de #73 (chantier de #38, chantier primaire #58), écrit par la session d'audit.
  *
  * **Où il vit, et pourquoi ici**. Le besoin de #73 est un besoin de **produit** — quatre
  * contraintes du produit reçoivent leur garde — et non une règle du projet : #73 ne crée ni ne

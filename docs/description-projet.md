@@ -359,11 +359,11 @@ la validation par la fusion.
 
 > Ok on part la dessus
 
-> I5/I6 semblent optimistes, non ? Il faut peut-être acter un invariant plus lache et enregistrer l'objectif final pour la suite ?
+> I5/I6 semblent optimistes, non ? Il faut peut-être acter un invariant plus lache et enregistrer la visée finale pour la suite ?
 
 ### Les cibles
 
-> Afin de rester simple et efficace, et sachant que le nombre de cibles sera faible (webapp, relai seul, apk, iPhone), quelle solution faut-il privilégier pour gérer les cibles qui croisées aux usages et aux contraintes devraient permettre de déterminer des objectifs à atteindre
+> Afin de rester simple et efficace, et sachant que le nombre de cibles sera faible (webapp, relai seul, apk, iPhone), quelle solution faut-il privilégier pour gérer les cibles qui croisées aux usages et aux contraintes devraient permettre de déterminer des chantiers à atteindre
 
 > Attention, il faudra sûrement faire une matrice de couverture mais tout ne doit pas être fait selon ce point de vue.
 

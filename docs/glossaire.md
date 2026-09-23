@@ -104,6 +104,12 @@ produit »).
 Une forme sous laquelle l'application se distribue — une webapp sur tel navigateur, le relais seul,
 l'APK… —, active, de côté ou à venir, au catalogue `docs/cibles.md`.
 
+## Visée
+
+La valeur qu'un invariant vise au-delà de sa **valeur**, celle qu'il tient : aucun harnais n'échoue
+dessus (`docs/invariants.md`). À ne pas confondre avec l'**objectif**, une tirelire (partie « Le
+produit »).
+
 ## Harnais
 
 Terme générique : l'ensemble de tests qui vérifie que le code produit répond au besoin. Selon le
