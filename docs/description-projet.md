@@ -451,3 +451,5 @@ qu'elles barrent.
 > On écrit des lettres d'intention. On peut définir les cibles et usages et contraintes si elles font parties de l'intention. C'est la session architecte du chantier concerné qui fera l'analyse approfondie
 
 > Je ne te demande pas d'écrire ces lettres, ça sera le codeur. Je te demande de définir 191 avec cette description
+
+> Non, il s'agissait du chantier 3 et non 1
