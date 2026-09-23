@@ -472,13 +472,6 @@ TypeScript du nom SQL (`cAs`), ce que le schéma permettait déjà sans que ce s
 La règle générale qui en découle : **le domaine se renomme librement, le stockage ne se renomme que
 s'il faut aussi changer la donnée.**
 
-**Sur la réécriture du journal.** D41 et D42 sont les seules décisions dont l'application a consisté à
-retoucher les entrées antérieures : le vocabulaire y a été remplacé partout, ainsi que dans
-l'analyse du besoin du 6 septembre. La règle « ajouter une entrée plutôt que réécrire l'ancienne » porte sur le
-*contenu* d'une décision, et aucun contenu n'a changé — laisser deux vocabulaires cohabiter aurait
-rendu le journal illisible, ce qu'aucune décision ne gagne. Le détail des mots remplacés se lit dans
-le commit de renommage.
-
 ## D43 · L'assistant propose, et ce qu'il propose vient de l'exemple
 
 D40 a remplacé les écrans de configuration par des questions, mais laissait devant chaque question un
@@ -510,7 +503,7 @@ d'attribuer chaque revenu et chaque prélèvement au bon compte, ce qui était i
 l'étape venait en dernier. La question du placement des réserves, elle, ne peut pas se poser avant
 qu'il existe des réserves : elle a migré à l'inverse, vers le résumé.
 
-**Complément (8 septembre) — l'étape Comptes.** Elle expliquait longuement ce qu'elle allait faire au
+**L'étape Comptes.** Elle expliquait longuement ce qu'elle allait faire au
 lieu de le montrer. Trois corrections : le texte tient en deux phrases et dit ce que l'étape attend —
 des **comptes bancaires réels**, ceux dont on reçoit un relevé, et non des catégories de budget ; le
 **compte principal y apparaît**, matérialisé à l'arrivée sur l'étape plutôt que créé au premier
@@ -567,7 +560,7 @@ Corrige aussi une scorie de D42 : le renommage automatique avait laissé un iden
 pouvait pas le voir — il était cohérent partout — ce qui rappelle qu'un renommage mécanique demande
 une relecture, pas seulement une compilation.
 
-**Correctif (8 septembre) — un remplacement muet.** Le passage à D45 a d'abord échoué en silence : le
+**Un remplacement muet.** Le passage à D45 a d'abord échoué en silence : le
 `sed` de renommage ne visait que les apostrophes simples, si bien que les valeurs HTML
 `<option value="holding">` et `value="third"` de l'assistant y ont survécu, et le remplacement de
 texte censé les corriger n'a rien trouvé — sans rien signaler. Le typage ne pouvait pas le voir : une
@@ -842,7 +835,7 @@ charges période après période : ce n'est pas ce que le plan fait, et il ne le
 
 ## D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
-Reprise du signalement « le jeu d'exemple ne contient aucun besoin » (8 septembre). Le défaut
+Reprise du signalement « le jeu d'exemple ne contient aucun besoin ». Le défaut
 principal n'existe plus : depuis D50 et D51, `example.ts` porte treize besoins, chacune des neuf
 tirelires en a au moins un, et le plan de la période en cours demande 2 350 € pour 630 € de marge.
 Rien n'était à corriger de ce côté. Restaient les deux points que le même signalement soulevait
@@ -1082,10 +1075,6 @@ fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` p
 fabriqué depuis l'extérieur.
 
 ## D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
-
-Écrite le 8 septembre en parallèle d'autres chantiers, et numérotée D52 à l'époque ; le numéro
-ayant servi ailleurs entre-temps, elle arrive ici en D59 sans autre changement que celui-ci et les
-deux rectifications signalées plus bas.
 
 Le correctif de placement avait laissé passer, sur les cinq écrans de Configuration, un formulaire écrit **avant** la
 liste : il s'insérait en haut du document, quel que soit l'endroit d'où l'on venait de cliquer.

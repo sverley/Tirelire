@@ -8,6 +8,9 @@ validation. Ce document tient la correspondance ; `packages/gardes` le relit.
 
 Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
 
+Une entrée d'invariant garde la valeur que [`invariants.md`](invariants.md) écrit, sans la
+recopier : son harnais échoue au-delà, ou sa vérification manuelle la constate.
+
 ## Ce qui est vérifié
 
 - **À chaque `pnpm test`**, donc dans la CI : chaque identifiant des deux documents a son entrée ici,
