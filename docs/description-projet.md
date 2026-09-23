@@ -155,7 +155,12 @@ Corrigé par le porteur le 22 septembre 2026 :
 
 > Non, les usages vont dans une section dédiée dans la description après les principes, mais les cibles sont dans un catalogues
 
-> Un invariant est la déclinaison chiffrée d'un principe ou d'une règle, pas d'une decision car il impacte tout le projet
+> ~~Un invariant est la déclinaison chiffrée d'un principe ou d'une règle, pas d'une decision car il impacte tout le projet~~
+
+Barré par le porteur le 23 septembre 2026 (#162), parce qu'elle contredit le principe 9.2 qu'il a
+validé le même jour, à la question « Veux-tu que je la barre ? » :
+
+> Oui
 
 > les principes font partie de la description du projet, il sont de moi.
 
