@@ -495,3 +495,38 @@ test('#141 · aucun fichier suivi ne nomme un autre hôte du domaine que la prod
   }
   assert.deepEqual(trouvés, [], 'un fichier suivi nomme un hôte qui n’est pas la production');
 });
+
+// ─── #175 · la case de l'aperçu ──────────────────────────────────────────────────────────────────
+
+const CASE = path.join(ICI, 'case-apercu.sh');
+const caseApercu = (corps, ...args) => {
+  const r = spawnSync('bash', [CASE, ...args], { input: corps, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.replace(/\n$/, '');
+};
+
+test('#175 · case de l’aperçu : ajoutée si elle manque, cochée seulement quand le dernier commit est en ligne', () => {
+  const [a, b] = ['a'.repeat(40), 'b'.repeat(40)];
+  assert.equal(caseApercu('Close #175', 'etat'), 'absente');
+  const neuve = caseApercu('Close #175', 'rafraichir', a);
+  assert.match(neuve, /^Close #175\n\n- \[ \] Aperçu du dernier commit en recette — en ligne : rien <!-- apercu: -->$/);
+  const déposée = caseApercu(neuve, 'deposee', a, a);
+  assert.equal(caseApercu(déposée, 'etat'), 'coche');
+  assert.equal(caseApercu(déposée, 'en-ligne'), a);
+  assert.match(déposée, /en ligne : `aaaaaaa`, le dernier commit/);
+  // Un commit de plus : la case se décoche et dit ce qui est en ligne.
+  const dépassée = caseApercu(déposée, 'rafraichir', b);
+  assert.equal(caseApercu(dépassée, 'etat'), 'vide');
+  assert.match(dépassée, /en ligne : `aaaaaaa`, pas le dernier commit \(`bbbbbbb`\)/);
+  // Déposé pendant qu'un commit arrivait : en ligne, mais pas cochée.
+  assert.equal(caseApercu(caseApercu(neuve, 'deposee', a, b), 'etat'), 'vide');
+  // Refus et échec décochent ; l'échec rend ce qui est en ligne incertain.
+  assert.equal(caseApercu(caseApercu(déposée, 'refusee', a), 'en-ligne'), a);
+  assert.equal(caseApercu(caseApercu(déposée, 'refusee', a), 'etat'), 'vide');
+  assert.match(caseApercu(déposée, 'echec', a, a), /- \[ \] .*incertain, le dépôt de `aaaaaaa` a échoué <!-- apercu: -->/);
+  // Une seule ligne, le reste de la description intact.
+  const corps = `Close #175\n\nUn mot.\n\n${déposée.split('\n').at(-1)}\n\nFin.`;
+  const r = caseApercu(corps, 'rafraichir', b);
+  assert.equal(r.split('\n').filter((l) => l.includes('<!-- apercu:')).length, 1);
+  assert.ok(r.startsWith('Close #175\n\nUn mot.\n\n- [ ]') && r.endsWith('\n\nFin.'));
+});

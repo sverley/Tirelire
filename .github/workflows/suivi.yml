@@ -5,7 +5,8 @@ name: Suivi de la PR prête
 # vu n'est plus tout à fait ce qu'il fusionnerait :
 # - un commit : la CI n'a pas tourné sur lui (elle ne tourne qu'au Ready). Le statut « Toute la CI
 #   sur ce commit » passe en échec, à côté du bouton de fusion, et le commentaire dit quoi faire :
-#   repasser la PR en brouillon, puis en Ready ;
+#   repasser la PR en brouillon, puis en Ready. La case de l'aperçu (#175) se décoche : l'aperçu en
+#   ligne n'est plus celui du dernier commit ;
 # - une édition de la PR (titre, description, base). Cocher ou décocher une case de la description
 #   (le dépôt de l'aperçu, #175) n'est pas un changement : rien n'est signalé ;
 # - une édition de l'issue qu'elle ferme (titre, description). Seule une issue qui porte l'étiquette
@@ -38,6 +39,7 @@ jobs:
       || (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'PR prête'))
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
       statuses: write
     env:
@@ -54,6 +56,12 @@ jobs:
       CONTEXTE: Toute la CI sur ce commit
       RELANCE: "Pour que la CI tourne dessus : repasser la PR en brouillon, puis en Ready."
     steps:
+      - uses: actions/checkout@v4
+        if: github.event.action == 'synchronize'
+        with:
+          ref: main
+          sparse-checkout: apps/hebergement
+          persist-credentials: false
       - name: Signaler le changement
         run: |
           set -euo pipefail
@@ -62,6 +70,8 @@ jobs:
             pull_request_target:synchronize)
               gh api "repos/$GH_REPO/statuses/$SHA" -f state=failure -f context="$CONTEXTE" \
                 -f description="Pas de CI sur ce commit : brouillon, puis Ready" > /dev/null
+              gh pr view "$PR" --json body --jq .body | bash apps/hebergement/case-apercu.sh rafraichir "$SHA" > "$RUNNER_TEMP/corps"
+              gh pr edit "$PR" --body-file "$RUNNER_TEMP/corps" > /dev/null
               gh pr comment "$PR" --body "Commit ${SHA::7} poussé après le Ready, par $AUTEUR : la CI n'a pas tourné sur lui. $RELANCE" ;;
             pull_request_target:edited)
               quoi=()
