@@ -237,6 +237,18 @@ test('#175 · CI pas verte ou brouillon : la case cochée ne dépose rien, se d�
   }
 });
 
+test('#175 · un commit sur un brouillon décoche la case cochée, sans rien d’autre ; sans case cochée, rien ne tourne', () => {
+  const commit = (boîte) => surLaPR('synchronize', true, { pull_request: { ...PR(true), body: CASE(boîte) }, after: 'c'.repeat(40) });
+  const jobs = tournent(exécutions(commit('x')));
+  assert.ok(fait(jobs, /case-apercu\.sh\s+rafraichir/), 'commit sur un brouillon, case cochée : la case n’est pas remise à jour');
+  // Les étapes jouées seulement : sur un brouillon, l'étape qui signale le commit est écartée.
+  const joué = (motif) => jobs.some((j) => j.joués.map(commande).some((c) => motif.test(c)));
+  assert.ok(!joué(COMMENTAIRE), 'commit sur un brouillon : un job commente');
+  assert.ok(!joué(STATUT_DE_COMMIT), 'commit sur un brouillon : un job touche le statut de toute la CI');
+  léger('commit sur un brouillon, case cochée', jobs);
+  assert.deepEqual(clés(tournent(exécutions(commit(' ')))), [], 'commit sur un brouillon, case vide : des jobs tournent');
+});
+
 test('#175 · sans la case cochée, une édition ne dépose rien', () => {
   for (const [quoi, é] of [
     ['case décochée', surLaPR('edited', false, { pull_request: { ...PR(false), body: CASE(' ') }, changes: { body: { from: CASE('x') } } })],

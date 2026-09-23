@@ -6,7 +6,8 @@ name: Suivi de la PR prête
 # - un commit : la CI n'a pas tourné sur lui (elle ne tourne qu'au Ready). Le statut « Toute la CI
 #   sur ce commit » passe en échec, à côté du bouton de fusion, et le commentaire dit quoi faire :
 #   repasser la PR en brouillon, puis en Ready. La case de l'aperçu (#175) se décoche : l'aperçu en
-#   ligne n'est plus celui du dernier commit ;
+#   ligne n'est plus celui du dernier commit. Sur un brouillon, seule la case cochée fait tourner le
+#   job, pour la décocher, sans statut ni commentaire : un brouillon sans case cochée ne coûte rien ;
 # - une édition de la PR (titre, description, base). Cocher ou décocher une case de la description
 #   (le dépôt de l'aperçu, #175) n'est pas un changement : rien n'est signalé ;
 # - une édition de l'issue qu'elle ferme (titre, description). Seule une issue qui porte l'étiquette
@@ -36,6 +37,8 @@ jobs:
     name: Changement après le Ready
     if: >-
       (github.event_name == 'pull_request_target' && github.event.pull_request.draft != true)
+      || (github.event_name == 'pull_request_target' && github.event.action == 'synchronize'
+          && contains(github.event.pull_request.body, '[x] Aperçu du dernier commit'))
       || (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'PR prête'))
     runs-on: ubuntu-latest
     permissions:
@@ -62,7 +65,15 @@ jobs:
           ref: main
           sparse-checkout: apps/hebergement
           persist-credentials: false
+      # Un commit : l'aperçu en ligne n'est plus celui du dernier commit. Sur un brouillon, c'est tout.
+      - name: La case de l'aperçu
+        if: github.event.action == 'synchronize'
+        run: |
+          set -euo pipefail
+          gh pr view "$PR" --json body --jq .body | bash apps/hebergement/case-apercu.sh rafraichir "$SHA" > "$RUNNER_TEMP/corps"
+          gh pr edit "$PR" --body-file "$RUNNER_TEMP/corps" > /dev/null
       - name: Signaler le changement
+        if: github.event.pull_request.draft != true
         run: |
           set -euo pipefail
           sans_cases() { sed -E 's/\[[ xX]\]/[ ]/g'; }
@@ -70,8 +81,6 @@ jobs:
             pull_request_target:synchronize)
               gh api "repos/$GH_REPO/statuses/$SHA" -f state=failure -f context="$CONTEXTE" \
                 -f description="Pas de CI sur ce commit : brouillon, puis Ready" > /dev/null
-              gh pr view "$PR" --json body --jq .body | bash apps/hebergement/case-apercu.sh rafraichir "$SHA" > "$RUNNER_TEMP/corps"
-              gh pr edit "$PR" --body-file "$RUNNER_TEMP/corps" > /dev/null
               gh pr comment "$PR" --body "Commit ${SHA::7} poussé après le Ready, par $AUTEUR : la CI n'a pas tourné sur lui. $RELANCE" ;;
             pull_request_target:edited)
               quoi=()
