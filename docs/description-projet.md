@@ -263,3 +263,15 @@ La parole du 14 septembre (#58, #84), puis celle du 22 septembre qui la modère.
 > Non, si un harnais peut être codé, il doit l'être
 
 > il faut modéré le propos avec les evolutions méthodologiques récentes : « si un harnais peut être codé, il doit l'être » reste vrai pour le produit. La garde doit restée simple et peu couteuse et c'est le travers dans lequel nous sommes tombés précédemment. Bilan : beaucoup de temps perdu sur la création d'un outil dans l'outil. Au final, le concept reste bon, on doit en garder l'essentiel mais on doit réussir à juger ce qui mérite d'aller dans une garde de ce qui peut être vérifier par analyse de code. Dans tous les cas, les harnais de la garde (amorcage) n'ont plus leur place sauf si le codage du test allant dans la garde est complexe.
+
+### Le besoin, pas la solution
+
+Le 22 septembre, dans #170.
+
+> on perd souvent du temps car l'analyse de l'auditeur est "trop" précise pour le codeur. Il faut que l'auditeur propose une analyse de besoin qui permette au codeur d'avoir son interprétation. C'est la confrontation des interprétations qui accelere le developpement, pas le forcage d'un agent par un autre
+
+### Le coût de la CI et la stabilité
+
+Le 22 septembre, dans #173, repris par #170.
+
+> Il faut que le compromis reste bon entre coût de CI et stabilité du développement. Si sauter un test qui devient rouge après le merge oblige a relancer tout un tour de review/code, on est perdant. Mais si les tests sont trop lourds et lents, on n'avance pas

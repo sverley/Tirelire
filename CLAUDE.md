@@ -93,13 +93,16 @@ CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'el
 de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
 et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
 ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
-crochet lent, pas d'alerte. Sept workflows, pour qu'aucune exécution ne montre sautés les jobs
-qu'une autre joue : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la garde),
+crochet lent, pas d'alerte. Sept workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la garde),
 `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu), `depot-apercu.yml`
 (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères d'une PR prête, case de
 l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un changement après le Ready, signalé) et `fin.yml` (« en cours »
-quitte l'issue à sa fermeture). Seul `depot-apercu.yml` y fait exception, accepté par le porteur :
-ses exécutions montrent des jobs sautés, et la case de l'aperçu dit ce qui est en ligne.
+quitte l'issue à sa fermeture). La règle des workflows tient à ce qu'elle protège : **aucun job sauté
+ne peut laisser fusionner ce qu'un job joué aurait rougi.** Un rouge découvert après la fusion (#149)
+relance tout un tour de relecture et de code ; un job sauté qui ne décide pas de la fusion, et dont le
+rouge éventuel reste visible ailleurs, ne coûte rien et reste permis (les exécutions d'`apercu.yml` et
+de `depot-apercu.yml` en montrent). C'est un compromis entre le coût de la CI et la stabilité du
+développement : ne rien sauter de ce qui décide de la fusion, ne pas alourdir ce qui n'en décide pas.
 
 ### Vérification et validation
 
@@ -152,6 +155,11 @@ Il passe en premier. Il ne code jamais le produit.
 2. Décider si le besoin tient en une tâche. Sinon, ouvrir les sous-issues, une par tâche, et
    s'arrêter : chaque sous-issue aura son propre auditeur.
 3. Écrire dans l'issue un « Fait quand » vérifiable : des phrases qu'un test peut trancher.
+   L'issue décrit le besoin et ce qui le rend atteint, observable, sans prescrire la solution — ni
+   fichiers, ni jobs, ni mécanismes : le codeur code depuis sa propre lecture, et c'est la
+   confrontation des lectures de l'auditeur et du codeur qui fait avancer, pas le forçage de l'une par
+   l'autre. Une construction choisie par le porteur reste dans l'issue, comme sa parole : elle fait
+   partie du besoin.
 4. Créer la branche, poser l'étiquette « en cours », écrire le harnais — un test qui rougit
    aujourd'hui et verdira quand le besoin sera couvert ; aucun par défaut pour la documentation ni
    pour la garde. Un seul fichier de test par issue, sauf raison dite.
