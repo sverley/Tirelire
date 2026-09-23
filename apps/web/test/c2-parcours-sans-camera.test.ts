@@ -1,6 +1,6 @@
 /**
  * Harnais de C2 — « L'essentiel ne dépend d'aucune capacité propre à une plateforme » (issue #73,
- * chantier de #38, objectif primaire #58). C2 cite nommément la lecture de QR code par caméra comme
+ * chantier de #38, chantier primaire #58). C2 cite nommément la lecture de QR code par caméra comme
  * exemple de capacité qui varie d'un navigateur à l'autre ; jusqu'ici seule une vérification
  * manuelle (`VM-C2-equivalent`) et une ligne « À bâtir » le tenaient.
  *

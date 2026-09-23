@@ -20,7 +20,7 @@ Seuls les fichiers Markdown de `docs/` sont fondateurs.
   besoins, écarts de placement, virements par couple de comptes, règlements avec les comptes
   tiers), positions reconstruites par compte, moteur de règles et actions groupées, dépôt SQLite
   (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
-- `packages/gardes` — la garde de l'objectif primaire (#58) : chaque invariant et chaque
+- `packages/gardes` — la garde du chantier primaire (#58) : chaque invariant et chaque
   contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et l'issue de chaque PR déclare les siennes.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
@@ -66,7 +66,7 @@ données de l'analyse pour voir le plan tout de suite.
 
 L'application Android est le même code web emballé avec Capacitor (`apps/web/android`).
 
-- L'application web est la distribution prioritaire (#45) : chaque objectif s'y livre et s'y
+- L'application web est la distribution prioritaire (#45) : chaque chantier s'y livre et s'y
   vérifie, sur Chrome, avant d'être porté ailleurs. L'APK n'est vérifié que par sa construction.
 - Un tag `vX.Y.Z` construit l'APK et produit une release nommée, avec notes générées ; rien ne se
   construit pour Android à un push ni sur une PR.
@@ -103,10 +103,10 @@ niveau :
   livraison, jugée sur l'état commis — l'index ou le commit poussé, jamais la copie de travail.
   - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
     `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
-    touchés, tests headless de l'interface ; objectif 30 s) ou **organisationnel** (garde et tous les
-    garde ; objectif 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
+    touchés, tests headless de l'interface ; durée attendue 30 s) ou **organisationnel** (tests de la
+    garde ; durée attendue 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
     restent à la CI. Un dépassement de plus de 20 % s'affiche, sans bloquer.
-  - Le harnais du besoin est toujours joué, à part et hors objectif. Il **bloque** quand ce qui arrive
+  - Le harnais du besoin est toujours joué, à part et hors durée attendue. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.
   - Le pré-push ne rejoue pas un arbre déjà vérifié à la fusion. Un push vers une sous-branche

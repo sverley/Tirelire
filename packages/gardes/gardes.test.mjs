@@ -1,5 +1,5 @@
 /**
- * Harnais de l'objectif primaire (#58) : la garde se vérifie elle-même.
+ * Harnais du chantier primaire (#58) : la garde se vérifie elle-même.
  *
  * Le premier test tient le dépôt réel : chaque invariant, usage et contrainte a son harnais, sa
  * vérification manuelle ou un renvoi gardé. Les autres tiennent la règle sur des documents

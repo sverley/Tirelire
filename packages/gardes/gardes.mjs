@@ -1,5 +1,5 @@
 /**
- * Garde de l'objectif primaire (#58).
+ * Garde du chantier primaire (#58).
  *
  * Deux vérifications, sans dépendance :
  *

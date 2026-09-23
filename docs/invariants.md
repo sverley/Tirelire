@@ -2,7 +2,7 @@
 
 Les valeurs mesurables des principes et des décisions (principe 9.2 de la
 [description du projet](description-projet.md), qui fait foi). Chacun cite ce qu'il décline et
-énonce sa **valeur**, que son harnais fait échouer au-delà ; s'il y a lieu, son **objectif**, visé,
+énonce sa **valeur**, que son harnais fait échouer au-delà ; s'il y a lieu, sa **visée**,
 sans harnais qui échoue dessus. Son harnais, ou sa vérification manuelle, est au registre
 ([`gardes.md`](gardes.md)). Une décision n'en porte un que selon D79 ; une contrainte est dans
 [`contraintes.md`](contraintes.md), une cible dans [`cibles.md`](cibles.md).
@@ -45,7 +45,7 @@ frappe sur un bouton ou une ligne, un choix dans une liste, une case cochée.
 **Valeur** : catégoriser une opération en 3 gestes au plus, 4 avec une sous-catégorie ; automatiser
 toutes les opérations semblables en 4 gestes au plus, 5 avec une sous-catégorie.
 
-**Objectif** : 2, 3, 3 et 4 gestes.
+**Visée** : 2, 3, 3 et 4 gestes.
 
 ## I7 · Les données restent en local
 

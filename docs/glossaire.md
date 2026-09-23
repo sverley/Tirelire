@@ -92,10 +92,23 @@ Terme générique. Un besoin est :
 Le type du besoin commande tout le reste : qui écrit son harnais, où ce harnais vit, et quand il est
 joué.
 
+## Chantier
+
+Un besoin de haut niveau, qui ne tient pas en une tâche : son issue, étiquetée « chantier », le
+décompose en sous-issues, chacune un besoin. L'architecte le suit jusqu'à sa fermeture
+(`docs/roles/architecte.md`). À ne pas confondre avec l'**objectif**, une tirelire (partie « Le
+produit »).
+
 ## Cible
 
 Une forme sous laquelle l'application se distribue — une webapp sur tel navigateur, le relais seul,
 l'APK… —, active, de côté ou à venir, au catalogue `docs/cibles.md`.
+
+## Visée
+
+La valeur qu'un invariant vise au-delà de sa **valeur**, celle qu'il tient : aucun harnais n'échoue
+dessus (`docs/invariants.md`). À ne pas confondre avec l'**objectif**, une tirelire (partie « Le
+produit »).
 
 ## Harnais
 
