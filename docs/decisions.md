@@ -1230,11 +1230,11 @@ produit) ou par la relecture (le travail).
 ### D80 · Quatre rôles
 
 Un besoin passe par quatre rôles, chacun décrit dans `docs/roles/`, en un texte qui sert de prompt :
-l'**architecte** analyse le besoin et pose ses spécifications, et suit un objectif jusqu'à sa
+l'**architecte** analyse le besoin et pose ses spécifications, et suit un chantier jusqu'à sa
 fermeture sans spécifier ses sous-issues ; l'**auditeur** code le harnais s'il le faut et vérifie le
-codage ; le **codeur** code ; le **porteur** valide. L'analyse du besoin est indépendante de l'audit
-: l'architecte et l'auditeur sont deux sessions distinctes. Un descriptif de rôle dit ce que le rôle
-fait, dans quel ordre ; il renvoie à ce catalogue pour les décisions qu'il applique.
+codage ; le **codeur** code ; le **porteur** valide. L'analyse du besoin est indépendante de
+l'audit : l'architecte et l'auditeur sont deux sessions distinctes. Un descriptif de rôle dit ce que
+le rôle fait, dans quel ordre ; il renvoie à ce catalogue pour les décisions qu'il applique.
 
 ### D81 · La garde
 

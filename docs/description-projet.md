@@ -109,9 +109,9 @@ Correction du porteur, le même jour :
 
 > J'ai trop réduit le verbatim en ne pensant qu'à un utilisateur, on peut prévoir une synchronisation agnostique tant qu'il y a partage des clés de chiffrement.
 
-## 11 septembre 2026 · objectifs
+## 11 septembre 2026 · chantiers
 
-Extrait des objectifs du projet : la ligne que le porteur marque « invariant ». Les dix objectifs
+Extrait des chantiers du projet : la ligne que le porteur marque « invariant ». Les dix chantiers
 sont suivis en issues (#45 à #54).
 
 > 4. l'appli propose un plan de virement permanent en lien avec le budget (les liens sont perennes, si un budget évolue, on doit "proposer et jamais faire de manière cachée" (invariant) des évolutions du plan
@@ -119,7 +119,7 @@ sont suivis en issues (#45 à #54).
 ## 11 septembre 2026 · assistants et vie de l'application
 
 Extrait : le paragraphe que le porteur marque « Invariant ». Les deux assistants qu'il envisage sont
-suivis en objectifs (#55, #56).
+suivis en chantiers (#55, #56).
 
 > Invariant : Tout ce qui est fait dans les assistants doit faire partie aussi de la vie de l'app. Un train de vie évolue, le budget doit proposer des adaptations. Le budget évolue, l'app doit proposer de changmeent de comportement à reproduire coté banque ou train de vie.
 

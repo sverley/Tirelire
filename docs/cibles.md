@@ -13,8 +13,8 @@ agents de codage et de distribution (`docs/roles/`).
   PR, plusieurs possibles. Sans étiquette, une issue vaut pour toutes les cibles actives.
 - **Ni jalon ni issue par cible** : un jalon est une échéance et se ferme, une issue se ferme ; une
   cible reste. Une cible change d'état ici, à la demande du porteur.
-- **Objectifs** : une case « prioritaire » de la matrice qu'aucune issue ne couvre donne un objectif,
-  étiqueté de sa cible. La matrice repère les trous ; elle ne découpe pas le travail — les objectifs
+- **Chantiers** : une case « prioritaire » de la matrice qu'aucune issue ne couvre donne un chantier,
+  étiqueté de sa cible. La matrice repère les trous ; elle ne découpe pas le travail — les chantiers
   restent des besoins produit. Elle se relit : aucun outil ne la vérifie.
 
 Une entrée donne, sur sa ligne **Construction**, les commandes entre accents graves qui la
