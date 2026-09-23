@@ -9,8 +9,8 @@ datés ; ce qu'il retire reste visible, barré.
 
 ## Principes
 
-Validés par le porteur le 23 septembre 2026 (#162), tels quels : « oui ». Du plus général au plus
-précis.
+Validés par le porteur le 23 septembre 2026 (#162), tels quels : « oui » ; 9, 9.1, 9.2 et 11.1 dans
+les formulations qu'il a validées le même jour. Du plus général au plus précis.
 
 ### Le produit
 
@@ -39,40 +39,26 @@ précis.
 
 7. Les paroles du porteur font foi ; lui seul les complète ou les corrige.
 8. Le besoin s'analyse avant les solutions.
-9. Les catalogues sont des ensembles cohérents, sans date : une règle ou une décision s'applique à tout moment, rétroactivement.
-   1. Une décision ne contrevient jamais à un principe ni à une règle.
-   2. Un invariant est la valeur mesurable d'un principe ou d'une règle, à laquelle on se réfère pour valider une mesure.
+9. Les catalogues sont des ensembles cohérents, sans date : une décision s'applique à tout moment, rétroactivement.
+   1. Une décision ne contrevient jamais à un principe ni à une autre décision.
+   2. Un invariant est la valeur mesurable d'un principe ou d'une décision, à laquelle on se réfère pour valider une mesure.
    3. Un changement peut rendre des tests rouges : ils deviennent une dette de cette évolution, suivie dans une issue.
 10. Ce qu'un test peut vérifier, un test le vérifie ; la documentation simple n'en a pas besoin.
     1. La CI cherche le bon compromis entre son coût et la stabilité : assez de tests pour qu'un rouge ne se découvre pas après la fusion, pas au point de ralentir le travail.
 11. Celui qui vérifie n'est pas celui qui code ; le porteur valide, et la fusion vaut validation.
-    1. L'auditeur et le codeur lisent le besoin chacun de son côté : c'est la confrontation de leurs lectures qui fait avancer, pas le forçage de l'un par l'autre.
+    1. L'architecte, le codeur et l'auditeur lisent le besoin chacun de son côté : c'est la confrontation de leurs lectures qui fait avancer, pas le forçage de l'un par l'autre.
 12. La garde reste simple et peu coûteuse ; elle ne décide pas de sa propre évolution, et tout changement de son comportement est validé par le porteur.
 
 ## Usages
 
-Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29), dans l'ordre où il
-les a donnés ; seul l'identifiant et le titre sont ajoutés. U1 est prioritaire (principe 2.1).
+Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29) ; seuls
+l'identifiant et le titre sont ajoutés. U1, l'usage prioritaire (principe 2.1), vient en tête.
 
-**U2 · Budget et virements permanents.**
-
-> on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires.
-
-**U4 · Budget reconstruit depuis l'historique.**
-
-> Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée.
-
-**U3 · Budget sans virements validés, puis import.**
-
-> Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue.
-
-**U1 · Budget seul.**
-
-> L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation.
-
-**U5 · Import seul.**
-
-> Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget.
+1. **U1 · Budget seul.** « L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation. »
+2. **U2 · Budget et virements permanents.** « on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires. »
+3. **U3 · Budget sans virements validés, puis import.** « Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue. »
+4. **U4 · Budget reconstruit depuis l'historique.** « Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée. »
+5. **U5 · Import seul.** « Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget. »
 
 ## 6 septembre 2026 · le besoin d'origine
 
@@ -161,7 +147,7 @@ Retiré par le porteur le 19 septembre 2026 :
 
 > Par contre, je vois que tu consignes des décisions concernant les règles comme les décisions qui concernent le produit. Elles n'ont pas le meme roles ni la meme valeur : une decision ne doit pas contrevenir aux regles. Une regle qui contrevient aux regles doit proposer des modifications des regles existantes. L'un travail au niveau organisationnel, l'autre au niveau produit
 
-> prends la définition au sens génie logiciel : un invariant est mesurable. Je pense qu'on se trompe de mot. Les invariants sont le produits d'une décision, d'une regles, d'un usage ou meme d'un principes qui alimente le résultat de harnais qui peuvent mesurer ces invariants. ~~Je pense qu'il faut un catalogue de principes séparés du catalogue d'invariants.~~ ll faut un catalogue de regles séparé du catalogue de decisions. il faut un catalogue ~~d'usage et~~ de contraintes.
+> prends la définition au sens génie logiciel : un invariant est mesurable. Je pense qu'on se trompe de mot. Les invariants sont le produits d'une décision, d'une regles, d'un usage ou meme d'un principes qui alimente le résultat de harnais qui peuvent mesurer ces invariants. ~~Je pense qu'il faut un catalogue de principes séparés du catalogue d'invariants.~~ ~~ll faut un catalogue de regles séparé du catalogue de decisions.~~ il faut un catalogue ~~d'usage et~~ de contraintes.
 
 Corrigé par le porteur le 22 septembre 2026 :
 
@@ -172,6 +158,19 @@ Corrigé par le porteur le 22 septembre 2026 :
 > Un invariant est la déclinaison chiffrée d'un principe ou d'une règle, pas d'une decision car il impacte tout le projet
 
 > les principes font partie de la description du projet, il sont de moi.
+
+Sur le catalogue de règles séparé, le porteur avait répondu le 22 septembre 2026 (#161) :
+
+> ~~Toujours vrai~~
+
+Corrigé par le porteur le 23 septembre 2026 (#162) :
+
+> Non, j'ai fait une erreur. Les regles au sens actuel sont organisationnelles. Elles décrivent des méthodes à respecter. Les decisions sont fonctionnelles, elle décrivent le fonctionnement du produit. Le comportement décrit les rôles et ce qui est attendus de chaque rôle.
+> Il y a une réflexion structurelle à mener. Je souhaitait ce découpage pour que les decisions ne puissent pas être en contraction avec les regles. Mais puisque c'est aussi vrai pour les regles envers les regles (idem pour les decisions), je ne sais pas s'il est encore utile de faire cette différenciation. Est-ce qu'on ne décrit pas le concept sémantique des exigences d'un projet ? Où les exigences sont ailleurs ?
+
+> Je pense que décision et méthodes sont décidées par moi, elles suivent la meme autorité et ordonnent à tout le projet. Pourquoi les différencier ? Par contre, les rôles peuvent avoir un descriptif dédié qui servira de prompt. La question de savoir si toutes les decisions, fonctionnelles ou organisationnelles, ont un invariants se pose. Tout en sachant qu'un invariant quantifie une mesure mais cette mesure n'est pas nécessairement programmable (tous les invariants n'ont pas forcément un harnais autre qu'une validation manuelle)
+
+> Ok, le catalogue des decisions est docs/decisions.md
 
 ### Ni journal, ni date : des ensembles cohérents
 
@@ -341,6 +340,10 @@ Paroles du porteur dans #162, #168, #175 et #176. Elles fondent les sections « 
 « Usages » ci-dessus, le catalogue des cibles ([`cibles.md`](cibles.md)), la forme des invariants et
 la validation par la fusion.
 
+### Les principes
+
+> Il faut en faire des points clairs, simples et explicites sous forme d'une liste. On peut les numéroter en esseyant de la faire par lien hiérarchique ou en tout cas des plus généraux aux plus précis
+
 ### Les invariants
 
 > Oui, les invariants sont des valeurs mesurables auxquelles on doit pouvoir se référer pour valider une mesure
@@ -406,3 +409,26 @@ Réponses du porteur aux questions du codeur, le 23 septembre.
 > Non, l'auditeur est là pour vérifier que le besoin et les fondamentaux sont respectés par la codeur. Le codeur a sa compréhension sa besoin et peut demander des modifications du besoin (issue) au porteur pour clairifer un point qui n'a pas ete traté pas le codeur
 
 > Les issues peuvent rester tant qu'elles sont en cohérences avec les catalogues. Elles servent à la gestion pratique du projet mais le projet doit tenir sans elles
+
+### Décisions, méthodes et rôles
+
+Paroles du porteur du 23 septembre, dans #162.
+
+> I11, on rétabli. Pour ce que j'ai demandé pour les principes et les usages qui vont dans la description, il faut en faire un invariant, non ?
+
+> Il faut stocker les regles de fonctionnement que j'ai pu enoncer dans le catalogue des regles. Mais il leur faut un invariants en face ?
+> #Regle: le document CLAUDE.md n'est pas source de vérité. Il ne doit jamais contrevenir aux fondamentaux.
+
+> Non, on reste dans la meme pr, on est en train de traiter les principes et les regles
+
+> ~~En fait, je veux différencier les regles (fonctionnel), les decisions (projet) et les comportement (agent).~~
+
+Les paroles qui corrigent le catalogue de règles séparé sont citées sous la parole du 13–14 septembre
+qu'elles barrent.
+
+> A moins que tu aies une bonne raison de garder séparée les decisions et méthodes
+
+> Il faut ajouter un rôle : architecte qui analyse un besoin et défini ses spécifications. C'est aujourd'hui réalisé par la première phase de l'auditeur mais je voudrais que l'auditeur soit vraiment réduit à coder le harnais si nécessaire et vérifier le codage. L'analyse du besoin doit être indépendante.
+> Pour le reste je valide les changements décidés maintenant qui vont engendrer un nouveau tour dans cette issue et pr
+
+> Il faudra aussi modifier les instructions dans le projet Claude.la pour se référer aux roles
