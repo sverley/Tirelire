@@ -4,12 +4,9 @@
 - Lire `docs/description-projet.md` avant tout : le texte du porteur, mot pour mot, qui fait foi,
   ouvert par ses sections « Principes » et « Usages ». Il ne se reformule pas ; seul le porteur le complète ou le corrige, avec ses mots, datés, ce qu'il
   retire restant barré.
-- Lire ensuite `docs/invariants.md` : les valeurs mesurables des principes et des règles, que les
-  harnais font échouer au-delà. Une décision se prend au regard des principes et des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
+- Lire ensuite `docs/invariants.md`. Une décision se prend au regard des principes et des invariants ; une demande qui en contredit un devient une question dans l'issue, pas
   une décision.
-- Lire `docs/cibles.md` : les cibles de distribution, leur état et la matrice usages × cibles. Le
-  travail se borne aux cibles actives ; une cible de côté ne se touche pas. Les étiquettes `cible:*`
-  d'une issue ou d'une PR nomment ses cibles ; sans étiquette, elle vaut pour toutes les actives.
+- Lire `docs/cibles.md` : les cibles de distribution, leur état et leurs étiquettes.
 - Lire aussi `docs/contraintes.md` : ce que les plateformes imposent à une application multiplateforme
   qui doit rester simple ; tout choix technique la respecte.
 - Lire `docs/decisions.md` avant de modifier le modèle, le plan, le dépôt ou la synchro : comment le
@@ -194,6 +191,9 @@ Il passe en second, sur la PR ouverte par l'auditeur.
    chaque vérification manuelle demandée, ce que ses modifications changent et ce qui reste à
    constater. Honnête et court. Puis s'arrêter.
 5. Si le harnais paraît faux ou le besoin impossible, le dire en commentaire et s'arrêter.
+6. Si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
+   manquante —, demander au porteur, en commentaire de l'issue, la modification proposée, avec son
+   texte.
 
 Il ne passe jamais la PR en Ready et ne la fusionne jamais. Il n'ouvre pas d'issue.
 
@@ -205,7 +205,7 @@ de dev, puis fusionne au vert ; la fusion vaut validation et ferme l'issue. Si l
 ou si une vérification échoue, il le dit en commentaire, avec le journal d'erreur ou son constat,
 repasse la PR en brouillon, et la boucle reprend.
 
-### Trois règles communes
+### Règles communes
 
 - **Une issue, une PR, une fusion.** Ce qui en déborde est une nouvelle issue, ouverte avant la
   fusion ; rien ne reste dans un fil qui va se fermer.
@@ -213,5 +213,8 @@ repasse la PR en brouillon, et la boucle reprend.
   renvoi à ce qu'elle remplace : on amende l'entrée ancienne. C'est l'auditeur qui vérifie qu'elle
   ne contredit ni les autres, ni les fondamentaux du projet ; la garde ne le vérifie pas, elle n'en
   serait pas capable. Si la règle rougit du code existant, le rouge devient une issue.
+- **Une information ne se duplique pas.** Elle vit à un seul endroit ; les autres y renvoient.
+- **Le projet tient sans ses issues.** Elles servent à le conduire ; une issue reste ouverte tant
+  qu'elle est cohérente avec les catalogues, et c'est le catalogue qui fait référence.
 - **Pas d'outil nouveau sans issue produit qui l'exige.** Une PR qui n'améliore que la garde, les
   crochets ou la CI ne s'ouvre pas sans que le porteur l'ait demandée.

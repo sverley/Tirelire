@@ -2,8 +2,8 @@
 
 Les cibles de distribution de Tirelire (principe 6 de la
 [description du projet](description-projet.md)) : ce que chacune est, ce qui la construit et la
-livre, et son état. Ce catalogue est la référence ; aucune issue ne porte une cible. Il borne le
-champ des agents de codage et de distribution.
+livre, et son état. Ce catalogue est la référence : il tient sans les issues. Il borne le champ des
+agents de codage et de distribution (`CLAUDE.md`).
 
 ## Comment il sert
 
@@ -13,16 +13,12 @@ champ des agents de codage et de distribution.
   PR, plusieurs possibles. Sans étiquette, une issue vaut pour toutes les cibles actives.
 - **Ni jalon ni issue par cible** : un jalon est une échéance et se ferme, une issue se ferme ; une
   cible reste. Une cible change d'état ici, à la demande du porteur.
-- **Contraintes** : la portée d'une contrainte ([`contraintes.md`](contraintes.md)) cite ses cibles
-  par leur nom ; sans portée, elle vaut pour toutes.
-- **Agents** : l'auditeur borne son « Fait quand » aux cibles actives ; le codeur ne touche pas une
-  cible de côté.
 - **Objectifs** : une case « prioritaire » de la matrice qu'aucune issue ne couvre donne un objectif,
   étiqueté de sa cible. La matrice repère les trous ; elle ne découpe pas le travail — les objectifs
   restent des besoins produit. Elle se relit : aucun outil ne la vérifie.
 
 Une entrée donne, sur sa ligne **Construction**, les commandes entre accents graves qui la
-construisent ; le harnais d'I9 vérifie que celles d'une cible active tournent sur `main`.
+construisent.
 
 ## Webapp · Chromium sur Android
 

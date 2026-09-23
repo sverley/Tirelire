@@ -10,9 +10,7 @@ datés ; ce qu'il retire reste visible, barré.
 ## Principes
 
 Validés par le porteur le 23 septembre 2026 (#162), tels quels : « oui ». Du plus général au plus
-précis. Les invariants ([`invariants.md`](invariants.md)) en sont les valeurs mesurables ; les
-décisions ([`decisions.md`](decisions.md)) ne les contredisent pas ; les règles de travail
-(`CLAUDE.md`) déclinent ceux du travail.
+précis.
 
 ### Le produit
 
@@ -53,16 +51,28 @@ décisions ([`decisions.md`](decisions.md)) ne les contredisent pas ; les règle
 
 ## Usages
 
-Les usages du principe 2, chacun dans les mots du porteur (11 septembre 2026, #29) ; U1 est
-prioritaire (principe 2.1). Aucun n'est le préalable d'un autre, aucun n'est le mode dégradé d'un
-autre. L'invariant I3 en mesure chacun ; le catalogue des cibles ([`cibles.md`](cibles.md)) dit sur
-quelles cibles chacun est prioritaire.
+Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29), dans l'ordre où il
+les a donnés ; seul l'identifiant et le titre sont ajoutés. U1 est prioritaire (principe 2.1).
 
-- **U1 · Budget seul.** « L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation. » Et, les 13–14 septembre : « la priorité reste l'usage de construction d'un buget exnihilo ».
-- **U2 · Budget et virements permanents.** « on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires. »
-- **U3 · Budget sans virements validés, puis import.** « Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue. »
-- **U4 · Budget reconstruit depuis l'historique.** « l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée. »
-- **U5 · Import seul.** « Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget. »
+**U2 · Budget et virements permanents.**
+
+> on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires.
+
+**U4 · Budget reconstruit depuis l'historique.**
+
+> Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée.
+
+**U3 · Budget sans virements validés, puis import.**
+
+> Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue.
+
+**U1 · Budget seul.**
+
+> L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation.
+
+**U5 · Import seul.**
+
+> Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget.
 
 ## 6 septembre 2026 · le besoin d'origine
 
@@ -88,17 +98,9 @@ agent, pas ses paroles. Le principe 1 et ses déclinaisons les remplacent.
 Donné à l'ouverture de l'issue #29.
 
 > L'esprit de l'application est d'aider les particuliers à gérer leur budget avec plusieurs comptes.
->
-> on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires.
->
-> Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée.
->
-> Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue.
->
-> L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation.
->
-> Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget.
->
+
+Les cinq paragraphes suivants, sur les usages, sont dans la section « Usages ».
+
 > Elle doit toujours rester simple pour les utilisateurs mais souple et configurable pour les usages avancée.
 >
 > Elle doit inciter à utiliser toutes les fonctionnalités en les rendant accessibles et attrayantes (claires et efficaces).
@@ -390,3 +392,17 @@ Puis, parmi les voies proposées, la troisième (identifiants FTP au niveau du d
 ### La méthode
 
 > Consigner dans une pr ne sert a rien, elle est fermée au merge
+
+### Pendant le codage de #162
+
+Réponses du porteur aux questions du codeur, le 23 septembre.
+
+> La description est gardée normalement. La garde doit pouvoir constater un écart sur le fichier et donc possiblement les usages. pourquoi la garde aurait besoin de savoir lire les usages ?
+
+> #Regle : Il ne faut dupliquer d'informations
+
+> oui, le plan est un résultat. Le budget et les flux doivent nécessiter la validation de l'utilisateur.
+
+> Non, l'auditeur est là pour vérifier que le besoin et les fondamentaux sont respectés par la codeur. Le codeur a sa compréhension sa besoin et peut demander des modifications du besoin (issue) au porteur pour clairifer un point qui n'a pas ete traté pas le codeur
+
+> Les issues peuvent rester tant qu'elles sont en cohérences avec les catalogues. Elles servent à la gestion pratique du projet mais le projet doit tenir sans elles

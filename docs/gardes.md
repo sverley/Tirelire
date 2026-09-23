@@ -41,14 +41,14 @@ Le vocabulaire est celui de [`glossaire.md`](glossaire.md).
   reconnaît pas —, le job est rouge et le dit : c'est au porteur de trancher. `pnpm test`, lui, joue
   la garde que la PR propose.
 - **La déclaration se lit comme GitHub l'affiche.** Les blocs de code et les commentaires HTML ne
-  comptent pas ; les identifiants se lisent sans tenir compte de la casse ; une plage (`U1 à U3`)
+  comptent pas ; les identifiants se lisent sans tenir compte de la casse ; une plage (`C1 à C3`)
   déclare chacun de ceux qu'elle couvre.
 - **Ce que la garde ne vérifie pas** : qu'une règle ou une décision nouvelle ne contredit ni les
   autres, ni les documents fondateurs. C'est un jugement, et il revient à l'auditeur (`CLAUDE.md`).
 
 ## Écrire une entrée
 
-Le titre commence par l'identifiant (`## I7 · …`, `### U1 · …`, `## C3 · …`) ; seul l'identifiant
+Le titre commence par l'identifiant (`## I7 · …`, `## C3 · …`) ; seul l'identifiant
 compte, et un titre qui s'ouvre sur un identifiant sous une autre forme est refusé. Viennent ensuite, au choix :
 
 - `Chemins :` suivi de motifs entre accents graves (`*` dans un dossier, `**` à travers les
@@ -89,79 +89,66 @@ Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
 
 ## I3 · Chaque usage tient seul
 
-- **Couvert par** · U1, U2, U3, U4, U5 — chaque usage a sa garde, ci-dessous.
+Les usages sont ceux de la description ; chaque ligne nomme le sien entre parenthèses, après le nom
+de son test.
+
 - **Vérification manuelle** · `VM-I3-independance` — Relire ce que la PR rend obligatoire (étape,
   écran, donnée) : aucun usage n'en exige un autre, comme importer pour budgéter ou créer une
   tirelire pour classer, et aucun n'est présenté comme la version réduite d'un autre.
-
-### U1 · Budget seul
-
 - **Harnais** · `packages/core/test/assistant.test.ts` — « budget construit par l'assistant
-  (D40) » : sans aucune opération, le budget se voit dès la période en cours.
+  (D40) » (U1) : sans aucune opération, le budget se voit dès la période en cours.
   Témoin rouge : « témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir »
 - **Harnais** · `packages/core/test/parcours-u1.test.ts` — « parcours U1 · de la base vide au plan, sans une seule opération » :
   d'une base vide, le budget écrit comme l'application l'écrit puis relu après redémarrage ; le plan
   de la période en cours se lit en entier — dotations, lissage de l'échéance, marge, virement à
   faire — et le bilan ne fabrique aucun observé, sans une seule opération.
   Témoin rouge : « témoin rouge · un plan dont les dotations viennent de ce que les opérations montrent »
-- **Vérification manuelle** · `VM-U1-parcours` — Sur une base vide, construire un budget avec
-  l'assistant jusqu'au plan sans importer de relevé : aucun écran ne bloque ni n'insiste pour
+- **Vérification manuelle** · `VM-I3-u1-parcours` — (U1) Sur une base vide, construire un budget
+  avec l'assistant jusqu'au plan sans importer de relevé : aucun écran ne bloque ni n'insiste pour
   importer, et le plan se lit.
-
-### U2 · Budget et virements permanents
-
-- **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — le virement permanent enregistre
-  le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le budget se
-  signale sans rien réécrire (#14, D60).
+- **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — (U2) le virement permanent
+  enregistre le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le
+  budget se signale sans rien réécrire (#14, D60).
   Témoin rouge : « témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer »
-- **Harnais** · `apps/web/test/navigateur/flux-derives-plan.test.ts` — à 375 px, l'écran Plan enregistre
-  l'ordre, qui survit au rechargement.
+- **Harnais** · `apps/web/test/navigateur/flux-derives-plan.test.ts` — (U2) à 375 px, l'écran Plan
+  enregistre l'ordre, qui survit au rechargement.
   Témoin rouge : « témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire »
 - **Harnais** · `packages/core/test/parcours-u2.test.ts` — « parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation » :
   d'une base vide au plan, l'ordre proposé n'est écrit que si l'utilisateur le valide (I10), puis il
   survit au redémarrage comme fait bancaire — un par couple de comptes, libellé à recopier — et le
   plan lit sa ventilation sans jamais la figer.
   Témoin rouge : « témoin rouge · un ordre validé qui ne laisse aucune trace dans la base »
-- **Vérification manuelle** · `VM-U2-ordres` — Construire un budget, puis valider la mise en place
-  des virements permanents proposés : chaque ordre est enregistré, et sa ventilation sur les
-  tirelires se lit dans le plan.
-
-### U3 · Budget sans virements validés, puis import
-
-- **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » : virements « TIRELIRE … »
-  reconnus et répartis par l'ordre de financement (D21), flux rapprochés quand libellé et montant
-  concordent.
+- **Vérification manuelle** · `VM-I3-u2-ordres` — (U2) Construire un budget, puis valider la mise
+  en place des virements permanents proposés : chaque ordre est enregistré, et sa ventilation sur
+  les tirelires se lit dans le plan.
+- **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » (U3) : virements
+  « TIRELIRE … » reconnus et répartis par l'ordre de financement (D21), flux rapprochés quand
+  libellé et montant concordent.
   Témoin rouge : « témoin rouge · un virement reconnu versé en entier à une seule tirelire »
-- **Vérification manuelle** · `VM-U3-rapprochement` — Construire un budget sans valider les
-  virements, puis importer un relevé inventé qui les contient : l'application propose de les
+- **Vérification manuelle** · `VM-I3-u3-rapprochement` — (U3) Construire un budget sans valider
+  les virements, puis importer un relevé inventé qui les contient : l'application propose de les
   rapprocher et reprend la ventilation prévue par le budget.
-- **À bâtir** · le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
-
-### U4 · Budget reconstruit depuis l'historique
-
-- **Harnais** · `packages/core/test/review.test.ts` — bilans par catégorie et des provisions tirés
-  des opérations ; une proposition d'ajustement ne s'applique jamais seule.
+- **À bâtir** · (U3) le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
+- **Harnais** · `packages/core/test/review.test.ts` — (U4) bilans par catégorie et des provisions
+  tirés des opérations ; une proposition d'ajustement ne s'applique jamais seule.
   Témoin rouge : « témoin rouge · un bilan qui compte les dépenses ponctuelles dans la moyenne »
-- **Vérification manuelle** · `VM-U4-reconstruction` — Sans budget, importer un historique inventé
-  et reconstruire un budget depuis les opérations : chaque lien entre une opération et un flux se
-  valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
-- **À bâtir** · le parcours complet, des opérations importées au budget reconstruit (#16).
-
-### U5 · Import seul
-
-- **Harnais** · `packages/core/test/import.test.ts` — lecture des relevés, doublons exacts et
+- **Vérification manuelle** · `VM-I3-u4-reconstruction` — (U4) Sans budget, importer un historique
+  inventé et reconstruire un budget depuis les opérations : chaque lien entre une opération et un
+  flux se valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
+- **À bâtir** · (U4) le parcours complet, des opérations importées au budget reconstruit (#16).
+- **Harnais** · `packages/core/test/import.test.ts` — (U5) lecture des relevés, doublons exacts et
   probables.
   Témoin rouge : « témoin rouge · un import qui ne cherche les doublons que dans le fichier »
-- **Harnais** · `packages/core/test/automations.test.ts` — moteur de règles de classement.
+- **Harnais** · `packages/core/test/automations.test.ts` — (U5) moteur de règles de classement.
   Témoin rouge : « témoin rouge · un moteur de règles qui applique les rangs à l’envers »
 - **Harnais** · `packages/core/test/parcours-u5.test.ts` — « parcours U5 · du relevé importé au bilan par catégorie, sans aucune tirelire » :
   d'une base vide, un relevé inventé importé, des catégories et des automatismes, le classement
   appliqué et relu après redémarrage ; le bilan par catégorie se lit et le plan ne réclame rien,
   sans qu'aucune tirelire, aucun besoin ni aucun budget n'existe jamais.
   Témoin rouge : « témoin rouge · un bilan qui ne compte que les opérations rattachées à une tirelire »
-- **Vérification manuelle** · `VM-U5-sans-tirelire` — Sur une base vide, importer un relevé
-  inventé, classer ses opérations et lire l'analyse par catégorie sans jamais créer de tirelire ni
-  de budget : aucun écran ne l'exige, aucun ne reste vide faute d'en avoir.
+- **Vérification manuelle** · `VM-I3-u5-sans-tirelire` — (U5) Sur une base vide, importer un
+  relevé inventé, classer ses opérations et lire l'analyse par catégorie sans jamais créer de
+  tirelire ni de budget : aucun écran ne l'exige, aucun ne reste vide faute d'en avoir.
 
 ## I4 · Simple par défaut, souple sur demande
 
@@ -277,6 +264,10 @@ Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/we
 
 Chemins : `packages/core/src/plan.ts`
 
+- **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — « I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base » :
+  le plan de trois périodes calculé sur le budget de l'assistant, le registre lu et la base
+  relue à l'identique ensuite.
+  Témoin rouge : « témoin rouge · un plan qui réécrit un besoin en se calculant »
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — un budget qui monte ou baisse
   fait dire au plan l'ancien montant de l'ordre et le nouveau ; un ordre qui diverge est signalé,
   jamais réécrit.

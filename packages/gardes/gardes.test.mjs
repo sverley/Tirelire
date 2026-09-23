@@ -86,9 +86,11 @@ Chemins : \`b/*.mjs\`
 const couverture = (modif = {}) =>
   verifierCouvertureTextes({ invariants: INVARIANTS, contraintes: CONTRAINTES, gardes: GARDES, fichiers: FICHIERS, ...modif }).problemes;
 
-test('le dépôt tient sa garde : chaque invariant, usage et contrainte est gardé', () => {
+// Depuis #162, les usages vivent dans la description, et leurs gardes dans l'entrée d'I3 : le dépôt
+// n'a plus d'identifiant U… à lire. La garde sait toujours en lire (jeu inventé ci-dessous).
+test('le dépôt tient sa garde : chaque invariant et chaque contrainte est gardé', () => {
   const { problemes, ids } = verifierCouverture();
-  for (const genre of ['I', 'U', 'C']) {
+  for (const genre of ['I', 'C']) {
     assert.ok([...ids.keys()].some((id) => id.startsWith(genre)), `aucun identifiant ${genre}… lu : le format des documents a changé ?`);
   }
   assert.deepEqual(problemes, []);

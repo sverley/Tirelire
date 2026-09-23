@@ -1,26 +1,11 @@
 # Invariants du produit
 
-Un invariant est la valeur mesurable d'un principe ou d'une règle (principe 9.2 de la
-[description du projet](description-projet.md)) : la valeur à laquelle on se réfère pour valider une
-mesure. Les principes et les usages vivent dans la description, qui fait foi ; un invariant qui s'en
-écarterait se corrige d'après elle. Ce qui ne se mesure pas reste principe, sans entrée ici.
-
-- Chaque invariant cite le principe ou la règle qu'il décline, et énonce sa **valeur** : ce que le
-  produit tient, et au-delà de quoi son harnais échoue. S'il y a lieu, il écrit à côté son
-  **objectif** : visé, sans harnais qui échoue dessus.
-- Son entrée au registre ([`gardes.md`](gardes.md)) porte le harnais qui mesure la valeur, ou la
-  vérification manuelle quand aucun test ne peut la trancher. Un harnais qui, à sa valeur,
-  rougirait le code existant devient une issue produit, et le registre le dit.
-- Une décision n'a pas d'invariant : elle est locale, s'amende, et se vérifie par les tests du
-  produit. Une décision qui imposerait une valeur à tout le projet est une règle ou un principe
-  déguisé. Une décision ne contredit pas un invariant ; si un besoin semble l'exiger, la question se
-  pose d'abord dans une issue.
-- Ce que les plateformes imposent est une contrainte ([`contraintes.md`](contraintes.md)) ; les
-  cibles de distribution ont leur catalogue ([`cibles.md`](cibles.md)).
-- Un invariant ne nomme ni modèle, ni écran, ni technique, sauf quand la description l'impose : le
-  reste est un choix, donc une décision.
-- Les invariants forment un ensemble cohérent, sans date : un invariant s'amende à la demande du
-  porteur, et s'applique aussitôt, rétroactivement.
+Les valeurs mesurables des principes et des règles (principe 9.2 de la
+[description du projet](description-projet.md), qui fait foi). Chacun cite ce qu'il décline et
+énonce sa **valeur**, que son harnais fait échouer au-delà ; s'il y a lieu, son **objectif**, visé,
+sans harnais qui échoue dessus. Son harnais, ou sa vérification manuelle, est au registre
+([`gardes.md`](gardes.md)). Une décision n'a pas d'invariant ; une contrainte est dans
+[`contraintes.md`](contraintes.md), une cible dans [`cibles.md`](cibles.md).
 
 ## I2 · Une tirelire est un livre de compte
 
@@ -32,20 +17,10 @@ de ses composantes, au centime près.
 
 ## I3 · Chaque usage tient seul
 
-Décline le principe 2. Les usages sont définis dans la section « Usages » de la description.
+Décline le principe 2, pour chacun des usages de la description.
 
-**Valeur** : chacun des cinq usages s'accomplit de bout en bout sur une base vide, sans aucune donnée
-propre à un autre usage.
-
-- **U1 · Budget seul.** De la base vide au plan de la période en cours, sans une seule opération.
-- **U2 · Budget et virements permanents.** De la base vide aux ordres permanents validés et
-  enregistrés avec leur ventilation, sans une seule opération importée.
-- **U3 · Budget sans virements validés, puis import.** D'un budget sans ordre validé à un relevé
-  importé dont les virements sont rapprochés, avec la ventilation prévue.
-- **U4 · Budget reconstruit depuis l'historique.** D'opérations importées sans budget à un budget
-  reconstruit, chaque lien validé par l'utilisateur, aucune ventilation supposée.
-- **U5 · Import seul.** D'un relevé importé au bilan par catégorie, sans qu'aucune tirelire, aucun
-  besoin ni aucun budget n'existe.
+**Valeur** : chaque usage s'accomplit de bout en bout sur une base vide, sans aucune donnée propre à
+un autre usage.
 
 ## I4 · Simple par défaut, souple sur demande
 
@@ -100,9 +75,9 @@ chaque push, et aucune cible de côté ou à venir ne bloque sa construction.
 
 Décline les principes 4 et 4.2.
 
-**Valeur** : aucune modification d'un ordre permanent enregistré sans une validation de
-l'utilisateur ; quand le budget évolue, chaque écart entre l'ordre enregistré et le plan se signale,
-avec l'ancien montant et le nouveau.
+**Valeur** : le budget et les flux ne changent que sur une validation de l'utilisateur ; le plan en
+est le résultat, recalculé, et le calculer ne modifie rien. Quand le budget évolue, chaque écart
+avec un ordre permanent enregistré se signale, avec l'ancien montant et le nouveau, sans le réécrire.
 
 ## I11 · Les assistants font partie de la vie de l'application
 

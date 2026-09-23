@@ -38,6 +38,7 @@ import {
   type Patch,
   type PlannedFlow,
 } from '../src/index.js';
+import { AS_OF, baseVide, ecrireLeBudget } from './parcours.js';
 
 const PRINCIPAL = 'acc-principal';
 const LIVRET = 'acc-livret';
@@ -668,4 +669,41 @@ it.fails('témoin rouge · une vieille photo de pair non migré prise pour la ve
   const photo: Record<string, number> = { 'env-auto': euros(650) };
 
   expect(photo).toEqual(attendue(l, op));
+});
+
+// ─── I10 · le plan est un résultat (#162) ────────────────────────────────────────────────────────
+
+/**
+ * La valeur d'I10 : le budget et les flux ne changent que sur une validation de l'utilisateur ; le
+ * plan en est le résultat. Calculer le plan — la période en cours et les suivantes — ne touche ni
+ * au registre lu, ni à la base : ce qui se relit ensuite est ce qui était écrit avant.
+ */
+async function calculerNeModifieRien(calculer: (ledger: Ledger) => unknown): Promise<void> {
+  const store = await baseVide('i10-plan-resultat');
+  ecrireLeBudget(store);
+  const lu = store.load();
+  const avant = structuredClone(lu);
+  const baseAvant = JSON.stringify(store.load());
+  calculer(lu);
+  expect(lu, 'le calcul du plan a modifié le budget ou les flux qu’il lisait').toEqual(avant);
+  expect(JSON.stringify(store.load()), 'le calcul du plan a écrit dans la base').toBe(baseAvant);
+  store.close();
+}
+
+const planSurTroisPeriodes = (ledger: Ledger) => {
+  for (const jour of [AS_OF, '2026-10-20', '2026-11-20']) computePlan(ledger, jour);
+};
+
+describe('I10 · le plan est un résultat', () => {
+  it('I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base', async () => {
+    await calculerNeModifieRien(planSurTroisPeriodes);
+  });
+
+  it.fails('témoin rouge · un plan qui réécrit un besoin en se calculant', async () => {
+    await calculerNeModifieRien((ledger) => {
+      planSurTroisPeriodes(ledger);
+      const besoin = ledger.needs?.[0];
+      if (besoin) besoin.amount = (besoin.amount ?? 0) + 100;
+    });
+  });
 });
