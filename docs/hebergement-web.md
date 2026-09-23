@@ -181,6 +181,18 @@ donne le lien du journal). Cocher ou décocher la case n'est pas un changement d
 Aucun réglage du dépôt n'est à ajouter : les identifiants et les variables de recette restent ceux de
 la production.
 
+Un aperçu dépose le PHP de sa PR (`relais.php`, `.htaccess`, `.ovhconfig`) : les scripts de dépôt
+sont ceux de `main`, mais ce qu'ils déposent est le site de la PR, et son PHP s'exécute sur
+l'hébergement **sous le même compte que la production**. Un PHP modifié par une PR peut donc lire ou
+écrire tout ce que ce compte atteint, site et paquets du relais de production compris. Risque accepté
+par le porteur (#165, 23/09) :
+
+> ok, on prend le risque pour le moment. D'ailleurs, il ne doit pas y avoir de données sur le serveur qu'on n'a pas sur la session client, non ?
+
+Les données de Tirelire restent sur les appareils (voir « Sécurité et limites ») : le serveur ne garde
+que des paquets chiffrés, dont seuls ceux pas encore tirés par un autre appareil manquent ailleurs.
+Ce qui reste exposé est le site de production lui-même, qu'un PHP d'aperçu pourrait modifier.
+
 Les workflows de la PR et ceux de `main` ne se mélangent pas (#155) — mais, dépôt privé, un workflow
 ajouté par la branche peut lire les identifiants (#176, ci-dessus). `ci.yml`, lu dans la branche,
 assemble le site de la PR sans identifiant ni réglage de recette, et le garde en artefact
