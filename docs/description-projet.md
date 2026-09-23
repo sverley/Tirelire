@@ -437,3 +437,5 @@ qu'elles barrent.
 > Pour le reste je valide les changements décidés maintenant qui vont engendrer un nouveau tour dans cette issue et pr
 
 > Il faudra aussi modifier les instructions dans le projet Claude.la pour se référer aux roles
+
+> En effet, il faut ajouter cette méthode au rôle de l'auditeur. Mais l'auditeur ajoute ses retours pour relancer un tour au codeur dans la PR si besoin.

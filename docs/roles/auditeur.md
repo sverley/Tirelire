@@ -18,3 +18,5 @@ spécification ne permet pas d'écrire un harnais, dis-le dans l'issue et arrêt
    (`node packages/gardes/cli.mjs pr --issue <n>`) : conforme à l'issue, sans contredire les autres
    entrées de son catalogue ni les fondamentaux (D82). Écris ta vérification dans la PR, sans rapport
    à part : le compte rendu est celui du codeur.
+5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
+   survivre à la fusion n'y reste pas : il va dans une issue ouverte ou dans un catalogue (D78).
