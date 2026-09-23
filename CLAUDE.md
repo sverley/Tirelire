@@ -88,11 +88,13 @@ CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'el
 de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
 et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
 ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
-crochet lent, pas d'alerte. Six workflows, pour qu'aucune exécution ne montre sautés les jobs
+crochet lent, pas d'alerte. Sept workflows, pour qu'aucune exécution ne montre sautés les jobs
 qu'une autre joue : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la garde),
-`apercu.yml` (dépôt de l'aperçu au vert de `ci.yml` et `validation.yml`, statut de toute la CI, et
-retrait), `pret.yml` (les repères d'une PR prête), `suivi.yml` (un changement après le Ready,
-signalé) et `fin.yml` (« en cours » quitte l'issue à sa fermeture).
+`apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu), `depot-apercu.yml`
+(dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères d'une PR prête, case de
+l'aperçu comprise), `suivi.yml` (un changement après le Ready, signalé) et `fin.yml` (« en cours »
+quitte l'issue à sa fermeture). Seul `depot-apercu.yml` y fait exception, accepté par le porteur :
+ses exécutions montrent des jobs sautés, et la case de l'aperçu dit ce qui est en ligne.
 
 ### Vérification et validation
 
@@ -103,6 +105,14 @@ Deux actes, qui ne se confondent pas :
   la PR ;
 - **la validation**, par le porteur : **la fusion vaut validation**, sans autre geste. Rien ne la
   bloque techniquement (dépôt privé, offre gratuite) : c'est au porteur de ne fusionner qu'au vert.
+
+**La case de l'aperçu** (#175). Rien n'est déposé sur la recette sans une action du porteur : il
+coche, dans la description de la PR, la case « Aperçu du dernier commit en recette ». Le dépôt n'a
+lieu que si la PR est prête et toute sa CI verte sur le dernier commit ; sinon la case se décoche et
+un commentaire dit pourquoi ; de même si elle est cochée par un autre que le propriétaire du dépôt.
+Cochée, elle dit que l'aperçu en ligne est celui du dernier commit.
+**Les agents ne cochent jamais cette case**, et ne la décochent pas non plus : elle est au porteur et
+aux workflows.
 
 Le brouillon ne joue aucun rôle dans la validation : il n'économise que la CI. Une PR s'ouvre en
 brouillon ; le porteur la passe en Ready à la main, ce qui lance toute la CI et assemble la version de
@@ -142,7 +152,8 @@ Il passe en premier. Il ne code jamais le produit.
    pour la garde. Un seul fichier de test par issue, sauf raison dite.
 5. Écrire dans l'issue la section « Invariants et contraintes » : les entrées du registre touchées,
    et pour chacune la vérification manuelle attendue, sans case (`node packages/gardes/cli.mjs
-   demander` la prépare). Ouvrir la PR en brouillon : `Close #n`, rien d'autre.
+   demander` la prépare). Ouvrir la PR en brouillon : `Close #n`, rien d'autre ; la case de l'aperçu
+   s'y ajoute d'elle-même au Ready.
 6. Répondre aux commentaires du codeur : corriger le harnais ou préciser l'issue. Vérifier son
    travail en local, garde comprise (`node packages/gardes/cli.mjs pr --issue <n>`).
 7. Si le besoin ajoute ou modifie une règle, une décision ou un invariant, vérifier avant d'ouvrir

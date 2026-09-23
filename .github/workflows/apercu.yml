@@ -1,29 +1,27 @@
 name: Aperçu
 
-# Dépôt et retrait de l'aperçu d'une PR sur l'instance de recette (#141, #155). Sur
+# Attente du vert de toute la CI au Ready, et retrait de l'aperçu d'une PR (#141, #155). Sur
 # `pull_request_target`, GitHub lit ce workflow sur `main`, jamais dans la PR : une PR ne peut ni le
 # réécrire, ni changer les scripts de dépôt qu'il lance. Les identifiants FTP (`OVH_FTP_*`) vivent
 # dans l'environnement `depot-ftp`, qui n'admet que `main` : un run de `pull_request`, dont le
 # workflow vient de la branche, ne peut pas les obtenir, quoi que la PR modifie.
 #
-# Rien de la PR ne s'exécute ici. Son site est assemblé par `ci.yml` (job « Assemblage de l'aperçu
-# de la PR », sans identifiants, après ses tests) et arrive en artefact ; ne viennent de `main` que
-# `apercu.sh`, `deposer.sh` et `verifier.sh`, donc le bornage à `<dossier>/pr-<numéro>`.
+# Rien de la PR ne s'exécute ici ; ne vient de `main` que `apercu.sh`, donc le bornage à
+# `<dossier>/pr-<numéro>`.
 #
-# Dépôt au vert (#169) : rien ne se dépose tant que toute la CI de la PR n'est pas verte — `ci.yml`
-# (tests, build, assemblage) et `validation.yml` (la garde), pour le dernier commit de la branche et
-# ce passage en Ready. Le job `attente` les attend ; si l'une rougit, `raison` le dit en commentaire de
-# la PR, avec le lien de l'exécution en cause, et rien n'est déposé. Le job `statut` termine le
-# statut « Toute la CI sur ce commit » (#168). Le porteur regarde l'aperçu déposé, puis fusionne : la
-# fusion vaut validation.
+# Le Ready ne dépose rien (#175) : le dépôt est une action du porteur, qui coche la case de l'aperçu
+# dans la description de la PR (`depot-apercu.yml`), et n'a lieu qu'au vert de toute la CI (#169).
+# Au Ready, le job `attente` attend toute la CI — `ci.yml` (tests, build, assemblage) et
+# `validation.yml` (la garde) — pour le dernier commit de la branche ; si l'une rougit, `raison` le dit
+# en commentaire de la PR, avec le lien de l'exécution en cause. Le job `statut` termine le statut
+# « Toute la CI sur ce commit » (#168). Le porteur coche la case au vert, regarde l'aperçu déposé, puis
+# fusionne : la fusion vaut validation.
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `attente` est hors harnais : il attend la fin de toute la CI de la PR et ne fait que lire leurs
 #   conclusions, en lecture seule, sans secret ni code de la PR.
 # - `statut` est hors harnais : il reporte sur le commit le verdict d'`attente`, sans rien vérifier.
 # - `raison` est hors harnais : quand `attente` a vu une CI rouge, il le dit en commentaire de la PR.
-# - `depot` lit hors des fichiers suivis : l'étape « Vérifier l'aperçu en ligne » (`verifier.sh`) lit
-#   l'aperçu déployé et le commit qu'il sert (#141).
 # - `retrait` est hors harnais : à la fermeture de la PR, il supprime son sous-dossier de recette
 #   (`apercu.sh retirer`), sans tests ni build (#131).
 
@@ -33,8 +31,7 @@ on:
 
 permissions: {}
 
-# Dépôt et retrait d'un même aperçu, l'un après l'autre ; un nouveau passage en Ready rend caducs
-# l'attente et le dépôt d'avant, jamais un retrait.
+# Un nouveau passage en Ready rend caduque l'attente d'avant, jamais un retrait.
 concurrency:
   group: apercu-${{ github.event.pull_request.number }}
   cancel-in-progress: ${{ github.event.action != 'closed' }}
@@ -60,7 +57,7 @@ jobs:
     steps:
       # Toute la CI de ce passage en Ready, sur le dernier commit de la branche : les exécutions créées
       # au plus tôt deux minutes avant celle-ci. Chacune doit finir verte ; une seule rouge, annulée ou
-      # absente dans l'heure, et rien ne se dépose.
+      # absente dans l'heure, et la case de l'aperçu ne déposera rien.
       - name: Attendre la fin de toute la CI
         id: ci
         run: |
@@ -98,17 +95,17 @@ jobs:
             rouges="- « CI et livraison » a fini sans laisser le site assemblé (apercu-pr-$NUMERO)"$'\n'
           fi
           if [ -n "$rouges" ]; then
-            message="Pas d'aperçu déposé pour ${SHA::7} : toute la CI de la PR doit être verte, et elle ne l'est pas."$'\n\n'"$rouges"
+            message="Toute la CI n'est pas verte sur ${SHA::7} : la case de l'aperçu n'y déposera rien."$'\n\n'"$rouges"
             printf '### Aperçu de la PR #%s\n\n%s' "$NUMERO" "$message" >> "$GITHUB_STEP_SUMMARY"
             { echo "message<<FIN_DU_MESSAGE"; echo "$message"; echo "FIN_DU_MESSAGE"; } >> "$GITHUB_OUTPUT"
-            echo "::error title=Pas d'aperçu::La CI de la PR n'est pas toute verte ; voir le commentaire de la PR."
+            echo "::error title=CI pas verte::La CI de la PR n'est pas toute verte ; voir le commentaire de la PR."
             exit 1
           fi
           echo "Toute la CI est verte ; site assemblé par l'exécution $run de ci.yml."
           echo "run=$run" >> "$GITHUB_OUTPUT"
 
   raison:
-    name: Pourquoi rien n'est déposé
+    name: Pourquoi la CI n'est pas verte
     # Seulement quand `attente` a vu une CI rouge : le commentaire nomme le workflow en cause. Un job à
     # part, pour que l'attente reste en lecture seule.
     needs: attente
@@ -147,103 +144,6 @@ jobs:
           if [ "$RESULTAT" = success ]; then etat=success; d="Toute la CI est verte sur ce commit"
           else etat=failure; d="La CI n'est pas toute verte sur ce commit : voir le commentaire de la PR"; fi
           gh api "repos/$GH_REPO/statuses/$SHA" -f state="$etat" -f context="$CONTEXTE" -f description="$d" > /dev/null
-
-  depot:
-    name: Aperçu de la PR sur l'instance de recette
-    needs: attente
-    # Au passage en Ready seulement (#150) : jamais sur un brouillon, ni à la fermeture.
-    if: github.event_name == 'pull_request_target' && github.event.action != 'closed' && github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
-    environment: depot-ftp
-    permissions:
-      actions: read # l'exécution de `ci.yml` sur la tête de la PR, et son artefact
-      contents: read
-    env:
-      NUMERO: ${{ github.event.pull_request.number }}
-      # Recette : aucune valeur par défaut, apercu.sh arrête tout si l'une manque ou vaut la production.
-      TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
-      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
-      TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
-      TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
-      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
-      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
-    steps:
-      # Les scripts de dépôt de `main`, jamais ceux de la branche (#155).
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          sparse-checkout: apps/hebergement
-          persist-credentials: false
-      # Avant tout transfert : sans réglages de recette, rien ne se dépose.
-      - name: Réglages de l'aperçu
-        id: reglages
-        run: bash apps/hebergement/apercu.sh reglages >> "$GITHUB_OUTPUT"
-      # L'artefact `apercu-pr-<numéro>` de l'exécution de `ci.yml` que le job `attente` a vue verte.
-      - name: Récupérer le site assemblé
-        uses: actions/download-artifact@v4
-        with:
-          name: apercu-pr-${{ github.event.pull_request.number }}
-          run-id: ${{ needs.attente.outputs.run }}
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/archive
-      # Ce qui vient de la PR n'est que des données : on le vérifie avant de le confier au dépôt.
-      - name: Ouvrir l'archive
-        id: archive
-        run: |
-          set -euo pipefail
-          site="$RUNNER_TEMP/site"
-          mkdir -p "$site"
-          unzip -q "$RUNNER_TEMP/archive/tirelire-hebergement.zip" -d "$site"
-          # Rien que des fichiers et des dossiers : un lien symbolique ferait téléverser ce qu'il
-          # désigne sur cette machine, identifiants compris.
-          intrus="$(find "$site" ! -type f ! -type d -print -quit)"
-          if [ -n "$intrus" ]; then
-            echo "Pas d'aperçu : l'archive contient autre chose qu'un fichier ou un dossier (${intrus#"$site"/})." >&2
-            exit 1
-          fi
-          # Garde-fou, comme en production : ni configuration locale du relais ni paquets.
-          rm -f "$site/relais.config.php"
-          rm -f "$site/donnees/"*.jsonl
-          test -f "$site/index.html"
-          test -f "$site/relais.php"
-          test -f "$site/.htaccess"
-          # Le commit que porte la page assemblée (#141) : celui que l'aperçu en ligne doit servir.
-          commit="$(sed -n 's/.*<meta name="tirelire-commit" content="\([0-9a-f]\{7,64\}\)".*/\1/p' "$site/index.html" | head -n 1)"
-          if [ -z "$commit" ]; then
-            echo "Pas d'aperçu : la page assemblée ne dit pas quel commit elle porte." >&2
-            exit 1
-          fi
-          echo "commit=$commit" >> "$GITHUB_OUTPUT"
-      - name: Installer lftp
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-      - name: Déposer l'aperçu
-        env:
-          SOURCE: ${{ runner.temp }}/site
-          HOTE: ${{ secrets.OVH_FTP_HOST }}
-          UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
-          MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
-        run: bash apps/hebergement/apercu.sh deposer
-      # Le diagnostic reste dans ce journal : aucun commentaire, l'adresse de recette ne s'affiche
-      # pas en clair dans le dépôt.
-      - name: Vérifier l'aperçu en ligne
-        env:
-          ADRESSE_SITE: ${{ steps.reglages.outputs.adresse }}
-          COMMIT_ATTENDU: ${{ steps.archive.outputs.commit }}
-        run: bash apps/hebergement/verifier.sh
-      - name: Résumé
-        if: always()
-        env:
-          COMMIT: ${{ steps.archive.outputs.commit }}
-        run: |
-          {
-            echo "### Aperçu de la PR #$NUMERO"
-            echo
-            if [ "${{ job.status }}" = success ]; then
-              echo "Déposé dans le sous-dossier \`pr-$NUMERO\` de la recette avec les scripts de \`main\`, et vérifié en ligne : il sert le commit \`${COMMIT::7}\`."
-            else
-              echo "Pas d'aperçu à jour : le diagnostic est dans le journal de ce job."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
 
   retrait:
     name: Retrait de l'aperçu de la PR

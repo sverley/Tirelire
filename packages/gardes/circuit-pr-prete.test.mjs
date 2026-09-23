@@ -97,7 +97,8 @@ const ISSUE_DE_PR = (draft) => ({ number: NUMÉRO, draft, labels: [], pull_reque
 const ISSUE_SEULE = (prête) => ({ number: ISSUE, labels: prête ? [{ name: 'besoin' }, { name: ÉTIQUETTE }] : [{ name: 'besoin' }], pull_request: null, body: 'Le besoin.' });
 const AVIS = { id: 1, body: 'Un avis.', author_association: 'OWNER', created_at: '2026-09-23T10:00:00Z' };
 
-const contexte = ([nom, event]) => ({
+/** `extra` : ce qu'un job décide à l'exécution, donné en hypothèse (`needs.<job>.outputs`). */
+const contexte = ([nom, event], extra = {}) => ({
   github: {
     event_name: nom,
     ref: /^pull_request(?:_review(?:_comment)?)?$/.test(nom) ? `refs/pull/${NUMÉRO}/merge` : 'refs/heads/main',
@@ -106,18 +107,19 @@ const contexte = ([nom, event]) => ({
   vars: { ...RECETTE },
   secrets: {},
   inputs: {},
+  ...extra,
 });
 const surLaPR = (action, draft, extra = {}) =>
   ['pull_request', 'pull_request_target'].map((nom) => [nom, { action, pull_request: PR(draft), ...extra }]);
 
-const exécutions = (événements) =>
+const exécutions = (événements, extra) =>
   événements.flatMap((é) =>
     workflows()
       .filter(({ yaml }) => lancé(déclencheurs(yaml), é[0], é[1].action))
       .map(({ nom, yaml }) => ({
         workflow: nom,
         événement: é[0],
-        jobs: jouer(yaml, contexte(é)).map((j) => ({
+        jobs: jouer(yaml, contexte(é, extra)).map((j) => ({
           ...j,
           clé: `${nom} › ${j.nom}`,
           commandes: étapes(j.lignes).map(commande),
@@ -174,11 +176,15 @@ test('#150 · sur un brouillon, ni ouverture, ni commit, ni édition, ni comment
 
 // ─── Le Ready joue toute la CI, une fois ─────────────────────────────────────────────────────────
 
-test('#150 · le passage en Ready lance toute la CI et la version de dev, sans commenter', () => {
+test('#150 · le passage en Ready lance toute la CI et assemble la version de dev, sans la déposer ni commenter', () => {
   const référence = clés(tournent(exécutions(surLaPR('ready_for_review', false))));
   for (const a of PASSAGES) {
     const jobs = tournent(exécutions(surLaPR(a, false)));
-    for (const [quoi, motif] of LOURDS) assert.ok(fait(jobs, motif), `passage en Ready (${a}) : aucun job ne joue ${quoi}`);
+    for (const [quoi, motif] of LOURDS.filter(([, m]) => m !== DÉPÔT_DE_LA_VERSION_DE_DEV)) {
+      assert.ok(fait(jobs, motif), `passage en Ready (${a}) : aucun job ne joue ${quoi}`);
+    }
+    // Le dépôt de l'aperçu est une action du porteur, par la case de l'aperçu (#175).
+    assert.ok(!fait(jobs, DÉPÔT_DE_LA_VERSION_DE_DEV), `passage en Ready (${a}) : un job dépose l'aperçu sans que la case soit cochée`);
     assert.ok(!fait(jobs, COMMENTAIRE), `passage en Ready (${a}) : un job commente la PR ou l'issue`);
     assert.deepEqual(clés(jobs), référence, `une PR ${a} hors brouillon ne lance pas les mêmes jobs qu'un passage en Ready`);
     const vus = clés(jobs);
@@ -191,6 +197,65 @@ test('#168 · au passage en Ready, l’issue reçoit l’étiquette « PR prête
     const jobs = tournent(exécutions(surLaPR(a, false)));
     assert.ok(fait(jobs, AJOUT), `passage en Ready (${a}) : aucun job ne pose l'étiquette « ${ÉTIQUETTE} »`);
     assert.ok(surLeStatut(jobs).length >= 2, `passage en Ready (${a}) : le statut « ${CONTEXTE} » n'est pas posé puis terminé`);
+  }
+});
+
+// ─── #175 · la case de l'aperçu ──────────────────────────────────────────────────────────────────
+
+const CASE = (boîte) => `Close #${ISSUE}\n\n- [${boîte}] Aperçu du dernier commit en recette — en ligne : rien <!-- apercu: -->`;
+/** Le porteur coche la case : la description passe de la case vide à la case cochée. */
+/** Ce que décide le job `demande` à l'exécution : la CI verte (le site à déposer), ou une raison de refuser. */
+const TENUE = { needs: { demande: { outputs: { run: '1', sha: 'a'.repeat(40), raison: '' } } } };
+const REFUSÉE = { needs: { demande: { outputs: { run: '', sha: 'a'.repeat(40), raison: 'la CI n’est pas verte' } } } };
+const cocher = (draft) =>
+  surLaPR('edited', draft, { pull_request: { ...PR(draft), body: CASE('x') }, changes: { body: { from: CASE(' ') } } });
+
+test('#175 · cocher la case de l’aperçu sur une PR prête lance le dépôt, lu sur main', () => {
+  const exé = exécutions(cocher(false), TENUE);
+  const jobs = tournent(exé);
+  assert.ok(fait(jobs, DÉPÔT_DE_LA_VERSION_DE_DEV), 'case cochée sur une PR prête : aucun job ne dépose l’aperçu');
+  for (const x of exé.filter((e) => e.jobs.some((j) => j.tourne && fait([j], DÉPÔT_DE_LA_VERSION_DE_DEV)))) {
+    assert.equal(x.événement, 'pull_request_target', `${x.workflow} : le dépôt tourne sur ${x.événement}, lu dans la branche`);
+  }
+  for (const [quoi, motif] of LOURDS.filter(([, m]) => m !== DÉPÔT_DE_LA_VERSION_DE_DEV)) {
+    assert.ok(!fait(jobs, motif), `case cochée : un job joue ${quoi}`);
+  }
+});
+
+test('#175 · CI pas verte ou brouillon : la case cochée ne dépose rien, se décoche et la PR dit pourquoi', () => {
+  for (const [quoi, é, décision] of [
+    ['CI pas verte', cocher(false), REFUSÉE],
+    ['brouillon', cocher(true), REFUSÉE],
+    ['brouillon, même CI verte', cocher(true), TENUE],
+  ]) {
+    const jobs = tournent(exécutions(é, décision));
+    assert.ok(!fait(jobs, DÉPÔT_DE_LA_VERSION_DE_DEV), `${quoi} : un job dépose l’aperçu`);
+    if (décision === REFUSÉE) {
+      assert.ok(fait(jobs, COMMENTAIRE), `${quoi} : aucun commentaire ne dit pourquoi rien n’est déposé`);
+      assert.ok(fait(jobs, /case-apercu\.sh\s+refusee/), `${quoi} : la case n’est pas décochée`);
+    }
+  }
+});
+
+test('#175 · un commit sur un brouillon décoche la case cochée, sans rien d’autre ; sans case cochée, rien ne tourne', () => {
+  const commit = (boîte) => surLaPR('synchronize', true, { pull_request: { ...PR(true), body: CASE(boîte) }, after: 'c'.repeat(40) });
+  const jobs = tournent(exécutions(commit('x')));
+  assert.ok(fait(jobs, /case-apercu\.sh\s+rafraichir/), 'commit sur un brouillon, case cochée : la case n’est pas remise à jour');
+  // Les étapes jouées seulement : sur un brouillon, l'étape qui signale le commit est écartée.
+  const joué = (motif) => jobs.some((j) => j.joués.map(commande).some((c) => motif.test(c)));
+  assert.ok(!joué(COMMENTAIRE), 'commit sur un brouillon : un job commente');
+  assert.ok(!joué(STATUT_DE_COMMIT), 'commit sur un brouillon : un job touche le statut de toute la CI');
+  léger('commit sur un brouillon, case cochée', jobs);
+  assert.deepEqual(clés(tournent(exécutions(commit(' ')))), [], 'commit sur un brouillon, case vide : des jobs tournent');
+});
+
+test('#175 · sans la case cochée, une édition ne dépose rien', () => {
+  for (const [quoi, é] of [
+    ['case décochée', surLaPR('edited', false, { pull_request: { ...PR(false), body: CASE(' ') }, changes: { body: { from: CASE('x') } } })],
+    ['titre seul', surLaPR('edited', false, { pull_request: { ...PR(false), body: CASE('x') }, changes: { title: { from: 'Avant' } } })],
+    ['description sans case', surLaPR('edited', false, { changes: { body: { from: 'Avant.' } } })],
+  ]) {
+    assert.ok(!fait(tournent(exécutions(é, TENUE)), DÉPÔT_DE_LA_VERSION_DE_DEV), `${quoi} : un job dépose l’aperçu`);
   }
 });
 

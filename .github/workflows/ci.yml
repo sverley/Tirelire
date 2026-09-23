@@ -1,9 +1,11 @@
 name: CI et livraison
 
 # Sur une PR, rien ne tourne en brouillon ; tout tourne au passage en Ready, une fois par passage
-# (#150). Six workflows, pour qu'aucune exécution ne montre sautés les jobs qu'une autre joue (B1) :
-# celui-ci (tests, assemblage de l'aperçu, livraison), `validation.yml` (la garde de `main`),
-# `apercu.yml` (dépôt et retrait de l'aperçu, lus sur `main`), `pret.yml` et `suivi.yml` (les repères
+# (#150). Sept workflows, pour qu'aucune exécution ne montre sautés les jobs qu'une autre joue (B1,
+# sauf `depot-apercu.yml`) : celui-ci (tests, assemblage de l'aperçu, livraison), `validation.yml` (la
+# garde de `main`), `apercu.yml` (attente de toute la CI au Ready, retrait de l'aperçu) et
+# `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case, #175), lus sur `main`,
+# `pret.yml` et `suivi.yml` (les repères
 # d'une PR prête, et le signalement d'un changement après le Ready, #168) et `fin.yml` (« en cours »
 # quitte l'issue fermée).
 #
@@ -23,7 +25,7 @@ name: CI et livraison
 # - `assemblage-apercu` est hors harnais : il assemble le site de la PR pour son sous-dossier de
 #   recette — le seul assemblage d'une PR, sans réglage de recette ni identifiant, pour que le site
 #   se construise toujours (I9, #153) — et le passe en artefact (`apercu-pr-<numéro>`) au job de
-#   dépôt d'`apercu.yml`, qui n'exécute rien de la PR (#155).
+#   dépôt de `depot-apercu.yml`, qui n'exécute rien de la PR (#155).
 
 on:
   push:
@@ -272,8 +274,8 @@ jobs:
     needs: test
     # Au passage en Ready seulement, après ses tests : jamais sur un brouillon. La version de dev est
     # celle du dernier commit de la branche (#141, #150). Aucun identifiant FTP, aucun réglage de
-    # recette, lecture seule : le dépôt se fait dans `apercu.yml`, lu sur `main`, qui reprend
-    # l'artefact (#155).
+    # recette, lecture seule : le dépôt se fait dans `depot-apercu.yml`, lu sur `main`, qui reprend
+    # l'artefact quand le porteur coche la case de l'aperçu (#155, #175).
     if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     permissions:
@@ -301,7 +303,7 @@ jobs:
           name: apercu-pr-${{ github.event.pull_request.number }}
           path: apps/hebergement/tirelire-hebergement.zip
           if-no-files-found: error
-          # `apercu.yml` le reprend quand toute la CI de la PR a fini verte (#169).
+          # `depot-apercu.yml` le reprend, case cochée, si toute la CI de la PR a fini verte (#169, #175).
           retention-days: 7
 
   android:

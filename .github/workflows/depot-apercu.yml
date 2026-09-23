@@ -1,0 +1,280 @@
+name: Dépôt de l'aperçu
+
+# Le dépôt de l'aperçu d'une PR sur l'instance de recette est une action du porteur (#175) : il coche
+# la case de l'aperçu dans la description de la PR (`apps/hebergement/case-apercu.sh`). Sans elle, rien
+# n'est jamais déposé ; les agents ne la cochent jamais (`CLAUDE.md`). Seul le propriétaire du dépôt
+# dépose : cochée par quelqu'un d'autre, la case se décoche. Les agents publiant avec le jeton du
+# porteur, cette condition n'écarte qu'autrui ; pour eux, c'est la règle écrite qui tient.
+#
+# Exception à B1, acceptée par le porteur (#175) : chaque exécution montre sautés des jobs qu'une
+# autre joue (`refus` quand le dépôt a lieu, `depot` et `case` quand il est refusé, tous quand
+# l'édition ne coche pas la case). La case, elle, dit toujours ce qui est en ligne.
+#
+# Cochée, la case n'est tenue que si la PR est prête et que toute sa CI — `ci.yml` (tests, build,
+# assemblage) et `validation.yml` (la garde) — a fini au vert sur le dernier commit (#169). Sinon rien
+# n'est déposé, la case redevient vide, et un commentaire de la PR dit pourquoi. Déposé, l'aperçu est
+# vérifié en ligne, et la case dit quel commit est en ligne : cochée tant que c'est le dernier commit.
+# Un commit poussé après le Ready la décoche (`suivi.yml`) ; le Ready la remet à jour (`pret.yml`).
+#
+# GitHub lit ce workflow sur `main` (`pull_request_target`) : une PR ne peut ni le réécrire, ni changer
+# les scripts de dépôt qu'il lance. Les identifiants FTP (`OVH_FTP_*`) vivent dans l'environnement
+# `depot-ftp`, qui n'admet que `main` (#155). Rien de la PR ne s'exécute ici : son site, assemblé par
+# `ci.yml` sans identifiants, arrive en artefact ; ne viennent de `main` que `case-apercu.sh`,
+# `apercu.sh`, `deposer.sh` et `verifier.sh`, donc le bornage à `<dossier>/pr-<numéro>`. Ce que font
+# les jetons des jobs (description, commentaire) ne déclenche aucun workflow. Cocher ou décocher la
+# case n'est pas un changement de la PR (`suivi.yml`, #168).
+#
+# Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
+# - `demande` est hors harnais : il lit la case et les conclusions de la CI, en lecture seule.
+# - `refus` est hors harnais : quand `demande` refuse, il décoche la case et dit pourquoi.
+# - `depot` lit hors des fichiers suivis : l'étape « Vérifier l'aperçu en ligne » (`verifier.sh`) lit
+#   l'aperçu déployé et le commit qu'il sert (#141).
+# - `case` est hors harnais : il écrit dans la case ce qui est en ligne.
+
+on:
+  pull_request_target:
+    types: [edited]
+
+permissions: {}
+
+# Une demande après l'autre ; aucune n'en annule une autre en cours de dépôt.
+concurrency:
+  group: depot-apercu-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  demande:
+    name: Case de l'aperçu cochée
+    # Seulement quand la description change avec la case cochée : toute autre édition ne démarre rien.
+    if: github.event.changes.body && contains(github.event.pull_request.body, '[x] Aperçu du dernier commit')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # les exécutions de la CI sur la tête de la PR, et l'artefact
+      contents: read
+    outputs:
+      run: ${{ steps.demande.outputs.run }}
+      sha: ${{ steps.demande.outputs.sha }}
+      raison: ${{ steps.demande.outputs.raison }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMERO: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+      BROUILLON: ${{ github.event.pull_request.draft }}
+      QUI: ${{ github.event.sender.login }}
+      PROPRIETAIRE: ${{ github.repository_owner }}
+      AVANT: ${{ github.event.changes.body.from }}
+      APRES: ${{ github.event.pull_request.body }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: apps/hebergement
+          persist-credentials: false
+      # La case vient d'être cochée ? La PR est prête, et toute sa CI verte sur le dernier commit ?
+      # Pas d'attente : une CI qui tourne encore n'est pas verte.
+      - name: Tenir ou refuser la demande
+        id: demande
+        run: |
+          set -euo pipefail
+          case_() { bash apps/hebergement/case-apercu.sh "$@"; }
+          avant="$(printf '%s' "$AVANT" | case_ etat)"
+          apres="$(printf '%s' "$APRES" | case_ etat)"
+          if [ "$apres" != coche ] || [ "$avant" = coche ]; then
+            echo "La case n'a pas été cochée par cette édition : rien à faire."
+            exit 0
+          fi
+          raison=""; run=""
+          if [ "$QUI" != "$PROPRIETAIRE" ]; then
+            raison="seul le propriétaire du dépôt ($PROPRIETAIRE) dépose l'aperçu ; la case a été cochée par $QUI."
+          elif [ "$BROUILLON" = true ]; then
+            raison="la PR est en brouillon, sa CI n'a pas tourné. La passer en Ready, puis cocher la case quand toute la CI est verte."
+          else
+            for w in ci.yml:pull_request validation.yml:pull_request_target; do
+              etat="$(gh api "repos/$GH_REPO/actions/workflows/${w%%:*}/runs?event=${w#*:}&head_sha=$SHA&per_page=20" \
+                --jq '[.workflow_runs[]] | sort_by(.created_at) | last // empty | "\(.id) \(.status) \(.conclusion // "-") \(.name)|\(.html_url)"')"
+              if [ -z "$etat" ]; then raison+="- \`${w%%:*}\` n'a pas tourné sur ce commit"$'\n'; continue; fi
+              read -r id statut conclusion reste <<< "$etat"
+              if [ "$statut" != completed ]; then raison+="- « ${reste%%|*} » n'a pas fini — ${reste#*|}"$'\n'
+              elif [ "$conclusion" != success ]; then raison+="- « ${reste%%|*} » : $conclusion — ${reste#*|}"$'\n'
+              elif [ "${w%%:*}" = ci.yml ]; then run="$id"; fi
+            done
+            if [ -z "$raison" ]; then
+              # L'artefact vit 7 jours : expiré, il faut rejouer la CI pour le reconstruire.
+              artefact="$(gh api "repos/$GH_REPO/actions/runs/$run/artifacts" \
+                --jq ".artifacts[] | select(.name == \"apercu-pr-$NUMERO\") | .expired" | head -n 1)"
+              case "$artefact" in
+                false) ;;
+                true) raison+="- le site assemblé par « CI et livraison » (apercu-pr-$NUMERO) a expiré"$'\n' ;;
+                *) raison+="- « CI et livraison » a fini sans laisser le site assemblé (apercu-pr-$NUMERO)"$'\n' ;;
+              esac
+            fi
+            [ -n "$raison" ] && raison="toute la CI n'est pas verte sur ce commit."$'\n\n'"$raison"$'\n'"Au besoin, repasser la PR en brouillon puis en Ready ; cocher la case quand toute la CI est verte."
+          fi
+          if [ -n "$raison" ]; then
+            printf '### Aperçu de la PR #%s\n\nRien de déposé : %s\n' "$NUMERO" "$raison" >> "$GITHUB_STEP_SUMMARY"
+            { echo "sha=$SHA"; echo "raison<<FIN_DE_LA_RAISON"; echo "$raison"; echo "FIN_DE_LA_RAISON"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Case cochée, PR prête, toute la CI verte ; site assemblé par l'exécution $run de ci.yml."
+          { echo "run=$run"; echo "sha=$SHA"; } >> "$GITHUB_OUTPUT"
+
+  refus:
+    name: Case décochée, rien de déposé
+    # Seulement quand `demande` a refusé : un job à part, pour que la demande reste en lecture seule.
+    needs: demande
+    if: github.event.changes.body && needs.demande.outputs.raison != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMERO: ${{ github.event.pull_request.number }}
+      SHA: ${{ needs.demande.outputs.sha }}
+      RAISON: ${{ needs.demande.outputs.raison }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: apps/hebergement
+          persist-credentials: false
+      - name: Décocher la case et dire pourquoi
+        run: |
+          set -euo pipefail
+          gh pr view "$NUMERO" --json body --jq .body | bash apps/hebergement/case-apercu.sh refusee "$SHA" > "$RUNNER_TEMP/corps"
+          gh pr edit "$NUMERO" --body-file "$RUNNER_TEMP/corps" > /dev/null
+          gh pr comment "$NUMERO" --body "Case de l'aperçu décochée, rien n'est déposé pour ${SHA::7} : $RAISON"
+
+  depot:
+    name: Aperçu de la PR sur l'instance de recette
+    needs: demande
+    # Seulement quand `demande` a vu la case cochée par le porteur, sur une PR prête, au vert de toute
+    # sa CI : jamais sur un brouillon.
+    if: github.event.changes.body && github.event.pull_request.draft != true && needs.demande.outputs.run != ''
+    runs-on: ubuntu-latest
+    environment: depot-ftp
+    permissions:
+      actions: read # l'exécution de `ci.yml` sur la tête de la PR, et son artefact
+      contents: read
+    env:
+      NUMERO: ${{ github.event.pull_request.number }}
+      # Recette : aucune valeur par défaut, apercu.sh arrête tout si l'une manque ou vaut la production.
+      TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
+      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
+      TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
+      TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
+      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
+      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
+    steps:
+      # Les scripts de dépôt de `main`, jamais ceux de la branche (#155).
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: apps/hebergement
+          persist-credentials: false
+      # Avant tout transfert : sans réglages de recette, rien ne se dépose.
+      - name: Réglages de l'aperçu
+        id: reglages
+        run: bash apps/hebergement/apercu.sh reglages >> "$GITHUB_OUTPUT"
+      # L'artefact `apercu-pr-<numéro>` de l'exécution de `ci.yml` que le job `demande` a vue verte.
+      - name: Récupérer le site assemblé
+        uses: actions/download-artifact@v4
+        with:
+          name: apercu-pr-${{ github.event.pull_request.number }}
+          run-id: ${{ needs.demande.outputs.run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/archive
+      # Ce qui vient de la PR n'est que des données : on le vérifie avant de le confier au dépôt.
+      - name: Ouvrir l'archive
+        id: archive
+        run: |
+          set -euo pipefail
+          site="$RUNNER_TEMP/site"
+          mkdir -p "$site"
+          unzip -q "$RUNNER_TEMP/archive/tirelire-hebergement.zip" -d "$site"
+          # Rien que des fichiers et des dossiers : un lien symbolique ferait téléverser ce qu'il
+          # désigne sur cette machine, identifiants compris.
+          intrus="$(find "$site" ! -type f ! -type d -print -quit)"
+          if [ -n "$intrus" ]; then
+            echo "Pas d'aperçu : l'archive contient autre chose qu'un fichier ou un dossier (${intrus#"$site"/})." >&2
+            exit 1
+          fi
+          # Garde-fou, comme en production : ni configuration locale du relais ni paquets.
+          rm -f "$site/relais.config.php"
+          rm -f "$site/donnees/"*.jsonl
+          test -f "$site/index.html"
+          test -f "$site/relais.php"
+          test -f "$site/.htaccess"
+          # Le commit que porte la page assemblée (#141) : celui que l'aperçu en ligne doit servir.
+          commit="$(sed -n 's/.*<meta name="tirelire-commit" content="\([0-9a-f]\{7,64\}\)".*/\1/p' "$site/index.html" | head -n 1)"
+          if [ -z "$commit" ]; then
+            echo "Pas d'aperçu : la page assemblée ne dit pas quel commit elle porte." >&2
+            exit 1
+          fi
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Installer lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+      - name: Déposer l'aperçu
+        env:
+          SOURCE: ${{ runner.temp }}/site
+          HOTE: ${{ secrets.OVH_FTP_HOST }}
+          UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
+          MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
+        run: bash apps/hebergement/apercu.sh deposer
+      # Le diagnostic reste dans ce journal : aucun commentaire, l'adresse de recette ne s'affiche
+      # pas en clair dans le dépôt.
+      - name: Vérifier l'aperçu en ligne
+        env:
+          ADRESSE_SITE: ${{ steps.reglages.outputs.adresse }}
+          COMMIT_ATTENDU: ${{ steps.archive.outputs.commit }}
+        run: bash apps/hebergement/verifier.sh
+      - name: Résumé
+        if: always()
+        env:
+          COMMIT: ${{ steps.archive.outputs.commit }}
+        run: |
+          {
+            echo "### Aperçu de la PR #$NUMERO"
+            echo
+            if [ "${{ job.status }}" = success ]; then
+              echo "Déposé dans le sous-dossier \`pr-$NUMERO\` de la recette avec les scripts de \`main\`, et vérifié en ligne : il sert le commit \`${COMMIT::7}\`."
+            else
+              echo "Pas d'aperçu à jour : le diagnostic est dans le journal de ce job."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  case:
+    name: La case dit ce qui est en ligne
+    # Après chaque dépôt tenté, réussi ou non.
+    needs: [demande, depot]
+    if: always() && github.event.changes.body && github.event.pull_request.draft != true && needs.demande.outputs.run != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMERO: ${{ github.event.pull_request.number }}
+      SHA: ${{ needs.demande.outputs.sha }}
+      RESULTAT: ${{ needs.depot.result }}
+      LIEN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: apps/hebergement
+          persist-credentials: false
+      - name: Écrire dans la case le commit en ligne
+        run: |
+          set -euo pipefail
+          # La tête a pu avancer pendant le dépôt : la case ne se coche que si l'aperçu est la tête.
+          tete="$(gh pr view "$NUMERO" --json headRefOid --jq .headRefOid)"
+          if [ "$RESULTAT" = success ]; then mode=(deposee "$SHA" "$tete"); else mode=(echec "$SHA" "$tete"); fi
+          gh pr view "$NUMERO" --json body --jq .body | bash apps/hebergement/case-apercu.sh "${mode[@]}" > "$RUNNER_TEMP/corps"
+          gh pr edit "$NUMERO" --body-file "$RUNNER_TEMP/corps" > /dev/null
+          if [ "$RESULTAT" != success ]; then
+            gh pr comment "$NUMERO" --body "Le dépôt de l'aperçu de ${SHA::7} n'a pas abouti : case décochée, l'aperçu en ligne est incertain. Diagnostic dans le journal : $LIEN"
+          fi

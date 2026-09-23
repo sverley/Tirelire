@@ -6,7 +6,9 @@ name: PR prête
 #   retirée au retour en brouillon ou à la fermeture ; elle dit, sans démarrer de machine, que
 #   modifier cette issue doit être signalé (`suivi.yml`) : une issue sans elle ne coûte rien en CI ;
 # - le statut « Toute la CI sur ce commit », mis en attente au Ready ; `apercu.yml` le termine quand
-#   toute la CI a fini, `suivi.yml` le passe en échec quand un commit arrive sans CI.
+#   toute la CI a fini, `suivi.yml` le passe en échec quand un commit arrive sans CI ;
+# - la case de l'aperçu dans la description (#175), ajoutée au Ready si elle manque, et décochée si
+#   l'aperçu en ligne n'est pas le dernier commit ; le porteur la coche pour déposer (`depot-apercu.yml`).
 #
 # Un workflow à part de `suivi.yml`, pour qu'aucune exécution ne montre sauté un job qu'une autre
 # joue (B1). GitHub le lit sur `main` (`pull_request_target`) ; rien de la PR ne s'exécute.
@@ -34,7 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      pull-requests: read
+      contents: read
+      pull-requests: write # la case de l'aperçu
       statuses: write
     env:
       GH_TOKEN: ${{ github.token }}
@@ -45,6 +48,12 @@ jobs:
       ETIQUETTE: PR prête
       CONTEXTE: Toute la CI sur ce commit
     steps:
+      - uses: actions/checkout@v4
+        if: github.event.action != 'converted_to_draft' && github.event.action != 'closed'
+        with:
+          ref: main
+          sparse-checkout: apps/hebergement
+          persist-credentials: false
       - name: Poser ou retirer les repères
         run: |
           set -euo pipefail
@@ -56,7 +65,9 @@ jobs:
               for n in $issues; do gh issue edit "$n" --add-label "$ETIQUETTE" > /dev/null; done
               sha="$(gh pr view "$PR" --json headRefOid --jq .headRefOid)"
               gh api "repos/$GH_REPO/statuses/$sha" -f state=pending -f context="$CONTEXTE" \
-                -f description="CI en cours sur ce commit" > /dev/null ;;
+                -f description="CI en cours sur ce commit" > /dev/null
+              gh pr view "$PR" --json body --jq .body | bash apps/hebergement/case-apercu.sh rafraichir "$sha" > "$RUNNER_TEMP/corps"
+              gh pr edit "$PR" --body-file "$RUNNER_TEMP/corps" > /dev/null ;;
             converted_to_draft|closed)
               for n in $issues; do
                 if gh issue view "$n" --json labels --jq '.labels[].name' | grep -qxF "$ETIQUETTE"; then
