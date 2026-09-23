@@ -65,7 +65,7 @@ const registre = () => lire(REGISTRE);
 
 /**
  * Ce que #73 a promis, entrée par entrée : les tests que le registre doit nommer. Les garder ici en
- * toutes lettres est le but même d'un amorçage — le registre peut évoluer, ces garanties-là ne
+ * toutes lettres est tout le propos de ce harnais — le registre peut évoluer, ces garanties-là ne
  * se retirent pas sans que cette liste le dise.
  */
 const PROMESSES = Object.freeze({
