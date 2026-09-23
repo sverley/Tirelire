@@ -89,8 +89,15 @@ jobs:
               elif [ "$conclusion" != success ]; then raison+="- « ${reste%%|*} » : $conclusion — ${reste#*|}"$'\n'
               elif [ "${w%%:*}" = ci.yml ]; then run="$id"; fi
             done
-            if [ -z "$raison" ] && ! gh api "repos/$GH_REPO/actions/runs/$run/artifacts" --jq '.artifacts[].name' | grep -qxF "apercu-pr-$NUMERO"; then
-              raison+="- « CI et livraison » a fini sans laisser le site assemblé (apercu-pr-$NUMERO)"$'\n'
+            if [ -z "$raison" ]; then
+              # L'artefact vit 7 jours : expiré, il faut rejouer la CI pour le reconstruire.
+              artefact="$(gh api "repos/$GH_REPO/actions/runs/$run/artifacts" \
+                --jq ".artifacts[] | select(.name == \"apercu-pr-$NUMERO\") | .expired" | head -n 1)"
+              case "$artefact" in
+                false) ;;
+                true) raison+="- le site assemblé par « CI et livraison » (apercu-pr-$NUMERO) a expiré"$'\n' ;;
+                *) raison+="- « CI et livraison » a fini sans laisser le site assemblé (apercu-pr-$NUMERO)"$'\n' ;;
+              esac
             fi
             [ -n "$raison" ] && raison="toute la CI n'est pas verte sur ce commit."$'\n\n'"$raison"$'\n'"Au besoin, repasser la PR en brouillon puis en Ready ; cocher la case quand toute la CI est verte."
           fi
