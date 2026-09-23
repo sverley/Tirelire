@@ -77,9 +77,10 @@ Dans cet ordre, dépôt encore public :
 
 1. Fusionner la PR de #176 (règle, étiquette, cette page).
 2. Settings → Environments → `depot-ftp` : relever les noms des *Environment variables* (`TIRELIRE_*`)
-   et leurs valeurs ; les secrets ne se relisent pas, reprendre leurs valeurs chez OVHcloud.
+   et leurs valeurs ; les secrets ne se relisent pas, reprendre leurs valeurs chez OVHcloud (et
+   l'adresse de recette, `TIRELIRE_DEV_SITE_URL`, chez soi).
 3. Settings → Secrets and variables → Actions : créer au niveau du dépôt `OVH_FTP_HOST`,
-   `OVH_FTP_USER`, `OVH_FTP_PASSWORD` et les variables relevées. Tant que le dépôt est public,
+   `OVH_FTP_USER`, `OVH_FTP_PASSWORD`, `TIRELIRE_DEV_SITE_URL` et les variables relevées. Tant que le dépôt est public,
    l'environnement garde la priorité : rien ne change encore.
 4. Settings → General → *Danger Zone* → *Change visibility* → privé.
 5. Constater : le prochain push sur `main` dépose et vérifie la production (le résumé du job « Dépôt
@@ -178,8 +179,8 @@ commentaire de la PR dit pourquoi, avec le lien de l'exécution en cause. Après
 quel commit est en ligne : cochée tant que c'est le dernier commit, décochée dès qu'un commit arrive
 (`suivi.yml`) ou si le dépôt échoue (l'aperçu en ligne est alors dit incertain, et un commentaire
 donne le lien du journal). Cocher ou décocher la case n'est pas un changement de la PR (#168).
-Aucun réglage du dépôt n'est à ajouter : les identifiants et les variables de recette restent ceux de
-la production.
+Aucun réglage du dépôt n'est à ajouter pour la case : les identifiants restent ceux de la production,
+et les réglages de recette ceux décrits plus bas.
 
 Un aperçu dépose le PHP de sa PR (`relais.php`, `.htaccess`, `.ovhconfig`) : les scripts de dépôt
 sont ceux de `main`, mais ce qu'ils déposent est le site de la PR, et son PHP s'exécute sur
@@ -212,15 +213,25 @@ partagent un même stockage navigateur, jamais celui de la production. Chaque ap
 service worker sur la portée de son sous-dossier. Le `robots.txt` de la racine de la recette se pose à
 la main ; aucun job n'y touche.
 
-Mêmes secrets `OVH_FTP_*` que la production, au même endroit, et deux variables (onglet *Variables*), sans valeur par
-défaut :
+Mêmes secrets `OVH_FTP_*` que la production, au même endroit. La recette n'a qu'un secret propre,
+par exception : son adresse, que le dépôt ne doit pas montrer (#156). Une variable s'écrit en clair
+dans les journaux de la CI, lisibles par tous tant que le dépôt est public ; un secret y est masqué.
+`apercu.sh` masque en plus les autres formes de l'adresse (hôte seul, minuscules), n'écrit que le
+sous-dossier `pr-<numéro>`, et le job de dépôt ne la fait passer par aucune sortie d'étape. Deux
+réglages, sans valeur par défaut :
 
-| Variable | Rôle |
-|---|---|
-| `TIRELIRE_DEV_SITE_URL` | adresse de la recette, en `https://`, racine d'un sous-domaine ; chaque aperçu est servi à `<adresse>/pr-<numéro>/` |
-| `TIRELIRE_DEV_FTP_DOSSIER` | dossier FTP que la recette sert (sa racine déclarée dans *Multisite*) |
+| Réglage | Nature | Rôle |
+|---|---|---|
+| `TIRELIRE_DEV_SITE_URL` | secret | adresse de la recette, en `https://`, racine d'un sous-domaine ; chaque aperçu est servi à `<adresse>/pr-<numéro>/` |
+| `TIRELIRE_DEV_FTP_DOSSIER` | variable | dossier FTP que la recette sert (sa racine déclarée dans *Multisite*) |
 
-Si l'une manque, ou vaut son équivalent de production (`TIRELIRE_FTP_DOSSIER`, `www` par défaut ;
+Le secret se range là où sont les secrets `OVH_FTP_*` : dans l'environnement `depot-ftp` tant que le
+dépôt est public, au niveau du dépôt une fois privé (étapes ci-dessus). La variable de même nom, si
+elle existe encore, se supprime : elle n'est plus lue, et sa valeur se lit dans les réglages.
+L'adresse reste découvrable par les registres publics de transparence des certificats ; le secret
+évite seulement qu'elle se lise depuis le dépôt.
+
+Si l'un manque, ou vaut son équivalent de production (`TIRELIRE_FTP_DOSSIER`, `www` par défaut ;
 `TIRELIRE_SITE_URL`, adresse ou origine), `apercu.sh` s'arrête avant tout transfert et nomme la
 variable en cause. Il ne dépose ni ne supprime rien ailleurs que dans `<dossier>/pr-<numéro>`.
 

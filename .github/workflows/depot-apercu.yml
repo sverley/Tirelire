@@ -162,8 +162,9 @@ jobs:
     env:
       NUMERO: ${{ github.event.pull_request.number }}
       # Recette : aucune valeur par défaut, apercu.sh arrête tout si l'une manque ou vaut la production.
+      # L'adresse est un secret, masqué dans les journaux, le dépôt restant public un temps (#156).
       TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
-      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
+      TIRELIRE_DEV_SITE_URL: ${{ secrets.TIRELIRE_DEV_SITE_URL }}
       TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
       TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
       PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
@@ -175,10 +176,10 @@ jobs:
           ref: main
           sparse-checkout: apps/hebergement
           persist-credentials: false
-      # Avant tout transfert : sans réglages de recette, rien ne se dépose.
+      # Avant tout transfert : sans réglages de recette, rien ne se dépose. L'adresse n'en sort pas :
+      # ni au journal, ni en sortie d'étape (#156).
       - name: Réglages de l'aperçu
-        id: reglages
-        run: bash apps/hebergement/apercu.sh reglages >> "$GITHUB_OUTPUT"
+        run: bash apps/hebergement/apercu.sh reglages > /dev/null
       # L'artefact `apercu-pr-<numéro>` de l'exécution de `ci.yml` que le job `demande` a vue verte.
       - name: Récupérer le site assemblé
         uses: actions/download-artifact@v4
@@ -226,11 +227,16 @@ jobs:
         run: bash apps/hebergement/apercu.sh deposer
       # Le diagnostic reste dans ce journal : aucun commentaire, l'adresse de recette ne s'affiche
       # pas en clair dans le dépôt.
+      # L'adresse se recalcule ici plutôt que de passer par une sortie d'étape : elle dérive d'un
+      # secret, et reste dans ce job, sous les masques posés par apercu.sh (#156).
       - name: Vérifier l'aperçu en ligne
         env:
-          ADRESSE_SITE: ${{ steps.reglages.outputs.adresse }}
           COMMIT_ATTENDU: ${{ steps.archive.outputs.commit }}
-        run: bash apps/hebergement/verifier.sh
+        run: |
+          set -euo pipefail
+          ADRESSE_SITE="$(bash apps/hebergement/apercu.sh reglages | sed -n 's/^adresse=//p')"
+          export ADRESSE_SITE
+          bash apps/hebergement/verifier.sh
       - name: Résumé
         if: always()
         env:

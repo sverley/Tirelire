@@ -156,7 +156,7 @@ jobs:
     env:
       NUMERO: ${{ github.event.pull_request.number }}
       TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
-      TIRELIRE_DEV_SITE_URL: ${{ vars.TIRELIRE_DEV_SITE_URL }}
+      TIRELIRE_DEV_SITE_URL: ${{ secrets.TIRELIRE_DEV_SITE_URL }}
       TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
       TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
       PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
