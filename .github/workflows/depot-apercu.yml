@@ -2,7 +2,13 @@ name: Dépôt de l'aperçu
 
 # Le dépôt de l'aperçu d'une PR sur l'instance de recette est une action du porteur (#175) : il coche
 # la case de l'aperçu dans la description de la PR (`apps/hebergement/case-apercu.sh`). Sans elle, rien
-# n'est jamais déposé ; les agents ne la cochent jamais (`CLAUDE.md`).
+# n'est jamais déposé ; les agents ne la cochent jamais (`CLAUDE.md`). Seul le propriétaire du dépôt
+# dépose : cochée par quelqu'un d'autre, la case se décoche. Les agents publiant avec le jeton du
+# porteur, cette condition n'écarte qu'autrui ; pour eux, c'est la règle écrite qui tient.
+#
+# Exception à B1, acceptée par le porteur (#175) : chaque exécution montre sautés des jobs qu'une
+# autre joue (`refus` quand le dépôt a lieu, `depot` et `case` quand il est refusé, tous quand
+# l'édition ne coche pas la case). La case, elle, dit toujours ce qui est en ligne.
 #
 # Cochée, la case n'est tenue que si la PR est prête et que toute sa CI — `ci.yml` (tests, build,
 # assemblage) et `validation.yml` (la garde) — a fini au vert sur le dernier commit (#169). Sinon rien
@@ -55,6 +61,8 @@ jobs:
       NUMERO: ${{ github.event.pull_request.number }}
       SHA: ${{ github.event.pull_request.head.sha }}
       BROUILLON: ${{ github.event.pull_request.draft }}
+      QUI: ${{ github.event.sender.login }}
+      PROPRIETAIRE: ${{ github.repository_owner }}
       AVANT: ${{ github.event.changes.body.from }}
       APRES: ${{ github.event.pull_request.body }}
     steps:
@@ -77,7 +85,9 @@ jobs:
             exit 0
           fi
           raison=""; run=""
-          if [ "$BROUILLON" = true ]; then
+          if [ "$QUI" != "$PROPRIETAIRE" ]; then
+            raison="seul le propriétaire du dépôt ($PROPRIETAIRE) dépose l'aperçu ; la case a été cochée par $QUI."
+          elif [ "$BROUILLON" = true ]; then
             raison="la PR est en brouillon, sa CI n'a pas tourné. La passer en Ready, puis cocher la case quand toute la CI est verte."
           else
             for w in ci.yml:pull_request validation.yml:pull_request_target; do

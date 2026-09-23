@@ -93,7 +93,8 @@ qu'une autre joue : `ci.yml` (tests, version de dev, livraison), `validation.yml
 `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu), `depot-apercu.yml`
 (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères d'une PR prête, case de
 l'aperçu comprise), `suivi.yml` (un changement après le Ready, signalé) et `fin.yml` (« en cours »
-quitte l'issue à sa fermeture).
+quitte l'issue à sa fermeture). Seul `depot-apercu.yml` y fait exception, accepté par le porteur :
+ses exécutions montrent des jobs sautés, et la case de l'aperçu dit ce qui est en ligne.
 
 ### Vérification et validation
 
@@ -108,7 +109,8 @@ Deux actes, qui ne se confondent pas :
 **La case de l'aperçu** (#175). Rien n'est déposé sur la recette sans une action du porteur : il
 coche, dans la description de la PR, la case « Aperçu du dernier commit en recette ». Le dépôt n'a
 lieu que si la PR est prête et toute sa CI verte sur le dernier commit ; sinon la case se décoche et
-un commentaire dit pourquoi. Cochée, elle dit que l'aperçu en ligne est celui du dernier commit.
+un commentaire dit pourquoi ; de même si elle est cochée par un autre que le propriétaire du dépôt.
+Cochée, elle dit que l'aperçu en ligne est celui du dernier commit.
 **Les agents ne cochent jamais cette case**, et ne la décochent pas non plus : elle est au porteur et
 aux workflows.
 

@@ -141,7 +141,8 @@ cochent jamais. Au passage en Ready, rien ne se dépose : `apercu.yml` attend se
 (`ci.yml` et `validation.yml`) sur le dernier commit, termine le statut « Toute la CI sur ce commit »
 et, si l'une rougit, le dit en commentaire. Quand le porteur coche la case, `depot-apercu.yml`
 vérifie, sans attendre, que la PR est prête et que ces deux workflows ont fini au vert sur le dernier
-commit (#169), avec le site assemblé. Sinon rien n'est déposé, la case redevient vide, et un
+commit (#169), avec le site assemblé, et que la case a été cochée par le propriétaire du dépôt.
+Sinon rien n'est déposé, la case redevient vide, et un
 commentaire de la PR dit pourquoi, avec le lien de l'exécution en cause. Après le dépôt, la case dit
 quel commit est en ligne : cochée tant que c'est le dernier commit, décochée dès qu'un commit arrive
 (`suivi.yml`) ou si le dépôt échoue (l'aperçu en ligne est alors dit incertain, et un commentaire
