@@ -27,6 +27,7 @@ Cloud Web et les VPS) ; le relais est donc réécrit en PHP, sans dépendance.
 | `deposer.test.mjs` | vérifie le dépôt contre un vrai serveur FTP local (sauté si `lftp` ou `pyftpdlib` manquent) |
 | `verifier.sh` | vérifie un site en ligne (accueil, relais, protections, commit servi) ; la CI de production publie son diagnostic |
 | `apercu.sh` | aperçu d'une PR sur l'instance de recette : dépôt dans `<dossier>/pr-<numéro>`, retrait à la fermeture |
+| `case-apercu.sh` | la case de l'aperçu dans la description d'une PR : son état, et ce qu'elle dit du commit en ligne (#175) |
 
 ## Installer
 
@@ -125,29 +126,36 @@ Le service worker met les appareils à jour au chargement suivant.
 
 ## Aperçu de chaque PR sur l'instance de recette
 
-Au passage en Ready d'une PR (jamais en brouillon), quand toute sa CI est verte, la PR a son aperçu : le site du dernier commit de sa branche,
+Une PR a son aperçu quand le porteur le demande (#175) : le site du dernier commit de sa branche,
 construit pour le sous-dossier `pr-<numéro>` d'une instance de recette, déposé par
 `apercu.sh deposer` dans `<TIRELIRE_DEV_FTP_DOSSIER>/pr-<numéro>`, puis vérifié en ligne par
 `verifier.sh`, commit servi compris. La fermeture de la PR (fusion ou abandon) supprime ce
-sous-dossier entier, paquets du relais compris (`apercu.sh retirer`), sans tests ni build. Le seul
-commentaire publié dit pourquoi rien n'a été déposé ; l'adresse de recette ne s'écrit nulle part en
-clair dans le dépôt, et le diagnostic d'un dépôt reste dans le journal de la CI.
+sous-dossier entier, paquets du relais compris (`apercu.sh retirer`), sans tests ni build.
+L'adresse de recette ne s'écrit nulle part en clair dans le dépôt, et le diagnostic d'un dépôt reste
+dans le journal de la CI.
 
-Le dépôt a lieu en fin de CI, et seulement au vert (#169). Au passage en Ready, le job « Attente du
-vert de toute la CI » d'`apercu.yml` attend les deux workflows de la PR pour son dernier commit :
-`ci.yml` (tests, build, assemblage) et `validation.yml` (la garde). Tous verts, le
-dépôt suit. L'un rouge, annulé ou pas fini dans l'heure : rien n'est déposé, et un commentaire de la
-PR nomme le workflow en cause avec le lien de son exécution, sans l'adresse de la recette. Le
-porteur regarde l'aperçu déposé, puis fusionne : la fusion vaut validation. Le retrait à la fermeture est
-automatique.
+La demande est une case de la description de la PR, « Aperçu du dernier commit en recette »,
+qu'ajoutent le modèle de PR et, s'il manque, le passage en Ready (`pret.yml`) ; elle est tenue par
+`apps/hebergement/case-apercu.sh`. Sans elle cochée, rien n'est jamais déposé, et les agents ne la
+cochent jamais. Au passage en Ready, rien ne se dépose : `apercu.yml` attend seulement toute la CI
+(`ci.yml` et `validation.yml`) sur le dernier commit, termine le statut « Toute la CI sur ce commit »
+et, si l'une rougit, le dit en commentaire. Quand le porteur coche la case, `depot-apercu.yml`
+vérifie, sans attendre, que la PR est prête et que ces deux workflows ont fini au vert sur le dernier
+commit (#169), avec le site assemblé. Sinon rien n'est déposé, la case redevient vide, et un
+commentaire de la PR dit pourquoi, avec le lien de l'exécution en cause. Après le dépôt, la case dit
+quel commit est en ligne : cochée tant que c'est le dernier commit, décochée dès qu'un commit arrive
+(`suivi.yml`) ou si le dépôt échoue (l'aperçu en ligne est alors dit incertain, et un commentaire
+donne le lien du journal). Cocher ou décocher la case n'est pas un changement de la PR (#168).
+Aucun réglage du dépôt n'est à ajouter : l'environnement `depot-ftp` et les variables de recette
+restent ceux d'avant.
 
 Le code de la PR et les identifiants ne se croisent jamais (#155). `ci.yml`, lu dans la branche,
 assemble le site de la PR sans identifiant ni réglage de recette, et le garde en artefact
-(`apercu-pr-<numéro>`). `apercu.yml`, lu sur `main` (`pull_request_target`), attend cette exécution et le reste de la CI,
+(`apercu-pr-<numéro>`). `depot-apercu.yml`, lu sur `main` (`pull_request_target`), vérifie cette exécution et le reste de la CI,
 reprend l'artefact et le dépose, dans un job de l'environnement `depot-ftp` qui n'extrait que `main`
 et n'exécute rien de la PR : les scripts de dépôt qui tournent, et donc le bornage à
 `<dossier>/pr-<numéro>`, sont ceux de `main`, que la PR les modifie ou non. Le retrait se fait de
-même. Une PR qui modifie `apercu.yml` ou ces scripts n'en voit l'effet qu'une fois fusionnée.
+même. Une PR qui modifie `apercu.yml`, `depot-apercu.yml` ou ces scripts n'en voit l'effet qu'une fois fusionnée.
 
 Sur une PR, le site ne s'assemble qu'une fois par passage, dans `ci.yml` (job « Assemblage de
 l'aperçu de la PR ») : pour le sous-dossier `pr-<numéro>`, sans lire les réglages de la recette. Il
