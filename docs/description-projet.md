@@ -445,3 +445,9 @@ qu'elles barrent.
 > Les sous issues peuvent servir plusieurs chantiers ou aucun. Dans ce cas, il faut les tagguer en outillage, nouvelle fonctionnalité, idée, etc.
 
 > Les chantiers doivent être définis dans docs/chantiers/ avec descriptifs des intentions globales, des contraintes, hypothèses, cibles, usages. C'est la seule vérité. Le système github a des tickets reflétant ces chantiers. L'architecte de chaque chantier sera en charge de définir les spec à partir du document (ça sera le produit de l'issue) et suivra l'évolution de toutes les sous issue permettant la réalisation du chantier. Les sous issues restent au niveau github (pas dans le document). Consigne ce fonctionnement dans le rôle de l'architecte et les decisions dans leur catalogue
+
+> Ouvre une issue pour rédiger les documents définissant globalement les chantiers
+
+> On écrit des lettres d'intention. On peut définir les cibles et usages et contraintes si elles font parties de l'intention. C'est la session architecte du chantier concerné qui fera l'analyse approfondie
+
+> Je ne te demande pas d'écrire ces lettres, ça sera le codeur. Je te demande de définir 191 avec cette description
