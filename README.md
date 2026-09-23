@@ -103,10 +103,10 @@ niveau :
   livraison, jugée sur l'état commis — l'index ou le commit poussé, jamais la copie de travail.
   - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
     `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
-    touchés, tests headless de l'interface ; objectif 30 s) ou **organisationnel** (garde et tous les
-    garde ; objectif 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
+    touchés, tests headless de l'interface ; durée attendue 30 s) ou **organisationnel** (tests de la
+    garde ; durée attendue 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
     restent à la CI. Un dépassement de plus de 20 % s'affiche, sans bloquer.
-  - Le harnais du besoin est toujours joué, à part et hors objectif. Il **bloque** quand ce qui arrive
+  - Le harnais du besoin est toujours joué, à part et hors durée attendue. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.
   - Le pré-push ne rejoue pas un arbre déjà vérifié à la fusion. Un push vers une sous-branche

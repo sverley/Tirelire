@@ -14,11 +14,11 @@
 #    est fonctionnel, un fichier absent est organisationnel. Les deux peuvent se cumuler.
 # 3. Sélection (hors tests navigateur, laissés à la CI) :
 #    - fonctionnel : typecheck et tests headless des paquets touchés, tests headless de
-#      l'interface ; objectif 30 s ;
-#    - organisationnel : tests de la garde et tous les amorçages ; objectif 45 s.
-#    Une sélection qui dépasse son objectif de plus de 20 % le dit, sans bloquer.
+#      l'interface ; durée attendue 30 s ;
+#    - organisationnel : tests de la garde ; durée attendue 45 s.
+#    Une sélection qui dépasse sa durée attendue de plus de 20 % le dit, sans bloquer.
 # 4. Harnais du besoin : les fichiers `*.test.*` que la branche ajoute ou modifie depuis sa base
-#    commune avec `origin/main`. Joué à part, quelle que soit sa finalité, hors objectif.
+#    commune avec `origin/main`. Joué à part, quelle que soit sa finalité, hors durée attendue.
 #    Il bloque si ce qui arrive (commits absents de `main` et de la branche d'arrivée) touche autre
 #    chose que le harnais et la documentation (`**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ;
 #    sinon son verdict s'affiche. La non-régression bloque toujours.
@@ -221,9 +221,9 @@ typecheck() { # nom dossier
 
 debut=$(date +%s)
 selection=''
-objectif=0
+attendue=0
 if [ -n "$fonc" ]; then
-  objectif=$((objectif + 30))
+  attendue=$((attendue + 30))
   paquets=$(grep -Eo '^(apps|packages)/[^/]+/' "$travail/fonctionnels" | sed 's#/$##' | sort -u)
   for p in $paquets; do
     [ -f "$juge/$p/package.json" ] || continue
@@ -235,7 +235,7 @@ if [ -n "$fonc" ]; then
   selection="fonctionnel ($(echo $paquets | tr ' ' ',') ; interface headless)"
 fi
 if [ -n "$org" ]; then
-  objectif=$((objectif + 45))
+  attendue=$((attendue + 45))
   non_regression garde packages/gardes
   selection="${selection:+$selection + }organisationnel (garde)"
 fi
@@ -243,8 +243,8 @@ fi
 dit "besoin $selection"
 wait
 duree=$(($(date +%s) - debut))
-if [ "$objectif" -gt 0 ] && [ $((duree * 10)) -gt $((objectif * 12)) ]; then
-  dit "la sélection a pris $duree s, au-delà de son objectif de $objectif s (+20 %) — sans bloquer"
+if [ "$attendue" -gt 0 ] && [ $((duree * 10)) -gt $((attendue * 12)) ]; then
+  dit "la sélection a pris $duree s, au-delà de sa durée attendue de $attendue s (+20 %) — sans bloquer"
 fi
 
 # ─── Harnais du besoin, joué à part ────────────────────────────────────────────────────────────────
