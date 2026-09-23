@@ -9,9 +9,10 @@ name: CI et livraison
 # d'une PR prête, et le signalement d'un changement après le Ready, #168) et `fin.yml` (« en cours »
 # quitte l'issue fermée).
 #
-# Les identifiants FTP (`OVH_FTP_*`) vivent dans l'environnement `depot-ftp`, qui n'admet que `main`
-# (#155) : ce workflow, lu dans la branche pour une PR, ne peut pas les obtenir. Seul `deploiement`
-# les lit ici, sur `main`.
+# Les identifiants FTP (`OVH_FTP_*`) : dépôt public, dans l'environnement `depot-ftp`, qui n'admet
+# que `main` (#155) ; dépôt privé sur l'offre gratuite, au niveau du dépôt, lisibles par tout workflow
+# d'une branche, risque accepté (#176, `docs/hebergement-web.md`). Seul `deploiement` les lit ici,
+# sur `main`.
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
@@ -121,8 +122,8 @@ jobs:
   deploiement:
     name: Dépôt FTP sur l'hébergement
     needs: hebergement
-    # Depuis `main` seulement : l'environnement `depot-ftp`, qui porte les identifiants, n'admet que
-    # `main` (#155). Un tag `v*` publie la release sans redéposer le site, déjà déposé au push.
+    # Depuis `main` seulement. L'environnement `depot-ftp` n'admet que `main` quand GitHub l'applique
+    # (dépôt public, #155) ; dépôt privé sur l'offre gratuite, il reste déclaré, sans effet (#176). Un tag `v*` publie la release sans redéposer le site, déjà déposé au push.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.deploiement != 'ignorer'
     runs-on: ubuntu-latest
     environment: depot-ftp

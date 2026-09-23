@@ -52,14 +52,45 @@ qu'avec le serveur intégré de PHP.
 renseignés ; à un tag `v*`, elle joint `tirelire-hebergement.zip` à la release, avec l'APK. Sans secrets, le job de dépôt le dit dans son résumé et ne fait rien
 d'autre : l'archive reste téléchargeable.
 
-### Secrets à créer (Paramètres du dépôt → Environments → `depot-ftp`)
+### Où vivent les identifiants, et le risque accepté (#176)
 
-Les identifiants FTP vivent dans l'environnement `depot-ftp`, pas au niveau du dépôt : c'est ce qui
-les met hors de portée du code d'une PR (#155). Créer l'environnement ; dans *Deployment branches and
-tags*, choisir *Selected branches and tags* et n'ajouter que la branche `main` ; y créer les trois
-secrets ci-dessous (*Environment secrets*), puis supprimer ceux du même nom au niveau du dépôt. Tant
-que ce n'est pas fait, les jobs qui déclarent l'environnement tournent encore, mais sans cette
-protection.
+Le dépôt est privé, sur l'offre gratuite : GitHub n'y fournit pas les environnements. Les identifiants
+FTP vivent donc **au niveau du dépôt** (Settings → Secrets and variables → Actions → *Repository
+secrets*), avec les variables ci-dessous (*Repository variables*). Les jobs de dépôt déclarent encore
+l'environnement `depot-ftp` : sans effet en privé, cette déclaration redonne la protection de #155 si
+le dépôt redevient public ou passe sur une offre payante.
+
+Risque accepté par le porteur : au niveau du dépôt, les identifiants sont lisibles par tout workflow
+lancé depuis une branche du dépôt, y compris un workflow que la branche ajoute elle-même, dès son
+premier `push`, avant toute PR ni relecture. Aucun harnais ne peut le garder : un test ne lit que les
+workflows de `main`. La recette et la production partagent le même compte FTP : ce qui fuit donne
+accès aux deux. Ce qui borne le risque :
+
+- `CLAUDE.md` interdit aux agents de créer ou de modifier un workflow, sauf quand l'issue le demande ;
+- au Ready, une PR qui modifie `.github/workflows/` ou `.github/actions/` porte l'étiquette « touche
+  un workflow » (`pret.yml`, lu sur `main`) : le porteur le voit avant de fusionner ;
+- un utilisateur FTP dédié, limité au dossier des sites, réduit ce qu'une fuite ouvre.
+
+### Passer le dépôt en privé sans casser la CI
+
+Dans cet ordre, dépôt encore public :
+
+1. Fusionner la PR de #176 (règle, étiquette, cette page).
+2. Settings → Environments → `depot-ftp` : relever les noms des *Environment variables* (`TIRELIRE_*`)
+   et leurs valeurs ; les secrets ne se relisent pas, reprendre leurs valeurs chez OVHcloud.
+3. Settings → Secrets and variables → Actions : créer au niveau du dépôt `OVH_FTP_HOST`,
+   `OVH_FTP_USER`, `OVH_FTP_PASSWORD` et les variables relevées. Tant que le dépôt est public,
+   l'environnement garde la priorité : rien ne change encore.
+4. Settings → General → *Danger Zone* → *Change visibility* → privé.
+5. Constater : le prochain push sur `main` dépose et vérifie la production (le résumé du job « Dépôt
+   FTP » ne dit pas que des secrets manquent) ; l'aperçu d'une PR, case cochée, se dépose.
+
+Laisser l'environnement `depot-ftp` en place : il ne gêne pas en privé et reprend effet au retour en
+public — il faudrait alors supprimer les secrets du niveau du dépôt pour refermer #155. En privé, les
+minutes d'Actions (2 000 par mois) et le stockage des artefacts (500 Mo, rétention 30 jours sur `main`,
+7 jours pour les aperçus) sont comptés ; les dépasser arrête la CI jusqu'au mois suivant.
+
+### Les secrets
 
 | Secret | Valeur | Où la trouver |
 |---|---|---|
@@ -147,10 +178,11 @@ commentaire de la PR dit pourquoi, avec le lien de l'exécution en cause. Après
 quel commit est en ligne : cochée tant que c'est le dernier commit, décochée dès qu'un commit arrive
 (`suivi.yml`) ou si le dépôt échoue (l'aperçu en ligne est alors dit incertain, et un commentaire
 donne le lien du journal). Cocher ou décocher la case n'est pas un changement de la PR (#168).
-Aucun réglage du dépôt n'est à ajouter : l'environnement `depot-ftp` et les variables de recette
-restent ceux d'avant.
+Aucun réglage du dépôt n'est à ajouter : les identifiants et les variables de recette restent ceux de
+la production.
 
-Le code de la PR et les identifiants ne se croisent jamais (#155). `ci.yml`, lu dans la branche,
+Les workflows de la PR et ceux de `main` ne se mélangent pas (#155) — mais, dépôt privé, un workflow
+ajouté par la branche peut lire les identifiants (#176, ci-dessus). `ci.yml`, lu dans la branche,
 assemble le site de la PR sans identifiant ni réglage de recette, et le garde en artefact
 (`apercu-pr-<numéro>`). `depot-apercu.yml`, lu sur `main` (`pull_request_target`), vérifie cette exécution et le reste de la CI,
 reprend l'artefact et le dépose, dans un job de l'environnement `depot-ftp` qui n'extrait que `main`
@@ -168,7 +200,7 @@ partagent un même stockage navigateur, jamais celui de la production. Chaque ap
 service worker sur la portée de son sous-dossier. Le `robots.txt` de la racine de la recette se pose à
 la main ; aucun job n'y touche.
 
-Mêmes secrets `OVH_FTP_*` que la production, dans le même environnement `depot-ftp`, et deux variables (onglet *Variables*), sans valeur par
+Mêmes secrets `OVH_FTP_*` que la production, au même endroit, et deux variables (onglet *Variables*), sans valeur par
 défaut :
 
 | Variable | Rôle |
