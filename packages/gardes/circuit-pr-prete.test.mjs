@@ -84,7 +84,9 @@ const NUMÉRO = 174;
 const ISSUE = 168;
 const ÉTIQUETTE = 'PR prête';
 const CONTEXTE = 'Toute la CI sur ce commit';
-const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette', TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
+// L'adresse de recette est un secret (#156), le dossier une variable.
+const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette' };
+const SECRETS_RECETTE = { TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
 const PR = (draft) => ({
   number: NUMÉRO,
   draft,
@@ -105,7 +107,7 @@ const contexte = ([nom, event], extra = {}) => ({
     event,
   },
   vars: { ...RECETTE },
-  secrets: {},
+  secrets: { ...SECRETS_RECETTE },
   inputs: {},
   ...extra,
 });

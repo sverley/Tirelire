@@ -41,7 +41,9 @@ const NUMÉRO = 153;
 // Les passages en Ready (#150) : `ready_for_review`, et une PR ouverte ou rouverte hors brouillon. Un
 // push sur une PR prête ne rejoue plus rien : il annule la validation du porteur (#168).
 const ACTIONS_PR = ['opened', 'reopened', 'ready_for_review'];
-const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette', TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
+// L'adresse de recette est un secret (#156), le dossier une variable.
+const RECETTE = { TIRELIRE_DEV_FTP_DOSSIER: 'recette' };
+const SECRETS_RECETTE = { TIRELIRE_DEV_SITE_URL: 'https://recette.example' };
 const pr = (action, recette) => ({
   github: {
     event_name: 'pull_request',
@@ -49,7 +51,7 @@ const pr = (action, recette) => ({
     event: { action, pull_request: { number: NUMÉRO, draft: false, head: { sha: 'a'.repeat(40) } } },
   },
   vars: recette ? { ...RECETTE } : {},
-  secrets: {},
+  secrets: recette ? { ...SECRETS_RECETTE } : {},
   inputs: {},
 });
 const push = (ref, vars = {}) => ({ github: { event_name: 'push', ref, event: {} }, vars, secrets: {}, inputs: {} });
@@ -223,7 +225,7 @@ const cible = (action, draft = false, workflow = NOM_WORKFLOW) => ({
     event: { action, pull_request: { number: NUMÉRO, draft, head: { sha: 'a'.repeat(40) }, base: { sha: 'b'.repeat(40) } } },
   },
   vars: { ...RECETTE },
-  secrets: {},
+  secrets: { ...SECRETS_RECETTE },
   inputs: {},
 });
 const nomAffiché = (job) => scalaire(job.lignes, /^ {4}name:/).replace(/^(['"])(.*)\1$/, '$2');

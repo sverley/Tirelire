@@ -166,6 +166,7 @@ test('#141 · aperçu : déposé et retiré dans <dossier>/pr-<numéro>, jamais 
       assert.equal(après['recette/pr-12/index.html'], '<html>Tirelire, l’aperçu neuf de la PR 12</html>', `le site n'est pas arrivé dans recette/pr-12 :\n${r.sortie}`);
       assert.equal(après['recette/pr-12/.htaccess'], 'RewriteEngine On', 'les fichiers cachés du site ne sont pas partis');
       assert.deepEqual(horsDe(après, 'recette/pr-12/'), horsDe(avant, 'recette/pr-12/'), 'un dépôt a touché hors de recette/pr-12');
+      assert.doesNotMatch(r.sortie, /recette\.exemple\.test/i, `le dépôt écrit l'adresse de recette au journal (#156) :\n${r.sortie}`);
     });
 
     for (const variable of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_DEV_SITE_URL']) {
@@ -223,6 +224,16 @@ test('#141 · aperçu : déposé et retiré dans <dossier>/pr-<numéro>, jamais 
 });
 
 // ─── Le commit servi ─────────────────────────────────────────────────────────────────────────────
+
+test('#156 · en CI, apercu.sh masque toutes les formes de l’adresse de recette', () => {
+  const brute = 'https://Recette.Exemple.test:8443/';
+  const masques = (env) => [...apercu('reglages', { ...RECETTE, TIRELIRE_DEV_SITE_URL: brute, ...env }).sortie.matchAll(/^::add-mask::(.*)$/gm)].map((m) => m[1]);
+  const posés = masques({ GITHUB_ACTIONS: 'true' });
+  for (const forme of [brute, 'https://recette.exemple.test:8443', 'Recette.Exemple.test:8443', 'recette.exemple.test:8443', 'Recette.Exemple.test']) {
+    assert.ok(posés.includes(forme), `« ${forme} » n'est pas masquée (masques : ${posés.join(', ')})`);
+  }
+  assert.deepEqual(masques({}), [], 'hors CI, aucune commande de masquage n’est écrite');
+});
 
 test('#141 · verifier.sh constate le commit servi quand COMMIT_ATTENDU est donné', async (t) => {
   let page = '';
@@ -346,9 +357,11 @@ test('#141 · workflows : le dépôt de l’aperçu, sur une PR prête', () => {
   assert.ok(dépôt, 'aucun job ne lance `apercu.sh deposer`');
   assert.ok(dépôt.w.types.length > 0, `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne tourne pas sur les PR`);
   assert.ok(sauté(dépôt.w, dépôt.nom, écarteBrouillon), `${dépôt.w.fichier} : le job « ${dépôt.nom} » dépose aussi un brouillon`);
-  for (const v of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_DEV_SITE_URL', 'TIRELIRE_FTP_DOSSIER', 'TIRELIRE_SITE_URL']) {
+  for (const v of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_FTP_DOSSIER', 'TIRELIRE_SITE_URL']) {
     assert.ok(voit(dépôt, new RegExp(`vars\\.${v}\\b`)), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`vars.${v}\``);
   }
+  // L'adresse de recette est un secret : une variable s'écrirait en clair dans les journaux (#156).
+  assert.ok(voit(dépôt, /secrets\.TIRELIRE_DEV_SITE_URL\b/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`secrets.TIRELIRE_DEV_SITE_URL\``);
   assert.ok(voit(dépôt, /NUMERO:.*pull_request\.number/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne passe pas le numéro de la PR dans NUMERO`);
   assert.ok(
     workflows().some((w) => /TIRELIRE_BASE:.*pull_request\.number/.test(w.texte)),
@@ -356,7 +369,8 @@ test('#141 · workflows : le dépôt de l’aperçu, sur une PR prête', () => {
   );
 
   const vérif = trouver(/verifier\.sh[\s\S]*COMMIT_ATTENDU|COMMIT_ATTENDU[\s\S]*verifier\.sh/);
-  assert.ok(vérif && voit(vérif, /vars\.TIRELIRE_DEV_SITE_URL\b/), 'aucun job ne lance `verifier.sh` sur l’aperçu avec `COMMIT_ATTENDU`');
+  assert.ok(vérif && voit(vérif, /secrets\.TIRELIRE_DEV_SITE_URL\b/), 'aucun job ne lance `verifier.sh` sur l’aperçu avec `COMMIT_ATTENDU`');
+  for (const w of workflows()) assert.doesNotMatch(w.texte, /vars\.TIRELIRE_DEV_SITE_URL\b/, `${w.fichier} : l’adresse de recette est lue d’une variable, écrite en clair dans les journaux (#156)`);
   for (const j of [dépôt, vérif]) assert.doesNotMatch(j.bloc, PUBLIE, `${j.w.fichier} : le job « ${j.nom} » publie un commentaire`);
 });
 

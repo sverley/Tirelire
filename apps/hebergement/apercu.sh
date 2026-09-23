@@ -7,7 +7,8 @@
 #   bash apps/hebergement/apercu.sh deposer    # dépose SOURCE par deposer.sh, dans ce sous-dossier seul
 #   bash apps/hebergement/apercu.sh retirer    # supprime ce sous-dossier entier, paquets du relais compris
 #
-# Environnement : NUMERO (numéro de la PR), TIRELIRE_DEV_FTP_DOSSIER, TIRELIRE_DEV_SITE_URL ; pour
+# Environnement : NUMERO (numéro de la PR), TIRELIRE_DEV_FTP_DOSSIER, TIRELIRE_DEV_SITE_URL (un secret :
+# l'adresse de recette ne se lit pas depuis le dépôt, #156) ; pour
 # comparaison, TIRELIRE_FTP_DOSSIER (défaut www, comme la production) et TIRELIRE_SITE_URL ;
 # SOURCE pour deposer ; l'accès FTP comme deposer.sh (HOTE, UTILISATEUR, MOTDEPASSE, PROTOCOLE,
 # VERIFIER_CERTIFICAT).
@@ -95,6 +96,16 @@ origine() {
 }
 
 DEV_URL="${TIRELIRE_DEV_SITE_URL:-}"
+# L'adresse de recette ne s'écrit dans aucun journal (#156). GitHub masque le secret tel qu'il est
+# saisi ; on masque aussi ses autres formes (hôte seul, minuscules, sans « / » final), que curl ou
+# ce script pourraient écrire. Les commandes de masquage valent pour tout le reste du job.
+if [ -n "$DEV_URL" ] && [ "${GITHUB_ACTIONS:-}" = true ]; then
+  masque_hote="${DEV_URL#*://}"
+  masque_hote="${masque_hote%%[/?#]*}"
+  for forme in "$DEV_URL" "$(cle_adresse "$DEV_URL")" "$masque_hote" "${masque_hote,,}" "${masque_hote%%:*}"; do
+    [ -n "$forme" ] && echo "::add-mask::$forme" >&2
+  done
+fi
 PROD_URL="${TIRELIRE_SITE_URL:-}"
 if [ -z "$DEV_URL" ]; then
   arreter "TIRELIRE_DEV_SITE_URL manque : l'adresse de la recette n'a pas de valeur par défaut."
@@ -122,7 +133,8 @@ case "$action" in
 
   deposer)
     # deposer.sh retombe sur « www » sans DOSSIER : on le fixe toujours, et sans nettoyage (D37).
-    echo "Aperçu de la PR #$NUMERO : dépôt dans « $DOSSIER_APERCU », servi à « $ADRESSE »."
+    # L'adresse n'est pas écrite : le sous-dossier suffit à situer l'aperçu (#156).
+    echo "Aperçu de la PR #$NUMERO : dépôt dans « $DOSSIER_APERCU », servi au sous-dossier pr-$NUMERO/ de la recette."
     env -u NETTOYER DOSSIER="$DOSSIER_APERCU" NETTOYER=non bash "$ici/deposer.sh"
     ;;
 
