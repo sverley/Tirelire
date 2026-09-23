@@ -27,14 +27,16 @@ puis le glossaire et les catalogues.
 
 ## Suivre un chantier
 
-Un chantier (glossaire) se définit dans son document, `docs/chantiers/<chantier>.md` : intentions
-globales, contraintes, hypothèses, cibles, usages. C'est sa seule vérité (D86). Son issue, étiquetée
+Un chantier (glossaire) se définit dans son document, `docs/chantiers/<chantier>.md`, sa seule
+vérité (D86) : une lettre d'intention, puis l'analyse approfondie que tu y ajoutes. Son issue, étiquetée
 « chantier », le reflète sur GitHub. Son architecte le suit jusqu'à sa fermeture ; chaque session
 reprend là où l'issue du chantier en est.
 
-1. Pose « en cours » sur l'issue du chantier. Lis son document. S'il n'existe pas encore, écris-le à
-   partir de l'issue et des paroles du porteur (modèle : `docs/chantiers/README.md`), et fais-le
-   valider par le porteur avant d'aller plus loin.
+1. Pose « en cours » sur l'issue du chantier. Lis son document. S'il n'existe pas encore, sa lettre
+   d'intention s'écrit d'abord, dans une issue, à partir des paroles du porteur (modèle :
+   `docs/chantiers/README.md`). S'il ne porte que sa lettre, fais-en l'analyse approfondie —
+   contraintes, hypothèses, cibles, usages — et fais-la valider par le porteur avant d'aller plus
+   loin.
 2. À partir du document, définis les spécifications du chantier dans son issue — c'en est le
    produit : son « Fait quand », borné à ses cibles et à ses usages, et les besoins qui le
    réalisent, un par sous-issue (étape 2). Ne spécifie pas les sous-issues elles-mêmes : chacune a

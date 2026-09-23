@@ -1351,9 +1351,11 @@ téléphone : réponses courtes, en prose, une question à la fois.
 
 ### D86 · Un chantier : un document, une issue, des sous-issues
 
-Un chantier se définit dans un document de `docs/chantiers/`, un par chantier : ses intentions
-globales, ses contraintes, ses hypothèses, ses cibles et ses usages. Ce document est sa seule
-vérité ; ce qu'il change s'y corrige, avec l'accord du porteur. Sur GitHub, une issue étiquetée
+Un chantier se définit dans un document de `docs/chantiers/`, un par chantier, sa seule vérité ; ce
+qu'il change s'y corrige, avec l'accord du porteur. Le document naît en lettre d'intention : les
+paroles du porteur qui fondent le chantier, et ce qu'elles demandent ; des cibles, des usages ou des
+contraintes seulement s'ils font partie de l'intention. L'architecte du chantier y ajoute l'analyse
+approfondie — contraintes, hypothèses, cibles, usages —, avec l'accord du porteur. Sur GitHub, une issue étiquetée
 « chantier » le reflète et renvoie à son document.
 
 L'architecte du chantier définit, à partir du document, les spécifications du chantier — c'est le
