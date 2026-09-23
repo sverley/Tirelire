@@ -1190,8 +1190,8 @@ budget, pas une ligne de budget à offrir (D43).
 Les documents fondateurs : `docs/description-projet.md` (les paroles du porteur, ouvertes par ses
 sections « Principes » et « Usages »), `docs/glossaire.md`, les catalogues — `docs/invariants.md`,
 `docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/gardes.md` (le registre : chaque
-invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — et les descriptifs
-des rôles, `docs/roles/`. Un document fondateur est forcément un fichier Markdown de `docs/` : un
+invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — les documents des chantiers,
+`docs/chantiers/`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est forcément un fichier Markdown de `docs/` : un
 document d'un autre format (HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se
 reprend dans un Markdown. Tout Markdown de `docs/` n'est pas fondateur pour autant : la liste est
 celle-ci.
@@ -1348,3 +1348,20 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
 Français partout : code, commentaires, commits, interface, documents. Le porteur lit surtout sur
 téléphone : réponses courtes, en prose, une question à la fois.
+
+### D86 · Un chantier : un document, une issue, des sous-issues
+
+Un chantier se définit dans un document de `docs/chantiers/`, un par chantier : ses intentions
+globales, ses contraintes, ses hypothèses, ses cibles et ses usages. Ce document est sa seule
+vérité ; ce qu'il change s'y corrige, avec l'accord du porteur. Sur GitHub, une issue étiquetée
+« chantier » le reflète et renvoie à son document.
+
+L'architecte du chantier définit, à partir du document, les spécifications du chantier — c'est le
+produit de son issue — et suit l'évolution de toutes les sous-issues qui le réalisent, jusqu'à sa
+fermeture (`docs/roles/architecte.md`). Les sous-issues restent sur GitHub : le document ne les
+liste pas.
+
+Une issue sert un chantier, plusieurs, ou aucun. GitHub ne lui donne qu'un parent : le chantier
+qu'elle sert d'abord ; les autres chantiers qu'elle sert la citent dans l'état de leur issue. Une
+issue qui ne sert aucun chantier porte l'étiquette de sa nature : « outillage », « nouvelle
+fonctionnalité », « idée »…

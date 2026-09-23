@@ -439,3 +439,9 @@ qu'elles barrent.
 > Il faudra aussi modifier les instructions dans le projet Claude.la pour se référer aux roles
 
 > En effet, il faut ajouter cette méthode au rôle de l'auditeur. Mais l'auditeur ajoute ses retours pour relancer un tour au codeur dans la PR si besoin.
+
+### Les chantiers
+
+> Les sous issues peuvent servir plusieurs chantiers ou aucun. Dans ce cas, il faut les tagguer en outillage, nouvelle fonctionnalité, idée, etc.
+
+> Les chantiers doivent être définis dans docs/chantiers/ avec descriptifs des intentions globales, des contraintes, hypothèses, cibles, usages. C'est la seule vérité. Le système github a des tickets reflétant ces chantiers. L'architecte de chaque chantier sera en charge de définir les spec à partir du document (ça sera le produit de l'issue) et suivra l'évolution de toutes les sous issue permettant la réalisation du chantier. Les sous issues restent au niveau github (pas dans le document). Consigne ce fonctionnement dans le rôle de l'architecte et les decisions dans leur catalogue
