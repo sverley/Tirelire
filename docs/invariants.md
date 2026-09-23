@@ -1,10 +1,10 @@
 # Invariants du produit
 
-Les valeurs mesurables des principes et des règles (principe 9.2 de la
+Les valeurs mesurables des principes et des décisions (principe 9.2 de la
 [description du projet](description-projet.md), qui fait foi). Chacun cite ce qu'il décline et
 énonce sa **valeur**, que son harnais fait échouer au-delà ; s'il y a lieu, son **objectif**, visé,
 sans harnais qui échoue dessus. Son harnais, ou sa vérification manuelle, est au registre
-([`gardes.md`](gardes.md)). Une décision n'a pas d'invariant ; une contrainte est dans
+([`gardes.md`](gardes.md)). Une décision n'en porte un que selon D79 ; une contrainte est dans
 [`contraintes.md`](contraintes.md), une cible dans [`cibles.md`](cibles.md).
 
 ## I2 · Une tirelire est un livre de compte
@@ -83,5 +83,5 @@ avec un ordre permanent enregistré se signale, avec l'ancien montant et le nouv
 
 Décline le principe 4.3.
 
-**Valeur** : tout ce qu'une étape d'assistant crée se retrouve, sous le même nom, dans l'écran
-ordinaire correspondant, et s'y modifie hors de l'assistant.
+**Valeur** : tout ce qu'une étape d'assistant crée ou fait se fait et se modifie aussi hors
+assistant.
