@@ -76,11 +76,6 @@ Retirer une vérification manuelle ou un harnais reste possible, mais l'issue de
 liste sous « Vérifications manuelles » (`VM-…` pour une vérification, `C9 · chemin` pour un
 harnais), constaté et validé comme le reste.
 
-## I1 · Aider un particulier à tenir un budget sur plusieurs comptes
-
-- **Couvert par** · I2, I3 — la raison d'être se garde à travers la tirelire tenue sur plusieurs
-  comptes et les cinq usages.
-
 ## I2 · Une tirelire est un livre de compte
 
 Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
@@ -198,14 +193,14 @@ Chemins : `apps/web/src/App.svelte`, `apps/web/src/views/More.svelte`
 
 Chemins : `packages/core/src/automations.ts`, `apps/web/src/views/Operations.svelte`
 
-Objectif du porteur (#71, 13 septembre 2026), depuis l'écran Opérations, l'opération sous les yeux :
+Objectif du porteur (#71), depuis l'écran Opérations, l'opération sous les yeux :
 **2 gestes** pour catégoriser une opération et **3 gestes** avec une sous-catégorie ; automatiser
 toutes les opérations semblables coûte un geste de plus, soit **3 gestes** et **4 gestes**. Un geste
 est une frappe sur un bouton ou une ligne, un choix dans une liste, une case cochée.
 
 Le harnais mesure à l'objectif plus **1 geste** de marge, accordée par le porteur : il fait échouer
-à 4, 5, 5 et 6 gestes. Mesure du 13 septembre 2026 : 3, 3, 4 et 4 gestes — l'objectif de 2 reste
-devant le produit, et le seuil interdit la hausse.
+à 4, 5, 5 et 6 gestes : c'est la valeur d'I6. Mesure de #71 : 3, 3, 4 et 4 gestes — l'objectif de 2
+reste devant le produit, et le seuil interdit la hausse.
 
 - **Harnais** · `packages/core/test/automations.test.ts` — une règle classe toutes les opérations
   semblables, se rejoue sans effet de bord, et son aperçu ne modifie rien.
@@ -231,7 +226,7 @@ Chemins : `packages/core/src/sync.ts`, `apps/web/src/lib/db.ts`, `apps/web/src/l
 - **Harnais** · `apps/web/test/navigateur/donnees-locales.test.ts` — « avec un relais renseigné, seuls des
   paquets chiffrés partent, et seulement après le remplissage et le clic explicites » : remplir
   l'adresse, le salon et la phrase puis cliquer sur « Synchroniser maintenant » vaut l'acceptation,
-  avertissement compris (tranché avec le porteur le 13 septembre 2026) ; rien ne part avant, et ce
+  avertissement compris (tranché avec le porteur) ; rien ne part avant, et ce
   qui part ensuite ne porte que `site`, `upTo`, `iv`, `blob`, `blob` ne se relisant pas comme du
   JSON en clair.
   Témoin rouge : « témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair »
@@ -257,12 +252,16 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
 
 ## I9 · Plusieurs distributions
 
-Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/capacitor.config.ts`, `apps/web/android/**`, `apps/hebergement/assembler.mjs`
+Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/capacitor.config.ts`, `apps/web/android/**`, `apps/hebergement/assembler.mjs`, `docs/cibles.md`
 
+- **Harnais** · `packages/gardes/distributions.test.mjs` — « I9 · chaque cible active du catalogue se construit à chaque push sur main » :
+  la valeur d'I9. Pour chaque cible active de `docs/cibles.md`, chaque commande de sa ligne
+  « Construction » tourne quand le workflow est joué à blanc sur un push de `main`.
+  Témoin rouge : « témoin rouge · un catalogue qui active l'APK sans que main la construise »
 - **Harnais** · `.github/workflows/ci.yml`, `packages/gardes/distributions.test.mjs` — au passage
   en Ready de chaque PR, le web et le site d'hébergement se construisent ; l'APK Android ne se construit qu'à un tag
-  `v*`, jamais sur une PR ni à une fusion : l'application web est la distribution prioritaire
-  (#45), et rien d'une autre distribution ne la bloque. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
+  `v*`, jamais sur une PR ni à une fusion : les cibles actives sont des webapps
+  (`cibles.md`), et rien d'une autre distribution ne la bloque. Un fichier de workflow ne pouvant pas accueillir de test, le harnais le lit
   (tranché dans #69).
   Témoin rouge : « témoin rouge · une CI qui construit l'APK sur chaque PR et le site d'hébergement seulement après fusion »
 - **Vérification manuelle** · `VM-I9-apk` — Si la PR touche la construction de l'application (ses
@@ -271,8 +270,8 @@ Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/we
   `./gradlew assembleRelease` dans `apps/web/android`). Sinon, et notamment si elle ne touche que des
   tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi la construction
   n'est pas atteinte, et ce qui dépend de ce qu'elle change. L'APK n'est vérifié que par sa
-  construction : son comportement réel n'est pas analysé tant que la priorité va à l'application
-  web (#45). Ne pas poser de tag `v*` depuis la branche : il publierait une release.
+  construction : son comportement réel n'est pas analysé tant que l'APK est de côté au catalogue
+  des cibles (`cibles.md`). Ne pas poser de tag `v*` depuis la branche : il publierait une release.
 
 ## I10 · Proposer, et ne jamais faire de manière cachée
 
@@ -377,7 +376,7 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
 
-Analyse (audit #73, 13 septembre 2026) : la partie de C4 que #42 doit encore construire — demander
+Analyse (audit #73) : la partie de C4 que #42 doit encore construire — demander
 `navigator.storage.persist()` et dire si elle est obtenue — n'existe pas dans le code
 (`apps/web/src/lib/db.ts` ne l'appelle pas). Un harnais ne peut garder un comportement qui n'existe
 pas : coder son témoin rouge demanderait de coder le comportement lui-même, ce qui sort de l'audit
@@ -389,11 +388,12 @@ n'est pas fusionnée, la vérification manuelle gardant la part déjà en place 
 Chemins : `apps/web/src/lib/db.ts`, `apps/web/vite.config.ts`, `apps/hebergement/assembler.mjs`
 
 - **Vérification manuelle** · `VM-C4-effacement` — Dans l'application web sur Chromium (la
-  distribution vérifiée, #45 ; ni l'APK ni Safari ne se vérifient ici) : ouvrir la version de la
+  distribution vérifiée, une cible active de `cibles.md` ; ni l'APK ni Safari ne se vérifient ici) : ouvrir la version de la
   branche là où celle de `main` a des données, même adresse et même navigateur, et constater
   qu'elles sont toujours là. Si la PR change l'adresse, le chemin de base ou le nom de la base
   locale, l'utilisateur est prévenu et guidé pour les reprendre. Ce que Safari efface après sept
-  jours sans visite ne se constate pas ici : #37 le porte, avec le reste de la cible Apple.
+  jours sans visite ne se constate pas ici : Webapp · Safari sur iPhone et iPad n'est pas une cible
+  active ([`cibles.md`](cibles.md)).
 - **À bâtir** · la demande de persistance du stockage (#42).
 
 ## C5 · Sans serveur, aucune sauvegarde n'est implicite
@@ -414,13 +414,14 @@ Chemins : `apps/web/src/lib/db.ts`, `apps/web/src/views/Settings.svelte`
 
 ## C7 · Hors magasin, les systèmes alertent ou bloquent
 
-Analyse (audit #73, 13 septembre 2026) : ce que C7 garde — l'avertissement ou le blocage qu'un
+Analyse (audit #73) : ce que C7 garde — l'avertissement ou le blocage qu'un
 système affiche à l'installation d'une application native hors magasin — est un fait de l'appareil
 et du système d'exploitation de qui installe, pas du code du dépôt ; aucun test lancé en CI n'ouvre
 un vrai Android, Windows ou macOS pour constater l'écran qu'ils affichent. C'est pour cela que #38
 la range dans les contraintes gardées « à la revue, quand une cible native est traitée » plutôt que
-par un harnais : la revue reste manuelle tant qu'une cible native n'est pas traitée (#36, #37), et
-le redevient à chaque cible nouvelle.
+par un harnais : la revue reste manuelle tant qu'aucune cible native n'est active au catalogue des
+cibles (`cibles.md` : APK Android, Application Apple, Application de bureau), et le redevient à
+chaque cible native qui y devient active.
 
 Chemins : `apps/web/android/**`, `apps/web/capacitor.config.ts`
 
@@ -462,7 +463,7 @@ Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/app.css`
   modifie, lisible à 375 px (D59).
   Témoin rouge : « témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe »
 - **Vérification manuelle** · `VM-C9-telephone` — Sur un vrai téléphone, dans l'application web
-  ouverte ou installée depuis Chrome sur Android (la distribution prioritaire, #45 ; l'APK ne se
+  ouverte ou installée depuis Chrome sur Android (une cible active de `cibles.md` ; l'APK ne se
   vérifie pas) : les écrans que la PR touche restent lisibles et atteignables au pouce, bord à bord,
   clavier logiciel ouvert, avec les polices du système.
 - **Vérification manuelle** · `VM-C9-ordinateur` — Sur un ordinateur à grand écran, à la souris

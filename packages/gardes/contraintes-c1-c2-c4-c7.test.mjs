@@ -43,7 +43,7 @@
  *    suite, est nommé par une ligne du registre. Une garantie ajoutée au code sans être écrite au
  *    registre rougit ici — c'est ce qui manquait quand le classement des documents est arrivé.
  * 3. **Les analyses de C4 et C7 renvoient à ce qui les lèvera** : celle de C4 cite #42, qui bâtira
- *    la demande de persistance ; celle de C7 cite #36 et #37, les cibles natives. Un paragraphe de
+ *    la demande de persistance ; celle de C7 cite le catalogue des cibles (`cibles.md`), où une cible native deviendra active. Un paragraphe de
  *    remplissage ne les cite pas.
  *
  * Chaque règle a ici son **témoin vert** — le registre réel, qui doit passer — et son **témoin
@@ -79,8 +79,12 @@ const PROMESSES = Object.freeze({
   }),
 });
 
-/** Analyses de C4 et C7 : les issues qu'elles doivent citer, faute de quoi elles ne disent rien d'utile. */
-const RENVOIS_ATTENDUS = Object.freeze({ C4: Object.freeze(['42']), C7: Object.freeze(['36', '37']) });
+/**
+ * Analyses de C4 et C7 : ce qu'elles doivent citer, faute de quoi elles ne disent rien d'utile — pour
+ * C4, l'issue qui bâtira la persistance ; pour C7, le catalogue des cibles, où une cible native
+ * deviendra active (#162 : aucun document ne renvoie plus une cible à une issue).
+ */
+const RENVOIS_ATTENDUS = Object.freeze({ C4: Object.freeze(['#42']), C7: Object.freeze(['cibles.md']) });
 
 // ─── Lecture ─────────────────────────────────────────────────────────────────────────────────
 
@@ -193,11 +197,11 @@ test('#73 · témoin rouge — une garantie ajoutée au code sans être écrite 
 function verifierAnalyseEcrite(id, texteDuRegistre) {
   const analyse = analyseDe(id, texteDuRegistre);
   assert.ok(analyse.length >= 80, `${id} n'a pas d'analyse écrite sous son titre : ${RELIRE}`);
-  for (const issue of RENVOIS_ATTENDUS[id]) {
+  for (const renvoi of RENVOIS_ATTENDUS[id]) {
     assert.match(
       analyse,
-      new RegExp(`#${issue}\\b`),
-      `${id} : l'analyse ne renvoie pas à #${issue}, qui lèvera ce que la vérification manuelle tient seule pour l'instant : ${RELIRE}`,
+      new RegExp(renvoi.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '\\b'),
+      `${id} : l'analyse ne renvoie pas à ${renvoi}, qui lèvera ce que la vérification manuelle tient seule pour l'instant : ${RELIRE}`,
     );
   }
 }
