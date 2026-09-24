@@ -491,3 +491,5 @@ qu'elles barrent.
 > Il faut aussi prévoir un certain étalement des tâches. Il ne faut pas que la v0 soit énorme à coder sans avoir la possibilité de confronter les choix aux usages
 
 > Ok
+
+> la fin d'une version est le croisement d'une cible et d'un usage

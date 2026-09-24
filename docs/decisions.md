@@ -1389,10 +1389,11 @@ version en sert un seul.
 ### D87 · Une version : un usage garanti sur des cibles
 
 Une version garantit un usage sur un ensemble de cibles ; elle naît d'une case « prioritaire » de la
-matrice des cibles et se définit dans `docs/versions.md` : son usage, ses cibles, son critère de fin,
-son tag. Elle se termine quand le critère de fin de son entrée est atteint et que le porteur a fait
-ses vérifications manuelles ; le tag de son nom la publie (D83). Une version livrée ne régresse
-pas : ce que son critère de fin tient vert le reste à chaque PR.
+matrice des cibles et se définit dans `docs/versions.md` : son usage, ses cibles, son critère de
+fin, son tag. La fin d'une version d'usage est le croisement d'une cible et d'un usage : le parcours
+de son usage (I3) vert sur chacune de ses cibles, et les vérifications manuelles du porteur ; le tag
+de son nom la publie (D83). Une version livrée ne régresse pas : ce que son critère de fin tient
+vert le reste à chaque PR.
 
 Le socle ne garantit aucun usage : il intègre les contraintes structurelles de tous les usages et de
 toutes les cibles actives — données, sauvegarde, synchronisation, versions d'instances,
@@ -1400,10 +1401,9 @@ distribution. Il s'étale en incréments, dont le premier est `v0` : un incréme
 qu'aucune version d'usage ne peut éviter d'avoir avant elle, et se place juste avant la première
 version d'usage qui l'exerce, pour que ses choix se confrontent aussitôt à un usage réel. Une
 contrainte structurelle se conçoit tôt, dans une issue de conception, pour ne fermer aucune porte ;
-elle se code dans la première version qui l'exerce. Son entrée énumère ses contraintes ; son
-critère de fin porte sur leurs harnais et vérifications manuelles, et sur ses issues de conception.
-
-Une version reste petite : au-delà d'environ huit tâches, son architecte la découpe.
+elle se code dans la première version qui l'exerce. C'est l'exception à la fin par le croisement
+d'une cible et d'un usage : son entrée énumère ses contraintes, et son critère de fin porte sur
+leurs harnais et vérifications manuelles, et sur ses issues de conception.
 
 Le travail est tiré par les versions : une tâche appartient au jalon de la version qui en a besoin,
 quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,

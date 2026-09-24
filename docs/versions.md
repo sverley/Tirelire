@@ -21,8 +21,8 @@ Une entrée donne l'usage, les cibles, le critère de fin et le tag.
 
 - **Usage** · aucun : ce qu'une version d'usage qui porte de vraies données ne peut éviter d'avoir
   avant elle.
-- **Cibles** · les cibles actives : Webapp · Chromium sur Android ; Webapp · Chromium sur
-  ordinateur ; Relais PHP seul.
+- **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur : les cibles
+  actives où ses contraintes s'exercent.
 - **Contraintes intégrées** · données locales (I7), leur persistance (C4), leur sauvegarde (C5), le
   fichier d'état (D58).
 - **Fin** · les harnais et vérifications manuelles d'I7, C4 et C5 sont tenus sur ces cibles, et les
