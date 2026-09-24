@@ -239,6 +239,11 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
   puis par le relais quand elles ne sont pas ouvertes ensemble, et l'avertissement sur le dépôt de
   données chiffrées paraît à la première mise en lien.
 - **À bâtir** · deux instances en direct et par relais, y compris entre deux personnes (#31).
+- **À bâtir** · une horloge par ligne, une suppression qui se synchronise, un fichier et des paquets
+  qui disent leur format, un format inconnu refusé sans rien perdre ni écrire (#196).
+- **À bâtir** · deux instances ouvertes depuis le même fichier, et une sauvegarde plus ancienne
+  restaurée, convergent sans perte (#196).
+- **À bâtir** · le compte principal a la même identité sur toutes les instances (#209).
 
 ## I9 · Plusieurs distributions
 
