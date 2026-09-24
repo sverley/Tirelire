@@ -53,11 +53,10 @@ Propres au chantier :
 1. L'application ne voit jamais la banque : un ordre enregistré est ce que l'utilisateur déclare
    avoir posé. Seul l'import (chantier 6) peut confirmer qu'il vire ; sans import, le plan le tient
    pour exact.
-2. L'ordre enregistré porte sa ventilation sur les tirelires qu'il sert, en parts librement
-   choisies (D27, D60) : fixes, un montant, ou flottantes, un pourcentage ou la part variable, qui
-   prend le reste. Les
-   parts flottantes se recalculent sur le montant constaté ; l'écart d'une part fixe avec ce que le
-   budget demande se propose comme toute évolution. 24 septembre 2026, à la question de ce
+2. L'ordre enregistré porte sa ventilation sur les tirelires qu'il sert, en parts librement choisies
+   (D27, D60) : fixes, un montant, ou flottantes, un pourcentage ou la part variable, qui prend le
+   reste. Les parts flottantes se recalculent sur le montant constaté ; l'écart d'une part fixe avec
+   ce que le budget demande se propose comme toute évolution. 24 septembre 2026, à la question de ce
    qu'« enregistrés avec leur ventilation » demande :
 
    > H2 : les ventilations sont assez libres. Elles peuvent être fixes ou flottantes. Quand elles sont flottantes, elles peuvent être en pourcentage ou la part "restante"

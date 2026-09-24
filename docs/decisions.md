@@ -1155,14 +1155,15 @@ que personne n'y a touché.
 **La ventilation de l'ordre est un choix de l'utilisateur**, enregistré avec l'ordre quand il en
 valide la mise en place (principe 4.1). Elle s'écrit en parts, comme celle d'une opération (D27) :
 une part **fixe** est un montant ; une part **flottante** est un pourcentage du montant viré, ou la
-part variable, qui prend le reste, au plus une. L'application en propose une à la validation, que l'utilisateur modifie
-librement. Les parts flottantes se recalculent sur le montant constaté ; une part fixe ne suit pas
-le budget, et son écart avec ce que le budget demande pour sa tirelire se propose comme celui du
-montant, au-delà du même pas, sans être réécrit (I10). À l'import, ce que les parts n'absorbent pas
-se répartit par l'ordre de financement au jour de l'opération (D06, D21), planchers d'abord
-(`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée se répartit ainsi en
-entier. `PlannedFlow.plannedAllocation` reste une colonne dépréciée (D30) : ce qu'elle figeait,
-des montants tirés du plan au moment de l'enregistrement, n'est pas une ventilation choisie.
+part variable, qui prend le reste, au plus une. L'application en propose une à la validation, que
+l'utilisateur modifie librement. Les parts flottantes se recalculent sur le montant constaté ; une
+part fixe ne suit pas le budget, et son écart avec ce que le budget demande pour sa tirelire se
+propose comme celui du montant, au-delà du même pas, sans être réécrit (I10). À l'import, ce que les
+parts n'absorbent pas se répartit par l'ordre de financement au jour de l'opération (D06, D21),
+planchers d'abord (`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée se
+répartit ainsi en entier. `PlannedFlow.plannedAllocation` reste une colonne dépréciée (D30) : ce
+qu'elle figeait, des montants tirés du plan au moment de l'enregistrement, n'est pas une ventilation
+choisie.
 
 Un virement saisi à la main est un flux déclaré comme un autre : il n'est pas pris pour l'ordre
 permanent, que le plan ne compare qu'à un flux dérivé, et rien ne le réécrit (D57).
