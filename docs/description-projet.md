@@ -453,3 +453,13 @@ qu'elles barrent.
 > Je ne te demande pas d'écrire ces lettres, ça sera le codeur. Je te demande de définir 191 avec cette description
 
 > Non, il s'agissait du chantier 3 et non 1
+
+### Les versions
+
+> je me demande s'il ne faut pas retravailler le découpage des chantiers pour qu'ils soient orientés par un usage x cible (la fin d'un chantier garantie l'usage décrit dans une cible). J'ai peur que le découpage actuel permette des choix qui ne prennent pas assez en compte l'ensemble des processus d'un usage. Mais en meme temps, si on oriente sur un usage, le risque est de faire des choix qui ne prennent pas assez en compte les autres usages. Propose des solutions en confrontant les gains avec les cout d'une restructuration projet.
+
+> finalement, un usage sur une cible peut devenir une version.
+
+> et C afin de dissocier le concept de Chantier du concept de Version (sinon, c'est la meme chose)
+
+> il faut ensuite que les taches soient rattachées à des chantiers mais leur ordre de traitement est résolu au regard de la version qui regroupe les taches nécessaire pour y parvenir
