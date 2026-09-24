@@ -13,9 +13,9 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
 1. **Ne lis pas le harnais.** Code depuis ta propre lecture du besoin (principe 11.1).
 2. Code sur la branche, commets, pousse. En brouillon, le verdict est local : `pnpm typecheck` et le
    harnais du besoin, rien d'autre (D83).
-3. Ne modifie jamais la PR une fois ouverte : ni description, ni état de brouillon, ni harnais. Ne modifie jamais un
-   document fondateur, sauf si l'issue le demande. Ne touche jamais une cible de côté
-   (`docs/cibles.md`).
+3. Ne modifie jamais la PR une fois ouverte : ni description, ni état de brouillon, ni harnais. Ne
+   modifie jamais un document fondateur, sauf si l'issue le demande. Ne touche jamais une cible de
+   côté (`docs/cibles.md`).
 4. Si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
    manquante —, demande au porteur, en commentaire de l'issue, la modification proposée, avec son
    texte.
