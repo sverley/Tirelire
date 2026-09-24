@@ -1401,9 +1401,10 @@ distribution. Il s'étale en incréments, dont le premier est `v0` : un incréme
 qu'aucune version d'usage ne peut éviter d'avoir avant elle, et se place juste avant la première
 version d'usage qui l'exerce, pour que ses choix se confrontent aussitôt à un usage réel. Une
 contrainte structurelle se conçoit tôt, dans une issue de conception, pour ne fermer aucune porte ;
-elle se code dans la première version qui l'exerce. C'est l'exception à la fin par le croisement
-d'une cible et d'un usage : son entrée énumère ses contraintes, et son critère de fin porte sur
-leurs harnais et vérifications manuelles, et sur ses issues de conception.
+elle se code dans la première version qui l'exerce. Le socle est l'exception à la fin par le
+croisement d'une cible et d'un usage : son entrée énumère ses contraintes, et son critère de fin
+porte sur leurs harnais et vérifications manuelles, sur ses issues de conception, et sur ce qu'elles
+demandent de vérifier en attendant le codage réel de ce qu'elles conçoivent.
 
 Le travail est tiré par les versions : une tâche appartient au jalon de la version qui en a besoin,
 quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,

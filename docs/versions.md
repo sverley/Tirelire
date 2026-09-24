@@ -25,8 +25,9 @@ Une entrée donne l'usage, les cibles, le critère de fin et le tag.
   actives où ses contraintes s'exercent.
 - **Contraintes intégrées** · données locales (I7), leur persistance (C4), leur sauvegarde (C5), le
   fichier d'état (D58).
-- **Fin** · les harnais et vérifications manuelles d'I7, C4 et C5 sont tenus sur ces cibles, et les
-  issues de conception de la version sont fermées.
+- **Fin** · les harnais et vérifications manuelles d'I7, C4 et C5 sont tenus sur ces cibles ; les
+  issues de conception de la version sont fermées, et ce qu'elles demandent de vérifier est tenu —
+  pour la synchro, ce qui la garde possible en attendant son codage réel.
 - **Tag** · `v0`.
 
 ## v1 · Budget seul sur la webapp

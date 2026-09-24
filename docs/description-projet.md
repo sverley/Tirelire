@@ -493,3 +493,7 @@ qu'elles barrent.
 > Ok
 
 > la fin d'une version est le croisement d'une cible et d'un usage
+
+> Non sinon elle se fermera avant d'être codé.
+
+> En fait, si, elle doit être traitée dans le jalon v0 pour inclure ce qui doit être vérifié en attendant le codage réel
