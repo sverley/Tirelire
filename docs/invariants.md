@@ -77,7 +77,8 @@ Décline les principes 4 et 4.2.
 
 **Valeur** : le budget et les flux ne changent que sur une validation de l'utilisateur ; le plan en
 est le résultat, recalculé, et le calculer ne modifie rien. Quand le budget évolue, chaque écart
-avec un ordre permanent enregistré se signale, avec l'ancien montant et le nouveau, sans le réécrire.
+avec un ordre permanent enregistré, montant ou part fixe de sa ventilation, qui dépasse le pas
+d'arrondi des ordres se signale, avec l'ancien montant et le nouveau, sans le réécrire.
 
 ## I11 · Les assistants font partie de la vie de l'application
 
