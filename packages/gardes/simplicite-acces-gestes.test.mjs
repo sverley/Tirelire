@@ -1,5 +1,5 @@
 /**
- * Harnais d'audit de #71 (chantier de #38, chantier primaire #58), écrit par la session d'audit.
+ * Harnais d'audit de #71 (#38, #58), écrit par la session d'audit.
  *
  * #71 demande trois choses : **I4** (simple par défaut) et **I5** (inciter à tout utiliser) reçoivent
  * un harnais, ou une renonciation assumée par écrit ; le **nombre de gestes d'I6** (catégoriser en
@@ -63,8 +63,8 @@ const RELIRE = "le harnais d'audit de #71 est à relire";
 /** Les entrées que #71 sort de la dette. */
 const SANS_HARNAIS = Object.freeze(['I4', 'I5']);
 
-/** Les issues du chantier : une dette laissée sous l'une d'elles est une dette non réglée. */
-const CHANTIER = new Set(['38', '71']);
+/** Les issues de cet audit : une dette laissée sous l'une d'elles est une dette non réglée. */
+const ISSUES_DE_L_AUDIT = new Set(['38', '71']);
 
 /**
  * Tranché par le porteur le 13 septembre 2026 (#71) : depuis l'écran Opérations, catégoriser demande
@@ -132,9 +132,9 @@ const renonciationEcrite = (texte, id) => {
   return /renonc/i.test(t) && /accord du porteur/i.test(t) && /(\d{4}-\d{2}-\d{2}|\d{1,2}\s+\p{L}+\s+\d{4}|#\d+)/u.test(t);
 };
 
-/** Une dette laissée sous une issue du chantier : #71 est censée la régler. */
-const detteDuChantier = (e) =>
-  e.aBatir.filter((a) => [...a.matchAll(/#(\d+)/g)].some((m) => CHANTIER.has(m[1])));
+/** Une dette laissée sous une issue de cet audit : #71 est censée la régler. */
+const detteDeLAudit = (e) =>
+  e.aBatir.filter((a) => [...a.matchAll(/#(\d+)/g)].some((m) => ISSUES_DE_L_AUDIT.has(m[1])));
 
 /** Les nombres de gestes écrits dans une entrée : « 3 gestes », « 1 geste de plus ». */
 const nombresDeGestes = (texte, id) => [...texteDeLEntree(texte, id).matchAll(/(\d+)\s*gestes?\b/gi)].map((m) => m[1]);
@@ -220,7 +220,7 @@ function garderOuRenoncer(texte, ids = SANS_HARNAIS) {
     if (!porteUnHarnaisNeuf(e) && !renonciationEcrite(texte, id)) {
       manquants.push(`${id} · ni harnais citant son témoin rouge, ni renonciation écrite avec l'accord du porteur`);
     }
-    for (const dette of detteDuChantier(e)) manquants.push(`${id} · dette laissée en place · À bâtir · ${dette}`);
+    for (const dette of detteDeLAudit(e)) manquants.push(`${id} · dette laissée en place · À bâtir · ${dette}`);
   }
   assert.deepEqual(manquants, [], `des invariants restent sans garde programmée et sans renonciation :\n${manquants.join('\n')}`);
 }
@@ -259,7 +259,7 @@ function gestesFixesEtMesures(texte) {
   if (!porteUnHarnaisNeuf(e) && !renonciationEcrite(texte, 'I6')) {
     manquants.push("I6 · le compte de gestes n'est mesuré par aucun harnais, et aucune renonciation écrite ne le dit");
   }
-  for (const dette of detteDuChantier(e)) manquants.push(`I6 · dette laissée en place · À bâtir · ${dette}`);
+  for (const dette of detteDeLAudit(e)) manquants.push(`I6 · dette laissée en place · À bâtir · ${dette}`);
   assert.deepEqual(manquants, [], `le nombre de gestes d'I6 n'est pas fixé et mesuré :\n${manquants.join('\n')}`);
 }
 

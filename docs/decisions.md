@@ -1202,7 +1202,7 @@ Les documents fondateurs : `docs/description-projet.md` (les paroles du porteur,
 sections « Principes » et « Usages »), `docs/glossaire.md`, les catalogues — `docs/invariants.md`,
 `docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/gardes.md` (le registre : chaque
 invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — les documents des
-chantiers, `docs/chantiers/`, le catalogue des versions, `docs/versions.md`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est
+domaines, `docs/domaines/`, le catalogue des versions, `docs/versions.md`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est
 forcément un fichier Markdown de `docs/` : un document d'un autre format (HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se
 reprend dans un Markdown. Tout Markdown de `docs/` n'est pas fondateur pour autant : la liste est
 celle-ci.
@@ -1241,8 +1241,8 @@ produit) ou par la relecture (le travail).
 ### D80 · Quatre rôles
 
 Un besoin passe par quatre rôles, chacun décrit dans `docs/roles/`, en un texte qui sert de prompt :
-l'**architecte** analyse le besoin et pose ses spécifications, et suit un chantier jusqu'à sa
-fermeture sans spécifier ses sous-issues ; l'**auditeur** code le harnais s'il le faut et vérifie le
+l'**architecte** analyse le besoin et pose ses spécifications, et suit une version jusqu'à sa
+publication sans spécifier ses tâches ; l'**auditeur** code le harnais s'il le faut et vérifie le
 codage ; le **codeur** code ; le **porteur** valide. L'analyse du besoin est indépendante de
 l'audit : l'architecte et l'auditeur sont deux sessions distinctes. Un descriptif de rôle dit ce que
 le rôle fait, dans quel ordre ; il renvoie à ce catalogue pour les décisions qu'il applique.
@@ -1364,38 +1364,49 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 Français partout : code, commentaires, commits, interface, documents. Le porteur lit surtout sur
 téléphone : réponses courtes, en prose, une question à la fois.
 
-### D86 · Un chantier : un document, une issue, des sous-issues
+### D86 · Des domaines, des issues de conception
 
-Un chantier se définit dans un document de `docs/chantiers/`, un par chantier, sa seule vérité ; ce
-qu'il change s'y corrige, avec l'accord du porteur. Le document naît en lettre d'intention : les
-paroles du porteur qui fondent le chantier, et ce qu'elles demandent ; des cibles, des usages ou des
-contraintes seulement s'ils font partie de l'intention. L'architecte du chantier y ajoute l'analyse
-approfondie — contraintes, hypothèses, cibles, usages —, avec l'accord du porteur. Sur GitHub, une issue étiquetée
-« chantier » le reflète et renvoie à son document.
+Un domaine est un bloc fonctionnel du produit : budget et tirelires ; plan et flux ; opérations ;
+rapprochement et bilan ; données et synchro ; assistant et exemple ; application. C'est une
+catégorie transverse des tâches : ni un but, ni une ligne d'une version, ni une unité de travail ; le
+travail est tiré et ordonné par les versions (D87). Chaque tâche du produit
+porte l'étiquette de son ou de ses domaines ; une tâche hors produit porte celle de sa nature
+(« outillage », « nouvelle fonctionnalité », « idée »…).
 
-L'architecte du chantier définit, à partir du document, les spécifications du chantier — c'est le
-produit de son issue — et suit l'évolution de toutes les sous-issues qui le réalisent, jusqu'à sa
-fermeture (`docs/roles/architecte.md`) : il les spécifie et les rattache ; leur ordre de traitement
-se résout dans la version qui les regroupe (D87). Les sous-issues restent sur GitHub : le document
-ne les liste pas.
+Un domaine a un document dans `docs/domaines/` : son intention, avec les paroles du porteur qui la
+fondent, et son analyse — contraintes, hypothèses, cibles, usages — quand elle existe. Il ne liste ni
+tâches, ni ordre, ni état.
 
-Une issue sert un chantier, plusieurs, ou aucun. GitHub ne lui donne qu'un parent : le chantier
-qu'elle sert d'abord ; les autres chantiers qu'elle sert la citent dans l'état de leur issue. Une
-issue qui ne sert aucun chantier porte l'étiquette de sa nature : « outillage », « nouvelle
-fonctionnalité », « idée »…
+Une réflexion d'ensemble sur un domaine se mène dans une **issue de conception**, par un architecte,
+en pensant aux cinq usages ; son produit va dans les décisions et dans l'analyse du domaine. Les
+choix réversibles se reprennent au fil des versions ; les choix structurels, qui engagent tous les
+usages et toutes les cibles, se posent avant, dans le socle (`v0`).
+
+Chaque spécification porte une ligne « Usages » : ce que la tâche fait à U1, U2, U3, U4 et U5 —
+sert, indifférent, ou à surveiller. C'est ce qui garde les autres usages dans le regard quand une
+version en sert un seul.
 
 ### D87 · Une version : un usage garanti sur des cibles
 
 Une version garantit un usage sur un ensemble de cibles ; elle naît d'une case « prioritaire » de la
-matrice des cibles et se définit dans `docs/versions.md` : son usage, ses cibles, son critère de fin,
-son tag. Elle se termine quand le parcours de son usage (I3) est vert sur ses cibles et que le
-porteur a fait ses vérifications manuelles ; le tag de son nom la publie (D83). Une version livrée
-ne régresse pas : le parcours de son usage reste vert sur ses cibles à chaque PR.
+matrice des cibles et se définit dans `docs/versions.md` : son usage, ses cibles, son critère de
+fin, son tag. La fin d'une version d'usage est le croisement d'une cible et d'un usage : le parcours
+de son usage (I3) vert sur chacune de ses cibles, et les vérifications manuelles du porteur ; le tag
+de son nom la publie (D83). Une version livrée ne régresse pas : ce que son critère de fin tient
+vert le reste à chaque PR.
 
-La version et le chantier sont deux concepts distincts. Un chantier est une capacité (D86) ; une
-version, un usage de bout en bout sur des cibles ; un chantier sert une ou plusieurs versions. Une
-tâche est rattachée à un chantier ; son ordre de traitement se résout au regard de la version qui
-regroupe les tâches nécessaires pour y parvenir. Sur GitHub, un jalon du même nom que la version
-regroupe ces tâches, quel que soit leur chantier ; son architecte les ordonne
-(`docs/roles/architecte.md`, « Suivre une version »). Le découpage par capacités garde les choix
-ouverts à tous les usages ; la version garde chaque usage entier.
+Le socle ne garantit aucun usage : il intègre les contraintes structurelles de tous les usages et de
+toutes les cibles actives — données, sauvegarde, synchronisation, versions d'instances,
+distribution. Il s'étale en incréments, dont le premier est `v0` : un incrément ne contient que ce
+qu'aucune version d'usage ne peut éviter d'avoir avant elle, et se place juste avant la première
+version d'usage qui l'exerce, pour que ses choix se confrontent aussitôt à un usage réel. Une
+contrainte structurelle se conçoit tôt, dans une issue de conception, pour ne fermer aucune porte ;
+elle se code dans la première version qui l'exerce. Le socle est l'exception à la fin par le
+croisement d'une cible et d'un usage : son entrée énumère ses contraintes, et son critère de fin
+porte sur leurs harnais et vérifications manuelles, sur ses issues de conception, et sur ce qu'elles
+demandent de vérifier en attendant le codage réel de ce qu'elles conçoivent.
+
+Le travail est tiré par les versions : une tâche appartient au jalon de la version qui en a besoin,
+quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,
+un jalon du même nom que la version regroupe ces tâches ; son architecte les ordonne
+(`docs/roles/architecte.md`, « Suivre une version »).

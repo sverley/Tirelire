@@ -1,5 +1,5 @@
 /**
- * Harnais d'audit de #70 (chantier de #38, chantier primaire #58), écrit par la session d'audit.
+ * Harnais d'audit de #70 (#38, #58), écrit par la session d'audit.
  *
  * #70 demande que chacun des cinq usages d'I3 — U1 budget seul, U2 budget et virements permanents,
  * U3 budget puis import, U4 budget reconstruit, U5 import seul — ait **son harnais de bout en bout
@@ -63,8 +63,8 @@ const PORTENT_UN_PARCOURS = Object.freeze(['U1', 'U2', 'U5']);
 /** Les deux usages dont le produit reste à outiller : leur parcours part avec leur besoin. */
 const PARCOURS_AVEC_LE_BESOIN = Object.freeze({ U3: '40', U4: '16' });
 
-/** Les issues du chantier : une dette nouvelle citerait la sienne, et se verrait. */
-const CHANTIER = new Set(['13', '15', '38', '39', '70']);
+/** Les issues de cet audit : une dette nouvelle citerait la sienne, et se verrait. */
+const ISSUES_DE_L_AUDIT = new Set(['13', '15', '38', '39', '70']);
 
 const registre = () => {
   try {
@@ -239,7 +239,7 @@ function detteReglee(texte, ids = PORTENT_UN_PARCOURS) {
   const restes = [];
   for (const e of entreesDesUsages(texte, ids)) {
     for (const a of e.aBatir) {
-      if ([...a.matchAll(/#(\d+)/g)].some((m) => CHANTIER.has(m[1]))) restes.push(`${e.id} · À bâtir · ${a}`);
+      if ([...a.matchAll(/#(\d+)/g)].some((m) => ISSUES_DE_L_AUDIT.has(m[1]))) restes.push(`${e.id} · À bâtir · ${a}`);
     }
   }
   assert.deepEqual(restes, [], `des usages restent « À bâtir » au lieu d'être gardés :\n${restes.join('\n')}`);

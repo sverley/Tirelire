@@ -278,7 +278,7 @@ Chemins : `packages/core/src/plan.ts`
 - **Vérification manuelle** · `VM-I10-propositions` — Faire évoluer le budget (monter, baisser,
   retirer un besoin) : le plan propose chaque évolution d'ordre qui en découle, et aucun ordre
   enregistré ne change sans validation.
-- **À bâtir** · #48.
+- **À bâtir** · les évolutions d'ordre proposées, acceptées ou non (#203 à #206).
 
 ## I11 · Les assistants font partie de la vie de l'application
 
@@ -294,11 +294,11 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
   Témoin rouge : « témoin rouge · une ligne créée par l’assistant introuvable hors assistant »
 - **Vérification manuelle** · `VM-I11-hors-assistant` — Pour une étape d'assistant que la PR ajoute
   et que le harnais ci-dessus ne couvre pas encore (nouvel assistant hors de « Construire mon
-  budget », #55/#56), ou pour l'adaptation proposée quand le train de vie ou le budget évolue (#17,
-  #48, #57) : retrouver le même geste hors de l'assistant, dans l'usage courant, et constater que
+  budget » ; domaine assistant et exemple), ou pour l'adaptation proposée quand le train de vie ou
+  le budget évolue (#17, #57, #203 à #206) : retrouver le même geste hors de l'assistant, dans l'usage courant, et constater que
   ce que l'assistant a créé se modifie ensuite depuis les écrans ordinaires.
-- **À bâtir** · #55, #56 ; adaptations proposées quand le train de vie ou le budget évoluent (#17,
-  #48, #57).
+- **À bâtir** · les deux assistants à venir (domaine assistant et exemple, `docs/domaines/`) ;
+  adaptations proposées quand le train de vie ou le budget évoluent (#17, #57, #203 à #206).
 
 ## C1 · Aucun geste technique pour l'utilisateur
 

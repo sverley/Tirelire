@@ -1,5 +1,5 @@
 /**
- * Harnais d'I6 — « Catégoriser en peu de clics » (issue #71, chantier de #38).
+ * Harnais d'I6 — « Catégoriser en peu de clics » (issue #71, #38).
  *
  * `VM-I6-gestes` seule faisait compter les gestes à la main : aucun nombre ne survivait d'une PR
  * à l'autre. Ce harnais mesure le compte dans le navigateur, sur le

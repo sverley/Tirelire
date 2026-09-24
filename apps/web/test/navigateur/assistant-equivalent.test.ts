@@ -1,6 +1,6 @@
 /**
- * Harnais d'I11 — « Les assistants font partie de la vie de l'application » (issue #72, chantier
- * de #38). L'invariant : « Rien de réservé aux assistants. Ce qu'un assistant crée reste vivant
+ * Harnais d'I11 — « Les assistants font partie de la vie de l'application » (issue #72, #38).
+ * L'invariant : « Rien de réservé aux assistants. Ce qu'un assistant crée reste vivant
  * dans l'application, et ce qu'il fait se retrouve dans l'usage courant. » Jusqu'ici, seule une
  * vérification manuelle (`VM-I11-hors-assistant`) le tenait.
  *

@@ -15,7 +15,7 @@ agents de codage et de distribution (`docs/roles/`).
   cible reste. Une cible change d'état ici, à la demande du porteur.
 - **Versions** : une case « prioritaire » de la matrice donne une version (`docs/versions.md`,
   D87) : l'usage de la case, garanti sur ses cibles. La matrice repère les trous ; elle ne découpe
-  pas le travail — les chantiers restent des capacités, et les tâches s'ordonnent dans la version. Elle se relit : aucun outil ne la vérifie.
+  pas le travail — les tâches s'ordonnent dans la version. Elle se relit : aucun outil ne la vérifie.
 
 Une entrée donne, sur sa ligne **Construction**, les commandes entre accents graves qui la
 construisent.

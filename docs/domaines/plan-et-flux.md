@@ -1,12 +1,24 @@
-# Chantier 4 · Un plan de virements permanents lié au budget, dont les évolutions se proposent
+# Domaine · Plan et flux
 
-Issue : #48.
+Le calcul du plan, les flux prévus, les virements permanents. Reprend les lettres des anciens
+chantiers 4 et 8 (#48, #52), et l'analyse du chantier 4.
 
 ## Intention
+
+### Un plan de virements permanents lié au budget (ancien chantier 4)
 
 > 4. l'appli propose un plan de virement permanent en lien avec le budget (les liens sont perennes, si un budget évolue, on doit "proposer et jamais faire de manière cachée" (invariant) des évolutions du plan
 
 L'application propose un plan de virements permanents lié au budget, d'un lien durable. Quand le budget évolue, elle propose les évolutions du plan et n'en fait jamais aucune de manière cachée : le porteur en fait un invariant (I10).
+
+### Le plan à partir des opérations (ancien chantier 8)
+
+> 8. l'app doit permettre la création du plan à partir des opérations
+
+L'application permet de créer le plan à partir des opérations.
+
+L'analyse qui suit porte sur le plan de virements lié au budget ; le plan à partir des opérations
+n'en a pas encore.
 
 ## Contraintes
 
@@ -15,7 +27,7 @@ Des fondements :
 - **I10** : le budget et les flux ne changent que sur une validation ; calculer le plan ne modifie
   rien ; quand le budget évolue, chaque écart avec un ordre enregistré, montant ou part fixe de sa
   ventilation, qui dépasse le pas d'arrondi des ordres se signale, ancien et nouveau montant, sans
-  le réécrire. C'est le cœur du chantier.
+  le réécrire. C'est le cœur du domaine.
 - **Principe 4.1, U2** : l'utilisateur pose ses ordres lui-même chez sa banque, l'application n'y a
   pas accès. Elle ne connaît un ordre que parce que l'utilisateur en valide la mise en place ; il est
   alors enregistré avec sa ventilation sur les tirelires.
@@ -34,13 +46,13 @@ Des fondements :
   une plateforme.
 - **C8, I8** : un ordre enregistré est un fait synchronisé ; deux instances à des versions
   différentes ne le perdent ni ne le dédoublent.
-- **Chantier 2, D43** : ce que l'assistant propose vient de l'exemple, ses virements compris, et
+- **Domaine assistant et exemple, D43** : ce que l'assistant propose vient de l'exemple, ses virements compris, et
   n'entre dans le projet qu'à la validation finale de l'assistant. Un ordre proposé par l'assistant
   ne s'enregistre qu'à cette validation.
 - **D53, D60** : l'exemple garde de quoi démontrer le plan ; il porte un ordre enregistré en écart
   avec le budget, au-delà du pas d'arrondi, et doit en démontrer aussi la ventilation.
 
-Propres au chantier :
+Propres au domaine :
 
 - Ce que le budget demande se recalcule et ne se stocke pas ; ce que l'utilisateur a validé — le
   montant de l'ordre chez la banque et sa ventilation — s'enregistre, et rien ne le réécrit (D57,
@@ -51,7 +63,7 @@ Propres au chantier :
 ## Hypothèses
 
 1. L'application ne voit jamais la banque : un ordre enregistré est ce que l'utilisateur déclare
-   avoir posé. Seul l'import (chantier 6) peut confirmer qu'il vire ; sans import, le plan le tient
+   avoir posé. Seul l'import (domaine rapprochement et bilan) peut confirmer qu'il vire ; sans import, le plan le tient
    pour exact.
 2. L'ordre enregistré porte sa ventilation sur les tirelires qu'il sert, en parts librement choisies
    (D27, D60) : fixes, un montant, ou flottantes, un pourcentage ou la part variable, qui prend le
@@ -72,13 +84,14 @@ Propres au chantier :
 5. Proposer, c'est laisser choisir : accepter, c'est enregistrer le nouveau montant ou la nouvelle
    ventilation une fois l'ordre modifié chez la banque ; ne pas accepter est légitime (D20), l'écart
    reste lisible sans bloquer. Une évolution d'ordre se calcule sur les données de l'utilisateur :
-   ce n'est pas une proposition au sens du chantier 2, qui vient de l'exemple (son hypothèse 1). Sa
-   forme hors du Plan se tranchera avec la question que le chantier 2 pose sur les propositions hors
+   ce n'est pas une proposition au sens du domaine assistant et exemple, qui vient de l'exemple (son
+   hypothèse 1). Sa
+   forme hors du Plan se tranchera avec la question que le domaine assistant et exemple pose sur les propositions hors
    de l'assistant, dont la piste du porteur est d'ouvrir la partie concernée de l'assistant.
 6. Sans ordre enregistré, le plan qui change n'est pas une action cachée : c'est un résultat
    recalculé (I10). Le signaler reste à évaluer.
 7. Deux sources proposent un ordre : le plan, qui propose ce que le budget demande ; l'assistant,
-   qui propose l'ordre de l'exemple (chantier 2). Suivre l'exemple jusqu'au bout enregistre l'ordre
+   qui propose l'ordre de l'exemple (domaine assistant et exemple). Suivre l'exemple jusqu'au bout enregistre l'ordre
    de l'exemple, écart compris, et le plan en propose aussitôt l'évolution : c'est la démonstration
    que l'exemple porte (D53, D60).
 
@@ -88,16 +101,16 @@ Propres au chantier :
   d'où un ordre se recopie vers l'application de sa banque.
 - **Webapp · Chromium sur ordinateur** : active.
 - **Relais PHP seul** : sans objet ; il transporte les ordres enregistrés comme toute donnée (I8),
-  sans travail propre au chantier.
-- Toutes les autres : hors du chantier.
+  sans travail propre au domaine.
+- Toutes les autres : hors du domaine.
 
 ## Usages
 
-- **U2** : l'usage du chantier. De la base vide : budget, ordres proposés par le plan ou, depuis
+- **U2** : l'usage premier du domaine. De la base vide : budget, ordres proposés par le plan ou, depuis
   l'exemple, par l'assistant, mise en place validée, ordres enregistrés avec leur ventilation, puis
   évolutions proposées quand le budget change.
 - **U1** : partage la proposition du plan de virements, le virement à faire du parcours U1 ; le
-  chantier ne lui ajoute aucune étape.
-- **U3** : s'appuie sur la ventilation d'un plan non validé ; le rapprochement relève du chantier 6.
-- **U4** : un plan tiré des opérations (chantier 8) garde le même lien au budget.
+  domaine ne lui ajoute aucune étape.
+- **U3** : s'appuie sur la ventilation d'un plan non validé ; le rapprochement relève du domaine rapprochement et bilan.
+- **U4** : un plan tiré des opérations (intention ci-dessus : le plan à partir des opérations) garde le même lien au budget.
 - **U5** : sans objet, ni tirelire ni budget.
