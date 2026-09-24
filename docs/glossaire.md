@@ -96,8 +96,9 @@ joué.
 
 Un bloc fonctionnel du produit — budget et tirelires, plan et flux, opérations, rapprochement et
 bilan, données et synchro, assistant et exemple, application —, décrit dans `docs/domaines/` (D86).
-Une tâche porte l'étiquette de son ou de ses domaines ; ce n'est pas une unité de travail : le
-travail est tiré par les **versions**.
+Une catégorie transverse des tâches : une tâche porte l'étiquette de son ou de ses domaines. Ce
+n'est ni un but, ni une ligne d'une version, ni une unité de travail : le travail est tiré par les
+**versions**.
 
 ## Cible
 

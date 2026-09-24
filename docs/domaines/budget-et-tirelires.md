@@ -13,7 +13,8 @@ périodes. Reprend les lettres des anciens chantiers 3 et 7 (#47, #51) ; pas enc
 
 > Ma vision est chantier 1 puisqu'il permet d'obtenir le budget seul sinon on aura vite un problème de rapprochement
 
-L'application sert à définir son budget. C'est ce domaine qui donne le budget seul (U1) : sans lui, le rapprochement poserait vite problème.
+L'application sert à définir son budget. Sans budget seul (U1), le rapprochement poserait vite
+problème.
 
 ### Le budget à partir des opérations (ancien chantier 7)
 

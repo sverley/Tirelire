@@ -483,3 +483,5 @@ qu'elles barrent.
 > Oui parfait
 
 > Oui 1. Et comme tous les chantiers n'avaient pas été analysés, il faut prendre en compte les disparités de traitements. Certains domaines devront peut-être être documentés par la meme occasion
+
+> Non, domaine est transverse et non un but ou une ligne d'une version. C'est une catégorie.

@@ -1367,8 +1367,9 @@ téléphone : réponses courtes, en prose, une question à la fois.
 ### D86 · Des domaines, des issues de conception
 
 Un domaine est un bloc fonctionnel du produit : budget et tirelires ; plan et flux ; opérations ;
-rapprochement et bilan ; données et synchro ; assistant et exemple ; application. Ce n'est pas une
-unité de travail : le travail est tiré et ordonné par les versions (D87). Chaque tâche du produit
+rapprochement et bilan ; données et synchro ; assistant et exemple ; application. C'est une
+catégorie transverse des tâches : ni un but, ni une ligne d'une version, ni une unité de travail ; le
+travail est tiré et ordonné par les versions (D87). Chaque tâche du produit
 porte l'étiquette de son ou de ses domaines ; une tâche hors produit porte celle de sa nature
 (« outillage », « nouvelle fonctionnalité », « idée »…).
 
@@ -1389,14 +1390,14 @@ version en sert un seul.
 
 Une version garantit un usage sur un ensemble de cibles ; elle naît d'une case « prioritaire » de la
 matrice des cibles et se définit dans `docs/versions.md` : son usage, ses cibles, son critère de fin,
-son tag. Elle se termine quand le parcours de son usage (I3) est vert sur ses cibles et que le
-porteur a fait ses vérifications manuelles ; le tag de son nom la publie (D83). Une version livrée
-ne régresse pas : le parcours de son usage reste vert sur ses cibles à chaque PR.
+son tag. Elle se termine quand le critère de fin de son entrée est atteint et que le porteur a fait
+ses vérifications manuelles ; le tag de son nom la publie (D83). Une version livrée ne régresse
+pas : ce que son critère de fin tient vert le reste à chaque PR.
 
 La première version, `v0 · Socle commun`, ne garantit aucun usage : elle intègre les contraintes
 structurelles de tous les usages et de toutes les cibles actives — données, sauvegarde,
-synchronisation, versions d'instances, distribution —, et se termine quand leurs harnais et
-vérifications manuelles sont tenus.
+synchronisation, versions d'instances, distribution —, que son entrée énumère ; son critère de fin
+porte sur leurs harnais et vérifications manuelles, et sur ses issues de conception.
 
 Le travail est tiré par les versions : une tâche appartient au jalon de la version qui en a besoin,
 quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,

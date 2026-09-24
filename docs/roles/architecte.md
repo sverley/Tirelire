@@ -29,19 +29,24 @@ puis le glossaire et les catalogues.
 ## Suivre une version
 
 Une version (glossaire) se définit dans `docs/versions.md` : un usage, des cibles, un critère de fin
-(D87). Son jalon, sur GitHub, regroupe les tâches nécessaires, quel que soit leur domaine. Son
+(D87). Le socle, `v0`, n'a pas d'usage : ce qui vaut ci-dessous pour le parcours de l'usage vaut
+pour lui des contraintes structurelles que son entrée intègre. Son jalon, sur GitHub, regroupe les tâches nécessaires, quel que soit leur domaine. Son
 architecte la suit jusqu'à sa publication ; chaque session reprend là où le jalon en est.
 
-1. Lis l'entrée de la version, l'usage dans la description et le parcours de l'usage au registre
-   (I3).
-2. Parcours l'usage de bout en bout sur chacune des cibles : chaque étape que l'utilisateur franchit,
-   sans en sauter. Pour chacune, repère ce qui manque ou ce qui casse.
+1. Lis l'entrée de la version, puis, pour une version d'usage, l'usage dans la description et son
+   parcours au registre (I3) ; pour le socle, chaque contrainte intégrée au registre, avec ses
+   harnais et ses vérifications manuelles.
+2. Pour une version d'usage, parcours l'usage de bout en bout sur chacune des cibles : chaque étape
+   que l'utilisateur franchit, sans en sauter. Pour le socle, passe chaque contrainte intégrée sur
+   chacune des cibles, et repère les choix structurels qui demandent une issue de conception. Dans
+   les deux cas, repère ce qui manque ou ce qui casse.
 3. Rattache au jalon les tâches existantes qui y répondent. Pour ce qui manque, ouvre le besoin,
    étiqueté de son domaine (D86), ou de sa nature s'il est hors produit.
 4. Ordonne les tâches du jalon : lesquelles d'abord, parce qu'une autre part de leur résultat ;
    lesquelles jamais en parallèle, parce qu'elles touchent les mêmes documents ou le même code.
    Écris cet ordre et l'état de chaque tâche dans la description du jalon, et là seulement (D78).
-5. Quand toutes les tâches du jalon sont fermées, vérifie le critère de fin — le parcours vert sur
-   chaque cible — puis demande au porteur ses vérifications manuelles. S'il manque quelque chose,
+5. Quand toutes les tâches du jalon sont fermées, vérifie le critère de fin de l'entrée — le
+   parcours vert sur chaque cible, ou, pour le socle, les harnais de ses contraintes verts et ses
+   issues de conception fermées — puis demande au porteur ses vérifications manuelles. S'il manque quelque chose,
    ouvre la tâche qui manque plutôt que de clore.
 6. Le critère atteint, le porteur publie la version par son tag (D83) ; ferme le jalon.

@@ -77,7 +77,7 @@ Propres au domaine :
 
 ## Usages
 
-Le domaine ne porte aucun usage en propre : c'est là que tous se livrent et se vérifient. Il les
-sert tous à la même condition, une webapp qui garde de vraies données : persistantes (C4),
-sauvegardées (C5), à une version connue (C8). D'après la matrice de `docs/cibles.md`, U1 est le
-premier servi sur les deux cibles Chromium ; U1 lui-même relève de la version v1 et du domaine budget et tirelires.
+Le domaine ne porte aucun usage en propre. Il les sert tous à la même condition, une webapp qui
+garde de vraies données : persistantes (C4), sauvegardées (C5), à une version connue (C8). D'après
+la matrice de `docs/cibles.md`, U1 est le premier servi sur les deux cibles Chromium ; U1 est la
+version v1.
