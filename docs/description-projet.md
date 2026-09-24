@@ -463,3 +463,7 @@ qu'elles barrent.
 > et C afin de dissocier le concept de Chantier du concept de Version (sinon, c'est la meme chose)
 
 > il faut ensuite que les taches soient rattachées à des chantiers mais leur ordre de traitement est résolu au regard de la version qui regroupe les taches nécessaire pour y parvenir
+
+### Le modèle de PR
+
+> quand il ne faut editer que de la documentation, il n'est pas nécessaire de coder un harnais. Dans ce cas, c'est le codeur qui ouvre le PR. Or il ne respecte pas les formats (notamment le "Close ") donc les test sont rouges. Il faut corriger le role du codeur pour que l'auditeur et le codeur utilise le meme template de pr

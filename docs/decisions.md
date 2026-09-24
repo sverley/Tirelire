@@ -1273,7 +1273,10 @@ fondamentaux ; il l'écrit dans la PR — et **la validation**, par le porteur, 
 autre geste (principe 11). Rien ne la bloque techniquement (dépôt privé, offre gratuite) : c'est
 au porteur de ne fusionner qu'au vert.
 
-Une PR s'ouvre en brouillon ; le brouillon n'économise que la CI. Le porteur la passe en Ready à la
+Une PR s'ouvre en brouillon, avec le corps du modèle `.github/pull_request_template.md` — `Close #n`
+et la case de l'aperçu, rien d'autre —, qui que ce soit qui l'ouvre : l'auditeur, ou le codeur quand
+le besoin n'a pas de harnais (D81). Une PR ouverte par l'API ne reçoit pas le modèle : il se
+recopie. Le brouillon n'économise que la CI. Le porteur la passe en Ready à la
 main, ce qui lance toute la CI et assemble la version de dev depuis le dernier commit de la branche.
 À côté du bouton de fusion, le statut « Toute la CI sur ce commit » dit si toute la CI a tourné au
 vert sur le dernier commit. Un changement après le Ready est signalé par un commentaire de la PR,

@@ -10,8 +10,10 @@ spécification ne permet pas d'écrire un harnais, dis-le dans l'issue et arrêt
 1. Crée la branche et indique-la dans l'issue. Écris le harnais s'il le faut : un test qui rougit
    aujourd'hui et verdira quand le besoin sera couvert ; aucun par défaut pour la documentation ni
    pour la garde (D81). Un seul fichier de test par issue, sauf raison dite.
-2. Ouvre la PR en brouillon : `Close #n`, rien d'autre ; la case de l'aperçu s'y ajoute d'elle-même
-   au Ready (D82).
+2. Ouvre la PR en brouillon, avec le corps du modèle `.github/pull_request_template.md`, `#…`
+   remplacé par le numéro de l'issue, rien d'autre (D82) ; par l'API, recopie-le. Quand le besoin
+   n'a pas de harnais, c'est le codeur qui crée la branche et ouvre la PR, avec le même modèle : ton
+   audit commence à son compte rendu (étape 4).
 3. Réponds aux commentaires du codeur : corrige le harnais, ou renvoie la question du besoin au
    porteur dans l'issue.
 4. Quand le codeur a rendu son compte rendu, vérifie son travail en local, garde comprise
