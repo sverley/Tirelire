@@ -23,7 +23,7 @@ livre et se vérifie d'abord là.
 
 ## Contraintes
 
-Du catalogue (`docs/contraintes.md`), telles qu'elles s'appliquent à une webapp qui porte de vraies
+Des catalogues (`docs/contraintes.md` et, pour I9, `docs/invariants.md`), tels qu'elles s'appliquent à une webapp qui porte de vraies
 données :
 
 - **C3** : l'instance de référence, la recette et le relais se servent en HTTPS.
