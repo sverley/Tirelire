@@ -1394,10 +1394,16 @@ son tag. Elle se termine quand le critère de fin de son entrée est atteint et 
 ses vérifications manuelles ; le tag de son nom la publie (D83). Une version livrée ne régresse
 pas : ce que son critère de fin tient vert le reste à chaque PR.
 
-La première version, `v0 · Socle commun`, ne garantit aucun usage : elle intègre les contraintes
-structurelles de tous les usages et de toutes les cibles actives — données, sauvegarde,
-synchronisation, versions d'instances, distribution —, que son entrée énumère ; son critère de fin
-porte sur leurs harnais et vérifications manuelles, et sur ses issues de conception.
+Le socle ne garantit aucun usage : il intègre les contraintes structurelles de tous les usages et de
+toutes les cibles actives — données, sauvegarde, synchronisation, versions d'instances,
+distribution. Il s'étale en incréments, dont le premier est `v0` : un incrément ne contient que ce
+qu'aucune version d'usage ne peut éviter d'avoir avant elle, et se place juste avant la première
+version d'usage qui l'exerce, pour que ses choix se confrontent aussitôt à un usage réel. Une
+contrainte structurelle se conçoit tôt, dans une issue de conception, pour ne fermer aucune porte ;
+elle se code dans la première version qui l'exerce. Son entrée énumère ses contraintes ; son
+critère de fin porte sur leurs harnais et vérifications manuelles, et sur ses issues de conception.
+
+Une version reste petite : au-delà d'environ huit tâches, son architecte la découpe.
 
 Le travail est tiré par les versions : une tâche appartient au jalon de la version qui en a besoin,
 quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,

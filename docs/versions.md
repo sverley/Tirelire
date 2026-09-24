@@ -2,9 +2,10 @@
 
 Le travail est tiré et ordonné par les versions (D87). Une version garantit un usage (description,
 section « Usages ») sur un ensemble de cibles (`docs/cibles.md`) ; elle naît d'une case
-« prioritaire » de la matrice des cibles. La première, `v0 · Socle commun`, ne garantit aucun
-usage : elle intègre les contraintes structurelles de tous les usages et de toutes les cibles
-actives, avant qu'une version d'usage ne s'appuie dessus.
+« prioritaire » de la matrice des cibles. Le socle, lui, ne garantit aucun usage : il intègre les
+contraintes structurelles de tous les usages et de toutes les cibles actives, par incréments, chacun
+placé juste avant la première version d'usage qui l'exerce (D87). Le premier est
+`v0 · Données sûres`.
 
 Une version se termine quand son critère de fin est atteint et que le porteur a fait ses
 vérifications manuelles ; elle se publie alors par le tag de son nom (D83). Une version livrée ne
@@ -16,16 +17,16 @@ ce catalogue ne les liste pas.
 
 Une entrée donne l'usage, les cibles, le critère de fin et le tag.
 
-## v0 · Socle commun
+## v0 · Données sûres
 
-- **Usage** · aucun : les contraintes structurelles de tous les usages.
+- **Usage** · aucun : ce qu'une version d'usage qui porte de vraies données ne peut éviter d'avoir
+  avant elle.
 - **Cibles** · les cibles actives : Webapp · Chromium sur Android ; Webapp · Chromium sur
   ordinateur ; Relais PHP seul.
-- **Contraintes intégrées** · données locales et leur persistance (I7, C4), sauvegarde (C5),
-  synchronisation et instances à des versions différentes (I8, C8), distribution et installation
-  (I9, C1, C2), adresse sûre (C3).
-- **Fin** · les harnais et vérifications manuelles de ses contraintes intégrées — I7, I8, I9, C1 à
-  C5, C8 — sont tenus sur ces cibles, et les issues de conception de la version sont fermées.
+- **Contraintes intégrées** · données locales (I7), leur persistance (C4), leur sauvegarde (C5), le
+  fichier d'état (D58).
+- **Fin** · les harnais et vérifications manuelles d'I7, C4 et C5 sont tenus sur ces cibles, et les
+  issues de conception de la version sont fermées.
 - **Tag** · `v0`.
 
 ## v1 · Budget seul sur la webapp

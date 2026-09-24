@@ -1,5 +1,5 @@
 /**
- * Harnais d'I4 — « Simple par défaut, souple sur demande » (issue #71, carnet #38).
+ * Harnais d'I4 — « Simple par défaut, souple sur demande » (issue #71, #38).
  *
  * Le registre portait la dette : « l'assistant mène jusqu'au plan sans ouvrir de réglage avancé ».
  * C'est ce que ce harnais mesure, sur une base vide, dans le navigateur.

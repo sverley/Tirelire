@@ -1,5 +1,5 @@
 /**
- * Plomberie commune aux parcours de bout en bout des usages (#70, carnet #38, #58).
+ * Plomberie commune aux parcours de bout en bout des usages (#70, #38, #58).
  *
  * Un parcours ne part pas d'un grand livre écrit à la main : il part d'une **base vide**, écrit par
  * `upsert` / `setSetting` comme le fait l'application (D84), et relit ce qui a été persisté.

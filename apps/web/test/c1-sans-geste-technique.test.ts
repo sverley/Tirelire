@@ -1,5 +1,5 @@
 /**
- * Harnais de C1 — « Aucun geste technique pour l'utilisateur » (issue #73, carnet #38,
+ * Harnais de C1 — « Aucun geste technique pour l'utilisateur » (issue #73, #38,
  * #58). Jusqu'ici, seule une vérification manuelle (`VM-C1-sans-geste`) le
  * tenait, à relire à chaque PR.
  *

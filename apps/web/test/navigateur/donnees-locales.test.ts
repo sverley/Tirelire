@@ -1,5 +1,5 @@
 /**
- * Harnais d'I7 — « Les données restent en local » (issue #72, carnet #38). L'invariant :
+ * Harnais d'I7 — « Les données restent en local » (issue #72, #38). L'invariant :
  * « Les données sont stockées en local, sur les appareils, et non sur un serveur. […] Une seule
  * exception : le stockage temporaire de paquets chiffrés sur un relais, pour la synchronisation
  * asynchrone (I8), que l'utilisateur accepte après avoir été averti. » Jusqu'ici, seule une

@@ -485,3 +485,9 @@ qu'elles barrent.
 > Oui 1. Et comme tous les chantiers n'avaient pas été analysés, il faut prendre en compte les disparités de traitements. Certains domaines devront peut-être être documentés par la meme occasion
 
 > Non, domaine est transverse et non un but ou une ligne d'une version. C'est une catégorie.
+
+> Il faut de la cohérence globale du projet
+
+> Il faut aussi prévoir un certain étalement des tâches. Il ne faut pas que la v0 soit énorme à coder sans avoir la possibilité de confronter les choix aux usages
+
+> Ok

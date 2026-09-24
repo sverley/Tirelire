@@ -42,9 +42,13 @@ architecte la suit jusqu'à sa publication ; chaque session reprend là où le j
    les deux cas, repère ce qui manque ou ce qui casse.
 3. Rattache au jalon les tâches existantes qui y répondent. Pour ce qui manque, ouvre le besoin,
    étiqueté de son domaine (D86), ou de sa nature s'il est hors produit.
-4. Ordonne les tâches du jalon : lesquelles d'abord, parce qu'une autre part de leur résultat ;
-   lesquelles jamais en parallèle, parce qu'elles touchent les mêmes documents ou le même code.
-   Écris cet ordre et l'état de chaque tâche dans la description du jalon, et là seulement (D78).
+4. Garde la version petite (D87) : au-delà d'environ huit tâches, découpe-la. Pour le socle, ne
+   garde que ce qu'aucune version d'usage ne peut éviter d'avoir avant elle ; une contrainte
+   structurelle qui peut attendre se conçoit dans une issue de conception et se code dans la
+   première version qui l'exerce. Ordonne les tâches du jalon : lesquelles d'abord, parce qu'une
+   autre part de leur résultat ; lesquelles jamais en parallèle, parce qu'elles touchent les mêmes
+   documents ou le même code. Écris cet ordre et l'état de chaque tâche dans la description du
+   jalon, et là seulement (D78).
 5. Quand toutes les tâches du jalon sont fermées, vérifie le critère de fin de l'entrée — le
    parcours vert sur chaque cible, ou, pour le socle, les harnais de ses contraintes verts et ses
    issues de conception fermées — puis demande au porteur ses vérifications manuelles. S'il manque quelque chose,
