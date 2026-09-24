@@ -33,6 +33,11 @@ Des fondements :
   une plateforme.
 - **C8, I8** : un ordre enregistré est un fait synchronisé ; deux instances à des versions
   différentes ne le perdent ni ne le dédoublent.
+- **Chantier 2, D43** : ce que l'assistant propose vient de l'exemple, ses virements compris, et
+  n'entre dans le projet qu'à la validation finale de l'assistant. Un ordre proposé par l'assistant
+  ne s'enregistre qu'à cette validation.
+- **D53, D60** : l'exemple garde de quoi démontrer le plan ; il porte un ordre enregistré en écart
+  avec le budget, au-delà du pas d'arrondi, et doit en démontrer aussi la ventilation.
 
 Propres au chantier :
 
@@ -64,9 +69,16 @@ Propres au chantier :
    porteur le 24 septembre 2026 : « H4 ok ».
 5. Proposer, c'est laisser choisir : accepter, c'est enregistrer le nouveau montant ou la nouvelle
    ventilation une fois l'ordre modifié chez la banque ; ne pas accepter est légitime (D20), l'écart
-   reste lisible sans bloquer.
+   reste lisible sans bloquer. Une évolution d'ordre se calcule sur les données de l'utilisateur :
+   ce n'est pas une proposition au sens du chantier 2, qui vient de l'exemple (son hypothèse 1). Sa
+   forme hors du Plan se tranchera avec la question que le chantier 2 pose sur les propositions hors
+   de l'assistant, dont la piste du porteur est d'ouvrir la partie concernée de l'assistant.
 6. Sans ordre enregistré, le plan qui change n'est pas une action cachée : c'est un résultat
    recalculé (I10). Le signaler reste à évaluer.
+7. Deux sources proposent un ordre : le plan, qui propose ce que le budget demande ; l'assistant,
+   qui propose l'ordre de l'exemple (chantier 2). Suivre l'exemple jusqu'au bout enregistre l'ordre
+   de l'exemple, écart compris, et le plan en propose aussitôt l'évolution : c'est la démonstration
+   que l'exemple porte (D53, D60).
 
 ## Cibles
 
@@ -79,8 +91,9 @@ Propres au chantier :
 
 ## Usages
 
-- **U2** : l'usage du chantier. De la base vide : budget, ordres proposés, mise en place validée,
-  ordres enregistrés avec leur ventilation, puis évolutions proposées quand le budget change.
+- **U2** : l'usage du chantier. De la base vide : budget, ordres proposés par le plan ou, depuis
+  l'exemple, par l'assistant, mise en place validée, ordres enregistrés avec leur ventilation, puis
+  évolutions proposées quand le budget change.
 - **U1** : partage la proposition du plan de virements, le virement à faire du parcours U1 ; le
   chantier ne lui ajoute aucune étape.
 - **U3** : s'appuie sur la ventilation d'un plan non validé ; le rapprochement relève du chantier 6.

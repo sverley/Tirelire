@@ -1188,8 +1188,7 @@ l'exemple n'importe aucun relevé, et lui en donner une retrancherait 600 € de
 demande, alors que ce plan est celui de l'analyse au centime près.
 
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
-(virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
-budget, pas une ligne de budget à offrir (D43).
+(virement SEPA, QR code), et l'assistant ne le propose pas encore.
 
 ## Le travail
 
