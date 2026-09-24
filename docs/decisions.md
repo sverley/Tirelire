@@ -1063,6 +1063,23 @@ séparé, régénérable pour le présent, qui ne touchera pas à ce format — 
 superflue pour un foyer sur relais chiffré. La granularité par cellule a été chiffrée et écartée :
 1,7 Ko de versions par opération pour des conflits que l'usage ne produit pas.
 
+Ce que la synchronisation exige du fichier pour venir sans migration cassante, tenu dès qu'il porte
+de vraies données, pour toutes les tables et sans structure propre à un usage (I3) :
+
+- **Une ligne a la même identité sur toutes les instances.** Une opération importée a celle de D09
+  sur toute instance qui importe le même relevé sur le même compte ; le compte principal, qu'il naisse
+  d'office ou par l'assistant, et les réglages ont la même partout.
+- **Chaque écriture se date et se garde.** Chaque ligne porte l'horloge de sa dernière écriture et
+  l'instance qui l'a faite ; une suppression est une écriture : rien d'une ligne synchronisée ne
+  disparaît physiquement.
+- **Ce qui décrit une instance reste à l'instance.** Son identité, ce qu'elle sait des autres, les
+  secrets du relais et ce qui ne concerne qu'elle ne voyagent ni par la synchronisation ni dans un
+  fichier ouvert ailleurs. Deux instances ouvertes depuis le même fichier sont deux instances, qui
+  convergent sans perte ; restaurer une sauvegarde plus ancienne puis synchroniser ne perd rien de ce
+  que les autres ont reçu entre-temps.
+- **Le format se dit.** Le fichier et chaque paquet portent leur format et sa version ; un format
+  inconnu est refusé sans rien perdre ni écrire (C8).
+
 Rupture sans migration, le produit n'ayant pas d'utilisateur : un fichier antérieur est refusé
 avec un message clair, `meta` porte un marqueur de format et une version, `MODEL_VERSION` repart
 à 1, `migration.ts` et les colonnes dépréciées disparaissent — le mécanisme D30 resservira après
