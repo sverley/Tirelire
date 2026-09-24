@@ -13,8 +13,9 @@ L'application propose un plan de virements permanents lié au budget, d'un lien 
 Des fondements :
 
 - **I10** : le budget et les flux ne changent que sur une validation ; calculer le plan ne modifie
-  rien ; quand le budget évolue, chaque écart avec un ordre enregistré se signale, ancien et nouveau
-  montant, sans le réécrire. C'est le cœur du chantier.
+  rien ; quand le budget évolue, chaque écart avec un ordre enregistré, montant ou part fixe de sa
+  ventilation, qui dépasse le pas d'arrondi des ordres se signale, ancien et nouveau montant, sans
+  le réécrire. C'est le cœur du chantier.
 - **Principe 4.1, U2** : l'utilisateur pose ses ordres lui-même chez sa banque, l'application n'y a
   pas accès. Elle ne connaît un ordre que parce que l'utilisateur en valide la mise en place ; il est
   alors enregistré avec sa ventilation sur les tirelires.
@@ -53,7 +54,8 @@ Propres au chantier :
    avoir posé. Seul l'import (chantier 6) peut confirmer qu'il vire ; sans import, le plan le tient
    pour exact.
 2. L'ordre enregistré porte sa ventilation sur les tirelires qu'il sert, en parts librement
-   choisies (D27, D60) : fixes, un montant, ou flottantes, un pourcentage ou la part restante. Les
+   choisies (D27, D60) : fixes, un montant, ou flottantes, un pourcentage ou la part variable, qui
+   prend le reste. Les
    parts flottantes se recalculent sur le montant constaté ; l'écart d'une part fixe avec ce que le
    budget demande se propose comme toute évolution. 24 septembre 2026, à la question de ce
    qu'« enregistrés avec leur ventilation » demande :
@@ -64,9 +66,10 @@ Propres au chantier :
    leurs noms ni à un montant : renommer, ajouter ou retirer un besoin, déplacer une tirelire ne
    rompt pas le lien, et fait au plus naître une proposition. Le libellé déjà posé chez la banque
    reste celui enregistré.
-4. Un changement de fond (principe 1.2) est un écart qui dépasse le pas d'arrondi de l'ordre
-   enregistré, dans un sens comme dans l'autre : en deçà, rien ne se propose (D60). Validé par le
-   porteur le 24 septembre 2026 : « H4 ok ».
+4. Un changement de fond (principe 1.2) est un écart qui dépasse le pas d'arrondi des ordres, un
+   réglage unique, dans un sens comme dans l'autre. En deçà, rien ne se propose, sauf pour un ordre
+   que le budget ne demande plus, signalé à tout montant (D60). Validé par le porteur le
+   24 septembre 2026 : « H4 ok ».
 5. Proposer, c'est laisser choisir : accepter, c'est enregistrer le nouveau montant ou la nouvelle
    ventilation une fois l'ordre modifié chez la banque ; ne pas accepter est légitime (D20), l'écart
    reste lisible sans bloquer. Une évolution d'ordre se calcule sur les données de l'utilisateur :

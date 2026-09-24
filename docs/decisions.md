@@ -180,7 +180,7 @@ reconnue par montant et libellé (D11), et sa ventilation proposée. Ce que les 
 ventilation n'absorbent pas — montant constaté différent du prévu, permanent posé il y a six mois,
 besoins qui ont bougé — se répartit par l'ordre de financement de D06, planchers d'abord puis
 priorités, plutôt qu'un prorata qui saupoudrerait. L'écart retourne dans les positions de tirelires
-et se represente au tour suivant.
+et se représente au tour suivant.
 
 ### D22 · Trois états d'une opération, la vérité est ce qui est verrouillé
 
@@ -1155,7 +1155,7 @@ que personne n'y a touché.
 **La ventilation de l'ordre est un choix de l'utilisateur**, enregistré avec l'ordre quand il en
 valide la mise en place (principe 4.1). Elle s'écrit en parts, comme celle d'une opération (D27) :
 une part **fixe** est un montant ; une part **flottante** est un pourcentage du montant viré, ou la
-part restante, au plus une. L'application en propose une à la validation, que l'utilisateur modifie
+part variable, qui prend le reste, au plus une. L'application en propose une à la validation, que l'utilisateur modifie
 librement. Les parts flottantes se recalculent sur le montant constaté ; une part fixe ne suit pas
 le budget, et son écart avec ce que le budget demande pour sa tirelire se propose comme celui du
 montant, au-delà du même pas, sans être réécrit (I10). À l'import, ce que les parts n'absorbent pas
@@ -1164,13 +1164,16 @@ se répartit par l'ordre de financement au jour de l'opération (D06, D21), plan
 entier. `PlannedFlow.plannedAllocation` reste une colonne dépréciée (D30) : ce qu'elle figeait,
 des montants tirés du plan au moment de l'enregistrement, n'est pas une ventilation choisie.
 
+Un virement saisi à la main est un flux déclaré comme un autre : il n'est pas pris pour l'ordre
+permanent, que le plan ne compare qu'à un flux dérivé, et rien ne le réécrit (D57).
+
 Ce que le budget demande comme ordre permanent est **la somme des dotations mensuelles** des
 tirelires placées sur ce compte, quoi qu'il ait déjà été viré dans la période — c'est un régime, pas
 un reste à faire. Comparer l'ordre au reste à virer (`PlanTransfer.standing`) allumait l'alerte le
 lendemain de chaque virement. Quatre cas s'en déduisent, et sont tenus par le harnais : un objectif
 atteint sort de la somme (il ne demande plus rien, D06) ; une échéance déjà provisionnée y reste
 (elle sera dépensée, l'épargne reprend juste après) ; un besoin versant (D48) n'y entre pas, il rend
-de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D37) au lieu de
+de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D19) au lieu de
 l'exiger deux fois. Le rattrapage n'en fait jamais partie : un ordre permanent ne se règle pas sur
 l'exceptionnel. L'écran l'affiche comme une somme, dépliable par « Détail » — c'est là que viendra
 la division d'un virement en plusieurs ordres (issue #25).
