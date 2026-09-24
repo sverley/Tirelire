@@ -1,5 +1,5 @@
 /**
- * Harnais d'I5 — « Inciter à tout utiliser » (issue #71, chantier de #38).
+ * Harnais d'I5 — « Inciter à tout utiliser » (issue #71, carnet #38).
  *
  * Le registre portait la dette : « l'inventaire des fonctions et de leur point d'entrée ». Le voici,
  * écrit une fois et vérifié à chaque exécution, sur une base vide — l'état où une fonction mal

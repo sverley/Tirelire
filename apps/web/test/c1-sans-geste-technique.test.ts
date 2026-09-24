@@ -1,6 +1,6 @@
 /**
- * Harnais de C1 — « Aucun geste technique pour l'utilisateur » (issue #73, chantier de #38,
- * chantier primaire #58). Jusqu'ici, seule une vérification manuelle (`VM-C1-sans-geste`) le
+ * Harnais de C1 — « Aucun geste technique pour l'utilisateur » (issue #73, carnet #38,
+ * #58). Jusqu'ici, seule une vérification manuelle (`VM-C1-sans-geste`) le
  * tenait, à relire à chaque PR.
  *
  * C1 : « Installer, mettre à jour, sauvegarder et synchroniser ne demandent ni ligne de commande,

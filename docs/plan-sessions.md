@@ -129,7 +129,7 @@ flux, et n'impose aucun compte — le compte principal est créé en silence, le
 fin de parcours avec le placement des réserves. La branche `feature/assistant-configuration` est
 abandonnée (elle créait des tirelires typées) ; l'assistant a été refait sur le modèle actuel.
 
-Reste à faire sur ce chantier : partir d'un **premier import** plutôt que d'une page blanche —
+Reste à faire sur ce travail : partir d'un **premier import** plutôt que d'une page blanche —
 proposer charges fixes et budgets à partir des opérations récurrentes détectées, en s'appuyant sur
 l'inférence de sélection (D26).
 

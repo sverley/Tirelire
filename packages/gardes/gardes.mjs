@@ -1,5 +1,5 @@
 /**
- * Garde du chantier primaire (#58).
+ * Garde du projet (#58).
  *
  * Deux vérifications, sans dépendance :
  *

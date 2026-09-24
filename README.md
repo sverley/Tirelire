@@ -66,7 +66,7 @@ données de l'analyse pour voir le plan tout de suite.
 
 L'application Android est le même code web emballé avec Capacitor (`apps/web/android`).
 
-- L'application web est la distribution prioritaire (#45) : chaque version s'y livre et s'y
+- L'application web est la distribution prioritaire (`docs/cibles.md`) : chaque version s'y livre et s'y
   vérifie, sur Chrome, avant d'être porté ailleurs. L'APK n'est vérifié que par sa construction.
 - Un tag `vX.Y.Z` construit l'APK et produit une release nommée, avec notes générées ; rien ne se
   construit pour Android à un push ni sur une PR.
