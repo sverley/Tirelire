@@ -10,7 +10,7 @@ Issue : #45.
 
 > Non, on se base sur chromium dans les harnais donc on ne cible que chromium pour le moment
 
-(11 septembre 2026, sur l'APK pendant cette priorité, retiré le 24 septembre :)
+(11 septembre 2026, sur l'APK pendant cette priorité, parole retirée le 24 septembre :)
 
 > ~~tant que ça peut compiler, on maintient la prod. Ca evite de choisir des solutions qui ne passeraient pas en apk. Mais on ne fait pas d'analyse de ce qui se passe vraiment cote app APK.~~
 
@@ -27,8 +27,7 @@ Du catalogue (`docs/contraintes.md`), telles qu'elles s'appliquent à une webapp
 données :
 
 - **C3** : l'instance de référence, la recette et le relais se servent en HTTPS.
-- **C4** : les données tiennent à l'adresse. L'adresse de référence ne change pas sans que
-  l'utilisateur puisse reprendre ses données ; tant que la persistance n'est pas demandée, Chrome
+- **C4** : les données tiennent à l'adresse ; tant que la persistance n'est pas demandée, Chrome
   peut les effacer faute de place.
 - **C5** : une webapp qui porte de vraies données n'en a aucune copie ailleurs ; la sauvegarde doit
   être évidente.
@@ -38,12 +37,20 @@ données :
 - **C1, C2** : l'installation proposée par Chrome ne demande aucun geste technique ; ce qui n'existe
   que dans Chromium (installation, lecture de QR code) garde une voie équivalente pour les cibles à
   venir.
+- **I9** : aucun travail sur une autre distribution ne bloque la construction de la webapp.
 
-Propres au chantier, d'après les paroles du porteur :
+Propres au chantier :
 
-- Chromium seulement, sur Android et sur ordinateur, comme les harnais navigateur.
+- Chromium seulement, sur Android et sur ordinateur, comme les harnais navigateur (parole du
+  11 septembre, citée dans l'intention).
 - L'adresse de l'instance de référence vient d'une variable GitHub, jamais écrite en dur.
-- Aucun travail sur une autre distribution ne bloque la webapp.
+  11 septembre 2026, à la question « tirelire.sim-dev.eu est-elle l'instance de référence
+  définitive ? » :
+
+  > oui surement mais pas de stockage en dur. On maintient par Variables github
+
+- L'adresse de référence ne change pas sans que l'utilisateur puisse reprendre ses données :
+  conséquence de C4, puisque les données restent attachées à l'ancienne adresse.
 
 ## Hypothèses
 
@@ -65,8 +72,7 @@ Propres au chantier, d'après les paroles du porteur :
 - **Webapp · Chromium sur ordinateur** : active.
 - **Relais PHP seul** : active, livré avec le site ; le chantier le porte parce qu'il fait partie de
   la distribution web.
-- Toutes les autres, APK Android comprise : hors du chantier ; il ne les vise pas et ne les empêche
-  pas.
+- Toutes les autres, APK Android comprise : hors du chantier ; il ne les vise pas.
 
 ## Usages
 
