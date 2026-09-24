@@ -15,7 +15,12 @@
  * - **la trace** d'une synchronisation, pour une instance : ce que la synchronisation lui a rendu
  *   (le résultat de `runSync`, `importBundle` ou `relaySync`), plus le contenu de toutes les tables
  *   de son fichier exporté, relu ligne à ligne. Un conflit « se voit » quand ce qui est écarté est
- *   dans la trace des deux instances ; une valeur remplacée sans conflit n'y est plus.
+ *   dans la trace des deux instances ; une valeur remplacée sans conflit n'y est plus. C'est
+ *   nécessaire, pas suffisant : que l'utilisateur le voie à l'écran se garde dans
+ *   `navigateur/conflit-visible.test.ts`, second fichier du harnais parce que les tests navigateur
+ *   vivent à part (#121) ;
+ * - **le fichier**, ligne à ligne : une ligne supprimée reste dans son fichier (D58 : rien d'une
+ *   ligne synchronisable ne disparaît physiquement), quoi que `load()` en montre.
  *
  * Le relais est un relais factice en mémoire qui tient le contrat de `apps/hebergement/serveur`
  * (dépôt, puis retrait filtré par appareil et par numéro) : rien ne sort de la machine.
@@ -71,6 +76,9 @@ function semer(store: LedgerStore): void {
   ecrire(store, 'importProfiles', bankMultiAccountProfile('profil-banque') as unknown as Ligne);
   ecrire(store, 'devices', { id: 'appareil-salon', name: 'Tablette du salon' });
   for (const [k, v] of Object.entries(l.settings)) if (k !== 'siteId') store.setSetting(k as never, v as never);
+  // Une ligne de plus par table, que rien ne référence : partagée par la première synchronisation,
+  // puis supprimée d'un seul côté (`horsLigne`).
+  for (const cle of CLES) ecrire(store, cle, copie(store, cle, 'partagee'));
 }
 
 /** L'état d'une instance, comparable d'une instance à l'autre : sans son identité, lignes triées. */
@@ -89,6 +97,20 @@ function contenu(bytes: Uint8Array): string {
   try {
     const tables = db.exec(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`)[0]?.values.map((v) => String(v[0])) ?? [];
     return tables.map((t) => `${t} ${JSON.stringify(db.exec(`SELECT * FROM "${t}"`)[0] ?? null)}`).join('\n');
+  } finally {
+    db.close();
+  }
+}
+
+/** La ligne `id` est-elle encore dans une table du fichier, supprimée ou non ? */
+function dansLeFichier(bytes: Uint8Array, id: string): boolean {
+  const db = new SQL.Database(bytes);
+  try {
+    const tables = db.exec(`SELECT name FROM sqlite_master WHERE type = 'table'`)[0]?.values.map((v) => String(v[0])) ?? [];
+    return tables.some((t) => {
+      const colonnes = db.exec(`PRAGMA table_info("${t}")`)[0]?.values.map((v) => String(v[1])) ?? [];
+      return colonnes.includes('id') && db.exec(`SELECT 1 FROM "${t}" WHERE id = ?`, [id]).length > 0;
+    });
   } finally {
     db.close();
   }
@@ -187,9 +209,14 @@ function verifierPresent(store: LedgerStore, cle: Cle, id: string, attendu: Reco
   expect(r).toMatchObject(attendu);
 }
 
-function verifierSupprime(store: LedgerStore, cle: Cle, id: string): void {
-  const r = lignes(store, cle).find((x) => x.id === id);
+function verifierSupprimeDans(charges: Ligne[], fichier: Uint8Array, cle: Cle, id: string): void {
+  const r = charges.find((x) => x.id === id);
   expect(r === undefined || !!r['deletedAt'], `${cle} ${id} n’est pas supprimé`).toBe(true);
+  expect(dansLeFichier(fichier, id), `${cle} ${id} a disparu physiquement du fichier`).toBe(true);
+}
+
+function verifierSupprime(store: LedgerStore, cle: Cle, id: string): void {
+  verifierSupprimeDans(lignes(store, cle), store.export(), cle, id);
 }
 
 function verifierConflitMontre(traceInstance: string, ecarte: string): void {
@@ -215,7 +242,10 @@ function verifierRienEcrit(avant: string, apres: string): void {
 // Deux instances, modifiées hors ligne dans toutes les tables et les réglages
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/** La ligne de chaque table qu'on modifie, qu'on copie et dont la copie se supprime. */
+/**
+ * La ligne de chaque table qu'on modifie et qu'on copie. Les copies ne sont référencées par rien,
+ * sauf la ventilation d'une copie, qui pointe l'opération copiée avec elle.
+ */
 function source(store: LedgerStore, cle: Cle): Ligne {
   const rs = lignes(store, cle);
   if (cle === 'accounts') return rs.find((r) => r['kind'] !== 'principal')!;
@@ -236,13 +266,17 @@ function modifie(store: LedgerStore, cle: Cle): Ligne {
   return r;
 }
 
-/** A crée et supprime dans toutes les tables ; B modifie et crée ; chacun touche un réglage. */
+/**
+ * A crée, supprime ce qu'elle vient de créer et supprime une ligne partagée, que B ne touche pas,
+ * dans toutes les tables ; B modifie et crée ; chacune touche un réglage.
+ */
 function horsLigne(a: LedgerStore, b: LedgerStore): void {
   for (const cle of CLES) {
     ecrire(a, cle, copie(a, cle, 'a'));
     ecrire(a, cle, copie(a, cle, 'z'));
   }
   for (const cle of CLES) a.remove(cle, copie(a, cle, 'z').id);
+  for (const cle of CLES) a.remove(cle, copie(a, cle, 'partagee').id);
   a.setSetting('principalCushion', 12345 as never);
   for (const cle of CLES) {
     ecrire(b, cle, modifie(b, cle));
@@ -259,6 +293,7 @@ function verifierHorsLigne(...instances: LedgerStore[]): void {
       verifierPresent(s, cle, copie(temoin, cle, 'a').id, {});
       verifierPresent(s, cle, copie(temoin, cle, 'b').id, {});
       verifierSupprime(s, cle, copie(temoin, cle, 'z').id);
+      verifierSupprime(s, cle, copie(temoin, cle, 'partagee').id);
     }
     expect(s.load().settings.principalCushion).toBe(12345);
     expect(s.load().settings.transferThreshold).toBe(2345);
@@ -618,10 +653,33 @@ it.fails('témoin rouge · un fichier qui garde une trace de chaque modification
   semer(a);
   const compte = lignes(a, 'accounts')[0]!;
   ecrire(a, 'accounts', { ...compte, name: nom(0) });
-  const apresUne = a.export().length;
-  // Version cassée : chaque modification laisse une ligne de plus, comme un journal.
-  for (let i = 1; i <= 100; i++) ecrire(a, 'categories', { id: `trace-${i}`, name: nom(i), nature: 'expense' });
-  verifierMemeTaille(apresUne, a.export().length);
+  const apresUne = a.export();
+  // Version cassée : le même fichier, où chaque modification de la ligne réécrit la ligne et laisse
+  // en plus une entrée de journal, comme le faisait main (D08).
+  const db = new SQL.Database(apresUne);
+  db.run(`CREATE TABLE journal_casse (seq INTEGER PRIMARY KEY, hlc TEXT, site TEXT, tbl TEXT, row_id TEXT, col TEXT, value TEXT, prev_hash TEXT, hash TEXT)`);
+  for (let i = 1; i <= 100; i++) {
+    const empreinte = createHash('sha256').update(String(i)).digest('hex');
+    db.run(`INSERT INTO journal_casse (hlc, site, tbl, row_id, col, value, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+      `17900000000${String(i).padStart(2, '0')}:0000:casse`, 'casse', 'accounts', compte.id, 'name', JSON.stringify(nom(i)), empreinte, empreinte,
+    ]);
+  }
+  const apresCent = db.export();
+  db.close();
+  verifierMemeTaille(apresUne.length, apresCent.length);
+});
+
+it.fails('témoin rouge · une ligne partagée effacée au lieu d’être supprimée', async () => {
+  const a = await instance();
+  semer(a);
+  const id = copie(a, 'categories', 'partagee').id;
+  // Version cassée : la suppression efface la ligne du fichier, qui ne la montre plus.
+  const db = new SQL.Database(a.export());
+  const tables = db.exec(`SELECT name FROM sqlite_master WHERE type = 'table'`)[0]?.values.map((v) => String(v[0])) ?? [];
+  for (const t of tables) if ((db.exec(`PRAGMA table_info("${t}")`)[0]?.values ?? []).some((v) => v[1] === 'id')) db.run(`DELETE FROM "${t}" WHERE id = ?`, [id]);
+  const efface = db.export();
+  db.close();
+  verifierSupprimeDans(lignes(a, 'categories').filter((r) => r.id !== id), efface, 'categories', id);
 });
 
 it.fails('témoin rouge · deux instances nées du même fichier dont une seule est entendue', async () => {
@@ -646,9 +704,9 @@ it.fails('témoin rouge · une version écartée sans rien en dire', async () =>
   verifierConflitMontre(trace(silencieuse, { sent: 1, received: 1 }), 'ECART-B-196');
 });
 
-it.fails('témoin rouge · un fichier étranger ouvert comme un fichier neuf', async () => {
-  // Version cassée : l'ouverture ne lit pas le format et part d'une base vide.
-  verifierRefus(await issue(() => instance()));
+it.fails('témoin rouge · un fichier antérieur ouvert sans lire son format', async () => {
+  // Version cassée : l'ouverture prend toute base SQLite, sans lire son marqueur ni sa version.
+  verifierRefus(await issue(() => new SQL.Database(fichierAncien())));
 });
 
 it.fails('témoin rouge · un paquet étranger appliqué avant d’être refusé', async () => {
