@@ -1,6 +1,7 @@
-# Chantier 1 · Priorité à la webapp
+# Domaine · Application
 
-Issue : #45.
+L'installation, les mises à jour, la version affichée, l'hébergement, et l'ergonomie commune à tous
+les écrans. Reprend la lettre et l'analyse de l'ancien chantier 1 (#45).
 
 ## Intention
 
@@ -39,7 +40,7 @@ s'appliquent à une webapp qui porte de vraies données :
   venir.
 - **I9** : aucun travail sur une autre distribution ne bloque la construction de la webapp.
 
-Propres au chantier :
+Propres au domaine :
 
 - Chromium seulement, sur Android et sur ordinateur, comme les harnais navigateur (parole du
   11 septembre, citée dans l'intention).
@@ -70,13 +71,13 @@ Propres au chantier :
 - **Webapp · Chromium sur Android** : active, prioritaire ; c'est là que le porteur utilise
   l'application.
 - **Webapp · Chromium sur ordinateur** : active.
-- **Relais PHP seul** : active, livré avec le site ; le chantier le porte parce qu'il fait partie de
+- **Relais PHP seul** : active, livré avec le site ; le domaine le porte parce qu'il fait partie de
   la distribution web.
-- Toutes les autres, APK Android comprise : hors du chantier ; il ne les vise pas.
+- Toutes les autres, APK Android comprise : hors du domaine ; il ne les vise pas.
 
 ## Usages
 
-Le chantier ne porte aucun usage en propre : c'est là que tous se livrent et se vérifient. Il les
+Le domaine ne porte aucun usage en propre : c'est là que tous se livrent et se vérifient. Il les
 sert tous à la même condition, une webapp qui garde de vraies données : persistantes (C4),
 sauvegardées (C5), à une version connue (C8). D'après la matrice de `docs/cibles.md`, U1 est le
-premier servi sur les deux cibles Chromium ; U1 lui-même relève du chantier 3.
+premier servi sur les deux cibles Chromium ; U1 lui-même relève de la version v1 et du domaine budget et tirelires.

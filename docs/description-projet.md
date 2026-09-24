@@ -467,3 +467,19 @@ qu'elles barrent.
 ### Le modèle de PR
 
 > quand il ne faut editer que de la documentation, il n'est pas nécessaire de coder un harnais. Dans ce cas, c'est le codeur qui ouvre le PR. Or il ne respecte pas les formats (notamment le "Close ") donc les test sont rouges. Il faut corriger le role du codeur pour que l'auditeur et le codeur utilise le meme template de pr
+
+### Les versions tirent le travail, les domaines l'organisent
+
+> je n'aime pas notre découpage de chantier. Je pense qu'il faut découper les chantiers en bloc fonctionnel : budget / flux / operations / comptes / tirelire / categories / synchro / io / bilan / plan. Fais la liste exhaustive des bloc fonctionnel
+
+> je voyais un découpage fonctionnel comme des workpackage d'un projet (appelé ici chantier), avec un besoin de cohérence entre les tache qu'il regroupe, et une approche de production tirée par les usages x cibles afin de choisir l'ordre de traitement
+
+> mais est-ce utile et efficient ?
+
+> ma crainte, et elle doit être confronter aux propositions, est qu'à se focaliser sur les versions (qui sont des usages), on oublie dans les choix des problématique pour d'autres usages. Mais peut etre est-ce la vie des versions : poser le probleme quand on augmente les fonctionnalités
+
+> On se rapproche beaucoup de ce qu'on e j'avais construit avec les chantiers : 0 pour l'outillage, 1 pour la partie commune puis une déclinaison par usage. Mais ok pour simplifier en restant sur un découpage tirée par les usages et en commençant par un bl c commun permettant l'intégration des contraintes structurelles  de tous les usages et cibles
+
+> Oui parfait
+
+> Oui 1. Et comme tous les chantiers n'avaient pas été analysés, il faut prendre en compte les disparités de traitements. Certains domaines devront peut-être être documentés par la meme occasion

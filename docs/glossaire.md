@@ -92,14 +92,12 @@ Terme générique. Un besoin est :
 Le type du besoin commande tout le reste : qui écrit son harnais, où ce harnais vit, et quand il est
 joué.
 
-## Chantier
+## Domaine
 
-Un besoin de haut niveau, qui ne tient pas en une tâche, défini dans son document de
-`docs/chantiers/`, sa seule vérité (D86) : une lettre d'intention, que son architecte complète par
-l'analyse approfondie — contraintes, hypothèses, cibles, usages. Sur GitHub, son issue, étiquetée « chantier », le reflète et porte ses sous-issues, chacune un
-besoin ; l'architecte le suit jusqu'à sa fermeture (`docs/roles/architecte.md`). C'est une
-capacité : il sert une ou plusieurs **versions**. À ne pas confondre avec l'**objectif**, une
-tirelire (partie « Le produit »).
+Un bloc fonctionnel du produit — budget et tirelires, plan et flux, opérations, rapprochement et
+bilan, données et synchro, assistant et exemple, application —, décrit dans `docs/domaines/` (D86).
+Une tâche porte l'étiquette de son ou de ses domaines ; ce n'est pas une unité de travail : le
+travail est tiré par les **versions**.
 
 ## Cible
 
@@ -109,10 +107,9 @@ l'APK… —, active, de côté ou à venir, au catalogue `docs/cibles.md`.
 ## Version
 
 Un usage garanti sur un ensemble de cibles, défini dans `docs/versions.md` (D87). Elle se termine
-quand le parcours de l'usage est vert sur ses cibles, et se publie par un tag. Sur GitHub, un jalon
-du même nom regroupe ses tâches, quel que soit leur chantier : c'est elle qui ordonne leur
-traitement. À ne pas confondre avec le **chantier**, une capacité, qui sert une ou plusieurs
-versions.
+quand le parcours de l'usage est vert sur ses cibles, et se publie par un tag ; la première, `v0`,
+est le socle commun, sans usage. Sur GitHub, un jalon du même nom regroupe ses tâches, quel que soit
+leur domaine : c'est elle qui ordonne leur traitement.
 
 ## Visée
 
