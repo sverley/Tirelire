@@ -1191,7 +1191,7 @@ Les documents fondateurs : `docs/description-projet.md` (les paroles du porteur,
 sections « Principes » et « Usages »), `docs/glossaire.md`, les catalogues — `docs/invariants.md`,
 `docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/gardes.md` (le registre : chaque
 invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — les documents des
-chantiers, `docs/chantiers/`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est
+chantiers, `docs/chantiers/`, le catalogue des versions, `docs/versions.md`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est
 forcément un fichier Markdown de `docs/` : un document d'un autre format (HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se
 reprend dans un Markdown. Tout Markdown de `docs/` n'est pas fondateur pour autant : la liste est
 celle-ci.
@@ -1327,7 +1327,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans son
   en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
 - **Livraison.** Un push sur `main` construit et dépose le site. L'APK et les releases ne sortent
-  qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion.
+  qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion. Un tag publie une version
+  (D87) et porte son nom (`docs/versions.md`).
 
 ### D84 · Le code, les données et les commits
 
@@ -1360,10 +1361,27 @@ approfondie — contraintes, hypothèses, cibles, usages —, avec l'accord du p
 
 L'architecte du chantier définit, à partir du document, les spécifications du chantier — c'est le
 produit de son issue — et suit l'évolution de toutes les sous-issues qui le réalisent, jusqu'à sa
-fermeture (`docs/roles/architecte.md`). Les sous-issues restent sur GitHub : le document ne les
-liste pas.
+fermeture (`docs/roles/architecte.md`) : il les spécifie et les rattache ; leur ordre de traitement
+se résout dans la version qui les regroupe (D87). Les sous-issues restent sur GitHub : le document
+ne les liste pas.
 
 Une issue sert un chantier, plusieurs, ou aucun. GitHub ne lui donne qu'un parent : le chantier
 qu'elle sert d'abord ; les autres chantiers qu'elle sert la citent dans l'état de leur issue. Une
 issue qui ne sert aucun chantier porte l'étiquette de sa nature : « outillage », « nouvelle
 fonctionnalité », « idée »…
+
+### D87 · Une version : un usage garanti sur des cibles
+
+Une version garantit un usage sur un ensemble de cibles ; elle naît d'une case « prioritaire » de la
+matrice des cibles et se définit dans `docs/versions.md` : son usage, ses cibles, son critère de fin,
+son tag. Elle se termine quand le parcours de son usage (I3) est vert sur ses cibles et que le
+porteur a fait ses vérifications manuelles ; le tag de son nom la publie (D83). Une version livrée
+ne régresse pas : le parcours de son usage reste vert sur ses cibles à chaque PR.
+
+La version et le chantier sont deux concepts distincts. Un chantier est une capacité (D86) ; une
+version, un usage de bout en bout sur des cibles ; un chantier sert une ou plusieurs versions. Une
+tâche est rattachée à un chantier ; son ordre de traitement se résout au regard de la version qui
+regroupe les tâches nécessaires pour y parvenir. Sur GitHub, un jalon du même nom que la version
+regroupe ces tâches, quel que soit leur chantier ; son architecte les ordonne
+(`docs/roles/architecte.md`, « Suivre une version »). Le découpage par capacités garde les choix
+ouverts à tous les usages ; la version garde chaque usage entier.
