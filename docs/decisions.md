@@ -110,12 +110,12 @@ dépense ou un revenu ; pour un virement interne, +montant côté compte hôte d
 Ce que l'hypothèse d'une catégorie par opération cachait : un passage en grande surface mêle
 alimentation, vêtements et cadeau ; un virement à un livret alimente trois provisions à la fois.
 
-### D11 · Un virement permanent par tirelire, libellé « TIRELIRE … »
+### D11 · Un virement permanent par couple de comptes, libellé « TIRELIRE … »
 
-Le plan propose un ordre permanent par tirelire hébergée hors principal, avec un libellé dérivé du
-nom de la tirelire (`transferLabel`). À l'import, une opération dont le libellé contient ce
-libellé est reconnue comme virement vers cette tirelire (`matchTirelireTransfers`). Un virement
-groupé reste possible : il se ventile à la main sur plusieurs tirelires.
+Le plan propose un ordre permanent du compte principal vers chaque compte d'accueil qui héberge des
+tirelires (D21), avec un libellé à recopier chez la banque, dérivé du nom du compte cible
+(`transferLabel`). À l'import, une opération dont le libellé contient ce libellé est reconnue comme
+un virement vers ce compte (`matchTirelireTransfers`), puis ventilée sur ses tirelires (D60).
 
 ### D12 · Pointage prudent
 
@@ -174,13 +174,13 @@ de stockage comme un autre, à durée de séjour courte : aucune règle particul
 
 ### D21 · Virement groupé à ventilation prévue
 
-Les écarts vers un même compte cible donnent un **virement permanent unique**, avec sa ventilation
-calculée d'avance et enregistrée comme flux attendu. À l'import, la ligne bancaire est reconnue par
-montant et libellé, et sa ventilation proposée. Si le montant constaté diffère du prévu — permanent
-posé il y a six mois, besoins qui ont bougé — la répartition rejoue l'ordre de financement de D06,
-planchers d'abord puis priorités, plutôt qu'un prorata qui saupoudrerait. L'écart retourne dans les
-positions de tirelires et se represente au tour suivant. Le libellé de D11 devient un libellé par
-couple de comptes, plus un libellé par tirelire.
+Les écarts vers un même compte cible donnent un **virement permanent unique**, enregistré comme flux
+attendu avec la ventilation que l'utilisateur a validée (D60). À l'import, la ligne bancaire est
+reconnue par montant et libellé (D11), et sa ventilation proposée. Ce que les parts de cette
+ventilation n'absorbent pas — montant constaté différent du prévu, permanent posé il y a six mois,
+besoins qui ont bougé — se répartit par l'ordre de financement de D06, planchers d'abord puis
+priorités, plutôt qu'un prorata qui saupoudrerait. L'écart retourne dans les positions de tirelires
+et se représente au tour suivant.
 
 ### D22 · Trois états d'une opération, la vérité est ce qui est verrouillé
 
@@ -1030,13 +1030,15 @@ budget au réel. Les deux sens de lecture sont de premier rang, aucun n'est un m
 
 Conséquence sur ce qui est stocké. Un flux **déclaré** (un salaire, un loyer, une échéance connue)
 est un fait : il appartient à l'utilisateur, rien ne le réécrit. Un flux **dérivé** du budget (un
-virement permanent et sa ventilation) est un calcul : il se recalcule à chaque changement du budget
-et l'application signale ce qui a bougé, plutôt que d'attendre qu'on pense à appuyer sur un bouton.
-Les deux doivent être distinguables dans le modèle comme à l'écran.
+virement permanent) naît d'un calcul : ce que le budget demande se recalcule à chaque changement du
+budget, et l'application signale ce qui a bougé, plutôt que d'attendre qu'on pense à appuyer sur un
+bouton. Une fois sa mise en place validée, ce que l'utilisateur a posé chez sa banque et la
+ventilation qu'il a choisie sont à lui : rien ne les réécrit, l'application en propose l'évolution
+(D60, I10). Les deux sortes de flux doivent être distinguables dans le modèle comme à l'écran.
 
-Cela remplace le choix fait au lot 4, où la ventilation d'un virement groupé était figée au moment
-de l'enregistrement : une photo du plan cessait d'être vraie sans que rien ne le dise. Ce qui se
-fige, c'est ce que la banque a fait — les opérations —, jamais ce que le budget prévoit.
+Ce qui se fige, c'est ce que la banque a fait — les opérations — et ce que l'utilisateur a validé,
+jamais une photo de ce que le budget prévoit : une photo cesse d'être vraie sans que rien ne le
+dise.
 
 ### D58 · Le fichier est un état : pas de journal, une horloge par ligne
 
@@ -1125,8 +1127,7 @@ liste remonte, et on ne la regardait pas. Il n'y a rien à corriger de ce côté
 
 ### D60 · Deux montants pour un virement permanent, un seul se stocke
 
-Applique D57 au virement permanent — le seul flux dérivé du budget, et le seul endroit où une photo
-du plan était enregistrée (D21, lot 4).
+Applique D57 au virement permanent, le seul flux dérivé du budget.
 
 Un ordre permanent porte deux montants de nature différente, et les confondre casse quelque chose
 dans les deux sens :
@@ -1145,16 +1146,27 @@ bouge, alors que l'ordre bancaire, lui, n'avait pas changé. Le bouton de l'écr
 donc pas : il change de sens. Il figeait un calcul, il **enregistre un fait** — « mon ordre vers le
 Livret A est désormais à 700 € ». Le plan compare les deux : `PlanTransfer.bankOrder` porte le
 montant enregistré et l'écart, et l'avertissement `bankOrderDrift` dit lequel est à aller changer,
-et où. Un ordre que le budget ne demande plus est signalé plutôt que supprimé en douce : il continue
-de virer chez la banque tant que personne n'y a touché.
+et où. Le plan n'évolue que sur un changement de fond (principe 1.2) : un écart ne se propose que
+s'il dépasse le pas d'arrondi des ordres (`settings.orderRounding`), dans un sens comme dans
+l'autre ; un pas nul fait proposer tout écart. Un ordre que le budget ne demande plus est signalé
+quel que soit son montant, plutôt que supprimé en douce : il continue de virer chez la banque tant
+que personne n'y a touché.
 
-`PlannedFlow.plannedAllocation` disparaît (colonne dépréciée, D30 ; migration 9 → 10 : les flux qui
-en portaient une deviennent dérivés, les autres restent déclarés — un virement saisi à la main est
-un flux déclaré comme un autre). `distributeTransfer` (`matching.ts`) devient le cas normal et non
-plus le cas de secours : à l'import, la répartition est celle de l'ordre de financement au jour de
-l'opération (D06), planchers d'abord. Le pire cas que cela corrige est le montant resté **identique**
-— l'ancienne photo s'appliquait alors telle quelle, sans que rien ne signale qu'elle ne
-correspondait plus au budget.
+**La ventilation de l'ordre est un choix de l'utilisateur**, enregistré avec l'ordre quand il en
+valide la mise en place (principe 4.1). Elle s'écrit en parts, comme celle d'une opération (D27) :
+une part **fixe** est un montant ; une part **flottante** est un pourcentage du montant viré, ou la
+part variable, qui prend le reste, au plus une. L'application en propose une à la validation, que
+l'utilisateur modifie librement. Les parts flottantes se recalculent sur le montant constaté ; une
+part fixe ne suit pas le budget, et son écart avec ce que le budget demande pour sa tirelire se
+propose comme celui du montant, au-delà du même pas, sans être réécrit (I10). À l'import, ce que les
+parts n'absorbent pas se répartit par l'ordre de financement au jour de l'opération (D06, D21),
+planchers d'abord (`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée se
+répartit ainsi en entier. `PlannedFlow.plannedAllocation` reste une colonne dépréciée (D30) : ce
+qu'elle figeait, des montants tirés du plan au moment de l'enregistrement, n'est pas une ventilation
+choisie.
+
+Un virement saisi à la main est un flux déclaré comme un autre : il n'est pas pris pour l'ordre
+permanent, que le plan ne compare qu'à un flux dérivé, et rien ne le réécrit (D57).
 
 Ce que le budget demande comme ordre permanent est **la somme des dotations mensuelles** des
 tirelires placées sur ce compte, quoi qu'il ait déjà été viré dans la période — c'est un régime, pas
@@ -1162,7 +1174,7 @@ un reste à faire. Comparer l'ordre au reste à virer (`PlanTransfer.standing`) 
 lendemain de chaque virement. Quatre cas s'en déduisent, et sont tenus par le harnais : un objectif
 atteint sort de la somme (il ne demande plus rien, D06) ; une échéance déjà provisionnée y reste
 (elle sera dépensée, l'épargne reprend juste après) ; un besoin versant (D48) n'y entre pas, il rend
-de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D37) au lieu de
+de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D19) au lieu de
 l'exiger deux fois. Le rattrapage n'en fait jamais partie : un ordre permanent ne se règle pas sur
 l'exceptionnel. L'écran l'affiche comme une somme, dépliable par « Détail » — c'est là que viendra
 la division d'un virement en plusieurs ordres (issue #25).
@@ -1180,8 +1192,7 @@ l'exemple n'importe aucun relevé, et lui en donner une retrancherait 600 € de
 demande, alors que ce plan est celui de l'analyse au centime près.
 
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
-(virement SEPA, QR code), et l'assistant ne le propose pas — un flux dérivé est une conséquence du
-budget, pas une ligne de budget à offrir (D43).
+(virement SEPA, QR code), et l'assistant ne le propose pas encore.
 
 ## Le travail
 
