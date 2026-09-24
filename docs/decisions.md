@@ -1070,7 +1070,7 @@ de vraies données, pour toutes les tables et sans structure propre à un usage 
   sur toute instance qui importe le même relevé sur le même compte ; le compte principal, qu'il naisse
   d'office ou par l'assistant, et les réglages ont la même partout.
 - **Chaque écriture se date et se garde.** Chaque ligne porte l'horloge de sa dernière écriture et
-  l'instance qui l'a faite ; une suppression est une écriture : rien d'une ligne synchronisée ne
+  l'instance qui l'a faite ; une suppression est une écriture : rien d'une ligne synchronisable ne
   disparaît physiquement.
 - **Ce qui décrit une instance reste à l'instance.** Son identité, ce qu'elle sait des autres, les
   secrets du relais et ce qui ne concerne qu'elle ne voyagent ni par la synchronisation ni dans un
