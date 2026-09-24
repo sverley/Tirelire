@@ -23,8 +23,8 @@ livre et se vérifie d'abord là.
 
 ## Contraintes
 
-Des catalogues (`docs/contraintes.md` et, pour I9, `docs/invariants.md`), tels qu'elles s'appliquent à une webapp qui porte de vraies
-données :
+Des catalogues (`docs/contraintes.md` et, pour I9, `docs/invariants.md`), telles qu'elles
+s'appliquent à une webapp qui porte de vraies données :
 
 - **C3** : l'instance de référence, la recette et le relais se servent en HTTPS.
 - **C4** : les données tiennent à l'adresse ; tant que la persistance n'est pas demandée, Chrome
