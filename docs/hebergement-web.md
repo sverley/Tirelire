@@ -217,8 +217,8 @@ Mêmes secrets `OVH_FTP_*` que la production, au même endroit. La recette n'a q
 par exception : son adresse, que le dépôt ne doit pas montrer (#156). Une variable s'écrit en clair
 dans les journaux de la CI, lisibles par tous tant que le dépôt est public ; un secret y est masqué.
 `apercu.sh` masque en plus les autres formes de l'adresse (hôte seul, minuscules), n'écrit que le
-sous-dossier `pr-<numéro>`, et le job de dépôt ne la fait passer par aucune sortie d'étape. Ses
-réglages, sans valeur par défaut :
+sous-dossier `pr-<numéro>`, et le job de dépôt ne la fait passer par aucune sortie d'étape. Les
+réglages propres à la recette, sans valeur par défaut :
 
 | Réglage | Nature | Rôle |
 |---|---|---|

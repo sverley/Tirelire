@@ -731,8 +731,8 @@ ce n'est plus le geste offert.
 liste montre jamais leur effet : un crédit terminé s'y lisait comme un crédit en cours.
 
 **Le jeu d'exemple porte des changements datés.** Il n'en avait aucun : on ne pouvait donc ni voir
-ni tester ce que produit un budget qui change, sinon en fabriquant des données à la main. Il en
-porte maintenant, choisis pour couvrir les quatre formes que prend un changement — une révision
+ni tester ce que produit un budget qui change, sinon en fabriquant des données à la main. Il
+porte maintenant des changements choisis pour couvrir les quatre formes que prend un changement — une révision
 déjà faite, une révision à venir, une ligne qui apparaît, une ligne qui s'arrête :
 
 - *Divers et sorties* passé de 300 à 250 € au 28 août : la version close se lit encore et ne dote
