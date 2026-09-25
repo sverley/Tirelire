@@ -1366,7 +1366,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   navigateur, garde, relais, hébergement), que les tests de niveau N ou moins ; ce qu'il écarte, il
   le compte et le dit. Les tests navigateur (`apps/web/test/navigateur/`), qui coûtent cher, ne se
   jouent que si l'option `--navigateur` les active, après le seuil (`pnpm test 2 --navigateur`) ;
-  sans elle, ils sont écartés, comptés et dits. Aucune variable d'environnement ne change ce qui se
+  sans elle, ils sont écartés, et comptés tels qu'ils sont écrits dans leurs fichiers, sans être
+  exécutés : un test écrit dans une boucle compte pour un, et la sortie dit ce qu'elle compte, pour
+  que ce nombre ne passe pas pour celui des tests exécutés. Aucune variable d'environnement ne change ce qui se
   joue : tout passe par les arguments. Un test appelé nommément (`-t` de vitest,
   `--test-name-pattern` de `node --test`) se joue quel que soit son niveau. Le script `test` de
   chaque paquet passe par `packages/gardes/lanceur.mjs`. Les seuils des moments :

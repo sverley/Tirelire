@@ -570,3 +570,8 @@ fichier à part, que le registre citerait en entier, sans les instantanés ni la
 > pnpm test [N] où N est facultatif (2 par defaut comme avant). Attention, légère modification du besoin par l'architecte à prendre en compte
 
 > les tests navigateur coutent tres cher, il faut une option dans pnpm test pour les activer dans 232
+
+Sur le compte des tests navigateur écartés, juste sur ce qu'il mesure — fichiers et tests écrits —
+plutôt qu'un nombre exact de tests engendrés, qui demanderait de lancer le navigateur :
+
+> ok pour cette lecture

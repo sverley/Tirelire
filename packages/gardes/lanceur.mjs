@@ -14,7 +14,9 @@
  *
  * Les tests navigateur (`test/navigateur/`, sous vitest) coûtent cher : ils ne se jouent que si
  * l'option `--navigateur` les active, après le seuil (`pnpm test 2 --navigateur`). Sans elle, ils
- * sont écartés, comptés dans leurs fichiers, et dits sur une ligne qui nomme le navigateur. Tout
+ * sont écartés et dits sur une ligne qui nomme le navigateur. Ils y sont comptés tels qu'ils sont
+ * écrits dans leurs fichiers, sans les charger : un test écrit dans une boucle compte pour un, et la
+ * ligne le dit, pour que ce nombre ne passe pas pour celui des tests exécutés (#232, point 3). Tout
  * paquet accepte l'option, puisque `pnpm test` la passe à chacun ; hors vitest, elle ne change rien.
  *
  * - vitest : le seuil devient un filtre de nom complet (`-t`), et un rapporteur de plus compte les
@@ -60,17 +62,22 @@ function binaireVitest() {
   }
 }
 
-/** Tests des fichiers `test/navigateur/**` du dossier de vitest (`--dir`, sinon le paquet). */
+/**
+ * Fichiers `test/navigateur/**` du dossier de vitest (`--dir`, sinon le paquet), et les tests qui y
+ * sont écrits : `{ fichiers, tests }`, ou `null` sans dossier.
+ */
 function testsNavigateur() {
   const i = reste.findIndex((a) => a === '--dir' || a.startsWith('--dir='));
   const racine = i < 0 ? process.cwd() : resolve(reste[i].startsWith('--dir=') ? reste[i].slice(6) : reste[i + 1]);
   const dossier = join(racine, 'test', 'navigateur');
   if (!existsSync(dossier)) return null;
-  let nombre = 0;
+  const compte = { fichiers: 0, tests: 0 };
   for (const f of readdirSync(dossier, { recursive: true })) {
-    if (/\.test\.[cm]?[jt]s$/.test(f)) nombre += appelsDeTests(readFileSync(join(dossier, f), 'utf8')).filter((a) => !a.suite).length;
+    if (!/\.test\.[cm]?[jt]s$/.test(f)) continue;
+    compte.fichiers++;
+    compte.tests += appelsDeTests(readFileSync(join(dossier, f), 'utf8')).filter((a) => !a.suite).length;
   }
-  return nombre;
+  return compte;
 }
 const sansNavigateur = vitest && !navigateur ? testsNavigateur() : null;
 
@@ -105,6 +112,12 @@ enfant.on('exit', (code, signal) => {
   }
   rmSync(travail, { recursive: true, force: true });
   console.log(ligneEcartes(seuil, ecartes, nomme));
-  if (sansNavigateur !== null) console.log(`navigateur : ${sansNavigateur} test(s) écarté(s), que l'option --navigateur active.`);
+  if (sansNavigateur !== null) {
+    const { fichiers, tests } = sansNavigateur;
+    console.log(
+      `navigateur : ${tests} test(s) écrits écarté(s), dans ${fichiers} fichier(s) de test/navigateur/, ` +
+        `lus sans être exécutés (un test écrit dans une boucle compte pour un) ; l'option --navigateur les active.`,
+    );
+  }
   process.exit(signal ? 1 : (code ?? 1));
 });
