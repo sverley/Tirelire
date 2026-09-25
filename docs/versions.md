@@ -15,8 +15,8 @@ Sur GitHub, un jalon du même nom regroupe toutes les tâches nécessaires à la
 leur domaine (D86) ; c'est la version qui ordonne leur traitement. Les tâches restent sur GitHub :
 ce catalogue ne les liste pas.
 
-Une entrée donne l'usage, les cibles, le critère de fin et le tag. L'ordre des entrées est l'ordre de
-travail : une version prévue attend que les précédentes soient publiées (D87).
+Une entrée donne l'usage, les cibles, le critère de fin et le tag. L'ordre des entrées est l'ordre
+de travail : une version prévue attend que les précédentes soient publiées (D87).
 
 ## v0 · Données sûres
 
