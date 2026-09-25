@@ -12,6 +12,11 @@
  * ligne qui parle d'« écarté(s) ». Un test s'appelle nommément par le filtre de nom de son
  * exécuteur (`-t` de vitest, `--test-name-pattern` de `node --test`), quel que soit son niveau.
  *
+ * **L'option navigateur.** Les tests navigateur (`apps/web/test/navigateur/`) ne se jouent que si
+ * l'option `--navigateur` les active, après le seuil : `pnpm test [N] --navigateur` (le porteur veut
+ * une option ; sa forme est la lecture de l'auditeur). Sans elle, ils sont écartés et la sortie le
+ * dit. Tout paquet accepte l'option, puisque `pnpm test` la passe à chacun.
+ *
  * **Le harnais du besoin** est le fichier de l'auditeur, et lui seul : nommé dans l'issue, il porte
  * le numéro de l'issue (ici, la première ligne de ce fichier). Dans la copie du dépôt des crochets,
  * la branche suit la forme des branches d'audit (`audit/<n>-…`) et le harnais porte « Harnais
@@ -24,7 +29,8 @@
  *   l'exécuteur de chaque ensemble — cœur et interface (vitest, interface dans le navigateur
  *   comprise), garde, relais et hébergement (`node --test`) —, à chaque seuil et nommément ; chaque
  *   test joué se note dans un fichier témoin. Le cœur et la garde font la matrice complète ;
- *   l'interface, le relais et l'hébergement, un seuil chacun ;
+ *   le relais et l'hébergement, un seuil chacun ; l'interface, un seuil sans l'option navigateur puis
+ *   avec ; la garde et le cœur acceptent l'option sans rien changer d'autre ;
  * - 5, 6 et 9 (crochets) : dans une copie du dépôt, sans ses tests, un test déjà sur `main` (la
  *   non-régression), le harnais du besoin et un test du codeur, tous deux ajoutés par la branche,
  *   sont joués par le vrai pré-commit, puis par la vraie livraison (pré-push) ; un second besoin,
@@ -282,9 +288,9 @@ const dossiersVitest = [];
 let compteur = 0;
 
 /** Joue le fichier inventé par l'exécuteur d'un paquet ; rend les tests joués, triés, et la sortie. */
-async function jouerFixture(nomPaquet, { seuil, nommé } = {}) {
+async function jouerFixture(nomPaquet, { seuil, nommé, navigateur = false } = {}) {
   const { dossier, exécuteur } = PAQUETS[nomPaquet];
-  const nom = `${nomPaquet}-${seuil ?? 'sans-seuil'}${nommé ? '-nomme' : ''}-${++compteur}`;
+  const nom = `${nomPaquet}-${seuil ?? 'sans-seuil'}${nommé ? '-nomme' : ''}${navigateur ? '-nav' : ''}-${++compteur}`;
   const témoin = join(temporaire, `${nom}.temoin`);
   writeFileSync(témoin, '');
   let args;
@@ -304,7 +310,7 @@ async function jouerFixture(nomPaquet, { seuil, nommé } = {}) {
     writeFileSync(fichier, source('node', nom));
     args = [...(nommé ? [`--test-name-pattern=${nommé}`] : []), fichier];
   }
-  const entrée = seuil === undefined ? [] : [String(seuil)];
+  const entrée = [...(seuil === undefined ? [] : [String(seuil)]), ...(navigateur ? ['--navigateur'] : [])];
   const r = await lancer('pnpm', ['--dir', join(RACINE, dossier), 'run', 'test', ...entrée, ...args], {
     cwd: RACINE,
     env: environnement({ NIVEAUX_TEMOIN: témoin }),
@@ -312,7 +318,7 @@ async function jouerFixture(nomPaquet, { seuil, nommé } = {}) {
   const notés = readFileSync(témoin, 'utf8').split('\n').filter(Boolean);
   const par = (préfixe) => notés.filter((l) => l.startsWith(`${préfixe}:`)).map((l) => l.slice(préfixe.length + 1)).sort();
   // L'interface joue deux fichiers inventés, headless et navigateur : l'écart se compte sur les deux.
-  return { ...r, joués: par(nom), navigateur: par(`${nom}-navigateur`), fichiers: nomPaquet === 'interface' ? 2 : 1 };
+  return { ...r, joués: par(nom), navigateur: par(`${nom}-navigateur`), fichiers: nomPaquet === 'interface' && navigateur ? 2 : 1 };
 }
 
 const mémo = (f) => {
@@ -327,6 +333,7 @@ for (const paquet of ['garde', 'cœur']) {
   scénarios[`${paquet}:nommé`] = mémo(() => jouerFixture(paquet, { nommé: '^n4 \\[niveau 4\\]$' }));
 }
 for (const paquet of ['interface', 'relais', 'hébergement']) scénarios[`${paquet}:1`] = mémo(() => jouerFixture(paquet, { seuil: 1 }));
+for (const paquet of ['interface', 'garde', 'cœur']) scénarios[`${paquet}:1+nav`] = mémo(() => jouerFixture(paquet, { seuil: 1, navigateur: true }));
 
 /** L'écart se compte et se dit : une ligne qui parle d'écarté(s) porte le nombre attendu. */
 const ditLÉcart = (sortie, nombre) => sortie.split('\n').some((l) => /écart/i.test(l) && new RegExp(`(?<!\\d)${nombre}(?!\\d)`).test(l));
@@ -424,7 +431,7 @@ const lancements = (é) =>
   déplier(commande(é))
     .split('\n')
     .filter((l) => PNPM_TEST.test(l))
-    .map((l) => ({ seuil: l.match(PNPM_TEST)[1] === undefined ? DÉFAUT : Number(l.match(PNPM_TEST)[1]), navigateur: /navigateur/.test(l) }));
+    .map((l) => ({ seuil: l.match(PNPM_TEST)[1] === undefined ? DÉFAUT : Number(l.match(PNPM_TEST)[1]), navigateur: /(?:^|\s)--navigateur(?:\s|$)/.test(l) }));
 
 const auReady = {
   github: { event_name: 'pull_request', ref: 'refs/pull/232/merge', event: { action: 'ready_for_review', pull_request: { number: 232, draft: false, head: { sha: 'a'.repeat(40) } } } },
@@ -515,12 +522,30 @@ test('rétrocompatibilité [niveau 3]', () => {});
     });
   }
 
-  for (const paquet of ['interface', 'relais', 'hébergement']) {
-    const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
-    test(`${paquet} (${exécuteur}) : l’ensemble respecte le seuil, ici 1`, async () => {
-      const r = await scénarios[`${paquet}:1`]();
-      constater(r, 1, `${paquet}, \`pnpm test 1\``);
-      if (paquet === 'interface') assert.deepEqual(r.navigateur, attendus(1), 'interface dans le navigateur : au seuil 1, seuls les tests de niveau 1 ou moins (#232, point 1)');
+  for (const paquet of ['relais', 'hébergement']) {
+    test(`${paquet} (node --test) : l’ensemble respecte le seuil, ici 1`, async () => {
+      constater(await scénarios[`${paquet}:1`](), 1, `${paquet}, \`pnpm test 1\``);
+    });
+  }
+
+  test('interface (vitest) : sans l’option, les tests navigateur sont écartés, et la sortie le dit', async () => {
+    const r = await scénarios['interface:1']();
+    assert.equal(r.code, 0, `interface, \`pnpm test 1\` : le lancement échoue\n${r.sortie.slice(-2000)}`);
+    assert.deepEqual(r.joués, attendus(1), 'interface headless : au seuil 1, seuls les tests de niveau 1 ou moins (#232, points 1 et 3)');
+    assert.deepEqual(r.navigateur, [], 'interface dans le navigateur : sans `--navigateur`, aucun test navigateur ne se joue (#232, point 3)');
+    const lignes = r.sortie.split('\n');
+    assert.ok(lignes.some((l) => /navigateur/i.test(l) && /écart/i.test(l)), `interface : sans \`--navigateur\`, la sortie dit que les tests navigateur sont écartés (#232, point 3)\n${r.sortie.slice(-1500)}`);
+  });
+
+  test('interface (vitest) : avec l’option, les tests navigateur se jouent au seuil', async () => {
+    const r = await scénarios['interface:1+nav']();
+    constater(r, 1, 'interface, `pnpm test 1 --navigateur`');
+    assert.deepEqual(r.navigateur, attendus(1), 'interface dans le navigateur : avec `--navigateur`, au seuil 1, seuls les tests de niveau 1 ou moins (#232, points 1 et 3)');
+  });
+
+  for (const paquet of ['garde', 'cœur']) {
+    test(`${paquet} : l’option navigateur est acceptée, et ne change rien d’autre`, async () => {
+      constater(await scénarios[`${paquet}:1+nav`](), 1, `${paquet}, \`pnpm test 1 --navigateur\``);
     });
   }
 
@@ -557,13 +582,13 @@ test('rétrocompatibilité [niveau 3]', () => {});
 
   // Points 7, 8 et 9 : la CI, jouée à blanc.
 
-  test('au Ready, la CI vérifie au seuil 1, plus les tests navigateur au seuil 2', () => {
+  test('au Ready, la CI vérifie au seuil 1, et active les tests navigateur au seuil 2', () => {
     const tests = étapesDeTests(lire(CI), auReady);
     const suite = tests.filter((t) => !t.navigateur);
     assert.ok(suite.length, `${CI} : aucune étape ne joue les tests au passage en Ready`);
     for (const t of suite) assert.equal(t.seuil, 1, `${CI} : au Ready, « ${t.job.nom} » joue les tests au seuil ${t.seuil}, attendu 1 (#232, point 7)`);
     const navigateur = tests.filter((t) => t.navigateur && t.seuil === 2 && !laisseÉchouer(t.job, t.é));
-    assert.ok(navigateur.length, `${CI} : au Ready, aucune étape bloquante ne joue les tests navigateur (\`test/navigateur\`) au seuil 2 (#232, point 7)`);
+    assert.ok(navigateur.length, `${CI} : au Ready, aucune étape bloquante n'active les tests navigateur (\`--navigateur\`) au seuil 2 (#232, point 7)`);
   });
 
   test('au Ready, une étape bloquante joue le harnais du besoin, par sa définition commune', () => {
@@ -573,10 +598,12 @@ test('rétrocompatibilité [niveau 3]', () => {});
     for (const { job, é } of harnais) assert.ok(!laisseÉchouer(job, é), `${CI} : le harnais du besoin, dans « ${job.nom} », ne doit pas se laisser échouer (#232, point 9)`);
   });
 
-  test('au tag v*, la CI vérifie au seuil 3 avant de publier', () => {
+  test('au tag v*, la CI vérifie au seuil 3, tests navigateur activés, avant de publier', () => {
     const yaml = lire(CI);
-    const au3 = étapesDeTests(yaml, auTag).filter((t) => t.seuil >= 3);
+    const tag = étapesDeTests(yaml, auTag);
+    const au3 = tag.filter((t) => t.seuil >= 3);
     assert.ok(au3.length, `${CI} : au tag v*, aucune étape ne joue les tests au seuil 3 (#232, point 8)`);
+    assert.ok(au3.some((t) => t.navigateur), `${CI} : au tag v*, les tests au seuil 3 activent les tests navigateur (\`--navigateur\`) (#232, point 8)`);
     assert.ok(jouer(yaml, auTag).some((job) => job.joués.some(publie)), `${CI} : au tag v*, rien ne publie ; le harnais de #232 est à relire`);
     const rouges = new Set(au3.map((t) => t.é.texte));
     const publiéQuandMême = jouer(yaml, auTag, (é) => rouges.has(é.texte)).filter((job) => job.joués.some(publie)).map((j) => j.nom);
