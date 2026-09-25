@@ -187,7 +187,7 @@ for (const lance of lances) {
   for (const l of journal.split('\n')) {
     if (/# SKIP/.test(l)) console.log(`${niveau} : test sauté (${nom}) : ${l.trim()}`);
     // Ce que le seuil écarte se dit (#232) : la ligne du lanceur.
-    else if (/^seuil .* écarté\(s\)/.test(l.trim()) && !/ 0 test\(s\) écarté/.test(l)) console.log(`${niveau} : ${nom}, ${l.trim()}`);
+    else if (/^seuil .* écarté\(s\)/.test(l) && !/ 0 test\(s\) écarté/.test(l)) console.log(`${niveau} : ${nom}, ${l.trim()}`);
   }
   const code = (lire(join(journaux, `${nom}.code`)) ?? '1').trim();
   if (code === '0') continue;

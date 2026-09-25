@@ -170,68 +170,70 @@ function vérifierLeTexte(r: { tropPetits: string[]; tropPâles: string[] }, éc
  * gris pâle. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur :
  * ce sont les seuils qu'on garde ici, pas une seconde mesure de l'application.
  */
-it.fails('témoin rouge · un écran aux cibles de 20 px et au texte gris pâle', () => {
-  vérifierLesCibles({ tropPetites: ['Modifier — 20×20'], collés: ['Supprimer à 2 px de Modifier'] }, 'inventé');
-  vérifierLeTexte({ tropPetits: ['« Solde à régler » à 9 px'], tropPâles: ['« Solde à régler » 2.10:1 (rgb(180, 180, 180) sur fond)'] }, 'inventé');
-});
-
-describe.skipIf(!navigateur)('ergonomie au doigt', () => {
-  let site: Site;
-
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-  }, 120_000);
-
-  afterAll(async () => {
-    await site?.fermer();
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un écran aux cibles de 20 px et au texte gris pâle', () => {
+    vérifierLesCibles({ tropPetites: ['Modifier — 20×20'], collés: ['Supprimer à 2 px de Modifier'] }, 'inventé');
+    vérifierLeTexte({ tropPetits: ['« Solde à régler » à 9 px'], tropPâles: ['« Solde à régler » 2.10:1 (rgb(180, 180, 180) sur fond)'] }, 'inventé');
   });
 
-  /** Les écrans où l'on passe du temps, et où l'on agit ligne par ligne. */
-  const ÉCRANS: Array<{ nom: string; onglet: string; suite?: (page: Page) => Promise<void> }> = [
-    { nom: 'Plan', onglet: 'Plan' },
-    { nom: 'Opérations', onglet: 'Opérations' },
-    { nom: 'Bilan', onglet: 'Bilan' },
-    {
-      nom: 'Tirelires',
-      onglet: 'Plus',
-      suite: async (page) => {
-        await cliquer(page, 'Tirelires');
+  describe.skipIf(!navigateur)('ergonomie au doigt', () => {
+    let site: Site;
+
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+    }, 120_000);
+
+    afterAll(async () => {
+      await site?.fermer();
+    });
+
+    /** Les écrans où l'on passe du temps, et où l'on agit ligne par ligne. */
+    const ÉCRANS: Array<{ nom: string; onglet: string; suite?: (page: Page) => Promise<void> }> = [
+      { nom: 'Plan', onglet: 'Plan' },
+      { nom: 'Opérations', onglet: 'Opérations' },
+      { nom: 'Bilan', onglet: 'Bilan' },
+      {
+        nom: 'Tirelires',
+        onglet: 'Plus',
+        suite: async (page) => {
+          await cliquer(page, 'Tirelires');
+        },
       },
-    },
-  ];
+    ];
 
-  for (const écran of ÉCRANS) {
-    it(`${écran.nom} : rien de plus petit que ${CIBLE} px sous le doigt`, async () => {
-      const page = await ouvrirLExemple(site);
-      await allerÀ(page, écran.onglet);
-      await écran.suite?.(page);
-      const r = await page.evaluate(mesurerLesCibles, CIBLE, ÉCART_DESTRUCTIF);
+    for (const écran of ÉCRANS) {
+      it(`${écran.nom} : rien de plus petit que ${CIBLE} px sous le doigt`, async () => {
+        const page = await ouvrirLExemple(site);
+        await allerÀ(page, écran.onglet);
+        await écran.suite?.(page);
+        const r = await page.evaluate(mesurerLesCibles, CIBLE, ÉCART_DESTRUCTIF);
+        await page.close();
+
+        vérifierLesCibles(r, écran.nom);
+      }, 60_000);
+
+      it(`${écran.nom} : rien sous ${TEXTE} px ni sous ${CONTRASTE}:1`, async () => {
+        const page = await ouvrirLExemple(site);
+        await allerÀ(page, écran.onglet);
+        await écran.suite?.(page);
+        const r = await page.evaluate(mesurerLeTexte, TEXTE, CONTRASTE);
+        await page.close();
+
+        vérifierLeTexte(r, écran.nom);
+      }, 60_000);
+    }
+
+    it('un champ atteint ne passe pas sous la barre d’onglets, clavier ouvert', async () => {
+      // 375 × 380 : ce qui reste d'un écran de téléphone quand le clavier logiciel occupe le bas.
+      const page = await ouvrirLExemple(site, 375, 380);
+      await allerÀ(page, 'Plus');
+      await cliquer(page, 'Tirelires');
+      await cliquer(page, 'Ajouter une tirelire');
+      const r = await page.evaluate(mesurerLOcclusion);
       await page.close();
 
-      vérifierLesCibles(r, écran.nom);
+      expect(r.champs, 'aucun champ trouvé : le formulaire ne s’est pas ouvert').toBeGreaterThan(0);
+      expect(r.masqués, 'un champ mis au point reste sous une barre fixe').toEqual([]);
     }, 60_000);
-
-    it(`${écran.nom} : rien sous ${TEXTE} px ni sous ${CONTRASTE}:1`, async () => {
-      const page = await ouvrirLExemple(site);
-      await allerÀ(page, écran.onglet);
-      await écran.suite?.(page);
-      const r = await page.evaluate(mesurerLeTexte, TEXTE, CONTRASTE);
-      await page.close();
-
-      vérifierLeTexte(r, écran.nom);
-    }, 60_000);
-  }
-
-  it('un champ atteint ne passe pas sous la barre d’onglets, clavier ouvert', async () => {
-    // 375 × 380 : ce qui reste d'un écran de téléphone quand le clavier logiciel occupe le bas.
-    const page = await ouvrirLExemple(site, 375, 380);
-    await allerÀ(page, 'Plus');
-    await cliquer(page, 'Tirelires');
-    await cliquer(page, 'Ajouter une tirelire');
-    const r = await page.evaluate(mesurerLOcclusion);
-    await page.close();
-
-    expect(r.champs, 'aucun champ trouvé : le formulaire ne s’est pas ouvert').toBeGreaterThan(0);
-    expect(r.masqués, 'un champ mis au point reste sous une barre fixe').toEqual([]);
-  }, 60_000);
+  });
 });

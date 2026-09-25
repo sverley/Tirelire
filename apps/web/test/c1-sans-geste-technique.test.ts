@@ -90,32 +90,34 @@ function vérifierBalayage(quoi: string, textes: string[], lire: (texte: string)
   expect(fautifs, `geste technique trouvé dans ${quoi} :\n${fautifs.join('\n')}`).toEqual([]);
 }
 
-describe('C1 · aucun geste technique dans les textes de l’interface (issue #73)', () => {
-  it('aucun fichier de apps/web/src ne porte un des motifs interdits', () => {
-    const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map(depuisLaRacine);
-    for (const suffixe of ['.svelte', '.ts'])
-      expect(
-        balayés.some((c) => c.endsWith(suffixe)),
-        `aucun fichier ${suffixe} balayé : de ce côté, C1 ne garderait plus rien`,
-      ).toBe(true);
-    vérifierBalayage('l’interface', balayés, (c) => readFileSync(join(RACINE, c), 'utf8'));
-  });
+describe('[niveau 1] harnais du registre', () => {
+  describe('C1 · aucun geste technique dans les textes de l’interface (issue #73)', () => {
+    it('aucun fichier de apps/web/src ne porte un des motifs interdits', () => {
+      const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map(depuisLaRacine);
+      for (const suffixe of ['.svelte', '.ts'])
+        expect(
+          balayés.some((c) => c.endsWith(suffixe)),
+          `aucun fichier ${suffixe} balayé : de ce côté, C1 ne garderait plus rien`,
+        ).toBe(true);
+      vérifierBalayage('l’interface', balayés, (c) => readFileSync(join(RACINE, c), 'utf8'));
+    });
 
-  it('ni index.html ni le manifeste de vite.config.ts ne portent un des motifs interdits', () => {
-    const textes = new Map<string, string>([
-      ['index.html', readFileSync(join(RACINE, 'index.html'), 'utf8')],
-      ...textesDuManifeste(readFileSync(join(RACINE, 'vite.config.ts'), 'utf8')),
-    ]);
-    expect(
-      [...textes.keys()],
-      'le manifeste ne livre plus ses trois textes : champ renommé, guillemets changés ? de ce côté, C1 ne garderait plus rien',
-    ).toEqual([
-      'index.html',
-      'vite.config.ts · manifest.name',
-      'vite.config.ts · manifest.short_name',
-      'vite.config.ts · manifest.description',
-    ]);
-    vérifierBalayage('un texte affiché hors de l’interface', [...textes.keys()], (nom) => textes.get(nom) ?? '');
+    it('ni index.html ni le manifeste de vite.config.ts ne portent un des motifs interdits', () => {
+      const textes = new Map<string, string>([
+        ['index.html', readFileSync(join(RACINE, 'index.html'), 'utf8')],
+        ...textesDuManifeste(readFileSync(join(RACINE, 'vite.config.ts'), 'utf8')),
+      ]);
+      expect(
+        [...textes.keys()],
+        'le manifeste ne livre plus ses trois textes : champ renommé, guillemets changés ? de ce côté, C1 ne garderait plus rien',
+      ).toEqual([
+        'index.html',
+        'vite.config.ts · manifest.name',
+        'vite.config.ts · manifest.short_name',
+        'vite.config.ts · manifest.description',
+      ]);
+      vérifierBalayage('un texte affiché hors de l’interface', [...textes.keys()], (nom) => textes.get(nom) ?? '');
+    });
   });
 });
 
@@ -123,18 +125,22 @@ describe('C1 · aucun geste technique dans les textes de l’interface (issue #7
  * Témoin rouge du balayage de l'interface : les mêmes assertions rejouées sur un écran inventé qui
  * invite à ouvrir un terminal. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-it.fails('témoin rouge · un texte d’interface qui invite à ouvrir un terminal', () => {
-  vérifierBalayage('l’interface', ['src/views/Reglages.svelte'], () => '<p>Ouvrez un terminal et lancez `pnpm install` puis `node serveur.js`.</p>');
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un texte d’interface qui invite à ouvrir un terminal', () => {
+    vérifierBalayage('l’interface', ['src/views/Reglages.svelte'], () => '<p>Ouvrez un terminal et lancez `pnpm install` puis `node serveur.js`.</p>');
+  });
 });
 
 /**
  * Témoin rouge du second temps : les mêmes assertions rejouées sur un manifeste inventé dont la
  * description fait ouvrir un terminal. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-it.fails('témoin rouge · un manifeste dont la description fait ouvrir un terminal', () => {
-  vérifierBalayage(
-    'un texte affiché hors de l’interface',
-    ['vite.config.ts · manifest.description'],
-    () => 'Comptes de la famille. Pour sauvegarder, ouvrez un terminal.',
-  );
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un manifeste dont la description fait ouvrir un terminal', () => {
+    vérifierBalayage(
+      'un texte affiché hors de l’interface',
+      ['vite.config.ts · manifest.description'],
+      () => 'Comptes de la famille. Pour sauvegarder, ouvrez un terminal.',
+    );
+  });
 });

@@ -59,10 +59,12 @@ function vérifierAbsenceCaméra(fichiers: string[], lire: (f: string) => string
   expect(fautifs, `dépendance caméra/QR trouvée hors synchronisation :\n${fautifs.join('\n')}`).toEqual([]);
 }
 
-describe('C2 · les parcours essentiels passent sans caméra ni QR code (issue #73)', () => {
-  it('aucun fichier essentiel ne fait appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts', () => {
-    const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map((c) => relative(RACINE, c).split('\\').join('/'));
-    vérifierAbsenceCaméra(balayés, (c) => readFileSync(join(RACINE, c), 'utf8'), FICHIERS_TOLÉRÉS);
+describe('[niveau 1] harnais du registre', () => {
+  describe('C2 · les parcours essentiels passent sans caméra ni QR code (issue #73)', () => {
+    it('aucun fichier essentiel ne fait appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts', () => {
+      const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map((c) => relative(RACINE, c).split('\\').join('/'));
+      vérifierAbsenceCaméra(balayés, (c) => readFileSync(join(RACINE, c), 'utf8'), FICHIERS_TOLÉRÉS);
+    });
   });
 });
 
@@ -70,10 +72,12 @@ describe('C2 · les parcours essentiels passent sans caméra ni QR code (issue #
  * Témoin rouge : les mêmes assertions rejouées sur un écran essentiel inventé — un Plan qui
  * appellerait `BarcodeDetector`. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-it.fails('témoin rouge · un écran essentiel qui dépend de BarcodeDetector', () => {
-  vérifierAbsenceCaméra(
-    ['src/views/Plan.svelte'],
-    () => "const détecteur = new BarcodeDetector({ formats: ['qr_code'] });",
-    FICHIERS_TOLÉRÉS,
-  );
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un écran essentiel qui dépend de BarcodeDetector', () => {
+    vérifierAbsenceCaméra(
+      ['src/views/Plan.svelte'],
+      () => "const détecteur = new BarcodeDetector({ formats: ['qr_code'] });",
+      FICHIERS_TOLÉRÉS,
+    );
+  });
 });

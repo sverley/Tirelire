@@ -23,7 +23,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import test, { describe } from 'node:test';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const RACINE = path.resolve(ICI, '../..');
@@ -440,16 +440,18 @@ function écartsDépôt(liste) {
   return écarts;
 }
 
-test('#155 · les identifiants FTP restent hors de portée du code des PR', () => {
-  const liste = workflows();
-  assert.deepEqual(écartsDépôt(liste), [], 'des identifiants FTP sont à portée du code d’une PR');
-  const dépôt = trouver(/apercu\.sh\s+deposer/);
-  const retrait = trouver(/apercu\.sh\s+retirer/);
-  assert.ok(dépôt && retrait, 'le dépôt ou le retrait de l’aperçu a disparu');
-  for (const j of [dépôt, retrait]) {
-    assert.ok(j.w.déclencheurs.has('pull_request_target'), `${j.w.fichier} : le job « ${j.nom} » ne tourne pas depuis main (pull_request_target)`);
-  }
-  assert.match(dépôt.bloc, /download-artifact/, `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas le site en artefact`);
+describe('[niveau 0] harnais du registre', () => {
+  test('#155 · les identifiants FTP restent hors de portée du code des PR', () => {
+    const liste = workflows();
+    assert.deepEqual(écartsDépôt(liste), [], 'des identifiants FTP sont à portée du code d’une PR');
+    const dépôt = trouver(/apercu\.sh\s+deposer/);
+    const retrait = trouver(/apercu\.sh\s+retirer/);
+    assert.ok(dépôt && retrait, 'le dépôt ou le retrait de l’aperçu a disparu');
+    for (const j of [dépôt, retrait]) {
+      assert.ok(j.w.déclencheurs.has('pull_request_target'), `${j.w.fichier} : le job « ${j.nom} » ne tourne pas depuis main (pull_request_target)`);
+    }
+    assert.match(dépôt.bloc, /download-artifact/, `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas le site en artefact`);
+  });
 });
 
 /** Un workflow d'essai, pour le témoin : `on` et `jobs` donnés en texte. */
@@ -464,14 +466,15 @@ ${extra}
         env:
           MOTDEPASSE: \${{ secrets.OVH_FTP_PASSWORD }}`;
 
-test('témoin rouge · un aperçu qui dépose avec des identifiants que le code de la PR peut atteindre', () => {
-  const cas = [
-    // Avant #155 : workflow de la branche, extraction de la PR, installation, sans environnement.
-    ['workflow lu sur la branche', essai('  pull_request:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}\n      - run: pnpm install --frozen-lockfile\n'))],
-    ['sans environnement', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT(''))],
-    ['code de la PR dans le job de dépôt', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - run: pnpm install\n'))],
-    ['extraction de la branche dans le job de dépôt', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: refs/pull/1/head\n'))],
-    ['assemblage avec le cache de main', essai('  pull_request_target:\n    types: [ready_for_review]', `  site:
+describe('[niveau 0] harnais du registre', () => {
+  test('témoin rouge · un aperçu qui dépose avec des identifiants que le code de la PR peut atteindre', () => {
+    const cas = [
+      // Avant #155 : workflow de la branche, extraction de la PR, installation, sans environnement.
+      ['workflow lu sur la branche', essai('  pull_request:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}\n      - run: pnpm install --frozen-lockfile\n'))],
+      ['sans environnement', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT(''))],
+      ['code de la PR dans le job de dépôt', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - run: pnpm install\n'))],
+      ['extraction de la branche dans le job de dépôt', essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: refs/pull/1/head\n'))],
+      ['assemblage avec le cache de main', essai('  pull_request_target:\n    types: [ready_for_review]', `  site:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -480,17 +483,18 @@ test('témoin rouge · un aperçu qui dépose avec des identifiants que le code 
         with:
           cache: pnpm
       - run: pnpm install`)],
-    ['assemblage avec un jeton en écriture', essai('  pull_request_target:\n    types: [ready_for_review]', `  site:
+      ['assemblage avec un jeton en écriture', essai('  pull_request_target:\n    types: [ready_for_review]', `  site:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - run: pnpm install`)],
-  ];
-  for (const [nom, w] of cas) assert.notDeepEqual(écartsDépôt([w]), [], `écart non vu : ${nom}`);
-  // Le témoin vert du même lecteur : la forme attendue ne relève rien.
-  const sain = essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: main\n'));
-  assert.deepEqual(écartsDépôt([sain]), []);
+    ];
+    for (const [nom, w] of cas) assert.notDeepEqual(écartsDépôt([w]), [], `écart non vu : ${nom}`);
+    // Le témoin vert du même lecteur : la forme attendue ne relève rien.
+    const sain = essai('  pull_request_target:\n    types: [ready_for_review]', JOB_DÉPÔT('    environment: depot-ftp').replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: main\n'));
+    assert.deepEqual(écartsDépôt([sain]), []);
+  });
 });
 
 // ─── L'adresse de recette ────────────────────────────────────────────────────────────────────────
