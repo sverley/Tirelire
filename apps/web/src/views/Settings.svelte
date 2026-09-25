@@ -36,6 +36,7 @@
       const bundle = JSON.parse(await file.text()) as StateBundle;
       const r = importBundle(app.store, bundle);
       app.reload();
+      app.showConflicts(r.conflicts);
       msg = `Paquet de ${bundle.name ?? bundle.site} : ${r.applied} lignes mises à jour, ${r.ignored} déjà connues, ${r.stale} plus anciennes que les nôtres${r.conflicts.length ? `, ${r.conflicts.length} modifiées des deux côtés (voir Synchronisation)` : ''}.`;
     } catch (err) {
       msg = `Import impossible : ${err instanceof Error ? err.message : String(err)}`;

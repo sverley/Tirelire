@@ -106,7 +106,7 @@ automatique des flux sûrs → moteur de règles → file de tri (interface).
 
 `LedgerStore` (sql.js) : le fichier est un état (D58). `upsert`, `remove` et `setSetting`
 réécrivent la ligne entière avec une nouvelle horloge ; `receive` fusionne des lignes venues d'une
-autre instance, la plus récente gagne, et garde l'écartée d'un conflit. Ce qui décrit l'instance
+autre instance, la plus récente gagne, et rend l'écartée d'un conflit sans la garder. Ce qui décrit l'instance
 (`InstanceState`) n'est pas dans le fichier : `apps/web/src/lib/db.ts` le garde à côté.
 `sync.ts` : protocole symétrique par delta d'état, transport abstrait ; fichier JSON, WebRTC,
 relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`). Détail :

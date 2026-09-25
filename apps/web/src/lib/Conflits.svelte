@@ -2,8 +2,8 @@
   /**
    * Les lignes modifiées des deux côtés depuis la dernière synchronisation (D58, I10) : pour
    * chacune, ce qu'elle est, la version retenue — la même sur toutes les instances — et celle qui
-   * a été écartée. Rien n'est écarté en silence ; l'utilisateur dit qu'il a vu, et peut reprendre
-   * à la main ce qui l'intéresse dans la version écartée.
+   * a été écartée, telles que la synchronisation qui les a détectées les a rendues. Rien n'est
+   * écarté en silence ; le conflit n'est gardé nulle part (D58), la liste ne vit que la session.
    */
   import type { Conflict, RowState, SqlValue } from '@tirelire/core';
   import { app } from './state.svelte';
@@ -84,7 +84,7 @@
 {#if app.conflicts.length}
   <h2>Modifiées des deux côtés</h2>
   <div class="card warn">
-    <p class="small">Ces lignes ont été modifiées sur deux appareils entre deux synchronisations. Tous les appareils retiennent la même version, la plus récente ; l'autre est écartée. Si l'écartée était la bonne, reprends-la à la main.</p>
+    <p class="small">Ces lignes ont été modifiées sur deux appareils entre deux synchronisations. Tous les appareils retiennent la même version, la plus récente ; l'autre est écartée. Si l'écartée était la bonne, reprends-la à la main : cette liste n'est pas gardée, elle disparaît à la fermeture de l'application.</p>
     {#each app.conflicts as c (c.id)}
       <div class="conflit">
         <strong>{TABLES[c.table] ?? c.table} « {nom(c)} »</strong>

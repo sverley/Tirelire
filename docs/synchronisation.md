@@ -33,8 +33,9 @@ Un message ou un paquet d'un autre format arrête l'échange en le disant, avant
 ## Conflits
 
 Une ligne modifiée des deux côtés sans que l'un ait vu la version de l'autre : les deux instances
-retiennent la plus récente, et chacune garde l'écartée, hors synchronisation, pour la montrer
-(écran Synchronisation, bandeau ailleurs) jusqu'à ce que l'utilisateur l'ait vue.
+retiennent la plus récente, et la synchronisation qui le détecte rend la ligne, la version retenue
+et l'écartée. L'application les montre (écran Synchronisation, bandeau ailleurs) le temps de la
+session ; le conflit n'est gardé nulle part (D58).
 
 ## Ce qui reste à l'instance
 

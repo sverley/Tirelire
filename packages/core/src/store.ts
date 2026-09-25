@@ -4,8 +4,9 @@
  * remplace l'ancienne, et le fichier ne grossit qu'avec les données.
  *
  * Toute écriture locale passe par `upsert` / `remove` / `setSetting` ; ce qui vient d'une autre
- * instance passe par `receive`, qui fusionne ligne par ligne (la plus récente gagne) et garde, pour
- * que l'utilisateur la voie, la version écartée d'une ligne modifiée des deux côtés.
+ * instance passe par `receive`, qui fusionne ligne par ligne (la plus récente gagne) et rend, pour
+ * que l'utilisateur la voie, la version écartée d'une ligne modifiée des deux côtés. Le conflit
+ * n'est gardé nulle part : il se montre à la synchronisation qui le détecte.
  *
  * Ce qui décrit l'instance — son identité, son horloge, ce qu'elle sait des autres, ses curseurs de
  * relais — n'est pas dans le fichier : c'est `InstanceState`, que l'appelant garde à côté
@@ -43,7 +44,7 @@ export interface RowState {
   v: Record<string, SqlValue>;
 }
 
-/** Une ligne modifiée des deux côtés : la version retenue, partout la même, et l'écartée. */
+/** Une ligne modifiée des deux côtés : la version retenue, partout la même, et l'écartée. Jamais gardé. */
 export interface Conflict {
   id: string;
   table: string;
@@ -93,7 +94,7 @@ export const REFUSAL_MESSAGES: Record<RefusalReason, string> = {
   etranger: 'Ce fichier est une base de données, mais pas un fichier Tirelire : il n’en porte pas le marqueur de format.',
   ancien:
     'Ce fichier vient d’une version antérieure de Tirelire, dont le format n’est plus lu : le format a changé avant la première version publiée, sans reprise des anciens fichiers.',
-  recent: 'Ce fichier vient d’une version plus récente de Tirelire, dont le format n’est pas encore lu ici : mettez l’application à jour.',
+  recent: 'Ce fichier vient d’une version plus récente de Tirelire, dont le format n’est pas encore lu ici : mets l’application à jour.',
 };
 
 export interface StoreOptions {
@@ -403,8 +404,8 @@ export class LedgerStore {
   /**
    * Fusionne des lignes venues d'une autre instance, ligne entière, la plus récente gagne,
    * suppression comprise. Une ligne modifiée des deux côtés sans que l'un ait vu l'autre est un
-   * conflit : les deux instances retiennent la même version, et l'écartée est gardée pour être
-   * montrée. Tout ou rien : une ligne illisible refuse le paquet entier, sans rien écrire.
+   * conflit : les deux instances retiennent la même version, et l'écartée est rendue pour être
+   * montrée, sans être gardée. Tout ou rien : une ligne illisible refuse le paquet entier, sans rien écrire.
    */
   receive(rows: RowState[], opts: ReceiveOptions): ReceiveResult {
     for (const row of rows) checkRow(row);
@@ -432,14 +433,6 @@ export class LedgerStore {
                 discarded: incomingWins ? local : row,
                 at: new Date().toISOString(),
               };
-              this.db.run(`INSERT INTO conflicts (id, tbl, row_id, kept, discarded, at) VALUES (?, ?, ?, ?, ?, ?)`, [
-                conflict.id,
-                conflict.table,
-                conflict.rowId,
-                JSON.stringify(conflict.kept),
-                JSON.stringify(conflict.discarded),
-                conflict.at,
-              ]);
               result.conflicts.push(conflict);
             }
           }
@@ -484,24 +477,6 @@ export class LedgerStore {
   setLocal(key: string, value: string | undefined): void {
     if (value === undefined) delete this.local[key];
     else this.local[key] = value;
-    this.notify();
-  }
-
-  /** Conflits rencontrés et pas encore vus par l'utilisateur, du plus ancien au plus récent. */
-  conflicts(): Conflict[] {
-    return this.query(`SELECT * FROM conflicts ORDER BY at, id`).map((r) => ({
-      id: r['id'] as string,
-      table: r['tbl'] as string,
-      rowId: r['row_id'] as string,
-      kept: JSON.parse(r['kept'] as string) as RowState,
-      discarded: JSON.parse(r['discarded'] as string) as RowState,
-      at: r['at'] as string,
-    }));
-  }
-
-  /** L'utilisateur a vu le conflit : il disparaît, la version retenue reste. */
-  dismissConflict(id: string): void {
-    this.db.run(`DELETE FROM conflicts WHERE id = ?`, [id]);
     this.notify();
   }
 

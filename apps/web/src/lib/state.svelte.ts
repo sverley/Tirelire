@@ -37,7 +37,11 @@ class AppState {
    * fichier neuf ou de l'exemple.
    */
   refused = $state<{ message: string; bytes: Uint8Array } | undefined>(undefined);
-  /** Lignes modifiées des deux côtés à la synchronisation, pas encore vues. */
+  /**
+   * Lignes modifiées des deux côtés, rendues par la synchronisation qui les a détectées (D58). Le
+   * conflit est déjà résolu ; il n'est gardé nulle part, ni dans le fichier ni à côté : cette liste
+   * ne vit que le temps de la session.
+   */
   conflicts = $state<Conflict[]>([]);
   private opened: OpenedStore | undefined;
 
@@ -93,13 +97,16 @@ class AppState {
 
   reload(): void {
     this.ledger = this.store.load();
-    this.conflicts = this.store.conflicts();
+  }
+
+  /** Montre les conflits qu'une synchronisation vient de rendre. */
+  showConflicts(conflicts: Conflict[]): void {
+    if (conflicts.length) this.conflicts = [...this.conflicts, ...conflicts];
   }
 
   /** L'utilisateur a vu un conflit. */
   dismissConflict(id: string): void {
-    this.store.dismissConflict(id);
-    this.reload();
+    this.conflicts = this.conflicts.filter((c) => c.id !== id);
   }
 
   upsert<K extends LedgerKey>(key: K, row: Ledger[K][number]): void {

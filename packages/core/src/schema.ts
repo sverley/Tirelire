@@ -264,7 +264,4 @@ export const SYSTEM_SQL = [
   // Le format du fichier et sa version, rien d'autre : ce qui décrit l'instance n'est pas dans le
   // fichier (D58).
   `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)`,
-  // Conflits rencontrés par cette instance : une ligne modifiée des deux côtés, la version retenue
-  // et l'écartée, jusqu'à ce que l'utilisateur les ait vues. Jamais synchronisés.
-  `CREATE TABLE IF NOT EXISTS conflicts (id TEXT PRIMARY KEY, tbl TEXT NOT NULL, row_id TEXT NOT NULL, kept TEXT NOT NULL, discarded TEXT NOT NULL, at TEXT NOT NULL)`,
 ];

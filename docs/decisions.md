@@ -1057,9 +1057,10 @@ que celui-ci savait déjà compléter. Le protocole et les transports de D16 res
 des paquets change.
 
 Une ligne modifiée des deux côtés sans que l'un ait vu la version de l'autre est un **conflit** :
-les deux instances retiennent la même version, la plus récente, et chacune garde l'écartée, hors
-synchronisation, pour la montrer à l'utilisateur jusqu'à ce qu'il l'ait vue (I10, principe 4).
-Une suppression contre une modification en est un. Ce qu'on abandonne : l'historique des valeurs
+les deux instances retiennent la même version, la plus récente, et la synchronisation qui le
+détecte montre à l'utilisateur la ligne, la version retenue et l'écartée (I10, principe 4). Une
+suppression contre une modification en est un. Le conflit est résolu sans être gardé, ni dans le
+fichier ni à côté : c'est au protocole de ne pas en laisser passer un sans le montrer. Ce qu'on abandonne : l'historique des valeurs
 remplacées — un « annuler » futur passera par un journal séparé, régénérable pour le présent, qui
 ne touchera pas à ce format — et la preuve de chaîne, superflue pour un foyer sur relais chiffré.
 La granularité par cellule a été chiffrée et écartée : elle alourdit chaque ligne pour des
@@ -1075,8 +1076,8 @@ usage (I3) :
   l'instance qui l'a faite ; une suppression est une écriture : rien d'une ligne synchronisable ne
   disparaît physiquement. Une ligne réécrite ne laisse rien d'elle dans le fichier.
 - **Ce qui décrit une instance reste à l'instance.** Son identité, son horloge, ce qu'elle sait des
-  autres, les secrets et curseurs du relais ne voyagent ni par la synchronisation ni dans un fichier :
-  l'application les garde à côté du fichier. Deux instances ouvertes depuis le même fichier sont deux
+  autres, les secrets et curseurs du relais et ce qui ne concerne qu'elle ne voyagent ni par la
+  synchronisation ni dans un fichier : l'application les garde à côté du fichier. Deux instances ouvertes depuis le même fichier sont deux
   instances, qui convergent sans perte ; un fichier restauré garde l'identité de l'instance qui le
   restaure, sans rien croire savoir de plus que ses lignes, si bien que synchroniser ne perd rien de
   ce que les autres ont reçu entre-temps.

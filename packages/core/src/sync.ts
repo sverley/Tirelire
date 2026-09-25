@@ -50,7 +50,7 @@ export interface SyncResult {
   conflicts: Conflict[];
 }
 
-const ANCIEN_FORMAT = 'Le paquet vient d’une version antérieure de Tirelire, qui ne parle plus le même format : mettez à jour Tirelire sur cet appareil-là. Rien n’a été écrit.';
+const ANCIEN_FORMAT = 'Le paquet vient d’une version antérieure de Tirelire, qui ne parle plus le même format : mets à jour Tirelire sur cet appareil-là. Rien n’a été écrit.';
 
 /**
  * Vérifie le format d'un message ou d'un paquet reçu ; lève `FormatRefused` sinon, avant toute
@@ -65,8 +65,8 @@ export function checkSyncFormat(msg: unknown): void {
     throw new FormatRefused(
       plusRecent ? 'recent' : 'ancien',
       plusRecent
-        ? `Le paquet vient d’une version plus récente de Tirelire (format ${String(m.version)}, ici ${FORMAT_VERSION}) : mettez à jour Tirelire sur cet appareil. Rien n’a été écrit.`
-        : `Le paquet vient d’une version antérieure de Tirelire (format ${String(m.version)}, ici ${FORMAT_VERSION}) : mettez à jour Tirelire sur l’autre appareil. Rien n’a été écrit.`,
+        ? `Le paquet vient d’une version plus récente de Tirelire (format ${String(m.version)}, ici ${FORMAT_VERSION}) : mets à jour Tirelire sur cet appareil. Rien n’a été écrit.`
+        : `Le paquet vient d’une version antérieure de Tirelire (format ${String(m.version)}, ici ${FORMAT_VERSION}) : mets à jour Tirelire sur l’autre appareil. Rien n’a été écrit.`,
     );
   }
   // Le format d'avant D58 : un journal de changements (`tirelire-changes`, ou des messages sans format).
