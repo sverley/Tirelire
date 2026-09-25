@@ -418,7 +418,8 @@ export function etapeTestsStricte(yaml) {
     }
     return false;
   };
-  const etape = lignes.findIndex((l) => /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test$/.test(l));
+  // `pnpm test`, ou `pnpm test N` : le seuil des niveaux de tests (#232).
+  const etape = lignes.findIndex((l) => /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test(?:\s+[0-4])?$/.test(l));
   if (etape < 0) return false;
   let tiret = etape;
   if (!/^\s*-\s/.test(lignes[etape])) {
@@ -533,8 +534,13 @@ function fermante(masque, ouvrante) {
   return masque.length;
 }
 
-/** Suites et tests d'un fichier, et les titres de ceux qui tournent. */
-export function analyserTests(source) {
+/**
+ * Appels de tests d'un fichier, dans l'ordre du texte : titre (`null` s'il n'est pas écrit en toutes
+ * lettres), suite ou test, désactivé, conditionnel, et les suites qui l'englobent, de la plus
+ * lointaine à la plus proche (`englobantes`). Sert à `analyserTests`, et à la lecture des niveaux
+ * (`niveaux.mjs`, #232).
+ */
+export function appelsDeTests(source) {
   const { masque, chaines } = masquer(source);
   const appels = [];
   for (const m of masque.matchAll(APPEL_DE_TEST)) {
@@ -561,9 +567,16 @@ export function analyserTests(source) {
       conditionnel ||= /\b(?:skip|todo)\s*:\s*(?!true\b|false\b|null\b|undefined\b|0\b|['"`])\S/.test(texteOptions);
     }
     const titre = chaine?.valeur == null ? null : chaine.valeur.replace(/\s+/g, ' ').trim();
-    appels.push({ titre, suite: m[2] === 'describe' || m[2] === 'suite', inactif, conditionnel, ouvrante, fin });
+    appels.push({ titre, suite: m[2] === 'describe' || m[2] === 'suite', inactif, conditionnel, debut: m.index, ouvrante, fin });
   }
-  const englobantes = (a) => appels.filter((b) => b !== a && b.suite && b.ouvrante < a.ouvrante && a.ouvrante < b.fin);
+  for (const a of appels) a.englobantes = appels.filter((b) => b !== a && b.suite && b.ouvrante < a.ouvrante && a.ouvrante < b.fin);
+  return appels;
+}
+
+/** Suites et tests d'un fichier, et les titres de ceux qui tournent. */
+export function analyserTests(source) {
+  const appels = appelsDeTests(source);
+  const englobantes = (a) => a.englobantes;
   const tourne = (a) =>
     !a.inactif &&
     !englobantes(a).some((b) => b.inactif) &&
