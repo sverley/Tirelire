@@ -1410,12 +1410,14 @@ version en sert un seul.
 
 ### D87 · Une version : un usage garanti sur des cibles
 
-Une version garantit un usage sur un ensemble de cibles ; elle naît d'une case « prioritaire » de la
-matrice des cibles et se définit dans `docs/versions.md` : son usage, ses cibles, son critère de
-fin, son tag. La fin d'une version d'usage est le croisement d'une cible et d'un usage : le parcours
-de son usage (I3) vert sur chacune de ses cibles, et les vérifications manuelles du porteur ; le tag
-de son nom la publie (D83). Une version livrée ne régresse pas : ce que son critère de fin tient
-vert le reste à chaque PR.
+Une version garantit un usage sur un ensemble de cibles ; elle se définit dans `docs/versions.md` :
+son usage, ses cibles, son critère de fin, son tag. Une version se travaille quand sa case de la
+matrice des cibles devient « prioritaire » ; elle peut être prévue avant, et l'ordre du catalogue
+est l'ordre de travail : une version prévue attend que les précédentes soient publiées. La fin d'une
+version d'usage est le croisement d'une cible et d'un usage : le parcours de son usage (I3) vert sur
+chacune de ses cibles, et les vérifications manuelles du porteur ; le tag de son nom la publie
+(D83). Une version livrée ne régresse pas : ce que son critère de fin tient vert le reste à chaque
+PR.
 
 Le socle ne garantit aucun usage : il intègre les contraintes structurelles de tous les usages et de
 toutes les cibles actives — données, sauvegarde, synchronisation, versions d'instances,
