@@ -813,8 +813,8 @@ charges période après période : ce n'est pas ce que le plan fait, et il ne le
 ### D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
 Reprise du signalement « le jeu d'exemple ne contient aucun besoin ». Le défaut
-principal n'existe plus : depuis D50 et D51, chaque tirelire de `example.ts` porte au moins un besoin, et le plan de
-la période en cours les demande en gardant une marge positive.
+principal n'existe plus : depuis D50 et D51, chaque tirelire de `example.ts` porte au moins un besoin, et la marge du
+plan de la période en cours est positive, mais inférieure à ce qu'il demande (`exemple-complet.test.ts`).
 Rien n'était à corriger de ce côté. Restaient les deux points que le même signalement soulevait
 en second, et qui tenaient toujours.
 
