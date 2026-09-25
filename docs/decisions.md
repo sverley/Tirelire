@@ -1301,10 +1301,10 @@ de niveau 4. La règle est un harnais de la garde, celui de #232 (`niveaux-des-t
 une logique de l'outil ; tout ce qui y entre se jouant à chaque fusion, la garde reste petite
 (principe 12).
 
-Un harnais du registre ou de la garde a une forme normale : un fichier de tests de niveau 0 et 1, que
-le registre cite en entier, et, s'il le faut, un fichier compagnon, hors registre, pour les tests de
-niveau 2 à 4 du même besoin. Les données lourdes (instantanés, jeux d'essai) vont dans des fichiers de
-données, que seuls les tests qui en ont besoin chargent.
+Un harnais du registre ou de la garde a une forme normale : un fichier de tests de niveau 0 et 1,
+que le registre cite en entier, et, s'il le faut, un second fichier, hors registre, pour les tests
+de niveau 2 à 4 du même besoin. Les données lourdes (instantanés, jeux d'essai) vont dans des
+fichiers de données, que seuls les tests qui en ont besoin chargent.
 
 ### D82 · Vérifier, valider : brouillon, Ready, aperçu
 
@@ -1379,14 +1379,14 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Publication d'une version (tag `v*`) | 3, tests navigateur activés |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
 
-- **Le harnais du besoin** est le ou les fichiers de l'auditeur — son harnais et son compagnon
-  éventuel (D81) —, et eux seuls : l'auditeur les nomme dans l'issue (« Harnais : chemins »), à côté
-  de la branche, et inscrit dans les trois premières lignes de chacun « Harnais d'audit de #<n> », le
-  numéro de l'issue, que porte aussi le nom de la branche (`audit/<n>-…`) : les crochets et la CI les
-  reconnaissent ainsi sans lire l'issue
-  (`.githooks/harnais-du-besoin.sh`, définition commune). Il se joue en entier, niveau 4 compris, à
-  chaque moment. Les autres fichiers de test que la branche ajoute ou modifie, ceux du codeur
-  compris, n'en font pas partie : ils se jouent à leur niveau.
+- **Le harnais du besoin** est le ou les fichiers de l'auditeur — son harnais et, s'il y en a un,
+  son second fichier éventuel (D81) —, et eux seuls : l'auditeur les nomme dans l'issue (« Harnais :
+  chemins »), à côté de la branche, et inscrit dans les trois premières lignes de chacun « Harnais
+  d'audit de #<n> », le numéro de l'issue, que porte aussi le nom de la branche (`audit/<n>-…`) :
+  les crochets et la CI les reconnaissent ainsi sans lire l'issue (`.githooks/harnais-du-besoin.sh`,
+  définition commune). Il se joue en entier, niveau 4 compris, à chaque moment. Les autres fichiers
+  de test que la branche ajoute ou modifie, ceux du codeur compris, n'en font pas partie : ils se
+  jouent à leur niveau.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
