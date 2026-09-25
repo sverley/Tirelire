@@ -51,16 +51,16 @@ travail : une version prévue attend que les précédentes soient publiées (D87
 
 - **Usage** · U3 · Budget sans virements validés, puis import.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
-- **Fin** · le parcours U3 d'I3 est vert — son harnais reste à bâtir (dette d'I3 au registre), et le porteur a
-  fait `VM-I3-u3-rapprochement` sur chacune des deux cibles.
+- **Fin** · le parcours U3 d'I3 est vert — son harnais reste à bâtir (dette d'I3 au registre), et le
+  porteur a fait `VM-I3-u3-rapprochement` sur chacune des deux cibles.
 - **Tag** · `v3`.
 
 ## v4 · Budget reconstruit
 
 - **Usage** · U4 · Budget reconstruit depuis l'historique.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
-- **Fin** · le parcours U4 d'I3 est vert — son harnais reste à bâtir (dette d'I3 au registre), et le porteur a
-  fait `VM-I3-u4-reconstruction` sur chacune des deux cibles.
+- **Fin** · le parcours U4 d'I3 est vert — son harnais reste à bâtir (dette d'I3 au registre), et le
+  porteur a fait `VM-I3-u4-reconstruction` sur chacune des deux cibles.
 - **Tag** · `v4`.
 
 ## v5 · Import seul
