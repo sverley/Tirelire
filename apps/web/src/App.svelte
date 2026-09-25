@@ -62,7 +62,7 @@
     <div class="card warn" role="alert">
       <h2 style="margin-top:0">Ces données ne s'ouvrent pas ici</h2>
       <p>{app.refused.message}</p>
-      <p class="small">Rien n'a été effacé. Enregistre-les d'abord si tu veux les garder, telles quelles, puis repars d'un fichier neuf ou de l'exemple : c'est seulement à ce moment qu'elles seront remplacées.</p>
+      <p class="small">Rien n'a été effacé. Enregistrez-les d'abord si vous voulez les garder, telles quelles, puis repartez d'un fichier neuf ou de l'exemple : c'est seulement à ce moment qu'elles seront remplacées.</p>
       <div class="actions" style="margin-bottom:0">
         <button class="btn" onclick={() => saveFile('tirelire-ancien-format.sqlite', app.refused!.bytes, 'application/x-sqlite3')}>Enregistrer ces données telles quelles</button>
         <button class="btn primary" onclick={() => app.startOver(false)}>Repartir d'un fichier neuf</button>
@@ -94,7 +94,7 @@
     {#if app.conflicts.length && app.view !== 'sync'}
       <div class="card warn">
         <div class="row">
-          <div class="label"><strong>{app.conflicts.length === 1 ? 'Une ligne modifiée' : `${app.conflicts.length} lignes modifiées`} des deux côtés à la synchronisation</strong><span class="sub">Une version a été retenue, l'autre écartée : regarde lesquelles.</span></div>
+          <div class="label"><strong>{app.conflicts.length === 1 ? 'Une ligne modifiée' : `${app.conflicts.length} lignes modifiées`} des deux côtés à la synchronisation</strong><span class="sub">Une version a été retenue, l'autre écartée : voyez lesquelles.</span></div>
           <button class="btn small primary" onclick={() => app.go('sync')}>Voir</button>
         </div>
       </div>

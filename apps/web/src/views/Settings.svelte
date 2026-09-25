@@ -93,7 +93,7 @@
       await app.importFile(bytes);
       msg = 'Fichier importé.';
     } catch (err) {
-      msg = `Import impossible : ${err instanceof Error ? err.message : String(err)} Tes données n’ont pas changé.`;
+      msg = `Import impossible : ${err instanceof Error ? err.message : String(err)} Vos données n’ont pas changé.`;
     }
     input.value = '';
   }
@@ -159,7 +159,7 @@
 
 <h2>Synchronisation entre appareils</h2>
 <div class="card">
-  <p class="small muted">Sans réseau : exporte un paquet ici, importe-le sur l'autre appareil, et inversement. Chaque appareil retient ce que les autres savaient au dernier échange ; les paquets peuvent se recouvrir sans risque.</p>
+  <p class="small muted">Sans réseau : exportez un paquet ici, importez-le sur l'autre appareil, et inversement. Chaque appareil retient ce que les autres savaient au dernier échange ; les paquets peuvent se recouvrir sans risque.</p>
   <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
     <label class="f">Nom de cet appareil <input bind:value={deviceName} placeholder="Téléphone" /></label>
     <button class="btn" onclick={saveDeviceName}>Enregistrer</button>

@@ -94,7 +94,7 @@ export const REFUSAL_MESSAGES: Record<RefusalReason, string> = {
   etranger: 'Ce fichier est une base de données, mais pas un fichier Tirelire : il n’en porte pas le marqueur de format.',
   ancien:
     'Ce fichier vient d’une version antérieure de Tirelire, dont le format n’est plus lu : le format a changé avant la première version publiée, sans reprise des anciens fichiers.',
-  recent: 'Ce fichier vient d’une version plus récente de Tirelire, dont le format n’est pas encore lu ici : mets l’application à jour.',
+  recent: 'Ce fichier vient d’une version plus récente de Tirelire, dont le format n’est pas encore lu ici : mettez l’application à jour.',
 };
 
 export interface StoreOptions {

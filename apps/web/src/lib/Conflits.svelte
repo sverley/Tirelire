@@ -84,7 +84,7 @@
 {#if app.conflicts.length}
   <h2>Modifiées des deux côtés</h2>
   <div class="card warn">
-    <p class="small">Ces lignes ont été modifiées sur deux appareils entre deux synchronisations. Tous les appareils retiennent la même version, la plus récente ; l'autre est écartée. Si l'écartée était la bonne, reprends-la à la main : cette liste n'est pas gardée, elle disparaît à la fermeture de l'application.</p>
+    <p class="small">Ces lignes ont été modifiées sur deux appareils entre deux synchronisations. Tous les appareils retiennent la même version, la plus récente ; l'autre est écartée. Si l'écartée était la bonne, reprenez-la à la main : cette liste n'est pas gardée, elle disparaît à la fermeture de l'application.</p>
     {#each app.conflicts as c (c.id)}
       <div class="conflit">
         <strong>{TABLES[c.table] ?? c.table} « {nom(c)} »</strong>
