@@ -5,11 +5,18 @@
  * **Le contrat.** Un test porte son niveau, de 0 à 4, par la marque `[niveau N]` dans son titre ; la
  * marque du test l'emporte, sinon celle de la suite la plus proche qui l'englobe ; sans marque, il
  * est de niveau 2. Le niveau se lit donc dans le fichier, sans l'exécuter. L'outil de test prend le
- * seuil en entrée par la variable `TIRELIRE_VERIFICATION` (lecture de l'auditeur, acceptée par le
- * porteur) : au seuil N, `pnpm test` et le script `test` de chaque paquet ne jouent que les tests de
- * niveau N ou moins, et disent combien ils en écartent, sur une ligne qui parle d'« écarté(s) » ;
- * sans entrée, le seuil est 2. Un test s'appelle nommément par le filtre de nom de son exécuteur
- * (`-t` de vitest, `--test-name-pattern` de `node --test`), quel que soit son niveau.
+ * seuil en entrée : `pnpm test [N]`, N facultatif, 2 sans entrée (le porteur, #232). Le script `test`
+ * de chaque paquet prend la même entrée, en premier argument, avant ce qu'il reçoit d'autre
+ * (fichiers, filtres) : lecture de l'auditeur, puisque les crochets jouent paquet par paquet. Au
+ * seuil N ne se jouent que les tests de niveau N ou moins, et le nombre d'écartés se dit sur une
+ * ligne qui parle d'« écarté(s) ». Un test s'appelle nommément par le filtre de nom de son
+ * exécuteur (`-t` de vitest, `--test-name-pattern` de `node --test`), quel que soit son niveau.
+ *
+ * **Le harnais du besoin** est le fichier de l'auditeur, et lui seul : nommé dans l'issue, il porte
+ * le numéro de l'issue (ici, la première ligne de ce fichier). Dans la copie du dépôt des crochets,
+ * la branche suit la forme des branches d'audit (`audit/<n>-…`) et le harnais porte « Harnais
+ * d'audit de #<n> » ; un autre fichier de test que la branche ajoute, celui d'un codeur, se joue à
+ * son niveau.
  *
  * **Ce que ce fichier vérifie**, point par point du « Fait quand » :
  *
@@ -19,8 +26,8 @@
  *   test joué se note dans un fichier témoin. Le cœur et la garde font la matrice complète ;
  *   l'interface, le relais et l'hébergement, un seuil chacun ;
  * - 5, 6 et 9 (crochets) : dans une copie du dépôt, sans ses tests, un test déjà sur `main` (la
- *   non-régression) et un test que la branche ajoute (le harnais du besoin, définition de D83) sont
- *   joués par le vrai pré-commit, puis par la vraie livraison (pré-push) ;
+ *   non-régression), le harnais du besoin et un test du codeur, tous deux ajoutés par la branche,
+ *   sont joués par le vrai pré-commit, puis par la vraie livraison (pré-push) ;
  * - 7, 8 et 9 (CI) : `ci.yml` est joué à blanc au passage en Ready et au tag `v*` ;
  * - 10 : la règle des harnais, sur le dépôt réel, avec ses témoins rouges.
  *
@@ -46,9 +53,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { RACINE, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
-import { commande, interpoler, jouer } from './workflow-a-blanc.mjs';
+import { commande, jouer } from './workflow-a-blanc.mjs';
 
-const VARIABLE = 'TIRELIRE_VERIFICATION';
 const NIVEAUX = Object.freeze([0, 1, 2, 3, 4]);
 const MARQUE = /\[niveau ([0-4])\]/;
 const DÉFAUT = 2;
@@ -207,9 +213,10 @@ const FIXTURE = Object.freeze([
 ]);
 const TOUT = FIXTURE.map((t) => t.id).sort();
 
-function source(exécuteur, nom) {
+function source(exécuteur, nom, entête) {
   const module = exécuteur === 'vitest' ? 'vitest' : 'node:test';
   const lignes = [
+    ...(entête ? [`// ${entête}`] : []),
     "import { appendFileSync } from 'node:fs';",
     `import { describe, test } from '${module}';`,
     `const note = (id) => { if (process.env.NIVEAUX_TEMOIN) appendFileSync(process.env.NIVEAUX_TEMOIN, '${nom}:' + id + '\\n'); };`,
@@ -238,7 +245,7 @@ const PAQUETS = Object.freeze({
 /** L'environnement d'un lancement : sans seuil hérité, sans contexte de test ni de git. */
 function environnement(extra = {}) {
   const env = { ...process.env };
-  for (const k of Object.keys(env)) if (k === VARIABLE || k === 'NODE_TEST_CONTEXT' || k.startsWith('VITEST') || k.startsWith('GIT_')) delete env[k];
+  for (const k of Object.keys(env)) if (k === 'NODE_TEST_CONTEXT' || k.startsWith('VITEST') || k.startsWith('GIT_')) delete env[k];
   for (const [k, v] of Object.entries(extra)) if (v !== undefined) env[k] = String(v);
   return env;
 }
@@ -294,9 +301,10 @@ async function jouerFixture(nomPaquet, { seuil, nommé } = {}) {
     writeFileSync(fichier, source('node', nom));
     args = [...(nommé ? [`--test-name-pattern=${nommé}`] : []), fichier];
   }
-  const r = await lancer('pnpm', ['--dir', join(RACINE, dossier), 'run', 'test', ...args], {
+  const entrée = seuil === undefined ? [] : [String(seuil)];
+  const r = await lancer('pnpm', ['--dir', join(RACINE, dossier), 'run', 'test', ...entrée, ...args], {
     cwd: RACINE,
-    env: environnement({ [VARIABLE]: seuil, NIVEAUX_TEMOIN: témoin }),
+    env: environnement({ NIVEAUX_TEMOIN: témoin }),
   });
   const notés = readFileSync(témoin, 'utf8').split('\n').filter(Boolean);
   const par = (préfixe) => notés.filter((l) => l.startsWith(`${préfixe}:`)).map((l) => l.slice(préfixe.length + 1)).sort();
@@ -334,6 +342,7 @@ function constater(r, seuil, étiquette) {
  * (`ancien`, la non-régression), puis un test que la branche ajoute (`nouveau`, le harnais du
  * besoin). Le pré-commit juge l'index, la livraison le commit poussé.
  */
+const BRANCHE = 'audit/999-besoin-invente';
 const crochets = mémo(async () => {
   const dépôt = join(temporaire, 'depot');
   const git = (...a) => execFileSync('git', a, { cwd: dépôt, env: environnement(), encoding: 'utf8' }).trim();
@@ -351,27 +360,28 @@ const crochets = mémo(async () => {
   git('add', '-A');
   git('commit', '-q', '--no-verify', '-m', 'base');
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
-  git('checkout', '-q', '-b', 'besoin');
+  git('checkout', '-q', '-b', BRANCHE);
   execFileSync('node', [join(RACINE, '.githooks/extraire.mjs'), RACINE, dépôt], { env: environnement() });
-  writeFileSync(join(dépôt, 'packages/gardes/nouveau.test.mjs'), source('node', 'nouveau'));
-  git('add', 'packages/gardes/nouveau.test.mjs');
+  writeFileSync(join(dépôt, 'packages/gardes/nouveau.test.mjs'), source('node', 'nouveau', "Harnais d'audit de #999 : un besoin inventé."));
+  writeFileSync(join(dépôt, 'packages/gardes/codeur.test.mjs'), source('node', 'codeur'));
+  git('add', 'packages/gardes/nouveau.test.mjs', 'packages/gardes/codeur.test.mjs');
 
   const témoinCommit = join(temporaire, 'pre-commit.temoin');
   writeFileSync(témoinCommit, '');
   const préCommit = await lancer('sh', ['.githooks/pre-commit'], { cwd: dépôt, env: environnement({ NIVEAUX_TEMOIN: témoinCommit }) });
-  git('commit', '-q', '--no-verify', '-m', 'besoin');
+  git('commit', '-q', '--no-verify', '-m', 'besoin #999');
   const sha = git('rev-parse', 'HEAD');
 
   const témoinPush = join(temporaire, 'pre-push.temoin');
   writeFileSync(témoinPush, '');
-  const livraison = await lancer('sh', ['.githooks/livraison.sh', 'push', 'refs/heads/besoin', sha, 'refs/heads/besoin', '0'.repeat(40)], {
+  const livraison = await lancer('sh', ['.githooks/livraison.sh', 'push', `refs/heads/${BRANCHE}`, sha, `refs/heads/${BRANCHE}`, '0'.repeat(40)], {
     cwd: dépôt,
     env: environnement({ NIVEAUX_TEMOIN: témoinPush }),
   });
   const lu = (f) => {
     const l = readFileSync(f, 'utf8').split('\n').filter(Boolean);
     const de = (n) => l.filter((x) => x.startsWith(`${n}:`)).map((x) => x.slice(n.length + 1)).sort();
-    return { ancien: de('ancien'), nouveau: de('nouveau') };
+    return { ancien: de('ancien'), nouveau: de('nouveau'), codeur: de('codeur') };
   };
   return { préCommit: { ...préCommit, ...lu(témoinCommit) }, livraison: { ...livraison, ...lu(témoinPush) } };
 });
@@ -389,31 +399,10 @@ function déplier(texte) {
 }
 const joueLesTests = (é) => /\bpnpm\s+(?:-r\s+|--recursive\s+)?(?:run\s+)?test\b/.test(déplier(commande(é)));
 
-/** Un bloc `env:` à ce renfoncement : clé → valeur, interpolée. */
-function envDe(lignes, motif, ctx) {
-  const i = lignes.findIndex((l) => motif.test(l));
-  if (i < 0) return {};
-  const colonne = lignes[i].search(/\S/) + (/^\s*- /.test(lignes[i]) ? 2 : 0);
-  const env = {};
-  for (const l of lignes.slice(i + 1)) {
-    if (!l.trim() || l.trim().startsWith('#')) continue;
-    if (l.search(/\S/) <= colonne) break;
-    const m = l.match(/^\s*([A-Za-z_][\w]*)\s*:\s*(.*)$/);
-    if (m) env[m[1]] = interpoler(m[2], ctx);
-  }
-  return env;
-}
-
-/** Le seuil d'une étape qui joue les tests : en ligne, puis l'étape, le job, le workflow ; 2 sinon. */
-function seuilDe(yaml, job, é, ctx) {
-  const enLigne = déplier(commande(é)).match(new RegExp(`\\b${VARIABLE}=["']?([0-4])`))?.[1];
-  if (enLigne) return Number(enLigne);
-  const tête = yaml.split('\n');
-  const workflow = envDe(tête.slice(0, tête.findIndex((l) => /^jobs:\s*$/.test(l))), /^env:\s*$/, ctx);
-  const duJob = envDe(job.lignes, /^ {4}env:\s*$/, ctx);
-  const deLÉtape = envDe(é.lignes, /^(?: {6}- | {8})env:\s*$/, ctx);
-  const v = deLÉtape[VARIABLE] ?? duJob[VARIABLE] ?? workflow[VARIABLE];
-  return v === undefined || v === '' ? DÉFAUT : Number(v);
+/** Le seuil d'une étape qui joue les tests : l'argument de `pnpm test`, 2 sans argument. */
+function seuilDe(é) {
+  const m = déplier(commande(é)).match(/\bpnpm\s+(?:-r\s+|--recursive\s+)?(?:run\s+)?test\b(?:\s+([0-4])\b)?/);
+  return m?.[1] === undefined ? DÉFAUT : Number(m[1]);
 }
 
 const auReady = {
@@ -424,7 +413,7 @@ const auReady = {
 };
 const auTag = { github: { event_name: 'push', ref: 'refs/tags/v1.0.0', event: {} }, vars: {}, secrets: {}, inputs: {} };
 
-const étapesDeTests = (yaml, ctx) => jouer(yaml, ctx).flatMap((job) => job.joués.filter(joueLesTests).map((é) => ({ job, é, seuil: seuilDe(yaml, job, é, ctx) })));
+const étapesDeTests = (yaml, ctx) => jouer(yaml, ctx).flatMap((job) => job.joués.filter(joueLesTests).map((é) => ({ job, é, seuil: seuilDe(é) })));
 const publie = (é) => /uses:\s*softprops\/action-gh-release@|deposer\.sh/.test(é.texte);
 const laisseÉchouer = (job, é) => /^ +(?:- )?continue-on-error:\s*true/m.test(é.texte) || /^ {4}continue-on-error:\s*true/m.test(job.lignes.join('\n'));
 
@@ -491,11 +480,11 @@ test('rétrocompatibilité [niveau 3]', () => {});
   for (const paquet of ['garde', 'cœur']) {
     const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
     test(`${paquet} (${exécuteur}) : sans seuil en entrée, le seuil est 2`, async () => {
-      constater(await scénarios[`${paquet}:défaut`](), DÉFAUT, `${paquet}, sans ${VARIABLE}`);
+      constater(await scénarios[`${paquet}:défaut`](), DÉFAUT, `${paquet}, \`pnpm test\` sans seuil`);
     });
     for (const s of NIVEAUX) {
       test(`${paquet} (${exécuteur}) : au seuil ${s}, les tests de niveau ${s} ou moins`, async () => {
-        constater(await scénarios[`${paquet}:${s}`](), s, `${paquet}, ${VARIABLE}=${s}`);
+        constater(await scénarios[`${paquet}:${s}`](), s, `${paquet}, \`pnpm test ${s}\``);
       });
     }
     test(`${paquet} (${exécuteur}) : un test de niveau 4 appelé nommément se joue, seul`, async () => {
@@ -509,7 +498,7 @@ test('rétrocompatibilité [niveau 3]', () => {});
     const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
     test(`${paquet} (${exécuteur}) : l’ensemble respecte le seuil, ici 1`, async () => {
       const r = await scénarios[`${paquet}:1`]();
-      constater(r, 1, `${paquet}, ${VARIABLE}=1`);
+      constater(r, 1, `${paquet}, \`pnpm test 1\``);
       if (paquet === 'interface') assert.deepEqual(r.navigateur, attendus(1), 'interface dans le navigateur : au seuil 1, seuls les tests de niveau 1 ou moins (#232, point 1)');
     });
   }
@@ -523,16 +512,18 @@ test('rétrocompatibilité [niveau 3]', () => {});
     assert.ok(r.ms < 5000, `pré-commit : ${r.ms} ms, au-delà de son budget de 5 s (#232, point 5)`);
   });
 
-  test('le pré-commit joue le harnais du besoin en entier, niveau 4 compris', async () => {
+  test('le pré-commit joue le harnais du besoin en entier, et les autres tests de la branche à leur niveau', async () => {
     const { préCommit: r } = await crochets();
-    assert.deepEqual(r.nouveau, TOUT, 'pré-commit : le harnais du besoin se joue en entier, niveau 4 compris (#232, point 9)');
+    assert.deepEqual(r.nouveau, TOUT, 'pré-commit : le harnais du besoin — le fichier qui porte le numéro de l’issue — se joue en entier, niveau 4 compris (#232, point 9)');
+    assert.deepEqual(r.codeur, attendus(0), 'pré-commit : un autre fichier de test que la branche ajoute n’est pas le harnais du besoin ; il se joue à son niveau, au seuil 0 (#232, point 9)');
   });
 
-  test('la livraison vérifie au seuil 2, et joue le harnais du besoin en entier', async () => {
+  test('la livraison vérifie au seuil 2, et joue le harnais du besoin en entier, lui seul', async () => {
     const { livraison: r } = await crochets();
     assert.equal(r.code, 0, `livraison (pré-push) refusée\n${r.sortie.slice(-2000)}`);
     assert.deepEqual(r.ancien, attendus(2), 'livraison : la non-régression se joue au seuil 2 (#232, point 6)');
-    assert.deepEqual(r.nouveau, TOUT, 'livraison : le harnais du besoin se joue en entier, niveau 4 compris (#232, point 9)');
+    assert.deepEqual(r.nouveau, TOUT, 'livraison : le harnais du besoin — le fichier qui porte le numéro de l’issue — se joue en entier, niveau 4 compris (#232, point 9)');
+    assert.deepEqual(r.codeur, attendus(2), 'livraison : un autre fichier de test que la branche ajoute n’est pas le harnais du besoin ; il se joue à son niveau, au seuil 2 (#232, point 9)');
   });
 
   // Points 7, 8 et 9 : la CI, jouée à blanc.
