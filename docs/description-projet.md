@@ -568,3 +568,5 @@ fichier à part, que le registre citerait en entier, sans les instantanés ni la
 > non, le contrat par varieble d'environnement me semble mauvais
 
 > pnpm test [N] où N est facultatif (2 par defaut comme avant). Attention, légère modification du besoin par l'architecte à prendre en compte
+
+> les tests navigateur coutent tres cher, il faut une option dans pnpm test pour les activer dans 232

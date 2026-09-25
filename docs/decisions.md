@@ -1364,18 +1364,21 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   L'outil de test prend un seuil N en entrée — `pnpm test N`, ou `pnpm --dir <paquet> run test N`,
   2 sans entrée — et ne joue, dans tous les ensembles (cœur, interface headless et dans le
   navigateur, garde, relais, hébergement), que les tests de niveau N ou moins ; ce qu'il écarte, il
-  le compte et le dit. Un test appelé nommément (`-t` de vitest, `--test-name-pattern` de
-  `node --test`) se joue quel que soit son niveau. Le script `test` de chaque paquet passe par
-  `packages/gardes/lanceur.mjs`. Les seuils des moments :
+  le compte et le dit. Les tests navigateur (`apps/web/test/navigateur/`), qui coûtent cher, ne se
+  jouent que si l'option `--navigateur` les active, après le seuil (`pnpm test 2 --navigateur`) ;
+  sans elle, ils sont écartés, comptés et dits. Aucune variable d'environnement ne change ce qui se
+  joue : tout passe par les arguments. Un test appelé nommément (`-t` de vitest,
+  `--test-name-pattern` de `node --test`) se joue quel que soit son niveau. Le script `test` de
+  chaque paquet passe par `packages/gardes/lanceur.mjs`. Les seuils des moments :
 
   | Moment | Seuil |
   |---|---|
-  | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier |
-  | Livraison (pré-fusion, pré-push) | 2, tests navigateur compris quand un navigateur est là |
+  | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur |
+  | Livraison (pré-fusion, pré-push) | 2, tests navigateur activés quand un navigateur est là |
   | Vérification de l'auditeur, avant le Ready | 2 |
   | CI au Ready | 1, plus les tests navigateur de niveau 2 |
-  | Publication d'une version (tag `v*`) | 3 |
-  | Demande explicite (`pnpm test 4`) | 4 |
+  | Publication d'une version (tag `v*`) | 3, tests navigateur activés |
+  | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
 
 - **Le harnais du besoin** est le ou les fichiers de l'auditeur — son harnais et son compagnon
   éventuel (D81) —, et eux seuls : l'auditeur les nomme dans l'issue (« Harnais : chemins »), à côté
@@ -1399,13 +1402,13 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
   l'interface, 40 s sans navigateur, 270 s avec) ou organisationnel (garde, 45 s) —, les tests navigateur
-  (`apps/web/test/navigateur/`) se jouent quand un navigateur est là, sinon la livraison le dit et
-  les laisse à la CI, et le harnais du besoin est joué à part, en entier, et bloque quand du code
+  (`apps/web/test/navigateur/`) sont activés quand un navigateur est là, sinon la livraison le dit
+  et les laisse à la CI, et le harnais du besoin est joué à part, en entier, et bloque quand du code
   arrive.
 - **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, les
-  harnais et la garde : typecheck, `pnpm test 1`, puis les tests navigateur de niveau 2 — qu'une
-  session sans navigateur ne peut pas jouer ; appelés nommément, pour ne pas rejouer ceux de niveau 0
-  et 1 —, le harnais du besoin en entier, build, version de dev ; un outil manquant y fait échouer le job. Avant toute fusion, les niveaux 0 à 2 ont
+  harnais et la garde : typecheck, `pnpm test 1`, puis les tests navigateur au seuil 2
+  (`--navigateur`) — qu'une session sans navigateur ne peut pas jouer —, le harnais du besoin en
+  entier, tests navigateur activés, build, version de dev ; un outil manquant y fait échouer le job. Avant toute fusion, les niveaux 0 à 2 ont
   donc été joués, par la livraison et par l'auditeur, et la CI rejoue 0 et 1 sur l'état final. Sept workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
@@ -1426,7 +1429,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
 - **Livraison.** Un push sur `main` construit et dépose le site. L'APK et les releases ne sortent
   qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion. Un tag publie une version
-  (D87) et porte son nom (`docs/versions.md`) ; ses tests se jouent au seuil 3 avant de publier.
+  (D87) et porte son nom (`docs/versions.md`) ; ses tests se jouent au seuil 3, tests navigateur
+  activés, avant de publier.
 
 ### D84 · Le code, les données et les commits
 
