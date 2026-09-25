@@ -25,9 +25,10 @@
  *    lecture. Le code : aucune fonction de migration exportée, plus la machinerie qui les portait,
  *    et un ancien genre de compte n'est plus lu comme le nouveau.
  * 3. La forme `op_` + 16 hexadécimaux ; le même relevé, deux fois ou sur deux instances.
- * 4. Par l'application (`upsert`, `importBundle`) : l'écriture échoue, le message nomme la table et la
- *    colonne telles que le fichier les nomme, et le contenu du fichier ne bouge pas. Par le fichier
- *    lui-même (D58 : `NOT NULL`, `CHECK`) : la même écriture en SQL échoue.
+ * 4. Par l'application (`upsert`, `importBundle`) : l'écriture échoue et le contenu du fichier ne
+ *    bouge pas ; chaque colonne obligatoire et chaque énumération est refusée ; le message nomme la
+ *    table et la colonne telles que le fichier les nomme. Par le fichier lui-même (D58 : `NOT NULL`,
+ *    `CHECK`) : la même écriture en SQL échoue. Un test par besoin, pour que chacun ait son niveau.
  * 5. Une colonne d'`operations` qui vaut partout le libellé normalisé est dérivée : si elle est
  *    gardée, `docs/decisions.md` la nomme. Que la raison tienne, et le classement des autres
  *    colonnes (saisie, importée, dérivée), se relit.
@@ -38,6 +39,14 @@
  *
  * Les assertions sont dans des fonctions à part, pour que les témoins rouges, en fin de fichier,
  * rejouent les mêmes sur une version volontairement cassée du besoin.
+ *
+ * Niveaux (#232), à marquer quand la marque existera ; un témoin a le niveau de ce qu'il garde :
+ * - 0 : point 3, les deux tests sans doublon ; point 4, une ligne refusée, écrite ou reçue, n'écrit
+ *   rien ; point 6, les quatre tests ; point 7, l'export qui se rouvre à l'identique.
+ * - 1 : point 7, la convergence (I8).
+ * - 2 : points 1, 2 et 5 ; point 3, la forme de la clé ; point 4, chaque colonne refusée et le refus
+ *   par le fichier lui-même ; point 7, le plan et l'import.
+ * - 3 : point 4, les deux refus qui nomment la table et la colonne.
  */
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
@@ -363,12 +372,30 @@ function verifierCles(ids: string[]): void {
   expect(ids.filter((id) => !/^op_[0-9a-f]{16}$/.test(id)), 'des identifiants d’opération hors de la forme op_ + 16 hexadécimaux').toEqual([]);
 }
 
-function verifierRefusEcrit(err: unknown, table: string, colonne: string, avant: string, apres: string): void {
-  expect(err, `l’écriture incohérente dans ${table}.${colonne} est acceptée`).toBeDefined();
+function verifierRefuse(err: unknown, pourquoi: string): void {
+  expect(err, `${pourquoi} : l’écriture est acceptée`).toBeDefined();
+}
+
+function verifierRefusSansEcriture(err: unknown, pourquoi: string, avant: string, apres: string): void {
+  verifierRefuse(err, pourquoi);
+  expect(apres, `${pourquoi} : le refus a écrit quelque chose`).toBe(avant);
+}
+
+function verifierRefusNomme(err: unknown, table: string, colonne: string): void {
+  verifierRefuse(err, `${table}.${colonne}`);
   const dit = err instanceof Error ? err.message : String(err);
   expect(dit, 'le refus ne nomme pas la table').toContain(table);
   expect(dit, 'le refus ne nomme pas la colonne').toContain(colonne);
-  expect(apres, 'le refus a écrit quelque chose').toBe(avant);
+}
+
+/** Ce que lève `fn`, ou `undefined` si elle ne lève rien. */
+function leve(fn: () => unknown): unknown {
+  try {
+    fn();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
 }
 
 function verifierRefusFichier(bytes: Uint8Array, table: string, colonne: string, id: string, valeur: unknown): void {
@@ -525,41 +552,66 @@ function casIncoherents(s: LedgerStore): Array<{ cle: Cle; ligne: Ligne; champ: 
   ];
 }
 
+/** Écrit la ligne du cas par l'application, sans le champ ou avec la valeur du cas. */
+function ecrire(s: LedgerStore, c: { cle: Cle; ligne: Ligne; champ: string; valeur: unknown }): void {
+  const { [c.champ]: _retire, ...reste } = c.ligne;
+  s.upsert(c.cle, (c.valeur === undefined ? reste : { ...reste, [c.champ]: c.valeur }) as never);
+}
+
+/** Le paquet d'une instance où une valeur a été remplacée, partout où elle paraît. */
+async function paquetIncoherent(de: string, par: unknown): Promise<{ paquet: unknown; table: string; colonne: string }> {
+  const b = await instance();
+  charger(b);
+  return { paquet: remplacer(structuredClone(exportBundle(b)), de, par), ...ou(b.export(), 'acc-principal', de) };
+}
+
+const RECUES = [
+  ['principal', 'pivot'],
+  ['Compte courant', null],
+] as const;
+
 describe('#197 · 4. le fichier refuse l’incohérent', () => {
-  it('écrire une ligne vide dans une colonne obligatoire, ou hors de son énumération, échoue sans rien écrire et en nommant la table et la colonne', async () => {
-    const s = await semee();
-    for (const c of casIncoherents(s)) {
-      const { table, colonne } = ou(s.export(), c.ligne.id, c.ligne[c.champ]);
+  // Ce qui ne se rattrape pas : une ligne refusée qui écrirait quand même resterait dans le fichier.
+  it('une ligne refusée à l’écriture n’écrit rien', async () => {
+    const s = await instance();
+    charger(s);
+    const compte = lignes(s, 'accounts').find((c) => c.id === 'acc-principal')!;
+    for (const c of [
+      { cle: 'accounts' as const, ligne: compte, champ: 'name', valeur: undefined, pourquoi: 'un compte sans nom' },
+      { cle: 'accounts' as const, ligne: compte, champ: 'kind', valeur: 'pivot', pourquoi: 'un genre de compte inconnu' },
+    ]) {
       const avant = contenu(s.export());
-      let err: unknown;
-      try {
-        const { [c.champ]: _retire, ...reste } = c.ligne;
-        s.upsert(c.cle, (c.valeur === undefined ? reste : { ...reste, [c.champ]: c.valeur }) as never);
-      } catch (e) {
-        err = e;
-      }
-      verifierRefusEcrit(err, table, colonne, avant, contenu(s.export()));
+      verifierRefusSansEcriture(leve(() => ecrire(s, c)), c.pourquoi, avant, contenu(s.export()));
     }
   });
 
-  it('une ligne incohérente reçue d’une autre instance est refusée sans rien écrire, en nommant la table et la colonne', async () => {
-    const b = await instance();
-    charger(b);
-    const bytesB = b.export();
-    for (const [de, par] of [
-      ['principal', 'pivot'],
-      ['Compte courant', null],
-    ] as const) {
-      const { table, colonne } = ou(bytesB, 'acc-principal', de);
+  it('une ligne incohérente reçue d’une autre instance est refusée sans rien écrire', async () => {
+    for (const [de, par] of RECUES) {
+      const { paquet } = await paquetIncoherent(de, par);
       const a = await instance();
       const avant = contenu(a.export());
-      let err: unknown;
-      try {
-        importBundle(a, remplacer(structuredClone(exportBundle(b)), de, par) as never);
-      } catch (e) {
-        err = e;
-      }
-      verifierRefusEcrit(err, table, colonne, avant, contenu(a.export()));
+      verifierRefusSansEcriture(leve(() => importBundle(a, paquet as never)), `${de} reçu comme ${String(par)}`, avant, contenu(a.export()));
+    }
+  });
+
+  it('chaque colonne obligatoire vide et chaque valeur hors de son énumération est refusée à l’écriture', async () => {
+    const s = await semee();
+    for (const c of casIncoherents(s)) verifierRefuse(leve(() => ecrire(s, c)), c.pourquoi);
+  });
+
+  it('le refus d’une écriture nomme la table et la colonne', async () => {
+    const s = await semee();
+    for (const c of casIncoherents(s)) {
+      const { table, colonne } = ou(s.export(), c.ligne.id, c.ligne[c.champ]);
+      verifierRefusNomme(leve(() => ecrire(s, c)), table, colonne);
+    }
+  });
+
+  it('le refus d’une ligne reçue nomme la table et la colonne', async () => {
+    for (const [de, par] of RECUES) {
+      const { paquet, table, colonne } = await paquetIncoherent(de, par);
+      const a = await instance();
+      verifierRefusNomme(leve(() => importBundle(a, paquet as never)), table, colonne);
     }
   });
 
@@ -670,7 +722,8 @@ describe('#197 · 6. le format précédent est refusé comme #196 le prévoit', 
   });
 
   it('par le relais : un dépôt d’une instance de main avant #197 arrête la synchronisation, et rien n’est reçu', async () => {
-    const a = await semee();
+    const a = await instance();
+    charger(a);
     const depots = relaisFactice();
     const { iv, blob } = await depotAvant(JSON.stringify(paquetAvant()));
     depots.push({ id: 1, site: 'avant197000', iv, blob, at: '2026-09-25T00:00:00Z' });
@@ -770,6 +823,15 @@ it.fails('témoin rouge · un ancien genre de compte lu comme le nouveau', () =>
 
 it.fails('témoin rouge · une clé d’opération à 32 hexadécimaux', () => {
   verifierCles(['op_' + '0123456789abcdef'.repeat(2)]);
+});
+
+it.fails('témoin rouge · une ligne refusée qui écrit quand même', () => {
+  // Version cassée : l'écriture a eu lieu avant le refus.
+  verifierRefusSansEcriture(new Error('refusé'), 'un compte sans nom', 'avant', 'après');
+});
+
+it.fails('témoin rouge · un refus qui ne nomme pas la colonne', () => {
+  verifierRefusNomme(new Error('Écriture refusée : accounts est incomplet.'), 'accounts', 'name');
 });
 
 it.fails('témoin rouge · un fichier qui accepte un genre de compte inconnu', () => {
