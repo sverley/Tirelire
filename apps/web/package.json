@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run",
+    "test": "node ../../packages/gardes/lanceur.mjs vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

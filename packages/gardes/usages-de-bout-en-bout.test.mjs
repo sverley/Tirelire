@@ -50,7 +50,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import { RACINE, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
 
 const REGISTRE = 'docs/gardes.md';
@@ -190,106 +190,108 @@ function parcoursDeBoutEnBout(texte, ids = PORTENT_UN_PARCOURS) {
   assert.deepEqual(manquants, [], `des usages n'ont pas leur harnais de bout en bout au registre :\n${manquants.join('\n')}`);
 }
 
-test('#70 · U1, U2 et U5 portent au registre un harnais de bout en bout, avec son témoin rouge', () => {
-  parcoursDeBoutEnBout(registre());
-});
+describe('[niveau 1] harnais de la garde', () => {
+  test('#70 · U1, U2 et U5 portent au registre un harnais de bout en bout, avec son témoin rouge', () => {
+    parcoursDeBoutEnBout(registre());
+  });
 
-test('#70 · un registre où chaque usage cite son parcours est accepté', () => {
-  parcoursDeBoutEnBout(avecParcours(registre()), USAGES);
-});
+  test('#70 · un registre où chaque usage cite son parcours est accepté', () => {
+    parcoursDeBoutEnBout(avecParcours(registre()), USAGES);
+  });
 
-test('#70 · témoin rouge — un usage laissé à ses seuls harnais unitaires fait échouer « U1, U2 et U5 portent un harnais de bout en bout »', () => {
-  const tenu = avecParcours(registre());
-  const casse = sansParcours(tenu);
-  assert.notEqual(casse, tenu, `aucun parcours n'a pu être retiré : ${RELIRE}`);
-  assert.throws(() => parcoursDeBoutEnBout(casse), /n'ont pas leur harnais de bout en bout/);
-});
+  test('#70 · témoin rouge — un usage laissé à ses seuls harnais unitaires fait échouer « U1, U2 et U5 portent un harnais de bout en bout »', () => {
+    const tenu = avecParcours(registre());
+    const casse = sansParcours(tenu);
+    assert.notEqual(casse, tenu, `aucun parcours n'a pu être retiré : ${RELIRE}`);
+    assert.throws(() => parcoursDeBoutEnBout(casse), /n'ont pas leur harnais de bout en bout/);
+  });
 
-// ─── 2. U3 et U4 : un parcours, ou une dette qui renvoie à leur besoin ───────────────────────────
+  // ─── 2. U3 et U4 : un parcours, ou une dette qui renvoie à leur besoin ───────────────────────────
 
-function detteOuParcours(texte) {
-  const orphelins = [];
-  for (const [id, issue] of Object.entries(PARCOURS_AVEC_LE_BESOIN)) {
-    const [e] = entreesDesUsages(texte, [id]);
-    const dette = e.aBatir.some((a) => [...a.matchAll(/#(\d+)/g)].some((m) => m[1] === issue));
-    if (!dette && !porteUnParcours(e)) {
-      orphelins.push(`${id} · ni harnais de bout en bout, ni « À bâtir » qui renvoie à #${issue}`);
+  function detteOuParcours(texte) {
+    const orphelins = [];
+    for (const [id, issue] of Object.entries(PARCOURS_AVEC_LE_BESOIN)) {
+      const [e] = entreesDesUsages(texte, [id]);
+      const dette = e.aBatir.some((a) => [...a.matchAll(/#(\d+)/g)].some((m) => m[1] === issue));
+      if (!dette && !porteUnParcours(e)) {
+        orphelins.push(`${id} · ni harnais de bout en bout, ni « À bâtir » qui renvoie à #${issue}`);
+      }
     }
+    assert.deepEqual(orphelins, [], `des usages ont perdu leur dette sans recevoir leur parcours :\n${orphelins.join('\n')}`);
   }
-  assert.deepEqual(orphelins, [], `des usages ont perdu leur dette sans recevoir leur parcours :\n${orphelins.join('\n')}`);
-}
 
-test('#70 · U3 et U4 gardent une dette qui renvoie à #40 et #16 tant que leur parcours n\'est pas bâti', () => {
-  detteOuParcours(registre());
-});
+  test('#70 · U3 et U4 gardent une dette qui renvoie à #40 et #16 tant que leur parcours n\'est pas bâti', () => {
+    detteOuParcours(registre());
+  });
 
-test('#70 · un parcours bâti tient lieu de dette : U3 sans « À bâtir » mais avec son parcours est accepté', () => {
-  detteOuParcours(sansDetteDe(avecParcours(registre()), 'U3'));
-});
+  test('#70 · un parcours bâti tient lieu de dette : U3 sans « À bâtir » mais avec son parcours est accepté', () => {
+    detteOuParcours(sansDetteDe(avecParcours(registre()), 'U3'));
+  });
 
-test('#70 · témoin rouge — la dette de U3 effacée sans parcours fait échouer « U3 et U4 gardent leur dette »', () => {
-  const casse = sansDetteDe(registre(), 'U3');
-  assert.notEqual(casse, registre(), `la dette de U3 n'a pas pu être effacée : ${RELIRE}`);
-  assert.throws(() => detteOuParcours(casse), /ont perdu leur dette sans recevoir leur parcours/);
-});
+  test('#70 · témoin rouge — la dette de U3 effacée sans parcours fait échouer « U3 et U4 gardent leur dette »', () => {
+    const casse = sansDetteDe(registre(), 'U3');
+    assert.notEqual(casse, registre(), `la dette de U3 n'a pas pu être effacée : ${RELIRE}`);
+    assert.throws(() => detteOuParcours(casse), /ont perdu leur dette sans recevoir leur parcours/);
+  });
 
-// ─── 3. La dette de U1, U2 et U5 est réglée, en bâtissant ────────────────────────────────────────
+  // ─── 3. La dette de U1, U2 et U5 est réglée, en bâtissant ────────────────────────────────────────
 
-function detteReglee(texte, ids = PORTENT_UN_PARCOURS) {
-  const restes = [];
-  for (const e of entreesDesUsages(texte, ids)) {
-    for (const a of e.aBatir) {
-      if ([...a.matchAll(/#(\d+)/g)].some((m) => ISSUES_DE_L_AUDIT.has(m[1]))) restes.push(`${e.id} · À bâtir · ${a}`);
+  function detteReglee(texte, ids = PORTENT_UN_PARCOURS) {
+    const restes = [];
+    for (const e of entreesDesUsages(texte, ids)) {
+      for (const a of e.aBatir) {
+        if ([...a.matchAll(/#(\d+)/g)].some((m) => ISSUES_DE_L_AUDIT.has(m[1]))) restes.push(`${e.id} · À bâtir · ${a}`);
+      }
     }
+    assert.deepEqual(restes, [], `des usages restent « À bâtir » au lieu d'être gardés :\n${restes.join('\n')}`);
   }
-  assert.deepEqual(restes, [], `des usages restent « À bâtir » au lieu d'être gardés :\n${restes.join('\n')}`);
-}
 
-test('#70 · U1, U2 et U5 ne restent plus « À bâtir » (#15, #13, #39)', () => {
-  detteReglee(registre());
-});
+  test('#70 · U1, U2 et U5 ne restent plus « À bâtir » (#15, #13, #39)', () => {
+    detteReglee(registre());
+  });
 
-test('#70 · un registre sans dette sur ces trois usages est accepté', () => {
-  detteReglee(sansDette(registre()));
-});
+  test('#70 · un registre sans dette sur ces trois usages est accepté', () => {
+    detteReglee(sansDette(registre()));
+  });
 
-test('#70 · témoin rouge — un usage remis « À bâtir » fait échouer « U1, U2 et U5 ne restent plus à bâtir »', () => {
-  const casse = enDette(sansDette(registre()));
-  assert.notEqual(casse, sansDette(registre()), `aucune ligne « À bâtir » n'a pu être remise : ${RELIRE}`);
-  assert.throws(() => detteReglee(casse), /restent « À bâtir »/);
-});
+  test('#70 · témoin rouge — un usage remis « À bâtir » fait échouer « U1, U2 et U5 ne restent plus à bâtir »', () => {
+    const casse = enDette(sansDette(registre()));
+    assert.notEqual(casse, sansDette(registre()), `aucune ligne « À bâtir » n'a pu être remise : ${RELIRE}`);
+    assert.throws(() => detteReglee(casse), /restent « À bâtir »/);
+  });
 
-function gardesTenues(texte) {
-  const i3 = entreeI3(texte);
-  const presents = new Set(i3.harnais.map((h) => identite(usageDe(h.description), h)));
-  const perdues = [...HARNAIS_DU_JOUR].filter((i) => !presents.has(i)).map((i) => `harnais disparu · ${i}`);
-  const vues = new Set(i3.verifications.map((v) => v.id));
-  for (const [id, attendues] of Object.entries(VERIFICATIONS_DU_JOUR)) {
-    for (const vm of attendues) if (!vues.has(vm)) perdues.push(`vérification manuelle disparue · ${id} · ${vm}`);
+  function gardesTenues(texte) {
+    const i3 = entreeI3(texte);
+    const presents = new Set(i3.harnais.map((h) => identite(usageDe(h.description), h)));
+    const perdues = [...HARNAIS_DU_JOUR].filter((i) => !presents.has(i)).map((i) => `harnais disparu · ${i}`);
+    const vues = new Set(i3.verifications.map((v) => v.id));
+    for (const [id, attendues] of Object.entries(VERIFICATIONS_DU_JOUR)) {
+      for (const vm of attendues) if (!vues.has(vm)) perdues.push(`vérification manuelle disparue · ${id} · ${vm}`);
+    }
+    assert.deepEqual(perdues, [], `des gardes des usages ont disparu au lieu d'être complétées :\n${perdues.join('\n')}`);
   }
-  assert.deepEqual(perdues, [], `des gardes des usages ont disparu au lieu d'être complétées :\n${perdues.join('\n')}`);
-}
 
-/** La version volontairement cassée : la première ligne `Harnais` d'un usage, effacée. */
-const sansUnHarnais = (texte) => retirerLignes(texte, new Set([entreesDesUsages(texte)[0].harnais[0].ligne]));
+  /** La version volontairement cassée : la première ligne `Harnais` d'un usage, effacée. */
+  const sansUnHarnais = (texte) => retirerLignes(texte, new Set([entreesDesUsages(texte)[0].harnais[0].ligne]));
 
-/** La version volontairement cassée : la vérification manuelle d'un usage, effacée. */
-const sansUneVerification = (texte) => retirerLignes(texte, new Set([entreesDesUsages(texte)[0].verifications[0].ligne]));
+  /** La version volontairement cassée : la vérification manuelle d'un usage, effacée. */
+  const sansUneVerification = (texte) => retirerLignes(texte, new Set([entreesDesUsages(texte)[0].verifications[0].ligne]));
 
-test('#70 · le registre garde les sept harnais et les six vérifications manuelles des usages', () => {
-  assert.equal(HARNAIS_DU_JOUR.size, 7, RELIRE);
-  assert.equal(Object.values(VERIFICATIONS_DU_JOUR).flat().length, 6, RELIRE);
-  gardesTenues(registre());
-});
+  test('#70 · le registre garde les sept harnais et les six vérifications manuelles des usages', () => {
+    assert.equal(HARNAIS_DU_JOUR.size, 7, RELIRE);
+    assert.equal(Object.values(VERIFICATIONS_DU_JOUR).flat().length, 6, RELIRE);
+    gardesTenues(registre());
+  });
 
-test('#70 · témoin rouge — un harnais d\'usage effacé fait échouer « le registre garde ses gardes »', () => {
-  const casse = sansUnHarnais(registre());
-  assert.notEqual(casse, registre(), `aucune ligne Harnais n'a pu être effacée : ${RELIRE}`);
-  assert.throws(() => gardesTenues(casse), /des gardes des usages ont disparu/);
-});
+  test('#70 · témoin rouge — un harnais d\'usage effacé fait échouer « le registre garde ses gardes »', () => {
+    const casse = sansUnHarnais(registre());
+    assert.notEqual(casse, registre(), `aucune ligne Harnais n'a pu être effacée : ${RELIRE}`);
+    assert.throws(() => gardesTenues(casse), /des gardes des usages ont disparu/);
+  });
 
-test('#70 · témoin rouge — une vérification manuelle d\'usage effacée fait échouer « le registre garde ses gardes »', () => {
-  const casse = sansUneVerification(registre());
-  assert.notEqual(casse, registre(), `aucune vérification manuelle n'a pu être effacée : ${RELIRE}`);
-  assert.throws(() => gardesTenues(casse), /vérification manuelle disparue/);
+  test('#70 · témoin rouge — une vérification manuelle d\'usage effacée fait échouer « le registre garde ses gardes »', () => {
+    const casse = sansUneVerification(registre());
+    assert.notEqual(casse, registre(), `aucune vérification manuelle n'a pu être effacée : ${RELIRE}`);
+    assert.throws(() => gardesTenues(casse), /vérification manuelle disparue/);
+  });
 });

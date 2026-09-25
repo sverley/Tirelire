@@ -16,7 +16,9 @@ name: CI et livraison
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
-#   l'archive du site qu'il dépose ensuite ne juge rien.
+#   l'archive du site qu'il dépose ensuite ne juge rien. Ses seuils (#232, D83) : au Ready et sur
+#   `main`, seuil 1, plus les tests navigateur au seuil 2, et le harnais du besoin en entier sur une
+#   PR ; au tag `v*`, seuil 3, tests navigateur activés, avant de publier.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
 #   `main`, à un tag `v*` et à la main ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).
 # - `deploiement` lit hors des fichiers suivis : après le dépôt FTP, l'étape « Vérifier le site en
@@ -63,6 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Toute l'histoire : le harnais du besoin se lit depuis la base commune avec `main` (#232).
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4 # version lue dans package.json (packageManager)
       - uses: actions/setup-node@v4
         with:
@@ -82,7 +87,31 @@ jobs:
           php -v | head -n 1
           lftp --version | head -n 1
           python3 -c 'import pyftpdlib; print("pyftpdlib présent")'
-      - run: pnpm test
+      # Seuils (#232, D83) : au Ready et sur `main`, les tests de niveau 0 et 1 — l'auditeur a
+      # vérifié au seuil 2 avant le Ready, la livraison aussi —, hors tests navigateur, que seule
+      # l'option `--navigateur` active ; puis les tests navigateur au seuil 2, qu'une session sans
+      # navigateur ne peut pas jouer.
+      - name: Tests au seuil 1
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: pnpm test 1
+        env:
+          TIRELIRE_STRICT: '1'
+      - name: Tests navigateur au seuil 2
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: pnpm --dir apps/web run test 2 --navigateur test/navigateur
+        env:
+          TIRELIRE_STRICT: '1'
+      # Le harnais du besoin en cours, en entier (seuil 4), par sa définition commune (D83).
+      - name: Harnais du besoin, en entier
+        if: github.event_name == 'pull_request'
+        run: sh .githooks/harnais-du-besoin.sh --jouer
+        env:
+          TIRELIRE_STRICT: '1'
+      # Avant de publier une version : les tests jusqu'au niveau 3, le dégradé compris, tests
+      # navigateur activés (D87).
+      - name: Tests au seuil 3, avant de publier
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: pnpm test 3 --navigateur
         env:
           TIRELIRE_STRICT: '1'
       - run: pnpm build

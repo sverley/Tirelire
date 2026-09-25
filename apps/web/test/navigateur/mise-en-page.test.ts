@@ -67,36 +67,38 @@ function vérifier(r: ReturnType<typeof mesurer>, largeur: number) {
  * échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur : c'est la règle
  * qu'on garde ici, pas une seconde mesure de l'application.
  */
-it.fails('témoin rouge · une page dont une ligne insécable déborde de l’écran', () => {
-  vérifier(
-    {
-      clientWidth: 375,
-      scrollWidth: 462,
-      chevauchements: ['« retenu 900,00 · croisière 100,00 · dem » 402 > 300'],
-      ongletsHorsÉcran: ['Plus'],
-    },
-    375,
-  );
-});
-
-describe.skipIf(!navigateur)('mise en page mobile de l’écran Plan', () => {
-  let site: Site;
-
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-  }, 120_000);
-
-  afterAll(async () => {
-    await site?.fermer();
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · une page dont une ligne insécable déborde de l’écran', () => {
+    vérifier(
+      {
+        clientWidth: 375,
+        scrollWidth: 462,
+        chevauchements: ['« retenu 900,00 · croisière 100,00 · dem » 402 > 300'],
+        ongletsHorsÉcran: ['Plus'],
+      },
+      375,
+    );
   });
 
-  for (const largeur of [320, 375]) {
-    it(`ne déborde pas et ne se chevauche pas à ${largeur} px`, async () => {
-      const page = await ouvrirLExemple(site, largeur);
-      const r = await page.evaluate(mesurer);
-      await page.close();
+  describe.skipIf(!navigateur)('mise en page mobile de l’écran Plan', () => {
+    let site: Site;
 
-      vérifier(r, largeur);
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+    }, 120_000);
+
+    afterAll(async () => {
+      await site?.fermer();
     });
-  }
+
+    for (const largeur of [320, 375]) {
+      it(`ne déborde pas et ne se chevauche pas à ${largeur} px`, async () => {
+        const page = await ouvrirLExemple(site, largeur);
+        const r = await page.evaluate(mesurer);
+        await page.close();
+
+        vérifier(r, largeur);
+      });
+    }
+  });
 });

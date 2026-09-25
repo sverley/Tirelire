@@ -63,8 +63,10 @@ function vérifierParcoursSansSynchro(requêtes: string[]) {
  * Témoin rouge : la même assertion rejouée sur un journal volontairement non vide — une requête
  * qui serait partie pendant le parcours. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-it.fails('témoin rouge · une requête réseau partie pendant un parcours sans synchronisation', () => {
-  vérifierParcoursSansSynchro(['https://un-serveur-quelconque.exemple/inventé']);
+describe('[niveau 0] harnais du registre', () => {
+  it.fails('témoin rouge · une requête réseau partie pendant un parcours sans synchronisation', () => {
+    vérifierParcoursSansSynchro(['https://un-serveur-quelconque.exemple/inventé']);
+  });
 });
 
 interface RequêteRelais {
@@ -97,10 +99,12 @@ function vérifierRelaisChiffré(avantAccord: RequêteRelais[], aprèsAccord: Re
  * Témoin rouge : la même vérification rejouée sur un paquet volontairement en clair — un `blob`
  * qui contient du JSON lisible, avec le nom d'une tirelire de l'exemple. Doit échouer.
  */
-it.fails('témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair', () => {
-  const enClair = JSON.stringify({ tirelire: 'Alimentation', montant: -1234 });
-  const corps = JSON.stringify({ site: 's1', iv: 'abc', blob: btoa(enClair) });
-  vérifierRelaisChiffré([], [{ méthode: 'POST', url: `${RELAIS}/r/salon`, corps }]);
+describe('[niveau 0] harnais du registre', () => {
+  it.fails('témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair', () => {
+    const enClair = JSON.stringify({ tirelire: 'Alimentation', montant: -1234 });
+    const corps = JSON.stringify({ site: 's1', iv: 'abc', blob: btoa(enClair) });
+    vérifierRelaisChiffré([], [{ méthode: 'POST', url: `${RELAIS}/r/salon`, corps }]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -127,92 +131,94 @@ async function remplirRelais(page: Page, url: string, salon: string, phrase: str
   );
 }
 
-describe.skipIf(!navigateur)('I7 · les données restent en local (issue #72)', () => {
-  let site: Site;
+describe('[niveau 0] harnais du registre', () => {
+  describe.skipIf(!navigateur)('I7 · les données restent en local (issue #72)', () => {
+    let site: Site;
 
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-  }, 120_000);
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+    }, 120_000);
 
-  afterAll(async () => {
-    await site?.fermer();
-  });
-
-  it('un parcours complet sans synchronisation ne fait sortir aucune donnée de l’appareil', async () => {
-    const page = await ouvrirLExemple(site);
-    const requêtes: string[] = [];
-    page.on('request', (req) => requêtes.push(req.url()));
-
-    await allerÀ(page, 'Opérations');
-    await pause(150);
-    await allerÀ(page, 'Bilan');
-    await pause(150);
-
-    await allerÀ(page, 'Import');
-    await pause(150);
-    const champFichier = await page.$('input[type=file]');
-    expect(champFichier, "l'écran Import ne présente aucun sélecteur de fichier").not.toBeNull();
-    await champFichier!.uploadFile(écrireCsvInventé());
-    await pause(400);
-
-    await allerÀ(page, 'Plus');
-    await cliquer(page, 'Réglages');
-    await pause(150);
-    await cliquer(page, 'Exporter le fichier SQLite');
-    await pause(300);
-
-    await page.close();
-    vérifierParcoursSansSynchro(requêtes);
-  }, 60_000);
-
-  it('avec un relais renseigné, seuls des paquets chiffrés partent, et seulement après le remplissage et le clic explicites', async () => {
-    const page = await ouvrirLExemple(site);
-    await allerÀ(page, 'Plus');
-    await cliquer(page, 'Synchronisation');
-    await pause(200);
-
-    const avantAccord: RequêteRelais[] = [];
-    const aprèsAccord: RequêteRelais[] = [];
-    let accordé = false;
-
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      const url = req.url();
-      if (!url.startsWith(RELAIS)) {
-        void req.continue();
-        return;
-      }
-      // Le relais factice répond comme un vrai relais d'une autre origine : en CORS, preflight
-      // compris. Sans cela, le retrait échoue dans la page et aucun dépôt ne part.
-      const cors = {
-        'access-control-allow-origin': '*',
-        'access-control-allow-methods': 'GET, POST, OPTIONS',
-        'access-control-allow-headers': 'content-type',
-      };
-      if (req.method() === 'OPTIONS') {
-        void req.respond({ status: 204, headers: cors, body: '' });
-        return;
-      }
-      const entrée = { méthode: req.method(), url, corps: req.postData() };
-      (accordé ? aprèsAccord : avantAccord).push(entrée);
-      void req.respond({
-        status: 200,
-        headers: cors,
-        contentType: 'application/json',
-        body: req.method() === 'GET' ? JSON.stringify({ records: [] }) : JSON.stringify({ id: 1 }),
-      });
+    afterAll(async () => {
+      await site?.fermer();
     });
 
-    await remplirRelais(page, RELAIS, 'salon-invente-harnais-i7', 'phrase de test suffisamment longue et inventée');
-    await pause(150);
+    it('un parcours complet sans synchronisation ne fait sortir aucune donnée de l’appareil', async () => {
+      const page = await ouvrirLExemple(site);
+      const requêtes: string[] = [];
+      page.on('request', (req) => requêtes.push(req.url()));
 
-    accordé = true;
-    await cliquer(page, 'Synchroniser maintenant');
-    // Le dépôt suit le retrait et le chiffrement (dérivation de clé) : l'attendre, sans s'y fier.
-    for (let i = 0; i < 50 && !aprèsAccord.some((r) => r.méthode === 'POST'); i++) await pause(100);
-    await pause(200);
+      await allerÀ(page, 'Opérations');
+      await pause(150);
+      await allerÀ(page, 'Bilan');
+      await pause(150);
 
-    await page.close();
-    vérifierRelaisChiffré(avantAccord, aprèsAccord);
-  }, 60_000);
+      await allerÀ(page, 'Import');
+      await pause(150);
+      const champFichier = await page.$('input[type=file]');
+      expect(champFichier, "l'écran Import ne présente aucun sélecteur de fichier").not.toBeNull();
+      await champFichier!.uploadFile(écrireCsvInventé());
+      await pause(400);
+
+      await allerÀ(page, 'Plus');
+      await cliquer(page, 'Réglages');
+      await pause(150);
+      await cliquer(page, 'Exporter le fichier SQLite');
+      await pause(300);
+
+      await page.close();
+      vérifierParcoursSansSynchro(requêtes);
+    }, 60_000);
+
+    it('avec un relais renseigné, seuls des paquets chiffrés partent, et seulement après le remplissage et le clic explicites', async () => {
+      const page = await ouvrirLExemple(site);
+      await allerÀ(page, 'Plus');
+      await cliquer(page, 'Synchronisation');
+      await pause(200);
+
+      const avantAccord: RequêteRelais[] = [];
+      const aprèsAccord: RequêteRelais[] = [];
+      let accordé = false;
+
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        const url = req.url();
+        if (!url.startsWith(RELAIS)) {
+          void req.continue();
+          return;
+        }
+        // Le relais factice répond comme un vrai relais d'une autre origine : en CORS, preflight
+        // compris. Sans cela, le retrait échoue dans la page et aucun dépôt ne part.
+        const cors = {
+          'access-control-allow-origin': '*',
+          'access-control-allow-methods': 'GET, POST, OPTIONS',
+          'access-control-allow-headers': 'content-type',
+        };
+        if (req.method() === 'OPTIONS') {
+          void req.respond({ status: 204, headers: cors, body: '' });
+          return;
+        }
+        const entrée = { méthode: req.method(), url, corps: req.postData() };
+        (accordé ? aprèsAccord : avantAccord).push(entrée);
+        void req.respond({
+          status: 200,
+          headers: cors,
+          contentType: 'application/json',
+          body: req.method() === 'GET' ? JSON.stringify({ records: [] }) : JSON.stringify({ id: 1 }),
+        });
+      });
+
+      await remplirRelais(page, RELAIS, 'salon-invente-harnais-i7', 'phrase de test suffisamment longue et inventée');
+      await pause(150);
+
+      accordé = true;
+      await cliquer(page, 'Synchroniser maintenant');
+      // Le dépôt suit le retrait et le chiffrement (dérivation de clé) : l'attendre, sans s'y fier.
+      for (let i = 0; i < 50 && !aprèsAccord.some((r) => r.méthode === 'POST'); i++) await pause(100);
+      await pause(200);
+
+      await page.close();
+      vérifierRelaisChiffré(avantAccord, aprèsAccord);
+    }, 60_000);
+  });
 });

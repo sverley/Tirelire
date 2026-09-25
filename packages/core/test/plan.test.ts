@@ -27,60 +27,62 @@ function line(plan: ReturnType<typeof computePlan>, needId: string) {
   return l;
 }
 
-describe('positions et soldes (D19, D29)', () => {
-  const ledger = exampleLedger();
-  const idx = indexLedger(ledger);
+describe('[niveau 1] harnais du registre', () => {
+  describe('positions et soldes (D19, D29)', () => {
+    const ledger = exampleLedger();
+    const idx = indexLedger(ledger);
 
-  it('une tirelire est répartie sur plusieurs comptes ; sa dotation attend sur le compte principal', () => {
-    // Taxe foncière : 900 sur le livret, dotation de septembre (rattrapage 150) sur le compte principal.
-    const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, asOf);
-    expect(tf.get('acc-livret')).toBe(euros(900));
-    expect(tf.get('acc-principal')).toBe(euros(150));
-    expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, asOf)).toBe(euros(1050));
-  });
+    it('une tirelire est répartie sur plusieurs comptes ; sa dotation attend sur le compte principal', () => {
+      // Taxe foncière : 900 sur le livret, dotation de septembre (rattrapage 150) sur le compte principal.
+      const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, asOf);
+      expect(tf.get('acc-livret')).toBe(euros(900));
+      expect(tf.get('acc-principal')).toBe(euros(150));
+      expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, asOf)).toBe(euros(1050));
+    });
 
-  it('un virement interne déplace une composante sans changer le solde', () => {
-    // Enfants : dotation 200 sur le compte principal, virée le jour même sur la carte enfants, puis 236 dépensés là.
-    const c = tirelireComponents(idx.tireliresById.get('env-enfants')!, idx, asOf);
-    expect(c.get('acc-principal') ?? 0).toBe(0);
-    expect(c.get('acc-enfants')).toBe(euros(-36));
-    expect(tirelireBalance(idx.tireliresById.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
-  });
+    it('un virement interne déplace une composante sans changer le solde', () => {
+      // Enfants : dotation 200 sur le compte principal, virée le jour même sur la carte enfants, puis 236 dépensés là.
+      const c = tirelireComponents(idx.tireliresById.get('env-enfants')!, idx, asOf);
+      expect(c.get('acc-principal') ?? 0).toBe(0);
+      expect(c.get('acc-enfants')).toBe(euros(-36));
+      expect(tirelireBalance(idx.tireliresById.get('env-enfants')!, idx, asOf)).toBe(euros(-36));
+    });
 
-  it('une dépense consomme la tirelire là où elle sort, même si l’argent dort ailleurs', () => {
-    // Santé, placée sur le compte principal : dotation 100 sur le compte principal, dentiste 80 payé par Marie.
-    const c = tirelireComponents(idx.tireliresById.get('env-sante')!, idx, asOf);
-    expect(c.get('acc-principal')).toBe(euros(100));
-    expect(c.get('acc-marie')).toBe(euros(-80));
-    expect(tirelireBalance(idx.tireliresById.get('env-sante')!, idx, asOf)).toBe(euros(20));
-  });
+    it('une dépense consomme la tirelire là où elle sort, même si l’argent dort ailleurs', () => {
+      // Santé, placée sur le compte principal : dotation 100 sur le compte principal, dentiste 80 payé par Marie.
+      const c = tirelireComponents(idx.tireliresById.get('env-sante')!, idx, asOf);
+      expect(c.get('acc-principal')).toBe(euros(100));
+      expect(c.get('acc-marie')).toBe(euros(-80));
+      expect(tirelireBalance(idx.tireliresById.get('env-sante')!, idx, asOf)).toBe(euros(20));
+    });
 
-  it('solde à régler avec les comptes tiers', () => {
-    const marie = idx.accountsById.get('acc-marie')!;
-    const enfants = idx.accountsById.get('acc-enfants')!;
-    // dentiste 80 payé par Marie (le compte principal lui doit 80) − allocations 100 reçues chez elle
-    expect(settlementBalance(marie, ledger, idx, asOf)).toBe(euros(-20));
-    // la dotation de 200 € alimente la tirelire placée là : pas une dette
-    expect(settlementBalance(enfants, ledger, idx, asOf)).toBe(0);
-  });
+    it('solde à régler avec les comptes tiers', () => {
+      const marie = idx.accountsById.get('acc-marie')!;
+      const enfants = idx.accountsById.get('acc-enfants')!;
+      // dentiste 80 payé par Marie (le compte principal lui doit 80) − allocations 100 reçues chez elle
+      expect(settlementBalance(marie, ledger, idx, asOf)).toBe(euros(-20));
+      // la dotation de 200 € alimente la tirelire placée là : pas une dette
+      expect(settlementBalance(enfants, ledger, idx, asOf)).toBe(0);
+    });
 
-  it('second invariant : solde bancaire = composantes portées + non affecté', () => {
-    for (const a of idx.accountsById.values()) {
-      expect(componentsOnAccount(a, idx, asOf) + unallocated(a, ledger, idx, asOf)).toBe(accountBalance(a, ledger, asOf));
-    }
-    // Principal : 2340 + 3400 − 200 (virement enfants) − dotations (150 + 50 + 200 + 300 + 900 + 200 + 250 + 200 + 100) + 200 (virement)
-    const principal = idx.accountsById.get('acc-principal')!;
-    expect(unallocated(principal, ledger, idx, asOf)).toBe(euros(2340 + 3400 - 200 - 2350 + 200));
-    const livret = idx.accountsById.get('acc-livret')!;
-    expect(unallocated(livret, ledger, idx, asOf)).toBe(euros(15));
-  });
+    it('second invariant : solde bancaire = composantes portées + non affecté', () => {
+      for (const a of idx.accountsById.values()) {
+        expect(componentsOnAccount(a, idx, asOf) + unallocated(a, ledger, idx, asOf)).toBe(accountBalance(a, ledger, asOf));
+      }
+      // Principal : 2340 + 3400 − 200 (virement enfants) − dotations (150 + 50 + 200 + 300 + 900 + 200 + 250 + 200 + 100) + 200 (virement)
+      const principal = idx.accountsById.get('acc-principal')!;
+      expect(unallocated(principal, ledger, idx, asOf)).toBe(euros(2340 + 3400 - 200 - 2350 + 200));
+      const livret = idx.accountsById.get('acc-livret')!;
+      expect(unallocated(livret, ledger, idx, asOf)).toBe(euros(15));
+    });
 
-  it('premier invariant : le solde est la somme des composantes', () => {
-    for (const e of idx.tireliresById.values()) {
-      let sum = 0;
-      for (const v of tirelireComponents(e, idx, asOf).values()) sum += v;
-      expect(tirelireBalance(e, idx, asOf)).toBe(sum);
-    }
+    it('premier invariant : le solde est la somme des composantes', () => {
+      for (const e of idx.tireliresById.values()) {
+        let sum = 0;
+        for (const v of tirelireComponents(e, idx, asOf).values()) sum += v;
+        expect(tirelireBalance(e, idx, asOf)).toBe(sum);
+      }
+    });
   });
 });
 
@@ -366,16 +368,18 @@ describe('placement réparti sur plusieurs comptes (D37)', () => {
 // `it.fails` tient l'échec attendu, et `pnpm test` rougit le jour où il se mettrait à passer (#66).
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-it.fails('témoin rouge · un solde de tirelire qui ne compte que son compte de placement', () => {
-  const idx = indexLedger(exampleLedger());
-  const tirelire = idx.tireliresById.get('env-tf')!;
-  // Version cassée : ce que la tirelire porte ailleurs que sur son compte de placement est perdu.
-  // Elle cesse d'être un livre de compte tenu à travers les comptes, et sa dotation en attente sur
-  // le compte principal disparaît de son solde.
-  const placés = new Set(tirelire.placement.map((p) => p.accountId));
-  const composantes = new Map([...tirelireComponents(tirelire, idx, asOf)].filter(([compte]) => placés.has(compte)));
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un solde de tirelire qui ne compte que son compte de placement', () => {
+    const idx = indexLedger(exampleLedger());
+    const tirelire = idx.tireliresById.get('env-tf')!;
+    // Version cassée : ce que la tirelire porte ailleurs que sur son compte de placement est perdu.
+    // Elle cesse d'être un livre de compte tenu à travers les comptes, et sa dotation en attente sur
+    // le compte principal disparaît de son solde.
+    const placés = new Set(tirelire.placement.map((p) => p.accountId));
+    const composantes = new Map([...tirelireComponents(tirelire, idx, asOf)].filter(([compte]) => placés.has(compte)));
 
-  expect(composantes.get('acc-livret')).toBe(euros(900));
-  expect(composantes.get('acc-principal')).toBe(euros(150));
-  expect([...composantes.values()].reduce((s, v) => s + v, 0)).toBe(euros(1050));
+    expect(composantes.get('acc-livret')).toBe(euros(900));
+    expect(composantes.get('acc-principal')).toBe(euros(150));
+    expect([...composantes.values()].reduce((s, v) => s + v, 0)).toBe(euros(1050));
+  });
 });

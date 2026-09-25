@@ -1295,6 +1295,20 @@ dans la garde. Un changement de comportement de la garde est expliqué et justif
 rendu du codeur : il nomme les tests de la garde de `main` qui rougissent avec la garde proposée, et
 ceux qu'il modifie ; la validation du porteur le couvre.
 
+Les harnais de la garde (`packages/gardes/*.test.mjs`) et ceux du registre servent le même but —
+que les principes et les règles ne soient pas enfreints — et se traitent de la même manière : tout
+leur test est de niveau 0 ou 1 (D83), témoins compris, donc joué à chaque fusion. Quand une ligne
+`Harnais` nomme un test, la règle vaut pour ce test, sa suite et son témoin ; quand elle cite un
+fichier, pour tout le fichier. Un harnais de la garde ou du registre n'accueille donc jamais de test
+de niveau 4. La règle est un harnais de la garde, celui de #232 (`niveaux-des-tests.test.mjs`), pas
+une logique de l'outil ; tout ce qui y entre se jouant à chaque fusion, la garde reste petite
+(principe 12).
+
+Un harnais du registre ou de la garde a une forme normale : un fichier de tests de niveau 0 et 1, que
+le registre cite en entier, et, s'il le faut, un fichier compagnon, hors registre, pour les tests de
+niveau 2 à 4 du même besoin. Les données lourdes (instantanés, jeux d'essai) vont dans des fichiers de
+données, que seuls les tests qui en ont besoin chargent.
+
 ### D82 · Vérifier, valider : brouillon, Ready, aperçu
 
 Deux actes, qui ne se confondent pas : **la vérification**, par l'auditeur — le travail est conforme à
@@ -1323,25 +1337,81 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
 ### D83 · Crochets, CI et workflows
 
+- **Niveaux des tests.** Le niveau d'un test dit le risque pris à ne pas le jouer, sans rien dire du
+  moment où on le joue. Il se choisit par le besoin que couvre le test, jamais par sa durée : si un
+  test de niveau 0 déborde en temps, c'est au porteur de proposer une solution. On pose dans l'ordre
+  ces questions sur le besoin couvert, chacune supposant qu'il cesse d'être satisfait sans que
+  personne le voie ; la première réponse « oui » donne le niveau :
+  - **0 · l'irréparable** — après correction du code, les données de l'utilisateur resteraient-elles
+    perdues, altérées ou sorties de l'appareil, ou un secret exposé ?
+  - **1 · une promesse tombe** — un usage (U1 à U5), un principe, un invariant ou une contrainte ne
+    serait-il plus tenu ? L'appui est un identifiant : un test nommé au registre, ou qui vérifie un
+    de ces énoncés tel qu'il est écrit.
+  - **2 · un cas est faux** — une règle, métier ou de la garde, donnerait-elle un résultat faux ou
+    refuserait-elle à tort, l'usage restant possible ? C'est le cas d'une décision, nominal comme
+    limite.
+  - **3 · le dégradé** — le résultat resterait-il juste, mais obtenu moins bien : plus de gestes,
+    moins lisible, moins accessible, un message moins clair ?
+  - **4 · rien de garanti** — sinon : un diagnostic, un détail que rien ne garantit, un contrôle du
+    harnais lui-même. Il permet de garder un test sans qu'il soit joué à chaque fois.
+
+  Départage : on nomme d'abord le besoin couvert (phrase du « Fait quand », entrée du registre,
+  décision) ; deux tests du même besoin ont le même niveau ; un témoin rouge prend le niveau de ce
+  qu'il garde ; dans le doute, le plus critique. Un test déclare son niveau par la marque
+  `[niveau N]` dans son titre, ou dans celui de la suite la plus proche qui l'englobe ; sans marque,
+  il est de niveau 2. Le niveau se lit ainsi dans le fichier, sans l'exécuter.
+
+  L'outil de test prend un seuil N en entrée — `pnpm test N`, ou `pnpm --dir <paquet> run test N`,
+  2 sans entrée — et ne joue, dans tous les ensembles (cœur, interface headless et dans le
+  navigateur, garde, relais, hébergement), que les tests de niveau N ou moins ; ce qu'il écarte, il
+  le compte et le dit. Les tests navigateur (`apps/web/test/navigateur/`), qui coûtent cher, ne se
+  jouent que si l'option `--navigateur` les active, après le seuil (`pnpm test 2 --navigateur`) ;
+  sans elle, ils sont écartés, et comptés tels qu'ils sont écrits dans leurs fichiers, sans être
+  exécutés : un test écrit dans une boucle compte pour un, et la sortie dit ce qu'elle compte, pour
+  que ce nombre ne passe pas pour celui des tests exécutés. Aucune variable d'environnement ne change ce qui se
+  joue : tout passe par les arguments. Un test appelé nommément (`-t` de vitest,
+  `--test-name-pattern` de `node --test`) se joue quel que soit son niveau. Le script `test` de
+  chaque paquet passe par `packages/gardes/lanceur.mjs`. Les seuils des moments :
+
+  | Moment | Seuil |
+  |---|---|
+  | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur |
+  | Livraison (pré-fusion, pré-push) | 2, tests navigateur activés quand un navigateur est là |
+  | Vérification de l'auditeur, avant le Ready | 2 |
+  | CI au Ready | 1, plus les tests navigateur de niveau 2 |
+  | Publication d'une version (tag `v*`) | 3, tests navigateur activés |
+  | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
+
+- **Le harnais du besoin** est le ou les fichiers de l'auditeur — son harnais et son compagnon
+  éventuel (D81) —, et eux seuls : l'auditeur les nomme dans l'issue (« Harnais : chemins »), à côté
+  de la branche, et inscrit dans les trois premières lignes de chacun « Harnais d'audit de #<n> », le
+  numéro de l'issue, que porte aussi le nom de la branche (`audit/<n>-…`) : les crochets et la CI les
+  reconnaissent ainsi sans lire l'issue
+  (`.githooks/harnais-du-besoin.sh`, définition commune). Il se joue en entier, niveau 4 compris, à
+  chaque moment. Les autres fichiers de test que la branche ajoute ou modifie, ceux du codeur
+  compris, n'en font pas partie : ils se jouent à leur niveau.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
 - **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck` et le harnais du besoin ;
-  l'auditeur vérifie en local ce qu'il relit. Aucune CI ne tourne en brouillon. Les crochets font
-  leur part, sur la copie de travail. Au commit, en moins de 5 s : les tests des paquets que touchent
-  les fichiers indexés — cœur ; garde ; relais ; hébergement —, et rien pour la seule documentation.
-  Au pré-commit, la non-régression bloque le commit ; le harnais du besoin (les fichiers de test que
-  la branche ajoute ou modifie depuis sa base commune avec `origin/main`) est joué, et le pré-commit
-  ne fait qu'en afficher le verdict, sans bloquer, sauf une erreur de syntaxe ; c'est la livraison
-  qui le bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la livraison
-  (pré-fusion et pré-push), sur l'état commis : la nature du besoin se lit par
-  `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests headless des paquets touchés et
-  de l'interface, 30 s) ou organisationnel (garde, 45 s) —, les tests navigateur
-  (`apps/web/test/navigateur/`) restent à la CI, et le harnais du besoin est joué à part et bloque
-  quand du code arrive.
-- **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, tous les
-  harnais et la garde : typecheck, `pnpm test`, build, version de dev ; un outil manquant y fait
-  échouer le job. Sept workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
+  l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready. Aucune CI ne tourne en
+  brouillon. Les crochets font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
+  tests de niveau 0 des paquets que touchent les fichiers indexés — cœur ; garde ; relais ;
+  hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
+  commit ; le harnais du besoin est joué à part, en entier, hors budget, et le pré-commit ne fait
+  qu'en afficher le verdict, sans bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le
+  bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la
+  livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
+  `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
+  l'interface, 40 s sans navigateur, 270 s avec) ou organisationnel (garde, 45 s) —, les tests navigateur
+  (`apps/web/test/navigateur/`) sont activés quand un navigateur est là, sinon la livraison le dit
+  et les laisse à la CI, et le harnais du besoin est joué à part, en entier, et bloque quand du code
+  arrive.
+- **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, les
+  harnais et la garde : typecheck, `pnpm test 1`, puis les tests navigateur au seuil 2
+  (`--navigateur`) — qu'une session sans navigateur ne peut pas jouer —, le harnais du besoin en
+  entier, tests navigateur activés, build, version de dev ; un outil manquant y fait échouer le job. Avant toute fusion, les niveaux 0 à 2 ont
+  donc été joués, par la livraison et par l'auditeur, et la CI rejoue 0 et 1 sur l'état final. Sept workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
   d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un
@@ -1361,7 +1431,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
 - **Livraison.** Un push sur `main` construit et dépose le site. L'APK et les releases ne sortent
   qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion. Un tag publie une version
-  (D87) et porte son nom (`docs/versions.md`).
+  (D87) et porte son nom (`docs/versions.md`) ; ses tests se jouent au seuil 3, tests navigateur
+  activés, avant de publier.
 
 ### D84 · Le code, les données et les commits
 

@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "node ../gardes/lanceur.mjs vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
