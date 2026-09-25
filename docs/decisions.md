@@ -731,8 +731,8 @@ ce n'est plus le geste offert.
 liste montre jamais leur effet : un crédit terminé s'y lisait comme un crédit en cours.
 
 **Le jeu d'exemple porte des changements datés.** Il n'en avait aucun : on ne pouvait donc ni voir
-ni tester ce que produit un budget qui change, sinon en fabriquant des données à la main. Il
-porte maintenant des changements choisis pour couvrir les quatre formes que prend un changement — une révision
+ni tester ce que produit un budget qui change, sinon en fabriquant des données à la main. Il en
+porte maintenant six, choisis pour couvrir les quatre formes que prend un changement — une révision
 déjà faite, une révision à venir, une ligne qui apparaît, une ligne qui s'arrête :
 
 - *Divers et sorties* passé de 300 à 250 € au 28 août : la version close se lit encore et ne dote
@@ -880,7 +880,7 @@ pour qu'une garde muette ne passe pas pour une garde verte.
 
 ### D55 · Des seuils tactiles mesurés, pas relus
 
-Un audit d'ergonomie relit des feuilles de style et donne un avis. Ces quatre-là se mesurent, donc
+Un audit d'ergonomie relit des feuilles de style et donne un avis. Ces cinq-là se mesurent, donc
 elles deviennent des gardes plutôt que des avis, dans le harnais posé par D54.
 
 **Les seuils.** Une cible tactile fait au moins 44 px de côté — Material en demande 48, Apple 44 ;
@@ -916,7 +916,7 @@ dans `apps/web/test/harnais.ts`, dont la garde de D54 se sert désormais aussi.
 
 ### D56 · Un écran de cartes se filtre par état
 
-Des écrans de Configuration listent des cartes : Comptes, Tirelires, Flux prévus. Depuis D50 et
+Trois écrans de Configuration listent des cartes : Comptes, Tirelires, Flux prévus. Depuis D50 et
 D51, ces listes portent des lignes qui ne concernent pas le jour même — la version close d'un budget
 révisé, son successeur daté, un crédit qui s'arrête en décembre, un besoin qui apparaît en novembre.
 Elles se lisent en retrait, avec une pastille, mais elles occupent la place, et sur un téléphone la
@@ -986,9 +986,9 @@ vérifie. Sans lui, l'écran Comptes de l'exemple n'aurait montré aucun filtre,
 restée invisible au chargement.
 
 **Gardes.** `packages/core/test/etats.test.ts` fige les trois états et leurs bornes, les deux
-réserves de l'état d'une tirelire, et le fait que l'exemple porte les trois états sur ces
+réserves de l'état d'une tirelire, et le fait que l'exemple porte les trois états sur les trois
 écrans. `apps/web/test/filtre-etat.test.ts` charge l'exemple dans un vrai navigateur à 375 px, va
-sur chacun de ces écrans et vérifie l'état de départ des interrupteurs, que le clos part rangé
+sur chacun des trois écrans et vérifie l'état de départ des interrupteurs, que le clos part rangé
 sans que son bouton disparaisse, et que chaque interrupteur montre ou masque ce qu'il annonce sans
 toucher aux autres — même harnais que la garde de mise en page (D54), et même abstention faute de
 Chrome, sauf en intégration continue.
@@ -1082,7 +1082,7 @@ Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'
 recalcule (D84). Importées : `account_id`, `date`, `label`, `details`, `amount` et
 `suggested_category`, la catégorie que propose la source. Saisie : `one_off`, et toutes les
 colonnes d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit pas
-dans la forme de l'identifiant, qui n'est qu'une identité (D09). Des colonnes établies sont
+dans la forme de l'identifiant, qui n'est qu'une identité (D09). Quatre colonnes établies sont
 gardées : `state`, que posent l'import, les automatismes ou l'utilisateur (D22), et
 `planned_flow_id`, `transfer_account_id` et `transfer_operation_id`, que le rapprochement établit.
 Elles ne se recalculent pas à l'identique : le rapprochement dépend des flux et des opérations du
@@ -1115,7 +1115,7 @@ frappe et se déferait à mesure qu'on corrige le nom.
 et pourrait renaître sans que rien ne l'attrape. Vitest et jsdom y entrent, avec des tests sur
 `revealed` (il amène le panneau au rendu suivant, en `block: 'nearest'` pour déplacer le moins
 possible, sans animation quand le mouvement est réduit) et des tests de structure qui figent, sur
-les écrans Comptes, Tirelires, Catégories, Flux prévus et Saisie, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
+les cinq écrans, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
 il porte `attached` et `use:revealed`, il porte un titre figé. Vérifié en remettant le
 `Flows.svelte` d'avant la correction : les trois échouent.
 
@@ -1240,12 +1240,11 @@ fondateurs et ne contredit jamais les fondamentaux.
   relisant (architecte, auditeur) ; la garde n'en serait pas capable. Les tests qu'elle rougit
   suivent le principe 9.3.
 - **Une information ne se duplique pas.** Elle vit à un seul endroit ; les autres y renvoient.
-- **Un document ne porte pas de chiffre qui change à chaque besoin.** Un chiffre qui compte ce que
-  le projet ajoute ou retire en avançant — tests, fichiers, décisions, issues, entrées, écrans,
-  colonnes, lignes — vit dans l'outil qui le produit (`pnpm test`, la garde, GitHub) : le document
-  donne la liste, ou renvoie à l'endroit où elle se trouve. Restent les chiffres qui sont des règles
-  (un budget, un plafond, un niveau, un seuil), les identifiants, une mesure qui motive une décision
-  sans avoir à rester vraie, et les paroles du porteur citées mot pour mot.
+- **Un document ne compte pas ce que le code produit.** Un nombre qui résulte du code sans être un
+  fondement du projet — le nombre de tests, par exemple — vit dans l'outil qui le produit
+  (`pnpm test`, la garde) ; le document n'en porte pas. Ce qui vit dans les documents se compte
+  librement, et un nombre accompagné de la liste qu'il compte reste : il en fait partie et lève les
+  ambiguïtés, à condition de compter juste.
 - **Le projet tient sans ses issues.** Elles servent à le conduire ; une issue reste ouverte tant
   qu'elle est cohérente avec les catalogues, et c'est le catalogue qui fait référence.
 - **Une issue, une PR, une fusion.** Ce qui en déborde est une nouvelle issue, ouverte avant la
@@ -1414,7 +1413,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   harnais et la garde : typecheck, `pnpm test 1`, puis les tests navigateur au seuil 2
   (`--navigateur`) — qu'une session sans navigateur ne peut pas jouer —, le harnais du besoin en
   entier, tests navigateur activés, build, version de dev ; un outil manquant y fait échouer le job. Avant toute fusion, les niveaux 0 à 2 ont
-  donc été joués, par la livraison et par l'auditeur, et la CI rejoue 0 et 1 sur l'état final. Les workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
+  donc été joués, par la livraison et par l'auditeur, et la CI rejoue 0 et 1 sur l'état final. Sept workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
   d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un

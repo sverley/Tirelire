@@ -79,5 +79,5 @@ Propres au domaine :
 
 Le domaine ne porte aucun usage en propre. Il les sert tous à la même condition, une webapp qui
 garde de vraies données : persistantes (C4), sauvegardées (C5), à une version connue (C8). D'après
-la matrice de `docs/cibles.md`, U1 est le premier servi sur les cibles Chromium ; la version v1
+la matrice de `docs/cibles.md`, U1 est le premier servi sur les deux cibles Chromium ; la version v1
 le garantit.
