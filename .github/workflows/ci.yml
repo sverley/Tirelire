@@ -88,17 +88,18 @@ jobs:
           lftp --version | head -n 1
           python3 -c 'import pyftpdlib; print("pyftpdlib présent")'
       # Seuils (#232, D83) : au Ready et sur `main`, les tests de niveau 0 et 1 — l'auditeur a
-      # vérifié au seuil 2 avant le Ready, la livraison aussi —, hors tests navigateur, joués ensuite
-      # au seuil 2 : une session sans navigateur ne peut pas les jouer.
+      # vérifié au seuil 2 avant le Ready, la livraison aussi —, puis les tests navigateur de niveau 2,
+      # qu'une session sans navigateur ne peut pas jouer. Ceux-ci sont appelés nommément (`-t`), par
+      # un motif qui ne retient que le niveau 2 (sans marque, ou dernière marque « [niveau 2] ») : les
+      # niveaux 0 et 1, déjà joués par `pnpm test 1`, ne se rejouent pas.
       - name: Tests au seuil 1
         if: "!startsWith(github.ref, 'refs/tags/v')"
         run: pnpm test 1
         env:
           TIRELIRE_STRICT: '1'
-          TIRELIRE_SANS_NAVIGATEUR: '1'
       - name: Tests navigateur au seuil 2
         if: "!startsWith(github.ref, 'refs/tags/v')"
-        run: pnpm --dir apps/web run test 2 test/navigateur
+        run: pnpm --dir apps/web run test 2 test/navigateur -t '^(?!.*\[niveau \d\])|\[niveau 2\](?!.*\[niveau \d\])'
         env:
           TIRELIRE_STRICT: '1'
       # Le harnais du besoin en cours, en entier (seuil 4), par sa définition commune (D83).

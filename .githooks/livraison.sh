@@ -15,7 +15,7 @@
 # 3. Sélection, au seuil 2 (#232 : les tests de niveau 0 à 2) :
 #    - fonctionnel : typecheck et tests des paquets touchés, tests de l'interface — dans le
 #      navigateur quand un navigateur est là, sinon laissés à la CI, et la livraison le dit ; durée
-#      attendue 30 s ;
+#      attendue 40 s sans navigateur, 270 s avec (mesurées le 25/09) ;
 #    - organisationnel : tests de la garde ; durée attendue 45 s.
 #    Une sélection qui dépasse sa durée attendue de plus de 20 % le dit, sans bloquer.
 # 4. Harnais du besoin (`harnais-du-besoin.sh` : le fichier de l'auditeur, qui porte le numéro de
@@ -240,7 +240,9 @@ debut=$(date +%s)
 selection=''
 attendue=0
 if [ -n "$fonc" ]; then
-  attendue=$((attendue + 30))
+  # Durées mesurées (#232) : les tests navigateur font l'essentiel de la sélection.
+  if navigateur; then attendue=$((attendue + 270)) interface='interface headless et navigateur'
+  else attendue=$((attendue + 40)) interface='interface headless'; fi
   paquets=$(grep -Eo '^(apps|packages)/[^/]+/' "$travail/fonctionnels" | sed 's#/$##' | sort -u)
   for p in $paquets; do
     [ -f "$juge/$p/package.json" ] || continue
@@ -249,7 +251,7 @@ if [ -n "$fonc" ]; then
     [ "$p" = apps/web ] || non_regression "$n" "$p"
   done
   non_regression interface apps/web
-  selection="fonctionnel ($(echo $paquets | tr ' ' ',') ; interface headless)"
+  selection="fonctionnel ($(echo $paquets | tr ' ' ',') ; $interface)"
 fi
 if [ -n "$org" ]; then
   attendue=$((attendue + 45))
