@@ -240,9 +240,10 @@ function source(exécuteur, nom, entête) {
   return `${lignes.join('\n')}\n`;
 }
 
-/** Deux tests de niveau 1 écrits dans une boucle, dans le fichier navigateur inventé. */
+/** Un test de niveau 1 écrit dans une boucle, qui en engendre deux, dans le fichier navigateur inventé. */
 const BOUCLE = "for (const k of [1, 2]) test(`b${k} [niveau 1]`, () => { note('b' + k); });\n";
-const NAVIGATEUR = FIXTURE.length + 2;
+/** Tests écrits du fichier navigateur inventé : la boucle compte pour un (#232, point 3). */
+const NAVIGATEUR_ÉCRITS = FIXTURE.length + 1;
 
 /** Ce qu'un seuil doit jouer : les tests de ce niveau ou moins. */
 const attendus = (seuil) => FIXTURE.filter((t) => t.niveau <= seuil).map((t) => t.id).sort();
@@ -307,7 +308,7 @@ async function jouerFixture(nomPaquet, { seuil, nommé, navigateur = false } = {
     mkdirSync(join(racine, 'test', 'navigateur'), { recursive: true });
     writeFileSync(join(racine, 'test', 'niveaux.test.ts'), source('vitest', nom));
     // L'interface dans le navigateur : même exécuteur, son propre dossier.
-    // Plus deux tests écrits dans une boucle : un test se compte autant de fois qu'il se joue.
+    // Plus un test écrit dans une boucle, qui en engendre deux : écrit une fois, il compte pour un.
     if (nomPaquet === 'interface') writeFileSync(join(racine, 'test', 'navigateur', 'niveaux.test.ts'), source('vitest', `${nom}-navigateur`) + BOUCLE);
     args = ['--dir', relatif, ...(nommé ? ['-t', nommé] : [])];
   } else {
@@ -533,16 +534,19 @@ test('rétrocompatibilité [niveau 3]', () => {});
     });
   }
 
-  test('interface (vitest) : sans l’option, les tests navigateur sont écartés, et la sortie le dit', async () => {
+  test('interface (vitest) : sans l’option, les tests navigateur sont écartés, et la sortie dit ce qu’elle compte', async () => {
     const r = await scénarios['interface:1']();
     assert.equal(r.code, 0, `interface, \`pnpm test 1\` : le lancement échoue\n${r.sortie.slice(-2000)}`);
     assert.deepEqual(r.joués, attendus(1), 'interface headless : au seuil 1, seuls les tests de niveau 1 ou moins (#232, points 1 et 3)');
     assert.deepEqual(r.navigateur, [], 'interface dans le navigateur : sans `--navigateur`, aucun test navigateur ne se joue (#232, point 3)');
     const lignes = r.sortie.split('\n');
     assert.ok(lignes.some((l) => /navigateur/i.test(l) && /écart/i.test(l)), `interface : sans \`--navigateur\`, la sortie dit que les tests navigateur sont écartés (#232, point 3)\n${r.sortie.slice(-1500)}`);
+    // La ligne dit ce qu'elle compte : des fichiers et des tests écrits, sans les exécuter ; la
+    // boucle compte pour un. Qu'elle ne présente pas ce nombre comme celui des tests exécutés reste
+    // à la relecture.
     assert.ok(
-      lignes.some((l) => /navigateur/i.test(l) && /écart/i.test(l) && new RegExp(`(?<!\\d)${NAVIGATEUR}(?!\\d)`).test(l)),
-      `interface : sans \`--navigateur\`, les ${NAVIGATEUR} tests navigateur écartés se comptent tous, deux tests écrits dans une boucle compris (#232, point 3)\n${lignes.filter((l) => /navigateur/i.test(l)).join('\n')}`,
+      lignes.some((l) => /navigateur/i.test(l) && /écart/i.test(l) && /fichier/i.test(l) && /écrit/i.test(l) && new RegExp(`(?<!\\d)${NAVIGATEUR_ÉCRITS}(?!\\d)`).test(l)),
+      `interface : sans \`--navigateur\`, la ligne dit ce qu'elle compte — des fichiers et des tests écrits : ici ${NAVIGATEUR_ÉCRITS} tests écrits, la boucle comptant pour un (#232, point 3)\n${lignes.filter((l) => /navigateur/i.test(l)).join('\n')}`,
     );
   });
 
