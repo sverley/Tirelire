@@ -76,7 +76,7 @@ describe('dépôt SQLite', () => {
 
   it('requête SQL libre', async () => {
     const s = await seeded('A');
-    const rows = s.query(`SELECT name FROM envelopes WHERE placement LIKE ? ORDER BY name`, ['%acc-livret%']);
+    const rows = s.query(`SELECT name FROM tirelires WHERE placement LIKE ? ORDER BY name`, ['%acc-livret%']);
     expect(rows.map((r) => r['name'])).toEqual(['Assurance auto', 'Taxe foncière', 'Vacances', 'Épargne de précaution']);
   });
 });
@@ -102,7 +102,7 @@ describe('identifiants', () => {
     const k3 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 1);
     expect(k1).toBe(k2);
     expect(k1).not.toBe(k3);
-    expect(k1).toMatch(/^op_[0-9a-f]{32}$/);
+    expect(k1).toMatch(/^op_[0-9a-f]{16}$/);
   });
 });
 

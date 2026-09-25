@@ -9,7 +9,6 @@
     isDerivedFlow,
     needForDueDateFlow,
     nextOccurrence,
-    stepOf,
     stateShown,
     syncFlowAutomations,
     todayISO,
@@ -40,7 +39,7 @@
     tolerancePct: '',
     labelPattern: '',
     variable: false,
-    makesRule: false,
+    makesAutomation: false,
     activeFrom: '',
     activeTo: '',
   });
@@ -80,7 +79,7 @@
   function startNew() {
     const principal = accounts.find((a) => a.kind === 'principal');
     editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: principal?.id ?? '', periodicity: { interval: 1, unit: 'month' as const, anchorDate: app.asOf }, dateWindowDays: 3 };
-    form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', interval: '1', unit: 'month' as PeriodUnit, anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesRule: false, activeFrom: '', activeTo: '' };
+    form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', interval: '1', unit: 'month' as PeriodUnit, anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesAutomation: false, activeFrom: '', activeTo: '' };
     titre = 'Ajouter un flux';
     error = '';
   }
@@ -95,15 +94,15 @@
       tirelireId: f.tirelireId ?? '',
       categoryId: f.categoryId ?? '',
       counterpartAccountId: f.counterpartAccountId ?? '',
-      interval: String(stepOf(f.periodicity).interval),
-      unit: stepOf(f.periodicity).unit,
+      interval: String(f.periodicity.interval),
+      unit: f.periodicity.unit,
       anchorDate: f.periodicity.anchorDate,
       dateWindowDays: String(f.dateWindowDays),
       toleranceAbs: centsToInput(f.amountTolerance?.abs),
       tolerancePct: f.amountTolerance?.pct !== undefined ? String(f.amountTolerance.pct) : '',
       labelPattern: f.labelPattern ?? '',
       variable: !!f.variable,
-      makesRule: !!f.makesRule,
+      makesAutomation: !!f.makesAutomation,
       activeFrom: f.activeFrom ?? '',
       activeTo: f.activeTo ?? '',
     };
@@ -145,7 +144,7 @@
         : {}),
       ...(form.labelPattern.trim() ? { labelPattern: form.labelPattern.trim() } : {}),
       ...(form.variable ? { variable: true } : {}),
-      ...(form.makesRule ? { makesRule: true } : {}),
+      ...(form.makesAutomation ? { makesAutomation: true } : {}),
       ...(form.activeFrom ? { activeFrom: form.activeFrom } : {}),
       ...(form.activeTo ? { activeTo: form.activeTo } : {}),
     };
@@ -225,7 +224,7 @@
       <label class="f">Actif à partir du <input type="date" bind:value={form.activeFrom} /></label>
       <label class="f">Actif jusqu'au <input type="date" bind:value={form.activeTo} /></label>
       <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (rapprochement à confirmer)</label>
-      <label class="f check"><input type="checkbox" bind:checked={form.makesRule} /> Classer automatiquement les opérations de ce flux (crée un automatisme qui verrouille)</label>
+      <label class="f check"><input type="checkbox" bind:checked={form.makesAutomation} /> Classer automatiquement les opérations de ce flux (crée un automatisme qui verrouille)</label>
     </div>
     {#if error}<div class="err">{error}</div>{/if}
     <div class="actions" style="margin:0">
@@ -249,7 +248,7 @@
       {@const provision = provisionText(f)}
       <div class="row {badge ? 'dormant' : ''}" class:editing={editing?.id === f.id}>
         <div class="label">
-          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesRule ? ' · automatisme' : ''}
+          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesAutomation ? ' · automatisme' : ''}
           {#if badge}<span class="pill dim">{badge}</span>{/if}
           {#if isDerivedFlow(f)}<span class="pill dim">dérivé du budget</span>{/if}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}{validite ? ` · ${validite}` : ''}</span>

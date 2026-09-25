@@ -403,7 +403,7 @@ export function syncFlowAutomations(ledger: Ledger, asOf: string): FlowAutomatio
   let rank = topRank(ledger);
   for (const flow of alive(ledger.plannedFlows)) {
     const current = existing.get(flow.id);
-    if (!flow.makesRule) {
+    if (!flow.makesAutomation) {
       if (current) out.automations.push({ ...current, validTo: asOf });
       continue;
     }

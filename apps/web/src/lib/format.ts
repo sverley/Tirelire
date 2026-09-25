@@ -3,7 +3,6 @@ import {
   formatCents,
   parseCents,
   parseDate,
-  stepOf,
   validityState,
   MONTHS_FR,
   type Account,
@@ -91,7 +90,7 @@ export const UNITS: Record<PeriodUnit, { un: string; pluriel: string }> = {
 export function periodicityLabel(p: Periodicity | undefined): string {
   if (!p) return '—';
   const when = shortDate(p.anchorDate);
-  const { interval, unit } = stepOf(p);
+  const { interval, unit } = p;
   if (interval === 1) {
     if (unit === 'month') return `chaque mois (dès le ${when})`;
     if (unit === 'year') return `chaque année le ${when.slice(0, -5)}`;

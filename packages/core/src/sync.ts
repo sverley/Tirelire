@@ -20,19 +20,20 @@ import { FormatRefused, knowledgeCovers, type Conflict, type Knowledge, type Led
 /** Marqueur des messages et des paquets de synchronisation. */
 export const SYNC_FORMAT = 'tirelire-etat';
 
-interface Envelope {
+/** En-tête de chaque message et de chaque paquet : son format, sa version, son émetteur. */
+interface Header {
   format: typeof SYNC_FORMAT;
   version: number;
   site: string;
 }
 
 export type SyncMessage =
-  | (Envelope & { type: 'hello'; name?: string; knowledge: Knowledge })
-  | (Envelope & { type: 'request' })
-  | (Envelope & { type: 'changes'; rows: RowState[]; knowledge: Knowledge })
-  | (Envelope & { type: 'done' })
+  | (Header & { type: 'hello'; name?: string; knowledge: Knowledge })
+  | (Header & { type: 'request' })
+  | (Header & { type: 'changes'; rows: RowState[]; knowledge: Knowledge })
+  | (Header & { type: 'done' })
   /** Fin de l'échange ; `refused` dit pourquoi l'autre l'arrête. */
-  | (Envelope & { type: 'bye'; refused?: string });
+  | (Header & { type: 'bye'; refused?: string });
 
 export interface Transport {
   send(msg: SyncMessage): void | Promise<void>;
@@ -57,7 +58,7 @@ const ANCIEN_FORMAT = 'Le paquet vient d’une version antérieure de Tirelire, 
  * écriture.
  */
 export function checkSyncFormat(msg: unknown): void {
-  const m = msg as Partial<Envelope> & { format?: unknown; version?: unknown } | null;
+  const m = msg as Partial<Header> & { format?: unknown; version?: unknown } | null;
   if (!m || typeof m !== 'object') throw new FormatRefused('etranger', 'Paquet illisible : ce n’est pas un paquet de synchronisation Tirelire. Rien n’a été écrit.');
   if (m.format === SYNC_FORMAT) {
     if (m.version === FORMAT_VERSION) return;
@@ -74,7 +75,7 @@ export function checkSyncFormat(msg: unknown): void {
   throw new FormatRefused('etranger', 'Ce paquet n’est pas au format de synchronisation de Tirelire. Rien n’a été écrit.');
 }
 
-function envelope(store: LedgerStore): Envelope {
+function header(store: LedgerStore): Header {
   return { format: SYNC_FORMAT, version: FORMAT_VERSION, site: store.siteId };
 }
 
@@ -110,7 +111,7 @@ export function runSync(store: LedgerStore, transport: Transport, opts: { name?:
     const finish = () => {
       if (weAreDone && theyAreDone && !byeSent) {
         byeSent = true;
-        void transport.send({ ...envelope(store), type: 'bye' });
+        void transport.send({ ...header(store), type: 'bye' });
       }
     };
     transport.onMessage((msg) => {
@@ -120,7 +121,7 @@ export function runSync(store: LedgerStore, transport: Transport, opts: { name?:
       } catch (err) {
         // Dire à l'autre pourquoi l'échange s'arrête, s'il sait le lire ; ne rien écrire ici.
         try {
-          void Promise.resolve(transport.send({ ...envelope(store), type: 'bye', refused: (err as Error).message })).catch(() => undefined);
+          void Promise.resolve(transport.send({ ...header(store), type: 'bye', refused: (err as Error).message })).catch(() => undefined);
         } catch {
           /* transport fermé */
         }
@@ -131,12 +132,12 @@ export function runSync(store: LedgerStore, transport: Transport, opts: { name?:
           peer = msg.site;
           peerName = msg.name;
           peerKnowledge = msg.knowledge ?? {};
-          void transport.send({ ...envelope(store), type: 'request' });
+          void transport.send({ ...header(store), type: 'request' });
         } else if (msg.type === 'request') {
           const rows = store.rowsNewerThan(peerKnowledge ?? {});
           sent = rows.length;
-          void transport.send({ ...envelope(store), type: 'changes', rows, knowledge: store.getKnowledge() });
-          void transport.send({ ...envelope(store), type: 'done' });
+          void transport.send({ ...header(store), type: 'changes', rows, knowledge: store.getKnowledge() });
+          void transport.send({ ...header(store), type: 'done' });
           weAreDone = true;
           finish();
         } else if (msg.type === 'changes') {
@@ -160,7 +161,7 @@ export function runSync(store: LedgerStore, transport: Transport, opts: { name?:
         fail(err);
       }
     });
-    void transport.send({ ...envelope(store), type: 'hello', ...(opts.name ? { name: opts.name } : {}), knowledge: store.getKnowledge() });
+    void transport.send({ ...header(store), type: 'hello', ...(opts.name ? { name: opts.name } : {}), knowledge: store.getKnowledge() });
   });
 }
 
@@ -168,7 +169,7 @@ export function runSync(store: LedgerStore, transport: Transport, opts: { name?:
 // Paquets : échange par fichier, dépôts sur le relais
 // ---------------------------------------------------------------------------
 
-export interface StateBundle extends Envelope {
+export interface StateBundle extends Header {
   type: 'paquet';
   name?: string;
   /** Ce que l'émetteur supposait déjà connu du destinataire : les lignes vont au-delà. */
@@ -178,13 +179,10 @@ export interface StateBundle extends Envelope {
   rows: RowState[];
 }
 
-/**
- * Paquet des lignes qu'ignore une instance qui sait `since` (rien : tout l'état). Un nombre, forme
- * d'un ancien curseur, vaut « tout ».
- */
-export function exportBundle(store: LedgerStore, since?: Knowledge | number, name?: string): StateBundle {
-  const base = typeof since === 'object' && since ? { ...since } : {};
-  return { ...envelope(store), type: 'paquet', ...(name ? { name } : {}), base, knowledge: store.getKnowledge(), rows: store.rowsNewerThan(base) };
+/** Paquet des lignes qu'ignore une instance qui sait `since` (rien : tout l'état). */
+export function exportBundle(store: LedgerStore, since?: Knowledge, name?: string): StateBundle {
+  const base = since ? { ...since } : {};
+  return { ...header(store), type: 'paquet', ...(name ? { name } : {}), base, knowledge: store.getKnowledge(), rows: store.rowsNewerThan(base) };
 }
 
 /** Paquet pour un pair déjà rencontré : seulement ce qu'il n'avait pas au dernier échange. */

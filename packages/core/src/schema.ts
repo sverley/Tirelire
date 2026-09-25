@@ -2,21 +2,37 @@
  * Description des tables : une seule source pour créer le schéma SQLite, lire et écrire les
  * lignes, et les échanger entre instances. Chaque table porte en plus une colonne `hlc` :
  * l'horloge de la dernière écriture de la ligne, appareil compris (D58).
+ *
+ * Les noms SQL sont ceux du domaine (D39, D42, D58) : la propriété `tirelireId` est la colonne
+ * `tirelire_id`, sans exception. Une colonne obligatoire est `NOT NULL`, une colonne à valeurs
+ * énumérées porte un `CHECK` nommé `table.colonne` : le fichier refuse ce qui ne se lit pas, et
+ * `rowProblem` dit la même chose avant d'écrire.
  */
+import {
+  ACCOUNT_KINDS,
+  CATEGORY_NATURES,
+  FLOW_ORIGINS,
+  NEED_KINDS,
+  OPERATION_ORIGINS,
+  OPERATION_STATES,
+  PLANNED_FLOW_KINDS,
+  REPLENISHMENT_KINDS,
+  SETTLEMENT_DIRECTIONS,
+} from './model.js';
+import { IMPORT_DATE_FORMATS, IMPORT_DELIMITERS, IMPORT_ENCODINGS, IMPORT_SOURCES } from './importer.js';
 
 export type ColumnType = 'text' | 'integer' | 'real' | 'json' | 'boolean';
 
 export interface ColumnDef {
   /** Nom de la propriété en TypeScript (camelCase). */
   prop: string;
-  /** Nom de la colonne SQL (snake_case). */
+  /** Nom de la colonne SQL : la propriété en snake_case. */
   col: string;
   type: ColumnType;
-  /**
-   * Colonne retirée du modèle (D30) : gardée dans le schéma, ignorée à la lecture et à
-   * l'écriture locale, acceptée d'un pair non migré, lue par les migrations.
-   */
-  deprecated?: boolean;
+  /** Obligatoire : jamais vide (`NOT NULL`). */
+  required?: boolean;
+  /** Valeurs permises (`CHECK`) ; un booléen n'en a que deux, 0 et 1. */
+  values?: readonly string[];
 }
 
 export interface TableDef {
@@ -24,216 +40,144 @@ export interface TableDef {
   columns: ColumnDef[];
 }
 
-const c = (prop: string, type: ColumnType = 'text'): ColumnDef => ({
+interface Options {
+  required?: boolean;
+  values?: readonly string[];
+}
+
+const c = (prop: string, type: ColumnType = 'text', opts: Options = {}): ColumnDef => ({
   prop,
   col: prop.replace(/[A-Z]/g, (m) => '_' + m.toLowerCase()),
   type,
+  ...opts,
 });
 
-/**
- * Colonne dont le nom SQL diffère du nom de la propriété. Sert au renommage du domaine (D41) :
- * « tirelire » côté modèle, `envelopes` / `envelope_id` côté stockage. Renommer une colonne
- * obligerait à la déprécier et à migrer (D30), et casserait la fusion avec un pair non migré,
- * pour un gain nul — le nom SQL n'est jamais lu par personne.
- */
-const cAs = (prop: string, col: string, type: ColumnType = 'text'): ColumnDef => ({ prop, col, type });
+/** Colonne obligatoire. */
+const req = (prop: string, type: ColumnType = 'text'): ColumnDef => c(prop, type, { required: true });
 
-/** Colonne dépréciée (voir `ColumnDef.deprecated`). */
-const old = (prop: string, type: ColumnType = 'text'): ColumnDef => ({ ...c(prop, type), deprecated: true });
+/** Colonne à valeurs énumérées, obligatoire ou non. */
+const oneOf = (prop: string, values: readonly string[], required = false): ColumnDef => c(prop, 'text', { values, ...(required ? { required } : {}) });
 
-/** Colonne dépréciée dont le nom SQL diffère du nom de la propriété. */
-const oldAs = (prop: string, col: string, type: ColumnType = 'text'): ColumnDef => ({ ...cAs(prop, col, type), deprecated: true });
-
-/** Version courante du modèle ; `migrateModel` (migration.ts) amène un dépôt plus ancien à cette version. */
-export const MODEL_VERSION = 10;
+const ID = req('id');
+const DELETED_AT = c('deletedAt');
 
 export const TABLES: Record<string, TableDef> = {
   accounts: {
     name: 'accounts',
     columns: [
-      c('id'),
-      c('name'),
-      c('kind'),
+      ID,
+      req('name'),
+      oneOf('kind', ACCOUNT_KINDS, true),
       c('bank'),
       c('accountNumber'),
-      c('openingBalance', 'integer'),
-      c('openingDate'),
-      old('payDay', 'integer'), // D44 : remplacé par le réglage periodStartDay
+      req('openingBalance', 'integer'),
+      req('openingDate'),
       c('tracksSettlement', 'boolean'),
       c('settlementThreshold', 'integer'),
-      c('settlementDirection'),
+      oneOf('settlementDirection', SETTLEMENT_DIRECTIONS),
       c('activeFrom'), // D56
       c('activeTo'),
-      c('deletedAt'),
+      DELETED_AT,
     ],
   },
   tirelires: {
-    // Nom SQL historique conservé (D41) : le domaine dit « tirelire », le stockage garde `envelopes`.
-    name: 'envelopes',
-    columns: [
-      c('id'),
-      c('name'),
-      c('placement', 'json'),
-      c('openingBalance', 'integer'),
-      c('openingDate'),
-      c('rollover', 'json'),
-      c('deletedAt'),
-      // Modèle D01–D18 (migration 1 → 2) :
-      old('kind'),
-      old('accountId'),
-      old('target', 'integer'),
-      old('periodicity', 'json'),
-      old('monthlyAmount', 'integer'),
-      old('priority', 'integer'),
-    ],
+    name: 'tirelires',
+    columns: [ID, req('name'), req('placement', 'json'), req('openingBalance', 'integer'), req('openingDate'), c('rollover', 'json'), DELETED_AT],
   },
   needs: {
     name: 'needs',
     columns: [
-      c('id'),
-      cAs('tirelireId', 'envelope_id'),
-      c('kind'),
+      ID,
+      req('tirelireId'),
+      oneOf('kind', NEED_KINDS, true),
       c('name'),
       c('amount', 'integer'),
       c('periodicity', 'json'),
       c('monthlyAmount', 'integer'),
-      c('priority', 'integer'),
+      req('priority', 'integer'),
       c('activeFrom'), // D50
       c('activeTo'),
-      c('deletedAt'),
+      DELETED_AT,
     ],
   },
   categories: {
     name: 'categories',
-    columns: [c('id'), c('name'), c('parentId'), cAs('tirelireId', 'envelope_id'), c('nature'), c('deletedAt')],
+    columns: [ID, req('name'), c('parentId'), c('tirelireId'), oneOf('nature', CATEGORY_NATURES, true), DELETED_AT],
   },
   plannedFlows: {
     name: 'planned_flows',
     columns: [
-      c('id'),
-      c('name'),
-      c('kind'),
-      c('amount', 'integer'),
-      c('accountId'),
-      cAs('tirelireId', 'envelope_id'),
+      ID,
+      req('name'),
+      oneOf('kind', PLANNED_FLOW_KINDS, true),
+      req('amount', 'integer'),
+      req('accountId'),
+      c('tirelireId'),
       c('counterpartAccountId'),
       c('categoryId'),
-      c('periodicity', 'json'),
-      c('dateWindowDays', 'integer'),
+      req('periodicity', 'json'),
+      req('dateWindowDays', 'integer'),
       c('amountTolerance', 'json'),
       c('labelPattern'),
       c('variable', 'boolean'),
       c('activeFrom'),
       c('activeTo'),
-      c('makesRule', 'boolean'),
-      c('origin'), // D57 : flux déclaré ou dérivé du budget
-      old('plannedAllocation', 'json'), // D60 : la ventilation d'un virement ne se stocke plus
-      c('deletedAt'),
+      c('makesAutomation', 'boolean'), // D24, D39
+      oneOf('origin', FLOW_ORIGINS), // D57 : flux déclaré ou dérivé du budget ; absent vaut déclaré
+      DELETED_AT,
     ],
   },
+  // Chaque colonne est importée, saisie, ou établie par le rapprochement et gardée pour la raison
+  // que D58 écrit ; le libellé normalisé se recalcule à la lecture et ne se stocke pas.
   operations: {
     name: 'operations',
     columns: [
-      c('id'),
-      c('accountId'),
-      c('origin'),
-      c('date'),
-      c('label'),
-      c('normalizedLabel'),
+      ID,
+      req('accountId'),
+      oneOf('origin', OPERATION_ORIGINS, true),
+      req('date'),
+      req('label'),
       c('details'),
-      c('amount', 'integer'),
-      c('state'),
+      req('amount', 'integer'),
+      oneOf('state', OPERATION_STATES, true),
       c('oneOff', 'boolean'),
       c('suggestedCategory'),
       c('plannedFlowId'),
       c('transferAccountId'),
       c('transferOperationId'),
-      c('rank', 'integer'),
-      c('deletedAt'),
-      // Modèle D01–D18 (migration 2 → 3) :
-      old('status'),
+      DELETED_AT,
     ],
   },
   allocations: {
     name: 'allocations',
-    columns: [
-      c('id'),
-      c('operationId'),
-      c('categoryId'),
-      cAs('tirelireId', 'envelope_id'),
-      c('share', 'json'),
-      c('replenishment'), // D49
-      c('deletedAt'),
-      // Modèle D01–D18 (migration 2 → 3) :
-      old('amount', 'integer'),
-    ],
+    columns: [ID, req('operationId'), c('categoryId'), c('tirelireId'), req('share', 'json'), oneOf('replenishment', REPLENISHMENT_KINDS), DELETED_AT],
   },
   automations: {
     name: 'automations',
-    columns: [
-      c('id'),
-      c('name'),
-      c('selection', 'json'),
-      c('action', 'json'),
-      c('rank'),
-      c('validFrom'),
-      c('validTo'),
-      c('flowId'),
-      c('deletedAt'),
-      // Modèle D01–D18 (migration 3 → 4) :
-      old('pattern'),
-      old('categoryId'),
-      oldAs('tirelireId', 'envelope_id'),
-      old('priority', 'integer'),
-    ],
-  },
-  // Table du modèle D01–D23, lue par la migration 4 → 5 puis laissée en place (D30) : un appareil
-  // resté en arrière continue d'y écrire sans faire échouer la fusion.
-  rules: {
-    name: 'rules',
-    columns: [
-      c('id'),
-      c('name'),
-      c('selection', 'json'),
-      c('action', 'json'),
-      c('rank'),
-      c('validFrom'),
-      c('validTo'),
-      c('flowId'),
-      c('deletedAt'),
-      old('pattern'),
-      old('categoryId'),
-      oldAs('tirelireId', 'envelope_id'),
-      old('priority', 'integer'),
-    ],
+    columns: [ID, c('name'), req('selection', 'json'), req('action', 'json'), req('rank'), c('validFrom'), c('validTo'), c('flowId'), DELETED_AT],
   },
   devices: {
     name: 'devices',
-    columns: [c('id'), c('name'), c('user'), c('lastSeen'), c('deletedAt')],
+    columns: [ID, req('name'), c('user'), c('lastSeen'), DELETED_AT],
   },
   importProfiles: {
     name: 'import_profiles',
     columns: [
-      c('id'),
-      c('name'),
-      c('source'),
-      c('encoding'),
-      c('delimiter'),
-      c('headerRow', 'integer'),
-      c('columns', 'json'),
-      c('dateFormat'),
+      ID,
+      req('name'),
+      oneOf('source', IMPORT_SOURCES, true),
+      oneOf('encoding', IMPORT_ENCODINGS, true),
+      oneOf('delimiter', IMPORT_DELIMITERS, true),
+      req('headerRow', 'integer'),
+      req('columns', 'json'),
+      oneOf('dateFormat', IMPORT_DATE_FORMATS, true),
       c('debitPositive', 'boolean'),
-      c('accountMap', 'json'),
+      req('accountMap', 'json'),
       c('accountId'),
-      c('deletedAt'),
+      DELETED_AT,
     ],
   },
 };
-
-/** Colonnes vivantes d'une table (hors dépréciées). */
-export function liveColumns(t: TableDef): ColumnDef[] {
-  return t.columns.filter((col) => !col.deprecated);
-}
 
 /** Clé de `Ledger` correspondant à chaque table. */
 export const LEDGER_KEYS = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
@@ -242,26 +186,60 @@ export type LedgerKey = (typeof LEDGER_KEYS)[number];
 /** Colonne de chaque table, réglages compris : l'horloge logique de la dernière écriture (D58). */
 export const HLC_COLUMN = 'hlc';
 
+const BOOLEAN_VALUES = [0, 1] as const;
+
+function sqlLiteral(v: string | number): string {
+  return typeof v === 'number' ? String(v) : `'${v.replace(/'/g, "''")}'`;
+}
+
+function columnSQL(t: TableDef, col: ColumnDef): string {
+  if (col.col === 'id') return `id TEXT PRIMARY KEY NOT NULL CONSTRAINT "${t.name}.id" CHECK (id <> '')`;
+  const sqlType = col.type === 'integer' || col.type === 'boolean' ? 'INTEGER' : col.type === 'real' ? 'REAL' : 'TEXT';
+  const parts = [col.col, sqlType];
+  if (col.required) parts.push('NOT NULL');
+  const values: ReadonlyArray<string | number> | undefined = col.type === 'boolean' ? BOOLEAN_VALUES : col.values;
+  if (values) parts.push(`CONSTRAINT "${t.name}.${col.col}" CHECK (${col.col} IN (${values.map(sqlLiteral).join(', ')}))`);
+  return parts.join(' ');
+}
+
 export function createTableSQL(t: TableDef): string {
-  const cols = t.columns.map((col) => {
-    const sqlType = col.type === 'integer' || col.type === 'boolean' ? 'INTEGER' : col.type === 'real' ? 'REAL' : 'TEXT';
-    return col.col === 'id' ? `${col.col} TEXT PRIMARY KEY` : `${col.col} ${sqlType}`;
-  });
-  return `CREATE TABLE IF NOT EXISTS ${t.name} (${cols.join(', ')}, ${HLC_COLUMN} TEXT)`;
+  return `CREATE TABLE IF NOT EXISTS ${t.name} (${t.columns.map((col) => columnSQL(t, col)).join(', ')}, ${HLC_COLUMN} TEXT NOT NULL)`;
+}
+
+/**
+ * Ce qui empêche d'écrire une ligne, en nommant la table et la colonne ; `undefined` si elle
+ * s'écrit. Les mêmes règles que le `NOT NULL` et les `CHECK` du fichier, vérifiées avant d'écrire
+ * pour que le refus se dise en français et que rien ne soit écrit.
+ */
+export function rowProblem(t: TableDef, id: unknown, v: Record<string, string | number | null>): string | undefined {
+  if (typeof id !== 'string' || !id) return `${t.name}.id est obligatoire.`;
+  for (const col of t.columns) {
+    if (col.col === 'id') continue;
+    const val = v[col.col] ?? null;
+    if (val === null) {
+      if (col.required) return `${t.name}.${col.col} est obligatoire.`;
+      continue;
+    }
+    if (col.type === 'boolean' && val !== 0 && val !== 1) return `${t.name}.${col.col} vaut « ${String(val)} », hors de 0 et 1.`;
+    if (col.values && !col.values.includes(val as string))
+      return `${t.name}.${col.col} vaut « ${String(val)} », hors de son énumération (${col.values.join(', ')}).`;
+  }
+  return undefined;
 }
 
 /** Marqueur du fichier, dans `meta` : ce qui distingue un dépôt Tirelire de toute autre base. */
 export const FILE_FORMAT = 'tirelire';
 /**
  * Version du format du fichier et des paquets de synchronisation. Un fichier ou un paquet d'une
- * autre version est refusé en le disant, sans rien écrire (D30, D58).
+ * autre version est refusé en le disant, sans rien écrire (D30, D58). La version 2 parle le
+ * domaine et contraint ses colonnes ; la version 1 n'est plus lue.
  */
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
 
 export const SYSTEM_SQL = [
   // Réglages : une ligne par clé, valeur JSON, horloge de la dernière écriture ; synchronisés.
-  `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT, ${HLC_COLUMN} TEXT)`,
+  `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, value TEXT, ${HLC_COLUMN} TEXT NOT NULL)`,
   // Le format du fichier et sa version, rien d'autre : ce qui décrit l'instance n'est pas dans le
   // fichier (D58).
-  `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)`,
+  `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY NOT NULL, value TEXT)`,
 ];

@@ -15,7 +15,6 @@ export type Cents = number;
 export type ISODate = string;
 export type Id = string;
 
-/** Périodicité générique : tous les `intervalMonths` mois à partir de `anchorDate`. */
 /** Unité d'un rythme. Le mois reste la plus courante ; la semaine sert aux revenus non mensuels. */
 export type PeriodUnit = 'day' | 'week' | 'month' | 'year';
 
@@ -24,17 +23,6 @@ export interface Periodicity {
   interval: number;
   unit: PeriodUnit;
   anchorDate: ISODate;
-  /**
-   * Ancienne forme, lue mais plus jamais écrite (D30, D47). La migration 8 → 9 la convertit ; ce
-   * champ n'existe que pour qu'un rythme écrit par un appareil non migré reste interprétable.
-   */
-  intervalMonths?: number;
-}
-
-/** Rythme effectif, quelle que soit la forme dans laquelle il a été écrit. */
-export function stepOf(p: Periodicity): { interval: number; unit: PeriodUnit } {
-  if (p.interval && p.unit) return { interval: p.interval, unit: p.unit };
-  return { interval: p.intervalMonths ?? 1, unit: 'month' };
 }
 
 /**
@@ -43,7 +31,7 @@ export function stepOf(p: Periodicity): { interval: number; unit: PeriodUnit } {
  * dotation, jamais à dater une occurrence (`nextOccurrence` fait, lui, du calendrier exact).
  */
 export function monthsOf(p: Periodicity): number {
-  const { interval, unit } = stepOf(p);
+  const { interval, unit } = p;
   const JOURS_PAR_MOIS = 365.2425 / 12;
   if (unit === 'day') return interval / JOURS_PAR_MOIS;
   if (unit === 'week') return (interval * 7) / JOURS_PAR_MOIS;
@@ -65,9 +53,11 @@ export function monthsOf(p: Periodicity): number {
  * - `courant`   : un autre compte courant (compte joint, compte d'un membre du foyer).
  * - `epargne`   : livret, PEL, assurance-vie… il héberge des tirelires.
  */
-export type AccountKind = 'principal' | 'courant' | 'epargne';
+export const ACCOUNT_KINDS = ['principal', 'courant', 'epargne'] as const;
+export type AccountKind = (typeof ACCOUNT_KINDS)[number];
 
-export type SettlementDirection = 'both' | 'toThird' | 'fromThird';
+export const SETTLEMENT_DIRECTIONS = ['both', 'toThird', 'fromThird'] as const;
+export type SettlementDirection = (typeof SETTLEMENT_DIRECTIONS)[number];
 
 export interface Account {
   id: Id;
@@ -143,7 +133,7 @@ export interface Tirelire {
 
 /**
  * Un besoin de financement porté par une tirelire (D28) :
- * - `recurring` : `amount` par période (lissé sur `periodicity.intervalMonths` périodes, 1 par défaut) ;
+ * - `recurring` : `amount` par période (lissé sur `periodicity`, une période par défaut) ;
  * - `dueDate`   : `amount` pour chaque échéance de `periodicity`, rattrapage lissé sur les périodes restantes ;
  * - `goal`      : `monthlyAmount` par période jusqu'à `amount` (cible facultative).
  * Les priorités et planchers de D06 se posent sur les besoins ; le solde de la tirelire leur est
@@ -155,7 +145,8 @@ export interface Tirelire {
  * dont on veut vivre toute l'année. Le montant se déclare pour la périodicité (typiquement l'année)
  * et se répartit sur les périodes ; la tirelire se vide d'autant.
  */
-export type NeedKind = 'recurring' | 'dueDate' | 'goal' | 'payout';
+export const NEED_KINDS = ['recurring', 'dueDate', 'goal', 'payout'] as const;
+export type NeedKind = (typeof NEED_KINDS)[number];
 
 export interface Need {
   id: Id;
@@ -288,7 +279,8 @@ export function dueDateFlowForNeed(need: Need, flows: PlannedFlow[], date: ISODa
 // Catégories
 // ---------------------------------------------------------------------------
 
-export type CategoryNature = 'expense' | 'income';
+export const CATEGORY_NATURES = ['expense', 'income'] as const;
+export type CategoryNature = (typeof CATEGORY_NATURES)[number];
 
 export interface Category {
   id: Id;
@@ -331,7 +323,8 @@ export function findCategoryByName(categories: Category[], name: string, nature:
  * - `dueDate`     : échéance payée depuis une tirelire (la tirelire se vide à la date).
  * - `transfer`    : virement interne attendu entre deux comptes suivis.
  */
-export type PlannedFlowKind = 'income' | 'fixedCharge' | 'dueDate' | 'transfer';
+export const PLANNED_FLOW_KINDS = ['income', 'fixedCharge', 'dueDate', 'transfer'] as const;
+export type PlannedFlowKind = (typeof PLANNED_FLOW_KINDS)[number];
 
 /**
  * D'où vient un flux (D57), et donc qui a le droit de l'écrire :
@@ -340,7 +333,8 @@ export type PlannedFlowKind = 'income' | 'fixedCharge' | 'dueDate' | 'transfer';
  *   qu'il devrait porter sont des calculs, refaits à chaque changement du budget ; seul le montant
  *   que l'ordre exécute réellement chez la banque s'y enregistre, faute de pouvoir le deviner.
  */
-export type FlowOrigin = 'declared' | 'derived';
+export const FLOW_ORIGINS = ['declared', 'derived'] as const;
+export type FlowOrigin = (typeof FLOW_ORIGINS)[number];
 
 export interface AmountTolerance {
   abs?: Cents;
@@ -375,8 +369,8 @@ export interface PlannedFlow {
   variable?: boolean;
   activeFrom?: ISODate;
   activeTo?: ISODate;
-  /** Le flux engendre-t-il une règle déterministe (D24) ? */
-  makesRule?: boolean;
+  /** Le flux engendre-t-il un automatisme (D24, D39) ? */
+  makesAutomation?: boolean;
   /** D57 : absent vaut `declared`, si bien qu'aucun flux déjà écrit n'est à réécrire. */
   origin?: FlowOrigin;
   deletedAt?: string;
@@ -394,7 +388,8 @@ export function isDerivedFlow(f: PlannedFlow): boolean {
 // Opérations et affectations
 // ---------------------------------------------------------------------------
 
-export type OperationOrigin = 'imported' | 'manual';
+export const OPERATION_ORIGINS = ['imported', 'manual'] as const;
+export type OperationOrigin = (typeof OPERATION_ORIGINS)[number];
 
 /**
  * État d'une opération (D22). La vérité est ce qui est verrouillé :
@@ -404,9 +399,8 @@ export type OperationOrigin = 'imported' | 'manual';
  *  - `locked` : plus aucune règle ne l'atteint ; toute modification manuelle verrouille.
  * Seul l'utilisateur déverrouille, à l'unité ou par action groupée (D26).
  */
-export type OperationState = 'untreated' | 'reconciled' | 'locked';
-
-export const OPERATION_STATES: OperationState[] = ['untreated', 'reconciled', 'locked'];
+export const OPERATION_STATES = ['untreated', 'reconciled', 'locked'] as const;
+export type OperationState = (typeof OPERATION_STATES)[number];
 
 /**
  * Une opération est ventilée en une ou plusieurs lignes (`Allocation`) à parts (D27), chacune
@@ -419,6 +413,10 @@ export interface Operation {
   origin: OperationOrigin;
   date: ISODate;
   label: string;
+  /**
+   * Dérivé du libellé (`normalizeLabel`) : jamais stocké, recalculé à la lecture du fichier (D58,
+   * D84). Tenu en mémoire parce que la recherche, les automatismes et le rapprochement le lisent.
+   */
   normalizedLabel: string;
   /** Libellé complet fourni par la banque (références, motifs). */
   details?: string;
@@ -436,8 +434,6 @@ export interface Operation {
   transferAccountId?: Id;
   /** Opération de contrepartie appariée (si les deux relevés sont importés). */
   transferOperationId?: Id;
-  /** Import : rang parmi les opérations identiques du même jour (entre dans la clé). */
-  rank?: number;
   deletedAt?: string;
 }
 
@@ -474,7 +470,8 @@ export type Share =
  * - `external` : un cadeau, un remboursement, une vente. Le foyer a été sauvé du dehors ; le budget
  *   permanent ne peut pas compter dessus.
  */
-export type ReplenishmentKind = 'internal' | 'external';
+export const REPLENISHMENT_KINDS = ['internal', 'external'] as const;
+export type ReplenishmentKind = (typeof REPLENISHMENT_KINDS)[number];
 
 export interface Allocation {
   id: Id;
@@ -584,7 +581,7 @@ export interface Settings {
    * le montant au centime près et signale alors tout écart.
    */
   orderRounding: Cents;
-  /** Identifiant de cet appareil (pour l'horloge logique et le journal). */
+  /** Identifiant de cette instance, pour l'horloge logique : jamais écrit dans le fichier (D58). */
   siteId: string;
 }
 
