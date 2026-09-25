@@ -1,5 +1,5 @@
 #!/bin/sh
-# Livraison de Tirelire (#121) : la pré-fusion et le pré-push jugent l'état commis.
+# Livraison de Tirelire (#121, #232) : la pré-fusion et le pré-push jugent l'état commis.
 #
 #   livraison.sh fusion
 #       `pre-merge-commit`, et `pre-commit` pendant une fusion (conflit) : juge l'index.
@@ -12,13 +12,14 @@
 # 2. Nature du besoin. Les fichiers modifiés des deux côtés depuis la base commune sont comparés à
 #    `packages/gardes/chemins-ignores` de l'arbre jugé (syntaxe de `.gitignore`) : un fichier listé
 #    est fonctionnel, un fichier absent est organisationnel. Les deux peuvent se cumuler.
-# 3. Sélection (hors tests navigateur, laissés à la CI) :
-#    - fonctionnel : typecheck et tests headless des paquets touchés, tests headless de
-#      l'interface ; durée attendue 30 s ;
+# 3. Sélection, au seuil 2 (#232 : les tests de niveau 0 à 2) :
+#    - fonctionnel : typecheck et tests des paquets touchés, tests de l'interface — dans le
+#      navigateur quand un navigateur est là, sinon laissés à la CI, et la livraison le dit ; durée
+#      attendue 30 s ;
 #    - organisationnel : tests de la garde ; durée attendue 45 s.
 #    Une sélection qui dépasse sa durée attendue de plus de 20 % le dit, sans bloquer.
-# 4. Harnais du besoin : les fichiers `*.test.*` que la branche ajoute ou modifie depuis sa base
-#    commune avec `origin/main`. Joué à part, quelle que soit sa finalité, hors durée attendue.
+# 4. Harnais du besoin (`harnais-du-besoin.sh` : le fichier de l'auditeur, qui porte le numéro de
+#    l'issue). Joué à part, en entier (seuil 4), quelle que soit sa finalité, hors durée attendue.
 #    Il bloque si ce qui arrive (commits absents de `main` et de la branche d'arrivée) touche autre
 #    chose que le harnais et la documentation (`**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ;
 #    sinon son verdict s'affiche. La non-régression bloque toujours.
@@ -138,7 +139,11 @@ elif [ -z "$hbase" ]; then
   dit "aucune base commune avec origin/main : tout test est non-régression"
 else
   git -c core.quotePath=false diff --name-only --no-renames --diff-filter=AM "$hbase" "$arbre" -- |
-    grep -E '\.test\.[^/]+$' >"$journaux/harnais.txt"
+    grep -E '\.test\.[^/]+$' >"$travail/candidats"
+  # shellcheck source=harnais-du-besoin.sh
+  . "$crochets/harnais-du-besoin.sh"
+  if [ "$mode" = push ]; then branche=$nom; else branche=$(branche_du_besoin); fi
+  harnais_retenus "$travail/candidats" "$journaux/harnais.txt" "$arbre:" "$branche" || exit 1
 fi
 git ls-tree -r --name-only "$arbre" >"$travail/fichiers" || exit 1
 git cat-file -p "$arbre:packages/gardes/chemins-ignores" >"$travail/chemins-ignores" 2>/dev/null || : >"$travail/chemins-ignores"
@@ -180,7 +185,16 @@ fi
 
 # ─── Lancements ────────────────────────────────────────────────────────────────────────────────────
 dans() { grep -E "^$1/" "$journaux/harnais.txt" | sed "s#^$1/##"; }
-vitest_de() { grep -q '"test": *"vitest' "$juge/$1/package.json" 2>/dev/null; }
+vitest_de() { grep -q '"test": *"[^"]*vitest' "$juge/$1/package.json" 2>/dev/null; }
+# Un navigateur pour les tests de l'interface (`apps/web/test/harnais.ts`) ?
+navigateur() {
+  for c in "${TIRELIRE_NAV:-}" "${CHROME_BIN:-}" "${CHROME_PATH:-}" "${PUPPETEER_EXECUTABLE_PATH:-}" \
+    /usr/bin/google-chrome /usr/bin/google-chrome-stable /usr/bin/chromium /usr/bin/chromium-browser \
+    /opt/google/chrome/chrome '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'; do
+    [ -n "$c" ] && [ -e "$c" ] && return 0
+  done
+  return 1
+}
 lance() { # nom dossier commande…
   nom=$1 dossier=$2
   shift 2
@@ -190,13 +204,16 @@ rapports_node() { echo "--test-reporter=tap" "--test-reporter-destination=stdout
 lances=''
 ajoute() { lances="$lances $1"; }
 
-# Non-régression d'un paquet de tests, sans ses fichiers du harnais du besoin.
+# Non-régression d'un paquet de tests, au seuil 2, sans ses fichiers du harnais du besoin.
 non_regression() { # nom dossier
   nom=$1 dossier=$2
   if vitest_de "$dossier"; then
-    set -- --passWithNoTests --reporter=default --reporter=json "--outputFile.json=$journaux/$nom.rapport"
+    set -- 2 --passWithNoTests --reporter=default --reporter=json "--outputFile.json=$journaux/$nom.rapport"
     [ "$dossier" = packages/core ] && set -- "$@" --no-isolate
-    [ "$dossier" = apps/web ] && set -- "$@" --exclude 'test/navigateur/**'
+    if [ "$dossier" = apps/web ] && ! navigateur; then
+      set -- "$@" --exclude 'test/navigateur/**'
+      dit "aucun navigateur (TIRELIRE_NAV, CHROME_BIN…) : les tests navigateur de l'interface sont laissés à la CI"
+    fi
     for f in $(dans "$dossier"); do set -- "$@" --exclude "$f"; done
     lance "$nom" "$dossier" pnpm run test "$@"
     ajoute "$nom:$dossier:vitest"
@@ -205,10 +222,10 @@ non_regression() { # nom dossier
       liste=$(grep -E "^$dossier/[^/]*\\.test\\.[cm]?js$" "$travail/fichiers" | grep -vxF -f "$journaux/harnais.txt" | sed "s#^$dossier/##")
       [ -n "$liste" ] || { dit "$nom : aucun test hors du harnais du besoin"; return 0; }
       # shellcheck disable=SC2046,SC2086
-      lance "$nom" "$dossier" pnpm run test $(rapports_node "$nom") $liste
+      lance "$nom" "$dossier" pnpm run test 2 $(rapports_node "$nom") $liste
     else
       # shellcheck disable=SC2046
-      lance "$nom" "$dossier" pnpm run test $(rapports_node "$nom")
+      lance "$nom" "$dossier" pnpm run test 2 $(rapports_node "$nom")
     fi
     ajoute "$nom:$dossier:node"
   fi
@@ -247,7 +264,7 @@ if [ "$attendue" -gt 0 ] && [ $((duree * 10)) -gt $((attendue * 12)) ]; then
   dit "la sélection a pris $duree s, au-delà de sa durée attendue de $attendue s (+20 %) — sans bloquer"
 fi
 
-# ─── Harnais du besoin, joué à part ────────────────────────────────────────────────────────────────
+# ─── Harnais du besoin, joué à part, en entier (seuil 4) ────────────────────────────────────────────────────────────────
 harnais_lances=''
 if [ -z "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
   for d in packages/core apps/web; do
@@ -255,7 +272,7 @@ if [ -z "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
     [ -n "$liste" ] || continue
     n="harnais-$(basename "$d")"
     # shellcheck disable=SC2086
-    lance "$n" "$d" pnpm run test --reporter=default --reporter=json "--outputFile.json=$journaux/$n.rapport" $liste
+    lance "$n" "$d" pnpm run test 4 --reporter=default --reporter=json "--outputFile.json=$journaux/$n.rapport" $liste
     harnais_lances="$harnais_lances $n:$d:vitest"
   done
   for d in $(grep -Eo '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | sed 's#/$##' | sort -u); do
@@ -263,7 +280,7 @@ if [ -z "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
     [ -f "$juge/$d/package.json" ] || continue
     n="harnais-$(basename "$d")"
     # shellcheck disable=SC2046,SC2086
-    lance "$n" "$d" pnpm run test $(rapports_node "$n") $(dans "$d")
+    lance "$n" "$d" pnpm run test 4 $(rapports_node "$n") $(dans "$d")
     harnais_lances="$harnais_lances $n:$d:node"
   done
   autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | tr '\n' ' ')
