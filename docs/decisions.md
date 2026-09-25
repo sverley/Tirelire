@@ -813,8 +813,8 @@ charges période après période : ce n'est pas ce que le plan fait, et il ne le
 ### D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
 Reprise du signalement « le jeu d'exemple ne contient aucun besoin ». Le défaut
-principal n'existe plus : depuis D50 et D51, `example.ts` porte treize besoins, chacune des neuf
-tirelires en a au moins un, et le plan de la période en cours demande 2 350 € pour 630 € de marge.
+principal n'existe plus : depuis D50 et D51, chaque tirelire de `example.ts` porte au moins un besoin, et le plan de
+la période en cours les demande en gardant une marge positive.
 Rien n'était à corriger de ce côté. Restaient les deux points que le même signalement soulevait
 en second, et qui tenaient toujours.
 
@@ -1115,7 +1115,7 @@ frappe et se déferait à mesure qu'on corrige le nom.
 et pourrait renaître sans que rien ne l'attrape. Vitest et jsdom y entrent, avec des tests sur
 `revealed` (il amène le panneau au rendu suivant, en `block: 'nearest'` pour déplacer le moins
 possible, sans animation quand le mouvement est réduit) et des tests de structure qui figent, sur
-les cinq écrans, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
+les cinq écrans — Comptes, Tirelires, Catégories, Flux prévus et Saisie —, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
 il porte `attached` et `use:revealed`, il porte un titre figé. Vérifié en remettant le
 `Flows.svelte` d'avant la correction : les trois échouent.
 
