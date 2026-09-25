@@ -34,6 +34,14 @@
  * du harnais du besoin au Ready (9 : le fichier constate seulement qu'une étape bloquante le joue,
  * par sa définition commune), les documents (11, 12).
  *
+ * Niveau de ses tests, choisi comme la criticité d'un message de journal (le porteur, #232) : si ce
+ * test échoue, quel message l'outil écrirait-il ? Ici, chaque échec dit que la chaîne de vérification
+ * ne tient plus ce que D83 lui demande — des tests joués ou écartés à tort, un harnais du besoin
+ * tronqué, une publication non vérifiée, une règle des harnais qui ne mord plus : une erreur qui
+ * demande une intervention, ERROR, le défaut, sans marque. Aucun n'est une défaillance critique qui
+ * arrêterait le système (FATAL), ni un simple problème potentiel (WARN). La durée d'un test n'entre
+ * jamais dans ce choix : un test trop long est au porteur à traiter, pas à déclasser.
+ *
  * Aujourd'hui, aucun test n'a de niveau : tout se joue, DEBUG compris. Les points 1 à 9 sont donc
  * rouges ; les règles du point 10 sont vertes sur le dépôt, et leurs témoins rouges échouent comme
  * attendu. `node:test` n'a pas de `test.fails` : l'échec attendu d'un témoin tient dans une assertion
@@ -377,9 +385,7 @@ for (const paquet of ['garde', 'cœur']) {
     constater(await scénarios[`${paquet}:défaut`](), DÉFAUT, `${paquet}, sans ${VARIABLE}`);
   });
   for (const s of SEUILS) {
-    // La matrice complète se joue à la Ready pour `node --test` ; pour vitest, plus lent, à la publication.
-    const niveau = paquet === 'cœur' && s !== DÉFAUT ? ' [WARN]' : '';
-    test(`#232 · ${paquet} (${exécuteur}) : au seuil ${s}, les tests ${s} et plus graves, DEBUG jamais${niveau}`, async () => {
+    test(`#232 · ${paquet} (${exécuteur}) : au seuil ${s}, les tests ${s} et plus graves, DEBUG jamais`, async () => {
       constater(await scénarios[`${paquet}:${s}`](), s, `${paquet}, ${VARIABLE}=${s}`);
     });
   }
@@ -392,7 +398,7 @@ for (const paquet of ['garde', 'cœur']) {
 
 for (const paquet of ['interface', 'relais', 'hébergement']) {
   const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
-  test(`#232 · ${paquet} (${exécuteur}) : l'ensemble respecte le seuil [WARN]`, async () => {
+  test(`#232 · ${paquet} (${exécuteur}) : l'ensemble respecte le seuil, ici WARN`, async () => {
     const r = await scénarios[`${paquet}:WARN`]();
     constater(r, 'WARN', `${paquet}, ${VARIABLE}=WARN`);
     if (paquet === 'interface') assert.deepEqual(r.navigateur, attendus('WARN'), `interface dans le navigateur : au seuil WARN, seuls les tests WARN et plus graves (#232, point 1)`);
@@ -548,16 +554,8 @@ test('#232 · au tag v*, la CI vérifie au seuil WARN avant de publier', () => {
 // ─── Lancements en parallèle, nettoyage ──────────────────────────────────────────────────────────
 
 // Tout part d'avance ; chaque test attend le sien, et un lancement en échec ne rougit que ses tests.
-// Ce qu'un seuil plus grave que WARN écarte de ce fichier ne part pas d'avance : ses tests, s'ils se
-// jouent quand même (le harnais du besoin, en entier), lancent le leur en l'attendant.
 before(() => {
-  const seuil = process.env[VARIABLE] || DÉFAUT;
-  const écartéWARN = gravité(seuil) > gravité('WARN');
-  for (const [nom, s] of Object.entries(scénarios)) {
-    const warn = /^(?:interface|relais|hébergement):|^cœur:(?:FATAL|WARN|INFO)$/.test(nom);
-    if (!(warn && écartéWARN)) s().catch(() => {});
-  }
-  crochets().catch(() => {});
+  for (const s of [...Object.values(scénarios), crochets]) s().catch(() => {});
 });
 
 after(() => {
