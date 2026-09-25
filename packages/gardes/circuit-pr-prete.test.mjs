@@ -134,7 +134,8 @@ const fait = (jobs, motif) => jobs.some((j) => j.commandes.some((c) => motif.tes
 const clés = (jobs) => jobs.map((j) => j.clé).sort();
 
 const TYPECHECK = /\bpnpm\s+(?:-r\s+)?typecheck\b/;
-const SUITE = /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test\s*$/m;
+// `pnpm test`, ou `pnpm test N` : toute la suite, jusqu'au niveau N (#238).
+const SUITE = /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test(?:\s+[0-4])?\s*$/m;
 const BUILD = /\bpnpm\s+(?:-r\s+)?(?:run\s+)?build\b/;
 const GARDE = /packages\/gardes\/cli\.mjs/;
 const DÉPÔT_DE_LA_VERSION_DE_DEV = /apercu\.sh\s+deposer/;

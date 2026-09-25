@@ -162,13 +162,15 @@ test('#73 · témoin rouge — un témoin rouge réécrit comme un test ordinair
 
 /**
  * Tout test actif du fichier de `id` est nommé par une ligne `Harnais` du registre. Les témoins
- * rouges et le titre de la suite n'en sont pas : l'un prouve l'échec, l'autre ne garde rien.
+ * rouges, le titre de la suite et les suites de niveau n'en sont pas : l'un prouve l'échec, les
+ * autres ne gardent rien (#238).
  */
 function verifierAucuneGarantieMuette(id, texteDuRegistre, sourceDuFichier) {
   const { fichier } = PROMESSES[id];
   const nommes = new Set(harnaisSur(id, fichier, texteDuRegistre).map((l) => l.nomme));
-  const muets = [...analyserTests(sourceDuFichier).actifs].filter(
-    (nom) => !/^témoin rouge/i.test(nom) && !new RegExp(`^${id} ·`).test(nom) && !nommes.has(nom),
+  const { actifs, enveloppes } = analyserTests(sourceDuFichier);
+  const muets = [...actifs].filter(
+    (nom) => !/^témoin rouge/i.test(nom) && !enveloppes.has(nom) && !new RegExp(`^${id} ·`).test(nom) && !nommes.has(nom),
   );
   assert.deepEqual(
     muets,

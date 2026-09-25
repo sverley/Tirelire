@@ -292,6 +292,16 @@ test('un test nommé au registre se cherche parmi les tests qui tournent, pas n\
   assert.deepEqual([...actifs], ['positions et soldes (D19, D29)', "budget construit par l'assistant (D40)", 'un titre en gabarit', 'option sans effet', 'option conditionnelle', 'conditionnel']);
   assert.deepEqual([...inactifs], ['désactivé', 'seulement prévu', 'sans test actif', 'en pause', 'suite désactivée', 'dans la suite désactivée', 'option skip']);
   assert.deepEqual([...V.titresDeTests(source)], [...actifs]);
+  // Une suite de niveau est une enveloppe ; un test qui en porte le titre, non (#238).
+  const niveaux = [
+    "describe('[niveau 1] harnais de la garde', () => { it('une garantie', () => {}); });",
+    "describe('[niveau 2]', () => { it('une autre', () => {}); });",
+    "describe('[niveau 5] hors des niveaux', () => { it('une troisième', () => {}); });",
+    "describe('pas [niveau 1] en tête', () => { it('une quatrième', () => {}); });",
+    "it('[niveau 3] un test, pas une suite', () => {});",
+  ].join('\n');
+  assert.deepEqual([...V.analyserTests(niveaux).enveloppes], ['[niveau 1] harnais de la garde', '[niveau 2]']);
+  assert.deepEqual([...V.analyserTests(source).enveloppes], []);
   assert.equal(V.testNomme("« budget construit par  l'assistant (D40) » : sans aucune opération"), "budget construit par l'assistant (D40)");
   assert.equal(V.testNomme('moteur de règles de classement.'), null);
 
@@ -362,6 +372,14 @@ test("l'étape pnpm test de la CI pose TIRELIRE_STRICT, dans son env, celui du j
   assert.equal(V.etapeTestsStricte(ci("      - run: pnpm test\n        env:\n          TIRELIRE_STRICT: '0'\n")), false);
   assert.equal(V.etapeTestsStricte(ci('      - run: pnpm test\n').replace('      - run: pnpm build\n', `      - run: pnpm build\n${strict}`)), false);
   assert.equal(V.etapeTestsStricte(''), false);
+  // `pnpm test N` : les tests jusqu'au niveau N, avec les mêmes exigences (#238).
+  for (const n of [0, 1, 2, 3, 4]) {
+    assert.equal(V.etapeTestsStricte(ci(`      - run: pnpm test ${n}\n${strict}`)), true, `pnpm test ${n}`);
+    assert.equal(V.etapeTestsStricte(ci(`      - run: pnpm test ${n}\n`)), false, `pnpm test ${n} sans TIRELIRE_STRICT`);
+  }
+  for (const autre of ['pnpm test 5', 'pnpm test 12', 'pnpm test 1 2', 'pnpm test1']) {
+    assert.equal(V.etapeTestsStricte(ci(`      - run: ${autre}\n${strict}`)), false, autre);
+  }
   assert.equal(V.etapeTestsStricte(lire(V.CI_WORKFLOW)), true);
 });
 
