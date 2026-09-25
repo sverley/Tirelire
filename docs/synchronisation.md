@@ -1,6 +1,6 @@
 # Synchronisation entre appareils
 
-Quatre transports, un seul protocole (`packages/core/src/sync.ts`) :
+Des transports, un seul protocole (`packages/core/src/sync.ts`) :
 
 | Transport | Où | Serveur | État |
 |---|---|---|---|
@@ -17,7 +17,7 @@ Le fichier est un état (D58) : chaque ligne porte l'horloge logique de sa derni
 nomme l'instance qui l'a faite. Chaque instance sait, pour chaque autre, la plus grande horloge
 qu'elle en a vue.
 
-Symétrique, cinq messages, chacun portant le format et sa version : `hello` (identité et ce que
+Symétrique ; chaque message porte le format et sa version : `hello` (identité et ce que
 l'instance sait), `request`, `changes` (les lignes plus récentes que ce que l'autre a annoncé, et ce
 que l'émetteur sait), `done`, puis `bye`. Une ligne s'écrit entière et la plus récente gagne,
 suppression logique comprise ; renvoyer une ligne déjà connue est sans effet. Ce qu'un appareil a

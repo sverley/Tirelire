@@ -732,7 +732,7 @@ liste montre jamais leur effet : un crédit terminé s'y lisait comme un crédit
 
 **Le jeu d'exemple porte des changements datés.** Il n'en avait aucun : on ne pouvait donc ni voir
 ni tester ce que produit un budget qui change, sinon en fabriquant des données à la main. Il en
-porte maintenant six, choisis pour couvrir les quatre formes que prend un changement — une révision
+porte maintenant, choisis pour couvrir les quatre formes que prend un changement — une révision
 déjà faite, une révision à venir, une ligne qui apparaît, une ligne qui s'arrête :
 
 - *Divers et sorties* passé de 300 à 250 € au 28 août : la version close se lit encore et ne dote
@@ -1115,7 +1115,7 @@ frappe et se déferait à mesure qu'on corrige le nom.
 et pourrait renaître sans que rien ne l'attrape. Vitest et jsdom y entrent, avec des tests sur
 `revealed` (il amène le panneau au rendu suivant, en `block: 'nearest'` pour déplacer le moins
 possible, sans animation quand le mouvement est réduit) et des tests de structure qui figent, sur
-chaque écran de Configuration, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
+les écrans Comptes, Tirelires, Catégories, Flux prévus et Saisie, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
 il porte `attached` et `use:revealed`, il porte un titre figé. Vérifié en remettant le
 `Flows.svelte` d'avant la correction : les trois échouent.
 
