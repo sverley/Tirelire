@@ -1373,8 +1373,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
 - **Le harnais du besoin** est le fichier de l'auditeur, et lui seul : l'auditeur le nomme dans
   l'issue (« Harnais : chemin »), à côté de la branche, et inscrit dans ses trois premières lignes
-  « harnais » et le numéro de l'issue (« Harnais d'audit de #232 »), le numéro que porte aussi le nom
-  de la branche (`audit/232-…`) : les crochets et la CI le reconnaissent ainsi sans lire l'issue
+  « Harnais d'audit de #<n> », le numéro de l'issue, que porte aussi le nom de la branche
+  (`audit/<n>-…`) : les crochets et la CI le reconnaissent ainsi sans lire l'issue
   (`.githooks/harnais-du-besoin.sh`, définition commune). Il se joue en entier, niveau 4 compris, à
   chaque moment. Les autres fichiers de test que la branche ajoute ou modifie, ceux du codeur
   compris, n'en font pas partie : ils se jouent à leur niveau.

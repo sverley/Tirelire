@@ -1,9 +1,9 @@
 # Harnais du besoin (#127, #121, #232), définition commune aux crochets et à la CI : le fichier de
 # test que l'auditeur nomme dans l'issue et qui porte le numéro de l'issue. Parmi les fichiers de
 # test (`*.test.*`) que la branche ajoute ou modifie depuis sa base commune avec `origin/main`, index
-# compris, c'est celui dont les trois premières lignes disent « harnais » et « #<numéro> », le numéro
-# étant celui du nom de la branche (`audit/232-…` → 232 ; sans numéro, tout « harnais … #<n> ») : les
-# crochets le reconnaissent sans lire l'issue. Les autres fichiers de test de la branche, ceux du
+# compris, c'est celui dont les trois premières lignes disent « Harnais d'audit de #<numéro> », le
+# numéro étant celui du nom de la branche (`audit/232-…` → 232 ; sans numéro, tout
+# « Harnais d'audit de #<n> ») : les crochets le reconnaissent sans lire l'issue. Les autres fichiers de test de la branche, ceux du
 # codeur compris, et tout autre test sont la non-régression : ils se jouent à leur niveau.
 #
 # harnais_du_besoin FICHIER : écrit la liste dans FICHIER, un chemin par ligne depuis la racine du
@@ -32,7 +32,7 @@ numero_du_besoin() {
 harnais_retenus() {
   : >"$2" || return 1
   hr_numero=$(numero_du_besoin "$4")
-  hr_motif="harnais[^#]*#${hr_numero:-[0-9][0-9]*}([^0-9]|\$)"
+  hr_motif="harnais d.{1,3}audit de #${hr_numero:-[0-9][0-9]*}([^0-9]|\$)"
   while IFS= read -r hr_f; do
     [ -n "$hr_f" ] || continue
     if git cat-file -p "$3$hr_f" 2>/dev/null | head -n 3 | grep -qiE "$hr_motif"; then
