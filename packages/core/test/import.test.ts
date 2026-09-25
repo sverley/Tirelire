@@ -108,14 +108,16 @@ describe('[niveau 1] harnais du registre', () => {
       expect(prep.candidates.find((c) => c.operation.amount === euros(-950))!.operation.details).toContain('CAPITAL 700');
     });
 
-    it('réimporter le même fichier : tout est en doublon exact', () => {
-      const { ledger, profile } = ledgerWithBank();
-      const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
-      const first = prepareImport(ledger, rows, profile);
-      const l2 = { ...ledger, operations: first.candidates.map((c) => c.operation) };
-      const second = prepareImport(l2, rows, profile);
-      expect(second.counts.exact).toBe(8);
-      expect(second.counts.new).toBe(0);
+    describe('[niveau 0]', () => {
+      it('réimporter le même fichier : tout est en doublon exact', () => {
+        const { ledger, profile } = ledgerWithBank();
+        const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
+        const first = prepareImport(ledger, rows, profile);
+        const l2 = { ...ledger, operations: first.candidates.map((c) => c.operation) };
+        const second = prepareImport(l2, rows, profile);
+        expect(second.counts.exact).toBe(8);
+        expect(second.counts.new).toBe(0);
+      });
     });
 
     it('doublon probable : même montant à ±3 jours, libellé réécrit', () => {

@@ -105,13 +105,15 @@ describe('états d’une opération (D22)', () => {
     expect(patch.operations[0]!.state).toBe('locked');
   });
 
-  it('le déverrouillage rend l’opération aux règles sans rien lui retirer', () => {
-    const { op } = withOperation();
-    const locked = manualEdit(op, { oneOff: true });
-    expect(locked.state).toBe('locked');
-    const freed = unlock(locked);
-    expect(freed.state).toBe('untreated');
-    expect(freed.oneOff).toBe(true);
+  describe('[niveau 0]', () => {
+    it('le déverrouillage rend l’opération aux règles sans rien lui retirer', () => {
+      const { op } = withOperation();
+      const locked = manualEdit(op, { oneOff: true });
+      expect(locked.state).toBe('locked');
+      const freed = unlock(locked);
+      expect(freed.state).toBe('untreated');
+      expect(freed.oneOff).toBe(true);
+    });
   });
 
   it('une ligne retirée à la main disparaît vraiment', () => {

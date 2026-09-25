@@ -120,22 +120,26 @@ describe('[niveau 1] harnais du registre', () => {
       expect(l.allocations.filter((a) => a.operationId === 'o1').length).toBe(0);
     });
 
-    it('une opération verrouillée est hors d’atteinte', () => {
-      const l = withOps(op('o1', 'SUPERMARCHE', euros(-40), { state: 'locked' }));
-      l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
-      expect(applyAutomations(l).operations.length).toBe(0);
-      expect(previewAutomations(l).some((d) => d.operation.id === 'o1')).toBe(false);
+    describe('[niveau 0]', () => {
+      it('une opération verrouillée est hors d’atteinte', () => {
+        const l = withOps(op('o1', 'SUPERMARCHE', euros(-40), { state: 'locked' }));
+        l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
+        expect(applyAutomations(l).operations.length).toBe(0);
+        expect(previewAutomations(l).some((d) => d.operation.id === 'o1')).toBe(false);
+      });
     });
 
-    it('ce que l’import a établi survit au passage des règles (D33)', () => {
-      const l = withOps(op('o1', 'VIR LIVRET', euros(-100), { transferAccountId: 'acc-livret' }));
-      l.allocations.push({ id: 'al1', operationId: 'o1', tirelireId: 'env-vacances', share: { kind: 'variable' } });
-      const patch = applyAutomations(l);
-      // La ventilation posée par l'appariement survit ; seul l'état suit (le virement est rapproché).
-      expect(patch.removedAllocations).toEqual([]);
-      // La ligne est réécrite à l'identique (même identifiant), pas remplacée.
-      expect(patch.allocations.map((a) => [a.id, a.tirelireId])).toEqual([['al1', 'env-vacances']]);
-      expect(patch.operations[0]!.state).toBe('reconciled');
+    describe('[niveau 0]', () => {
+      it('ce que l’import a établi survit au passage des règles (D33)', () => {
+        const l = withOps(op('o1', 'VIR LIVRET', euros(-100), { transferAccountId: 'acc-livret' }));
+        l.allocations.push({ id: 'al1', operationId: 'o1', tirelireId: 'env-vacances', share: { kind: 'variable' } });
+        const patch = applyAutomations(l);
+        // La ventilation posée par l'appariement survit ; seul l'état suit (le virement est rapproché).
+        expect(patch.removedAllocations).toEqual([]);
+        // La ligne est réécrite à l'identique (même identifiant), pas remplacée.
+        expect(patch.allocations.map((a) => [a.id, a.tirelireId])).toEqual([['al1', 'env-vacances']]);
+        expect(patch.operations[0]!.state).toBe('reconciled');
+      });
     });
 
     it('l’aperçu montre l’avant et l’après sans rien écrire', () => {
@@ -193,24 +197,26 @@ describe('[niveau 1] harnais du registre', () => {
       expect(patch.automations[0]!.flowId).toBe('flow-credit');
     });
 
-    it('modifier le flux archive la règle et en crée une nouvelle, sans réécrire le passé', () => {
-      let l = withOps();
-      const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
-      flow.makesRule = true;
-      l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
-      const first = l.automations[l.automations.length - 1]!;
+    describe('[niveau 0]', () => {
+      it('modifier le flux archive la règle et en crée une nouvelle, sans réécrire le passé', () => {
+        let l = withOps();
+        const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
+        flow.makesRule = true;
+        l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
+        const first = l.automations[l.automations.length - 1]!;
 
-      flow.amount = euros(-1000);
-      const patch = syncFlowAutomations(l, '2026-10-07');
-      const archived = patch.automations.find((r) => r.id === first.id)!;
-      const created = patch.automations.find((r) => r.id !== first.id)!;
-      expect(archived.validTo).toBe('2026-10-07');
-      expect(created.validFrom).toBe('2026-10-07');
+        flow.amount = euros(-1000);
+        const patch = syncFlowAutomations(l, '2026-10-07');
+        const archived = patch.automations.find((r) => r.id === first.id)!;
+        const created = patch.automations.find((r) => r.id !== first.id)!;
+        expect(archived.validTo).toBe('2026-10-07');
+        expect(created.validFrom).toBe('2026-10-07');
 
-      // Une opération d'avant la bascule reste sélectionnée par l'ancienne règle, pas par la nouvelle.
-      const ancienne = op('o-ancien', 'CREDIT MAISON', euros(-950), { date: '2026-08-05' });
-      l = applyPatchToLedger(l, { operations: [ancienne], allocations: [] });
-      expect(selects(created.selection, ancienne) && !created.validFrom).toBe(false);
+        // Une opération d'avant la bascule reste sélectionnée par l'ancienne règle, pas par la nouvelle.
+        const ancienne = op('o-ancien', 'CREDIT MAISON', euros(-950), { date: '2026-08-05' });
+        l = applyPatchToLedger(l, { operations: [ancienne], allocations: [] });
+        expect(selects(created.selection, ancienne) && !created.validFrom).toBe(false);
+      });
     });
 
     it('un flux à montant variable ne contraint pas le montant', () => {
