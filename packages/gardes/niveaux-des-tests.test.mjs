@@ -27,8 +27,11 @@
  *   l'interface, le relais et l'hébergement, un seuil chacun ;
  * - 5, 6 et 9 (crochets) : dans une copie du dépôt, sans ses tests, un test déjà sur `main` (la
  *   non-régression), le harnais du besoin et un test du codeur, tous deux ajoutés par la branche,
- *   sont joués par le vrai pré-commit, puis par la vraie livraison (pré-push) ;
- * - 7, 8 et 9 (CI) : `ci.yml` est joué à blanc au passage en Ready et au tag `v*` ;
+ *   sont joués par le vrai pré-commit, puis par la vraie livraison (pré-push) ; un second besoin,
+ *   fonctionnel, fait jouer à la livraison les tests de l'interface, navigateur compris quand un
+ *   navigateur est là — sinon, elle doit le dire ;
+ * - 7, 8 et 9 (CI) : `ci.yml` est joué à blanc au passage en Ready (seuil 1, plus les tests
+ *   navigateur au seuil 2, reconnus à `navigateur` dans la commande) et au tag `v*` ;
  * - 10 : la règle des harnais, sur le dépôt réel, avec ses témoins rouges.
  *
  * **Ce qui reste à la relecture** : les durées attendues de la livraison (6), la vérification de
@@ -343,6 +346,7 @@ function constater(r, seuil, étiquette) {
  * besoin). Le pré-commit juge l'index, la livraison le commit poussé.
  */
 const BRANCHE = 'audit/999-besoin-invente';
+const BRANCHE_FONCTIONNELLE = 'audit/998-besoin-fonctionnel';
 const crochets = mémo(async () => {
   const dépôt = join(temporaire, 'depot');
   const git = (...a) => execFileSync('git', a, { cwd: dépôt, env: environnement(), encoding: 'utf8' }).trim();
@@ -357,6 +361,9 @@ const crochets = mémo(async () => {
   git('config', 'user.email', 'harnais@exemple.invalid');
   git('config', 'commit.gpgsign', 'false');
   writeFileSync(join(dépôt, 'packages/gardes/ancien.test.mjs'), source('node', 'ancien'));
+  mkdirSync(join(dépôt, 'apps/web/test/navigateur'), { recursive: true });
+  writeFileSync(join(dépôt, 'apps/web/test/ancien-web.test.ts'), source('vitest', 'web'));
+  writeFileSync(join(dépôt, 'apps/web/test/navigateur/ancien-nav.test.ts'), source('vitest', 'nav'));
   git('add', '-A');
   git('commit', '-q', '--no-verify', '-m', 'base');
   git('update-ref', 'refs/remotes/origin/main', 'HEAD');
@@ -381,9 +388,20 @@ const crochets = mémo(async () => {
   const lu = (f) => {
     const l = readFileSync(f, 'utf8').split('\n').filter(Boolean);
     const de = (n) => l.filter((x) => x.startsWith(`${n}:`)).map((x) => x.slice(n.length + 1)).sort();
-    return { ancien: de('ancien'), nouveau: de('nouveau'), codeur: de('codeur') };
+    return { ancien: de('ancien'), nouveau: de('nouveau'), codeur: de('codeur'), web: de('web'), nav: de('nav') };
   };
-  return { préCommit: { ...préCommit, ...lu(témoinCommit) }, livraison: { ...livraison, ...lu(témoinPush) } };
+
+  // Un besoin fonctionnel : le relais touché, la livraison joue l'interface (#232, point 6).
+  git('checkout', '-q', '-b', BRANCHE_FONCTIONNELLE, 'main');
+  writeFileSync(join(dépôt, 'apps/relay/README.md'), `${readFileSync(join(dépôt, 'apps/relay/README.md'), 'utf8')}\nUne ligne de plus.\n`);
+  git('commit', '-q', '--no-verify', '-am', 'besoin fonctionnel #998');
+  const témoinFonctionnel = join(temporaire, 'pre-push-fonctionnel.temoin');
+  writeFileSync(témoinFonctionnel, '');
+  const fonctionnel = await lancer('sh', ['.githooks/livraison.sh', 'push', `refs/heads/${BRANCHE_FONCTIONNELLE}`, git('rev-parse', 'HEAD'), `refs/heads/${BRANCHE_FONCTIONNELLE}`, '0'.repeat(40)], {
+    cwd: dépôt,
+    env: environnement({ NIVEAUX_TEMOIN: témoinFonctionnel }),
+  });
+  return { préCommit: { ...préCommit, ...lu(témoinCommit) }, livraison: { ...livraison, ...lu(témoinPush) }, fonctionnel: { ...fonctionnel, ...lu(témoinFonctionnel) } };
 });
 
 // ─── La CI, jouée à blanc (points 7, 8 et 9) ─────────────────────────────────────────────────────
@@ -394,16 +412,18 @@ const scripts = JSON.parse(lire('package.json')).scripts ?? {};
 /** La commande d'une étape, les scripts `pnpm <script>` de la racine dépliés d'un niveau. */
 function déplier(texte) {
   let t = texte;
-  for (const m of texte.matchAll(/\bpnpm\s+(?:run\s+)?([\w:.-]+)/g)) if (scripts[m[1]]) t += `\n${scripts[m[1]]}`;
+  for (const m of texte.matchAll(/\bpnpm\s+(?:run\s+)?([\w:.-]+)/g)) if (m[1] !== 'test' && scripts[m[1]]) t += `\n${scripts[m[1]]}`;
   return t;
 }
-const joueLesTests = (é) => /\bpnpm\s+(?:-r\s+|--recursive\s+)?(?:run\s+)?test\b/.test(déplier(commande(é)));
+/** `pnpm test [N]`, options de pnpm comprises (`-r`, `--dir <paquet>`, `--filter <paquet>`). */
+const PNPM_TEST = /\bpnpm\b(?:\s+(?:-r|--recursive|(?:--dir|-C|--filter|-F)\s+\S+))*\s+(?:run\s+)?test\b(?:\s+([0-4])\b)?/;
 
-/** Le seuil d'une étape qui joue les tests : l'argument de `pnpm test`, 2 sans argument. */
-function seuilDe(é) {
-  const m = déplier(commande(é)).match(/\bpnpm\s+(?:-r\s+|--recursive\s+)?(?:run\s+)?test\b(?:\s+([0-4])\b)?/);
-  return m?.[1] === undefined ? DÉFAUT : Number(m[1]);
-}
+/** Chaque lancement des tests dans une étape : son seuil (2 sans argument), et s'il vise les tests navigateur. */
+const lancements = (é) =>
+  déplier(commande(é))
+    .split('\n')
+    .filter((l) => PNPM_TEST.test(l))
+    .map((l) => ({ seuil: l.match(PNPM_TEST)[1] === undefined ? DÉFAUT : Number(l.match(PNPM_TEST)[1]), navigateur: /navigateur/.test(l) }));
 
 const auReady = {
   github: { event_name: 'pull_request', ref: 'refs/pull/232/merge', event: { action: 'ready_for_review', pull_request: { number: 232, draft: false, head: { sha: 'a'.repeat(40) } } } },
@@ -413,7 +433,7 @@ const auReady = {
 };
 const auTag = { github: { event_name: 'push', ref: 'refs/tags/v1.0.0', event: {} }, vars: {}, secrets: {}, inputs: {} };
 
-const étapesDeTests = (yaml, ctx) => jouer(yaml, ctx).flatMap((job) => job.joués.filter(joueLesTests).map((é) => ({ job, é, seuil: seuilDe(é) })));
+const étapesDeTests = (yaml, ctx) => jouer(yaml, ctx).flatMap((job) => job.joués.flatMap((é) => lancements(é).map((l) => ({ job, é, ...l }))));
 const publie = (é) => /uses:\s*softprops\/action-gh-release@|deposer\.sh/.test(é.texte);
 const laisseÉchouer = (job, é) => /^ +(?:- )?continue-on-error:\s*true/m.test(é.texte) || /^ {4}continue-on-error:\s*true/m.test(job.lignes.join('\n'));
 
@@ -526,13 +546,23 @@ test('rétrocompatibilité [niveau 3]', () => {});
     assert.deepEqual(r.codeur, attendus(2), 'livraison : un autre fichier de test que la branche ajoute n’est pas le harnais du besoin ; il se joue à son niveau, au seuil 2 (#232, point 9)');
   });
 
+  test('la livraison d’un besoin fonctionnel vérifie l’interface au seuil 2, tests navigateur compris quand un navigateur est là', async () => {
+    const { fonctionnel: r } = await crochets();
+    assert.equal(r.code, 0, `livraison (pré-push) d'un besoin fonctionnel refusée\n${r.sortie.slice(-2000)}`);
+    assert.deepEqual(r.web, attendus(2), 'livraison : les tests headless de l’interface se jouent au seuil 2 (#232, point 6)');
+    if (r.nav.length) assert.deepEqual(r.nav, attendus(2), 'livraison : avec un navigateur, les tests navigateur se jouent au seuil 2 (#232, point 6)');
+    else assert.ok(r.sortie.split('\n').some((l) => /navigateur/i.test(l)), `livraison : sans navigateur, elle le dit et laisse les tests navigateur à la CI (#232, point 6)\n${r.sortie.slice(-1500)}`);
+  });
+
   // Points 7, 8 et 9 : la CI, jouée à blanc.
 
-  test('au Ready, la CI vérifie au seuil 1', () => {
-    const yaml = lire(CI);
-    const tests = étapesDeTests(yaml, auReady);
-    assert.ok(tests.length, `${CI} : aucune étape ne joue les tests au passage en Ready`);
-    for (const t of tests) assert.equal(t.seuil, 1, `${CI} : au Ready, « ${t.job.nom} » joue les tests au seuil ${t.seuil}, attendu 1 (#232, point 7)`);
+  test('au Ready, la CI vérifie au seuil 1, plus les tests navigateur au seuil 2', () => {
+    const tests = étapesDeTests(lire(CI), auReady);
+    const suite = tests.filter((t) => !t.navigateur);
+    assert.ok(suite.length, `${CI} : aucune étape ne joue les tests au passage en Ready`);
+    for (const t of suite) assert.equal(t.seuil, 1, `${CI} : au Ready, « ${t.job.nom} » joue les tests au seuil ${t.seuil}, attendu 1 (#232, point 7)`);
+    const navigateur = tests.filter((t) => t.navigateur && t.seuil === 2 && !laisseÉchouer(t.job, t.é));
+    assert.ok(navigateur.length, `${CI} : au Ready, aucune étape bloquante ne joue les tests navigateur (\`test/navigateur\`) au seuil 2 (#232, point 7)`);
   });
 
   test('au Ready, une étape bloquante joue le harnais du besoin, par sa définition commune', () => {
