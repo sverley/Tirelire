@@ -116,7 +116,7 @@ relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`).
 
 ## Vérification
 
-- `pnpm test` : 174 tests vitest sur le cœur (périodes, plan, positions et invariants, besoins,
+- `pnpm test` : les tests vitest du cœur (périodes, plan, positions et invariants, besoins,
   report, états et filtre, dépôt, fusion, import, rapprochement, règles, ventilation à parts,
   bilan, sync), plus trois gardes de navigateur sur le harnais commun `apps/web/test/harnais.ts`
   (mise en page mobile, ergonomie au doigt, filtre d'état).

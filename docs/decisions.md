@@ -1075,20 +1075,22 @@ opération importée (D09) est `op_` + 16 hexadécimaux. L'écriture par ligne e
 `CHECK` nommé `table.colonne`, et le cœur vérifie la même chose avant d'écrire, localement comme à la
 réception, si bien qu'une ligne incohérente est refusée sans rien écrire, en nommant la table et la
 colonne. Les références et les autres invariants sont vérifiés par une fonction du cœur, qui sert
-aussi à l'ouverture d'un fichier étranger.
+aussi à l'ouverture d'un fichier étranger. Le format est documenté dans
+`docs/format-depot-sqlite.md` pour pouvoir être fabriqué depuis l'extérieur.
 
 Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'y stocke qui se
 recalcule (D84). Importées : `account_id`, `date`, `label`, `details`, `amount` et
-`suggested_category`, la catégorie que propose la source. Saisies : `state` et `one_off`, et toutes
-les colonnes d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit
-pas dans la forme de l'identifiant, qui n'est qu'une identité (D09). Trois colonnes dérivées sont
-gardées : `planned_flow_id`, `transfer_account_id` et `transfer_operation_id`, que le rapprochement
-établit. Elles ne se recalculent pas à l'identique : le rapprochement dépend des flux et des
-opérations du jour où il a eu lieu, une proposition confirmée est une décision de l'utilisateur
-(D12), et le moteur d'automatismes repart de ce qu'elles établissent (D33). Le libellé normalisé,
-lui, se déduit du libellé seul (`normalizeLabel`) : il ne se stocke pas, il se recalcule à la
-lecture du fichier. Le rang parmi les identiques du jour n'entre que dans la clé (D09). Le format est documenté dans `docs/format-depot-sqlite.md` pour
-pouvoir être fabriqué depuis l'extérieur.
+`suggested_category`, la catégorie que propose la source. Saisie : `one_off`, et toutes les
+colonnes d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit pas
+dans la forme de l'identifiant, qui n'est qu'une identité (D09). Quatre colonnes établies sont
+gardées : `state`, que posent l'import, les automatismes ou l'utilisateur (D22), et
+`planned_flow_id`, `transfer_account_id` et `transfer_operation_id`, que le rapprochement établit.
+Elles ne se recalculent pas à l'identique : le rapprochement dépend des flux et des opérations du
+jour où il a eu lieu, une proposition confirmée ou un verrouillage est une décision de
+l'utilisateur (D12, D22), et le moteur d'automatismes repart de ce qu'elles établissent (D33). Le
+libellé normalisé, lui, se déduit du libellé seul (`normalizeLabel`) : il ne se stocke pas, il se
+recalcule à la lecture du fichier. Le rang parmi les identiques du jour n'entre que dans la clé
+(D09).
 
 ### D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
 
