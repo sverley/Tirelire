@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  operationKey,
   applyPatchToLedger,
   bankMultiAccountProfile,
   decodeBytes,
@@ -103,7 +104,9 @@ describe('[niveau 1] harnais du registre', () => {
       const twins = prep.candidates.filter((c) => c.operation.amount === euros(-85.4));
       expect(twins.length).toBe(2);
       expect(twins[0]!.operation.id).not.toBe(twins[1]!.operation.id);
-      expect(twins.map((t) => t.operation.rank)).toEqual([0, 1]);
+      const t0 = twins[0]!.operation;
+      // Le rang parmi les identiques du jour n'entre que dans la clé (D09) : 0 puis 1.
+      expect(twins.map((t) => t.operation.id)).toEqual([0, 1].map((rang) => operationKey(t0.accountId, t0.date, t0.amount, t0.normalizedLabel, rang)));
       expect(twins[0]!.operation.details).toBeUndefined(); // libellé complet identique : rien à garder
       expect(prep.candidates.find((c) => c.operation.amount === euros(-950))!.operation.details).toContain('CAPITAL 700');
     });

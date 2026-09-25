@@ -25,7 +25,6 @@
     type NeedKind,
     type StateVisibility,
     type ValidityState,
-    stepOf,
   } from '@tirelire/core';
 
   // Tirelire : nom, placement voulu (D20), solde initial, report (D05/D29).
@@ -50,7 +49,7 @@
     name: '',
     kind: 'recurring' as NeedKind,
     amount: '',
-    intervalMonths: '1',
+    interval: '1',
     anchorDate: app.asOf,
     monthlyAmount: '',
     priority: '20',
@@ -191,7 +190,7 @@
 
   function startNewNeed(e: Tirelire) {
     editingNeed = { need: { id: app.newId(), tirelireId: e.id, kind: 'recurring', priority: DEFAULT_PRIORITY.recurring }, isNew: true };
-    needForm = { name: '', kind: 'recurring', amount: '', intervalMonths: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring), activeFrom: '', activeTo: '' };
+    needForm = { name: '', kind: 'recurring', amount: '', interval: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring), activeFrom: '', activeTo: '' };
     needTitre = `Ajouter un besoin — ${e.name}`;
     needError = '';
   }
@@ -202,7 +201,7 @@
       name: n.name ?? '',
       kind: n.kind,
       amount: centsToInput(n.amount),
-      intervalMonths: String(n.periodicity ? stepOf(n.periodicity).interval : n.kind === 'dueDate' ? 12 : 1),
+      interval: String(n.periodicity ? n.periodicity.interval : n.kind === 'dueDate' ? 12 : 1),
       anchorDate: n.periodicity?.anchorDate ?? app.asOf,
       monthlyAmount: centsToInput(n.monthlyAmount),
       priority: String(n.priority),
@@ -235,7 +234,7 @@
 
   function onNeedKindChange() {
     needForm.priority = String(DEFAULT_PRIORITY[needForm.kind]);
-    needForm.intervalMonths = needForm.kind === 'dueDate' || needForm.kind === 'payout' ? '12' : '1';
+    needForm.interval = needForm.kind === 'dueDate' || needForm.kind === 'payout' ? '12' : '1';
   }
 
   function saveNeed(ev: Event) {
@@ -243,7 +242,7 @@
     if (!editingNeed) return;
     const amount = inputToCents(needForm.amount);
     const monthly = inputToCents(needForm.monthlyAmount);
-    const interval = Math.max(1, Number(needForm.intervalMonths) || 1);
+    const interval = Math.max(1, Number(needForm.interval) || 1);
     const row: Need = {
       id: editingNeed.need.id,
       tirelireId: editingNeed.need.tirelireId,
@@ -298,7 +297,7 @@
     if (n.kind === 'dueDate')
       return `${money(n.amount ?? 0)} ${periodicityLabel(n.periodicity)} · prochaine ${n.periodicity ? shortDate(nextOccurrence(n.periodicity, app.asOf)) : '?'}${suffixe}`;
     if (n.kind === 'goal') return `${money(n.monthlyAmount ?? 0)} par période${n.amount !== undefined ? ` · cible ${money(n.amount)}` : ''}${suffixe}`;
-    const per = n.periodicity && stepOf(n.periodicity).interval === 12 ? 'par an' : n.periodicity && stepOf(n.periodicity).interval > 1 ? `tous les ${stepOf(n.periodicity).interval} mois` : 'par période';
+    const per = n.periodicity && n.periodicity.interval === 12 ? 'par an' : n.periodicity && n.periodicity.interval > 1 ? `tous les ${n.periodicity.interval} mois` : 'par période';
     return `${money(n.amount ?? 0)} ${per} · dotation ${money(needCruise(n))}${suffixe}`;
   }
 
@@ -386,11 +385,11 @@
       <label class="f">Nom (facultatif) <input bind:value={needForm.name} placeholder="Taxe foncière" /></label>
       {#if needForm.kind === 'dueDate'}
         <label class="f">Montant de l'échéance <input bind:value={needForm.amount} inputmode="decimal" placeholder="1 200,00" /></label>
-        <label class="f">Tous les (mois) <input type="number" min="1" bind:value={needForm.intervalMonths} /></label>
+        <label class="f">Tous les (mois) <input type="number" min="1" bind:value={needForm.interval} /></label>
         <label class="f">Première échéance <input type="date" bind:value={needForm.anchorDate} /></label>
       {:else if needForm.kind === 'recurring'}
         <label class="f">Montant <input bind:value={needForm.amount} inputmode="decimal" placeholder="900,00" /></label>
-        <label class="f">Par période de (mois) <input type="number" min="1" bind:value={needForm.intervalMonths} /></label>
+        <label class="f">Par période de (mois) <input type="number" min="1" bind:value={needForm.interval} /></label>
         <label class="f">Depuis le <input type="date" bind:value={needForm.anchorDate} /></label>
       {:else if needForm.kind === 'payout'}
         <p class="muted small" style="grid-column:1/-1;margin:0">
@@ -398,7 +397,7 @@
           encaissés en quelques mois, reversés régulièrement le reste de l'année.
         </p>
         <label class="f">Montant à reverser <input bind:value={needForm.amount} inputmode="decimal" placeholder="12 000,00" /></label>
-        <label class="f">Réparti sur (mois) <input type="number" min="1" bind:value={needForm.intervalMonths} /></label>
+        <label class="f">Réparti sur (mois) <input type="number" min="1" bind:value={needForm.interval} /></label>
         <label class="f">Depuis le <input type="date" bind:value={needForm.anchorDate} /></label>
       {:else}
         <label class="f">Mensualité <input bind:value={needForm.monthlyAmount} inputmode="decimal" placeholder="300,00" /></label>

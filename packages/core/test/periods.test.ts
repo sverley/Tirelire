@@ -105,10 +105,4 @@ describe('rythmes en jours, semaines et années (D47)', () => {
     expect(nextOccurrence(annuel, '2026-10-16')).toBe('2027-10-15');
     expect(nextOccurrence(annuel, '2029-01-01')).toBe('2029-10-15');
   });
-
-  it('lit encore un rythme écrit sous la forme ancienne', () => {
-    // Ce qu'un appareil non migré peut nous envoyer (D30, D47).
-    const ancien = { intervalMonths: 3, anchorDate: '2026-01-31' } as never;
-    expect(nextOccurrence(ancien, '2026-02-01')).toBe('2026-04-30');
-  });
 });

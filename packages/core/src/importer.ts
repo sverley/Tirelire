@@ -22,17 +22,22 @@ export interface ImportColumns {
   subCategory?: string;
 }
 
+export const IMPORT_SOURCES = ['bank', 'linxo', 'other'] as const;
+export const IMPORT_ENCODINGS = ['auto', 'utf-8', 'windows-1252'] as const;
+export const IMPORT_DELIMITERS = ['auto', ';', ',', '\t', '|'] as const;
+export const IMPORT_DATE_FORMATS = ['DMY', 'YMD', 'MDY'] as const;
+
 export interface ImportProfile {
   id: Id;
   name: string;
   /** Source, pour la date de bascule et les doublons entre sources. */
-  source: 'bank' | 'linxo' | 'other';
-  encoding: 'auto' | 'utf-8' | 'windows-1252';
-  delimiter: 'auto' | ';' | ',' | '\t' | '|';
+  source: (typeof IMPORT_SOURCES)[number];
+  encoding: (typeof IMPORT_ENCODINGS)[number];
+  delimiter: (typeof IMPORT_DELIMITERS)[number];
   /** Indice (0-based) de la ligne d'en-tête ; les lignes avant sont ignorées. */
   headerRow: number;
   columns: ImportColumns;
-  dateFormat: 'DMY' | 'YMD' | 'MDY';
+  dateFormat: (typeof IMPORT_DATE_FORMATS)[number];
   /** Débit / crédit en colonnes séparées : le débit est-il exprimé en positif ? */
   debitPositive?: boolean;
   /** Valeur de la colonne compte → compte Tirelire. */
@@ -314,7 +319,6 @@ export function prepareImport(ledger: Ledger, parsed: ParsedRow[], profile: Impo
       normalizedLabel: normalized,
       amount: row.amount,
       state: 'untreated',
-      rank,
       ...(row.suggestedCategory ? { suggestedCategory: row.suggestedCategory } : {}),
     };
     const exact = byKey.has(id) || seenInFile.has(id);

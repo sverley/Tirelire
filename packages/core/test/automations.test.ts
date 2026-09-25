@@ -190,7 +190,7 @@ describe('[niveau 1] harnais du registre', () => {
     it('un flux qui engendre une règle la fait verrouiller : elle porte toute la classification', () => {
       const l = withOps();
       const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
-      flow.makesRule = true;
+      flow.makesAutomation = true;
       const patch = syncFlowAutomations(l, '2026-09-07');
       expect(patch.automations.length).toBe(1);
       expect(patch.automations[0]!.action.state).toBe('lock');
@@ -201,7 +201,7 @@ describe('[niveau 1] harnais du registre', () => {
       it('modifier le flux archive la règle et en crée une nouvelle, sans réécrire le passé', () => {
         let l = withOps();
         const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
-        flow.makesRule = true;
+        flow.makesAutomation = true;
         l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
         const first = l.automations[l.automations.length - 1]!;
 
@@ -230,9 +230,9 @@ describe('[niveau 1] harnais du registre', () => {
     it('décocher « engendre une règle » archive la règle plutôt que de la supprimer', () => {
       const l = withOps();
       const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
-      flow.makesRule = true;
+      flow.makesAutomation = true;
       l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
-      flow.makesRule = false;
+      flow.makesAutomation = false;
       const patch = syncFlowAutomations(l, '2026-10-07');
       expect(patch.automations[0]!.validTo).toBe('2026-10-07');
       expect(patch.automations[0]!.deletedAt).toBeUndefined();

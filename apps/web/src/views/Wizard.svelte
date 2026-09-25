@@ -18,9 +18,9 @@
     budgetPeriodContaining,
     needName,
     nextOccurrence,
-    stepOf,
     budgetSuggestions,
     nextDueDate,
+    monthsOf,
     DEFAULT_PRIORITY,
     type Account,
     type PeriodUnit,
@@ -80,7 +80,7 @@
    * démarre qu'à la première période entièrement postérieure à l'ouverture ; ouvrir « aujourd'hui »
    * priverait donc le budget de sa toute première période.
    */
-  const periodStart = () => budgetPeriodContaining(app.asOf, Number(payDay) || 1).start;
+  const periodStart = () => budgetPeriodContaining(app.asOf, Number(startDay) || 1).start;
   const perPeriod = (amount: Cents, months: number) => divideCents(amount, Math.max(1, months));
 
   /**
@@ -116,10 +116,10 @@
 
   // --- Début de la période budgétaire : un choix du foyer, pas un champ de compte (D44) ---
   // Valeur initiale volontairement figée : le champ est ensuite piloté par la saisie.
-  let payDay = $state(untrack(() => String(app.ledger.settings.periodStartDay)));
-  function savePayDay() {
-    const d = Math.min(31, Math.max(1, Number(payDay) || 1));
-    payDay = String(d);
+  let startDay = $state(untrack(() => String(app.ledger.settings.periodStartDay)));
+  function saveStartDay() {
+    const d = Math.min(31, Math.max(1, Number(startDay) || 1));
+    startDay = String(d);
     if (app.ledger.settings.periodStartDay !== d) app.setSetting('periodStartDay', d);
   }
   /** Jour du plus gros revenu déclaré : ce que l'assistant propose comme début de période. */
@@ -391,7 +391,7 @@
     if (v && v !== f.periodicity.anchorDate) app.upsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate: v } });
   }
   function editFlowStep(f: PlannedFlow, champ: 'interval' | 'unit', v: string) {
-    const actuel = stepOf(f.periodicity);
+    const actuel = f.periodicity;
     const suivant =
       champ === 'interval'
         ? { ...actuel, interval: Math.max(1, Number(v) || 1) }
@@ -516,14 +516,14 @@
     <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
-      {#if stepOf(f.periodicity).unit === 'month' && stepOf(f.periodicity).interval === 1}
+      {#if f.periodicity.unit === 'month' && f.periodicity.interval === 1}
         <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
       {:else}
         <input class="date" type="date" value={f.periodicity.anchorDate} onchange={(e) => editFlowDate(f, e.currentTarget.value)} title="Première échéance ; les suivantes en découlent" />
       {/if}
-      <input class="jour" type="number" min="1" value={stepOf(f.periodicity).interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
-      <select class="unite" value={stepOf(f.periodicity).unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
-        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{stepOf(f.periodicity).interval > 1 ? l.pluriel : l.un}</option>{/each}
+      <input class="jour" type="number" min="1" value={f.periodicity.interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
+      <select class="unite" value={f.periodicity.unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
+        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{f.periodicity.interval > 1 ? l.pluriel : l.un}</option>{/each}
       </select>
       {#if accounts.length > 1}
         <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
@@ -531,7 +531,7 @@
         </select>
       {/if}
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
-      {#if stepOf(f.periodicity).unit !== 'month' || stepOf(f.periodicity).interval !== 1}
+      {#if f.periodicity.unit !== 'month' || f.periodicity.interval !== 1}
         <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
       {/if}
     </div>
@@ -575,20 +575,20 @@
     commencer au jour de leur paie, pour savoir si l'argent tient jusqu'à la prochaine.
   </p>
   <div class="propositions">
-    {#if jourDuRevenu !== undefined && Number(payDay) !== jourDuRevenu}
-      <button class="prop" onclick={() => { payDay = String(jourDuRevenu); savePayDay(); }}>
+    {#if jourDuRevenu !== undefined && Number(startDay) !== jourDuRevenu}
+      <button class="prop" onclick={() => { startDay = String(jourDuRevenu); saveStartDay(); }}>
         <span class="n">Commencer au jour de ma paie</span><span class="v num">le {jourDuRevenu}</span>
       </button>
     {/if}
-    {#if Number(payDay) !== 1}
-      <button class="prop" onclick={() => { payDay = '1'; savePayDay(); }}>
+    {#if Number(startDay) !== 1}
+      <button class="prop" onclick={() => { startDay = '1'; saveStartDay(); }}>
         <span class="n">Suivre le mois calendaire</span><span class="v num">le 1er</span>
       </button>
     {/if}
   </div>
-  <form class="edit" onsubmit={(e) => { e.preventDefault(); savePayDay(); }}>
+  <form class="edit" onsubmit={(e) => { e.preventDefault(); saveStartDay(); }}>
     <div class="grid">
-      <label class="f">La période commence le (jour) <input type="number" min="1" max="31" bind:value={payDay} onchange={savePayDay} /></label>
+      <label class="f">La période commence le (jour) <input type="number" min="1" max="31" bind:value={startDay} onchange={saveStartDay} /></label>
     </div>
   </form>
 
@@ -604,14 +604,14 @@
     <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
-      {#if stepOf(f.periodicity).unit === 'month' && stepOf(f.periodicity).interval === 1}
+      {#if f.periodicity.unit === 'month' && f.periodicity.interval === 1}
         <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
       {:else}
         <input class="date" type="date" value={f.periodicity.anchorDate} onchange={(e) => editFlowDate(f, e.currentTarget.value)} title="Première échéance ; les suivantes en découlent" />
       {/if}
-      <input class="jour" type="number" min="1" value={stepOf(f.periodicity).interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
-      <select class="unite" value={stepOf(f.periodicity).unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
-        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{stepOf(f.periodicity).interval > 1 ? l.pluriel : l.un}</option>{/each}
+      <input class="jour" type="number" min="1" value={f.periodicity.interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
+      <select class="unite" value={f.periodicity.unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
+        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{f.periodicity.interval > 1 ? l.pluriel : l.un}</option>{/each}
       </select>
       {#if accounts.length > 1}
         <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
@@ -619,7 +619,7 @@
         </select>
       {/if}
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
-      {#if stepOf(f.periodicity).unit !== 'month' || stepOf(f.periodicity).interval !== 1}
+      {#if f.periodicity.unit !== 'month' || f.periodicity.interval !== 1}
         <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
       {/if}
     </div>
@@ -710,7 +710,7 @@
         <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
       </div>
       <p class="muted small" style="margin:4px 0 0">
-        {money(perPeriod(n.amount ?? 0, n.periodicity?.intervalMonths ?? 12))} à mettre de côté par mois.
+        {money(perPeriod(n.amount ?? 0, n.periodicity ? monthsOf(n.periodicity) : 12))} à mettre de côté par mois.
       </p>
     </div>
   {/each}

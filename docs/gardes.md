@@ -447,7 +447,7 @@ Chemins : `apps/web/android/**`, `apps/web/capacitor.config.ts`
 
 ## C8 · Les instances ne sont pas toutes à la même version
 
-Chemins : `packages/core/src/schema.ts`, `packages/core/src/migration.ts`, `packages/core/src/model.ts`, `packages/core/src/store.ts`, `packages/core/src/sync.ts`
+Chemins : `packages/core/src/schema.ts`, `packages/core/src/model.ts`, `packages/core/src/store.ts`, `packages/core/src/sync.ts`
 
 - **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 6. un fichier étranger au format
   est refusé » : un fichier d'un format antérieur, une base sans le marqueur de Tirelire ou ce qui

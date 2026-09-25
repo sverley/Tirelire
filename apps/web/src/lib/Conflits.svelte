@@ -11,7 +11,7 @@
 
   const TABLES: Record<string, string> = {
     accounts: 'Compte',
-    envelopes: 'Tirelire',
+    tirelires: 'Tirelire',
     needs: 'Besoin',
     categories: 'Catégorie',
     planned_flows: 'Flux prévu',
@@ -34,7 +34,7 @@
     priority: 'Priorité',
     placement: 'Placement',
     category_id: 'Catégorie',
-    envelope_id: 'Tirelire',
+    tirelire_id: 'Tirelire',
     account_id: 'Compte',
     active_from: 'Valable du',
     active_to: 'Valable jusqu’au',

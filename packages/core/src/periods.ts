@@ -2,7 +2,7 @@
  * Périodes budgétaires (d'une paie à la suivante) et occurrences d'une périodicité
  * « tous les N jours, semaines, mois ou années à partir d'une date » (D47).
  */
-import { stepOf, type ISODate, type Periodicity } from './model.js';
+import { type ISODate, type Periodicity } from './model.js';
 import { addDays, addMonths, addUnits, dateInMonth, daysInMonth, diffDays, parseDate, MONTHS_FR, formatDate } from './dates.js';
 
 export interface Period {
@@ -81,7 +81,7 @@ export function periodsUntil(from: Period, date: ISODate, startDay: number): num
 
 /** Première occurrence de `p` à une date ≥ `from`. */
 export function nextOccurrence(p: Periodicity, from: ISODate): ISODate {
-  const { interval, unit } = stepOf(p);
+  const { interval, unit } = p;
   if (interval < 1) throw new Error('interval doit être ≥ 1');
   if (p.anchorDate >= from) return p.anchorDate;
 
@@ -119,7 +119,7 @@ export function occurrencesBetween(p: Periodicity, start: ISODate, end: ISODate)
 /** Dernière occurrence strictement avant `date` (ou undefined). */
 export function previousOccurrence(p: Periodicity, date: ISODate): ISODate | undefined {
   const next = nextOccurrence(p, date);
-  const { interval, unit } = stepOf(p);
+  const { interval, unit } = p;
   const prev = nextOccurrence(p, addUnits(next, -interval, unit));
   return prev < date ? prev : undefined;
 }

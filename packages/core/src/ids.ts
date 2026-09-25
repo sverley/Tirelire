@@ -52,8 +52,9 @@ export function normalizeLabel(label: string): string {
 }
 
 /**
- * Clé déterministe d'une opération importée.
- * `rank` distingue les opérations strictement identiques du même jour (0, 1, 2…).
+ * Clé déterministe d'une opération importée (D09) : `op_` suivi de 16 hexadécimaux, soit les
+ * 64 premiers bits d'un SHA-256. `rank` distingue les opérations strictement identiques du même
+ * jour dans un relevé (0, 1, 2…) ; il n'entre que dans la clé et ne se garde pas.
  */
 export function operationKey(
   accountId: string,
@@ -63,7 +64,7 @@ export function operationKey(
   rank: number,
 ): string {
   const material = [accountId, date, String(amount), normalizedLabel, String(rank)].join('');
-  return 'op_' + bytesToHex(sha256(new TextEncoder().encode(material))).slice(0, 32);
+  return 'op_' + bytesToHex(sha256(new TextEncoder().encode(material))).slice(0, 16);
 }
 
 export function sha256Hex(s: string): string {

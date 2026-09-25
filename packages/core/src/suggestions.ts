@@ -16,7 +16,7 @@
  */
 import { parseDate, todayISO } from './dates.js';
 import { exampleLedger } from './example.js';
-import { activeAt, alive, stepOf, type Cents, type ISODate, type PeriodUnit } from './model.js';
+import { activeAt, alive, type Cents, type ISODate, type PeriodUnit } from './model.js';
 
 export interface IncomeSuggestion {
   name: string;
@@ -87,7 +87,8 @@ export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions
     .map((f) => ({
       name: f.name,
       amount: Math.abs(f.amount),
-      ...stepOf(f.periodicity),
+      interval: f.periodicity.interval,
+      unit: f.periodicity.unit,
       day: parseDate(f.periodicity.anchorDate).d,
     }));
 
@@ -96,7 +97,8 @@ export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions
     .map((f) => ({
       name: f.name,
       amount: Math.abs(f.amount),
-      ...stepOf(f.periodicity),
+      interval: f.periodicity.interval,
+      unit: f.periodicity.unit,
       day: parseDate(f.periodicity.anchorDate).d,
     }));
 
@@ -115,7 +117,7 @@ export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions
       return {
         name: nameOf(n),
         amount: n.amount ?? 0,
-        ...(n.periodicity ? stepOf(n.periodicity) : { interval: 12, unit: 'month' as const }),
+        ...(n.periodicity ? { interval: n.periodicity.interval, unit: n.periodicity.unit } : { interval: 12, unit: 'month' as const }),
         month: m,
         day: d,
       };

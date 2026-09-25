@@ -9,19 +9,18 @@ Tirelire/
 │   ├── src/dates.ts        dates civiles AAAA-MM-JJ sans fuseau
 │   ├── src/periods.ts      périodes de paie, périodicités
 │   ├── src/money.ts        centimes : parsing et formatage français
-│   ├── src/ids.ts          uuidv7, normalizeLabel, operationKey
+│   ├── src/ids.ts          uuidv7, normalizeLabel, operationKey (`op_` + 16 hexadécimaux)
 │   ├── src/balances.ts     positions reconstruites (composantes par compte, besoins, dotations, position simulée d'une période à venir, non affecté, solde à régler, état d'une tirelire)
 │   ├── src/plan.ts         plan de période : croisière / rattrapage, priorités, virements
 │   ├── src/csv.ts          décodage et parseur CSV
 │   ├── src/importer.ts     profils d'import, lecture des lignes, clés, doublons
 │   ├── src/matching.ts     virements internes, virements par compte, rapprochement de flux, pipeline
-│   ├── src/rules.ts        moteur de règles, aperçu, actions groupées, règles issues des flux
+│   ├── src/automations.ts  moteur d'automatismes, aperçu, actions groupées, automatismes issus des flux
 │   ├── src/edit.ts         édition manuelle : verrouillage, ventilation à parts
-│   ├── src/migration.ts    anciennes migrations du modèle, plus appelées (retrait : #197)
 │   ├── src/review.ts       bilan par catégorie, calibrage, provisions prévu vs payé
 │   ├── src/hlc.ts          horloge logique hybride
-│   ├── src/schema.ts       définition des tables (une source pour SQL, lecture, écriture, échange), format du fichier
-│   ├── src/store.ts        dépôt sql.js : état daté par ligne, réception et conflits, refus d'un autre format
+│   ├── src/schema.ts       définition des tables aux noms du domaine, colonnes obligatoires et énumérées (une source pour SQL, lecture, écriture, échange), format du fichier
+│   ├── src/store.ts        dépôt sql.js : état daté par ligne, refus d'une ligne incohérente, réception et conflits, refus d'un autre format
 │   ├── src/sync.ts         synchronisation par delta d'état, paquets par fichier et par relais
 │   └── src/example.ts      jeu de données de l'analyse
 ├── apps/web/               PWA Svelte 5 + Vite
@@ -48,12 +47,15 @@ Tirelire/
 | `PlannedFlow` | revenu, charge fixe, échéance payée par une tirelire, virement attendu ; périodicité, fenêtre, tolérance, motif | UUID v7 |
 | `Operation` | ligne de relevé (`imported`) ou saisie (`manual`) ; état (non traitée / rapprochée / verrouillée) ; transfert ; flux rapproché | clé déterministe ou UUID v7 |
 | `Allocation` | ligne de ventilation : catégorie + tirelire + part (fixe, pourcentage, variable) | UUID v7 |
-| `Rule` | sélection + action à champs facultatifs + rang (clé triable) + validité | UUID v7 |
+| `Automation` | sélection + action à champs facultatifs + rang (clé triable) + validité | UUID v7 |
 | `ImportProfile` | colonnes, formats, correspondance des comptes | UUID v7 |
 | `Device` (branche sync) | appareil et personne | siteId |
 | `Settings` | coussin du compte principal, seuil de virement, siteId | clé/valeur |
 
 Montants en centimes entiers signés (négatif = débit). Dates `AAAA-MM-JJ`. Suppression = `deletedAt`.
+Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la propriété en snake_case
+(`tirelires`, `tirelire_id`, `makes_automation`) ; le libellé normalisé d'une opération se recalcule
+à la lecture (D58).
 
 ## Conventions de signe
 
@@ -89,7 +91,7 @@ Montants en centimes entiers signés (négatif = débit). Dates `AAAA-MM-JJ`. Su
 à chaque passage) → `locked` (vérité, plus aucune règle ne l'atteint). Toute modification manuelle
 verrouille (`edit.ts`) ; seul l'utilisateur déverrouille, à l'unité ou par action groupée.
 
-## Moteur de règles (`rules.ts`, D23)
+## Moteur d’automatismes (`automations.ts`, D23)
 
 Les règles se rejouent du rang le plus élevé au rang 1 sur les opérations non verrouillées : chaque
 champ renseigné écrase, les champs vides laissent en place, le rang tranche. Le calcul repart de ce
@@ -114,8 +116,8 @@ relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`).
 
 ## Vérification
 
-- `pnpm test` : 174 tests vitest sur le cœur (périodes, plan, positions et invariants, besoins,
-  report, états et filtre, dépôt, migrations, fusion, import, rapprochement, règles, ventilation à parts,
+- `pnpm test` : les tests vitest du cœur (périodes, plan, positions et invariants, besoins,
+  report, états et filtre, dépôt, fusion, import, rapprochement, règles, ventilation à parts,
   bilan, sync), plus trois gardes de navigateur sur le harnais commun `apps/web/test/harnais.ts`
   (mise en page mobile, ergonomie au doigt, filtre d'état).
 - `pnpm typecheck`, `pnpm build`.

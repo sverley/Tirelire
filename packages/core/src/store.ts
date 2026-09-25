@@ -14,7 +14,7 @@
  */
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
 import { formatTimestamp, HLC, parseTimestamp } from './hlc.js';
-import { uuidv7 } from './ids.js';
+import { normalizeLabel, uuidv7 } from './ids.js';
 import { DEFAULT_SETTINGS, emptyLedger, type Ledger, type Settings } from './model.js';
 import {
   createTableSQL,
@@ -22,7 +22,7 @@ import {
   FORMAT_VERSION,
   HLC_COLUMN,
   LEDGER_KEYS,
-  liveColumns,
+  rowProblem,
   SYSTEM_SQL,
   TABLES,
   type ColumnDef,
@@ -86,6 +86,17 @@ export class FormatRefused extends Error {
   ) {
     super(message);
     this.name = 'FormatRefused';
+  }
+}
+
+/** Une ligne qui ne s'écrit pas : rien n'a été écrit, et le message nomme la table et la colonne. */
+export class RowRefused extends Error {
+  constructor(
+    readonly table: string,
+    message: string,
+  ) {
+    super(`Écriture refusée : ${message} Rien n’a été écrit.`);
+    this.name = 'RowRefused';
   }
 }
 
@@ -222,38 +233,21 @@ export class LedgerStore {
     for (const key of LEDGER_KEYS) {
       (ledger[key] as unknown[]) = this.readTable(TABLES[key]!);
     }
+    // Ce qui se recalcule ne se stocke pas (D58, D84) : le libellé normalisé se déduit du libellé.
+    for (const op of ledger.operations) op.normalizedLabel = normalizeLabel(op.label);
     ledger.settings = this.readSettings();
     return ledger;
   }
 
-  private readTable(t: TableDef, includeDeprecated = false): Row[] {
+  private readTable(t: TableDef): Row[] {
     const stmt = this.db.prepare(`SELECT * FROM ${t.name}`);
     const rows: Row[] = [];
     try {
-      while (stmt.step()) rows.push(fromRow(t, stmt.getAsObject() as Row, includeDeprecated));
+      while (stmt.step()) rows.push(fromRow(t, stmt.getAsObject() as Row));
     } finally {
       stmt.free();
     }
     return rows;
-  }
-
-  /** Lignes brutes d'une table, colonnes dépréciées comprises : réservé aux migrations (D30). */
-  readRawTable(key: LedgerKey): Row[] {
-    return this.readTable(TABLES[key]!, true);
-  }
-
-  /** Lecture d'une table héritée, toujours déclarée (D30) : réservé aux migrations. */
-  readLegacyTable(name: keyof typeof TABLES): Row[] {
-    return this.readTable(TABLES[name]!, true);
-  }
-
-  /** Version du modèle enregistrée (D30) : réservé aux migrations. */
-  get modelVersion(): number {
-    return Number(this.getMeta('model_version') ?? 0);
-  }
-
-  setModelVersion(v: number): void {
-    this.db.run(`INSERT OR REPLACE INTO meta (key, value) VALUES ('model_version', ?)`, [String(v)]);
   }
 
   readSettings(): Settings {
@@ -272,25 +266,23 @@ export class LedgerStore {
     return s as unknown as Settings;
   }
 
-  /** Valeur brute d'un réglage sous son ancien nom : réservé aux migrations (D30, D41). */
-  readLegacySetting(key: string): unknown {
-    const r = this.db.exec(`SELECT value FROM settings WHERE key = ?`, [key]);
-    const v = r[0]?.values[0]?.[0] as string | null | undefined;
-    return v === null || v === undefined ? undefined : JSON.parse(v);
-  }
-
   // -------------------------------------------------------------------------
   // Écriture locale
   // -------------------------------------------------------------------------
 
-  /** Insère ou réécrit une ligne entière, avec une nouvelle horloge ; rien si elle ne change pas. */
+  /**
+   * Insère ou réécrit une ligne entière, avec une nouvelle horloge ; rien si elle ne change pas.
+   * Une ligne qui ne s'écrit pas — colonne obligatoire vide, valeur hors de son énumération — est
+   * refusée avant d'écrire, en nommant la table et la colonne (`RowRefused`).
+   */
   upsert<K extends LedgerKey>(key: K, row: Ledger[K][number]): void {
     const t = TABLES[key]!;
     const r = row as unknown as Row;
-    if (typeof r['id'] !== 'string' || !r['id']) throw new Error('id manquant');
     const v: Record<string, SqlValue> = {};
-    for (const col of liveColumns(t)) if (col.prop !== 'id') v[col.col] = toSql(col, r[col.prop]);
-    const existing = this.readRowState(t.name, r['id']);
+    for (const col of t.columns) if (col.prop !== 'id') v[col.col] = toSql(col, r[col.prop]);
+    const problem = rowProblem(t, r['id'], v);
+    if (problem) throw new RowRefused(t.name, problem);
+    const existing = this.readRowState(t.name, r['id'] as string);
     if (existing && sameValues(existing.v, v)) return;
     this.transaction(() => this.writeRow({ t: t.name, id: r['id'] as string, hlc: this.tick(), v }));
     this.notify();
@@ -330,7 +322,7 @@ export class LedgerStore {
       return;
     }
     const t = tableByName(row.t)!;
-    const cols = liveColumns(t).filter((c) => c.col !== 'id');
+    const cols = t.columns.filter((c) => c.col !== 'id');
     const names = [...cols.map((c) => c.col), HLC_COLUMN];
     const values: SqlValue[] = [row.id, ...cols.map((c) => row.v[c.col] ?? null), row.hlc];
     this.db.run(
@@ -346,7 +338,7 @@ export class LedgerStore {
       return r ? { t: table, id, hlc: (r[1] as string | null) ?? '', v: { value: r[0] as SqlValue } } : undefined;
     }
     const t = tableByName(table)!;
-    const cols = liveColumns(t).filter((c) => c.col !== 'id');
+    const cols = t.columns.filter((c) => c.col !== 'id');
     const r = this.db.exec(`SELECT ${[...cols.map((c) => c.col), HLC_COLUMN].join(', ')} FROM ${t.name} WHERE id = ?`, [id])[0]?.values[0];
     if (!r) return undefined;
     const v: Record<string, SqlValue> = {};
@@ -377,7 +369,7 @@ export class LedgerStore {
 
   private *allRows(): Generator<RowState> {
     for (const t of Object.values(TABLES)) {
-      const cols = liveColumns(t).filter((c) => c.col !== 'id');
+      const cols = t.columns.filter((c) => c.col !== 'id');
       const stmt = this.db.prepare(`SELECT id, ${[...cols.map((c) => c.col), HLC_COLUMN].join(', ')} FROM ${t.name}`);
       try {
         while (stmt.step()) {
@@ -545,20 +537,12 @@ export class LedgerStore {
     }
   }
 
-  private getMeta(key: string): string | undefined {
-    return readMeta(this.db, key);
-  }
 }
 
 // ---------------------------------------------------------------------------
 
 function newSiteId(): string {
   return uuidv7().slice(-12);
-}
-
-function readMeta(db: Database, key: string): string | undefined {
-  const r = db.exec(`SELECT value FROM meta WHERE key = ?`, [key]);
-  return r[0]?.values[0]?.[0] as string | undefined;
 }
 
 /**
@@ -615,11 +599,13 @@ function checkRow(row: RowState): void {
   }
   const t = tableByName(row.t);
   if (!t) throw bad(`table ${String(row.t)}`);
-  const known = new Set(liveColumns(t).map((c) => c.col));
+  const known = new Set(t.columns.map((c) => c.col));
   for (const [k, val] of Object.entries(row.v)) {
     if (!known.has(k) || k === 'id') throw bad(`colonne ${t.name}.${k}`);
     if (val !== null && typeof val !== 'string' && typeof val !== 'number') throw bad(`valeur ${t.name}.${k}`);
   }
+  const problem = rowProblem(t, row.id, row.v);
+  if (problem) throw new FormatRefused('etranger', `Ligne reçue refusée : ${problem} Rien n’a été écrit.`);
 }
 
 function sameValues(a: Record<string, SqlValue>, b: Record<string, SqlValue>): boolean {
@@ -648,10 +634,9 @@ function toSql(col: ColumnDef, value: unknown): string | number | null {
   }
 }
 
-function fromRow(t: TableDef, raw: Row, includeDeprecated = false): Row {
+function fromRow(t: TableDef, raw: Row): Row {
   const out: Row = {};
   for (const col of t.columns) {
-    if (col.deprecated && !includeDeprecated) continue;
     const v = raw[col.col];
     if (v === null || v === undefined) continue;
     switch (col.type) {
@@ -664,15 +649,6 @@ function fromRow(t: TableDef, raw: Row, includeDeprecated = false): Row {
       default:
         out[col.prop] = v;
     }
-  }
-  // Les anciens genres de compte restent lisibles (D41, D45) : un appareil non migré peut réécrire
-  // l'ancienne valeur, et rien ne garantit que toutes les lignes soient passées par la migration.
-  // Jamais en lecture brute : les migrations doivent voir la valeur telle qu'elle est écrite,
-  // sans quoi `migrateTo8` ne saurait plus distinguer un ancien « third » d'un compte courant.
-  if (t.name === 'accounts' && !includeDeprecated) {
-    const anciens: Record<string, string> = { pivot: 'principal', holding: 'epargne', third: 'courant' };
-    const remplacant = anciens[out['kind'] as string];
-    if (remplacant) out['kind'] = remplacant;
   }
   return out;
 }
