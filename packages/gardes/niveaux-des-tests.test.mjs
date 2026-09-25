@@ -311,7 +311,8 @@ async function jouerFixture(nomPaquet, { seuil, nommé } = {}) {
   });
   const notés = readFileSync(témoin, 'utf8').split('\n').filter(Boolean);
   const par = (préfixe) => notés.filter((l) => l.startsWith(`${préfixe}:`)).map((l) => l.slice(préfixe.length + 1)).sort();
-  return { ...r, joués: par(nom), navigateur: par(`${nom}-navigateur`) };
+  // L'interface joue deux fichiers inventés, headless et navigateur : l'écart se compte sur les deux.
+  return { ...r, joués: par(nom), navigateur: par(`${nom}-navigateur`), fichiers: nomPaquet === 'interface' ? 2 : 1 };
 }
 
 const mémo = (f) => {
@@ -334,7 +335,7 @@ function constater(r, seuil, étiquette) {
   const attendu = attendus(seuil);
   assert.equal(r.code, 0, `${étiquette} : le lancement échoue\n${r.sortie.slice(-2000)}`);
   assert.deepEqual(r.joués, attendu, `${étiquette} : au seuil ${seuil}, seuls les tests de niveau ${seuil} ou moins se jouent ; sans marque, un test est de niveau 2, sinon celui de sa suite (#232, points 1 et 3)`);
-  const écartés = FIXTURE.length - attendu.length;
+  const écartés = (FIXTURE.length - attendu.length) * r.fichiers;
   if (écartés) assert.ok(ditLÉcart(r.sortie, écartés), `${étiquette} : ${écartés} test(s) écarté(s) au seuil ${seuil}, à compter et à dire sur une ligne qui parle d'« écarté(s) » (#232, point 3)\n${r.sortie.slice(-1500)}`);
 }
 
