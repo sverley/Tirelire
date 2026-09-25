@@ -1,67 +1,57 @@
 /**
- * Harnais d'audit de #232 : chaque test a un niveau de vérification ; les règles des harnais sont
- * gardées. Écrit par l'auditeur.
+ * Harnais d'audit de #232 : chaque test a un niveau, qui dit le risque pris à ne pas le jouer ; les
+ * règles des harnais sont gardées. Écrit par l'auditeur, selon la spécification de l'issue.
  *
- * **Le contrat**, proposé par l'auditeur et accepté par le porteur dans #232 (« c'est parfait »), les
- * niveaux renommés à la manière des journaux :
+ * **Le contrat.** Un test porte son niveau, de 0 à 4, par la marque `[niveau N]` dans son titre ; la
+ * marque du test l'emporte, sinon celle de la suite la plus proche qui l'englobe ; sans marque, il
+ * est de niveau 2. Le niveau se lit donc dans le fichier, sans l'exécuter. L'outil de test prend le
+ * seuil en entrée par la variable `TIRELIRE_VERIFICATION` (lecture de l'auditeur, acceptée par le
+ * porteur) : au seuil N, `pnpm test` et le script `test` de chaque paquet ne jouent que les tests de
+ * niveau N ou moins, et disent combien ils en écartent, sur une ligne qui parle d'« écarté(s) » ;
+ * sans entrée, le seuil est 2. Un test s'appelle nommément par le filtre de nom de son exécuteur
+ * (`-t` de vitest, `--test-name-pattern` de `node --test`), quel que soit son niveau.
  *
- * - un test déclare son niveau dans son titre, par la marque `[FATAL]`, `[ERROR]`, `[WARN]`,
- *   `[INFO]` ou `[DEBUG]` ; la marque du test l'emporte, sinon celle de la suite la plus proche qui
- *   l'englobe (`describe`) ; sans marque, il est ERROR. Le niveau se lit donc dans le fichier, sans
- *   l'exécuter ;
- * - l'outil de test prend le niveau en entrée, par la variable `TIRELIRE_VERIFICATION` : au seuil X,
- *   `pnpm test` (et le script `test` de chaque paquet) ne joue que les tests de niveau X et plus
- *   graves, et dit combien il en écarte, sur une ligne qui parle d'« écarté(s) ». Sans entrée, le
- *   seuil est ERROR. DEBUG n'entre dans aucune chaîne ;
- * - un test s'appelle nommément par le filtre de nom de son exécuteur : `-t` de vitest,
- *   `--test-name-pattern` de `node --test`. C'est la lecture de l'auditeur du point 4.
+ * **Ce que ce fichier vérifie**, point par point du « Fait quand » :
  *
- * Ce que ce fichier vérifie, point par point du « Fait quand » :
- *
- * - 1 à 4 et 8 : un fichier de test inventé, qui porte chaque niveau, est joué par l'exécuteur de
- *   chaque ensemble — cœur et interface (vitest, interface dans le navigateur comprise), garde,
- *   relais et hébergement (`node --test`) — à chaque seuil, et nommément ; chaque test joué se note
- *   dans un fichier témoin. Le cœur et la garde font la matrice complète ; l'interface, le relais et
- *   l'hébergement, un seuil chacun (WARN) ;
- * - 5 et 9 (crochets) : dans une copie du dépôt, sans ses tests, un test déjà sur `main` (la
+ * - 1 à 4 et 8 (seuil 4) : un fichier de test inventé, qui porte chaque niveau, est joué par
+ *   l'exécuteur de chaque ensemble — cœur et interface (vitest, interface dans le navigateur
+ *   comprise), garde, relais et hébergement (`node --test`) —, à chaque seuil et nommément ; chaque
+ *   test joué se note dans un fichier témoin. Le cœur et la garde font la matrice complète ;
+ *   l'interface, le relais et l'hébergement, un seuil chacun ;
+ * - 5, 6 et 9 (crochets) : dans une copie du dépôt, sans ses tests, un test déjà sur `main` (la
  *   non-régression) et un test que la branche ajoute (le harnais du besoin, définition de D83) sont
  *   joués par le vrai pré-commit, puis par la vraie livraison (pré-push) ;
- * - 6, 7 et 9 (CI) : `ci.yml` est joué à blanc (`workflow-a-blanc.mjs`) au passage en Ready et au
- *   tag `v*` ;
- * - 10 : les règles des harnais, sur le dépôt réel, chacune avec son témoin rouge.
+ * - 7, 8 et 9 (CI) : `ci.yml` est joué à blanc au passage en Ready et au tag `v*` ;
+ * - 10 : la règle des harnais, sur le dépôt réel, avec ses témoins rouges.
  *
- * Ce qui reste à la relecture : les durées attendues de la livraison (6), l'exécution « en entier »
- * du harnais du besoin au Ready (9 : le fichier constate seulement qu'une étape bloquante le joue,
- * par sa définition commune), les documents (11, 12).
+ * **Ce qui reste à la relecture** : les durées attendues de la livraison (6), la vérification de
+ * l'auditeur au seuil 2 avant le Ready (7, un rôle), l'exécution « en entier » du harnais du besoin
+ * au Ready (9 : ce fichier constate seulement qu'une étape bloquante le joue, par sa définition
+ * commune), les documents (11, 12).
  *
- * Niveau de ses tests, choisi comme la criticité d'un message de journal (le porteur, #232) : si ce
- * test échoue, quel message l'outil écrirait-il ? Ici, chaque échec dit que la chaîne de vérification
- * ne tient plus ce que D83 lui demande — des tests joués ou écartés à tort, un harnais du besoin
- * tronqué, une publication non vérifiée, une règle des harnais qui ne mord plus : une erreur qui
- * demande une intervention, ERROR, le défaut, sans marque. Aucun n'est une défaillance critique qui
- * arrêterait le système (FATAL), ni un simple problème potentiel (WARN). La durée d'un test n'entre
- * jamais dans ce choix : un test trop long est au porteur à traiter, pas à déclasser.
+ * **Niveau de ses tests.** C'est un harnais de la garde : ses tests sont de niveau 0 ou 1 par
+ * définition. Par la suite de questions : aucun échec ne laisserait de données perdues ou sorties
+ * (pas 0) ; chacun laisserait une promesse sans tenue — la chaîne de vérification de D83, ou la
+ * règle des harnais qui garde le principe 10.1 : niveau 1, porté par la suite qui les englobe tous.
  *
- * Aujourd'hui, aucun test n'a de niveau : tout se joue, DEBUG compris. Les points 1 à 9 sont donc
- * rouges ; les règles du point 10 sont vertes sur le dépôt, et leurs témoins rouges échouent comme
- * attendu. `node:test` n'a pas de `test.fails` : l'échec attendu d'un témoin tient dans une assertion
- * (docs/gardes.md, #66).
+ * Aujourd'hui, aucun test n'a de niveau : tout se joue, niveau 4 compris, et aucun test de la garde
+ * ni du registre n'est de niveau 0 ou 1. Le fichier est donc rouge sur les points 1 à 10, sauf ce
+ * que la situation d'aujourd'hui tient déjà. `node:test` n'a pas de `test.fails` : l'échec attendu
+ * d'un témoin tient dans une assertion (docs/gardes.md, #66).
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { after, before, test } from 'node:test';
-import { RACINE, lireRegistre, testNomme } from './gardes.mjs';
+import { after, before, describe, test } from 'node:test';
+import { RACINE, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
 import { commande, interpoler, jouer } from './workflow-a-blanc.mjs';
 
 const VARIABLE = 'TIRELIRE_VERIFICATION';
-/** Du moins grave au plus grave. */
-const NIVEAUX = Object.freeze(['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL']);
-const gravité = (n) => NIVEAUX.indexOf(n);
-const MARQUE = /\[(FATAL|ERROR|WARN|INFO|DEBUG)\]/;
-const DÉFAUT = 'ERROR';
+const NIVEAUX = Object.freeze([0, 1, 2, 3, 4]);
+const MARQUE = /\[niveau ([0-4])\]/;
+const DÉFAUT = 2;
 
 const lire = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').replace(/\r\n?/g, '\n');
 
@@ -128,7 +118,10 @@ function fermante(masque, ouvrante) {
   return masque.length;
 }
 
-/** Les tests d'un fichier et leur niveau : marque du test, sinon de la suite la plus proche, sinon ERROR. */
+/**
+ * Les appels de test d'un fichier (suites comprises) et leur niveau : marque du test, sinon de la
+ * suite la plus proche qui l'englobe, sinon 2. Une suite porte aussi la liste de ses tests.
+ */
 function niveauxDesTests(source) {
   const { masque, chaines } = masquer(String(source));
   const appels = [];
@@ -146,116 +139,73 @@ function niveauxDesTests(source) {
     if (titre === undefined) continue;
     appels.push({ titre: titre.replace(/\s+/g, ' ').trim(), suite: m[1] === 'describe' || m[1] === 'suite', ouvrante, fin });
   }
-  const niveau = (a) => {
-    const propre = a.titre.match(MARQUE)?.[1];
-    if (propre) return propre;
-    const parents = appels.filter((b) => b.suite && b !== a && b.ouvrante < a.ouvrante && a.ouvrante < b.fin).sort((x, y) => y.ouvrante - x.ouvrante);
-    for (const p of parents) {
-      const n = p.titre.match(MARQUE)?.[1];
-      if (n) return n;
-    }
-    return DÉFAUT;
-  };
-  const englobés = (s) => appels.filter((a) => !a.suite && s.ouvrante < a.ouvrante && a.ouvrante < s.fin);
-  return appels.map((a) => ({ titre: a.titre, suite: a.suite, niveau: niveau(a), tests: a.suite ? englobés(a).map((t) => ({ titre: t.titre, niveau: niveau(t) })) : undefined }));
+  const parents = (a) => appels.filter((b) => b.suite && b !== a && b.ouvrante < a.ouvrante && a.ouvrante < b.fin).sort((x, y) => y.ouvrante - x.ouvrante);
+  const marque = (a) => (MARQUE.test(a.titre) ? Number(a.titre.match(MARQUE)[1]) : undefined);
+  const niveau = (a) => marque(a) ?? parents(a).map(marque).find((n) => n !== undefined) ?? DÉFAUT;
+  return appels.map((a) => ({
+    titre: a.titre,
+    suite: a.suite,
+    niveau: niveau(a),
+    tests: a.suite ? appels.filter((t) => !t.suite && a.ouvrante < t.ouvrante && t.ouvrante < a.fin).map((t) => ({ titre: t.titre, niveau: niveau(t) })) : undefined,
+    parents: parents(a).map((p) => ({ titre: p.titre, niveau: niveau(p) })),
+  }));
 }
 
-// ─── Les règles des harnais (point 10) ───────────────────────────────────────────────────────────
+// ─── La règle des harnais (point 10) ─────────────────────────────────────────────────────────────
 
-const TRANCHE = new Set(['ERROR', 'FATAL']);
+const GARDÉ = (n) => n === 0 || n === 1;
 
 /**
- * Les manquements d'un harnais aux règles de #232 : aucun test INFO ni DEBUG ; au moins un test
- * ERROR ou FATAL, et, quand le registre nomme un test, ce test-là (ou, pour une suite, l'un des
- * siens) est ERROR ou FATAL : c'est lui qui tranche ce que le harnais garde (principe 10.1).
+ * Les manquements d'un harnais de la garde ou du registre : un test hors des niveaux 0 et 1. Sans
+ * nom, la règle vaut pour tout le fichier ; avec des noms (le test que nomme la ligne `Harnais`, et
+ * son témoin), pour ces tests, leurs suites et, quand un nom désigne une suite, tous ses tests.
  */
-function manquements(source, { fichier, nommé = null } = {}) {
+function manquements(source, { fichier, noms = [] } = {}) {
   const tout = niveauxDesTests(source);
-  const tests = tout.filter((t) => !t.suite);
-  const m = [];
-  for (const t of tests) if (t.niveau === 'INFO' || t.niveau === 'DEBUG') m.push(`${fichier} : « ${t.titre} » est ${t.niveau} ; un harnais n'a aucun test INFO ni DEBUG.`);
-  if (nommé) {
-    const cible = tout.find((t) => t.titre === nommé);
-    if (cible) {
-      const tranchants = cible.suite ? cible.tests.filter((t) => TRANCHE.has(t.niveau)) : TRANCHE.has(cible.niveau) ? [cible] : [];
-      if (!tranchants.length) m.push(`${fichier} : « ${nommé} », que le registre nomme, n'est ni ERROR ni FATAL (${cible.suite ? 'aucun de ses tests' : cible.niveau}).`);
+  const hors = (t) => `${fichier} : « ${t.titre} » est de niveau ${t.niveau} ; un test d'un harnais de la garde ou du registre est de niveau 0 ou 1 (#232, point 10).`;
+  if (!noms.length) return tout.filter((t) => !t.suite && !GARDÉ(t.niveau)).map(hors);
+  const vus = new Map();
+  for (const nom of noms) {
+    for (const a of tout.filter((t) => t.titre === nom)) {
+      for (const t of [a, ...a.parents, ...(a.tests ?? [])]) if (!GARDÉ(t.niveau)) vus.set(t.titre, hors(t));
     }
-  } else if (!tests.some((t) => TRANCHE.has(t.niveau))) {
-    m.push(`${fichier} : aucun test ERROR ni FATAL ; chaque harnais en garde au moins un, celui qui tranche ce qu'il garde.`);
   }
-  return m;
+  return [...vus.values()];
 }
 
-/** Les harnais du registre (fichiers de test que citent les lignes `Harnais`) et ceux de la garde. */
+/** Les harnais de la garde (fichiers entiers) et du registre (selon la portée de chaque ligne `Harnais`). */
 function harnais() {
   const liste = [];
   const { entrees } = lireRegistre(lire('docs/gardes.md'));
   for (const e of entrees.values()) {
     for (const h of e.harnais) {
-      for (const c of h.chemins.filter((c) => /\.test\.[cm]?[jt]s$/.test(c) && existsSync(join(RACINE, c)))) {
-        liste.push({ fichier: c, nommé: testNomme(h.description), source: `${e.id}` });
-      }
+      const nommé = testNomme(h.description);
+      const témoin = temoinRouge(h.description)?.nom;
+      const noms = nommé ? [nommé, ...(témoin ? [témoin] : [])] : [];
+      for (const c of h.chemins.filter((c) => /\.test\.[cm]?[jt]s$/.test(c) && existsSync(join(RACINE, c)))) liste.push({ fichier: c, noms, source: e.id });
     }
   }
   const gardes = execFileSync('git', ['ls-files', 'packages/gardes/*.test.mjs'], { cwd: RACINE, encoding: 'utf8' }).split('\n').filter(Boolean);
-  for (const f of gardes) if (existsSync(join(RACINE, f))) liste.push({ fichier: f, nommé: null, source: 'garde' });
+  for (const f of gardes) if (existsSync(join(RACINE, f))) liste.push({ fichier: f, noms: [], source: 'garde' });
   return liste;
 }
 
-test('#232 · le niveau se lit dans le fichier : marque du test, sinon de la suite qui l’englobe, sinon ERROR', () => {
-  const lus = Object.fromEntries(niveauxDesTests(source('node', 'lecture')).filter((t) => !t.suite).map((t) => [t.titre.split(' ')[0], t.niveau]));
-  assert.deepEqual(lus, Object.fromEntries(FIXTURE.map((t) => [t.id, t.niveau])));
-});
-
-test('#232 · les harnais du registre et de la garde n’ont aucun test INFO ni DEBUG, et chacun a un test ERROR ou FATAL', () => {
-  const liste = harnais();
-  assert.ok(liste.some((h) => h.source !== 'garde'), 'aucun harnais du registre trouvé : le harnais de #232 est à relire');
-  const m = liste.flatMap((h) => manquements(lire(h.fichier), h));
-  assert.deepEqual(m, [], `règles des harnais (#232) :\n${m.join('\n')}`);
-});
-
-const harnaisSain = `
-describe('garde [FATAL]', () => { it('tient', () => {}); });
-test('tranche', () => {});
-test('rétrocompatibilité [WARN]', () => {});
-`;
-
-test('témoin vert · un harnais FATAL, ERROR et WARN respecte les règles', () => {
-  assert.deepEqual(manquements(harnaisSain, { fichier: 'sain' }), []);
-  assert.deepEqual(manquements(harnaisSain, { fichier: 'sain', nommé: 'tranche' }), []);
-});
-
-test('témoin rouge · un harnais qui porte un test INFO', () => {
-  assert.equal(manquements(`${harnaisSain}\ntest('détail [INFO]', () => {});`, { fichier: 'rouge' }).length, 1);
-});
-
-test('témoin rouge · un harnais qui porte un test DEBUG, par sa suite', () => {
-  assert.equal(manquements(`${harnaisSain}\ndescribe('diagnostic [DEBUG]', () => { it('trace', () => {}); });`, { fichier: 'rouge' }).length, 1);
-});
-
-test('témoin rouge · un harnais dont aucun test n’est ERROR ni FATAL', () => {
-  assert.equal(manquements(`describe('tout [WARN]', () => { it('a', () => {}); it('b', () => {}); });`, { fichier: 'rouge' }).length, 1);
-});
-
-test('témoin rouge · un test nommé au registre qui n’est que WARN', () => {
-  assert.equal(manquements(harnaisSain, { fichier: 'rouge', nommé: 'rétrocompatibilité [WARN]' }).length, 1);
-});
-
 // ─── Un fichier de test inventé, qui porte chaque niveau (points 1 à 4, 8) ───────────────────────
 
-/** Chaque test, son titre et le niveau qu'il déclare (ou reçoit de sa suite, ou du défaut). */
+/** Chaque test, son titre et le niveau qu'il porte (le sien, celui de sa suite, ou le défaut). */
 const FIXTURE = Object.freeze([
-  { id: 'f', titre: 'f [FATAL]', niveau: 'FATAL' },
-  { id: 'e', titre: 'e [ERROR]', niveau: 'ERROR' },
-  { id: 'w', titre: 'w [WARN]', niveau: 'WARN' },
-  { id: 'i', titre: 'i [INFO]', niveau: 'INFO' },
-  { id: 'd', titre: 'd [DEBUG]', niveau: 'DEBUG' },
-  { id: 's', titre: 's sans marque', niveau: 'ERROR' },
-  { id: 'gw', titre: 'gw hérite de sa suite', niveau: 'WARN', suite: 'groupe [WARN]' },
-  { id: 'gd', titre: 'gd [DEBUG]', niveau: 'DEBUG', suite: 'groupe [WARN]' },
-  { id: 'gf', titre: 'gf [FATAL]', niveau: 'FATAL', suite: 'groupe [WARN]' },
-  { id: 'gs', titre: 'gs hérite du défaut', niveau: 'ERROR', suite: 'groupe sans marque' },
+  { id: 'n0', titre: 'n0 [niveau 0]', niveau: 0 },
+  { id: 'n1', titre: 'n1 [niveau 1]', niveau: 1 },
+  { id: 'n2', titre: 'n2 [niveau 2]', niveau: 2 },
+  { id: 'n3', titre: 'n3 [niveau 3]', niveau: 3 },
+  { id: 'n4', titre: 'n4 [niveau 4]', niveau: 4 },
+  { id: 's', titre: 's sans marque', niveau: 2 },
+  { id: 'g3', titre: 'g3 hérite de sa suite', niveau: 3, suite: 'groupe [niveau 3]' },
+  { id: 'g4', titre: 'g4 [niveau 4]', niveau: 4, suite: 'groupe [niveau 3]' },
+  { id: 'g0', titre: 'g0 [niveau 0]', niveau: 0, suite: 'groupe [niveau 3]' },
+  { id: 'gs', titre: 'gs hérite du défaut', niveau: 2, suite: 'groupe sans marque' },
 ]);
+const TOUT = FIXTURE.map((t) => t.id).sort();
 
 function source(exécuteur, nom) {
   const module = exécuteur === 'vitest' ? 'vitest' : 'node:test';
@@ -274,8 +224,8 @@ function source(exécuteur, nom) {
   return `${lignes.join('\n')}\n`;
 }
 
-/** Ce qu'un seuil doit jouer : les tests de ce niveau et plus graves, jamais DEBUG. */
-const attendus = (seuil) => FIXTURE.filter((t) => t.niveau !== 'DEBUG' && gravité(t.niveau) >= gravité(seuil)).map((t) => t.id).sort();
+/** Ce qu'un seuil doit jouer : les tests de ce niveau ou moins. */
+const attendus = (seuil) => FIXTURE.filter((t) => t.niveau <= seuil).map((t) => t.id).sort();
 
 const PAQUETS = Object.freeze({
   cœur: { dossier: 'packages/core', exécuteur: 'vitest' },
@@ -289,7 +239,7 @@ const PAQUETS = Object.freeze({
 function environnement(extra = {}) {
   const env = { ...process.env };
   for (const k of Object.keys(env)) if (k === VARIABLE || k === 'NODE_TEST_CONTEXT' || k.startsWith('VITEST') || k.startsWith('GIT_')) delete env[k];
-  for (const [k, v] of Object.entries(extra)) if (v !== undefined) env[k] = v;
+  for (const [k, v] of Object.entries(extra)) if (v !== undefined) env[k] = String(v);
   return env;
 }
 
@@ -315,6 +265,7 @@ function lancer(cmd, args, options) {
     else attente.push(go);
   });
 }
+
 
 const temporaire = mkdtempSync(join(tmpdir(), 'niveaux-232-'));
 const dossiersVitest = [];
@@ -357,55 +308,26 @@ const mémo = (f) => {
   return () => (p ??= f());
 };
 
-const SEUILS = ['FATAL', 'ERROR', 'WARN', 'INFO'];
 const scénarios = {};
 for (const paquet of ['garde', 'cœur']) {
   scénarios[`${paquet}:défaut`] = mémo(() => jouerFixture(paquet));
-  for (const s of SEUILS) scénarios[`${paquet}:${s}`] = mémo(() => jouerFixture(paquet, { seuil: s }));
-  scénarios[`${paquet}:nommé`] = mémo(() => jouerFixture(paquet, { nommé: '^d \\[DEBUG\\]$' }));
+  for (const s of NIVEAUX) scénarios[`${paquet}:${s}`] = mémo(() => jouerFixture(paquet, { seuil: s }));
+  scénarios[`${paquet}:nommé`] = mémo(() => jouerFixture(paquet, { nommé: '^n4 \\[niveau 4\\]$' }));
 }
-for (const paquet of ['interface', 'relais', 'hébergement']) scénarios[`${paquet}:WARN`] = mémo(() => jouerFixture(paquet, { seuil: 'WARN' }));
+for (const paquet of ['interface', 'relais', 'hébergement']) scénarios[`${paquet}:1`] = mémo(() => jouerFixture(paquet, { seuil: 1 }));
 
 /** L'écart se compte et se dit : une ligne qui parle d'écarté(s) porte le nombre attendu. */
-function ditLÉcart(sortie, nombre) {
-  return sortie.split('\n').some((l) => /écart/i.test(l) && new RegExp(`(?<!\\d)${nombre}(?!\\d)`).test(l));
-}
+const ditLÉcart = (sortie, nombre) => sortie.split('\n').some((l) => /écart/i.test(l) && new RegExp(`(?<!\\d)${nombre}(?!\\d)`).test(l));
 
 function constater(r, seuil, étiquette) {
   const attendu = attendus(seuil);
   assert.equal(r.code, 0, `${étiquette} : le lancement échoue\n${r.sortie.slice(-2000)}`);
-  assert.deepEqual(r.joués, attendu, `${étiquette} : au seuil ${seuil}, seuls les tests ${seuil} et plus graves se jouent, jamais DEBUG (#232, points 1, 3, 4)`);
+  assert.deepEqual(r.joués, attendu, `${étiquette} : au seuil ${seuil}, seuls les tests de niveau ${seuil} ou moins se jouent ; sans marque, un test est de niveau 2, sinon celui de sa suite (#232, points 1 et 3)`);
   const écartés = FIXTURE.length - attendu.length;
-  assert.ok(ditLÉcart(r.sortie, écartés), `${étiquette} : ${écartés} test(s) écarté(s) au seuil ${seuil}, à compter et à dire sur une ligne qui parle d'« écarté(s) » (#232, point 3)\n${r.sortie.slice(-1500)}`);
+  if (écartés) assert.ok(ditLÉcart(r.sortie, écartés), `${étiquette} : ${écartés} test(s) écarté(s) au seuil ${seuil}, à compter et à dire sur une ligne qui parle d'« écarté(s) » (#232, point 3)\n${r.sortie.slice(-1500)}`);
 }
 
-for (const paquet of ['garde', 'cœur']) {
-  const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
-  test(`#232 · ${paquet} (${exécuteur}) : sans niveau en entrée, le seuil est ERROR`, async () => {
-    constater(await scénarios[`${paquet}:défaut`](), DÉFAUT, `${paquet}, sans ${VARIABLE}`);
-  });
-  for (const s of SEUILS) {
-    test(`#232 · ${paquet} (${exécuteur}) : au seuil ${s}, les tests ${s} et plus graves, DEBUG jamais`, async () => {
-      constater(await scénarios[`${paquet}:${s}`](), s, `${paquet}, ${VARIABLE}=${s}`);
-    });
-  }
-  test(`#232 · ${paquet} (${exécuteur}) : un test DEBUG appelé nommément se joue, seul`, async () => {
-    const r = await scénarios[`${paquet}:nommé`]();
-    assert.equal(r.code, 0, `${paquet}, appel nommé : le lancement échoue\n${r.sortie.slice(-2000)}`);
-    assert.deepEqual(r.joués, ['d'], `${paquet} : « d [DEBUG] », appelé par le filtre de nom de son exécuteur, se joue, et lui seul (#232, point 4)`);
-  });
-}
-
-for (const paquet of ['interface', 'relais', 'hébergement']) {
-  const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
-  test(`#232 · ${paquet} (${exécuteur}) : l'ensemble respecte le seuil, ici WARN`, async () => {
-    const r = await scénarios[`${paquet}:WARN`]();
-    constater(r, 'WARN', `${paquet}, ${VARIABLE}=WARN`);
-    if (paquet === 'interface') assert.deepEqual(r.navigateur, attendus('WARN'), `interface dans le navigateur : au seuil WARN, seuls les tests WARN et plus graves (#232, point 1)`);
-  });
-}
-
-// ─── Les crochets : pré-commit et livraison (points 5 et 9) ──────────────────────────────────────
+// ─── Les crochets : pré-commit et livraison (points 5, 6 et 9) ───────────────────────────────────
 
 /**
  * Une copie du dépôt tel que la copie de travail le porte, sans ses tests : un test déjà sur `main`
@@ -454,28 +376,7 @@ const crochets = mémo(async () => {
   return { préCommit: { ...préCommit, ...lu(témoinCommit) }, livraison: { ...livraison, ...lu(témoinPush) } };
 });
 
-const TOUT = FIXTURE.map((t) => t.id).sort();
-
-test('#232 · le pré-commit vérifie au seuil FATAL les paquets touchés, dans son budget de 5 s', async () => {
-  const { préCommit: r } = await crochets();
-  assert.equal(r.code, 0, `pré-commit refusé\n${r.sortie.slice(-2000)}`);
-  assert.deepEqual(r.ancien, attendus('FATAL'), 'pré-commit : la non-régression du paquet touché se joue au seuil FATAL (#232, point 5)');
-  assert.ok(r.ms < 5000, `pré-commit : ${r.ms} ms, au-delà de son budget de 5 s (#232, point 5)`);
-});
-
-test('#232 · le pré-commit joue le harnais du besoin en entier, DEBUG compris', async () => {
-  const { préCommit: r } = await crochets();
-  assert.deepEqual(r.nouveau, TOUT, 'pré-commit : le harnais du besoin se joue en entier, tous niveaux, DEBUG compris (#232, point 9)');
-});
-
-test('#232 · la livraison vérifie au seuil ERROR, et joue le harnais du besoin en entier', async () => {
-  const { livraison: r } = await crochets();
-  assert.equal(r.code, 0, `livraison (pré-push) refusée\n${r.sortie.slice(-2000)}`);
-  assert.deepEqual(r.ancien, attendus('ERROR'), 'livraison : la non-régression se joue au seuil ERROR (#232, point 6)');
-  assert.deepEqual(r.nouveau, TOUT, 'livraison : le harnais du besoin se joue en entier, DEBUG compris (#232, point 9)');
-});
-
-// ─── La CI, jouée à blanc (points 6, 7 et 9) ─────────────────────────────────────────────────────
+// ─── La CI, jouée à blanc (points 7, 8 et 9) ─────────────────────────────────────────────────────
 
 const CI = '.github/workflows/ci.yml';
 const scripts = JSON.parse(lire('package.json')).scripts ?? {};
@@ -503,15 +404,16 @@ function envDe(lignes, motif, ctx) {
   return env;
 }
 
-/** Le seuil d'une étape qui joue les tests : en ligne, puis l'étape, le job, le workflow ; ERROR sinon. */
+/** Le seuil d'une étape qui joue les tests : en ligne, puis l'étape, le job, le workflow ; 2 sinon. */
 function seuilDe(yaml, job, é, ctx) {
-  const enLigne = déplier(commande(é)).match(new RegExp(`\\b${VARIABLE}=["']?([A-Z]+)`))?.[1];
-  if (enLigne) return enLigne;
+  const enLigne = déplier(commande(é)).match(new RegExp(`\\b${VARIABLE}=["']?([0-4])`))?.[1];
+  if (enLigne) return Number(enLigne);
   const tête = yaml.split('\n');
   const workflow = envDe(tête.slice(0, tête.findIndex((l) => /^jobs:\s*$/.test(l))), /^env:\s*$/, ctx);
   const duJob = envDe(job.lignes, /^ {4}env:\s*$/, ctx);
   const deLÉtape = envDe(é.lignes, /^(?: {6}- | {8})env:\s*$/, ctx);
-  return deLÉtape[VARIABLE] || duJob[VARIABLE] || workflow[VARIABLE] || DÉFAUT;
+  const v = deLÉtape[VARIABLE] ?? duJob[VARIABLE] ?? workflow[VARIABLE];
+  return v === undefined || v === '' ? DÉFAUT : Number(v);
 }
 
 const auReady = {
@@ -522,43 +424,140 @@ const auReady = {
 };
 const auTag = { github: { event_name: 'push', ref: 'refs/tags/v1.0.0', event: {} }, vars: {}, secrets: {}, inputs: {} };
 
-const étapesDeTests = (yaml, ctx, échoue) =>
-  jouer(yaml, ctx, échoue).flatMap((job) => job.joués.filter(joueLesTests).map((é) => ({ job, é, seuil: seuilDe(yaml, job, é, ctx) })));
+const étapesDeTests = (yaml, ctx) => jouer(yaml, ctx).flatMap((job) => job.joués.filter(joueLesTests).map((é) => ({ job, é, seuil: seuilDe(yaml, job, é, ctx) })));
 const publie = (é) => /uses:\s*softprops\/action-gh-release@|deposer\.sh/.test(é.texte);
+const laisseÉchouer = (job, é) => /^ +(?:- )?continue-on-error:\s*true/m.test(é.texte) || /^ {4}continue-on-error:\s*true/m.test(job.lignes.join('\n'));
 
-test('#232 · au Ready, la CI vérifie au seuil ERROR', () => {
-  const yaml = lire(CI);
-  const tests = étapesDeTests(yaml, auReady);
-  assert.ok(tests.length, `${CI} : aucune étape ne joue les tests au passage en Ready`);
-  for (const t of tests) assert.equal(t.seuil, 'ERROR', `${CI} : au Ready, « ${t.job.nom} » joue les tests au seuil ${t.seuil}, attendu ERROR (#232, point 6)`);
+// ─── Les tests, tous de niveau 1 (voir l'en-tête) ────────────────────────────────────────────────
+
+describe('#232 · niveaux des tests et règles des harnais [niveau 1]', () => {
+  // Tout part d'avance ; chaque test attend le sien, et un lancement en échec ne rougit que ses tests.
+  before(() => {
+    for (const s of [...Object.values(scénarios), crochets]) s().catch(() => {});
+  });
+  after(() => {
+    for (const d of dossiersVitest) rmSync(d, { recursive: true, force: true });
+    rmSync(temporaire, { recursive: true, force: true });
+  });
+
+  test('le niveau se lit dans le fichier : marque du test, sinon de la suite qui l’englobe, sinon 2', () => {
+    const lus = Object.fromEntries(niveauxDesTests(source('node', 'lecture')).filter((t) => !t.suite).map((t) => [t.titre.split(' ')[0], t.niveau]));
+    assert.deepEqual(lus, Object.fromEntries(FIXTURE.map((t) => [t.id, t.niveau])));
+  });
+
+  // Point 10 : la règle des harnais, sur le dépôt, puis ses témoins.
+
+  test('tout test d’un harnais de la garde ou du registre est de niveau 0 ou 1', () => {
+    const liste = harnais();
+    assert.ok(liste.some((h) => h.source !== 'garde'), 'aucun harnais du registre trouvé : le harnais de #232 est à relire');
+    const m = [...new Set(liste.flatMap((h) => manquements(lire(h.fichier), h)))];
+    assert.deepEqual(m, [], `règle des harnais (#232, point 10) :\n${m.join('\n')}`);
+  });
+
+  const gardé = `
+describe('garde [niveau 1]', () => {
+  it('tient', () => {});
+  it('témoin rouge · casse', () => {});
+  it('irréparable [niveau 0]', () => {});
 });
+test('rétrocompatibilité [niveau 3]', () => {});
+`;
 
-test('#232 · au Ready, une étape bloquante joue le harnais du besoin, par sa définition commune', () => {
-  const yaml = lire(CI);
-  const joués = jouer(yaml, auReady).flatMap((job) => job.joués.map((é) => ({ job, é })));
-  const harnais = joués.filter(({ é }) => /harnais-du-besoin/.test(déplier(commande(é))));
-  assert.ok(harnais.length, `${CI} : au Ready, aucune étape ne joue le harnais du besoin (définition de D83, \`.githooks/harnais-du-besoin.sh\`) (#232, point 9)`);
-  for (const { job, é } of harnais) assert.ok(!/^ +(?:- )?continue-on-error:\s*true/m.test(é.texte) && !/^ {4}continue-on-error:\s*true/m.test(job.lignes.join('\n')), `${CI} : le harnais du besoin, dans « ${job.nom} », ne doit pas se laisser échouer (#232, point 9)`);
-});
+  test('témoin vert · un harnais en niveaux 0 et 1, et un test hors de la portée nommée', () => {
+    assert.deepEqual(manquements(gardé.replace(/test\('rétro[^\n]*\n/, ''), { fichier: 'vert' }), []);
+    assert.deepEqual(manquements(gardé, { fichier: 'vert', noms: ['tient', 'témoin rouge · casse'] }), []);
+  });
 
-test('#232 · au tag v*, la CI vérifie au seuil WARN avant de publier', () => {
-  const yaml = lire(CI);
-  const warn = étapesDeTests(yaml, auTag).filter((t) => gravité(t.seuil) <= gravité('WARN') && t.seuil !== 'DEBUG');
-  assert.ok(warn.length, `${CI} : au tag v*, aucune étape ne joue les tests au seuil WARN (#232, point 7)`);
-  assert.ok(jouer(yaml, auTag).some((job) => job.joués.some(publie)), `${CI} : au tag v*, rien ne publie ; le harnais de #232 est à relire`);
-  const rouges = new Set(warn.map((t) => t.é.texte));
-  const publiéQuandMême = jouer(yaml, auTag, (é) => rouges.has(é.texte)).filter((job) => job.joués.some(publie)).map((j) => j.nom);
-  assert.deepEqual(publiéQuandMême, [], `${CI} : au tag v*, un rouge au seuil WARN doit empêcher de publier (#232, point 7)`);
-});
+  test('témoin rouge · un test de la garde sans marque, donc de niveau 2', () => {
+    assert.equal(manquements(`${gardé.replace(/test\('rétro[^\n]*\n/, '')}\ntest('oublié', () => {});`, { fichier: 'rouge' }).length, 1);
+  });
 
-// ─── Lancements en parallèle, nettoyage ──────────────────────────────────────────────────────────
+  test('témoin rouge · un test de niveau 3 dans un fichier de la garde', () => {
+    assert.equal(manquements(gardé, { fichier: 'rouge' }).length, 1);
+  });
 
-// Tout part d'avance ; chaque test attend le sien, et un lancement en échec ne rougit que ses tests.
-before(() => {
-  for (const s of [...Object.values(scénarios), crochets]) s().catch(() => {});
-});
+  test('témoin rouge · un test nommé au registre dont le témoin est de niveau 2', () => {
+    const source = `${gardé}\ntest('témoin rouge · hors de la suite', () => {});`;
+    assert.equal(manquements(source, { fichier: 'rouge', noms: ['tient', 'témoin rouge · hors de la suite'] }).length, 1);
+  });
 
-after(() => {
-  for (const d of dossiersVitest) rmSync(d, { recursive: true, force: true });
-  rmSync(temporaire, { recursive: true, force: true });
+  test('témoin rouge · une suite nommée au registre qui contient un test de niveau 4', () => {
+    const source = gardé.replace("it('tient', () => {});", "it('tient', () => {});\n  it('trace [niveau 4]', () => {});");
+    assert.equal(manquements(source, { fichier: 'rouge', noms: ['garde [niveau 1]'] }).length, 1);
+  });
+
+  // Points 1 à 4 et 8 : le seuil, dans chaque ensemble.
+
+  for (const paquet of ['garde', 'cœur']) {
+    const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
+    test(`${paquet} (${exécuteur}) : sans seuil en entrée, le seuil est 2`, async () => {
+      constater(await scénarios[`${paquet}:défaut`](), DÉFAUT, `${paquet}, sans ${VARIABLE}`);
+    });
+    for (const s of NIVEAUX) {
+      test(`${paquet} (${exécuteur}) : au seuil ${s}, les tests de niveau ${s} ou moins`, async () => {
+        constater(await scénarios[`${paquet}:${s}`](), s, `${paquet}, ${VARIABLE}=${s}`);
+      });
+    }
+    test(`${paquet} (${exécuteur}) : un test de niveau 4 appelé nommément se joue, seul`, async () => {
+      const r = await scénarios[`${paquet}:nommé`]();
+      assert.equal(r.code, 0, `${paquet}, appel nommé : le lancement échoue\n${r.sortie.slice(-2000)}`);
+      assert.deepEqual(r.joués, ['n4'], `${paquet} : « n4 [niveau 4] », appelé par le filtre de nom de son exécuteur au seuil par défaut, se joue, et lui seul (#232, point 4)`);
+    });
+  }
+
+  for (const paquet of ['interface', 'relais', 'hébergement']) {
+    const exécuteur = PAQUETS[paquet].exécuteur === 'vitest' ? 'vitest' : 'node --test';
+    test(`${paquet} (${exécuteur}) : l’ensemble respecte le seuil, ici 1`, async () => {
+      const r = await scénarios[`${paquet}:1`]();
+      constater(r, 1, `${paquet}, ${VARIABLE}=1`);
+      if (paquet === 'interface') assert.deepEqual(r.navigateur, attendus(1), 'interface dans le navigateur : au seuil 1, seuls les tests de niveau 1 ou moins (#232, point 1)');
+    });
+  }
+
+  // Points 5, 6 et 9 : les crochets.
+
+  test('le pré-commit vérifie au seuil 0 les paquets touchés, dans son budget de 5 s', async () => {
+    const { préCommit: r } = await crochets();
+    assert.equal(r.code, 0, `pré-commit refusé\n${r.sortie.slice(-2000)}`);
+    assert.deepEqual(r.ancien, attendus(0), 'pré-commit : la non-régression du paquet touché se joue au seuil 0 (#232, point 5)');
+    assert.ok(r.ms < 5000, `pré-commit : ${r.ms} ms, au-delà de son budget de 5 s (#232, point 5)`);
+  });
+
+  test('le pré-commit joue le harnais du besoin en entier, niveau 4 compris', async () => {
+    const { préCommit: r } = await crochets();
+    assert.deepEqual(r.nouveau, TOUT, 'pré-commit : le harnais du besoin se joue en entier, niveau 4 compris (#232, point 9)');
+  });
+
+  test('la livraison vérifie au seuil 2, et joue le harnais du besoin en entier', async () => {
+    const { livraison: r } = await crochets();
+    assert.equal(r.code, 0, `livraison (pré-push) refusée\n${r.sortie.slice(-2000)}`);
+    assert.deepEqual(r.ancien, attendus(2), 'livraison : la non-régression se joue au seuil 2 (#232, point 6)');
+    assert.deepEqual(r.nouveau, TOUT, 'livraison : le harnais du besoin se joue en entier, niveau 4 compris (#232, point 9)');
+  });
+
+  // Points 7, 8 et 9 : la CI, jouée à blanc.
+
+  test('au Ready, la CI vérifie au seuil 1', () => {
+    const yaml = lire(CI);
+    const tests = étapesDeTests(yaml, auReady);
+    assert.ok(tests.length, `${CI} : aucune étape ne joue les tests au passage en Ready`);
+    for (const t of tests) assert.equal(t.seuil, 1, `${CI} : au Ready, « ${t.job.nom} » joue les tests au seuil ${t.seuil}, attendu 1 (#232, point 7)`);
+  });
+
+  test('au Ready, une étape bloquante joue le harnais du besoin, par sa définition commune', () => {
+    const joués = jouer(lire(CI), auReady).flatMap((job) => job.joués.map((é) => ({ job, é })));
+    const harnais = joués.filter(({ é }) => /harnais-du-besoin/.test(déplier(commande(é))));
+    assert.ok(harnais.length, `${CI} : au Ready, aucune étape ne joue le harnais du besoin (définition de D83, \`.githooks/harnais-du-besoin.sh\`) (#232, point 9)`);
+    for (const { job, é } of harnais) assert.ok(!laisseÉchouer(job, é), `${CI} : le harnais du besoin, dans « ${job.nom} », ne doit pas se laisser échouer (#232, point 9)`);
+  });
+
+  test('au tag v*, la CI vérifie au seuil 3 avant de publier', () => {
+    const yaml = lire(CI);
+    const au3 = étapesDeTests(yaml, auTag).filter((t) => t.seuil >= 3);
+    assert.ok(au3.length, `${CI} : au tag v*, aucune étape ne joue les tests au seuil 3 (#232, point 8)`);
+    assert.ok(jouer(yaml, auTag).some((job) => job.joués.some(publie)), `${CI} : au tag v*, rien ne publie ; le harnais de #232 est à relire`);
+    const rouges = new Set(au3.map((t) => t.é.texte));
+    const publiéQuandMême = jouer(yaml, auTag, (é) => rouges.has(é.texte)).filter((job) => job.joués.some(publie)).map((j) => j.nom);
+    assert.deepEqual(publiéQuandMême, [], `${CI} : au tag v*, un rouge au seuil 3 doit empêcher de publier (#232, point 8)`);
+  });
 });
