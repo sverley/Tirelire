@@ -555,3 +555,10 @@ qu'elles barrent.
 > je souhaite pouvoir faire la différence entre les fusions manuelles et la CI sur github. le but étant de réduire le cout CI, on peut jouer sur les hook et sur les scripts CI pour garantir que tout sera bien joué avant d'arriver sur main
 
 > ok
+
+### La forme normale d'un harnais
+
+Sur la proposition de l'auditeur de #197 de sortir les tests de niveau 0 et 1 d'un harnais dans un
+fichier à part, que le registre citerait en entier, sans les instantanés ni la sonde de diagnostic :
+
+> oui

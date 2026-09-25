@@ -14,12 +14,14 @@ audit commence à son compte rendu (étape 4).
 
 1. Si le besoin demande un harnais : crée la branche, son nom portant le numéro de l'issue
    (`audit/<n>-…`), et écris le harnais, un test qui rougit aujourd'hui et verdira quand le besoin
-   sera couvert. Un seul fichier de test par issue, sauf raison dite ; ses trois premières lignes
-   disent « Harnais d'audit de #<n> », pour que les crochets le reconnaissent (D83). Nomme la
-   branche et le harnais dans l'issue (« Harnais : chemin »). Classe chaque test par la suite de
-   questions de D83 et marque son niveau. Tu peux garder des tests de niveau 4 (diagnostic) dans ton
-   harnais ; quand il est de la garde ou du registre, qui n'en accueille jamais (D81), mets-les dans
-   un fichier à part, à côté : le codeur n'en voit que le verdict.
+   sera couvert. Un harnais par issue, plus son compagnon éventuel, sauf raison dite : un harnais
+   du registre ou de la garde prend sa forme normale (D81), un fichier de niveau 0 et 1 que le
+   registre cite en entier, et un compagnon, hors registre, pour les niveaux 2 à 4. Les trois
+   premières lignes de chaque fichier disent « Harnais d'audit de #<n> », pour que les crochets le
+   reconnaissent (D83). Nomme la branche et le ou les fichiers dans l'issue (« Harnais : chemins »).
+   Classe chaque test par la suite de questions de D83 et marque son niveau. Tu peux garder des
+   tests de niveau 4 (diagnostic) dans ton harnais ; quand il est de la garde ou du registre, qui
+   n'en accueille jamais (D81), mets-les dans son compagnon : le codeur n'en voit que le verdict.
 2. Ouvre la PR en brouillon, avec le corps du modèle `.github/pull_request_template.md`, `#…`
    remplacé par le numéro de l'issue, rien d'autre (D82) ; par l'API, recopie-le.
 3. Réponds aux commentaires du codeur : corrige le harnais, ou renvoie la question du besoin au
