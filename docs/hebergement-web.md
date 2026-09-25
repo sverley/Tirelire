@@ -241,8 +241,8 @@ variable en cause. Il ne dépose ni ne supprime rien ailleurs que dans `<dossier
   chiffrement la clé de lecture ; le serveur ne connaît que des blobs AES-GCM. Ne pas
   publier l'adresse du site avec le salon.
 - Rien ne limite le nombre de salons ni la taille des fichiers : l'hébergement est privé, on
-  compte sur le fait que le salon reste secret. Un compactage viendra avec celui du journal
-  de changements (voir `docs/synchronisation.md`).
+  compte sur le fait que le salon reste secret ; les dépôts ne sont pas purgés (voir
+  `docs/synchronisation.md`).
 - Écriture sous verrou `flock` : deux appareils qui poussent en même temps n'obtiennent
   jamais le même `id`.
 - Les données de Tirelire ne sont **pas** sur le serveur : perdre l'hébergement ne perd rien,

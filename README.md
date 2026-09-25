@@ -19,7 +19,7 @@ Seuls les fichiers Markdown de `docs/` sont fondateurs.
   modèle, périodes de paie, calcul du plan (croisière / rattrapage, financement par priorité des
   besoins, écarts de placement, virements par couple de comptes, règlements avec les comptes
   tiers), positions reconstruites par compte, moteur de règles et actions groupées, dépôt SQLite
-  (sql.js) avec journal de changements chaîné par empreinte et horloge logique hybride.
+  (sql.js), un état daté par ligne (horloge logique hybride) et synchronisé par delta d'état.
 - `packages/gardes` — la garde (#58) : chaque invariant et chaque
   contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et l'issue de chaque PR déclare les siennes.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le

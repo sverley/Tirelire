@@ -217,8 +217,8 @@ Chemins : `packages/core/src/sync.ts`, `apps/web/src/lib/db.ts`, `apps/web/src/l
   paquets chiffrés partent, et seulement après le remplissage et le clic explicites » : remplir
   l'adresse, le salon et la phrase puis cliquer sur « Synchroniser maintenant » vaut l'acceptation,
   avertissement compris (tranché avec le porteur) ; rien ne part avant, et ce
-  qui part ensuite ne porte que `site`, `upTo`, `iv`, `blob`, `blob` ne se relisant pas comme du
-  JSON en clair.
+  qui part ensuite ne porte que `site`, `iv`, `blob`, `blob` ne se relisant pas comme du JSON en
+  clair.
   Témoin rouge : « témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair »
 
 ## I8 · Synchroniser de pair à pair les instances qui partagent les clés
@@ -226,11 +226,31 @@ Chemins : `packages/core/src/sync.ts`, `apps/web/src/lib/db.ts`, `apps/web/src/l
 Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/core/src/hlc.ts`, `apps/web/src/lib/relay.ts`, `apps/web/src/lib/webrtc.ts`, `apps/web/src/views/Sync.svelte`, `apps/relay/**`, `apps/hebergement/serveur/**`
 
 - **Harnais** · `packages/core/test/sync.test.ts` — deux puis trois appareils convergent par le
-  protocole, les changements d'un tiers sont relayés, l'échange par fichier est idempotent.
+  protocole, les lignes d'un tiers se propagent, l'échange par fichier ne porte que le delta.
   Témoin rouge : « témoin rouge · un échange par fichier qui repart toujours de zéro »
-- **Harnais** · `packages/core/test/store.test.ts` — « fusion entre deux appareils » : champs
-  modifiés en concurrence, le plus récent gagne, une empreinte fausse est refusée.
-  Témoin rouge : « témoin rouge · une fusion qui réécrit la ligne entière au lieu de la colonne »
+- **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 1. le fichier ne grossit qu’avec
+  les données » : cent modifications d'une ligne laissent le fichier à la taille d'une seule, une
+  synchronisation ne le fait grossir que des lignes reçues.
+  Témoin rouge : « témoin rouge · un fichier qui garde une trace de chaque modification »
+- **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 2. deux instances convergent » :
+  créations, modifications et suppressions dans toutes les tables, réglages compris, en direct, par
+  le relais et par fichier ; une ligne partagée supprimée d'un côté l'est partout et reste dans le
+  fichier.
+  Témoin rouge : « témoin rouge · une ligne partagée effacée au lieu d’être supprimée »
+- **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 3. trois instances convergent par
+  relais » : deux instances qui ne se croisent jamais convergent par la troisième.
+  Témoin rouge : « témoin rouge · une ligne partagée effacée au lieu d’être supprimée »
+- **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 4. une instance reste une
+  instance » : deux instances nées du même fichier, et une sauvegarde restaurée, convergent sans
+  perte.
+  Témoin rouge : « témoin rouge · deux instances nées du même fichier dont une seule est entendue »
+- **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 5. un conflit se voit » : une ligne
+  modifiée des deux côtés, suppression comprise, garde la même version partout et l'écartée se voit ;
+  une ligne modifiée tour à tour n'est pas un conflit.
+  Témoin rouge : « témoin rouge · une version écartée sans rien en dire »
+- **Harnais** · `apps/web/test/navigateur/conflit-visible.test.ts` — « #196 · 5. un conflit se voit
+  à l’écran » : après la synchronisation, l'écran montre le nom retenu et le nom écarté.
+  Témoin rouge : « témoin rouge · un conflit tranché sans que l’écran en dise rien »
 - **Harnais** · `apps/relay/server.test.mjs`, `apps/hebergement/relais.test.mjs` — relais Node et
   PHP : dépôt, puis retrait filtré par appareil.
   Témoin rouge : « témoin rouge · un relais qui rend à chaque appareil ce qu’il a lui-même déposé »
@@ -239,10 +259,6 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
   puis par le relais quand elles ne sont pas ouvertes ensemble, et l'avertissement sur le dépôt de
   données chiffrées paraît à la première mise en lien.
 - **À bâtir** · deux instances en direct et par relais, y compris entre deux personnes (#31).
-- **À bâtir** · une horloge par ligne, une suppression qui se synchronise, un fichier et des paquets
-  qui disent leur format, un format inconnu refusé sans rien perdre ni écrire (#196).
-- **À bâtir** · deux instances ouvertes depuis le même fichier, et une sauvegarde plus ancienne
-  restaurée, convergent sans perte (#196).
 - **À bâtir** · le compte principal a la même identité sur toutes les instances (#209).
 
 ## I9 · Plusieurs distributions
@@ -433,12 +449,14 @@ Chemins : `apps/web/android/**`, `apps/web/capacitor.config.ts`
 
 Chemins : `packages/core/src/schema.ts`, `packages/core/src/migration.ts`, `packages/core/src/model.ts`, `packages/core/src/store.ts`, `packages/core/src/sync.ts`
 
-- **Harnais** · `packages/core/test/store.test.ts` — « migration du modèle (D30) » : un champ
-  réécrit par un pair non migré reste compris, et la migration est idempotente.
-  Témoin rouge : « témoin rouge · une lecture qui rend les anciens genres tels quels »
-- **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — une vieille photo de ventilation
-  écrite par un pair non migré est ignorée.
-  Témoin rouge : « témoin rouge · une vieille photo de pair non migré prise pour la ventilation »
+- **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 6. un fichier étranger au format
+  est refusé » : un fichier d'un format antérieur, une base sans le marqueur de Tirelire ou ce qui
+  n'est pas une base ne s'ouvre pas, et reste intact.
+  Témoin rouge : « témoin rouge · un fichier antérieur ouvert sans lire son format »
+- **Harnais** · `apps/web/test/fichier-etat.test.ts` — « #196 · 7. une instance d’un autre format
+  est refusée sans perte » : en direct, par fichier et par le relais, un paquet d'un autre format
+  arrête la synchronisation en le disant, et rien n'est écrit.
+  Témoin rouge : « témoin rouge · un paquet étranger appliqué avant d’être refusé »
 - **Vérification manuelle** · `VM-C8-deux-versions` — Si la PR change le schéma, le modèle ou le
   protocole : synchroniser une instance construite depuis `main` avec une instance de la branche,
   dans les deux sens, en modifiant des deux côtés : rien ne se perd, ou l'écart est signalé
