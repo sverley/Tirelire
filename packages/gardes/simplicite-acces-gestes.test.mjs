@@ -54,7 +54,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import { RACINE, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
 
 const REGISTRE = 'docs/gardes.md';
@@ -225,90 +225,92 @@ function garderOuRenoncer(texte, ids = SANS_HARNAIS) {
   assert.deepEqual(manquants, [], `des invariants restent sans garde programmée et sans renonciation :\n${manquants.join('\n')}`);
 }
 
-test('#71 · I4 et I5 sont gardés par un harnais, ou par une renonciation écrite et datée', () => {
-  garderOuRenoncer(registre());
-});
+describe('[niveau 1] harnais de la garde', () => {
+  test('#71 · I4 et I5 sont gardés par un harnais, ou par une renonciation écrite et datée', () => {
+    garderOuRenoncer(registre());
+  });
 
-test('#71 · témoin vert — I4 gardé par un harnais, I5 par une renonciation, sont acceptés', () => {
-  const tenu = avecRenonciation(avecHarnais(registre(), 'I4', 'apps/web/test/navigateur/assistant-simple.test.ts'), 'I5');
-  garderOuRenoncer(tenu);
-});
+  test('#71 · témoin vert — I4 gardé par un harnais, I5 par une renonciation, sont acceptés', () => {
+    const tenu = avecRenonciation(avecHarnais(registre(), 'I4', 'apps/web/test/navigateur/assistant-simple.test.ts'), 'I5');
+    garderOuRenoncer(tenu);
+  });
 
-test("#71 · témoin rouge — une entrée laissée à sa seule vérification manuelle fait échouer « I4 et I5 sont gardés »", () => {
-  const casse = sansGardeProgrammee(registre(), 'I4');
-  assert.notEqual(casse, registre(), `aucune garde programmée n'a pu être retirée d'I4 : ${RELIRE}`);
-  assert.throws(() => garderOuRenoncer(casse), /restent sans garde programmée et sans renonciation/);
-});
+  test("#71 · témoin rouge — une entrée laissée à sa seule vérification manuelle fait échouer « I4 et I5 sont gardés »", () => {
+    const casse = sansGardeProgrammee(registre(), 'I4');
+    assert.notEqual(casse, registre(), `aucune garde programmée n'a pu être retirée d'I4 : ${RELIRE}`);
+    assert.throws(() => garderOuRenoncer(casse), /restent sans garde programmée et sans renonciation/);
+  });
 
-// ─── 2. I6 : le nombre de gestes fixé, et mesuré ─────────────────────────────────────────────────
+  // ─── 2. I6 : le nombre de gestes fixé, et mesuré ─────────────────────────────────────────────────
 
-function gestesFixesEtMesures(texte) {
-  const manquants = [];
-  const t = texteDeLEntree(texte, 'I6');
-  const gestes = new Set(nombresDeGestes(texte, 'I6'));
-  for (const [cas, n] of Object.entries(VISÉE)) {
-    if (!gestes.has(String(n))) manquants.push(`I6 · la visée de ${n} gestes (${cas}) n'est écrite nulle part dans l'entrée`);
+  function gestesFixesEtMesures(texte) {
+    const manquants = [];
+    const t = texteDeLEntree(texte, 'I6');
+    const gestes = new Set(nombresDeGestes(texte, 'I6'));
+    for (const [cas, n] of Object.entries(VISÉE)) {
+      if (!gestes.has(String(n))) manquants.push(`I6 · la visée de ${n} gestes (${cas}) n'est écrite nulle part dans l'entrée`);
+    }
+    if (!/marge|tolérance/i.test(t) || !new RegExp(`${MARGE}\\s*gestes?\\b`, 'i').test(t)) {
+      manquants.push(`I6 · la marge de ${MARGE} geste accordée au harnais n'est pas écrite`);
+    }
+    if (!/(automatis|semblables)[^.\n]*?\d+\s*gestes?|\d+\s*gestes?[^.\n]*?(automatis|semblables)/i.test(t)) {
+      manquants.push("I6 · aucun nombre de gestes pour automatiser toutes les opérations semblables");
+    }
+    const e = entree(texte, 'I6');
+    if (!porteUnHarnaisNeuf(e) && !renonciationEcrite(texte, 'I6')) {
+      manquants.push("I6 · le compte de gestes n'est mesuré par aucun harnais, et aucune renonciation écrite ne le dit");
+    }
+    for (const dette of detteDeLAudit(e)) manquants.push(`I6 · dette laissée en place · À bâtir · ${dette}`);
+    assert.deepEqual(manquants, [], `le nombre de gestes d'I6 n'est pas fixé et mesuré :\n${manquants.join('\n')}`);
   }
-  if (!/marge|tolérance/i.test(t) || !new RegExp(`${MARGE}\\s*gestes?\\b`, 'i').test(t)) {
-    manquants.push(`I6 · la marge de ${MARGE} geste accordée au harnais n'est pas écrite`);
+
+  test("#71 · le nombre de gestes d'I6 est fixé au registre et mesuré", () => {
+    gestesFixesEtMesures(registre());
+  });
+
+  test("#71 · témoin vert — la visée du porteur écrite et un harnais qui la mesure sont acceptés", () => {
+    gestesFixesEtMesures(avecLesNombres(registre()));
+  });
+
+  test("#71 · témoin rouge — une visée de gestes qui n'est écrite nulle part fait échouer « le nombre de gestes est fixé »", () => {
+    const casse = dansLEntree(registre(), 'I6', (t) => t.replace(/\d+\s*gestes?/gi, 'peu de gestes'));
+    assert.notEqual(casse, registre(), `aucun nombre de gestes n'a pu être effacé : ${RELIRE}`);
+    assert.throws(() => gestesFixesEtMesures(casse), /la visée de 2 gestes/);
+  });
+
+  test("#71 · témoin rouge — la marge effacée fait échouer « le nombre de gestes est fixé »", () => {
+    const casse = dansLEntree(registre(), 'I6', (t) => t.replace(/marge|tolérance/gi, 'mesure'));
+    assert.notEqual(casse, registre(), `la marge n'a pas pu être retirée : ${RELIRE}`);
+    assert.throws(() => gestesFixesEtMesures(casse), /la marge de 1 geste/);
+  });
+
+  // ─── 3. Les gardes du jour ne disparaissent pas ──────────────────────────────────────────────────
+
+  function gardesTenues(texte) {
+    const entrees = lireRegistre(texte).entrees;
+    const presents = new Set([...entrees.values()].flatMap((e) => e.harnais.map((h) => identite(e.id, h))));
+    const perdues = [...HARNAIS_DU_JOUR].filter((i) => !presents.has(i)).map((i) => `harnais disparu · ${i}`);
+    for (const [id, attendues] of Object.entries(VERIFICATIONS_DU_JOUR)) {
+      const vues = new Set((entrees.get(id)?.verifications ?? []).map((v) => v.id));
+      for (const vm of attendues) if (!vues.has(vm)) perdues.push(`vérification manuelle disparue · ${id} · ${vm}`);
+    }
+    assert.deepEqual(perdues, [], `des gardes d'I4, I5 et I6 ont disparu au lieu d'être complétées :\n${perdues.join('\n')}`);
   }
-  if (!/(automatis|semblables)[^.\n]*?\d+\s*gestes?|\d+\s*gestes?[^.\n]*?(automatis|semblables)/i.test(t)) {
-    manquants.push("I6 · aucun nombre de gestes pour automatiser toutes les opérations semblables");
-  }
-  const e = entree(texte, 'I6');
-  if (!porteUnHarnaisNeuf(e) && !renonciationEcrite(texte, 'I6')) {
-    manquants.push("I6 · le compte de gestes n'est mesuré par aucun harnais, et aucune renonciation écrite ne le dit");
-  }
-  for (const dette of detteDeLAudit(e)) manquants.push(`I6 · dette laissée en place · À bâtir · ${dette}`);
-  assert.deepEqual(manquants, [], `le nombre de gestes d'I6 n'est pas fixé et mesuré :\n${manquants.join('\n')}`);
-}
 
-test("#71 · le nombre de gestes d'I6 est fixé au registre et mesuré", () => {
-  gestesFixesEtMesures(registre());
-});
+  test("#71 · le registre garde le harnais d'I6 et les trois vérifications manuelles d'I4, I5 et I6", () => {
+    assert.equal(Object.values(VERIFICATIONS_DU_JOUR).flat().length, 3, RELIRE);
+    gardesTenues(registre());
+  });
 
-test("#71 · témoin vert — la visée du porteur écrite et un harnais qui la mesure sont acceptés", () => {
-  gestesFixesEtMesures(avecLesNombres(registre()));
-});
+  test("#71 · témoin rouge — la vérification manuelle d'I4 effacée fait échouer « le registre garde ses gardes »", () => {
+    const casse = retirerLignes(registre(), new Set([entree(registre(), 'I4').verifications[0].ligne]));
+    assert.notEqual(casse, registre(), `aucune vérification manuelle n'a pu être effacée : ${RELIRE}`);
+    assert.throws(() => gardesTenues(casse), /vérification manuelle disparue/);
+  });
 
-test("#71 · témoin rouge — une visée de gestes qui n'est écrite nulle part fait échouer « le nombre de gestes est fixé »", () => {
-  const casse = dansLEntree(registre(), 'I6', (t) => t.replace(/\d+\s*gestes?/gi, 'peu de gestes'));
-  assert.notEqual(casse, registre(), `aucun nombre de gestes n'a pu être effacé : ${RELIRE}`);
-  assert.throws(() => gestesFixesEtMesures(casse), /la visée de 2 gestes/);
-});
-
-test("#71 · témoin rouge — la marge effacée fait échouer « le nombre de gestes est fixé »", () => {
-  const casse = dansLEntree(registre(), 'I6', (t) => t.replace(/marge|tolérance/gi, 'mesure'));
-  assert.notEqual(casse, registre(), `la marge n'a pas pu être retirée : ${RELIRE}`);
-  assert.throws(() => gestesFixesEtMesures(casse), /la marge de 1 geste/);
-});
-
-// ─── 3. Les gardes du jour ne disparaissent pas ──────────────────────────────────────────────────
-
-function gardesTenues(texte) {
-  const entrees = lireRegistre(texte).entrees;
-  const presents = new Set([...entrees.values()].flatMap((e) => e.harnais.map((h) => identite(e.id, h))));
-  const perdues = [...HARNAIS_DU_JOUR].filter((i) => !presents.has(i)).map((i) => `harnais disparu · ${i}`);
-  for (const [id, attendues] of Object.entries(VERIFICATIONS_DU_JOUR)) {
-    const vues = new Set((entrees.get(id)?.verifications ?? []).map((v) => v.id));
-    for (const vm of attendues) if (!vues.has(vm)) perdues.push(`vérification manuelle disparue · ${id} · ${vm}`);
-  }
-  assert.deepEqual(perdues, [], `des gardes d'I4, I5 et I6 ont disparu au lieu d'être complétées :\n${perdues.join('\n')}`);
-}
-
-test("#71 · le registre garde le harnais d'I6 et les trois vérifications manuelles d'I4, I5 et I6", () => {
-  assert.equal(Object.values(VERIFICATIONS_DU_JOUR).flat().length, 3, RELIRE);
-  gardesTenues(registre());
-});
-
-test("#71 · témoin rouge — la vérification manuelle d'I4 effacée fait échouer « le registre garde ses gardes »", () => {
-  const casse = retirerLignes(registre(), new Set([entree(registre(), 'I4').verifications[0].ligne]));
-  assert.notEqual(casse, registre(), `aucune vérification manuelle n'a pu être effacée : ${RELIRE}`);
-  assert.throws(() => gardesTenues(casse), /vérification manuelle disparue/);
-});
-
-test("#71 · témoin rouge — le harnais d'I6 effacé fait échouer « le registre garde ses gardes »", () => {
-  const casse = retirerLignes(registre(), new Set([entree(registre(), 'I6').harnais[0].ligne]));
-  assert.notEqual(casse, registre(), `aucune ligne Harnais n'a pu être effacée : ${RELIRE}`);
-  assert.throws(() => gardesTenues(casse), /harnais disparu/);
+  test("#71 · témoin rouge — le harnais d'I6 effacé fait échouer « le registre garde ses gardes »", () => {
+    const casse = retirerLignes(registre(), new Set([entree(registre(), 'I6').harnais[0].ligne]));
+    assert.notEqual(casse, registre(), `aucune ligne Harnais n'a pu être effacée : ${RELIRE}`);
+    assert.throws(() => gardesTenues(casse), /harnais disparu/);
+  });
 });

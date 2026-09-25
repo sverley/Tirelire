@@ -500,3 +500,78 @@ qu'elles barrent.
 
 > oui, construit les versions jusqu'a v5.
 > si tu analyses le contenue des issues, et au regard du changement de structuration du projet orientée "version", je pense que beaucoup d'issue peuvent aller dans des versions qui a l'époque du traitement de l'issue n'existaient pas (donc aucune référence)
+
+## 25 septembre 2026 · les niveaux des tests
+
+### Des niveaux de harnais
+
+> il faut poser une methodo complémentaire au niveau des harnais pour réduire l'impact de leur temps d'éxecution. J'imagine 4 niveaux (à discuter) de harnais : ceux qui doivent tourner à chaque commit (toujours rapides, plutot dédiés à la tache en cours ou dont leur validation est importante en permacence), ceux qui doivent tourner à chaque merge (rapide aussi mais plus larges. Ils doivent assurer un premier niveau de retrocompatibilité et de conformité), ceux qui ne tournent que avant la prod pour etre plus complets sur la retrocompatibilité et enfin ceux hors CI qui servent lors du codage pour les besoins de vérification locales et qui peuvent être appelés quand on veut faire tourner la chaine de test complete (explicitement). Qu'en dis-tu ? Trop de niveau ?
+
+> point 1 : ok
+> point 2 : le découpage actuel dont tu parles est au niveau de la CI. Je parle moi d'un découpage inférieur au niveau des harnais eux-memes et de la suite de test (npm tests). les harnais de la garde ont un niveau commun 2. Mais il faut bien voir que pendant le dev d'un besoin, les harnais de ce besoin doivent pouvoir tourner quelques soit leur niveau pour que le codeur et l'auditeur puissent analyser le comportement du code
+
+> il y a confusion. Un harnais porte plusieurs tests. Ce sont ces tests que je veux hierarchiser pour que l'execution d'un harnais soit variable en fonction du niveau de verification demandée
+
+> quelle différence entre harnais de la garde et harnais du registre ?
+
+> pour moi, même si leur cible de controle differe, ils servent le meme but : s'assurer que les principes et regles ne sont pas enfreints. Ils doivent être traités de la meme maniere. On peut cependant prévoir que certains tests de ces 2 type de harnais puissent etre de niveau 1 ou de niveau 3, meme si la majorité devra être de niveau 2
+
+> ok. Les regles des harnais doivent être codées en harnais de la garde
+
+> renome les niveaux de tests avec les usage des loglevel : DEBUG (diagnostic détaillé), INFO (événements normaux), WARN (problème potentiel), ERROR (erreur nécessitant une intervention) et FATAL (défaillance critique pouvant arrêter le système).
+
+> c'est parfait, et l'outil de test prend le testlevel en input
+
+### Le risque de ne pas jouer un test
+
+> Attention, le temps d'execution d'un test NE PEUT PAS etre un critere de choix de sa severité. Si un test est necessaire à vérifier que l'app ne va pas terminer en FATAL, il doit être classé comme tel. C'est ensuite au porteur de proposer une solution pour éviter qu'il ne déborde en temps
+
+> le critere de choix doit plutot etre défini comme présenté : on réfléchi la criticité du test comme la criticité d'un message de log
+
+> c'est donc la similitude avec loglevel qui ne fonctionne pas. Il faut renommer les niveau de test pour mieux correspondre au besoin : il faut porter l'idée du risque de ne pas les jouer ces tests à un moment. Un test de niveau 0 est un test qui couvre un besoin avec un risque trop grave s'il n'est pas satisfait à tout moment (0 risque toléré), un test de niveau maximum est un test qui sert au debug (0 risque pris à ne pas le faire tourner). Est-ce que cette vision basée risque est plus appropriée ?
+
+> mais ton classement traite du moment joué (que j'ai déjà proposé). Or on cherche un critère par niveau pour explicité le risque pris à ne pas jouer un test. Savoir quand on tolere ce risque est une autre question.
+
+> j'ai peur que cette echelle ne ventile pas suffisamment les tests. vois ce qu'elle donne sur l'exitant
+
+> on peut tester comme ça. Il faut un moyen assez fiable et reproductible de classer la crititicité d'un test au regard de son besoin. Ensuite, le niveau 4 n'existe pas car les auditeurs et codeur ne pouvaient pas enregistrer des tests dans les harnais sans qu'ils soient joués après à tous les coups.
+
+> par définition, les tests de la garde et du registre sont 0 ou 1. Je ne vois pas de cas où un niveau supérieur serait nécessaire
+
+> ready 1. L'auditeur aura fait tourner 2 avant. Livraison 2.
+
+### Les tests de diagnostic
+
+> on peut éditer les roles du codeur et de l'auditeur afin qu'ils puissent créer des tests necessaires au debug/analyse classifier comme tel. Il faut gérer la contradiction avec l'interdiction faite au codeur de lire le harnais. Propose une solution
+
+> parfait
+
+### Le coût de la CI
+
+> 3. il faut limiter le cout CI. Peut-on prévoir 2 en pre-push ?
+
+> attends, je ne suis pas sur de bien voir les etapes dans github. Dans une PR, on peut avoir plusieurs branches. Quel hook n'est joué que lors de la fusion de la PR sur [main] ou sur sa branche désignée, et pas quand des branches de la PR sont fusionnées dans la PR ?
+
+> je souhaite pouvoir faire la différence entre les fusions manuelles et la CI sur github. le but étant de réduire le cout CI, on peut jouer sur les hook et sur les scripts CI pour garantir que tout sera bien joué avant d'arriver sur main
+
+> ok
+
+### La forme normale d'un harnais
+
+Sur la proposition de l'auditeur de #197 de sortir les tests de niveau 0 et 1 d'un harnais dans un
+fichier à part, que le registre citerait en entier, sans les instantanés ni la sonde de diagnostic :
+
+> oui
+
+### L'entrée du seuil
+
+> non, le contrat par varieble d'environnement me semble mauvais
+
+> pnpm test [N] où N est facultatif (2 par defaut comme avant). Attention, légère modification du besoin par l'architecte à prendre en compte
+
+> les tests navigateur coutent tres cher, il faut une option dans pnpm test pour les activer dans 232
+
+Sur le compte des tests navigateur écartés, juste sur ce qu'il mesure — fichiers et tests écrits —
+plutôt qu'un nombre exact de tests engendrés, qui demanderait de lancer le navigateur :
+
+> ok pour cette lecture

@@ -71,15 +71,17 @@ function vérifierUneMesure(m: Mesure) {
  * échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur : c'est la règle
  * qu'on garde ici, pas une seconde visite de l'écran.
  */
-it.fails('témoin rouge · un classement qui coûte un geste de plus que le seuil', () => {
-  vérifierUneMesure({
-    cas: 'automatiser les semblables',
-    gestes: ['ouvrir la ligne', 'déplier la ventilation', 'choisir la catégorie', 'cocher un automatisme', 'Enregistrer'],
-    classée: true,
-    catégorie: 'Alimentation',
-    automatismesAvant: 2,
-    automatismesAprès: 2,
-    automatismeAttendu: true,
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un classement qui coûte un geste de plus que le seuil', () => {
+    vérifierUneMesure({
+      cas: 'automatiser les semblables',
+      gestes: ['ouvrir la ligne', 'déplier la ventilation', 'choisir la catégorie', 'cocher un automatisme', 'Enregistrer'],
+      classée: true,
+      catégorie: 'Alimentation',
+      automatismesAvant: 2,
+      automatismesAprès: 2,
+      automatismeAttendu: true,
+    });
   });
 });
 
@@ -254,111 +256,113 @@ async function mesurer(page: Page, c: Consigne): Promise<Mesure> {
   };
 }
 
-describe.skipIf(!navigateur)('I6 · catégoriser en peu de gestes (issue #71)', () => {
-  let site: Site;
-  let contexte: BrowserContext;
-  let page: Page;
-  const mesures = new Map<Cas, Mesure>();
+describe('[niveau 1] harnais du registre', () => {
+  describe.skipIf(!navigateur)('I6 · catégoriser en peu de gestes (issue #71)', () => {
+    let site: Site;
+    let contexte: BrowserContext;
+    let page: Page;
+    const mesures = new Map<Cas, Mesure>();
 
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-    contexte = await site.chrome.createBrowserContext();
-    page = await contexte.newPage();
-    page.on('dialog', (d) => void d.dismiss());
-    await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
-    await page.goto(site.url, { waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => !document.body.textContent?.includes('Ouverture de la base'));
-    await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes("Charger l'exemple"));
-      (b as HTMLButtonElement | undefined)?.click();
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+      contexte = await site.chrome.createBrowserContext();
+      page = await contexte.newPage();
+      page.on('dialog', (d) => void d.dismiss());
+      await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
+      await page.goto(site.url, { waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => !document.body.textContent?.includes('Ouverture de la base'));
+      await page.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes("Charger l'exemple"));
+        (b as HTMLButtonElement | undefined)?.click();
+      });
+      await page.waitForFunction(() => [...document.querySelectorAll('h2')].some((h) => h.textContent === 'Tirelires'));
+
+      // L'exemple ne porte aucune sous-catégorie : le harnais en crée une par l'interface.
+      await allerÀ(page, 'Plus');
+      await page.evaluate(() => {
+        const b = [...document.querySelectorAll('main button')].find((x) => (x.textContent ?? '').startsWith('Catégories'));
+        (b as HTMLButtonElement | undefined)?.click();
+      });
+      await pause(250);
+      const sousCatégorie = await page.evaluate((nom: string) => {
+        const b = [...document.querySelectorAll('main button')].find(
+          (x) => (x.textContent ?? '').trim() === 'Ajouter une catégorie de dépenses',
+        ) as HTMLButtonElement | undefined;
+        if (!b) return '';
+        b.click();
+        return nom;
+      }, 'Sous-poste de mesure');
+      await pause(250);
+      const créée = await page.evaluate((nom: string) => {
+        const f = document.querySelector('form.edit');
+        if (!f) return false;
+        const champ = (début: string) =>
+          [...f.querySelectorAll('label')].find((x) => (x.textContent ?? '').trim().startsWith(début));
+        const nomChamp = champ('Nom')?.querySelector('input') as HTMLInputElement | null;
+        if (!nomChamp) return false;
+        nomChamp.value = nom;
+        nomChamp.dispatchEvent(new Event('input', { bubbles: true }));
+        const parent = champ('Catégorie parente')?.querySelector('select') as HTMLSelectElement | null;
+        const premier = parent && [...parent.options].find((o) => o.value);
+        if (!parent || !premier) return false;
+        parent.value = premier.value;
+        parent.dispatchEvent(new Event('change', { bubbles: true }));
+        (f as HTMLFormElement).requestSubmit();
+        return true;
+      }, sousCatégorie);
+      if (!créée) throw new Error('la sous-catégorie de mesure n’a pas pu être créée');
+      await pause(400);
+
+      await allerÀ(page, 'Opérations');
+      await filtrer(page, 'Toutes');
+      const dépenses = (await listées(page)).filter((o) => o.dépense).map((o) => o.libellé);
+      await filtrer(page, 'Non traitées');
+      if (dépenses.length < 3) throw new Error(`l'exemple ne contient que ${dépenses.length} dépense(s) : mesure impossible`);
+
+      // Une catégorie principale de l'exemple, choisie dans la liste que le panneau propose lui-même.
+      await remettreÀZéro(page, dépenses[0]!);
+      await ouvrirLaLigne(page, dépenses[0]!);
+      const proposées = await catégoriesProposées(page);
+      const principale = proposées.find((c) => c !== sousCatégorie);
+      if (!principale) throw new Error('aucune catégorie proposée par le panneau de ventilation');
+      await page.evaluate(() => {
+        const f = document.querySelector('form.edit');
+        const b = ([...(f?.querySelectorAll('button') ?? [])] as HTMLButtonElement[]).find(
+          (x) => (x.textContent ?? '').trim() === 'Fermer',
+        );
+        b?.click();
+      });
+      await pause(200);
+
+      const consignes: Consigne[] = [
+        { cas: 'catégoriser', libellé: dépenses[0]!, catégorie: principale, automatiser: false },
+        { cas: 'catégoriser avec une sous-catégorie', libellé: dépenses[1]!, catégorie: sousCatégorie, automatiser: false },
+        { cas: 'automatiser les semblables', libellé: dépenses[2]!, catégorie: principale, automatiser: true },
+        {
+          cas: 'automatiser les semblables avec une sous-catégorie',
+          libellé: dépenses[0]!,
+          catégorie: sousCatégorie,
+          automatiser: true,
+        },
+      ];
+      for (const c of consignes) {
+        await remettreÀZéro(page, c.libellé);
+        mesures.set(c.cas, await mesurer(page, c));
+      }
+    }, 300_000);
+
+    afterAll(async () => {
+      await contexte?.close();
+      await site?.fermer();
     });
-    await page.waitForFunction(() => [...document.querySelectorAll('h2')].some((h) => h.textContent === 'Tirelires'));
 
-    // L'exemple ne porte aucune sous-catégorie : le harnais en crée une par l'interface.
-    await allerÀ(page, 'Plus');
-    await page.evaluate(() => {
-      const b = [...document.querySelectorAll('main button')].find((x) => (x.textContent ?? '').startsWith('Catégories'));
-      (b as HTMLButtonElement | undefined)?.click();
-    });
-    await pause(250);
-    const sousCatégorie = await page.evaluate((nom: string) => {
-      const b = [...document.querySelectorAll('main button')].find(
-        (x) => (x.textContent ?? '').trim() === 'Ajouter une catégorie de dépenses',
-      ) as HTMLButtonElement | undefined;
-      if (!b) return '';
-      b.click();
-      return nom;
-    }, 'Sous-poste de mesure');
-    await pause(250);
-    const créée = await page.evaluate((nom: string) => {
-      const f = document.querySelector('form.edit');
-      if (!f) return false;
-      const champ = (début: string) =>
-        [...f.querySelectorAll('label')].find((x) => (x.textContent ?? '').trim().startsWith(début));
-      const nomChamp = champ('Nom')?.querySelector('input') as HTMLInputElement | null;
-      if (!nomChamp) return false;
-      nomChamp.value = nom;
-      nomChamp.dispatchEvent(new Event('input', { bubbles: true }));
-      const parent = champ('Catégorie parente')?.querySelector('select') as HTMLSelectElement | null;
-      const premier = parent && [...parent.options].find((o) => o.value);
-      if (!parent || !premier) return false;
-      parent.value = premier.value;
-      parent.dispatchEvent(new Event('change', { bubbles: true }));
-      (f as HTMLFormElement).requestSubmit();
-      return true;
-    }, sousCatégorie);
-    if (!créée) throw new Error('la sous-catégorie de mesure n’a pas pu être créée');
-    await pause(400);
-
-    await allerÀ(page, 'Opérations');
-    await filtrer(page, 'Toutes');
-    const dépenses = (await listées(page)).filter((o) => o.dépense).map((o) => o.libellé);
-    await filtrer(page, 'Non traitées');
-    if (dépenses.length < 3) throw new Error(`l'exemple ne contient que ${dépenses.length} dépense(s) : mesure impossible`);
-
-    // Une catégorie principale de l'exemple, choisie dans la liste que le panneau propose lui-même.
-    await remettreÀZéro(page, dépenses[0]!);
-    await ouvrirLaLigne(page, dépenses[0]!);
-    const proposées = await catégoriesProposées(page);
-    const principale = proposées.find((c) => c !== sousCatégorie);
-    if (!principale) throw new Error('aucune catégorie proposée par le panneau de ventilation');
-    await page.evaluate(() => {
-      const f = document.querySelector('form.edit');
-      const b = ([...(f?.querySelectorAll('button') ?? [])] as HTMLButtonElement[]).find(
-        (x) => (x.textContent ?? '').trim() === 'Fermer',
-      );
-      b?.click();
-    });
-    await pause(200);
-
-    const consignes: Consigne[] = [
-      { cas: 'catégoriser', libellé: dépenses[0]!, catégorie: principale, automatiser: false },
-      { cas: 'catégoriser avec une sous-catégorie', libellé: dépenses[1]!, catégorie: sousCatégorie, automatiser: false },
-      { cas: 'automatiser les semblables', libellé: dépenses[2]!, catégorie: principale, automatiser: true },
-      {
-        cas: 'automatiser les semblables avec une sous-catégorie',
-        libellé: dépenses[0]!,
-        catégorie: sousCatégorie,
-        automatiser: true,
-      },
-    ];
-    for (const c of consignes) {
-      await remettreÀZéro(page, c.libellé);
-      mesures.set(c.cas, await mesurer(page, c));
-    }
-  }, 300_000);
-
-  afterAll(async () => {
-    await contexte?.close();
-    await site?.fermer();
+    it('gestes de classement · catégoriser une opération, puis toutes les semblables', () => {
+      for (const cas of Object.keys(VISÉE) as Cas[]) {
+        const m = mesures.get(cas);
+        expect(m, `le cas « ${cas} » n’a pas été mesuré`).toBeDefined();
+        console.log(`[gestes] ${cas} : ${m!.gestes.length} (visée ${VISÉE[cas]}, seuil ${seuil(VISÉE[cas])}) — ${m!.gestes.join(' → ')}`);
+        vérifierUneMesure(m!);
+      }
+    }, 60_000);
   });
-
-  it('gestes de classement · catégoriser une opération, puis toutes les semblables', () => {
-    for (const cas of Object.keys(VISÉE) as Cas[]) {
-      const m = mesures.get(cas);
-      expect(m, `le cas « ${cas} » n’a pas été mesuré`).toBeDefined();
-      console.log(`[gestes] ${cas} : ${m!.gestes.length} (visée ${VISÉE[cas]}, seuil ${seuil(VISÉE[cas])}) — ${m!.gestes.join(' → ')}`);
-      vérifierUneMesure(m!);
-    }
-  }, 60_000);
 });

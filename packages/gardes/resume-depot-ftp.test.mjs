@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import { RACINE } from './gardes.mjs';
 
 const CI = '.github/workflows/ci.yml';
@@ -121,25 +121,27 @@ function leResteDuDépôtEstIntact(yaml) {
   );
 }
 
-test("#145 · le résumé du dépôt FTP ignoré dit où l'archive du site se trouve vraiment", () => {
-  résuméDitOùEstLArchive(lire());
-});
+describe('[niveau 1] harnais de la garde', () => {
+  test("#145 · le résumé du dépôt FTP ignoré dit où l'archive du site se trouve vraiment", () => {
+    résuméDitOùEstLArchive(lire());
+  });
 
-test('#145 · le job de dépôt garde par ailleurs ses étapes et son artefact', () => {
-  leResteDuDépôtEstIntact(lire());
-});
+  test('#145 · le job de dépôt garde par ailleurs ses étapes et son artefact', () => {
+    leResteDuDépôtEstIntact(lire());
+  });
 
-/** Le workflow volontairement cassé : le résumé renvoie de nouveau vers la release `latest`. */
-function ciCassé(yaml) {
-  return yaml.replace(
-    /^(\s*)\} >> "\$GITHUB_STEP_SUMMARY"$/m,
-    (fin, indentation) =>
-      `${indentation}  echo "Le site reste téléchargeable dans la release \\\`latest\\\`."\n${fin}`,
-  );
-}
+  /** Le workflow volontairement cassé : le résumé renvoie de nouveau vers la release `latest`. */
+  function ciCassé(yaml) {
+    return yaml.replace(
+      /^(\s*)\} >> "\$GITHUB_STEP_SUMMARY"$/m,
+      (fin, indentation) =>
+        `${indentation}  echo "Le site reste téléchargeable dans la release \\\`latest\\\`."\n${fin}`,
+    );
+  }
 
-test('témoin rouge · un résumé qui renvoie vers la release `latest`', () => {
-  const cassé = ciCassé(lire());
-  assert.notEqual(cassé, lire(), 'le workflow n’a pas pu être cassé : le harnais de #145 est à relire');
-  assert.throws(() => résuméDitOùEstLArchive(cassé), /la release `latest` est encore nommée/);
+  test('témoin rouge · un résumé qui renvoie vers la release `latest`', () => {
+    const cassé = ciCassé(lire());
+    assert.notEqual(cassé, lire(), 'le workflow n’a pas pu être cassé : le harnais de #145 est à relire');
+    assert.throws(() => résuméDitOùEstLArchive(cassé), /la release `latest` est encore nommée/);
+  });
 });

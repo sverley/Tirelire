@@ -54,7 +54,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import { RACINE, analyserTests, fichiersDuDepot, globVersRegex, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
 
 const REGISTRE = 'docs/gardes.md';
@@ -144,136 +144,140 @@ function verifierPromessesNommees(id, texteDuRegistre, sourceDuFichier) {
   }
 }
 
-test('#73 · témoin vert — chaque garantie promise par C1 et C2 est nommée au registre, témoin rouge en it.fails à l’appui', () => {
-  for (const id of Object.keys(PROMESSES)) verifierPromessesNommees(id, registre(), lire(PROMESSES[id].fichier));
-});
+describe('[niveau 1] harnais de la garde', () => {
+  test('#73 · témoin vert — chaque garantie promise par C1 et C2 est nommée au registre, témoin rouge en it.fails à l’appui', () => {
+    for (const id of Object.keys(PROMESSES)) verifierPromessesNommees(id, registre(), lire(PROMESSES[id].fichier));
+  });
 
-test('#73 · témoin rouge — une ligne qui décrit sa garde en prose au lieu de nommer son test fait échouer la règle 1', () => {
-  const enProse = registre().replace(/« aucun fichier essentiel ne fait\s+appel[^»]*»\s*:/, 'la caméra, en gros, reste de côté —');
-  assert.throws(() => verifierPromessesNommees('C2', enProse, lire(PROMESSES.C2.fichier)), /ne nomme «/);
-});
+  test('#73 · témoin rouge — une ligne qui décrit sa garde en prose au lieu de nommer son test fait échouer la règle 1', () => {
+    const enProse = registre().replace(/« aucun fichier essentiel ne fait\s+appel[^»]*»\s*:/, 'la caméra, en gros, reste de côté —');
+    assert.throws(() => verifierPromessesNommees('C2', enProse, lire(PROMESSES.C2.fichier)), /ne nomme «/);
+  });
 
-test('#73 · témoin rouge — un témoin rouge réécrit comme un test ordinaire fait échouer la règle 1', () => {
-  const source = "it('témoin rouge · un écran essentiel qui dépend de BarcodeDetector', () => {});";
-  assert.throws(() => verifierPromessesNommees('C2', registre(), source), /n'est pas déclaré avec `it\.fails`/);
-});
+  test('#73 · témoin rouge — un témoin rouge réécrit comme un test ordinaire fait échouer la règle 1', () => {
+    const source = "it('témoin rouge · un écran essentiel qui dépend de BarcodeDetector', () => {});";
+    assert.throws(() => verifierPromessesNommees('C2', registre(), source), /n'est pas déclaré avec `it\.fails`/);
+  });
 
-// ─── Règle 2 · aucune garantie muette ────────────────────────────────────────────────────────
+  // ─── Règle 2 · aucune garantie muette ────────────────────────────────────────────────────────
 
-/**
- * Tout test actif du fichier de `id` est nommé par une ligne `Harnais` du registre. Les témoins
- * rouges et le titre de la suite n'en sont pas : l'un prouve l'échec, l'autre ne garde rien.
- */
-function verifierAucuneGarantieMuette(id, texteDuRegistre, sourceDuFichier) {
-  const { fichier } = PROMESSES[id];
-  const nommes = new Set(harnaisSur(id, fichier, texteDuRegistre).map((l) => l.nomme));
-  const muets = [...analyserTests(sourceDuFichier).actifs].filter(
-    (nom) => !/^témoin rouge/i.test(nom) && !new RegExp(`^${id} ·`).test(nom) && !nommes.has(nom),
-  );
-  assert.deepEqual(
-    muets,
-    [],
-    `${id} : ces tests de \`${fichier}\` gardent quelque chose qu'aucune ligne du registre ne nomme — ` +
-      `les écrire au registre, sans quoi les retirer ne se verrait pas :\n${muets.join('\n')}`,
-  );
-}
-
-test('#73 · témoin vert — aucun test de C1 et C2 ne garde quelque chose que le registre ne nomme pas', () => {
-  for (const id of Object.keys(PROMESSES)) verifierAucuneGarantieMuette(id, registre(), lire(PROMESSES[id].fichier));
-});
-
-test('#73 · témoin rouge — une garantie ajoutée au code sans être écrite au registre fait échouer la règle 2', () => {
-  const source = `${lire(PROMESSES.C2.fichier)}\nit('une garantie neuve que personne n’a écrite au registre', () => {});\n`;
-  assert.throws(() => verifierAucuneGarantieMuette('C2', registre(), source), /qu'aucune ligne du registre ne nomme/);
-});
-
-// ─── Règle 3 · les analyses de C4 et C7 renvoient à ce qui les lèvera ────────────────────────
-
-/**
- * L'entrée porte, avant sa première ligne d'étiquette, un paragraphe d'analyse qui cite les issues
- * attendues. Citer l'issue est ce qui distingue une analyse d'un paragraphe de remplissage : elle
- * dit à quelle condition la vérification manuelle cessera d'être la seule garde.
- */
-function verifierAnalyseEcrite(id, texteDuRegistre) {
-  const analyse = analyseDe(id, texteDuRegistre);
-  assert.ok(analyse.length >= 80, `${id} n'a pas d'analyse écrite sous son titre : ${RELIRE}`);
-  for (const renvoi of RENVOIS_ATTENDUS[id]) {
-    assert.match(
-      analyse,
-      new RegExp(renvoi.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '\\b'),
-      `${id} : l'analyse ne renvoie pas à ${renvoi}, qui lèvera ce que la vérification manuelle tient seule pour l'instant : ${RELIRE}`,
+  /**
+   * Tout test actif du fichier de `id` est nommé par une ligne `Harnais` du registre. Les témoins
+   * rouges, le titre de la suite et les suites de niveau n'en sont pas : l'un prouve l'échec, les
+   * autres ne gardent rien (#238).
+   */
+  function verifierAucuneGarantieMuette(id, texteDuRegistre, sourceDuFichier) {
+    const { fichier } = PROMESSES[id];
+    const nommes = new Set(harnaisSur(id, fichier, texteDuRegistre).map((l) => l.nomme));
+    const { actifs, enveloppes } = analyserTests(sourceDuFichier);
+    const muets = [...actifs].filter(
+      (nom) => !/^témoin rouge/i.test(nom) && !enveloppes.has(nom) && !new RegExp(`^${id} ·`).test(nom) && !nommes.has(nom),
+    );
+    assert.deepEqual(
+      muets,
+      [],
+      `${id} : ces tests de \`${fichier}\` gardent quelque chose qu'aucune ligne du registre ne nomme — ` +
+        `les écrire au registre, sans quoi les retirer ne se verrait pas :\n${muets.join('\n')}`,
     );
   }
-}
 
-test('#73 · témoin vert — les analyses de C4 et C7 sont écrites et renvoient aux issues qui les lèveront', () => {
-  for (const id of Object.keys(RENVOIS_ATTENDUS)) verifierAnalyseEcrite(id, registre());
-});
+  test('#73 · témoin vert — aucun test de C1 et C2 ne garde quelque chose que le registre ne nomme pas', () => {
+    for (const id of Object.keys(PROMESSES)) verifierAucuneGarantieMuette(id, registre(), lire(PROMESSES[id].fichier));
+  });
 
-test('#73 · témoin rouge — une analyse réduite à du remplissage, sans renvoi à son issue, fait échouer la règle 3', () => {
-  const remplissage = registre().replace(
-    analyseDe('C4', registre()),
-    'Rien de particulier à signaler ici, mais il faut bien écrire quelques lignes pour remplir la place.',
-  );
-  assert.throws(() => verifierAnalyseEcrite('C4', remplissage), /ne renvoie pas à #42/);
-});
+  test('#73 · témoin rouge — une garantie ajoutée au code sans être écrite au registre fait échouer la règle 2', () => {
+    const source = `${lire(PROMESSES.C2.fichier)}\nit('une garantie neuve que personne n’a écrite au registre', () => {});\n`;
+    assert.throws(() => verifierAucuneGarantieMuette('C2', registre(), source), /qu'aucune ligne du registre ne nomme/);
+  });
 
-test('#73 · témoin rouge — une entrée réduite à sa seule vérification manuelle fait échouer la règle 3', () => {
-  const nue = "## C7 · Hors magasin, les systèmes alertent ou bloquent\n\n- **Vérification manuelle** · `VM-C7-installation` — à la main.\n";
-  assert.throws(() => verifierAnalyseEcrite('C7', nue), /n'a pas d'analyse écrite/);
-});
+  // ─── Règle 3 · les analyses de C4 et C7 renvoient à ce qui les lèvera ────────────────────────
 
-// ─── Règle 4 · les `Chemins` couvrent ce que le harnais balaie ───────────────────────────────
+  /**
+   * L'entrée porte, avant sa première ligne d'étiquette, un paragraphe d'analyse qui cite les issues
+   * attendues. Citer l'issue est ce qui distingue une analyse d'un paragraphe de remplissage : elle
+   * dit à quelle condition la vérification manuelle cessera d'être la seule garde.
+   */
+  function verifierAnalyseEcrite(id, texteDuRegistre) {
+    const analyse = analyseDe(id, texteDuRegistre);
+    assert.ok(analyse.length >= 80, `${id} n'a pas d'analyse écrite sous son titre : ${RELIRE}`);
+    for (const renvoi of RENVOIS_ATTENDUS[id]) {
+      assert.match(
+        analyse,
+        new RegExp(renvoi.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&') + '\\b'),
+        `${id} : l'analyse ne renvoie pas à ${renvoi}, qui lèvera ce que la vérification manuelle tient seule pour l'instant : ${RELIRE}`,
+      );
+    }
+  }
 
-/**
- * Ce que chaque harnais balaie réellement, au 14 septembre 2026. Une entrée du registre annonce sous
- * `Chemins` un **plancher** : modifier un fichier qui y répond impose de déclarer l'entrée, donc de
- * demander sa vérification manuelle. Si le harnais lit un fichier que le plancher ignore, une PR
- * peut toucher ce que C1 ou C2 garde sans que personne ait à relire quoi que ce soit — et le
- * registre affirme le contraire de ce qu'il fait.
- *
- * La couverture ne peut pas le voir : elle refuse un motif qui ne désigne aucun fichier, jamais un
- * fichier qu'aucun motif ne désigne. C'est un silence, pas une alerte, et c'est pour cela que cette
- * vérification est ici.
- */
-const BALAYES = Object.freeze({
-  C1: (tous) => [...tous.filter((f) => f.startsWith('apps/web/src/') && /\.(svelte|ts)$/.test(f)), 'apps/web/index.html', 'apps/web/vite.config.ts'],
-  C2: (tous) => tous.filter((f) => f.startsWith('apps/web/src/') && /\.(svelte|ts)$/.test(f)),
-});
+  test('#73 · témoin vert — les analyses de C4 et C7 sont écrites et renvoient aux issues qui les lèveront', () => {
+    for (const id of Object.keys(RENVOIS_ATTENDUS)) verifierAnalyseEcrite(id, registre());
+  });
 
-/** Chaque fichier balayé par le harnais de `id` répond à l'un des motifs `Chemins`, tels que la garde les lit. */
-function verifierCheminsCouvrentLeBalayage(id, texteDuRegistre, balayes) {
-  const entree = lireRegistre(texteDuRegistre).entrees.get(id);
-  if (!entree) assert.fail(`${id} n'a pas d'entrée dans ${REGISTRE} : ${RELIRE}`);
-  const motifs = entree.chemins.map(globVersRegex);
-  const oublies = balayes.filter((f) => !motifs.some((re) => re.test(f)));
-  assert.deepEqual(
-    oublies,
-    [],
-    `${id} : le harnais balaie des fichiers qu'aucun motif \`Chemins\` ne désigne — les modifier ne demanderait ` +
-      `aucune vérification manuelle, alors que le registre dit le contraire :\n${oublies.join('\n')}`,
-  );
-}
+  test('#73 · témoin rouge — une analyse réduite à du remplissage, sans renvoi à son issue, fait échouer la règle 3', () => {
+    const remplissage = registre().replace(
+      analyseDe('C4', registre()),
+      'Rien de particulier à signaler ici, mais il faut bien écrire quelques lignes pour remplir la place.',
+    );
+    assert.throws(() => verifierAnalyseEcrite('C4', remplissage), /ne renvoie pas à #42/);
+  });
 
-/**
- * Rouge au 14 septembre 2026 : `Chemins` de C1 tenait sur deux lignes depuis `7c974a3`, et
- * `lireRegistre` ne lisait que la première — `apps/web/vite.config.ts`, écrit au registre, n'était
- * jamais lu. Vert depuis `5a2ea94`, qui apprend à la garde à prolonger la ligne ; le `todo` qui
- * portait cette dette est retiré le même jour, sans quoi ce test passerait sans plus rien dire.
- */
-test('#73 · les Chemins de C1 et C2 couvrent chaque fichier que leur harnais balaie', () => {
-  const tous = fichiersDuDepot();
-  for (const id of Object.keys(BALAYES)) verifierCheminsCouvrentLeBalayage(id, registre(), BALAYES[id](tous));
-});
+  test('#73 · témoin rouge — une entrée réduite à sa seule vérification manuelle fait échouer la règle 3', () => {
+    const nue = "## C7 · Hors magasin, les systèmes alertent ou bloquent\n\n- **Vérification manuelle** · `VM-C7-installation` — à la main.\n";
+    assert.throws(() => verifierAnalyseEcrite('C7', nue), /n'a pas d'analyse écrite/);
+  });
 
-const C1_UNE_SEULE_LIGNE =
-  "## C1 · Aucun geste technique pour l'utilisateur\n\nChemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`, `apps/web/index.html`, `apps/web/vite.config.ts`\n\n- **Vérification manuelle** · `VM-C1-sans-geste` — une consigne assez longue pour être acceptée par la lecture du registre.\n";
+  // ─── Règle 4 · les `Chemins` couvrent ce que le harnais balaie ───────────────────────────────
 
-test('#73 · témoin vert — des Chemins qui couvrent tout le balayage sont acceptés', () => {
-  verifierCheminsCouvrentLeBalayage('C1', C1_UNE_SEULE_LIGNE, ['apps/web/src/main.ts', 'apps/web/src/views/Plan.svelte', 'apps/web/index.html', 'apps/web/vite.config.ts']);
-});
+  /**
+   * Ce que chaque harnais balaie réellement, au 14 septembre 2026. Une entrée du registre annonce sous
+   * `Chemins` un **plancher** : modifier un fichier qui y répond impose de déclarer l'entrée, donc de
+   * demander sa vérification manuelle. Si le harnais lit un fichier que le plancher ignore, une PR
+   * peut toucher ce que C1 ou C2 garde sans que personne ait à relire quoi que ce soit — et le
+   * registre affirme le contraire de ce qu'il fait.
+   *
+   * La couverture ne peut pas le voir : elle refuse un motif qui ne désigne aucun fichier, jamais un
+   * fichier qu'aucun motif ne désigne. C'est un silence, pas une alerte, et c'est pour cela que cette
+   * vérification est ici.
+   */
+  const BALAYES = Object.freeze({
+    C1: (tous) => [...tous.filter((f) => f.startsWith('apps/web/src/') && /\.(svelte|ts)$/.test(f)), 'apps/web/index.html', 'apps/web/vite.config.ts'],
+    C2: (tous) => tous.filter((f) => f.startsWith('apps/web/src/') && /\.(svelte|ts)$/.test(f)),
+  });
 
-test('#73 · témoin rouge — un fichier balayé qu’aucun motif ne désigne fait échouer la règle 4', () => {
-  const sansManifeste = C1_UNE_SEULE_LIGNE.replace(', `apps/web/vite.config.ts`', '');
-  assert.throws(() => verifierCheminsCouvrentLeBalayage('C1', sansManifeste, ['apps/web/index.html', 'apps/web/vite.config.ts']), /qu'aucun motif `Chemins` ne désigne/);
+  /** Chaque fichier balayé par le harnais de `id` répond à l'un des motifs `Chemins`, tels que la garde les lit. */
+  function verifierCheminsCouvrentLeBalayage(id, texteDuRegistre, balayes) {
+    const entree = lireRegistre(texteDuRegistre).entrees.get(id);
+    if (!entree) assert.fail(`${id} n'a pas d'entrée dans ${REGISTRE} : ${RELIRE}`);
+    const motifs = entree.chemins.map(globVersRegex);
+    const oublies = balayes.filter((f) => !motifs.some((re) => re.test(f)));
+    assert.deepEqual(
+      oublies,
+      [],
+      `${id} : le harnais balaie des fichiers qu'aucun motif \`Chemins\` ne désigne — les modifier ne demanderait ` +
+        `aucune vérification manuelle, alors que le registre dit le contraire :\n${oublies.join('\n')}`,
+    );
+  }
+
+  /**
+   * Rouge au 14 septembre 2026 : `Chemins` de C1 tenait sur deux lignes depuis `7c974a3`, et
+   * `lireRegistre` ne lisait que la première — `apps/web/vite.config.ts`, écrit au registre, n'était
+   * jamais lu. Vert depuis `5a2ea94`, qui apprend à la garde à prolonger la ligne ; le `todo` qui
+   * portait cette dette est retiré le même jour, sans quoi ce test passerait sans plus rien dire.
+   */
+  test('#73 · les Chemins de C1 et C2 couvrent chaque fichier que leur harnais balaie', () => {
+    const tous = fichiersDuDepot();
+    for (const id of Object.keys(BALAYES)) verifierCheminsCouvrentLeBalayage(id, registre(), BALAYES[id](tous));
+  });
+
+  const C1_UNE_SEULE_LIGNE =
+    "## C1 · Aucun geste technique pour l'utilisateur\n\nChemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`, `apps/web/index.html`, `apps/web/vite.config.ts`\n\n- **Vérification manuelle** · `VM-C1-sans-geste` — une consigne assez longue pour être acceptée par la lecture du registre.\n";
+
+  test('#73 · témoin vert — des Chemins qui couvrent tout le balayage sont acceptés', () => {
+    verifierCheminsCouvrentLeBalayage('C1', C1_UNE_SEULE_LIGNE, ['apps/web/src/main.ts', 'apps/web/src/views/Plan.svelte', 'apps/web/index.html', 'apps/web/vite.config.ts']);
+  });
+
+  test('#73 · témoin rouge — un fichier balayé qu’aucun motif ne désigne fait échouer la règle 4', () => {
+    const sansManifeste = C1_UNE_SEULE_LIGNE.replace(', `apps/web/vite.config.ts`', '');
+    assert.throws(() => verifierCheminsCouvrentLeBalayage('C1', sansManifeste, ['apps/web/index.html', 'apps/web/vite.config.ts']), /qu'aucun motif `Chemins` ne désigne/);
+  });
 });

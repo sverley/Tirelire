@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import test, { describe } from 'node:test';
 
 const ICI = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = 'apps/hebergement/verifier.sh';
@@ -44,23 +44,25 @@ function relèveLaRedirectionHttps(script) {
   assert.match(bloc, /echecs=\$\(\(echecs \+ 1\)\)/, `${SCRIPT} : une redirection absente ne compte pas son échec`);
 }
 
-test('C3 · le script de vérification sonde l’adresse en http:// et relève la redirection', () => {
-  relèveLaRedirectionHttps(lire());
-});
+describe('[niveau 1] harnais du registre', () => {
+  test('C3 · le script de vérification sonde l’adresse en http:// et relève la redirection', () => {
+    relèveLaRedirectionHttps(lire());
+  });
 
-/** Le script volontairement cassé : il sonde la redirection, mais n'en compte jamais l'échec (#78). */
-const sansEchec = (script) =>
-  script.replace(/\nif \[ "\$\{base#https:\/\/\}" != "\$base" \];[\s\S]*?\nfi\n/, (bloc) => bloc.replace(/\n\s*echecs=\$\(\(echecs \+ 1\)\)/g, ''));
+  /** Le script volontairement cassé : il sonde la redirection, mais n'en compte jamais l'échec (#78). */
+  const sansEchec = (script) =>
+    script.replace(/\nif \[ "\$\{base#https:\/\/\}" != "\$base" \];[\s\S]*?\nfi\n/, (bloc) => bloc.replace(/\n\s*echecs=\$\(\(echecs \+ 1\)\)/g, ''));
 
-test('C3 · témoin rouge — un script qui sonde la redirection sans compter son échec', () => {
-  assert.throws(() => relèveLaRedirectionHttps(sansEchec(lire())), /ne compte pas son échec/);
-});
+  test('C3 · témoin rouge — un script qui sonde la redirection sans compter son échec', () => {
+    assert.throws(() => relèveLaRedirectionHttps(sansEchec(lire())), /ne compte pas son échec/);
+  });
 
-/** Le script volontairement cassé : la redirection HTTPS n'est plus sondée du tout. */
-const sansRedirection = (script) => script.replace(/\nif \[ "\$\{base#https:\/\/\}" != "\$base" \];[\s\S]*?\nfi\n/, '\n');
+  /** Le script volontairement cassé : la redirection HTTPS n'est plus sondée du tout. */
+  const sansRedirection = (script) => script.replace(/\nif \[ "\$\{base#https:\/\/\}" != "\$base" \];[\s\S]*?\nfi\n/, '\n');
 
-test('témoin rouge · un script de vérification qui ne sonde plus l’adresse en http://', () => {
-  const cassé = sansRedirection(lire());
-  assert.notEqual(cassé, lire(), 'la section de redirection n’a pas pu être retirée : le harnais de C3 est à relire');
-  assert.throws(() => relèveLaRedirectionHttps(cassé), /rien ne teste la redirection/);
+  test('témoin rouge · un script de vérification qui ne sonde plus l’adresse en http://', () => {
+    const cassé = sansRedirection(lire());
+    assert.notEqual(cassé, lire(), 'la section de redirection n’a pas pu être retirée : le harnais de C3 est à relire');
+    assert.throws(() => relèveLaRedirectionHttps(cassé), /rien ne teste la redirection/);
+  });
 });

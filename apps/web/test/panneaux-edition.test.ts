@@ -55,42 +55,44 @@ function nommeCeQuIlModifie(vue: string, texte: string) {
   expect(texte, `${vue} : titre non figé à l’ouverture`).toMatch(/^\s*(need)?[Tt]itre = /m);
 }
 
-describe('panneaux d’édition de la Configuration', () => {
-  it.each(VUES)('%s : chaque panneau est un extrait rendu au point d’usage', (vue) => {
-    extraitAuPointDUsage(vue, source(vue));
+describe('[niveau 1] harnais du registre', () => {
+  describe('panneaux d’édition de la Configuration', () => {
+    it.each(VUES)('%s : chaque panneau est un extrait rendu au point d’usage', (vue) => {
+      extraitAuPointDUsage(vue, source(vue));
+    });
+
+    it.each(VUES)('%s : chaque panneau est attaché à sa ligne et ramené à l’écran', (vue) => {
+      attachéEtRamené(vue, source(vue));
+    });
+
+    it.each(VUES)('%s : chaque panneau nomme ce qu’il modifie', (vue) => {
+      nommeCeQuIlModifie(vue, source(vue));
+    });
   });
 
-  it.each(VUES)('%s : chaque panneau est attaché à sa ligne et ramené à l’écran', (vue) => {
-    attachéEtRamené(vue, source(vue));
+  /**
+   * Témoin rouge du harnais C9 (docs/gardes.md) : les trois mêmes conditions, rejouées sur un écran
+   * volontairement écrit comme celui d'avant D52 — formulaire en tête de document, hors extrait, sans
+   * attache, sans titre. Il doit échouer ; `it.fails` tient l'échec attendu (#66).
+   */
+  const VUE_CASSÉE = [
+    '<script lang="ts">',
+    "  let ouvert = $state('');",
+    '</script>',
+    '',
+    '<form class="edit" onsubmit={enregistrer}>',
+    '  <label>Nom<input bind:value={form.name} /></label>',
+    '</form>',
+    '',
+    '{#snippet ligne(t)}',
+    '  <div class="row"><button onclick={() => (ouvert = t.id)}>Modifier</button></div>',
+    '{/snippet}',
+    '',
+  ].join('\n');
+
+  it.fails('témoin rouge · un panneau écrit en tête de document, hors extrait et sans titre', () => {
+    extraitAuPointDUsage('Cassée', VUE_CASSÉE);
+    attachéEtRamené('Cassée', VUE_CASSÉE);
+    nommeCeQuIlModifie('Cassée', VUE_CASSÉE);
   });
-
-  it.each(VUES)('%s : chaque panneau nomme ce qu’il modifie', (vue) => {
-    nommeCeQuIlModifie(vue, source(vue));
-  });
-});
-
-/**
- * Témoin rouge du harnais C9 (docs/gardes.md) : les trois mêmes conditions, rejouées sur un écran
- * volontairement écrit comme celui d'avant D52 — formulaire en tête de document, hors extrait, sans
- * attache, sans titre. Il doit échouer ; `it.fails` tient l'échec attendu (#66).
- */
-const VUE_CASSÉE = [
-  '<script lang="ts">',
-  "  let ouvert = $state('');",
-  '</script>',
-  '',
-  '<form class="edit" onsubmit={enregistrer}>',
-  '  <label>Nom<input bind:value={form.name} /></label>',
-  '</form>',
-  '',
-  '{#snippet ligne(t)}',
-  '  <div class="row"><button onclick={() => (ouvert = t.id)}>Modifier</button></div>',
-  '{/snippet}',
-  '',
-].join('\n');
-
-it.fails('témoin rouge · un panneau écrit en tête de document, hors extrait et sans titre', () => {
-  extraitAuPointDUsage('Cassée', VUE_CASSÉE);
-  attachéEtRamené('Cassée', VUE_CASSÉE);
-  nommeCeQuIlModifie('Cassée', VUE_CASSÉE);
 });

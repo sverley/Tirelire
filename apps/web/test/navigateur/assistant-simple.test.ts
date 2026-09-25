@@ -77,19 +77,21 @@ function vérifierLeParcours(p: Parcours) {
  * attendu (#66). Il se joue sans navigateur : c'est la règle qu'on garde ici, pas une seconde
  * traversée.
  */
-it.fails('témoin rouge · un parcours simple qui exige un réglage pour avancer', () => {
-  vérifierLeParcours({
-    routes: [{ depuis: 'accueil', gestes: 1, ouvre: true }],
-    étapes: [
-      { titre: 'Le principe', primaire: 'Commencer ›', franchie: true, resteDansLAssistant: true, erreur: '' },
-      { titre: 'Comptes', primaire: 'Suivant ›', franchie: false, resteDansLAssistant: true, erreur: 'Crée d’abord un compte principal.' },
-    ],
-    gestes: 3,
-    résumé: false,
-    planAtteint: false,
-    tirelinesDotées: 0,
-    réservé: '0,00 €',
-    réservéNonNul: false,
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un parcours simple qui exige un réglage pour avancer', () => {
+    vérifierLeParcours({
+      routes: [{ depuis: 'accueil', gestes: 1, ouvre: true }],
+      étapes: [
+        { titre: 'Le principe', primaire: 'Commencer ›', franchie: true, resteDansLAssistant: true, erreur: '' },
+        { titre: 'Comptes', primaire: 'Suivant ›', franchie: false, resteDansLAssistant: true, erreur: 'Crée d’abord un compte principal.' },
+      ],
+      gestes: 3,
+      résumé: false,
+      planAtteint: false,
+      tirelinesDotées: 0,
+      réservé: '0,00 €',
+      réservéNonNul: false,
+    });
   });
 });
 
@@ -183,33 +185,35 @@ async function traverser(page: Page): Promise<Parcours> {
   };
 }
 
-describe.skipIf(!navigateur)('I4 · le chemin simple mène au plan (issue #71)', () => {
-  let site: Site;
-  let contexte: BrowserContext;
-  let page: Page;
-  let parcours: Parcours;
+describe('[niveau 1] harnais du registre', () => {
+  describe.skipIf(!navigateur)('I4 · le chemin simple mène au plan (issue #71)', () => {
+    let site: Site;
+    let contexte: BrowserContext;
+    let page: Page;
+    let parcours: Parcours;
 
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-    // Contexte isolé, base vide : l'utilisateur qui découvre l'application.
-    contexte = await site.chrome.createBrowserContext();
-    page = await contexte.newPage();
-    page.on('dialog', (d) => void d.dismiss());
-    await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
-    await page.goto(site.url, { waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
-    parcours = await traverser(page);
-  }, 300_000);
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+      // Contexte isolé, base vide : l'utilisateur qui découvre l'application.
+      contexte = await site.chrome.createBrowserContext();
+      page = await contexte.newPage();
+      page.on('dialog', (d) => void d.dismiss());
+      await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
+      await page.goto(site.url, { waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
+      parcours = await traverser(page);
+    }, 300_000);
 
-  afterAll(async () => {
-    await contexte?.close();
-    await site?.fermer();
+    afterAll(async () => {
+      await contexte?.close();
+      await site?.fermer();
+    });
+
+    it('parcours simple · de la base vide au plan, sans un seul réglage avancé', () => {
+      console.log(
+        `[simple] ${parcours.gestes} gestes, ${parcours.étapes.length} étapes — ${parcours.étapes.map((e) => e.titre).join(' → ')} → plan (${parcours.tirelinesDotées} tirelires, réservé ${parcours.réservé})`,
+      );
+      vérifierLeParcours(parcours);
+    }, 60_000);
   });
-
-  it('parcours simple · de la base vide au plan, sans un seul réglage avancé', () => {
-    console.log(
-      `[simple] ${parcours.gestes} gestes, ${parcours.étapes.length} étapes — ${parcours.étapes.map((e) => e.titre).join(' → ')} → plan (${parcours.tirelinesDotées} tirelires, réservé ${parcours.réservé})`,
-    );
-    vérifierLeParcours(parcours);
-  }, 60_000);
 });

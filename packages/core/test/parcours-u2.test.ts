@@ -53,60 +53,62 @@ function lOrdreEstEnregistré(ledger: Ledger, plan: Plan, permanent: Cents): voi
   expect(plan.warnings.filter((w) => w.code === 'bankOrderDrift')).toEqual([]);
 }
 
-describe('U2 · budget et virements permanents, de bout en bout (#13)', () => {
-  it('parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation', async () => {
-    const store = await baseVide('parcours-u2');
-    ecrireLeBudget(store);
+describe('[niveau 1] harnais du registre', () => {
+  describe('U2 · budget et virements permanents, de bout en bout (#13)', () => {
+    it('parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation', async () => {
+      const store = await baseVide('parcours-u2');
+      ecrireLeBudget(store);
 
-    const avant = computePlan(store.load(), AS_OF);
-    const virement = virementDuLivret(avant);
-    expect(virement, 'aucun virement permanent proposé').toBeDefined();
-    expect(virement!.label).toBe(transferLabel('Livret A'));
-    expect(virement!.label.length).toBeLessThanOrEqual(35);
-    const permanent = virement!.permanent;
-    expect(permanent).toBe(euros(300));
+      const avant = computePlan(store.load(), AS_OF);
+      const virement = virementDuLivret(avant);
+      expect(virement, 'aucun virement permanent proposé').toBeDefined();
+      expect(virement!.label).toBe(transferLabel('Livret A'));
+      expect(virement!.label.length).toBeLessThanOrEqual(35);
+      const permanent = virement!.permanent;
+      expect(permanent).toBe(euros(300));
 
-    // Rien ne s'enregistre d'office (I10) : tant que l'utilisateur n'a pas validé, aucun ordre.
-    expect(standingOrderFlow(store.load().plannedFlows, LIVRET)).toBeUndefined();
-    expect(virement!.bankOrder).toBeUndefined();
+      // Rien ne s'enregistre d'office (I10) : tant que l'utilisateur n'a pas validé, aucun ordre.
+      expect(standingOrderFlow(store.load().plannedFlows, LIVRET)).toBeUndefined();
+      expect(virement!.bankOrder).toBeUndefined();
 
-    // L'utilisateur valide la mise en place chez sa banque.
-    const flux = standingTransferFlow(avant, virement!, PRINCIPAL, 'flux-ordre-livret');
-    expect(flux, 'aucun flux dérivé à enregistrer').toBeDefined();
-    store.upsert('plannedFlows', flux!);
+      // L'utilisateur valide la mise en place chez sa banque.
+      const flux = standingTransferFlow(avant, virement!, PRINCIPAL, 'flux-ordre-livret');
+      expect(flux, 'aucun flux dérivé à enregistrer').toBeDefined();
+      store.upsert('plannedFlows', flux!);
 
-    const ledger = await relire(store, 'parcours-u2');
-    store.close();
-    lOrdreEstEnregistré(ledger, computePlan(ledger, AS_OF), permanent);
-  });
+      const ledger = await relire(store, 'parcours-u2');
+      store.close();
+      lOrdreEstEnregistré(ledger, computePlan(ledger, AS_OF), permanent);
+    });
 
-  it('un ordre posé plus court que le budget ne se réécrit pas : le plan dit lequel changer', async () => {
-    const store = await baseVide('parcours-u2-écart');
-    ecrireLeBudget(store);
-    const avant = computePlan(store.load(), AS_OF);
-    const virement = virementDuLivret(avant)!;
-    const posé = virement.permanent - euros(20);
+    it('un ordre posé plus court que le budget ne se réécrit pas : le plan dit lequel changer', async () => {
+      const store = await baseVide('parcours-u2-écart');
+      ecrireLeBudget(store);
+      const avant = computePlan(store.load(), AS_OF);
+      const virement = virementDuLivret(avant)!;
+      const posé = virement.permanent - euros(20);
 
-    // Ce que la banque exécute, et non ce que le budget demande (D60).
-    store.upsert('plannedFlows', standingTransferFlow(avant, virement, PRINCIPAL, 'flux-ordre-livret', posé)!);
-    const ledger = await relire(store, 'parcours-u2-écart');
-    store.close();
+      // Ce que la banque exécute, et non ce que le budget demande (D60).
+      store.upsert('plannedFlows', standingTransferFlow(avant, virement, PRINCIPAL, 'flux-ordre-livret', posé)!);
+      const ledger = await relire(store, 'parcours-u2-écart');
+      store.close();
 
-    const après = virementDuLivret(computePlan(ledger, AS_OF))!;
-    expect(après.bankOrder?.amount).toBe(posé);
-    expect(après.permanent).toBe(virement.permanent);
-    expect(après.bankOrder?.drift).toBe(virement.permanent - posé);
-    expect(computePlan(ledger, AS_OF).warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(1);
-  });
+      const après = virementDuLivret(computePlan(ledger, AS_OF))!;
+      expect(après.bankOrder?.amount).toBe(posé);
+      expect(après.permanent).toBe(virement.permanent);
+      expect(après.bankOrder?.drift).toBe(virement.permanent - posé);
+      expect(computePlan(ledger, AS_OF).warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(1);
+    });
 
-  it.fails('témoin rouge · un ordre validé qui ne laisse aucune trace dans la base', async () => {
-    const store = await baseVide('parcours-u2-témoin');
-    ecrireLeBudget(store);
-    const ledger = store.load();
-    store.close();
-    // Version volontairement cassée : l'application propose l'ordre, l'utilisateur le valide, et
-    // rien n'est écrit — l'ordre ne sera reconnu à aucun import, sa ventilation nulle part.
-    const plan = computePlan(ledger, AS_OF);
-    lOrdreEstEnregistré(ledger, plan, virementDuLivret(plan)!.permanent);
+    it.fails('témoin rouge · un ordre validé qui ne laisse aucune trace dans la base', async () => {
+      const store = await baseVide('parcours-u2-témoin');
+      ecrireLeBudget(store);
+      const ledger = store.load();
+      store.close();
+      // Version volontairement cassée : l'application propose l'ordre, l'utilisateur le valide, et
+      // rien n'est écrit — l'ordre ne sera reconnu à aucun import, sa ventilation nulle part.
+      const plan = computePlan(ledger, AS_OF);
+      lOrdreEstEnregistré(ledger, plan, virementDuLivret(plan)!.permanent);
+    });
   });
 });

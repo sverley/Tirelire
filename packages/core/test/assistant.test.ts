@@ -72,40 +72,42 @@ function budgetDeLAssistant(): Ledger {
   return l;
 }
 
-describe("budget construit par l'assistant (D40)", () => {
-  it('se voit dès la période en cours, revenus comme réserves', () => {
-    const plan = computePlan(budgetDeLAssistant(), asOf);
+describe('[niveau 1] harnais du registre', () => {
+  describe("budget construit par l'assistant (D40)", () => {
+    it('se voit dès la période en cours, revenus comme réserves', () => {
+      const plan = computePlan(budgetDeLAssistant(), asOf);
 
-    // Le revenu ancré sur une occurrence passée compte bien dans la période en cours.
-    expect(plan.totals.incomes).toBe(euros(2400));
-    // `totals.fixedCharges` est une magnitude positive, pas un montant signé.
-    expect(plan.totals.fixedCharges).toBe(euros(750));
-    expect(plan.warnings.map((w) => w.code)).not.toContain('noIncome');
+      // Le revenu ancré sur une occurrence passée compte bien dans la période en cours.
+      expect(plan.totals.incomes).toBe(euros(2400));
+      // `totals.fixedCharges` est une magnitude positive, pas un montant signé.
+      expect(plan.totals.fixedCharges).toBe(euros(750));
+      expect(plan.warnings.map((w) => w.code)).not.toContain('noIncome');
 
-    // Les deux tirelires produisent une ligne dès cette période.
-    expect(plan.lines.map((l) => l.needId).sort()).toEqual(['n-assurance', 'n-courses']);
-  });
+      // Les deux tirelires produisent une ligne dès cette période.
+      expect(plan.lines.map((l) => l.needId).sort()).toEqual(['n-assurance', 'n-courses']);
+    });
 
-  it("lisse l'échéance annuelle sur les périodes qui restent avant la date", () => {
-    const plan = computePlan(budgetDeLAssistant(), asOf);
-    const assurance = plan.lines.find((l) => l.needId === 'n-assurance')!;
+    it("lisse l'échéance annuelle sur les périodes qui restent avant la date", () => {
+      const plan = computePlan(budgetDeLAssistant(), asOf);
+      const assurance = plan.lines.find((l) => l.needId === 'n-assurance')!;
 
-    // De la période de septembre à l'échéance du 15 janvier, il reste cinq virements :
-    // 1 200 € / 5 = 240 € par période, en rattrapage puisque la réserve part de zéro.
-    expect(assurance.requested).toBe(euros(240));
-    expect(assurance.status).toBe('catchUp');
-  });
+      // De la période de septembre à l'échéance du 15 janvier, il reste cinq virements :
+      // 1 200 € / 5 = 240 € par période, en rattrapage puisque la réserve part de zéro.
+      expect(assurance.requested).toBe(euros(240));
+      expect(assurance.status).toBe('catchUp');
+    });
 
-  it('laisse un reste à vivre cohérent avec ce qui a été déclaré', () => {
-    const plan = computePlan(budgetDeLAssistant(), asOf);
-    // 2 400 − 750 de loyer − (500 de courses + 240 d'assurance) = 910 €.
-    expect(plan.totals.requested).toBe(euros(740));
-    expect(plan.totals.margin).toBe(euros(910));
-  });
+    it('laisse un reste à vivre cohérent avec ce qui a été déclaré', () => {
+      const plan = computePlan(budgetDeLAssistant(), asOf);
+      // 2 400 − 750 de loyer − (500 de courses + 240 d'assurance) = 910 €.
+      expect(plan.totals.requested).toBe(euros(740));
+      expect(plan.totals.margin).toBe(euros(910));
+    });
 
-  it("n'annonce pas de découvert quand le solde du compte a été renseigné", () => {
-    const plan = computePlan(budgetDeLAssistant(), asOf);
-    expect(plan.warnings.map((w) => w.code)).not.toContain('principalOverdrawn');
+    it("n'annonce pas de découvert quand le solde du compte a été renseigné", () => {
+      const plan = computePlan(budgetDeLAssistant(), asOf);
+      expect(plan.warnings.map((w) => w.code)).not.toContain('principalOverdrawn');
+    });
   });
 });
 
@@ -187,11 +189,13 @@ function budgetCassé(): Ledger {
   };
 }
 
-it.fails('témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir', () => {
-  const plan = computePlan(budgetCassé(), asOf);
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir', () => {
+    const plan = computePlan(budgetCassé(), asOf);
 
-  expect(plan.totals.incomes).toBe(euros(2400));
-  expect(plan.totals.fixedCharges).toBe(euros(750));
-  expect(plan.warnings.map((w) => w.code)).not.toContain('noIncome');
-  expect(plan.lines.map((l) => l.needId).sort()).toEqual(['n-assurance', 'n-courses']);
+    expect(plan.totals.incomes).toBe(euros(2400));
+    expect(plan.totals.fixedCharges).toBe(euros(750));
+    expect(plan.warnings.map((w) => w.code)).not.toContain('noIncome');
+    expect(plan.lines.map((l) => l.needId).sort()).toEqual(['n-assurance', 'n-courses']);
+  });
 });

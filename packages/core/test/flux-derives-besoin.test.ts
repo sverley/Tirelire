@@ -204,488 +204,496 @@ const dotationRevue = (l: Ledger): Ledger => ({
 // 1. « La ventilation d'un virement dérivé du budget est recalculée, pas mémorisée. »
 // ---------------------------------------------------------------------------------------------
 
-describe('#14 · la ventilation est recalculée, pas mémorisée', () => {
-  it('le flux enregistré ne garde que ce qui reconnaît la ligne bancaire : aucune tirelire, aucune part', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    const f = ordre(l);
-    expect(isDerivedFlow(f)).toBe(true);
-    expect(f.labelPattern).toBeTruthy();
-    expect(f.amountTolerance).toBeTruthy();
-    const écrit = JSON.stringify(f);
-    for (const e of l.tirelires) expect(écrit, `le flux mentionne la tirelire ${e.name}`).not.toContain(e.id);
-    expect(f.tirelireId).toBeUndefined();
+describe('[niveau 1] harnais du registre', () => {
+  describe('#14 · la ventilation est recalculée, pas mémorisée', () => {
+    it('le flux enregistré ne garde que ce qui reconnaît la ligne bancaire : aucune tirelire, aucune part', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(650));
+      const f = ordre(l);
+      expect(isDerivedFlow(f)).toBe(true);
+      expect(f.labelPattern).toBeTruthy();
+      expect(f.amountTolerance).toBeTruthy();
+      const écrit = JSON.stringify(f);
+      for (const e of l.tirelires) expect(écrit, `le flux mentionne la tirelire ${e.name}`).not.toContain(e.id);
+      expect(f.tirelireId).toBeUndefined();
+    });
+
+    it('à l’import, la répartition est celle de l’ordre de financement au jour de l’opération (D06)', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(650));
+      for (const montant of [euros(650), euros(600), euros(700)]) {
+        const op = ligneBancaire(l, montant);
+        const { proposition, patch } = importer(l, op);
+        expect(proposition?.flowId, `virement de ${formatCents(montant)} non reconnu`).toBe(ordre(l).id);
+        expect(ventilation(patch)).toEqual(attendue(l, op));
+        expect(Object.values(ventilation(patch)).reduce((s, v) => s + v, 0)).toBe(montant);
+      }
+    });
+
+    it.each([
+      ['un besoin ajouté', besoinAjouté],
+      ['une priorité modifiée', prioritéModifiée],
+      ['une dotation revue', dotationRevue],
+    ])('à montant viré inchangé, %s change la ventilation : c’est le budget du jour qui décide', (_, bouger) => {
+      const avant = enregistrerOrdre(exampleLedger(), euros(650));
+      const après = bouger(avant);
+      const op = ligneBancaire(avant, euros(650));
+      const vAvant = ventilation(importer(avant, op).patch);
+      const vAprès = ventilation(importer(après, op).patch);
+      expect(vAprès).toEqual(attendue(après, op));
+      expect(vAprès).not.toEqual(vAvant);
+    });
+
+    it('une échéance passée entre deux virements identiques change la ventilation du second', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(650));
+      // Taxe foncière due le 15 octobre : le même ordre vire le 28 septembre, puis le 28 octobre.
+      const avantÉchéance = ligneBancaire(l, euros(650), '2026-09-28', 'op-avant');
+      const aprèsÉchéance = ligneBancaire(l, euros(650), '2026-10-28', 'op-apres');
+      const vAvant = ventilation(importer(l, avantÉchéance).patch);
+      const vAprès = ventilation(importer(l, aprèsÉchéance).patch);
+      expect(vAvant).toEqual(attendue(l, avantÉchéance));
+      expect(vAprès).toEqual(attendue(l, aprèsÉchéance));
+      expect(vAprès).not.toEqual(vAvant);
+    });
   });
 
-  it('à l’import, la répartition est celle de l’ordre de financement au jour de l’opération (D06)', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    for (const montant of [euros(650), euros(600), euros(700)]) {
-      const op = ligneBancaire(l, montant);
-      const { proposition, patch } = importer(l, op);
-      expect(proposition?.flowId, `virement de ${formatCents(montant)} non reconnu`).toBe(ordre(l).id);
+  // ---------------------------------------------------------------------------------------------
+  // 2. « Quand le budget change, les flux qui en dérivent sont mis à jour tout seuls, et
+  //    l'application dit ce qui a bougé. Aucun bouton à penser à appuyer. »
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · le budget bouge, le plan suit sans geste et le dit', () => {
+    it('ce que le budget demande se relit sans qu’aucune écriture ne soit nécessaire', () => {
+      const l = gelé(enregistrerOrdre(exampleLedger(), roundOrderUp(demande(exampleLedger(), AVANT), euros(10))));
+      const après = besoinAjouté(l);
+      // Aucune fonction du parcours ne modifie le dépôt (un objet gelé lèverait).
+      expect(() => computePlan(après, AVANT)).not.toThrow();
+      expect(demande(après, AVANT)).toBeGreaterThan(demande(l, AVANT));
+    });
+
+    it('un budget qui monte fait dire au plan l’ancien montant de l’ordre et le nouveau montant demandé', () => {
+      const base = exampleLedger();
+      const l = enregistrerOrdre(base, demande(base, AVANT));
+      expect(alertes(l, AVANT)).toHaveLength(0);
+      const après = besoinAjouté(l);
+      const [alerte, ...autres] = alertes(après, AVANT);
+      expect(autres).toHaveLength(0);
+      expect(alerte?.message).toContain('Livret A');
+      expect(alerte?.message).toContain(formatCents(demande(base, AVANT)));
+      expect(alerte?.message).toContain(formatCents(demande(après, AVANT)));
+    });
+
+    it('un budget qui baisse au-delà du pas d’arrondi se dit aussi', () => {
+      const base = besoinAjouté(exampleLedger());
+      const l = enregistrerOrdre(base, demande(base, AVANT));
+      const après: Ledger = { ...l, needs: l.needs.filter((n) => n.id !== 'need-harnais-travaux') };
+      const alerte = alertes(après, AVANT)[0];
+      expect(alerte?.message).toContain(formatCents(demande(base, AVANT)));
+      expect(alerte?.message).toContain(formatCents(demande(après, AVANT)));
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 3. « Le montant permanent enregistré ne peut pas se mettre à jour tout seul chez la banque :
+  //    quand il diverge, l'application signale qu'un ordre est à modifier. »
+  // ---------------------------------------------------------------------------------------------
+
+  describe('[niveau 0]', () => {
+    describe('#14 · l’ordre chez la banque diverge : signalé, jamais réécrit', () => {
+      it('le montant enregistré ne suit pas le budget', () => {
+        const l = enregistrerOrdre(exampleLedger(), euros(650));
+        const après = dotationRevue(besoinAjouté(l));
+        const { t } = transfert(après, AVANT);
+        expect(ordre(après).amount).toBe(-euros(650));
+        expect(t?.bankOrder?.amount).toBe(euros(650));
+      });
+
+      it('un ordre trop court d’un centime est signalé, quel que soit le pas', () => {
+        const base = exampleLedger();
+        for (const pas of [0, euros(10), euros(50)]) {
+          const l = enregistrerOrdre({ ...base, settings: { ...base.settings, orderRounding: pas } }, demande(base, AVANT) - 1);
+          expect(alertes(l, AVANT), `pas ${pas}`).toHaveLength(1);
+        }
+      });
+
+      it('un ordre que le budget ne demande plus est signalé, même s’il est petit', () => {
+        // Plus aucune tirelire ne veut d'argent sur le Livret A : tout ordre vers lui est à supprimer.
+        const base = exampleLedger();
+        const vide: Ledger = { ...base, needs: base.needs.filter((n) => !['env-tf', 'env-auto', 'env-vac', 'env-precaution'].includes(n.tirelireId)) };
+        for (const montant of [euros(300), euros(10), euros(5)]) {
+          const l = enregistrerOrdre(vide, montant);
+          expect(demande(l, AVANT)).toBe(0);
+          expect(alertes(l, AVANT), `ordre de ${formatCents(montant)} devenu inutile, non signalé`).toHaveLength(1);
+        }
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 4. Le cycle réel : l'ordre n'a pas changé, le budget non plus, la banque vire, on importe.
+  //    Rien n'a divergé : le plan ne doit rien demander de modifier.
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · cycle mensuel sans changement : aucune fausse alerte', () => {
+    it('le plan de la période est le même avant et après l’import du virement attendu', () => {
+      const base = exampleLedger();
+      const demandé = demande(base, LENDEMAIN);
+      const l = enregistrerOrdre(base, demandé, LENDEMAIN);
+      expect(alertes(l, LENDEMAIN), 'alerte avant même le virement').toHaveLength(0);
+
+      const { proposition, après } = importer(l, ligneBancaire(l, demandé, JOUR_VIREMENT));
+      expect(proposition?.auto, 'le virement au montant exact doit se pointer seul (D12)').toBe(true);
+
+      // Ni le budget ni l'ordre n'ont bougé : ce que le budget demande comme ordre permanent reste
+      // ce qu'il demandait, et aucun ordre n'est « à modifier chez la banque ».
+      expect(alertes(après, LENDEMAIN).map((w) => w.message)).toEqual([]);
+      expect(demande(après, LENDEMAIN)).toBe(demandé);
+    });
+
+    it('sur un budget minimal sans arriéré, l’ordre juste n’est pas déclaré « à supprimer » après son virement', () => {
+      const { après } = budgetMinimalAprèsVirement();
+      for (const jour of ['2026-09-29', '2026-10-15', '2026-10-27'])
+        expect(computePlan(après, jour).warnings.filter((w) => w.code === 'bankOrderDrift').map((w) => `${jour} : ${w.message}`)).toEqual([]);
+    });
+
+    it('au fil de la période qui suit le virement, l’alerte ne s’allume pas', () => {
+      const base = exampleLedger();
+      const demandé = demande(base, LENDEMAIN);
+      const posé = roundOrderUp(demande(base, LENDEMAIN), base.settings.orderRounding);
+      const avecOrdre = enregistrerOrdre(base, posé, LENDEMAIN);
+      const l = importer(avecOrdre, ligneBancaire(avecOrdre, posé)).après;
+      for (const jour of ['2026-10-05', '2026-10-15', '2026-10-27']) expect(alertes(l, jour).map((w) => `${jour} : ${w.message}`)).toEqual([]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 5. « Distinguer un flux déclaré d'un flux dérivé. Un flux déclaré n'est jamais réécrit. »
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · déclaré ou dérivé', () => {
+    it('seul l’ordre enregistré depuis le Plan est dérivé ; le reste de l’exemple est déclaré', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(650));
+      const dérivés = alive(l.plannedFlows).filter(isDerivedFlow).map((f) => f.id);
+      expect(dérivés).toEqual([ordre(l).id]);
+    });
+
+    it('un virement saisi à la main reste déclaré et n’est pas pris pour l’ordre permanent', () => {
+      // L'exemple porte son propre ordre dérivé (D60) : on le retire pour n'avoir que celui saisi.
+      const base = exampleLedger();
+      const l: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
+      const main: PlannedFlow = {
+        id: 'flow-main',
+        name: 'Virement saisi',
+        kind: 'transfer',
+        amount: -euros(650),
+        accountId: PRINCIPAL,
+        counterpartAccountId: LIVRET,
+        periodicity: { interval: 1, unit: 'month', anchorDate: '2026-08-28' },
+        dateWindowDays: 5,
+      };
+      const avec: Ledger = { ...l, plannedFlows: [...l.plannedFlows, main] };
+      expect(isDerivedFlow(main)).toBe(false);
+      expect(standingOrderFlow(avec.plannedFlows, LIVRET)).toBeUndefined();
+      expect(transfert(avec, AVANT).t?.bankOrder).toBeUndefined();
+    });
+
+    describe('[niveau 0]', () => {
+      it('ni le plan, ni le rapprochement, ni la reconnaissance par libellé ne réécrivent un flux', () => {
+        const l = gelé(dotationRevue(enregistrerOrdre(exampleLedger(), euros(650))));
+        const op = ligneBancaire(l, euros(650));
+        const avec = gelé({ ...l, operations: [...l.operations, op] });
+        expect(() => {
+          computePlan(avec, LENDEMAIN);
+          for (const p of proposeMatches(avec, AVANT, LENDEMAIN)) {
+            const patch = applyMatch(avec, p);
+            expect(Object.keys(patch)).not.toContain('plannedFlows');
+          }
+          expect(Object.keys(matchTirelireTransfers(avec))).not.toContain('plannedFlows');
+        }).not.toThrow();
+      });
+    });
+
+    it('réenregistrer l’ordre remplace le fait, sans créer un second flux', () => {
+      const une = enregistrerOrdre(exampleLedger(), euros(650));
+      const deux = enregistrerOrdre(une, euros(700));
+      expect(alive(deux.plannedFlows).filter(isDerivedFlow)).toHaveLength(1);
+      expect(transfert(deux, AVANT).t?.bankOrder?.amount).toBe(euros(700));
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 6. « Ne pas casser la reconnaissance à l'import. Un ordre que Simon n'a pas encore modifié
+  //    chez sa banque doit continuer d'être reconnu. »
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · la reconnaissance à l’import tient quand le budget bouge', () => {
+    it('le budget a monté, l’ordre bancaire non : la ligne à l’ancien montant est reconnue et pointée seule', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(650));
+      const après = dotationRevue(besoinAjouté(l));
+      expect(demande(après, AVANT)).not.toBe(euros(650));
+      const { proposition } = importer(après, ligneBancaire(après, euros(650)));
+      expect(proposition?.flowId).toBe(ordre(après).id);
+      expect(proposition?.auto).toBe(true);
+    });
+
+    it('Simon a modifié son ordre chez la banque sans le confirmer : la ligne est reconnue (tolérance)', () => {
+      const l = besoinAjouté(enregistrerOrdre(exampleLedger(), euros(650)));
+      const nouveau = roundOrderUp(demande(l, AVANT), l.settings.orderRounding);
+      const { proposition, patch } = importer(l, ligneBancaire(l, nouveau));
+      if (Math.abs(nouveau - euros(650)) <= euros(650) * 0.2) expect(proposition?.flowId).toBe(ordre(l).id);
+      // Au-delà de la tolérance, le libellé « TIRELIRE LIVRET A » suffit encore (D11).
+      else expect(Object.keys(ventilation(matchTirelireTransfers({ ...l, operations: [...l.operations, ligneBancaire(l, nouveau)] })))).not.toHaveLength(0);
+      if (patch) expect(ventilation(patch)).toEqual(attendue(l, ligneBancaire(l, nouveau)));
+    });
+
+    it('même hors tolérance, le libellé reconnaît le virement et le ventile par l’ordre de financement', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(650));
+      const op = ligneBancaire(l, euros(1000));
+      expect(importer(l, op).proposition?.flowId).not.toBe(ordre(l).id);
+      const patch = matchTirelireTransfers({ ...l, operations: [...l.operations, op] });
+      expect(patch.operations.find((o) => o.id === op.id)?.transferAccountId).toBe(LIVRET);
       expect(ventilation(patch)).toEqual(attendue(l, op));
-      expect(Object.values(ventilation(patch)).reduce((s, v) => s + v, 0)).toBe(montant);
-    }
+    });
   });
 
-  it.each([
-    ['un besoin ajouté', besoinAjouté],
-    ['une priorité modifiée', prioritéModifiée],
-    ['une dotation revue', dotationRevue],
-  ])('à montant viré inchangé, %s change la ventilation : c’est le budget du jour qui décide', (_, bouger) => {
+  // ---------------------------------------------------------------------------------------------
+  // 7. Arbitrage du 10 septembre : l'ordre voulu est la somme des dotations mensuelles des tirelires
+  //    placées sur le compte, quel que soit ce qui a déjà été viré dans la période.
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · arbitrage : l’ordre voulu est la somme des dotations mensuelles', () => {
+    it('le harnais recalcule bien la somme de l’exemple (650 € vers le Livret A, 1 150 € dès la paie de décembre)', () => {
+      const l = exampleLedger();
+      expect(sommeDesDotations(l, LIVRET, AVANT)).toBe(euros(650));
+      expect(sommeDesDotations(l, LIVRET, '2026-12-29')).toBe(euros(1150));
+    });
+
+    it('avant tout virement, le plan compare l’ordre à cette somme, période après période', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(1));
+      for (const jour of [AVANT, LENDEMAIN, '2026-10-29', '2026-11-29', '2026-12-29'])
+        expect(montantComparé(l, LIVRET, jour), jour).toBe(sommeDesDotations(l, LIVRET, jour));
+    });
+
+    it('après l’import du virement du mois, la somme comparée ne baisse pas', () => {
+      const base = exampleLedger();
+      const posé = sommeDesDotations(base, LIVRET, LENDEMAIN);
+      const avecOrdre = enregistrerOrdre(base, posé, LENDEMAIN);
+      const { après } = importer(avecOrdre, ligneBancaire(avecOrdre, posé));
+      for (const jour of [LENDEMAIN, '2026-10-15', '2026-10-27'])
+        expect(montantComparé(après, LIVRET, jour), jour).toBe(sommeDesDotations(après, LIVRET, jour));
+    });
+
+    it('sur le budget minimal, la somme comparée reste 200 € après le virement', () => {
+      const { après, compte } = budgetMinimalAprèsVirement();
+      for (const jour of ['2026-09-29', '2026-10-15', '2026-10-27']) expect(montantComparé(après, compte, jour), jour).toBe(euros(200));
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 8. Arbitrage du 10 septembre, suite : le « Détail » divise le virement, « simple pour le plus
+  //    grand nombre, souple pour les exigeants ».
+  //
+  //    Sorti du périmètre de #14 le 10 septembre : la division est l'issue #25, et ces gardes en sont
+  //    la vérification. À écrire dès que la forme du modèle existe : les écrire maintenant obligerait
+  //    à inventer des noms que le développement choisira. Elles restent listées ici pour qu'aucune ne
+  //    soit oubliée ; `vitest` les affiche comme « todo ».
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · arbitrage : diviser le virement, simple par défaut, souple sur demande', () => {
+    // Simple
+    it.todo('sans aucun réglage, un compte a un seul ordre voulu : la somme des dotations de ses tirelires');
+    it.todo('un budget qui n’a jamais été divisé se comporte exactement comme aujourd’hui (aucune migration de sens)');
+    // Souple
+    it.todo('les tirelires d’un compte se répartissent librement en plusieurs ordres, chacune dans un seul ordre, aucune oubliée');
+    it.todo('ce que le budget demande pour chaque ordre est la somme des dotations de ses tirelires, et le total des ordres vaut la somme du compte');
+    it.todo('un ordre par tirelire est un cas particulier du regroupement, pas un mode à part');
+    it.todo('revenir à un seul ordre regroupe tout, sans perdre les faits bancaires enregistrés');
+    // Ce que chaque ordre doit tenir, comme l'ordre unique aujourd'hui (D57)
+    it.todo('chaque ordre enregistre son propre fait bancaire et se compare à sa propre demande ; l’écart d’un ordre ne masque pas celui d’un autre');
+    it.todo('chaque ordre a un libellé distinct, et chaque ligne bancaire est reconnue par l’ordre qui la vire');
+    it.todo('la ligne d’un ordre se ventile par l’ordre de financement parmi ses seules tirelires, recalculé au jour de l’opération');
+    it.todo('le regroupement est un choix de l’utilisateur (fait déclaré) ; les montants des groupes restent des calculs jamais stockés');
+    it.todo('une tirelire ajoutée sur le compte après la division est rattachée à un ordre, et le plan dit lequel est à modifier');
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 9. Audit du code (10 septembre, après « codage fini ») : cas limites de `permanent` et de
+  //    l'enregistrement. Chaque garde part d'une phrase du besoin ou d'une règle déjà en vigueur ;
+  //    rouge = le code de la branche ne la tient pas.
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · audit : ce que le budget demande ne compte que ce que le plan financera', () => {
+    it('une tirelire placée sur deux livrets n’est pas comptée deux fois dans les ordres voulus', () => {
+      // Épargne de précaution moitié sur le Livret A, moitié sur un second livret : sa dotation de
+      // 300 € se partage entre deux ordres, elle ne se demande pas deux fois.
+      const base = exampleLedger();
+      const LDD = 'acc-harnais-ldd';
+      const l: Ledger = {
+        ...base,
+        accounts: [...base.accounts, { id: LDD, name: 'LDDS', kind: 'epargne', openingBalance: euros(1600), openingDate: '2026-08-27' }],
+        tirelires: base.tirelires.map((e) =>
+          e.id === 'env-precaution'
+            ? { ...e, placement: [{ accountId: LIVRET, share: { kind: 'percent', pct: 50 } }, { accountId: LDD, share: { kind: 'percent', pct: 50 } }] }
+            : e,
+        ),
+      };
+      const plan = computePlan(l, AVANT);
+      const total = plan.transfers.filter((t) => t.accountId === LIVRET || t.accountId === LDD).reduce((s, t) => s + t.permanent, 0);
+      expect(total).toBe(euros(650));
+    });
+
+    it('une tirelire versante (payout, D48) ne fait pas monter l’ordre demandé : elle verse, elle ne réclame pas', () => {
+      const base = exampleLedger();
+      const avant = demande(base, AVANT);
+      const l: Ledger = {
+        ...base,
+        needs: [...base.needs, { id: 'need-harnais-versant', tirelireId: 'env-vac', kind: 'payout', amount: euros(1200), periodicity: { interval: 1, unit: 'year', anchorDate: '2026-01-01' }, priority: 50 } as Need],
+      };
+      expect(demande(l, AVANT)).toBeLessThanOrEqual(avant);
+    });
+
+    it('un objectif atteint ne réclame plus sa dotation (D06) : il sort de la somme demandée', () => {
+      // L'épargne de précaution vise 6 000 € ; on la dit pleine. Le financement ne lui donne plus
+      // rien (`requested = 0`) : un ordre qui la compterait encore virerait de l'argent sans emploi.
+      const base = exampleLedger();
+      const pleine: Ledger = { ...base, tirelires: base.tirelires.map((e) => (e.id === 'env-precaution' ? { ...e, openingBalance: euros(6000) } : e)) };
+      expect(demande(pleine, AVANT)).toBe(demande(base, AVANT) - euros(300));
+    });
+  });
+
+  describe('#14 · audit : un ordre enregistré depuis n’importe quelle période reste reconnu', () => {
+    it('enregistré en regardant le plan de décembre, l’ordre reconnaît quand même le virement de septembre', () => {
+      // Le Plan se feuillette (periodsAround) ; le geste « Enregistrer / Corriger mon ordre » prend
+      // pour ancrage le début de la période affichée. Un ordre bancaire, lui, vire déjà.
+      const base = exampleLedger();
+      const décembre = computePlan(base, '2026-12-06');
+      const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
+      const flux = standingTransferFlow(décembre, t, PRINCIPAL, t.bankOrder!.flowId, euros(650))!;
+      const l: Ledger = { ...base, plannedFlows: base.plannedFlows.map((f) => (f.id === flux.id ? flux : f)) };
+      const { proposition } = importer(l, ligneBancaire(l, euros(650), JOUR_VIREMENT));
+      expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 10. Contre-vérification de afe97f0 (10 septembre, 21 h) : la dotation se partage désormais avec
+  //     les parts du placement (`placementShares`). Une part **fixe** est un plafond de position,
+  //     pas une part de flux : une fois atteinte, ce compte ne doit plus rien recevoir de la dotation.
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · contre-vérification : une part fixe déjà atteinte ne réclame plus de dotation', () => {
+    it('précaution plafonnée à 1 000 € sur le Livret A et déjà au-delà : l’ordre vers le livret ne la compte plus', () => {
+      const base = exampleLedger();
+      const l: Ledger = {
+        ...base,
+        tirelires: base.tirelires.map((e) =>
+          e.id === 'env-precaution'
+            ? { ...e, placement: [{ accountId: LIVRET, share: { kind: 'fixed', amount: euros(1000) } }, { accountId: PRINCIPAL, share: { kind: 'variable' } }] }
+            : e,
+        ),
+      };
+      const plan = computePlan(l, AVANT);
+      // Le plan demande de ramener l'excédent du livret vers le compte courant…
+      const retour = plan.gaps.find((g) => g.tirelireId === 'env-precaution' && g.fromAccountId === LIVRET && g.toAccountId === PRINCIPAL);
+      expect(retour?.amount ?? 0).toBeGreaterThan(0);
+      // …il ne peut pas, dans le même temps, demander un ordre permanent qui l'y renvoie.
+      const t = plan.transfers.find((x) => x.accountId === LIVRET)!;
+      expect(t.breakdown.map((b) => b.tirelireId)).not.toContain('env-precaution');
+      expect(t.permanent).toBe(euros(350));
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // 11. Audit de a059494 : deux évolutions du besoin consignées dans #14 n'avaient pas de garde.
+  // ---------------------------------------------------------------------------------------------
+
+  describe('#14 · évolutions du besoin : ce qui reste dans la somme, et l’ordre nouveau', () => {
+    it('une échéance déjà provisionnée reste dans la somme : elle sera dépensée, l’épargne reprend juste après', () => {
+      // La taxe foncière (1 200 € au 15 octobre) est déjà entièrement provisionnée.
+      const base = exampleLedger();
+      const provisionnée: Ledger = { ...base, tirelires: base.tirelires.map((e) => (e.id === 'env-tf' ? { ...e, openingBalance: euros(1200) } : e)) };
+      const t = transfert(provisionnée, AVANT).t!;
+      expect(t.breakdown.find((b) => b.tirelireId === 'env-tf')?.cruise).toBe(euros(100));
+      expect(t.permanent).toBe(demande(base, AVANT));
+    });
+
+    it('un ordre nouveau, enregistré en regardant décembre, reconnaît le virement de septembre', () => {
+      // Le Plan se feuillette : la période lue est décembre, la date du jour reste le 6 septembre.
+      const base = exampleLedger();
+      const sansOrdre: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => !isDerivedFlow(f)) };
+      const décembre = computePlan(sansOrdre, '2026-12-06', AVANT);
+      const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
+      expect(t.bankOrder).toBeUndefined();
+      const flux = standingTransferFlow(décembre, t, PRINCIPAL, 'flow-ordre-neuf', euros(650))!;
+      const l: Ledger = { ...sansOrdre, plannedFlows: [...sansOrdre.plannedFlows, flux] };
+      const { proposition } = importer(l, ligneBancaire(l, euros(650), JOUR_VIREMENT));
+      expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────────
+  // Témoins rouges des harnais U2, I10 et C8 (docs/gardes.md) : les assertions des sections 1, 2
+  // et 3 ci-dessus, rejouées sur des versions volontairement cassées du besoin.
+  // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+  it.fails('témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer', () => {
     const avant = enregistrerOrdre(exampleLedger(), euros(650));
-    const après = bouger(avant);
+    const après = besoinAjouté(avant);
     const op = ligneBancaire(avant, euros(650));
     const vAvant = ventilation(importer(avant, op).patch);
-    const vAprès = ventilation(importer(après, op).patch);
+    // Version cassée : la ventilation est la photo prise le jour où l'ordre a été enregistré. Le
+    // budget a bougé, le virement se répartit toujours comme avant.
+    const vAprès = vAvant;
+
     expect(vAprès).toEqual(attendue(après, op));
     expect(vAprès).not.toEqual(vAvant);
   });
 
-  it('une échéance passée entre deux virements identiques change la ventilation du second', () => {
+  it.fails('témoin rouge · un plan qui réécrit l’ordre chez la banque au lieu de le signaler', () => {
     const l = enregistrerOrdre(exampleLedger(), euros(650));
-    // Taxe foncière due le 15 octobre : le même ordre vire le 28 septembre, puis le 28 octobre.
-    const avantÉchéance = ligneBancaire(l, euros(650), '2026-09-28', 'op-avant');
-    const aprèsÉchéance = ligneBancaire(l, euros(650), '2026-10-28', 'op-apres');
-    const vAvant = ventilation(importer(l, avantÉchéance).patch);
-    const vAprès = ventilation(importer(l, aprèsÉchéance).patch);
-    expect(vAvant).toEqual(attendue(l, avantÉchéance));
-    expect(vAprès).toEqual(attendue(l, aprèsÉchéance));
-    expect(vAprès).not.toEqual(vAvant);
-  });
-});
+    const budgetBougé = dotationRevue(besoinAjouté(l));
+    // Version cassée : le montant enregistré suit le budget tout seul. Plus rien ne diverge, donc
+    // plus rien n'est signalé — et l'ordre chez la banque, lui, n'a pas bougé.
+    const après = enregistrerOrdre(budgetBougé, demande(budgetBougé, AVANT));
 
-// ---------------------------------------------------------------------------------------------
-// 2. « Quand le budget change, les flux qui en dérivent sont mis à jour tout seuls, et
-//    l'application dit ce qui a bougé. Aucun bouton à penser à appuyer. »
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · le budget bouge, le plan suit sans geste et le dit', () => {
-  it('ce que le budget demande se relit sans qu’aucune écriture ne soit nécessaire', () => {
-    const l = gelé(enregistrerOrdre(exampleLedger(), roundOrderUp(demande(exampleLedger(), AVANT), euros(10))));
-    const après = besoinAjouté(l);
-    // Aucune fonction du parcours ne modifie le dépôt (un objet gelé lèverait).
-    expect(() => computePlan(après, AVANT)).not.toThrow();
-    expect(demande(après, AVANT)).toBeGreaterThan(demande(l, AVANT));
-  });
-
-  it('un budget qui monte fait dire au plan l’ancien montant de l’ordre et le nouveau montant demandé', () => {
-    const base = exampleLedger();
-    const l = enregistrerOrdre(base, demande(base, AVANT));
-    expect(alertes(l, AVANT)).toHaveLength(0);
-    const après = besoinAjouté(l);
-    const [alerte, ...autres] = alertes(après, AVANT);
-    expect(autres).toHaveLength(0);
-    expect(alerte?.message).toContain('Livret A');
-    expect(alerte?.message).toContain(formatCents(demande(base, AVANT)));
-    expect(alerte?.message).toContain(formatCents(demande(après, AVANT)));
-  });
-
-  it('un budget qui baisse au-delà du pas d’arrondi se dit aussi', () => {
-    const base = besoinAjouté(exampleLedger());
-    const l = enregistrerOrdre(base, demande(base, AVANT));
-    const après: Ledger = { ...l, needs: l.needs.filter((n) => n.id !== 'need-harnais-travaux') };
-    const alerte = alertes(après, AVANT)[0];
-    expect(alerte?.message).toContain(formatCents(demande(base, AVANT)));
-    expect(alerte?.message).toContain(formatCents(demande(après, AVANT)));
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-// 3. « Le montant permanent enregistré ne peut pas se mettre à jour tout seul chez la banque :
-//    quand il diverge, l'application signale qu'un ordre est à modifier. »
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · l’ordre chez la banque diverge : signalé, jamais réécrit', () => {
-  it('le montant enregistré ne suit pas le budget', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    const après = dotationRevue(besoinAjouté(l));
-    const { t } = transfert(après, AVANT);
     expect(ordre(après).amount).toBe(-euros(650));
-    expect(t?.bankOrder?.amount).toBe(euros(650));
+    expect(alertes(après, AVANT)).toHaveLength(1);
   });
 
-  it('un ordre trop court d’un centime est signalé, quel que soit le pas', () => {
-    const base = exampleLedger();
-    for (const pas of [0, euros(10), euros(50)]) {
-      const l = enregistrerOrdre({ ...base, settings: { ...base.settings, orderRounding: pas } }, demande(base, AVANT) - 1);
-      expect(alertes(l, AVANT), `pas ${pas}`).toHaveLength(1);
-    }
-  });
+  // ─── I10 · le plan est un résultat (#162) ────────────────────────────────────────────────────────
 
-  it('un ordre que le budget ne demande plus est signalé, même s’il est petit', () => {
-    // Plus aucune tirelire ne veut d'argent sur le Livret A : tout ordre vers lui est à supprimer.
-    const base = exampleLedger();
-    const vide: Ledger = { ...base, needs: base.needs.filter((n) => !['env-tf', 'env-auto', 'env-vac', 'env-precaution'].includes(n.tirelireId)) };
-    for (const montant of [euros(300), euros(10), euros(5)]) {
-      const l = enregistrerOrdre(vide, montant);
-      expect(demande(l, AVANT)).toBe(0);
-      expect(alertes(l, AVANT), `ordre de ${formatCents(montant)} devenu inutile, non signalé`).toHaveLength(1);
-    }
-  });
-});
+  /**
+   * La valeur d'I10 : le budget et les flux ne changent que sur une validation de l'utilisateur ; le
+   * plan en est le résultat. Calculer le plan — la période en cours et les suivantes — ne touche ni
+   * au registre lu, ni à la base : ce qui se relit ensuite est ce qui était écrit avant.
+   */
+  async function calculerNeModifieRien(calculer: (ledger: Ledger) => unknown): Promise<void> {
+    const store = await baseVide('i10-plan-resultat');
+    ecrireLeBudget(store);
+    const lu = store.load();
+    const avant = structuredClone(lu);
+    const baseAvant = JSON.stringify(store.load());
+    calculer(lu);
+    expect(lu, 'le calcul du plan a modifié le budget ou les flux qu’il lisait').toEqual(avant);
+    expect(JSON.stringify(store.load()), 'le calcul du plan a écrit dans la base').toBe(baseAvant);
+    store.close();
+  }
 
-// ---------------------------------------------------------------------------------------------
-// 4. Le cycle réel : l'ordre n'a pas changé, le budget non plus, la banque vire, on importe.
-//    Rien n'a divergé : le plan ne doit rien demander de modifier.
-// ---------------------------------------------------------------------------------------------
+  const planSurTroisPeriodes = (ledger: Ledger) => {
+    for (const jour of [AS_OF, '2026-10-20', '2026-11-20']) computePlan(ledger, jour);
+  };
 
-describe('#14 · cycle mensuel sans changement : aucune fausse alerte', () => {
-  it('le plan de la période est le même avant et après l’import du virement attendu', () => {
-    const base = exampleLedger();
-    const demandé = demande(base, LENDEMAIN);
-    const l = enregistrerOrdre(base, demandé, LENDEMAIN);
-    expect(alertes(l, LENDEMAIN), 'alerte avant même le virement').toHaveLength(0);
+  describe('I10 · le plan est un résultat', () => {
+    describe('[niveau 0]', () => {
+      it('I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base', async () => {
+        await calculerNeModifieRien(planSurTroisPeriodes);
+      });
+    });
 
-    const { proposition, après } = importer(l, ligneBancaire(l, demandé, JOUR_VIREMENT));
-    expect(proposition?.auto, 'le virement au montant exact doit se pointer seul (D12)').toBe(true);
-
-    // Ni le budget ni l'ordre n'ont bougé : ce que le budget demande comme ordre permanent reste
-    // ce qu'il demandait, et aucun ordre n'est « à modifier chez la banque ».
-    expect(alertes(après, LENDEMAIN).map((w) => w.message)).toEqual([]);
-    expect(demande(après, LENDEMAIN)).toBe(demandé);
-  });
-
-  it('sur un budget minimal sans arriéré, l’ordre juste n’est pas déclaré « à supprimer » après son virement', () => {
-    const { après } = budgetMinimalAprèsVirement();
-    for (const jour of ['2026-09-29', '2026-10-15', '2026-10-27'])
-      expect(computePlan(après, jour).warnings.filter((w) => w.code === 'bankOrderDrift').map((w) => `${jour} : ${w.message}`)).toEqual([]);
-  });
-
-  it('au fil de la période qui suit le virement, l’alerte ne s’allume pas', () => {
-    const base = exampleLedger();
-    const demandé = demande(base, LENDEMAIN);
-    const posé = roundOrderUp(demande(base, LENDEMAIN), base.settings.orderRounding);
-    const avecOrdre = enregistrerOrdre(base, posé, LENDEMAIN);
-    const l = importer(avecOrdre, ligneBancaire(avecOrdre, posé)).après;
-    for (const jour of ['2026-10-05', '2026-10-15', '2026-10-27']) expect(alertes(l, jour).map((w) => `${jour} : ${w.message}`)).toEqual([]);
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-// 5. « Distinguer un flux déclaré d'un flux dérivé. Un flux déclaré n'est jamais réécrit. »
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · déclaré ou dérivé', () => {
-  it('seul l’ordre enregistré depuis le Plan est dérivé ; le reste de l’exemple est déclaré', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    const dérivés = alive(l.plannedFlows).filter(isDerivedFlow).map((f) => f.id);
-    expect(dérivés).toEqual([ordre(l).id]);
-  });
-
-  it('un virement saisi à la main reste déclaré et n’est pas pris pour l’ordre permanent', () => {
-    // L'exemple porte son propre ordre dérivé (D60) : on le retire pour n'avoir que celui saisi.
-    const base = exampleLedger();
-    const l: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
-    const main: PlannedFlow = {
-      id: 'flow-main',
-      name: 'Virement saisi',
-      kind: 'transfer',
-      amount: -euros(650),
-      accountId: PRINCIPAL,
-      counterpartAccountId: LIVRET,
-      periodicity: { interval: 1, unit: 'month', anchorDate: '2026-08-28' },
-      dateWindowDays: 5,
-    };
-    const avec: Ledger = { ...l, plannedFlows: [...l.plannedFlows, main] };
-    expect(isDerivedFlow(main)).toBe(false);
-    expect(standingOrderFlow(avec.plannedFlows, LIVRET)).toBeUndefined();
-    expect(transfert(avec, AVANT).t?.bankOrder).toBeUndefined();
-  });
-
-  it('ni le plan, ni le rapprochement, ni la reconnaissance par libellé ne réécrivent un flux', () => {
-    const l = gelé(dotationRevue(enregistrerOrdre(exampleLedger(), euros(650))));
-    const op = ligneBancaire(l, euros(650));
-    const avec = gelé({ ...l, operations: [...l.operations, op] });
-    expect(() => {
-      computePlan(avec, LENDEMAIN);
-      for (const p of proposeMatches(avec, AVANT, LENDEMAIN)) {
-        const patch = applyMatch(avec, p);
-        expect(Object.keys(patch)).not.toContain('plannedFlows');
-      }
-      expect(Object.keys(matchTirelireTransfers(avec))).not.toContain('plannedFlows');
-    }).not.toThrow();
-  });
-
-  it('réenregistrer l’ordre remplace le fait, sans créer un second flux', () => {
-    const une = enregistrerOrdre(exampleLedger(), euros(650));
-    const deux = enregistrerOrdre(une, euros(700));
-    expect(alive(deux.plannedFlows).filter(isDerivedFlow)).toHaveLength(1);
-    expect(transfert(deux, AVANT).t?.bankOrder?.amount).toBe(euros(700));
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-// 6. « Ne pas casser la reconnaissance à l'import. Un ordre que Simon n'a pas encore modifié
-//    chez sa banque doit continuer d'être reconnu. »
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · la reconnaissance à l’import tient quand le budget bouge', () => {
-  it('le budget a monté, l’ordre bancaire non : la ligne à l’ancien montant est reconnue et pointée seule', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    const après = dotationRevue(besoinAjouté(l));
-    expect(demande(après, AVANT)).not.toBe(euros(650));
-    const { proposition } = importer(après, ligneBancaire(après, euros(650)));
-    expect(proposition?.flowId).toBe(ordre(après).id);
-    expect(proposition?.auto).toBe(true);
-  });
-
-  it('Simon a modifié son ordre chez la banque sans le confirmer : la ligne est reconnue (tolérance)', () => {
-    const l = besoinAjouté(enregistrerOrdre(exampleLedger(), euros(650)));
-    const nouveau = roundOrderUp(demande(l, AVANT), l.settings.orderRounding);
-    const { proposition, patch } = importer(l, ligneBancaire(l, nouveau));
-    if (Math.abs(nouveau - euros(650)) <= euros(650) * 0.2) expect(proposition?.flowId).toBe(ordre(l).id);
-    // Au-delà de la tolérance, le libellé « TIRELIRE LIVRET A » suffit encore (D11).
-    else expect(Object.keys(ventilation(matchTirelireTransfers({ ...l, operations: [...l.operations, ligneBancaire(l, nouveau)] })))).not.toHaveLength(0);
-    if (patch) expect(ventilation(patch)).toEqual(attendue(l, ligneBancaire(l, nouveau)));
-  });
-
-  it('même hors tolérance, le libellé reconnaît le virement et le ventile par l’ordre de financement', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    const op = ligneBancaire(l, euros(1000));
-    expect(importer(l, op).proposition?.flowId).not.toBe(ordre(l).id);
-    const patch = matchTirelireTransfers({ ...l, operations: [...l.operations, op] });
-    expect(patch.operations.find((o) => o.id === op.id)?.transferAccountId).toBe(LIVRET);
-    expect(ventilation(patch)).toEqual(attendue(l, op));
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-// 7. Arbitrage du 10 septembre : l'ordre voulu est la somme des dotations mensuelles des tirelires
-//    placées sur le compte, quel que soit ce qui a déjà été viré dans la période.
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · arbitrage : l’ordre voulu est la somme des dotations mensuelles', () => {
-  it('le harnais recalcule bien la somme de l’exemple (650 € vers le Livret A, 1 150 € dès la paie de décembre)', () => {
-    const l = exampleLedger();
-    expect(sommeDesDotations(l, LIVRET, AVANT)).toBe(euros(650));
-    expect(sommeDesDotations(l, LIVRET, '2026-12-29')).toBe(euros(1150));
-  });
-
-  it('avant tout virement, le plan compare l’ordre à cette somme, période après période', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(1));
-    for (const jour of [AVANT, LENDEMAIN, '2026-10-29', '2026-11-29', '2026-12-29'])
-      expect(montantComparé(l, LIVRET, jour), jour).toBe(sommeDesDotations(l, LIVRET, jour));
-  });
-
-  it('après l’import du virement du mois, la somme comparée ne baisse pas', () => {
-    const base = exampleLedger();
-    const posé = sommeDesDotations(base, LIVRET, LENDEMAIN);
-    const avecOrdre = enregistrerOrdre(base, posé, LENDEMAIN);
-    const { après } = importer(avecOrdre, ligneBancaire(avecOrdre, posé));
-    for (const jour of [LENDEMAIN, '2026-10-15', '2026-10-27'])
-      expect(montantComparé(après, LIVRET, jour), jour).toBe(sommeDesDotations(après, LIVRET, jour));
-  });
-
-  it('sur le budget minimal, la somme comparée reste 200 € après le virement', () => {
-    const { après, compte } = budgetMinimalAprèsVirement();
-    for (const jour of ['2026-09-29', '2026-10-15', '2026-10-27']) expect(montantComparé(après, compte, jour), jour).toBe(euros(200));
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-// 8. Arbitrage du 10 septembre, suite : le « Détail » divise le virement, « simple pour le plus
-//    grand nombre, souple pour les exigeants ».
-//
-//    Sorti du périmètre de #14 le 10 septembre : la division est l'issue #25, et ces gardes en sont
-//    la vérification. À écrire dès que la forme du modèle existe : les écrire maintenant obligerait
-//    à inventer des noms que le développement choisira. Elles restent listées ici pour qu'aucune ne
-//    soit oubliée ; `vitest` les affiche comme « todo ».
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · arbitrage : diviser le virement, simple par défaut, souple sur demande', () => {
-  // Simple
-  it.todo('sans aucun réglage, un compte a un seul ordre voulu : la somme des dotations de ses tirelires');
-  it.todo('un budget qui n’a jamais été divisé se comporte exactement comme aujourd’hui (aucune migration de sens)');
-  // Souple
-  it.todo('les tirelires d’un compte se répartissent librement en plusieurs ordres, chacune dans un seul ordre, aucune oubliée');
-  it.todo('ce que le budget demande pour chaque ordre est la somme des dotations de ses tirelires, et le total des ordres vaut la somme du compte');
-  it.todo('un ordre par tirelire est un cas particulier du regroupement, pas un mode à part');
-  it.todo('revenir à un seul ordre regroupe tout, sans perdre les faits bancaires enregistrés');
-  // Ce que chaque ordre doit tenir, comme l'ordre unique aujourd'hui (D57)
-  it.todo('chaque ordre enregistre son propre fait bancaire et se compare à sa propre demande ; l’écart d’un ordre ne masque pas celui d’un autre');
-  it.todo('chaque ordre a un libellé distinct, et chaque ligne bancaire est reconnue par l’ordre qui la vire');
-  it.todo('la ligne d’un ordre se ventile par l’ordre de financement parmi ses seules tirelires, recalculé au jour de l’opération');
-  it.todo('le regroupement est un choix de l’utilisateur (fait déclaré) ; les montants des groupes restent des calculs jamais stockés');
-  it.todo('une tirelire ajoutée sur le compte après la division est rattachée à un ordre, et le plan dit lequel est à modifier');
-});
-
-// ---------------------------------------------------------------------------------------------
-// 9. Audit du code (10 septembre, après « codage fini ») : cas limites de `permanent` et de
-//    l'enregistrement. Chaque garde part d'une phrase du besoin ou d'une règle déjà en vigueur ;
-//    rouge = le code de la branche ne la tient pas.
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · audit : ce que le budget demande ne compte que ce que le plan financera', () => {
-  it('une tirelire placée sur deux livrets n’est pas comptée deux fois dans les ordres voulus', () => {
-    // Épargne de précaution moitié sur le Livret A, moitié sur un second livret : sa dotation de
-    // 300 € se partage entre deux ordres, elle ne se demande pas deux fois.
-    const base = exampleLedger();
-    const LDD = 'acc-harnais-ldd';
-    const l: Ledger = {
-      ...base,
-      accounts: [...base.accounts, { id: LDD, name: 'LDDS', kind: 'epargne', openingBalance: euros(1600), openingDate: '2026-08-27' }],
-      tirelires: base.tirelires.map((e) =>
-        e.id === 'env-precaution'
-          ? { ...e, placement: [{ accountId: LIVRET, share: { kind: 'percent', pct: 50 } }, { accountId: LDD, share: { kind: 'percent', pct: 50 } }] }
-          : e,
-      ),
-    };
-    const plan = computePlan(l, AVANT);
-    const total = plan.transfers.filter((t) => t.accountId === LIVRET || t.accountId === LDD).reduce((s, t) => s + t.permanent, 0);
-    expect(total).toBe(euros(650));
-  });
-
-  it('une tirelire versante (payout, D48) ne fait pas monter l’ordre demandé : elle verse, elle ne réclame pas', () => {
-    const base = exampleLedger();
-    const avant = demande(base, AVANT);
-    const l: Ledger = {
-      ...base,
-      needs: [...base.needs, { id: 'need-harnais-versant', tirelireId: 'env-vac', kind: 'payout', amount: euros(1200), periodicity: { interval: 1, unit: 'year', anchorDate: '2026-01-01' }, priority: 50 } as Need],
-    };
-    expect(demande(l, AVANT)).toBeLessThanOrEqual(avant);
-  });
-
-  it('un objectif atteint ne réclame plus sa dotation (D06) : il sort de la somme demandée', () => {
-    // L'épargne de précaution vise 6 000 € ; on la dit pleine. Le financement ne lui donne plus
-    // rien (`requested = 0`) : un ordre qui la compterait encore virerait de l'argent sans emploi.
-    const base = exampleLedger();
-    const pleine: Ledger = { ...base, tirelires: base.tirelires.map((e) => (e.id === 'env-precaution' ? { ...e, openingBalance: euros(6000) } : e)) };
-    expect(demande(pleine, AVANT)).toBe(demande(base, AVANT) - euros(300));
-  });
-});
-
-describe('#14 · audit : un ordre enregistré depuis n’importe quelle période reste reconnu', () => {
-  it('enregistré en regardant le plan de décembre, l’ordre reconnaît quand même le virement de septembre', () => {
-    // Le Plan se feuillette (periodsAround) ; le geste « Enregistrer / Corriger mon ordre » prend
-    // pour ancrage le début de la période affichée. Un ordre bancaire, lui, vire déjà.
-    const base = exampleLedger();
-    const décembre = computePlan(base, '2026-12-06');
-    const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
-    const flux = standingTransferFlow(décembre, t, PRINCIPAL, t.bankOrder!.flowId, euros(650))!;
-    const l: Ledger = { ...base, plannedFlows: base.plannedFlows.map((f) => (f.id === flux.id ? flux : f)) };
-    const { proposition } = importer(l, ligneBancaire(l, euros(650), JOUR_VIREMENT));
-    expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-// 10. Contre-vérification de afe97f0 (10 septembre, 21 h) : la dotation se partage désormais avec
-//     les parts du placement (`placementShares`). Une part **fixe** est un plafond de position,
-//     pas une part de flux : une fois atteinte, ce compte ne doit plus rien recevoir de la dotation.
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · contre-vérification : une part fixe déjà atteinte ne réclame plus de dotation', () => {
-  it('précaution plafonnée à 1 000 € sur le Livret A et déjà au-delà : l’ordre vers le livret ne la compte plus', () => {
-    const base = exampleLedger();
-    const l: Ledger = {
-      ...base,
-      tirelires: base.tirelires.map((e) =>
-        e.id === 'env-precaution'
-          ? { ...e, placement: [{ accountId: LIVRET, share: { kind: 'fixed', amount: euros(1000) } }, { accountId: PRINCIPAL, share: { kind: 'variable' } }] }
-          : e,
-      ),
-    };
-    const plan = computePlan(l, AVANT);
-    // Le plan demande de ramener l'excédent du livret vers le compte courant…
-    const retour = plan.gaps.find((g) => g.tirelireId === 'env-precaution' && g.fromAccountId === LIVRET && g.toAccountId === PRINCIPAL);
-    expect(retour?.amount ?? 0).toBeGreaterThan(0);
-    // …il ne peut pas, dans le même temps, demander un ordre permanent qui l'y renvoie.
-    const t = plan.transfers.find((x) => x.accountId === LIVRET)!;
-    expect(t.breakdown.map((b) => b.tirelireId)).not.toContain('env-precaution');
-    expect(t.permanent).toBe(euros(350));
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-// 11. Audit de a059494 : deux évolutions du besoin consignées dans #14 n'avaient pas de garde.
-// ---------------------------------------------------------------------------------------------
-
-describe('#14 · évolutions du besoin : ce qui reste dans la somme, et l’ordre nouveau', () => {
-  it('une échéance déjà provisionnée reste dans la somme : elle sera dépensée, l’épargne reprend juste après', () => {
-    // La taxe foncière (1 200 € au 15 octobre) est déjà entièrement provisionnée.
-    const base = exampleLedger();
-    const provisionnée: Ledger = { ...base, tirelires: base.tirelires.map((e) => (e.id === 'env-tf' ? { ...e, openingBalance: euros(1200) } : e)) };
-    const t = transfert(provisionnée, AVANT).t!;
-    expect(t.breakdown.find((b) => b.tirelireId === 'env-tf')?.cruise).toBe(euros(100));
-    expect(t.permanent).toBe(demande(base, AVANT));
-  });
-
-  it('un ordre nouveau, enregistré en regardant décembre, reconnaît le virement de septembre', () => {
-    // Le Plan se feuillette : la période lue est décembre, la date du jour reste le 6 septembre.
-    const base = exampleLedger();
-    const sansOrdre: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => !isDerivedFlow(f)) };
-    const décembre = computePlan(sansOrdre, '2026-12-06', AVANT);
-    const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
-    expect(t.bankOrder).toBeUndefined();
-    const flux = standingTransferFlow(décembre, t, PRINCIPAL, 'flow-ordre-neuf', euros(650))!;
-    const l: Ledger = { ...sansOrdre, plannedFlows: [...sansOrdre.plannedFlows, flux] };
-    const { proposition } = importer(l, ligneBancaire(l, euros(650), JOUR_VIREMENT));
-    expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// Témoins rouges des harnais U2, I10 et C8 (docs/gardes.md) : les assertions des sections 1, 2
-// et 3 ci-dessus, rejouées sur des versions volontairement cassées du besoin.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-
-it.fails('témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer', () => {
-  const avant = enregistrerOrdre(exampleLedger(), euros(650));
-  const après = besoinAjouté(avant);
-  const op = ligneBancaire(avant, euros(650));
-  const vAvant = ventilation(importer(avant, op).patch);
-  // Version cassée : la ventilation est la photo prise le jour où l'ordre a été enregistré. Le
-  // budget a bougé, le virement se répartit toujours comme avant.
-  const vAprès = vAvant;
-
-  expect(vAprès).toEqual(attendue(après, op));
-  expect(vAprès).not.toEqual(vAvant);
-});
-
-it.fails('témoin rouge · un plan qui réécrit l’ordre chez la banque au lieu de le signaler', () => {
-  const l = enregistrerOrdre(exampleLedger(), euros(650));
-  const budgetBougé = dotationRevue(besoinAjouté(l));
-  // Version cassée : le montant enregistré suit le budget tout seul. Plus rien ne diverge, donc
-  // plus rien n'est signalé — et l'ordre chez la banque, lui, n'a pas bougé.
-  const après = enregistrerOrdre(budgetBougé, demande(budgetBougé, AVANT));
-
-  expect(ordre(après).amount).toBe(-euros(650));
-  expect(alertes(après, AVANT)).toHaveLength(1);
-});
-
-// ─── I10 · le plan est un résultat (#162) ────────────────────────────────────────────────────────
-
-/**
- * La valeur d'I10 : le budget et les flux ne changent que sur une validation de l'utilisateur ; le
- * plan en est le résultat. Calculer le plan — la période en cours et les suivantes — ne touche ni
- * au registre lu, ni à la base : ce qui se relit ensuite est ce qui était écrit avant.
- */
-async function calculerNeModifieRien(calculer: (ledger: Ledger) => unknown): Promise<void> {
-  const store = await baseVide('i10-plan-resultat');
-  ecrireLeBudget(store);
-  const lu = store.load();
-  const avant = structuredClone(lu);
-  const baseAvant = JSON.stringify(store.load());
-  calculer(lu);
-  expect(lu, 'le calcul du plan a modifié le budget ou les flux qu’il lisait').toEqual(avant);
-  expect(JSON.stringify(store.load()), 'le calcul du plan a écrit dans la base').toBe(baseAvant);
-  store.close();
-}
-
-const planSurTroisPeriodes = (ledger: Ledger) => {
-  for (const jour of [AS_OF, '2026-10-20', '2026-11-20']) computePlan(ledger, jour);
-};
-
-describe('I10 · le plan est un résultat', () => {
-  it('I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base', async () => {
-    await calculerNeModifieRien(planSurTroisPeriodes);
-  });
-
-  it.fails('témoin rouge · un plan qui réécrit un besoin en se calculant', async () => {
-    await calculerNeModifieRien((ledger) => {
-      planSurTroisPeriodes(ledger);
-      const besoin = ledger.needs?.[0];
-      if (besoin) besoin.amount = (besoin.amount ?? 0) + 100;
+    it.fails('témoin rouge · un plan qui réécrit un besoin en se calculant', async () => {
+      await calculerNeModifieRien((ledger) => {
+        planSurTroisPeriodes(ledger);
+        const besoin = ledger.needs?.[0];
+        if (besoin) besoin.amount = (besoin.amount ?? 0) + 100;
+      });
     });
   });
 });
