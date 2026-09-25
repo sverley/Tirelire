@@ -1381,8 +1381,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
 ### D85 · La langue, et la lecture sur téléphone
 
-Français partout : code, commentaires, commits, interface, documents. Le porteur lit surtout sur
-téléphone : réponses courtes, en prose, une question à la fois.
+Français partout : code, commentaires, commits, interface, documents. L'outil vouvoie
+l'utilisateur, partout où il s'adresse à lui : écrans, boutons, messages, aides, documentation qui
+lui est destinée ; le tutoiement n'y a pas cours. Le porteur lit surtout sur téléphone : réponses
+courtes, en prose, une question à la fois.
 
 ### D86 · Des domaines, des issues de conception
 
