@@ -1,11 +1,11 @@
 # Versions
 
 Le travail est tiré et ordonné par les versions (D87). Une version garantit un usage (description,
-section « Usages ») sur un ensemble de cibles (`docs/cibles.md`) ; elle naît d'une case
-« prioritaire » de la matrice des cibles. Le socle, lui, ne garantit aucun usage : il intègre les
-contraintes structurelles de tous les usages et de toutes les cibles actives, par incréments, chacun
-placé juste avant la première version d'usage qui l'exerce (D87). Le premier est
-`v0 · Données sûres`.
+section « Usages ») sur un ensemble de cibles (`docs/cibles.md`) ; elle se travaille quand sa case
+de la matrice des cibles devient « prioritaire », et peut être prévue avant. Le socle, lui, ne
+garantit aucun usage : il intègre les contraintes structurelles de tous les usages et de toutes les
+cibles actives, par incréments, chacun placé juste avant la première version d'usage qui l'exerce
+(D87). Le premier est `v0 · Données sûres`.
 
 Une version se termine quand son critère de fin est atteint et que le porteur a fait ses
 vérifications manuelles ; elle se publie alors par le tag de son nom (D83). Une version livrée ne
