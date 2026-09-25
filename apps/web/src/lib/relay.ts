@@ -1,9 +1,10 @@
 /**
- * Client du relais : pousse nos changements chiffrés, tire ceux des autres.
- * Chiffrement AES-GCM avec une clé dérivée (PBKDF2) de la phrase du foyer ;
- * le relais ne voit jamais la phrase ni le contenu.
+ * Client du relais : dépose chiffré ce que le relais n'a pas encore reçu de nous, tire et applique
+ * ce que les autres y ont déposé (delta d'état, D58). Chiffrement AES-GCM avec une clé dérivée
+ * (PBKDF2) de la phrase du foyer ; le relais ne voit jamais la phrase ni le contenu. Les curseurs
+ * sont propres à l'instance : ils ne sont pas dans le fichier.
  */
-import { exportBundle, importBundle, type ChangeBundle, type LedgerStore } from '@tirelire/core';
+import { checkBundle, exportBundle, importBundle, type Conflict, type Knowledge, type LedgerStore, type StateBundle } from '@tirelire/core';
 
 export interface RelayConfig {
   url: string;
@@ -45,15 +46,10 @@ async function decrypt(key: CryptoKey, iv: string, blob: string): Promise<string
   return dec.decode(pt);
 }
 
-const PUSH_KEY = 'relay_pushed_upto';
-const PULL_KEY = 'relay_pulled_after';
-
-function getMeta(store: LedgerStore, key: string): number {
-  return Number(store.query(`SELECT value FROM meta WHERE key = ?`, [key])[0]?.['value'] ?? 0);
-}
-function setMeta(store: LedgerStore, key: string, v: number): void {
-  store.query(`INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`, [key, String(v)]);
-}
+/** Ce que nos dépôts ont déjà porté au relais (ce que nous savions au dernier dépôt). */
+const PUSH_KEY = 'relay_pushed';
+/** Dernier dépôt des autres déjà tiré. */
+export const PULL_KEY = 'relay_pulled_after';
 
 export function newRoomId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(18));
@@ -64,31 +60,22 @@ export interface RelayResult {
   pushed: number;
   pulledBundles: number;
   applied: number;
+  /** Lignes modifiées des deux côtés : la version retenue et l'écartée. */
+  conflicts: Conflict[];
 }
 
-/** Un aller-retour complet : pousser nos nouveautés, tirer et appliquer celles des autres. */
+/** Un aller-retour complet : déposer nos nouveautés, tirer et appliquer celles des autres. */
 export async function relaySync(store: LedgerStore, cfg: RelayConfig, deviceName?: string): Promise<RelayResult> {
   const base = cfg.url.replace(/\/+$/, '') + '/r/' + encodeURIComponent(cfg.room);
   const key = await deriveKey(cfg.passphrase, cfg.room);
 
-  // Pousser
-  const since = getMeta(store, PUSH_KEY);
-  const bundle = exportBundle(store, since, deviceName);
-  let pushed = 0;
-  if (bundle.entries.length) {
-    const { iv, blob } = await encrypt(key, JSON.stringify(bundle));
-    const res = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ site: store.siteId, upTo: bundle.upTo, iv, blob }) });
-    if (!res.ok) throw new Error(`Relais : ${res.status}`);
-    setMeta(store, PUSH_KEY, bundle.upTo);
-    pushed = bundle.entries.length;
-  }
-
-  // Tirer
-  const after = getMeta(store, PULL_KEY);
+  // Tirer d'abord, tout vérifier avant de rien appliquer : un dépôt d'un autre format arrête
+  // l'échange, et rien n'est reçu ni déposé.
+  const after = Number(store.getLocal(PULL_KEY) ?? 0);
   const res = await fetch(`${base}?site=${encodeURIComponent(store.siteId)}&after=${after}`);
   if (!res.ok) throw new Error(`Relais : ${res.status}`);
   const { records } = (await res.json()) as { records: Array<{ id: number; site: string; iv: string; blob: string }> };
-  let applied = 0;
+  const bundles: StateBundle[] = [];
   let last = after;
   for (const r of records) {
     let text: string;
@@ -97,10 +84,42 @@ export async function relaySync(store: LedgerStore, cfg: RelayConfig, deviceName
     } catch {
       throw new Error('Phrase de chiffrement incorrecte (ou paquet corrompu).');
     }
-    const b = JSON.parse(text) as ChangeBundle;
-    applied += importBundle(store, b).applied;
+    let b: unknown;
+    try {
+      b = JSON.parse(text);
+    } catch {
+      throw new Error('Paquet du relais illisible. Rien n’a été reçu.');
+    }
+    checkBundle(b);
+    bundles.push(b);
     last = Math.max(last, r.id);
   }
-  setMeta(store, PULL_KEY, last);
-  return { pushed, pulledBundles: records.length, applied };
+  let applied = 0;
+  const conflicts: Conflict[] = [];
+  for (const b of bundles) {
+    const r = importBundle(store, b);
+    applied += r.applied;
+    conflicts.push(...r.conflicts);
+  }
+  store.setLocal(PULL_KEY, String(last));
+
+  // Déposer ce que le relais n'a pas encore reçu de nous.
+  const pushed = readKnowledge(store.getLocal(PUSH_KEY));
+  const bundle = exportBundle(store, pushed, deviceName);
+  if (bundle.rows.length) {
+    const { iv, blob } = await encrypt(key, JSON.stringify(bundle));
+    const res2 = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ site: store.siteId, iv, blob }) });
+    if (!res2.ok) throw new Error(`Relais : ${res2.status}`);
+    store.setLocal(PUSH_KEY, JSON.stringify(bundle.knowledge));
+  }
+  return { pushed: bundle.rows.length, pulledBundles: records.length, applied, conflicts };
+}
+
+function readKnowledge(json: string | undefined): Knowledge {
+  try {
+    const k = JSON.parse(json ?? '{}') as Knowledge;
+    return k && typeof k === 'object' ? k : {};
+  } catch {
+    return {};
+  }
 }

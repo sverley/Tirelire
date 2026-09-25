@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
-import { LedgerStore, computePlan, euros, exampleLedger, exportBundle, getPeerCursor, importBundle, knownPeers, memoryTransportPair, runSync } from '../src/index.js';
+import { LedgerStore, computePlan, euros, exampleLedger, exportBundle, exportBundleFor, importBundle, knownPeers, memoryTransportPair, runSync } from '../src/index.js';
 
 const SQL = await initSqlJs();
 async function seeded(site: string) {
@@ -12,6 +12,7 @@ async function seeded(site: string) {
   for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
   return s;
 }
+const lignes = (l: ReturnType<typeof exampleLedger>) => l.accounts.length + l.tirelires.length + l.needs.length + l.plannedFlows.length;
 
 describe('synchronisation', () => {
   it('deux appareils convergent par le protocole, puis n’échangent plus que le delta', async () => {
@@ -21,9 +22,9 @@ describe('synchronisation', () => {
     const [ra, rb] = await Promise.all([runSync(a, ta, { name: 'Téléphone' }), runSync(b, tb, { name: 'PC' })]);
     expect(ra.peer).toBe('B');
     expect(ra.peerName).toBe('PC');
-    expect(rb.applied).toBeGreaterThan(0);
+    expect(rb.applied).toBe(lignes(exampleLedger()));
     expect(computePlan(b.load(), '2026-09-06').totals).toEqual(computePlan(a.load(), '2026-09-06').totals);
-    expect(getPeerCursor(b, 'A')).toBe(a.lastSeq);
+    expect(b.getKnowledge()['A']).toBe(a.getKnowledge()['A']);
     expect(knownPeers(a).map((p) => p.site)).toEqual(['B']);
 
     // Modification de chaque côté, second échange : seul le delta circule.
@@ -35,11 +36,12 @@ describe('synchronisation', () => {
     const [r2a, r2b] = await Promise.all([runSync(a, t2a), runSync(b, t2b)]);
     expect(r2a.sent).toBe(1);
     expect(r2b.sent).toBe(1);
+    expect(r2a.conflicts).toEqual([]);
     expect(a.load().needs.find((n) => n.id === 'need-tf')!.amount).toBe(euros(1300));
     expect(b.load().accounts.find((x) => x.id === 'acc-principal')!.name).toBe('Compte joint');
   });
 
-  it('trois appareils : C reçoit les changements de A relayés par B', async () => {
+  it('trois appareils : C reçoit les lignes de A par B', async () => {
     const a = await seeded('A');
     const b = await LedgerStore.create({ sqlJs: SQL, siteId: 'B' });
     const c = await LedgerStore.create({ sqlJs: SQL, siteId: 'C' });
@@ -47,28 +49,29 @@ describe('synchronisation', () => {
     await Promise.all([runSync(a, x), runSync(b, y)]);
     [x, y] = memoryTransportPair();
     await Promise.all([runSync(b, x), runSync(c, y)]);
-    expect(c.load().tirelires.length).toBe(a.load().tirelires.length);
-    // Et A n'a rien à recevoir de C que ses propres changements relayés (ignorés).
+    expect(c.load()).toEqual({ ...a.load(), settings: { ...a.load().settings, siteId: 'C' } });
+    // Et A n'a rien à recevoir de C : C lui annonce tout savoir de A.
     [x, y] = memoryTransportPair();
-    const [ra] = await Promise.all([runSync(a, x), runSync(c, y)]);
-    expect(ra.applied).toBe(0);
+    const [ra, rc] = await Promise.all([runSync(a, x), runSync(c, y)]);
+    expect(ra.received).toBe(0);
+    expect(rc.received).toBe(0);
   });
 
-  it('échange par fichier : export depuis un curseur, import idempotent', async () => {
+  it('échange par fichier : un paquet pour ce qu’un pair ignore, import idempotent', async () => {
     const a = await seeded('A');
     const b = await LedgerStore.create({ sqlJs: SQL, siteId: 'B' });
-    const bundle = exportBundle(a, 0, 'Téléphone');
-    expect(bundle.entries.length).toBe(a.lastSeq);
+    const bundle = exportBundle(a, undefined, 'Téléphone');
+    expect(bundle.rows.length).toBe(lignes(exampleLedger()));
     const r1 = importBundle(b, bundle);
-    expect(r1.applied).toBeGreaterThan(0);
+    expect(r1.applied).toBe(bundle.rows.length);
     const r2 = importBundle(b, bundle);
     expect(r2.applied).toBe(0);
-    expect(getPeerCursor(b, 'A')).toBe(a.lastSeq);
-    // Delta suivant
+    // B répond : A apprend ce que B sait, et le paquet suivant ne porte que la nouveauté.
+    importBundle(a, exportBundle(b));
     const acc = a.load().accounts[0]!;
     a.upsert('accounts', { ...acc, name: 'Renommé' });
-    const delta = exportBundle(a, getPeerCursor(b, 'A'));
-    expect(delta.entries.length).toBe(1);
+    const delta = exportBundleFor(a, 'B');
+    expect(delta.rows.length).toBe(1);
     importBundle(b, delta);
     expect(b.load().accounts.find((x) => x.id === acc.id)!.name).toBe('Renommé');
     expect(() => importBundle(b, { ...delta, format: 'x' as never })).toThrow();
@@ -83,12 +86,13 @@ describe('synchronisation', () => {
 it.fails('témoin rouge · un échange par fichier qui repart toujours de zéro', async () => {
   const a = await seeded('A');
   const b = await LedgerStore.create({ sqlJs: SQL, siteId: 'B' });
-  importBundle(b, exportBundle(a, 0, 'Téléphone'));
+  importBundle(b, exportBundle(a, undefined, 'Téléphone'));
+  importBundle(a, exportBundle(b));
   const acc = a.load().accounts[0]!;
   a.upsert('accounts', { ...acc, name: 'Renommé' });
-  // Version cassée : le curseur du pair est ignoré ; chaque échange renvoie tout le journal, et
-  // deux appareils ne « n'échangent plus que le delta » jamais.
-  const delta = exportBundle(a, 0);
+  // Version cassée : ce que sait le pair est ignoré ; chaque paquet porte tout l'état, et deux
+  // appareils ne « n'échangent plus que le delta » jamais.
+  const delta = exportBundle(a);
 
-  expect(delta.entries.length).toBe(1);
+  expect(delta.rows.length).toBe(1);
 });

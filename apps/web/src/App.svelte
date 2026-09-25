@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { app, type View } from './lib/state.svelte';
   import { shortDate } from './lib/format';
-  import { isNative } from './lib/platform';
+  import { isNative, saveFile } from './lib/platform';
 
   /**
    * Au-delà de cet écart entre la dernière opération connue et la date de lecture, l'application
@@ -58,7 +58,18 @@
 </header>
 
 <main>
-  {#if app.error}
+  {#if app.refused}
+    <div class="card warn" role="alert">
+      <h2 style="margin-top:0">Ces données ne s'ouvrent pas ici</h2>
+      <p>{app.refused.message}</p>
+      <p class="small">Rien n'a été effacé. Enregistre-les d'abord si tu veux les garder, telles quelles, puis repars d'un fichier neuf ou de l'exemple : c'est seulement à ce moment qu'elles seront remplacées.</p>
+      <div class="actions" style="margin-bottom:0">
+        <button class="btn" onclick={() => saveFile('tirelire-ancien-format.sqlite', app.refused!.bytes, 'application/x-sqlite3')}>Enregistrer ces données telles quelles</button>
+        <button class="btn primary" onclick={() => app.startOver(false)}>Repartir d'un fichier neuf</button>
+        <button class="btn" onclick={() => app.startOver(true)}>Repartir de l'exemple</button>
+      </div>
+    </div>
+  {:else if app.error}
     <div class="card warn">Impossible d'ouvrir la base : {app.error}</div>
   {:else if !app.ready}
     <p class="muted">Ouverture de la base…</p>
@@ -77,6 +88,14 @@
         <div class="actions" style="margin:6px 0 0">
           <button class="btn small primary" onclick={() => app.switchTab('import')}>Importer un relevé</button>
           <button class="btn small" onclick={() => (app.asOf = app.lastOperationDate!)}>Lire au {shortDate(app.lastOperationDate)}</button>
+        </div>
+      </div>
+    {/if}
+    {#if app.conflicts.length && app.view !== 'sync'}
+      <div class="card warn">
+        <div class="row">
+          <div class="label"><strong>{app.conflicts.length === 1 ? 'Une ligne modifiée' : `${app.conflicts.length} lignes modifiées`} des deux côtés à la synchronisation</strong><span class="sub">Une version a été retenue, l'autre écartée : regarde lesquelles.</span></div>
+          <button class="btn small primary" onclick={() => app.go('sync')}>Voir</button>
         </div>
       </div>
     {/if}

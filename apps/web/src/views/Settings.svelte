@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { centsToInput, inputToCents } from '../lib/format';
-  import { exportBundle, importBundle, knownPeers, type ChangeBundle } from '@tirelire/core';
+  import { exportBundleFor, importBundle, knownPeers, type StateBundle } from '@tirelire/core';
   import { saveFile } from '../lib/platform';
 
   let deviceName = $state(readDeviceName());
@@ -23,21 +23,20 @@
   }
   const peers = $derived(app.ready ? knownPeers(app.store) : []);
   async function exportChanges() {
-    const since = peerFilter ? (peers.find((p) => p.site === peerFilter)?.cursor ?? 0) : 0;
-    const bundle = exportBundle(app.store, since, deviceName.trim() || undefined);
+    const bundle = exportBundleFor(app.store, peerFilter || undefined, deviceName.trim() || undefined);
     const bytes = new TextEncoder().encode(JSON.stringify(bundle));
-    await saveFile(`tirelire-changements-${app.store.siteId}-${bundle.upTo}.json`, bytes, 'application/json');
-    msg = `${bundle.entries.length} changements exportés.`;
+    await saveFile(`tirelire-paquet-${app.store.siteId}-${new Date().toISOString().slice(0, 10)}.json`, bytes, 'application/json');
+    msg = `${bundle.rows.length} lignes exportées.`;
   }
   async function importChanges(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
     try {
-      const bundle = JSON.parse(await file.text()) as ChangeBundle;
+      const bundle = JSON.parse(await file.text()) as StateBundle;
       const r = importBundle(app.store, bundle);
       app.reload();
-      msg = `Paquet de ${bundle.name ?? bundle.site} : ${r.applied} changements appliqués, ${r.ignored} déjà connus, ${r.stale} dépassés.`;
+      msg = `Paquet de ${bundle.name ?? bundle.site} : ${r.applied} lignes mises à jour, ${r.ignored} déjà connues, ${r.stale} plus anciennes que les nôtres${r.conflicts.length ? `, ${r.conflicts.length} modifiées des deux côtés (voir Synchronisation)` : ''}.`;
     } catch (err) {
       msg = `Import impossible : ${err instanceof Error ? err.message : String(err)}`;
     }
@@ -93,7 +92,7 @@
       await app.importFile(bytes);
       msg = 'Fichier importé.';
     } catch (err) {
-      msg = `Import impossible : ${err instanceof Error ? err.message : String(err)}`;
+      msg = `Import impossible : ${err instanceof Error ? err.message : String(err)} Tes données n’ont pas changé.`;
     }
     input.value = '';
   }
@@ -154,22 +153,22 @@
     <button class="btn" onclick={loadExample}>Charger l'exemple</button>
     <button class="btn danger" onclick={erase}>Tout effacer</button>
   </div>
-  <p class="small muted">Appareil : <span class="num">{app.ledger.settings.siteId}</span> · changements journalisés : <span class="num">{app.ready ? app.store.lastSeq : 0}</span></p>
+  <p class="small muted">Appareil : <span class="num">{app.ledger.settings.siteId}</span>. Le fichier exporté porte les données, pas l'appareil : ouvert ailleurs, il y devient une autre instance.</p>
 </div>
 
 <h2>Synchronisation entre appareils</h2>
 <div class="card">
-  <p class="small muted">En attendant la synchronisation directe : exporte un paquet de changements ici, importe-le sur l'autre appareil, et inversement. Chaque appareil retient ce qu'il a déjà reçu de chaque autre ; les paquets peuvent se recouvrir sans risque.</p>
+  <p class="small muted">Sans réseau : exporte un paquet ici, importe-le sur l'autre appareil, et inversement. Chaque appareil retient ce que les autres savaient au dernier échange ; les paquets peuvent se recouvrir sans risque.</p>
   <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
     <label class="f">Nom de cet appareil <input bind:value={deviceName} placeholder="Téléphone" /></label>
     <button class="btn" onclick={saveDeviceName}>Enregistrer</button>
   </div>
   <div class="actions">
     <select class="btn" bind:value={peerFilter}>
-      <option value="">Tout le journal</option>
-      {#each peers as p (p.site)}<option value={p.site}>Depuis le dernier échange avec {p.site}</option>{/each}
+      <option value="">Toutes les données</option>
+      {#each peers as p (p.site)}<option value={p.site}>Depuis le dernier échange avec {p.name ?? p.site}</option>{/each}
     </select>
-    <button class="btn primary" onclick={exportChanges}>Exporter un paquet de changements</button>
+    <button class="btn primary" onclick={exportChanges}>Exporter un paquet</button>
     <label class="btn">Importer un paquet… <input type="file" accept=".json,application/json" onchange={importChanges} hidden /></label>
   </div>
 </div>
