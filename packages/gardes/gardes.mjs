@@ -543,8 +543,7 @@ export const ENVELOPPE_DE_NIVEAU = /^\[niveau [0-4]\](?:\s|$)/;
 /**
  * Appels de tests d'un fichier, dans l'ordre du texte : titre (`null` s'il n'est pas écrit en toutes
  * lettres), suite ou test, désactivé, conditionnel, et les suites qui l'englobent, de la plus
- * lointaine à la plus proche (`englobantes`). Sert à `analyserTests`, et à la lecture des niveaux
- * (`niveaux.mjs`, #232).
+ * lointaine à la plus proche (`englobantes`). Sert à `analyserTests`.
  */
 export function appelsDeTests(source) {
   const { masque, chaines } = masquer(source);

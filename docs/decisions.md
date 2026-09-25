@@ -1300,8 +1300,9 @@ que les principes et les règles ne soient pas enfreints — et se traitent de l
 leur test est de niveau 0 ou 1 (D83), témoins compris, donc joué à chaque fusion. Quand une ligne
 `Harnais` nomme un test, la règle vaut pour ce test, sa suite et son témoin ; quand elle cite un
 fichier, pour tout le fichier. Un harnais de la garde ou du registre n'accueille donc jamais de test
-de niveau 4. La règle est un harnais de la garde (`regles-des-harnais.test.mjs`), pas une logique de
-l'outil ; tout ce qui y entre se jouant à chaque fusion, la garde reste petite (principe 12).
+de niveau 4. La règle est un harnais de la garde, celui de #232 (`niveaux-des-tests.test.mjs`), pas
+une logique de l'outil ; tout ce qui y entre se jouant à chaque fusion, la garde reste petite
+(principe 12).
 
 Un harnais du registre ou de la garde a une forme normale : un fichier de tests de niveau 0 et 1, que
 le registre cite en entier, et, s'il le faut, un fichier compagnon, hors registre, pour les tests de
@@ -1397,14 +1398,14 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
-  l'interface, 30 s) ou organisationnel (garde, 45 s) —, les tests navigateur
+  l'interface, 40 s sans navigateur, 270 s avec) ou organisationnel (garde, 45 s) —, les tests navigateur
   (`apps/web/test/navigateur/`) se jouent quand un navigateur est là, sinon la livraison le dit et
   les laisse à la CI, et le harnais du besoin est joué à part, en entier, et bloque quand du code
   arrive.
 - **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, les
-  harnais et la garde : typecheck, `pnpm test 1` hors tests navigateur, puis les tests navigateur au
-  seuil 2 — qu'une session sans navigateur ne peut pas jouer —, le harnais du besoin en entier, build,
-  version de dev ; un outil manquant y fait échouer le job. Avant toute fusion, les niveaux 0 à 2 ont
+  harnais et la garde : typecheck, `pnpm test 1`, puis les tests navigateur de niveau 2 — qu'une
+  session sans navigateur ne peut pas jouer ; appelés nommément, pour ne pas rejouer ceux de niveau 0
+  et 1 —, le harnais du besoin en entier, build, version de dev ; un outil manquant y fait échouer le job. Avant toute fusion, les niveaux 0 à 2 ont
   donc été joués, par la livraison et par l'auditeur, et la CI rejoue 0 et 1 sur l'état final. Sept workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères

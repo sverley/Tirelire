@@ -4,14 +4,12 @@
  * Le niveau d'un test dit le risque pris à ne pas le jouer, de 0 (l'irréparable) à 4 (rien de
  * garanti). Il se déclare par la marque `[niveau N]` dans le titre du test, sinon dans celui de la
  * suite la plus proche qui l'englobe ; sans marque, il est de niveau 2. Il se lit donc dans le
- * fichier, sans l'exécuter (`niveauxDuFichier`).
+ * fichier, sans l'exécuter.
  *
  * Un lancement vérifie à un seuil : il ne joue que les tests de niveau inférieur ou égal
- * (`lanceur.mjs`). Ce module est partagé par le lanceur, par ses deux branchements (`node --test`,
- * vitest) et par la règle des harnais (`regles-des-harnais.test.mjs`).
+ * (`lanceur.mjs`). Ce module est partagé par le lanceur et ses deux branchements (`node --test`,
+ * vitest).
  */
-import { appelsDeTests, lireRegistre, temoinRouge, testNomme } from './gardes.mjs';
-
 export const NIVEAU_PAR_DEFAUT = 2;
 export const NIVEAU_MAX = 4;
 
@@ -31,18 +29,6 @@ export function niveauDesTitres(titres) {
     if (n !== null) return n;
   }
   return NIVEAU_PAR_DEFAUT;
-}
-
-/**
- * Tests et suites d'un fichier, avec leur niveau, lu sans exécuter : `{ titre, suite, niveau,
- * chaine, debut, fin }`, où `chaine` liste les titres des suites englobantes puis le sien. Un titre
- * qui n'est pas écrit en toutes lettres (gabarit) garde sa forme brute entre accents graves.
- */
-export function niveauxDuFichier(source) {
-  return appelsDeTests(source).map((a) => {
-    const titres = [...a.englobantes.map((b) => b.titre ?? ''), a.titre ?? ''];
-    return { titre: a.titre, suite: a.suite, niveau: niveauDesTitres(titres), chaine: titres, debut: a.debut, fin: a.fin, appel: a };
-  });
 }
 
 /**
@@ -72,57 +58,3 @@ export function ligneEcartes(seuil, nombre, nomme = false) {
   return `seuil ${seuil} : ${nombre} test(s) écarté(s), de niveau supérieur à ${seuil}.`;
 }
 
-// ─── Règle des harnais (#232, point 10) ─────────────────────────────────────────────────────────
-
-/** Les harnais de la garde : ses fichiers de test. */
-export const HARNAIS_DE_LA_GARDE = /^packages\/gardes\/[^/]+\.test\.[cm]?js$/;
-
-/**
- * Portée de la règle « 0 ou 1 » : par fichier, `true` pour tout le fichier, ou l'ensemble des titres
- * nommés (test ou suite, et témoin rouge). Une ligne `Harnais` du registre qui nomme un test porte sur
- * ce test, sa suite et son témoin ; une ligne qui ne cite que des fichiers, sur tout le fichier ; un
- * fichier de test de la garde, sur tout le fichier.
- */
-export function porteeDesHarnais(registre, fichiers) {
-  const portee = new Map();
-  const ajouter = (chemin, nom) => {
-    if (portee.get(chemin) === true) return;
-    if (nom === true) portee.set(chemin, true);
-    else portee.set(chemin, new Set([...(portee.get(chemin) ?? []), nom]));
-  };
-  for (const f of fichiers) if (HARNAIS_DE_LA_GARDE.test(f)) ajouter(f, true);
-  for (const entree of lireRegistre(registre).entrees.values()) {
-    for (const h of entree.harnais) {
-      const tests = h.chemins.filter((c) => /\.test\.[^/]+$/.test(c));
-      const nomme = testNomme(h.description);
-      const temoin = temoinRouge(h.description)?.nom;
-      for (const c of tests) {
-        if (!nomme) ajouter(c, true);
-        else for (const n of [nomme, temoin].filter(Boolean)) ajouter(c, n);
-      }
-    }
-  }
-  return portee;
-}
-
-/**
- * Tests et suites d'un harnais de la garde ou du registre qui ne sont pas de niveau 0 ou 1. Pour un
- * titre nommé : lui, ce qu'il contient, et les suites qui l'englobent. Rend des messages.
- */
-export function niveauxHorsDesHarnais({ registre, fichiers, lireFichier }) {
-  const problemes = [];
-  for (const [chemin, noms] of porteeDesHarnais(registre, fichiers)) {
-    const source = lireFichier(chemin);
-    if (source == null) continue; // un harnais absent : la couverture le dit déjà
-    const lus = niveauxDuFichier(source);
-    let concernes = lus;
-    if (noms !== true) {
-      const nommes = lus.filter((l) => l.titre !== null && noms.has(l.titre));
-      concernes = lus.filter((l) => nommes.some((n) => n === l || l.appel.englobantes.includes(n.appel) || n.appel.englobantes.includes(l.appel)));
-    }
-    for (const l of concernes) {
-      if (l.niveau > 1) problemes.push(`${chemin} : « ${l.titre ?? '(titre calculé)'} » est de niveau ${l.niveau} ; un test d'un harnais de la garde ou du registre est de niveau 0 ou 1 (#232).`);
-    }
-  }
-  return problemes;
-}
