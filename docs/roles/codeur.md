@@ -13,14 +13,18 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
 1. **Ne lis pas le harnais.** Code depuis ta propre lecture du besoin (principe 11.1).
 2. Code sur la branche, commets, pousse. En brouillon, le verdict est local : `pnpm typecheck` et le
    harnais du besoin, rien d'autre (D83).
-3. Ne modifie jamais la PR une fois ouverte : ni description, ni état de brouillon, ni harnais. Ne
+3. Tu peux écrire tes propres tests, dans tes propres fichiers, jamais dans celui du harnais. Classe
+   chacun par la suite de questions de D83 et marque son niveau (`[niveau N]`) ; un test qui ne sert
+   qu'au diagnostic ou à l'analyse est de niveau 4 : il reste dans le dépôt et ne se joue que
+   nommément ou au seuil 4. Jamais de niveau 4 dans un harnais de la garde ou du registre (D81).
+4. Ne modifie jamais la PR une fois ouverte : ni description, ni état de brouillon, ni harnais. Ne
    modifie jamais un document fondateur, sauf si l'issue le demande. Ne touche jamais une cible de
    côté (`docs/cibles.md`).
-4. Si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
+5. Si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
    manquante —, demande au porteur, en commentaire de l'issue, la modification proposée, avec son
    texte.
-5. Si le harnais paraît faux ou le besoin impossible, dis-le en commentaire et arrête-toi.
-6. Quand le typecheck et le harnais sont verts, écris un seul commentaire sur la PR : ce qui appelle
+6. Si le harnais paraît faux ou le besoin impossible, dis-le en commentaire et arrête-toi.
+7. Quand le typecheck et le harnais sont verts, écris un seul commentaire sur la PR : ce qui appelle
    une validation humaine — pour chaque vérification manuelle demandée, ce que tes modifications
    changent et ce qui reste à constater —, et, si tu changes le comportement de la garde, ce qu'en
    demande D81. Honnête et court. Puis arrête-toi.
