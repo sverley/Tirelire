@@ -16,8 +16,8 @@
 # SORTIE. La livraison s'en sert sur l'arbre qu'elle juge.
 #
 # Exécuté (`sh .githooks/harnais-du-besoin.sh --jouer`), il joue le harnais du besoin en entier, au
-# seuil 4, dans le paquet de chaque fichier, et sort en échec si l'un rougit : c'est l'étape de la CI
-# au Ready. Sans harnais du besoin, il le dit et sort en succès.
+# seuil 4, tests navigateur activés, dans le paquet de chaque fichier, et sort en échec si l'un
+# rougit : c'est l'étape de la CI au Ready. Sans harnais du besoin, il le dit et sort en succès.
 
 # Nom de la branche : celle qui est extraite, sinon celle de la PR en CI.
 branche_du_besoin() {
@@ -79,7 +79,7 @@ if [ "${1:-}" = --jouer ]; then
     hdb_fichiers=$(grep -E "^$hdb_d/" "$hdb_liste" | sed "s#^$hdb_d/##" | tr '\n' ' ')
     echo "harnais du besoin, en entier (seuil 4) — $hdb_d : $hdb_fichiers"
     # shellcheck disable=SC2086 # un fichier par mot
-    pnpm --dir "$hdb_d" run test 4 $hdb_fichiers || hdb_code=1
+    pnpm --dir "$hdb_d" run test 4 --navigateur $hdb_fichiers || hdb_code=1
   done
   hdb_autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$hdb_liste" | tr '\n' ' ')
   if [ -n "$hdb_autres" ]; then

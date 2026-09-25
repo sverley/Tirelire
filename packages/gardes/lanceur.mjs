@@ -12,16 +12,22 @@
  * Un test appelé nommément (`-t` de vitest, `--test-name-pattern` de node) se joue quel que soit son
  * niveau : le seuil ne s'applique pas.
  *
+ * Les tests navigateur (`test/navigateur/`, sous vitest) coûtent cher : ils ne se jouent que si
+ * l'option `--navigateur` les active, après le seuil (`pnpm test 2 --navigateur`). Sans elle, ils
+ * sont écartés, comptés dans leurs fichiers, et dits sur une ligne qui nomme le navigateur. Tout
+ * paquet accepte l'option, puisque `pnpm test` la passe à chacun ; hors vitest, elle ne change rien.
+ *
  * - vitest : le seuil devient un filtre de nom complet (`-t`), et un rapporteur de plus compte les
  *   tests écartés (`niveaux-vitest-rapport.mjs`).
  * - node --test : un préchargement (`niveaux-node.mjs`) substitue à `node:test` une enveloppe qui
  *   n'inscrit pas les tests au-dessus du seuil et les compte.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { appelsDeTests } from './gardes.mjs';
 import { NIVEAU_MAX, ligneEcartes, lireSeuil, motifDuSeuil } from './niveaux.mjs';
 
 const ici = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +38,10 @@ if (fin < 0) {
   console.error('lanceur : usage « lanceur.mjs vitest run [N] … » ou « lanceur.mjs node … --test [N] … ».');
   process.exit(2);
 }
-const { seuil, reste } = lireSeuil(argv.slice(fin + 1));
+const lu = lireSeuil(argv.slice(fin + 1));
+const { seuil } = lu;
+const navigateur = lu.reste.includes('--navigateur');
+const reste = lu.reste.filter((a) => a !== '--navigateur');
 const nomme = reste.some((a) => (vitest ? /^(?:-t|--testNamePattern|--test-name-pattern)(?:=|$)/ : /^--test-name-pattern(?:=|$)/).test(a));
 const filtre = !nomme && seuil < NIVEAU_MAX;
 
@@ -51,11 +60,26 @@ function binaireVitest() {
   }
 }
 
+/** Tests des fichiers `test/navigateur/**` du dossier de vitest (`--dir`, sinon le paquet). */
+function testsNavigateur() {
+  const i = reste.findIndex((a) => a === '--dir' || a.startsWith('--dir='));
+  const racine = i < 0 ? process.cwd() : resolve(reste[i].startsWith('--dir=') ? reste[i].slice(6) : reste[i + 1]);
+  const dossier = join(racine, 'test', 'navigateur');
+  if (!existsSync(dossier)) return null;
+  let nombre = 0;
+  for (const f of readdirSync(dossier, { recursive: true })) {
+    if (/\.test\.[cm]?[jt]s$/.test(f)) nombre += appelsDeTests(readFileSync(join(dossier, f), 'utf8')).filter((a) => !a.suite).length;
+  }
+  return nombre;
+}
+const sansNavigateur = vitest && !navigateur ? testsNavigateur() : null;
+
 let commande;
 let args;
 if (vitest) {
   commande = binaireVitest();
   args = [...argv.slice(1, fin + 1), ...reste];
+  if (sansNavigateur !== null) args.push('--exclude', 'test/navigateur/**');
   if (filtre) {
     if (!reste.some((a) => /^--reporter(?:=|$)/.test(a))) args.push('--reporter=default');
     args.push(`--reporter=${resolve(ici, 'niveaux-vitest-rapport.mjs')}`, '-t', motifDuSeuil(seuil));
@@ -81,5 +105,6 @@ enfant.on('exit', (code, signal) => {
   }
   rmSync(travail, { recursive: true, force: true });
   console.log(ligneEcartes(seuil, ecartes, nomme));
+  if (sansNavigateur !== null) console.log(`navigateur : ${sansNavigateur} test(s) écarté(s), que l'option --navigateur active.`);
   process.exit(signal ? 1 : (code ?? 1));
 });

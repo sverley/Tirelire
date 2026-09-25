@@ -210,9 +210,9 @@ non_regression() { # nom dossier
   if vitest_de "$dossier"; then
     set -- 2 --passWithNoTests --reporter=default --reporter=json "--outputFile.json=$journaux/$nom.rapport"
     [ "$dossier" = packages/core ] && set -- "$@" --no-isolate
-    if [ "$dossier" = apps/web ] && ! navigateur; then
-      set -- "$@" --exclude 'test/navigateur/**'
-      dit "aucun navigateur (TIRELIRE_NAV, CHROME_BIN…) : les tests navigateur de l'interface sont laissés à la CI"
+    if [ "$dossier" = apps/web ]; then
+      if navigateur; then set -- "$@" --navigateur
+      else dit "aucun navigateur (TIRELIRE_NAV, CHROME_BIN…) : les tests navigateur de l'interface sont laissés à la CI"; fi
     fi
     for f in $(dans "$dossier"); do set -- "$@" --exclude "$f"; done
     lance "$nom" "$dossier" pnpm run test "$@"
@@ -274,7 +274,7 @@ if [ -z "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
     [ -n "$liste" ] || continue
     n="harnais-$(basename "$d")"
     # shellcheck disable=SC2086
-    lance "$n" "$d" pnpm run test 4 --reporter=default --reporter=json "--outputFile.json=$journaux/$n.rapport" $liste
+    lance "$n" "$d" pnpm run test 4 $(navigateur && echo --navigateur) --reporter=default --reporter=json "--outputFile.json=$journaux/$n.rapport" $liste
     harnais_lances="$harnais_lances $n:$d:vitest"
   done
   for d in $(grep -Eo '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | sed 's#/$##' | sort -u); do
