@@ -169,65 +169,69 @@ function verifierConflitAffiche(texte: string): void {
   expect(texte.includes(VERSION_A) && texte.includes(VERSION_B), `l’écran ne montre pas le retenu et l’écarté (${VERSION_A}, ${VERSION_B}) : « ${resume} »`).toBe(true);
 }
 
-it.fails('témoin rouge · un conflit tranché sans que l’écran en dise rien', () => {
-  // Version cassée : l'écran de synchronisation ne montre que le nombre de changements reçus, et
-  // la catégorie sous la version retenue.
-  verifierConflitAffiche(`Synchronisation\nÉchange terminé : 3 changements reçus.\nCatégories\n${VERSION_A}`);
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un conflit tranché sans que l’écran en dise rien', () => {
+    // Version cassée : l'écran de synchronisation ne montre que le nombre de changements reçus, et
+    // la catégorie sous la version retenue.
+    verifierConflitAffiche(`Synchronisation\nÉchange terminé : 3 changements reçus.\nCatégories\n${VERSION_A}`);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-describe.skipIf(!navigateur)('#196 · 5. un conflit se voit à l’écran', () => {
-  let site: Site;
+describe('[niveau 1] harnais du registre', () => {
+  describe.skipIf(!navigateur)('#196 · 5. un conflit se voit à l’écran', () => {
+    let site: Site;
 
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-  }, 120_000);
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+    }, 120_000);
 
-  afterAll(async () => {
-    await site?.fermer();
+    afterAll(async () => {
+      await site?.fermer();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('une catégorie renommée des deux côtés : après la synchronisation, l’écran montre le nom retenu et le nom écarté', async () => {
+      const { depots, pourNode, pourLaPage } = relais();
+      vi.stubGlobal('fetch', pourNode);
+
+      // A : le cœur, l'exemple déposé sur le relais.
+      const a = await LedgerStore.create({ sqlJs: SQL });
+      const l = exampleLedger();
+      for (const cle of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations'] as const)
+        for (const r of l[cle]) a.upsert(cle, r as never);
+      await relaySync(a, RELAIS);
+
+      // B : l'application, vide, qui reçoit l'exemple par le relais.
+      const page = await ouvrirVide(site);
+      await page.setRequestInterception(true);
+      page.on('request', pourLaPage);
+      await synchroniserParLeRelais(page, depots);
+      await relaySync(a, RELAIS);
+
+      // Chacune renomme la même catégorie, hors ligne.
+      a.upsert('categories', { ...a.load().categories.find((c) => c.id === CATEGORIE.id)!, name: VERSION_A });
+      await renommerLaCategorie(page, CATEGORIE.name, VERSION_B);
+
+      // A se synchronise, puis B : B reçoit la version de A et dépose la sienne.
+      await relaySync(a, RELAIS);
+      await synchroniserParLeRelais(page, depots);
+
+      const vu = await ceQueVoitLUtilisateur(page);
+      await page.close();
+
+      // Le scénario a bien eu lieu : B a déposé sur le relais, et A, qui reçoit ce dépôt, retient
+      // l'une des deux versions.
+      const siteA = depots[0]?.['site'];
+      expect(depots.some((d) => d['site'] !== siteA), 'la page n’a rien déposé sur le relais').toBe(true);
+      await relaySync(a, RELAIS);
+      expect([VERSION_A, VERSION_B], 'A ne retient aucune des deux versions').toContain(a.load().categories.find((c) => c.id === CATEGORIE.id)?.name);
+
+      verifierConflitAffiche(vu);
+    }, 120_000);
   });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('une catégorie renommée des deux côtés : après la synchronisation, l’écran montre le nom retenu et le nom écarté', async () => {
-    const { depots, pourNode, pourLaPage } = relais();
-    vi.stubGlobal('fetch', pourNode);
-
-    // A : le cœur, l'exemple déposé sur le relais.
-    const a = await LedgerStore.create({ sqlJs: SQL });
-    const l = exampleLedger();
-    for (const cle of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations'] as const)
-      for (const r of l[cle]) a.upsert(cle, r as never);
-    await relaySync(a, RELAIS);
-
-    // B : l'application, vide, qui reçoit l'exemple par le relais.
-    const page = await ouvrirVide(site);
-    await page.setRequestInterception(true);
-    page.on('request', pourLaPage);
-    await synchroniserParLeRelais(page, depots);
-    await relaySync(a, RELAIS);
-
-    // Chacune renomme la même catégorie, hors ligne.
-    a.upsert('categories', { ...a.load().categories.find((c) => c.id === CATEGORIE.id)!, name: VERSION_A });
-    await renommerLaCategorie(page, CATEGORIE.name, VERSION_B);
-
-    // A se synchronise, puis B : B reçoit la version de A et dépose la sienne.
-    await relaySync(a, RELAIS);
-    await synchroniserParLeRelais(page, depots);
-
-    const vu = await ceQueVoitLUtilisateur(page);
-    await page.close();
-
-    // Le scénario a bien eu lieu : B a déposé sur le relais, et A, qui reçoit ce dépôt, retient
-    // l'une des deux versions.
-    const siteA = depots[0]?.['site'];
-    expect(depots.some((d) => d['site'] !== siteA), 'la page n’a rien déposé sur le relais').toBe(true);
-    await relaySync(a, RELAIS);
-    expect([VERSION_A, VERSION_B], 'A ne retient aucune des deux versions').toContain(a.load().categories.find((c) => c.id === CATEGORIE.id)?.name);
-
-    verifierConflitAffiche(vu);
-  }, 120_000);
 });

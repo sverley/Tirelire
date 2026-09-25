@@ -84,56 +84,58 @@ function leBilanParCatégorieSeLit(ledger: Ledger): void {
   expect(plan.warnings.filter((w) => w.tirelireId || w.needId)).toEqual([]);
 }
 
-describe('U5 · import seul, de bout en bout (#39)', () => {
-  it('parcours U5 · du relevé importé au bilan par catégorie, sans aucune tirelire', async () => {
-    const store = await baseVide('parcours-u5');
-    store.setSetting('periodStartDay', PAIE);
-    store.upsert('accounts', { id: COMPTE, name: 'Compte courant', kind: 'principal', openingBalance: euros(1200), openingDate: DEBUT });
-    const p = profil();
-    store.upsert('importProfiles', p);
+describe('[niveau 1] harnais du registre', () => {
+  describe('U5 · import seul, de bout en bout (#39)', () => {
+    it('parcours U5 · du relevé importé au bilan par catégorie, sans aucune tirelire', async () => {
+      const store = await baseVide('parcours-u5');
+      store.setSetting('periodStartDay', PAIE);
+      store.upsert('accounts', { id: COMPTE, name: 'Compte courant', kind: 'principal', openingBalance: euros(1200), openingDate: DEBUT });
+      const p = profil();
+      store.upsert('importProfiles', p);
 
-    // Import : lecture du relevé, puis écriture des opérations retenues.
-    const lu = parseRows(parseCsv(RELEVÉ), p);
-    expect(lu.errors).toEqual([]);
-    const préparé = prepareImport(store.load(), lu.rows, p);
-    expect(préparé.unmappedAccounts).toEqual([]);
-    expect(préparé.counts.new).toBe(4);
-    for (const c of préparé.candidates) store.upsert('operations', c.operation);
+      // Import : lecture du relevé, puis écriture des opérations retenues.
+      const lu = parseRows(parseCsv(RELEVÉ), p);
+      expect(lu.errors).toEqual([]);
+      const préparé = prepareImport(store.load(), lu.rows, p);
+      expect(préparé.unmappedAccounts).toEqual([]);
+      expect(préparé.counts.new).toBe(4);
+      for (const c of préparé.candidates) store.upsert('operations', c.operation);
 
-    // Classement : des catégories et des automatismes, aucune tirelire.
-    store.upsert('categories', { id: 'cat-alimentation', name: 'Alimentation', nature: 'expense' });
-    store.upsert('categories', { id: 'cat-salaire', name: 'Salaire', nature: 'income' });
-    const rang = rankBetween(undefined, undefined);
-    store.upsert('automations', { id: 'auto-supermarché', name: 'Supermarché', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alimentation' }, rank: rang });
-    store.upsert('automations', { id: 'auto-salaire', name: 'Salaire', selection: { labelPattern: 'EMPLOYEUR' }, action: { categoryId: 'cat-salaire' }, rank: rankBetween(undefined, rang) });
-    ecrire(store, applyAutomations(store.load()));
+      // Classement : des catégories et des automatismes, aucune tirelire.
+      store.upsert('categories', { id: 'cat-alimentation', name: 'Alimentation', nature: 'expense' });
+      store.upsert('categories', { id: 'cat-salaire', name: 'Salaire', nature: 'income' });
+      const rang = rankBetween(undefined, undefined);
+      store.upsert('automations', { id: 'auto-supermarché', name: 'Supermarché', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alimentation' }, rank: rang });
+      store.upsert('automations', { id: 'auto-salaire', name: 'Salaire', selection: { labelPattern: 'EMPLOYEUR' }, action: { categoryId: 'cat-salaire' }, rank: rankBetween(undefined, rang) });
+      ecrire(store, applyAutomations(store.load()));
 
-    const ledger = await relire(store, 'parcours-u5');
+      const ledger = await relire(store, 'parcours-u5');
 
-    // Réimporter le même relevé n'ajoute rien : les clés déterministes suffisent, sans budget (D09).
-    expect(prepareImport(ledger, lu.rows, p).counts.exact).toBe(lu.rows.length);
-    store.close();
+      // Réimporter le même relevé n'ajoute rien : les clés déterministes suffisent, sans budget (D09).
+      expect(prepareImport(ledger, lu.rows, p).counts.exact).toBe(lu.rows.length);
+      store.close();
 
-    leBilanParCatégorieSeLit(ledger);
-  });
+      leBilanParCatégorieSeLit(ledger);
+    });
 
-  it.fails('témoin rouge · un bilan qui ne compte que les opérations rattachées à une tirelire', async () => {
-    const store = await baseVide('parcours-u5-témoin');
-    store.setSetting('periodStartDay', PAIE);
-    store.upsert('accounts', { id: COMPTE, name: 'Compte courant', kind: 'principal', openingBalance: euros(1200), openingDate: DEBUT });
-    const p = profil();
-    for (const c of prepareImport(store.load(), parseRows(parseCsv(RELEVÉ), p).rows, p).candidates) store.upsert('operations', c.operation);
-    store.upsert('categories', { id: 'cat-alimentation', name: 'Alimentation', nature: 'expense' });
-    store.upsert('categories', { id: 'cat-salaire', name: 'Salaire', nature: 'income' });
-    const rang = rankBetween(undefined, undefined);
-    store.upsert('automations', { id: 'auto-supermarché', name: 'Supermarché', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alimentation' }, rank: rang });
-    store.upsert('automations', { id: 'auto-salaire', name: 'Salaire', selection: { labelPattern: 'EMPLOYEUR' }, action: { categoryId: 'cat-salaire' }, rank: rankBetween(undefined, rang) });
-    ecrire(store, applyAutomations(store.load()));
-    const ledger = store.load();
-    store.close();
+    it.fails('témoin rouge · un bilan qui ne compte que les opérations rattachées à une tirelire', async () => {
+      const store = await baseVide('parcours-u5-témoin');
+      store.setSetting('periodStartDay', PAIE);
+      store.upsert('accounts', { id: COMPTE, name: 'Compte courant', kind: 'principal', openingBalance: euros(1200), openingDate: DEBUT });
+      const p = profil();
+      for (const c of prepareImport(store.load(), parseRows(parseCsv(RELEVÉ), p).rows, p).candidates) store.upsert('operations', c.operation);
+      store.upsert('categories', { id: 'cat-alimentation', name: 'Alimentation', nature: 'expense' });
+      store.upsert('categories', { id: 'cat-salaire', name: 'Salaire', nature: 'income' });
+      const rang = rankBetween(undefined, undefined);
+      store.upsert('automations', { id: 'auto-supermarché', name: 'Supermarché', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alimentation' }, rank: rang });
+      store.upsert('automations', { id: 'auto-salaire', name: 'Salaire', selection: { labelPattern: 'EMPLOYEUR' }, action: { categoryId: 'cat-salaire' }, rank: rankBetween(undefined, rang) });
+      ecrire(store, applyAutomations(store.load()));
+      const ledger = store.load();
+      store.close();
 
-    // Version volontairement cassée : le classement n'est retenu que s'il désigne une tirelire —
-    // l'usage devient le mode dégradé du budget, ce que I3 refuse.
-    leBilanParCatégorieSeLit({ ...ledger, allocations: ledger.allocations.filter((a) => a.tirelireId) });
+      // Version volontairement cassée : le classement n'est retenu que s'il désigne une tirelire —
+      // l'usage devient le mode dégradé du budget, ce que I3 refuse.
+      leBilanParCatégorieSeLit({ ...ledger, allocations: ledger.allocations.filter((a) => a.tirelireId) });
+    });
   });
 });

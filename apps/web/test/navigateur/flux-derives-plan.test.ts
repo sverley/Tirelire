@@ -119,187 +119,189 @@ function vérifierOrdrePosé(c: Carte, posé: number, demandé: number, alertes:
  * n'a pas bougé. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans
  * navigateur : c'est la règle qu'on garde ici, pas une seconde visite de l'écran.
  */
-it.fails('témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire', () => {
-  const demandé = 65000;
-  const posé = demandé - 7000;
-  const carteCassée: Carte = {
-    visible: true,
-    lignes: [
-      { libellé: 'Virement permanent', sous: '', montant: '650,00 €' },
-      { libellé: 'Ordre permanent chez la banque', sous: 'chez la banque', montant: '650,00 €' },
-    ],
-    boutons: ['Détail', 'Corriger mon ordre'],
-  };
-  vérifierOrdrePosé(carteCassée, posé, demandé, []);
-});
-
-describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 px', () => {
-  let site: Site;
-  let page: Page;
-  const dialogues: string[] = [];
-
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-    page = await ouvrirLExemple(site, 375, 812);
-    page.on('dialog', (d) => {
-      dialogues.push(d.message());
-      void d.accept();
-    });
-  });
-  afterAll(async () => {
-    await site?.fermer();
-  });
-
-  let demandé = 0;
-
-  it('le Plan montre les deux montants dès l’exemple, et dit lequel changer', async () => {
-    // Le jeu d'exemple porte un ordre volontairement décalé (D60) : la banque vire 600 €, le
-    // budget en demande 650. La comparaison est donc là sans qu'on ait rien saisi.
-    const c = await carte(page);
-    expect(c.visible, `carte « ${COMPTE} » absente du Plan`).toBe(true);
-    const permanent = ligne(c, 'Virement permanent');
-    expect(permanent, 'ligne « Virement permanent » absente').toBeTruthy();
-    demandé = centimes(permanent!.montant);
-    expect(demandé).toBeGreaterThan(0);
-    const banque = ligne(c, 'Ordre permanent chez la banque');
-    expect(banque, 'ligne « Ordre permanent chez la banque » absente').toBeTruthy();
-    expect(centimes(banque!.montant)).toBeLessThan(demandé);
-    expect(c.boutons).toContain('Corriger mon ordre');
-    const [alerte] = await alertesÀlÉcran(page);
-    expect(alerte).toContain(COMPTE);
-  });
-
-  it('le virement s’affiche comme une somme ; « Détail » montre la dotation de chaque tirelire', async () => {
-    const TIRELIRES = ['Taxe foncière', 'Assurance auto', 'Vacances', 'Épargne de précaution'];
-    const lignesTirelires = () =>
-      page.evaluate((noms: string[]) => {
-        const c = [...document.querySelectorAll('.card')].find((x) => x.querySelector(':scope > .row strong')?.textContent?.trim() === 'Livret A');
-        if (!c) return [];
-        return [...c.querySelectorAll('.row')]
-          .filter((r) => (r as HTMLElement).offsetParent !== null)
-          .map((r) => ({ label: r.querySelector('.label')?.firstChild?.textContent?.trim() ?? '', num: r.querySelector('.num')?.textContent?.trim() ?? '' }))
-          .filter((l) => noms.includes(l.label));
-      }, TIRELIRES);
-
-    expect(await lignesTirelires(), 'la carte détaille déjà les tirelires au lieu d’afficher une somme').toEqual([]);
-    const boutons = (await carte(page)).boutons;
-    const détail = boutons.find((b) => /^détail/i.test(b));
-    expect(détail, `pas de bouton « Détail » dans la carte (boutons : ${boutons.join(', ')})`).toBeTruthy();
-    await cliquerDansCarte(page, détail!);
-
-    const lignes = await lignesTirelires();
-    expect(lignes.map((l) => l.label).sort()).toEqual([...TIRELIRES].sort());
-    const parTirelire = Object.fromEntries(lignes.map((l) => [l.label, centimes(l.num)]));
-    expect(parTirelire).toEqual({ 'Taxe foncière': 10000, 'Assurance auto': 5000, Vacances: 20000, 'Épargne de précaution': 30000 });
-    expect(Object.values(parTirelire).reduce((a, b) => a + b, 0)).toBe(demandé);
-
-    // Refermer, pour que la suite parte de la carte telle qu'elle s'ouvre.
-    const refermer = (await carte(page)).boutons.find((b) => /^détail|masquer|fermer/i.test(b));
-    if (refermer) await cliquerDansCarte(page, refermer);
-  });
-
-  it('le bouton ouvre une saisie dans la carte, visible, préremplie au pas au-dessus', async () => {
-    expect(await cliquerDansCarte(page, 'Corriger mon ordre')).toBe(true);
-    await attendre(400);
-    const c = await carte(page);
-    expect(dialogues, 'une boîte de confirmation fige-t-elle encore un calcul ?').toEqual([]);
-    expect(c.formulaire, 'aucune saisie ouverte dans la carte').toBeTruthy();
-    expect(c.formulaire!.haut).toBeGreaterThanOrEqual(0);
-    expect(c.formulaire!.bas).toBeLessThanOrEqual(812);
-    const proposé = centimes(c.formulaire!.valeur);
-    expect(proposé % 1000).toBe(0);
-    expect(proposé).toBeGreaterThanOrEqual(demandé);
-    expect(proposé - demandé).toBeLessThan(1000);
-  });
-
-  it('Annuler n’enregistre rien', async () => {
-    const avant = centimes((await carte(page)).lignes.find((l) => l.libellé.startsWith('Ordre permanent chez la banque'))?.montant ?? '');
-    expect(await cliquerDansCarte(page, 'Annuler')).toBe(true);
-    const c = await carte(page);
-    expect(c.formulaire).toBeUndefined();
-    // Le montant enregistré n'a pas bougé : rien n'a été écrit.
-    expect(centimes(ligne(c, 'Ordre permanent chez la banque')!.montant)).toBe(avant);
-  });
-
-  it('un ordre posé trop court s’enregistre tel quel, et le plan dit lequel changer', async () => {
-    await cliquerDansCarte(page, 'Corriger mon ordre');
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire', () => {
+    const demandé = 65000;
     const posé = demandé - 7000;
-    await saisirMontant(page, euros(posé));
-    await cliquerDansCarte(page, 'Enregistrer');
-    const c = await carte(page);
-    vérifierOrdrePosé(c, posé, demandé, await alertesÀlÉcran(page));
+    const carteCassée: Carte = {
+      visible: true,
+      lignes: [
+        { libellé: 'Virement permanent', sous: '', montant: '650,00 €' },
+        { libellé: 'Ordre permanent chez la banque', sous: 'chez la banque', montant: '650,00 €' },
+      ],
+      boutons: ['Détail', 'Corriger mon ordre'],
+    };
+    vérifierOrdrePosé(carteCassée, posé, demandé, []);
   });
 
-  it('le fait enregistré survit au rechargement', async () => {
-    // La sauvegarde dans IndexedDB part 400 ms après la dernière écriture (db.ts).
-    await attendre(1200);
-    await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => [...document.querySelectorAll('h2')].some((h) => h.textContent === 'Tirelires'));
-    const c = await carte(page);
-    expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(demandé - 7000);
-  });
+  describe.skipIf(!navigateur)('#14 · l’ordre permanent à l’écran, à 375 px', () => {
+    let site: Site;
+    let page: Page;
+    const dialogues: string[] = [];
 
-  it('corrigé à un montant arrondi au-dessus, l’ordre ne crie plus', async () => {
-    await cliquerDansCarte(page, 'Corriger mon ordre');
-    await saisirMontant(page, euros(demandé + 500));
-    await cliquerDansCarte(page, 'Enregistrer');
-    const c = await carte(page);
-    expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(demandé + 500);
-    expect(await alertesÀlÉcran(page)).toEqual([]);
-    // Un seul ordre : la correction remplace le fait, elle n'en ajoute pas un second.
-    expect(c.lignes.filter((l) => l.libellé.startsWith('Ordre permanent chez la banque'))).toHaveLength(1);
-  });
-
-  it('à l’écran Flux, l’ordre est marqué dérivé et ne s’ouvre pas à la main', async () => {
-    await allerÀ(page, 'Plus');
-    expect(await cliquer(page, 'Flux prévus')).toBe(true);
-    const flux = await page.evaluate(() =>
-      [...document.querySelectorAll('.row')]
-        .filter((r) => r.querySelector('strong')?.textContent?.includes('Virement'))
-        .map((r) => ({ texte: r.textContent ?? '', boutons: [...r.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '') })),
-    );
-    expect(flux, 'le flux de l’ordre permanent n’apparaît pas à l’écran Flux').toHaveLength(1);
-    expect(flux[0]!.texte).toContain('dérivé du budget');
-    expect(flux[0]!.boutons).not.toContain('Modifier');
-    expect(flux[0]!.boutons).toContain('Voir dans le Plan');
-    // Les flux déclarés, eux, restent modifiables.
-    const déclarés = await page.evaluate(() =>
-      [...document.querySelectorAll('.row')].filter((r) => r.textContent?.includes('Salaire') && r.querySelector('button')).map((r) => [...r.querySelectorAll('button')].map((b) => b.textContent?.trim())),
-    );
-    expect(déclarés.length).toBeGreaterThan(0);
-    for (const b of déclarés) expect(b).toContain('Modifier');
-    expect(await cliquer(page, 'Voir dans le Plan')).toBe(true);
-    expect((await carte(page)).visible).toBe(true);
-  });
-
-  it('le pas d’arrondi se règle : à zéro, le moindre écart se dit', async () => {
-    await allerÀ(page, 'Plus');
-    expect(await cliquer(page, 'Réglages')).toBe(true);
-    const ok = await page.evaluate(() => {
-      const h = [...document.querySelectorAll('h2')].find((x) => x.textContent?.includes('Arrondi des ordres permanents'));
-      const card = h?.nextElementSibling;
-      const input = card?.querySelector('input') as HTMLInputElement | null;
-      const bouton = card?.querySelector('button') as HTMLButtonElement | null;
-      if (!input || !bouton) return false;
-      input.value = '0';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      bouton.click();
-      return true;
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+      page = await ouvrirLExemple(site, 375, 812);
+      page.on('dialog', (d) => {
+        dialogues.push(d.message());
+        void d.accept();
+      });
     });
-    expect(ok, 'réglage « Arrondi des ordres permanents » introuvable').toBe(true);
-    await attendre();
-    await allerÀ(page, 'Plan');
-    const alertes = await alertesÀlÉcran(page);
-    expect(alertes).toHaveLength(1);
-    expect(alertes[0]).toContain(euros(demandé + 500));
-  });
+    afterAll(async () => {
+      await site?.fermer();
+    });
 
-  // Arbitrage du 10 septembre, suite : « simple pour le plus grand nombre, souple pour les
-  // exigeants ». Sorti de #14 : c'est l'issue #25. À rendre concrètes quand l'écran existe (les
-  // libellés ne sont pas encore choisis).
-  it.todo('sans rien toucher, la carte montre une seule ligne de virement permanent et un seul ordre à poser');
-  it.todo('depuis « Détail », diviser le virement ne demande pas de quitter la carte, et Annuler revient à la somme');
-  it.todo('depuis « Détail », regrouper des tirelires en plusieurs ordres : chaque ordre affiche sa demande, son fait bancaire et son écart');
-  it.todo('à 375 px, un compte divisé en quatre ordres reste lisible sans débordement');
-  it.todo('à l’écran Flux, chaque ordre d’un compte divisé est un flux dérivé distinct, non modifiable à la main');
+    let demandé = 0;
+
+    it('le Plan montre les deux montants dès l’exemple, et dit lequel changer', async () => {
+      // Le jeu d'exemple porte un ordre volontairement décalé (D60) : la banque vire 600 €, le
+      // budget en demande 650. La comparaison est donc là sans qu'on ait rien saisi.
+      const c = await carte(page);
+      expect(c.visible, `carte « ${COMPTE} » absente du Plan`).toBe(true);
+      const permanent = ligne(c, 'Virement permanent');
+      expect(permanent, 'ligne « Virement permanent » absente').toBeTruthy();
+      demandé = centimes(permanent!.montant);
+      expect(demandé).toBeGreaterThan(0);
+      const banque = ligne(c, 'Ordre permanent chez la banque');
+      expect(banque, 'ligne « Ordre permanent chez la banque » absente').toBeTruthy();
+      expect(centimes(banque!.montant)).toBeLessThan(demandé);
+      expect(c.boutons).toContain('Corriger mon ordre');
+      const [alerte] = await alertesÀlÉcran(page);
+      expect(alerte).toContain(COMPTE);
+    });
+
+    it('le virement s’affiche comme une somme ; « Détail » montre la dotation de chaque tirelire', async () => {
+      const TIRELIRES = ['Taxe foncière', 'Assurance auto', 'Vacances', 'Épargne de précaution'];
+      const lignesTirelires = () =>
+        page.evaluate((noms: string[]) => {
+          const c = [...document.querySelectorAll('.card')].find((x) => x.querySelector(':scope > .row strong')?.textContent?.trim() === 'Livret A');
+          if (!c) return [];
+          return [...c.querySelectorAll('.row')]
+            .filter((r) => (r as HTMLElement).offsetParent !== null)
+            .map((r) => ({ label: r.querySelector('.label')?.firstChild?.textContent?.trim() ?? '', num: r.querySelector('.num')?.textContent?.trim() ?? '' }))
+            .filter((l) => noms.includes(l.label));
+        }, TIRELIRES);
+
+      expect(await lignesTirelires(), 'la carte détaille déjà les tirelires au lieu d’afficher une somme').toEqual([]);
+      const boutons = (await carte(page)).boutons;
+      const détail = boutons.find((b) => /^détail/i.test(b));
+      expect(détail, `pas de bouton « Détail » dans la carte (boutons : ${boutons.join(', ')})`).toBeTruthy();
+      await cliquerDansCarte(page, détail!);
+
+      const lignes = await lignesTirelires();
+      expect(lignes.map((l) => l.label).sort()).toEqual([...TIRELIRES].sort());
+      const parTirelire = Object.fromEntries(lignes.map((l) => [l.label, centimes(l.num)]));
+      expect(parTirelire).toEqual({ 'Taxe foncière': 10000, 'Assurance auto': 5000, Vacances: 20000, 'Épargne de précaution': 30000 });
+      expect(Object.values(parTirelire).reduce((a, b) => a + b, 0)).toBe(demandé);
+
+      // Refermer, pour que la suite parte de la carte telle qu'elle s'ouvre.
+      const refermer = (await carte(page)).boutons.find((b) => /^détail|masquer|fermer/i.test(b));
+      if (refermer) await cliquerDansCarte(page, refermer);
+    });
+
+    it('le bouton ouvre une saisie dans la carte, visible, préremplie au pas au-dessus', async () => {
+      expect(await cliquerDansCarte(page, 'Corriger mon ordre')).toBe(true);
+      await attendre(400);
+      const c = await carte(page);
+      expect(dialogues, 'une boîte de confirmation fige-t-elle encore un calcul ?').toEqual([]);
+      expect(c.formulaire, 'aucune saisie ouverte dans la carte').toBeTruthy();
+      expect(c.formulaire!.haut).toBeGreaterThanOrEqual(0);
+      expect(c.formulaire!.bas).toBeLessThanOrEqual(812);
+      const proposé = centimes(c.formulaire!.valeur);
+      expect(proposé % 1000).toBe(0);
+      expect(proposé).toBeGreaterThanOrEqual(demandé);
+      expect(proposé - demandé).toBeLessThan(1000);
+    });
+
+    it('Annuler n’enregistre rien', async () => {
+      const avant = centimes((await carte(page)).lignes.find((l) => l.libellé.startsWith('Ordre permanent chez la banque'))?.montant ?? '');
+      expect(await cliquerDansCarte(page, 'Annuler')).toBe(true);
+      const c = await carte(page);
+      expect(c.formulaire).toBeUndefined();
+      // Le montant enregistré n'a pas bougé : rien n'a été écrit.
+      expect(centimes(ligne(c, 'Ordre permanent chez la banque')!.montant)).toBe(avant);
+    });
+
+    it('un ordre posé trop court s’enregistre tel quel, et le plan dit lequel changer', async () => {
+      await cliquerDansCarte(page, 'Corriger mon ordre');
+      const posé = demandé - 7000;
+      await saisirMontant(page, euros(posé));
+      await cliquerDansCarte(page, 'Enregistrer');
+      const c = await carte(page);
+      vérifierOrdrePosé(c, posé, demandé, await alertesÀlÉcran(page));
+    });
+
+    it('le fait enregistré survit au rechargement', async () => {
+      // La sauvegarde dans IndexedDB part 400 ms après la dernière écriture (db.ts).
+      await attendre(1200);
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => [...document.querySelectorAll('h2')].some((h) => h.textContent === 'Tirelires'));
+      const c = await carte(page);
+      expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(demandé - 7000);
+    });
+
+    it('corrigé à un montant arrondi au-dessus, l’ordre ne crie plus', async () => {
+      await cliquerDansCarte(page, 'Corriger mon ordre');
+      await saisirMontant(page, euros(demandé + 500));
+      await cliquerDansCarte(page, 'Enregistrer');
+      const c = await carte(page);
+      expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(demandé + 500);
+      expect(await alertesÀlÉcran(page)).toEqual([]);
+      // Un seul ordre : la correction remplace le fait, elle n'en ajoute pas un second.
+      expect(c.lignes.filter((l) => l.libellé.startsWith('Ordre permanent chez la banque'))).toHaveLength(1);
+    });
+
+    it('à l’écran Flux, l’ordre est marqué dérivé et ne s’ouvre pas à la main', async () => {
+      await allerÀ(page, 'Plus');
+      expect(await cliquer(page, 'Flux prévus')).toBe(true);
+      const flux = await page.evaluate(() =>
+        [...document.querySelectorAll('.row')]
+          .filter((r) => r.querySelector('strong')?.textContent?.includes('Virement'))
+          .map((r) => ({ texte: r.textContent ?? '', boutons: [...r.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '') })),
+      );
+      expect(flux, 'le flux de l’ordre permanent n’apparaît pas à l’écran Flux').toHaveLength(1);
+      expect(flux[0]!.texte).toContain('dérivé du budget');
+      expect(flux[0]!.boutons).not.toContain('Modifier');
+      expect(flux[0]!.boutons).toContain('Voir dans le Plan');
+      // Les flux déclarés, eux, restent modifiables.
+      const déclarés = await page.evaluate(() =>
+        [...document.querySelectorAll('.row')].filter((r) => r.textContent?.includes('Salaire') && r.querySelector('button')).map((r) => [...r.querySelectorAll('button')].map((b) => b.textContent?.trim())),
+      );
+      expect(déclarés.length).toBeGreaterThan(0);
+      for (const b of déclarés) expect(b).toContain('Modifier');
+      expect(await cliquer(page, 'Voir dans le Plan')).toBe(true);
+      expect((await carte(page)).visible).toBe(true);
+    });
+
+    it('le pas d’arrondi se règle : à zéro, le moindre écart se dit', async () => {
+      await allerÀ(page, 'Plus');
+      expect(await cliquer(page, 'Réglages')).toBe(true);
+      const ok = await page.evaluate(() => {
+        const h = [...document.querySelectorAll('h2')].find((x) => x.textContent?.includes('Arrondi des ordres permanents'));
+        const card = h?.nextElementSibling;
+        const input = card?.querySelector('input') as HTMLInputElement | null;
+        const bouton = card?.querySelector('button') as HTMLButtonElement | null;
+        if (!input || !bouton) return false;
+        input.value = '0';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        bouton.click();
+        return true;
+      });
+      expect(ok, 'réglage « Arrondi des ordres permanents » introuvable').toBe(true);
+      await attendre();
+      await allerÀ(page, 'Plan');
+      const alertes = await alertesÀlÉcran(page);
+      expect(alertes).toHaveLength(1);
+      expect(alertes[0]).toContain(euros(demandé + 500));
+    });
+
+    // Arbitrage du 10 septembre, suite : « simple pour le plus grand nombre, souple pour les
+    // exigeants ». Sorti de #14 : c'est l'issue #25. À rendre concrètes quand l'écran existe (les
+    // libellés ne sont pas encore choisis).
+    it.todo('sans rien toucher, la carte montre une seule ligne de virement permanent et un seul ordre à poser');
+    it.todo('depuis « Détail », diviser le virement ne demande pas de quitter la carte, et Annuler revient à la somme');
+    it.todo('depuis « Détail », regrouper des tirelires en plusieurs ordres : chaque ordre affiche sa demande, son fait bancaire et son écart');
+    it.todo('à 375 px, un compte divisé en quatre ordres reste lisible sans débordement');
+    it.todo('à l’écran Flux, chaque ordre d’un compte divisé est un flux dérivé distinct, non modifiable à la main');
+  });
 });

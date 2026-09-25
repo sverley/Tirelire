@@ -324,333 +324,335 @@ function vérifierUneOuverture(écran: string, o: Ouverture, tous: string[]) {
  * gris pâle et renommé à chaque frappe. Il doit échouer ; `it.fails` tient l'échec attendu (#66).
  * Il se joue sans navigateur : c'est la règle qu'on garde ici, pas une seconde visite des écrans.
  */
-it.fails('témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe', () => {
-  vérifierUneOuverture(
-    'Tirelires',
-    {
-      libellé: 'Modifier',
-      conteneur: 'ligne',
-      requis: ['Taxe foncière'],
-      panneaux: 1,
-      titre: 'Modifier',
-      lisible: true,
-      position: 'inventée',
-      figé: false,
-      déborde: false,
-      ajouteDébordement: false,
-      taille: 10,
-      contraste: 2.1,
-      fermé: true,
-    },
-    ['Taxe foncière', 'Assurance auto'],
-  );
-});
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe', () => {
+    vérifierUneOuverture(
+      'Tirelires',
+      {
+        libellé: 'Modifier',
+        conteneur: 'ligne',
+        requis: ['Taxe foncière'],
+        panneaux: 1,
+        titre: 'Modifier',
+        lisible: true,
+        position: 'inventée',
+        figé: false,
+        déborde: false,
+        ajouteDébordement: false,
+        taille: 10,
+        contraste: 2.1,
+        fermé: true,
+      },
+      ['Taxe foncière', 'Assurance auto'],
+    );
+  });
 
-describe.skipIf(!navigateur)('panneaux d’édition : ils disent sur quoi ils portent (issue #23, second défaut)', () => {
-  let site: Site;
-  let contexte: BrowserContext;
-  let page: Page;
+  describe.skipIf(!navigateur)('panneaux d’édition : ils disent sur quoi ils portent (issue #23, second défaut)', () => {
+    let site: Site;
+    let contexte: BrowserContext;
+    let page: Page;
 
-  async function aller(écran: { menu: string; titre: string }) {
-    await allerÀ(page, 'Plus');
-    if (!(await cliquer(page, écran.menu))) throw new Error(`l'écran ${écran.menu} est introuvable`);
-    await page.waitForFunction((t) => document.querySelector('h1')?.textContent === t, {}, écran.titre);
-  }
+    async function aller(écran: { menu: string; titre: string }) {
+      await allerÀ(page, 'Plus');
+      if (!(await cliquer(page, écran.menu))) throw new Error(`l'écran ${écran.menu} est introuvable`);
+      await page.waitForFunction((t) => document.querySelector('h1')?.textContent === t, {}, écran.titre);
+    }
 
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-    // Contexte isolé : base vide, sans rien hériter des autres tests ni de l'exemple.
-    contexte = await site.chrome.createBrowserContext();
-    page = await contexte.newPage();
-    page.on('dialog', (d) => void d.dismiss());
-    await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
-    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-    await page.goto(site.url, { waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
-    await page.evaluate(installer);
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+      // Contexte isolé : base vide, sans rien hériter des autres tests ni de l'exemple.
+      contexte = await site.chrome.createBrowserContext();
+      page = await contexte.newPage();
+      page.on('dialog', (d) => void d.dismiss());
+      await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
+      await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+      await page.goto(site.url, { waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
+      await page.evaluate(installer);
 
-    const distincts = TOUS.every((a) => TOUS.every((b) => a === b || !b.includes(a)));
-    if (!distincts) throw new Error('tirage de noms : un nom en contient un autre, relancer');
+      const distincts = TOUS.every((a) => TOUS.every((b) => a === b || !b.includes(a)));
+      if (!distincts) throw new Error('tirage de noms : un nom en contient un autre, relancer');
 
-    await aller(COMPTES);
-    await page.evaluate(async (n: Noms) => {
-      const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-      for (const nom of [n.compteA, n.compteB, n.compteLong]) {
-        o.bouton(document, 'Ajouter un compte').click();
-        await o.attendre();
-        const f = o.panneaux()[0]!;
-        await o.remplir(f, 'Nom', nom);
-        await o.soumettre(f);
-      }
-    }, NOMS);
-
-    await aller(TIRELIRES);
-    await page.evaluate(async (n: Noms) => {
-      const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-      for (const [nom, placée] of [[n.tirelireA, true], [n.tirelireB, true], [n.tirelireSansPlacement, false]] as const) {
-        o.bouton(document, 'Ajouter une tirelire').click();
-        await o.attendre();
-        const f = o.panneaux()[0]!;
-        await o.remplir(f, 'Nom', nom);
-        // Le formulaire peut proposer d'emblée une ligne de placement : on la complète, ou on la retire.
-        const aUneLigne = () => [...f.querySelectorAll('label')].some((l) => o.texte(l).startsWith('Compte'));
-        if (placée) {
-          if (!aUneLigne()) {
-            o.bouton(f, 'Ajouter un compte').click();
-            await o.attendre();
-          }
-          await o.remplir(f, 'Compte', n.compteB).catch(() => o.remplir(f, 'Compte', n.compteA));
-        } else {
-          while (aUneLigne()) {
-            o.bouton(f, 'Retirer').click();
-            await o.attendre();
-          }
+      await aller(COMPTES);
+      await page.evaluate(async (n: Noms) => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        for (const nom of [n.compteA, n.compteB, n.compteLong]) {
+          o.bouton(document, 'Ajouter un compte').click();
+          await o.attendre();
+          const f = o.panneaux()[0]!;
+          await o.remplir(f, 'Nom', nom);
+          await o.soumettre(f);
         }
-        await o.soumettre(f);
-      }
-      for (const nom of ['', n.besoinNommé]) {
-        const carte = o.carte(n.tirelireA);
-        if (!carte) throw new Error(`carte « ${n.tirelireA} » introuvable`);
-        o.bouton(carte, 'Ajouter un besoin').click();
-        await o.attendre();
-        const f = o.panneaux()[0]!;
-        if (nom) await o.remplir(f, 'Nom', nom);
-        await o.remplir(f, 'Montant', '100,00');
-        await o.soumettre(f);
-      }
-    }, NOMS);
+      }, NOMS);
 
-    await aller(CATÉGORIES);
-    await page.evaluate(async (n: Noms) => {
-      const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-      const ouvrirDépense = async () => {
+      await aller(TIRELIRES);
+      await page.evaluate(async (n: Noms) => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        for (const [nom, placée] of [[n.tirelireA, true], [n.tirelireB, true], [n.tirelireSansPlacement, false]] as const) {
+          o.bouton(document, 'Ajouter une tirelire').click();
+          await o.attendre();
+          const f = o.panneaux()[0]!;
+          await o.remplir(f, 'Nom', nom);
+          // Le formulaire peut proposer d'emblée une ligne de placement : on la complète, ou on la retire.
+          const aUneLigne = () => [...f.querySelectorAll('label')].some((l) => o.texte(l).startsWith('Compte'));
+          if (placée) {
+            if (!aUneLigne()) {
+              o.bouton(f, 'Ajouter un compte').click();
+              await o.attendre();
+            }
+            await o.remplir(f, 'Compte', n.compteB).catch(() => o.remplir(f, 'Compte', n.compteA));
+          } else {
+            while (aUneLigne()) {
+              o.bouton(f, 'Retirer').click();
+              await o.attendre();
+            }
+          }
+          await o.soumettre(f);
+        }
+        for (const nom of ['', n.besoinNommé]) {
+          const carte = o.carte(n.tirelireA);
+          if (!carte) throw new Error(`carte « ${n.tirelireA} » introuvable`);
+          o.bouton(carte, 'Ajouter un besoin').click();
+          await o.attendre();
+          const f = o.panneaux()[0]!;
+          if (nom) await o.remplir(f, 'Nom', nom);
+          await o.remplir(f, 'Montant', '100,00');
+          await o.soumettre(f);
+        }
+      }, NOMS);
+
+      await aller(CATÉGORIES);
+      await page.evaluate(async (n: Noms) => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        const ouvrirDépense = async () => {
+          for (const b of o.ouvreursPossibles().filter((x) => o.attendus(x, []).conteneur === 'libre')) {
+            b.click();
+            await o.attendre();
+            const f = o.panneaux()[0];
+            const nature = f && ([...f.querySelectorAll('select')] as HTMLSelectElement[]).find((s) => [...s.options].some((x) => x.value === 'income'));
+            if (f && nature?.value === 'expense') return f;
+            await o.annuler();
+          }
+          throw new Error('aucun panneau de création de catégorie de dépense');
+        };
+        for (const [nom, parent] of [[n.catégorie, ''], [n.sousCatégorie, n.catégorie], [n.catégorieLongue, '']] as const) {
+          const f = await ouvrirDépense();
+          await o.remplir(f, 'Nom', nom);
+          if (parent) await o.remplir(f, 'Catégorie parente', parent);
+          await o.soumettre(f);
+        }
+      }, NOMS);
+
+      await aller(FLUX);
+      await page.evaluate(async (n: Noms) => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        for (const nom of [n.flux, n.fluxLong]) {
+          o.bouton(document, 'Ajouter un flux').click();
+          await o.attendre();
+          const f = o.panneaux()[0]!;
+          await o.remplir(f, 'Nom', nom);
+          await o.remplir(f, 'Montant', '10,00');
+          await o.soumettre(f);
+        }
+      }, NOMS);
+
+      await aller(SAISIE);
+      await page.evaluate(async (n: Noms) => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        for (const nom of [n.opération, n.opérationLongue]) {
+          o.bouton(document, 'Saisir une opération').click();
+          await o.attendre();
+          const f = o.panneaux()[0]!;
+          await o.remplir(f, 'Libellé', nom);
+          await o.remplir(f, 'Montant', '12,00');
+          await o.soumettre(f);
+        }
+      }, NOMS);
+    }, 180_000);
+
+    afterAll(async () => {
+      await contexte?.close();
+      await site?.fermer();
+    });
+
+    for (const écran of ÉCRANS) {
+      it(`${écran.titre} : chaque panneau nomme l’élément touché, et lui seul`, async () => {
+        await aller(écran);
+        const { erreur, ouvertures } = await page.evaluate((noms: string[]) => (window as unknown as { __panneaux: Outillage }).__panneaux.toutOuvrir(noms), TOUS);
+        expect(erreur).toBeUndefined();
+        console.log(`[titres] ${écran.titre} : ${ouvertures.length} panneaux — ${ouvertures.map((o) => `« ${o.titre} »`).join(' ; ')}`);
+
+        for (const o of ouvertures) vérifierUneOuverture(écran.titre, o, TOUS);
+
+        // Deux actions différentes sur les mêmes éléments doivent s'annoncer différemment.
+        const parCible = new Map<string, Map<string, Set<string>>>();
+        for (const o of ouvertures) {
+          const cible = o.requis.join(' + ') || '(création)';
+          const actions = parCible.get(cible) ?? new Map<string, Set<string>>();
+          const action = `« ${o.libellé} » (${o.conteneur})`;
+          actions.set(action, (actions.get(action) ?? new Set<string>()).add(o.titre));
+          parCible.set(cible, actions);
+        }
+        for (const [cible, actions] of parCible) {
+          const liste = [...actions];
+          for (let i = 0; i < liste.length; i++)
+            for (let j = i + 1; j < liste.length; j++) {
+              const communs = [...liste[i]![1]].filter((t) => liste[j]![1].has(t));
+              expect.soft(communs, `${écran.titre}, ${cible} : ${liste[i]![0]} et ${liste[j]![0]} s’annoncent pareil`).toEqual([]);
+            }
+        }
+
+        // Couverture : le harnais ne passe pas à vide.
+        for (const c of écran.couverture) {
+          const clé = [...c.requis].sort().join(' + ');
+          const n = ouvertures.filter((o) => o.requis.join(' + ') === clé && (!c.conteneur || o.conteneur === c.conteneur)).length;
+          expect(n, `couverture : panneau non ouvert pour ${clé || 'une création'}${c.conteneur ? ` (${c.conteneur})` : ''}`).toBeGreaterThanOrEqual(c.min ?? 1);
+        }
+      }, 120_000);
+    }
+
+    for (const écran of ÉCRANS) {
+      it(`${écran.titre} : passer d’un élément à l’autre sans annuler renomme le panneau`, async () => {
+        await aller(écran);
+        const r = await page.evaluate(async (noms: string[]) => {
+          const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+          const cands = o.ouvreursPossibles().map((b) => ({ b, action: o.texte(b), ...o.attendus(b, noms) }));
+          const seul = cands.filter((x) => x.requis.length === 1);
+          let paire: [(typeof seul)[number], (typeof seul)[number]] | undefined;
+          for (const x of seul) for (const y of seul) if (!paire && x.action === y.action && x.conteneur === y.conteneur && x.requis[0] !== y.requis[0]) paire = [x, y];
+          if (!paire) return { trouvé: false, panneaux: 0, titre: '', de: '', vers: '' };
+          paire[0].b.click();
+          await o.attendre();
+          paire[1].b.click();
+          await o.attendre();
+          const ps = o.panneaux();
+          const titre = ps[0] ? o.lire(ps[0]).titre : '';
+          await o.annuler();
+          return { trouvé: true, panneaux: ps.length, titre, de: paire[0].requis[0]!, vers: paire[1].requis[0]! };
+        }, TOUS);
+        expect(r.trouvé, 'deux éléments ouvrables par la même action introuvables').toBe(true);
+        expect(r.panneaux).toBe(1);
+        expect(r.titre.includes(r.vers), `« ${r.titre} » ne nomme pas « ${r.vers} »`).toBe(true);
+        expect(r.titre.includes(r.de), `« ${r.titre} » nomme encore « ${r.de} »`).toBe(false);
+      }, 60_000);
+    }
+
+    it('Tirelires : deux panneaux ouverts ensemble nomment chacun le leur', async () => {
+      await aller(TIRELIRES);
+      const r = await page.evaluate(
+        async (noms: string[], a: string, b: string) => {
+          const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+          const deCarte = (nom: string) =>
+            o.ouvreursPossibles().filter((x) => {
+              const at = o.attendus(x, noms);
+              return at.conteneur === 'carte' && at.requis.length === 1 && at.requis[0] === nom;
+            });
+          // Le panneau de la tirelire s'ouvre après sa carte ; celui d'un besoin, dans la carte.
+          const où = async (x: HTMLButtonElement) => {
+            x.click();
+            await o.attendre();
+            const f = o.panneaux()[0];
+            const lieu = f ? (f.closest('.card') ? 'dans' : 'après') : 'aucun';
+            await o.annuler();
+            return lieu;
+          };
+          let pourA: HTMLButtonElement | undefined;
+          let pourB: HTMLButtonElement | undefined;
+          for (const x of deCarte(a)) if (!pourA && (await où(x)) === 'après') pourA = x;
+          for (const x of deCarte(b)) if (!pourB && (await où(x)) === 'dans') pourB = x;
+          if (!pourA || !pourB) return { trouvé: false, panneaux: 0, après: '', dans: '', carte: '' };
+          pourA.click();
+          await o.attendre();
+          pourB.click();
+          await o.attendre();
+          const ps = o.panneaux();
+          const fApres = ps.find((f) => !f.closest('.card'));
+          const fDans = ps.find((f) => !!f.closest('.card'));
+          const résultat = {
+            trouvé: true,
+            panneaux: ps.length,
+            après: fApres ? o.lire(fApres).titre : '',
+            dans: fDans ? o.lire(fDans).titre : '',
+            carte: fDans ? o.propre(fDans.closest('.card')!.querySelector(':scope > .row > .label')) : '',
+          };
+          await o.annuler();
+          return résultat;
+        },
+        TOUS,
+        NOMS.tirelireA,
+        NOMS.tirelireB,
+      );
+      expect(r.trouvé, 'boutons de tirelire et de besoin introuvables').toBe(true);
+      expect(r.panneaux).toBe(2);
+      expect(r.carte).toBe(NOMS.tirelireB);
+      expect(r.après.includes(NOMS.tirelireA) && !r.après.includes(NOMS.tirelireB), `panneau de la tirelire : « ${r.après} »`).toBe(true);
+      expect(r.dans.includes(NOMS.tirelireB) && !r.dans.includes(NOMS.tirelireA), `panneau du besoin : « ${r.dans} »`).toBe(true);
+    }, 60_000);
+
+    it('Catégories : basculer la nature fait annoncer la nature choisie', async () => {
+      await aller(CATÉGORIES);
+      const r = await page.evaluate(async () => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        const natureDe = (f: Element) =>
+          ([...f.querySelectorAll('select')] as HTMLSelectElement[]).find((s) => {
+            const v = [...s.options].map((x) => x.value);
+            return v.includes('expense') && v.includes('income');
+          });
+        const parNature = new Map<string, { b: HTMLButtonElement; titre: string }>();
         for (const b of o.ouvreursPossibles().filter((x) => o.attendus(x, []).conteneur === 'libre')) {
           b.click();
           await o.attendre();
           const f = o.panneaux()[0];
-          const nature = f && ([...f.querySelectorAll('select')] as HTMLSelectElement[]).find((s) => [...s.options].some((x) => x.value === 'income'));
-          if (f && nature?.value === 'expense') return f;
+          const s = f && natureDe(f);
+          if (f && s) parNature.set(s.value, { b, titre: o.lire(f).titre });
           await o.annuler();
         }
-        throw new Error('aucun panneau de création de catégorie de dépense');
-      };
-      for (const [nom, parent] of [[n.catégorie, ''], [n.sousCatégorie, n.catégorie], [n.catégorieLongue, '']] as const) {
-        const f = await ouvrirDépense();
-        await o.remplir(f, 'Nom', nom);
-        if (parent) await o.remplir(f, 'Catégorie parente', parent);
-        await o.soumettre(f);
-      }
-    }, NOMS);
-
-    await aller(FLUX);
-    await page.evaluate(async (n: Noms) => {
-      const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-      for (const nom of [n.flux, n.fluxLong]) {
-        o.bouton(document, 'Ajouter un flux').click();
+        const natures = [...parNature.keys()];
+        if (natures.length < 2) return { trouvé: false, départ: '', direct: '', basculé: '' };
+        const [de, vers] = natures as [string, string];
+        parNature.get(de)!.b.click();
         await o.attendre();
-        const f = o.panneaux()[0]!;
-        await o.remplir(f, 'Nom', nom);
-        await o.remplir(f, 'Montant', '10,00');
-        await o.soumettre(f);
-      }
-    }, NOMS);
-
-    await aller(SAISIE);
-    await page.evaluate(async (n: Noms) => {
-      const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-      for (const nom of [n.opération, n.opérationLongue]) {
-        o.bouton(document, 'Saisir une opération').click();
-        await o.attendre();
-        const f = o.panneaux()[0]!;
-        await o.remplir(f, 'Libellé', nom);
-        await o.remplir(f, 'Montant', '12,00');
-        await o.soumettre(f);
-      }
-    }, NOMS);
-  }, 180_000);
-
-  afterAll(async () => {
-    await contexte?.close();
-    await site?.fermer();
-  });
-
-  for (const écran of ÉCRANS) {
-    it(`${écran.titre} : chaque panneau nomme l’élément touché, et lui seul`, async () => {
-      await aller(écran);
-      const { erreur, ouvertures } = await page.evaluate((noms: string[]) => (window as unknown as { __panneaux: Outillage }).__panneaux.toutOuvrir(noms), TOUS);
-      expect(erreur).toBeUndefined();
-      console.log(`[titres] ${écran.titre} : ${ouvertures.length} panneaux — ${ouvertures.map((o) => `« ${o.titre} »`).join(' ; ')}`);
-
-      for (const o of ouvertures) vérifierUneOuverture(écran.titre, o, TOUS);
-
-      // Deux actions différentes sur les mêmes éléments doivent s'annoncer différemment.
-      const parCible = new Map<string, Map<string, Set<string>>>();
-      for (const o of ouvertures) {
-        const cible = o.requis.join(' + ') || '(création)';
-        const actions = parCible.get(cible) ?? new Map<string, Set<string>>();
-        const action = `« ${o.libellé} » (${o.conteneur})`;
-        actions.set(action, (actions.get(action) ?? new Set<string>()).add(o.titre));
-        parCible.set(cible, actions);
-      }
-      for (const [cible, actions] of parCible) {
-        const liste = [...actions];
-        for (let i = 0; i < liste.length; i++)
-          for (let j = i + 1; j < liste.length; j++) {
-            const communs = [...liste[i]![1]].filter((t) => liste[j]![1].has(t));
-            expect.soft(communs, `${écran.titre}, ${cible} : ${liste[i]![0]} et ${liste[j]![0]} s’annoncent pareil`).toEqual([]);
-          }
-      }
-
-      // Couverture : le harnais ne passe pas à vide.
-      for (const c of écran.couverture) {
-        const clé = [...c.requis].sort().join(' + ');
-        const n = ouvertures.filter((o) => o.requis.join(' + ') === clé && (!c.conteneur || o.conteneur === c.conteneur)).length;
-        expect(n, `couverture : panneau non ouvert pour ${clé || 'une création'}${c.conteneur ? ` (${c.conteneur})` : ''}`).toBeGreaterThanOrEqual(c.min ?? 1);
-      }
-    }, 120_000);
-  }
-
-  for (const écran of ÉCRANS) {
-    it(`${écran.titre} : passer d’un élément à l’autre sans annuler renomme le panneau`, async () => {
-      await aller(écran);
-      const r = await page.evaluate(async (noms: string[]) => {
-        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-        const cands = o.ouvreursPossibles().map((b) => ({ b, action: o.texte(b), ...o.attendus(b, noms) }));
-        const seul = cands.filter((x) => x.requis.length === 1);
-        let paire: [(typeof seul)[number], (typeof seul)[number]] | undefined;
-        for (const x of seul) for (const y of seul) if (!paire && x.action === y.action && x.conteneur === y.conteneur && x.requis[0] !== y.requis[0]) paire = [x, y];
-        if (!paire) return { trouvé: false, panneaux: 0, titre: '', de: '', vers: '' };
-        paire[0].b.click();
-        await o.attendre();
-        paire[1].b.click();
-        await o.attendre();
-        const ps = o.panneaux();
-        const titre = ps[0] ? o.lire(ps[0]).titre : '';
-        await o.annuler();
-        return { trouvé: true, panneaux: ps.length, titre, de: paire[0].requis[0]!, vers: paire[1].requis[0]! };
-      }, TOUS);
-      expect(r.trouvé, 'deux éléments ouvrables par la même action introuvables').toBe(true);
-      expect(r.panneaux).toBe(1);
-      expect(r.titre.includes(r.vers), `« ${r.titre} » ne nomme pas « ${r.vers} »`).toBe(true);
-      expect(r.titre.includes(r.de), `« ${r.titre} » nomme encore « ${r.de} »`).toBe(false);
-    }, 60_000);
-  }
-
-  it('Tirelires : deux panneaux ouverts ensemble nomment chacun le leur', async () => {
-    await aller(TIRELIRES);
-    const r = await page.evaluate(
-      async (noms: string[], a: string, b: string) => {
-        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-        const deCarte = (nom: string) =>
-          o.ouvreursPossibles().filter((x) => {
-            const at = o.attendus(x, noms);
-            return at.conteneur === 'carte' && at.requis.length === 1 && at.requis[0] === nom;
-          });
-        // Le panneau de la tirelire s'ouvre après sa carte ; celui d'un besoin, dans la carte.
-        const où = async (x: HTMLButtonElement) => {
-          x.click();
-          await o.attendre();
-          const f = o.panneaux()[0];
-          const lieu = f ? (f.closest('.card') ? 'dans' : 'après') : 'aucun';
-          await o.annuler();
-          return lieu;
-        };
-        let pourA: HTMLButtonElement | undefined;
-        let pourB: HTMLButtonElement | undefined;
-        for (const x of deCarte(a)) if (!pourA && (await où(x)) === 'après') pourA = x;
-        for (const x of deCarte(b)) if (!pourB && (await où(x)) === 'dans') pourB = x;
-        if (!pourA || !pourB) return { trouvé: false, panneaux: 0, après: '', dans: '', carte: '' };
-        pourA.click();
-        await o.attendre();
-        pourB.click();
-        await o.attendre();
-        const ps = o.panneaux();
-        const fApres = ps.find((f) => !f.closest('.card'));
-        const fDans = ps.find((f) => !!f.closest('.card'));
-        const résultat = {
-          trouvé: true,
-          panneaux: ps.length,
-          après: fApres ? o.lire(fApres).titre : '',
-          dans: fDans ? o.lire(fDans).titre : '',
-          carte: fDans ? o.propre(fDans.closest('.card')!.querySelector(':scope > .row > .label')) : '',
-        };
-        await o.annuler();
-        return résultat;
-      },
-      TOUS,
-      NOMS.tirelireA,
-      NOMS.tirelireB,
-    );
-    expect(r.trouvé, 'boutons de tirelire et de besoin introuvables').toBe(true);
-    expect(r.panneaux).toBe(2);
-    expect(r.carte).toBe(NOMS.tirelireB);
-    expect(r.après.includes(NOMS.tirelireA) && !r.après.includes(NOMS.tirelireB), `panneau de la tirelire : « ${r.après} »`).toBe(true);
-    expect(r.dans.includes(NOMS.tirelireB) && !r.dans.includes(NOMS.tirelireA), `panneau du besoin : « ${r.dans} »`).toBe(true);
-  }, 60_000);
-
-  it('Catégories : basculer la nature fait annoncer la nature choisie', async () => {
-    await aller(CATÉGORIES);
-    const r = await page.evaluate(async () => {
-      const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-      const natureDe = (f: Element) =>
-        ([...f.querySelectorAll('select')] as HTMLSelectElement[]).find((s) => {
-          const v = [...s.options].map((x) => x.value);
-          return v.includes('expense') && v.includes('income');
-        });
-      const parNature = new Map<string, { b: HTMLButtonElement; titre: string }>();
-      for (const b of o.ouvreursPossibles().filter((x) => o.attendus(x, []).conteneur === 'libre')) {
-        b.click();
+        const s = natureDe(o.panneaux()[0]!)!;
+        s.value = vers;
+        s.dispatchEvent(new Event('change', { bubbles: true }));
         await o.attendre();
         const f = o.panneaux()[0];
-        const s = f && natureDe(f);
-        if (f && s) parNature.set(s.value, { b, titre: o.lire(f).titre });
+        const basculé = f ? o.lire(f).titre : '';
         await o.annuler();
-      }
-      const natures = [...parNature.keys()];
-      if (natures.length < 2) return { trouvé: false, départ: '', direct: '', basculé: '' };
-      const [de, vers] = natures as [string, string];
-      parNature.get(de)!.b.click();
-      await o.attendre();
-      const s = natureDe(o.panneaux()[0]!)!;
-      s.value = vers;
-      s.dispatchEvent(new Event('change', { bubbles: true }));
-      await o.attendre();
-      const f = o.panneaux()[0];
-      const basculé = f ? o.lire(f).titre : '';
-      await o.annuler();
-      return { trouvé: true, départ: parNature.get(de)!.titre, direct: parNature.get(vers)!.titre, basculé };
-    });
-    expect(r.trouvé, 'deux panneaux de création de natures différentes introuvables').toBe(true);
-    expect(r.direct, 'les créations des deux natures s’annoncent pareil').not.toBe(r.départ);
-    expect(r.basculé, `après bascule, « ${r.basculé} » au lieu de « ${r.direct} »`).toBe(r.direct);
-  }, 60_000);
-
-  // En dernier : « Réviser » écrit une révision dans la base.
-  it('Tirelires : une révision nomme sa tirelire et ne s’annonce pas comme une modification', async () => {
-    await aller(TIRELIRES);
-    const r = await page.evaluate(async (noms: string[], a: string) => {
-      const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-      const réviser = ([...document.querySelectorAll('main button')] as HTMLButtonElement[]).find((b) => {
-        const at = o.attendus(b, noms);
-        return o.texte(b) === 'Réviser' && at.conteneur === 'ligne' && at.requis.join() === a;
+        return { trouvé: true, départ: parNature.get(de)!.titre, direct: parNature.get(vers)!.titre, basculé };
       });
-      const ligne = réviser?.closest('.row');
-      const modifier = ligne ? o.ouvreursPossibles().find((b) => b.closest('.row') === ligne) : undefined;
-      if (!réviser || !modifier) return { trouvé: false, modification: '', révision: '' };
-      modifier.click();
-      await o.attendre();
-      const modification = o.lire(o.panneaux()[0]!).titre;
-      await o.annuler();
-      réviser.click();
-      await o.attendre();
-      const f = o.panneaux()[0];
-      const révision = f ? o.lire(f).titre : '';
-      await o.annuler();
-      return { trouvé: true, modification, révision };
-    }, TOUS, NOMS.tirelireA);
-    expect(r.trouvé, 'besoin révisable introuvable').toBe(true);
-    expect(r.révision.includes(NOMS.tirelireA), `« ${r.révision} » ne nomme pas la tirelire`).toBe(true);
-    expect(TOUS.filter((n) => n !== NOMS.tirelireA && r.révision.includes(n)), 'la révision nomme un autre élément').toEqual([]);
-    expect(r.révision, 'la révision s’annonce comme une modification').not.toBe(r.modification);
-  }, 60_000);
+      expect(r.trouvé, 'deux panneaux de création de natures différentes introuvables').toBe(true);
+      expect(r.direct, 'les créations des deux natures s’annoncent pareil').not.toBe(r.départ);
+      expect(r.basculé, `après bascule, « ${r.basculé} » au lieu de « ${r.direct} »`).toBe(r.direct);
+    }, 60_000);
+
+    // En dernier : « Réviser » écrit une révision dans la base.
+    it('Tirelires : une révision nomme sa tirelire et ne s’annonce pas comme une modification', async () => {
+      await aller(TIRELIRES);
+      const r = await page.evaluate(async (noms: string[], a: string) => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        const réviser = ([...document.querySelectorAll('main button')] as HTMLButtonElement[]).find((b) => {
+          const at = o.attendus(b, noms);
+          return o.texte(b) === 'Réviser' && at.conteneur === 'ligne' && at.requis.join() === a;
+        });
+        const ligne = réviser?.closest('.row');
+        const modifier = ligne ? o.ouvreursPossibles().find((b) => b.closest('.row') === ligne) : undefined;
+        if (!réviser || !modifier) return { trouvé: false, modification: '', révision: '' };
+        modifier.click();
+        await o.attendre();
+        const modification = o.lire(o.panneaux()[0]!).titre;
+        await o.annuler();
+        réviser.click();
+        await o.attendre();
+        const f = o.panneaux()[0];
+        const révision = f ? o.lire(f).titre : '';
+        await o.annuler();
+        return { trouvé: true, modification, révision };
+      }, TOUS, NOMS.tirelireA);
+      expect(r.trouvé, 'besoin révisable introuvable').toBe(true);
+      expect(r.révision.includes(NOMS.tirelireA), `« ${r.révision} » ne nomme pas la tirelire`).toBe(true);
+      expect(TOUS.filter((n) => n !== NOMS.tirelireA && r.révision.includes(n)), 'la révision nomme un autre élément').toEqual([]);
+      expect(r.révision, 'la révision s’annonce comme une modification').not.toBe(r.modification);
+    }, 60_000);
+  });
 });

@@ -22,62 +22,64 @@ async function seeded(site: string) {
   return s;
 }
 
-describe('dépôt SQLite', () => {
-  it('LEDGER_KEYS couvre toutes les tables du grand livre', () => {
-    // Écrire un grand livre table par table, à la main, se paie : la fonction qui charge l'exemple
-    // dans l'application avait oublié `needs`, donc chargeait des tirelires sans aucun besoin. Tout
-    // ce qui parcourt les tables passe désormais par cette liste, et ce test la garde complète.
-    const tables = Object.entries(emptyLedger())
-      .filter(([, v]) => Array.isArray(v))
-      .map(([k]) => k);
-    expect([...LEDGER_KEYS].sort()).toEqual(tables.sort());
-  });
+describe('[niveau 0] harnais du registre', () => {
+  describe('dépôt SQLite', () => {
+    it('LEDGER_KEYS couvre toutes les tables du grand livre', () => {
+      // Écrire un grand livre table par table, à la main, se paie : la fonction qui charge l'exemple
+      // dans l'application avait oublié `needs`, donc chargeait des tirelires sans aucun besoin. Tout
+      // ce qui parcourt les tables passe désormais par cette liste, et ce test la garde complète.
+      const tables = Object.entries(emptyLedger())
+        .filter(([, v]) => Array.isArray(v))
+        .map(([k]) => k);
+      expect([...LEDGER_KEYS].sort()).toEqual(tables.sort());
+    });
 
-  it('écrit, relit, et le plan est identique à celui calculé en mémoire', async () => {
-    const s = await seeded('A');
-    const loaded = s.load();
-    const fromMemory = computePlan(exampleLedger(), '2026-09-06');
-    const fromStore = computePlan(loaded, '2026-09-06');
-    expect(fromStore.totals).toEqual(fromMemory.totals);
-    expect(fromStore.transfers).toEqual(fromMemory.transfers);
-    expect(loaded.settings.principalCushion).toBe(exampleLedger().settings.principalCushion);
-    expect(loaded.settings.siteId).toBe('A');
-  });
+    it('écrit, relit, et le plan est identique à celui calculé en mémoire', async () => {
+      const s = await seeded('A');
+      const loaded = s.load();
+      const fromMemory = computePlan(exampleLedger(), '2026-09-06');
+      const fromStore = computePlan(loaded, '2026-09-06');
+      expect(fromStore.totals).toEqual(fromMemory.totals);
+      expect(fromStore.transfers).toEqual(fromMemory.transfers);
+      expect(loaded.settings.principalCushion).toBe(exampleLedger().settings.principalCushion);
+      expect(loaded.settings.siteId).toBe('A');
+    });
 
-  it('survit à un export / réouverture', async () => {
-    const s = await seeded('A');
-    const bytes = s.export();
-    const again = await open('A', bytes);
-    expect(again.load().tirelires.length).toBe(exampleLedger().tirelires.length);
-    expect(again.load()).toEqual(s.load());
-  });
+    it('survit à un export / réouverture', async () => {
+      const s = await seeded('A');
+      const bytes = s.export();
+      const again = await open('A', bytes);
+      expect(again.load().tirelires.length).toBe(exampleLedger().tirelires.length);
+      expect(again.load()).toEqual(s.load());
+    });
 
-  it('une écriture date la ligne entière, et rien ne se date si rien ne change', async () => {
-    const s = await open('A');
-    const acc = exampleLedger().accounts[0]!;
-    s.upsert('accounts', acc);
-    const horloge = () => s.query(`SELECT hlc FROM accounts WHERE id = ?`, [acc.id])[0]!['hlc'] as string;
-    const avant = horloge();
-    expect(avant).toMatch(/:A$/);
-    s.upsert('accounts', acc); // identique : rien
-    expect(horloge()).toBe(avant);
-    s.upsert('accounts', { ...acc, name: 'Compte joint' });
-    expect(horloge() > avant).toBe(true);
-    expect(s.query(`SELECT name FROM sqlite_master WHERE name IN ('changes', 'cell_versions')`)).toEqual([]);
-  });
+    it('une écriture date la ligne entière, et rien ne se date si rien ne change', async () => {
+      const s = await open('A');
+      const acc = exampleLedger().accounts[0]!;
+      s.upsert('accounts', acc);
+      const horloge = () => s.query(`SELECT hlc FROM accounts WHERE id = ?`, [acc.id])[0]!['hlc'] as string;
+      const avant = horloge();
+      expect(avant).toMatch(/:A$/);
+      s.upsert('accounts', acc); // identique : rien
+      expect(horloge()).toBe(avant);
+      s.upsert('accounts', { ...acc, name: 'Compte joint' });
+      expect(horloge() > avant).toBe(true);
+      expect(s.query(`SELECT name FROM sqlite_master WHERE name IN ('changes', 'cell_versions')`)).toEqual([]);
+    });
 
-  it('suppression logique', async () => {
-    const s = await seeded('A');
-    s.remove('tirelires', 'env-divers');
-    const l = s.load();
-    expect(l.tirelires.find((e) => e.id === 'env-divers')?.deletedAt).toBeTruthy();
-    expect(computePlan(l, '2026-09-06').lines.map((x) => x.tirelireId)).not.toContain('env-divers');
-  });
+    it('suppression logique', async () => {
+      const s = await seeded('A');
+      s.remove('tirelires', 'env-divers');
+      const l = s.load();
+      expect(l.tirelires.find((e) => e.id === 'env-divers')?.deletedAt).toBeTruthy();
+      expect(computePlan(l, '2026-09-06').lines.map((x) => x.tirelireId)).not.toContain('env-divers');
+    });
 
-  it('requête SQL libre', async () => {
-    const s = await seeded('A');
-    const rows = s.query(`SELECT name FROM envelopes WHERE placement LIKE ? ORDER BY name`, ['%acc-livret%']);
-    expect(rows.map((r) => r['name'])).toEqual(['Assurance auto', 'Taxe foncière', 'Vacances', 'Épargne de précaution']);
+    it('requête SQL libre', async () => {
+      const s = await seeded('A');
+      const rows = s.query(`SELECT name FROM envelopes WHERE placement LIKE ? ORDER BY name`, ['%acc-livret%']);
+      expect(rows.map((r) => r['name'])).toEqual(['Assurance auto', 'Taxe foncière', 'Vacances', 'Épargne de précaution']);
+    });
   });
 });
 
@@ -111,15 +113,17 @@ describe('identifiants', () => {
 // version volontairement cassée du besoin.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-it.fails('témoin rouge · une sauvegarde qui rejoue les tables et en oublie une', async () => {
-  const s = await seeded('A');
-  // Version cassée : au lieu du fichier exporté, la sauvegarde réécrit les tables une à une — et
-  // en oublie une, exactement comme la fonction qui chargeait l'exemple sans ses besoins.
-  const copie = await open('A');
-  const l = s.load();
-  for (const a of l.accounts) copie.upsert('accounts', a);
-  for (const n of l.needs) copie.upsert('needs', n);
+describe('[niveau 0] harnais du registre', () => {
+  it.fails('témoin rouge · une sauvegarde qui rejoue les tables et en oublie une', async () => {
+    const s = await seeded('A');
+    // Version cassée : au lieu du fichier exporté, la sauvegarde réécrit les tables une à une — et
+    // en oublie une, exactement comme la fonction qui chargeait l'exemple sans ses besoins.
+    const copie = await open('A');
+    const l = s.load();
+    for (const a of l.accounts) copie.upsert('accounts', a);
+    for (const n of l.needs) copie.upsert('needs', n);
 
-  expect(copie.load().tirelires.length).toBe(exampleLedger().tirelires.length);
-  expect(copie.load()).toEqual(s.load());
+    expect(copie.load().tirelires.length).toBe(exampleLedger().tirelires.length);
+    expect(copie.load()).toEqual(s.load());
+  });
 });

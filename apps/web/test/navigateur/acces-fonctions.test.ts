@@ -116,23 +116,25 @@ function vérifierLInventaire(r: Relevé) {
  * muet. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur : c'est
  * la règle qu'on garde ici, pas une seconde visite des écrans.
  */
-it.fails('témoin rouge · une fonction sans point d entrée depuis l accueil', () => {
-  vérifierLInventaire({
-    vuesDuShell: [...INVENTAIRE.map((f) => f.vue), 'automatismes'],
-    visites: [
-      {
-        vue: 'entries',
-        nom: 'Saisie manuelle',
-        gestes: 3,
-        atteint: true,
-        point: 'Saisie manuelle',
-        annonce: 'Saisie manuelle',
-        description: '',
-        marqueLue: true,
-        amorceLue: false,
-        texte: 'Saisie Aucune opération saisie.',
-      },
-    ],
+describe('[niveau 1] harnais du registre', () => {
+  it.fails('témoin rouge · une fonction sans point d entrée depuis l accueil', () => {
+    vérifierLInventaire({
+      vuesDuShell: [...INVENTAIRE.map((f) => f.vue), 'automatismes'],
+      visites: [
+        {
+          vue: 'entries',
+          nom: 'Saisie manuelle',
+          gestes: 3,
+          atteint: true,
+          point: 'Saisie manuelle',
+          annonce: 'Saisie manuelle',
+          description: '',
+          marqueLue: true,
+          amorceLue: false,
+          texte: 'Saisie Aucune opération saisie.',
+        },
+      ],
+    });
   });
 });
 
@@ -213,34 +215,36 @@ async function visiter(page: Page, f: Fonction): Promise<Visite> {
   };
 }
 
-describe.skipIf(!navigateur)('I5 · inventaire des fonctions et de leur point d’entrée (issue #71)', () => {
-  let site: Site;
-  let contexte: BrowserContext;
-  let page: Page;
-  let relevé: Relevé;
+describe('[niveau 1] harnais du registre', () => {
+  describe.skipIf(!navigateur)('I5 · inventaire des fonctions et de leur point d’entrée (issue #71)', () => {
+    let site: Site;
+    let contexte: BrowserContext;
+    let page: Page;
+    let relevé: Relevé;
 
-  beforeAll(async () => {
-    site = await ouvrirLeSite();
-    // Contexte isolé, base vide : c'est là qu'un écran mal amené ne dit rien.
-    contexte = await site.chrome.createBrowserContext();
-    page = await contexte.newPage();
-    page.on('dialog', (d) => void d.dismiss());
-    await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
-    await page.goto(site.url, { waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
+    beforeAll(async () => {
+      site = await ouvrirLeSite();
+      // Contexte isolé, base vide : c'est là qu'un écran mal amené ne dit rien.
+      contexte = await site.chrome.createBrowserContext();
+      page = await contexte.newPage();
+      page.on('dialog', (d) => void d.dismiss());
+      await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
+      await page.goto(site.url, { waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
 
-    const visites: Visite[] = [];
-    for (const f of INVENTAIRE) visites.push(await visiter(page, f));
-    relevé = { vuesDuShell: vuesDuShell(readFileSync(resolve(RACINE, 'src/lib/state.svelte.ts'), 'utf8')), visites };
-  }, 300_000);
+      const visites: Visite[] = [];
+      for (const f of INVENTAIRE) visites.push(await visiter(page, f));
+      relevé = { vuesDuShell: vuesDuShell(readFileSync(resolve(RACINE, 'src/lib/state.svelte.ts'), 'utf8')), visites };
+    }, 300_000);
 
-  afterAll(async () => {
-    await contexte?.close();
-    await site?.fermer();
+    afterAll(async () => {
+      await contexte?.close();
+      await site?.fermer();
+    });
+
+    it('inventaire des fonctions · chacune atteinte, nommée, et amorcée à vide', () => {
+      console.log(`[accès] ${relevé.visites.map((v) => `${v.nom} (${v.gestes})`).join(' · ')}`);
+      vérifierLInventaire(relevé);
+    }, 60_000);
   });
-
-  it('inventaire des fonctions · chacune atteinte, nommée, et amorcée à vide', () => {
-    console.log(`[accès] ${relevé.visites.map((v) => `${v.nom} (${v.gestes})`).join(' · ')}`);
-    vérifierLInventaire(relevé);
-  }, 60_000);
 });

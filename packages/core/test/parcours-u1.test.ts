@@ -76,39 +76,41 @@ function planDeLObservé(plan: Plan): Plan {
   };
 }
 
-describe('U1 · budget seul, de bout en bout (#15)', () => {
-  it('parcours U1 · de la base vide au plan, sans une seule opération', async () => {
-    const store = await baseVide('parcours-u1');
-    expect(store.load().tirelires, 'la base ne part pas vide').toEqual([]);
+describe('[niveau 1] harnais du registre', () => {
+  describe('U1 · budget seul, de bout en bout (#15)', () => {
+    it('parcours U1 · de la base vide au plan, sans une seule opération', async () => {
+      const store = await baseVide('parcours-u1');
+      expect(store.load().tirelires, 'la base ne part pas vide').toEqual([]);
 
-    ecrireLeBudget(store);
-    const ledger = await relire(store, 'parcours-u1');
-    store.close();
+      ecrireLeBudget(store);
+      const ledger = await relire(store, 'parcours-u1');
+      store.close();
 
-    // Rien n'a été importé ni saisi : c'est la condition de l'usage, pas un détail du cas.
-    expect(ledger.operations).toEqual([]);
-    expect(ledger.allocations).toEqual([]);
-    expect(ledger.settings.periodStartDay).toBe(PAIE);
-    expect(ledger.tirelires).toHaveLength(3);
+      // Rien n'a été importé ni saisi : c'est la condition de l'usage, pas un détail du cas.
+      expect(ledger.operations).toEqual([]);
+      expect(ledger.allocations).toEqual([]);
+      expect(ledger.settings.periodStartDay).toBe(PAIE);
+      expect(ledger.tirelires).toHaveLength(3);
 
-    leParcoursSeLit(computePlan(ledger, AS_OF));
+      leParcoursSeLit(computePlan(ledger, AS_OF));
 
-    // Le bilan ne fabrique pas d'observé : aucun historique, aucune moyenne — mais la cible du
-    // budget s'y lit déjà (« ce qui est prévu », #15).
-    expect(historyStart(ledger)).toBeUndefined();
-    const bilan = reviewCategories(ledger, lastPeriods(ledger, AS_OF, 3));
-    for (const c of bilan) {
-      expect(c.totalSpent, `« ${c.name} » montre une dépense sans opération`).toBe(0);
-      expect(c.avg3).toBe(0);
-    }
-    expect(bilan.filter((c) => c.target !== undefined).map((c) => c.target)).toEqual([euros(500)]);
-  });
+      // Le bilan ne fabrique pas d'observé : aucun historique, aucune moyenne — mais la cible du
+      // budget s'y lit déjà (« ce qui est prévu », #15).
+      expect(historyStart(ledger)).toBeUndefined();
+      const bilan = reviewCategories(ledger, lastPeriods(ledger, AS_OF, 3));
+      for (const c of bilan) {
+        expect(c.totalSpent, `« ${c.name} » montre une dépense sans opération`).toBe(0);
+        expect(c.avg3).toBe(0);
+      }
+      expect(bilan.filter((c) => c.target !== undefined).map((c) => c.target)).toEqual([euros(500)]);
+    });
 
-  it.fails('témoin rouge · un plan dont les dotations viennent de ce que les opérations montrent', async () => {
-    const store = await baseVide('parcours-u1-témoin');
-    ecrireLeBudget(store);
-    const ledger = store.load();
-    store.close();
-    leParcoursSeLit(planDeLObservé(computePlan(ledger, AS_OF)));
+    it.fails('témoin rouge · un plan dont les dotations viennent de ce que les opérations montrent', async () => {
+      const store = await baseVide('parcours-u1-témoin');
+      ecrireLeBudget(store);
+      const ledger = store.load();
+      store.close();
+      leParcoursSeLit(planDeLObservé(computePlan(ledger, AS_OF)));
+    });
   });
 });
