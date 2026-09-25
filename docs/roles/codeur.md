@@ -26,9 +26,10 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
    manquante —, demande au porteur, en commentaire de l'issue, la modification proposée, avec son
    texte.
 6. Si le harnais paraît faux ou le besoin impossible, dis-le en commentaire et arrête-toi.
-7. Quand le typecheck et le harnais sont verts, écris un seul commentaire sur la PR : ce qui appelle
-   une validation humaine — pour chaque vérification manuelle demandée, ce que tes modifications
-   changent et ce qui reste à constater —, et, si tu changes le comportement de la garde, ce qu'en
-   demande D81. Honnête et court. Puis arrête-toi.
+7. Quand le typecheck et le harnais sont verts, écris un commentaire sur la PR, un seul par tour —
+   un compte rendu à chaque fois que tu rends le travail, au premier tour comme après chaque retour
+   de l'auditeur ou du porteur : ce qui appelle une validation humaine — pour chaque vérification
+   manuelle demandée, ce que tes modifications changent et ce qui reste à constater —, et, si tu
+   changes le comportement de la garde, ce qu'en demande D81. Honnête et court. Puis arrête-toi.
 
 Tu ne passes jamais la PR en Ready et ne la fusionnes jamais. Tu n'ouvres pas d'issue.
