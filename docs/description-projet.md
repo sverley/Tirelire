@@ -562,3 +562,9 @@ Sur la proposition de l'auditeur de #197 de sortir les tests de niveau 0 et 1 d'
 fichier à part, que le registre citerait en entier, sans les instantanés ni la sonde de diagnostic :
 
 > oui
+
+### L'entrée du seuil
+
+> non, le contrat par varieble d'environnement me semble mauvais
+
+> pnpm test [N] où N est facultatif (2 par defaut comme avant). Attention, légère modification du besoin par l'architecte à prendre en compte
