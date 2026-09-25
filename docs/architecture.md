@@ -118,7 +118,7 @@ relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`).
 
 - `pnpm test` : les tests vitest du cœur (périodes, plan, positions et invariants, besoins,
   report, états et filtre, dépôt, fusion, import, rapprochement, règles, ventilation à parts,
-  bilan, sync), plus trois gardes de navigateur sur le harnais commun `apps/web/test/harnais.ts`
-  (mise en page mobile, ergonomie au doigt, filtre d'état).
+  bilan, sync), plus les gardes de navigateur de `apps/web/test/navigateur/`, sur le harnais commun
+  `apps/web/test/harnais.ts`.
 - `pnpm typecheck`, `pnpm build`.
 - Scénarios navigateur joués avec Playwright pendant le développement (exemple → import CSV → tri → bilan ; synchronisation WebRTC et relais entre deux contextes).

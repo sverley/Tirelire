@@ -813,8 +813,8 @@ charges période après période : ce n'est pas ce que le plan fait, et il ne le
 ### D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
 Reprise du signalement « le jeu d'exemple ne contient aucun besoin ». Le défaut
-principal n'existe plus : depuis D50 et D51, `example.ts` porte treize besoins, chacune des neuf
-tirelires en a au moins un, et le plan de la période en cours demande 2 350 € pour 630 € de marge.
+principal n'existe plus : depuis D50 et D51, chaque tirelire de `example.ts` porte au moins un besoin, et la marge du
+plan de la période en cours est positive, mais inférieure à ce qu'il demande (`exemple-complet.test.ts`).
 Rien n'était à corriger de ce côté. Restaient les deux points que le même signalement soulevait
 en second, et qui tenaient toujours.
 
@@ -880,7 +880,7 @@ pour qu'une garde muette ne passe pas pour une garde verte.
 
 ### D55 · Des seuils tactiles mesurés, pas relus
 
-Un audit d'ergonomie relit des feuilles de style et donne un avis. Ces quatre-là se mesurent, donc
+Un audit d'ergonomie relit des feuilles de style et donne un avis. Ces cinq-là se mesurent, donc
 elles deviennent des gardes plutôt que des avis, dans le harnais posé par D54.
 
 **Les seuils.** Une cible tactile fait au moins 44 px de côté — Material en demande 48, Apple 44 ;
@@ -1112,10 +1112,10 @@ est **figé à l'ouverture** plutôt que lu depuis le champ « Nom » du formula
 frappe et se déferait à mesure qu'on corrige le nom.
 
 **`apps/web` a un harnais de test.** Il n'en avait aucun ; le défaut a donc pu naître, être corrigé,
-et pourrait renaître sans que rien ne l'attrape. Vitest et jsdom y entrent, avec trois tests sur
+et pourrait renaître sans que rien ne l'attrape. Vitest et jsdom y entrent, avec des tests sur
 `revealed` (il amène le panneau au rendu suivant, en `block: 'nearest'` pour déplacer le moins
-possible, sans animation quand le mouvement est réduit) et quinze tests de structure qui figent, sur
-les cinq écrans, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
+possible, sans animation quand le mouvement est réduit) et des tests de structure qui figent, sur
+les cinq écrans — Comptes, Tirelires, Catégories, Flux prévus et Saisie —, les trois conditions dont dépend la correction : le formulaire est un `{#snippet}`,
 il porte `attached` et `use:revealed`, il porte un titre figé. Vérifié en remettant le
 `Flows.svelte` d'avant la correction : les trois échouent.
 
@@ -1240,6 +1240,11 @@ fondateurs et ne contredit jamais les fondamentaux.
   relisant (architecte, auditeur) ; la garde n'en serait pas capable. Les tests qu'elle rougit
   suivent le principe 9.3.
 - **Une information ne se duplique pas.** Elle vit à un seul endroit ; les autres y renvoient.
+- **Un document ne compte pas ce que le code produit.** Un nombre qui résulte du code sans être un
+  fondement du projet — le nombre de tests, par exemple — vit dans l'outil qui le produit
+  (`pnpm test`, la garde) ; le document n'en porte pas. Ce qui vit dans les documents se compte
+  librement, et un nombre accompagné de la liste qu'il compte reste : il en fait partie et lève les
+  ambiguïtés, à condition de compter juste.
 - **Le projet tient sans ses issues.** Elles servent à le conduire ; une issue reste ouverte tant
   qu'elle est cohérente avec les catalogues, et c'est le catalogue qui fait référence.
 - **Une issue, une PR, une fusion.** Ce qui en déborde est une nouvelle issue, ouverte avant la
