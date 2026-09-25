@@ -1,5 +1,5 @@
 /**
- * Harnais de #197 — « Le stockage parle le vocabulaire du domaine, et ne garde rien de mort (D58) ».
+ * Harnais d'audit de #197 — « Le stockage parle le vocabulaire du domaine, et ne garde rien de mort (D58) ».
  * Garde C8 et I8, et ce que #197 demande encore de C5.
  *
  * Chaque `describe` reprend un point du « Fait quand » de l'issue, sous son numéro ; le point 8 (les
@@ -40,7 +40,7 @@
  * Les assertions sont dans des fonctions à part, pour que les témoins rouges, en fin de fichier,
  * rejouent les mêmes sur une version volontairement cassée du besoin.
  *
- * Niveaux (#232), à marquer quand la marque existera ; un témoin a le niveau de ce qu'il garde :
+ * Niveaux (#232, D83), marqués dans chaque titre ; un témoin a le niveau de ce qu'il garde :
  * - 0 : point 3, les deux tests sans doublon ; point 4, une ligne refusée, écrite ou reçue, n'écrit
  *   rien ; point 6, les quatre tests ; point 7, l'export qui se rouvre à l'identique.
  * - 1 : point 7, la convergence (I8).
@@ -435,16 +435,16 @@ function verifierMemePlan(store: LedgerStore): void {
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 describe('#197 · 1. le fichier parle le domaine', () => {
-  it('dans un fichier neuf, aucun nom de table ni de colonne ne contient envelope ni rule', async () => {
+  it('dans un fichier neuf, aucun nom de table ni de colonne ne contient envelope ni rule [niveau 2]', async () => {
     verifierNomsDuDomaine((await instance()).export());
   });
 
-  it('les tirelires et les automatismes y portent leur nom, jusque dans les colonnes qui désignent une tirelire', async () => {
+  it('les tirelires et les automatismes y portent leur nom, jusque dans les colonnes qui désignent une tirelire [niveau 2]', async () => {
     const s = await semee();
     verifierNomsPortes(s.export(), lignes(s, 'tirelires').map((t) => t.id));
   });
 
-  it('deux colonnes de même nom désignent la même chose : même type, et le rang du jour n’est pas la clé triable', async () => {
+  it('deux colonnes de même nom désignent la même chose : même type, et le rang du jour n’est pas la clé triable [niveau 2]', async () => {
     const s = await semee();
     const bytes = s.export();
     verifierMemesTypes(bytes);
@@ -470,18 +470,18 @@ describe('#197 · 1. le fichier parle le domaine', () => {
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 describe('#197 · 2. rien de mort', () => {
-  it('un fichier neuf ne porte aucune table ni colonne que l’application ne lit ni n’écrit', async () => {
+  it('un fichier neuf ne porte aucune table ni colonne que l’application ne lit ni n’écrit [niveau 2]', async () => {
     const s = await semee();
     verifierRienDeMort(await sonder(s.export()));
   });
 
-  it('le code ne porte plus d’étape de migration, ni la machinerie qui les portait', () => {
+  it('le code ne porte plus d’étape de migration, ni la machinerie qui les portait [niveau 2]', () => {
     expect(Object.keys(coeur).filter((n) => /migrat/i.test(n)), 'des migrations exportées par le cœur').toEqual([]);
     const machinerie = ['readRawTable', 'readLegacyTable', 'readLegacySetting', 'setModelVersion', 'modelVersion'].filter((m) => m in LedgerStore.prototype);
     expect(machinerie, 'la machinerie des migrations reste dans le dépôt').toEqual([]);
   });
 
-  it('un ancien genre de compte n’est plus lu comme le nouveau', async () => {
+  it('un ancien genre de compte n’est plus lu comme le nouveau [niveau 2]', async () => {
     const s = await instance();
     charger(s);
     const bytes = s.export();
@@ -502,20 +502,20 @@ describe('#197 · 2. rien de mort', () => {
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 describe('#197 · 3. la clé est courte et stable', () => {
-  it('une opération importée a pour identifiant op_ suivi de 16 hexadécimaux', async () => {
+  it('une opération importée a pour identifiant op_ suivi de 16 hexadécimaux [niveau 2]', async () => {
     const s = await semee();
     expect(importees(s).length).toBe(LIGNES_DU_RELEVE);
     verifierCles(importees(s).map((o) => o.id));
   });
 
-  it('importer deux fois le même relevé sur la même instance ne crée aucun doublon', async () => {
+  it('importer deux fois le même relevé sur la même instance ne crée aucun doublon [niveau 0]', async () => {
     const s = await semee();
     const avant = importees(s).map((o) => o.id).sort();
     importer(s);
     expect(importees(s).map((o) => o.id).sort()).toEqual(avant);
   });
 
-  it('deux instances qui importent le même relevé donnent les mêmes identifiants, et aucun doublon après synchronisation', async () => {
+  it('deux instances qui importent le même relevé donnent les mêmes identifiants, et aucun doublon après synchronisation [niveau 0]', async () => {
     const a = await semee();
     const b = await semee();
     const ids = importees(a).map((o) => o.id).sort();
@@ -572,7 +572,7 @@ const RECUES = [
 
 describe('#197 · 4. le fichier refuse l’incohérent', () => {
   // Ce qui ne se rattrape pas : une ligne refusée qui écrirait quand même resterait dans le fichier.
-  it('une ligne refusée à l’écriture n’écrit rien', async () => {
+  it('une ligne refusée à l’écriture n’écrit rien [niveau 0]', async () => {
     const s = await instance();
     charger(s);
     const compte = lignes(s, 'accounts').find((c) => c.id === 'acc-principal')!;
@@ -585,7 +585,7 @@ describe('#197 · 4. le fichier refuse l’incohérent', () => {
     }
   });
 
-  it('une ligne incohérente reçue d’une autre instance est refusée sans rien écrire', async () => {
+  it('une ligne incohérente reçue d’une autre instance est refusée sans rien écrire [niveau 0]', async () => {
     for (const [de, par] of RECUES) {
       const { paquet } = await paquetIncoherent(de, par);
       const a = await instance();
@@ -594,12 +594,12 @@ describe('#197 · 4. le fichier refuse l’incohérent', () => {
     }
   });
 
-  it('chaque colonne obligatoire vide et chaque valeur hors de son énumération est refusée à l’écriture', async () => {
+  it('chaque colonne obligatoire vide et chaque valeur hors de son énumération est refusée à l’écriture [niveau 2]', async () => {
     const s = await semee();
     for (const c of casIncoherents(s)) verifierRefuse(leve(() => ecrire(s, c)), c.pourquoi);
   });
 
-  it('le refus d’une écriture nomme la table et la colonne', async () => {
+  it('le refus d’une écriture nomme la table et la colonne [niveau 3]', async () => {
     const s = await semee();
     for (const c of casIncoherents(s)) {
       const { table, colonne } = ou(s.export(), c.ligne.id, c.ligne[c.champ]);
@@ -607,7 +607,7 @@ describe('#197 · 4. le fichier refuse l’incohérent', () => {
     }
   });
 
-  it('le refus d’une ligne reçue nomme la table et la colonne', async () => {
+  it('le refus d’une ligne reçue nomme la table et la colonne [niveau 3]', async () => {
     for (const [de, par] of RECUES) {
       const { paquet, table, colonne } = await paquetIncoherent(de, par);
       const a = await instance();
@@ -615,7 +615,7 @@ describe('#197 · 4. le fichier refuse l’incohérent', () => {
     }
   });
 
-  it('le fichier lui-même refuse une colonne obligatoire vide et une valeur hors de son énumération', async () => {
+  it('le fichier lui-même refuse une colonne obligatoire vide et une valeur hors de son énumération [niveau 2]', async () => {
     const s = await semee();
     const bytes = s.export();
     for (const c of casIncoherents(s)) {
@@ -630,7 +630,7 @@ describe('#197 · 4. le fichier refuse l’incohérent', () => {
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 describe('#197 · 5. rien de dérivé sans raison', () => {
-  it('une colonne d’operations qui se déduit du libellé n’est gardée qu’avec sa raison écrite dans les décisions', async () => {
+  it('une colonne d’operations qui se déduit du libellé n’est gardée qu’avec sa raison écrite dans les décisions [niveau 2]', async () => {
     const s = await semee();
     const bytes = s.export();
     const ops = importees(s);
@@ -685,14 +685,14 @@ async function depotAvant(texte: string): Promise<{ iv: string; blob: string }> 
 }
 
 describe('#197 · 6. le format précédent est refusé comme #196 le prévoit', () => {
-  it('un fichier au format de main avant #197 est refusé en le disant, et rien n’en est effacé', async () => {
+  it('un fichier au format de main avant #197 est refusé en le disant, et rien n’en est effacé [niveau 0]', async () => {
     const avant = fichierAvant();
     const copie = avant.slice();
     verifierRefus(await issue(() => instance(avant)));
     expect(Buffer.from(avant).equals(Buffer.from(copie)), 'le fichier refusé a été modifié').toBe(true);
   });
 
-  it('en direct : une instance au format de main avant #197 arrête la synchronisation, et rien n’est écrit', async () => {
+  it('en direct : une instance au format de main avant #197 arrête la synchronisation, et rien n’est écrit [niveau 0]', async () => {
     const a = await semee();
     const avant = contenu(a.export());
     const p = paquetAvant() as { format: string; version: number; site: string; rows: unknown[]; knowledge: unknown };
@@ -714,14 +714,14 @@ describe('#197 · 6. le format précédent est refusé comme #196 le prévoit', 
     verifierRienEcrit(avant, contenu(a.export()));
   });
 
-  it('par fichier : un paquet au format de main avant #197 est refusé en le disant, et rien n’est écrit', async () => {
+  it('par fichier : un paquet au format de main avant #197 est refusé en le disant, et rien n’est écrit [niveau 0]', async () => {
     const a = await semee();
     const avant = contenu(a.export());
     verifierRefus(await issue(() => importBundle(a, paquetAvant() as never)));
     verifierRienEcrit(avant, contenu(a.export()));
   });
 
-  it('par le relais : un dépôt d’une instance de main avant #197 arrête la synchronisation, et rien n’est reçu', async () => {
+  it('par le relais : un dépôt d’une instance de main avant #197 arrête la synchronisation, et rien n’est reçu [niveau 0]', async () => {
     const a = await instance();
     charger(a);
     const depots = relaisFactice();
@@ -765,7 +765,7 @@ function releve(store: LedgerStore): unknown {
 }
 
 describe('#197 · 7. ce qui tenait tient encore', () => {
-  it('un fichier exporté se rouvre à l’identique', async () => {
+  it('un fichier exporté se rouvre à l’identique [niveau 0]', async () => {
     const a = await semee();
     a.remove('categories', 'cat-abos');
     const bytes = a.export();
@@ -774,7 +774,7 @@ describe('#197 · 7. ce qui tenait tient encore', () => {
     expect(contenu(b.export())).toBe(contenu(bytes));
   });
 
-  it('deux instances convergent', async () => {
+  it('deux instances convergent [niveau 1]', async () => {
     const a = await semee();
     const b = await instance();
     await direct(a, b);
@@ -787,13 +787,13 @@ describe('#197 · 7. ce qui tenait tient encore', () => {
     expect(lignes(a, 'automations')[0]!['name']).toBe('Renommé par B');
   });
 
-  it('l’exemple se charge et donne le même plan qu’avant', async () => {
+  it('l’exemple se charge et donne le même plan qu’avant [niveau 2]', async () => {
     const s = await instance();
     charger(s);
     verifierMemePlan(s);
   });
 
-  it('un import de relevé inventé donne les mêmes opérations, classements compris', async () => {
+  it('un import de relevé inventé donne les mêmes opérations, classements compris [niveau 2]', async () => {
     const s = await semee();
     expect(releve(s)).toEqual(deplier(RELEVE_AVANT));
   });
@@ -803,12 +803,12 @@ describe('#197 · 7. ce qui tenait tient encore', () => {
 // Témoins rouges : les mêmes assertions, sur une version volontairement cassée du besoin.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-it.fails('témoin rouge · un fichier qui garde les noms envelopes et rules', () => {
+it.fails('témoin rouge · un fichier qui garde les noms envelopes et rules [niveau 2]', () => {
   // Version cassée : le fichier de main avant #197.
   verifierNomsDuDomaine(fichierAvant());
 });
 
-it.fails('témoin rouge · une colonne que l’application ne lit ni n’écrit', async () => {
+it.fails('témoin rouge · une colonne que l’application ne lit ni n’écrit [niveau 2]', async () => {
   const s = await semee();
   const bytes = s.export();
   // Version cassée : une colonne ajoutée au fichier, que rien n'écrit ni ne lit.
@@ -816,39 +816,39 @@ it.fails('témoin rouge · une colonne que l’application ne lit ni n’écrit'
   verifierRienDeMort(await sonder(modifier(bytes, (db) => db.run(`ALTER TABLE "${table}" ADD COLUMN colonne_morte_197 TEXT`))));
 });
 
-it.fails('témoin rouge · un ancien genre de compte lu comme le nouveau', () => {
+it.fails('témoin rouge · un ancien genre de compte lu comme le nouveau [niveau 2]', () => {
   // Version cassée : la lecture qui traduit `pivot` en `principal`.
   verifierPasDeSynonyme({ etat: 'accepté', dit: JSON.stringify('principal') }, 'principal');
 });
 
-it.fails('témoin rouge · une clé d’opération à 32 hexadécimaux', () => {
+it.fails('témoin rouge · une clé d’opération à 32 hexadécimaux [niveau 2]', () => {
   verifierCles(['op_' + '0123456789abcdef'.repeat(2)]);
 });
 
-it.fails('témoin rouge · une ligne refusée qui écrit quand même', () => {
+it.fails('témoin rouge · une ligne refusée qui écrit quand même [niveau 0]', () => {
   // Version cassée : l'écriture a eu lieu avant le refus.
   verifierRefusSansEcriture(new Error('refusé'), 'un compte sans nom', 'avant', 'après');
 });
 
-it.fails('témoin rouge · un refus qui ne nomme pas la colonne', () => {
+it.fails('témoin rouge · un refus qui ne nomme pas la colonne [niveau 3]', () => {
   verifierRefusNomme(new Error('Écriture refusée : accounts est incomplet.'), 'accounts', 'name');
 });
 
-it.fails('témoin rouge · un fichier qui accepte un genre de compte inconnu', () => {
+it.fails('témoin rouge · un fichier qui accepte un genre de compte inconnu [niveau 2]', () => {
   // Version cassée : le fichier de main avant #197, sans contrainte.
   verifierRefusFichier(fichierAvant(), 'accounts', 'kind', 'cpt-avant-197', 'pivot');
 });
 
-it.fails('témoin rouge · une colonne dérivée gardée sans raison écrite', () => {
+it.fails('témoin rouge · une colonne dérivée gardée sans raison écrite [niveau 2]', () => {
   verifierRaisonEcrite(['normalized_label'], '');
 });
 
-it.fails('témoin rouge · un fichier du format précédent ouvert sans lire son format', async () => {
+it.fails('témoin rouge · un fichier du format précédent ouvert sans lire son format [niveau 0]', async () => {
   // Version cassée : l'ouverture prend toute base SQLite, sans lire son marqueur ni sa version.
   verifierRefus(await issue(() => new SQL.Database(fichierAvant())));
 });
 
-it.fails('témoin rouge · un plan qui n’est plus celui d’avant', async () => {
+it.fails('témoin rouge · un plan qui n’est plus celui d’avant [niveau 2]', async () => {
   const s = await instance();
   // Version cassée : l'exemple chargé sans le besoin de l'Alimentation.
   const l = exampleLedger();
