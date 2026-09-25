@@ -6,7 +6,7 @@
   "description": "Tirelire à déposer sur un hébergement web mutualisé (Apache + PHP) : la PWA et son relais de synchronisation en PHP.",
   "scripts": {
     "assembler": "node assembler.mjs",
-    "test": "node --import ../../packages/gardes/sans-sortie.mjs --test",
+    "test": "node ../../packages/gardes/lanceur.mjs node --import ../../packages/gardes/sans-sortie.mjs --test",
     "typecheck": "echo ok",
     "build": "echo \"(l'assemblage du site se lance avec pnpm --filter @tirelire/hebergement assembler)\""
   }
