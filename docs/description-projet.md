@@ -497,3 +497,6 @@ qu'elles barrent.
 > Non sinon elle se fermera avant d'être codé.
 
 > En fait, si, elle doit être traitée dans le jalon v0 pour inclure ce qui doit être vérifié en attendant le codage réel
+
+> oui, construit les versions jusqu'a v5.
+> si tu analyses le contenue des issues, et au regard du changement de structuration du projet orientée "version", je pense que beaucoup d'issue peuvent aller dans des versions qui a l'époque du traitement de l'issue n'existaient pas (donc aucune référence)
