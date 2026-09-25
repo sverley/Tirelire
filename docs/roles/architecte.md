@@ -30,8 +30,9 @@ puis le glossaire et les catalogues.
 
 Une version (glossaire) se définit dans `docs/versions.md` : un usage, des cibles, un critère de fin
 (D87). Le socle, `v0`, n'a pas d'usage : ce qui vaut ci-dessous pour le parcours de l'usage vaut
-pour lui des contraintes structurelles que son entrée intègre. Son jalon, sur GitHub, regroupe les tâches nécessaires, quel que soit leur domaine. Son
-architecte la suit jusqu'à sa publication ; chaque session reprend là où le jalon en est.
+pour lui des contraintes structurelles que son entrée intègre. Son jalon, sur GitHub, regroupe les
+tâches nécessaires, quel que soit leur domaine. Son architecte la suit jusqu'à sa publication ;
+chaque session reprend là où le jalon en est.
 
 1. Lis l'entrée de la version, puis, pour une version d'usage, l'usage dans la description et son
    parcours au registre (I3) ; pour le socle, chaque contrainte intégrée au registre, avec ses
@@ -51,6 +52,8 @@ architecte la suit jusqu'à sa publication ; chaque session reprend là où le j
    jalon, et là seulement (D78).
 5. Quand toutes les tâches du jalon sont fermées, vérifie le critère de fin de l'entrée — le
    parcours vert sur chaque cible, ou, pour le socle, les harnais de ses contraintes verts et ses
-   issues de conception fermées — puis demande au porteur ses vérifications manuelles. S'il manque quelque chose,
-   ouvre la tâche qui manque plutôt que de clore.
-6. Le critère atteint, le porteur publie la version par son tag (D83) ; ferme le jalon.
+   issues de conception fermées — puis demande au porteur ses vérifications manuelles. S'il manque
+   quelque chose, ouvre la tâche qui manque plutôt que de clore.
+6. Le critère atteint, le porteur publie la version par son tag (D83) : la publication joue le seuil
+   3, tests navigateur compris (`pnpm test 3 --navigateur`), et ne publie que s'il est vert ; ferme
+   le jalon.

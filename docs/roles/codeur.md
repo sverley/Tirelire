@@ -13,10 +13,12 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
 1. **Ne lis pas le harnais.** Code depuis ta propre lecture du besoin (principe 11.1).
 2. Code sur la branche, commets, pousse. En brouillon, le verdict est local : `pnpm typecheck` et le
    harnais du besoin, rien d'autre (D83).
-3. Tu peux écrire tes propres tests, dans tes propres fichiers, jamais dans celui du harnais. Classe
-   chacun par la suite de questions de D83 et marque son niveau (`[niveau N]`) ; un test qui ne sert
-   qu'au diagnostic ou à l'analyse est de niveau 4 : il reste dans le dépôt et ne se joue que
-   nommément ou au seuil 4. Jamais de niveau 4 dans un harnais de la garde ou du registre (D81).
+3. Tu n'es pas tenu d'écrire des tests : seulement si le besoin l'exige — un diagnostic, une
+   analyse, un cas que tu veux garder. Si tu en écris, c'est dans tes propres fichiers, jamais dans
+   celui du harnais. Classe chacun par la suite de questions de D83 et marque son niveau
+   (`[niveau N]`) ; un test qui ne sert qu'au diagnostic ou à l'analyse est de niveau 4 : il reste
+   dans le dépôt et ne se joue que nommément ou au seuil 4. Jamais de niveau 4 dans un harnais de la
+   garde ou du registre (D81).
 4. Ne modifie jamais la PR une fois ouverte : ni description, ni état de brouillon, ni harnais. Ne
    modifie jamais un document fondateur, sauf si l'issue le demande. Ne touche jamais une cible de
    côté (`docs/cibles.md`).

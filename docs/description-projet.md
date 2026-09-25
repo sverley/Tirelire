@@ -575,3 +575,7 @@ Sur le compte des tests navigateur écartés, juste sur ce qu'il mesure — fich
 plutôt qu'un nombre exact de tests engendrés, qui demanderait de lancer le navigateur :
 
 > ok pour cette lecture
+
+> faut-il mettre à jour les roles suite aux changements de fonctionnement de la suite de test et de la méthode de classification des tests du harnais
+
+> tu parlles de "compagnons". C'est un nouveau terme que je n'ai pas validé. Il faut ajouter que le codeur n'est pas tenu de faire des tests. Uniquement si besoin.
