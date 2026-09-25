@@ -1,25 +1,38 @@
 /**
- * Synchronisation entre appareils : protocole d'échange de changements,
- * indépendant du transport (fichier, relais HTTP, WebRTC…).
+ * Synchronisation entre instances par delta d'état (D16, D58), indépendante du transport (direct,
+ * relais, fichier).
  *
- * Chaque appareil retient, pour chaque pair, le dernier numéro de séquence
- * (`seq`, propre au journal du pair) qu'il a reçu de lui. Un échange, symétrique :
- *   A → B : hello { site: A }                      (et B → A de même)
- *   A → B : request { cursor: dernier seq de B connu de A }
- *   B → A : changes { entries de B depuis ce seq, upTo }, puis done
- *   A ↔ B : bye { lastSeq } une fois tout reçu (le journal a grandi des entrées reçues)
- * Les entrées relayées (changements d'un troisième appareil déjà reçus) voyagent
- * aussi ; le destinataire ignore ce qu'il connaît déjà (empreinte unique).
+ * Chaque instance sait, pour chaque autre, la plus grande horloge qu'elle en a vue (`Knowledge`).
+ * Un échange, symétrique :
+ *   A → B : hello { ce que A sait }                  (et B → A de même)
+ *   A → B : request                                  (« envoie-moi ce qui me manque »)
+ *   B → A : changes { les lignes plus récentes que ce que A sait, ce que B sait }, puis done
+ *   A ↔ B : bye une fois tout reçu
+ * L'état d'une instance contient ce qu'elle a reçu des autres : ce qu'un appareil tient d'un
+ * troisième se propage avec lui, sans rien de plus.
+ *
+ * Chaque message et chaque paquet porte son format et sa version : un autre format arrête
+ * l'échange en le disant, avant que rien ne soit écrit (C8).
  */
-import type { ChangeEntry, LedgerStore } from './store.js';
+import { FORMAT_VERSION } from './schema.js';
+import { FormatRefused, knowledgeCovers, type Conflict, type Knowledge, type LedgerStore, type RowState } from './store.js';
+
+/** Marqueur des messages et des paquets de synchronisation. */
+export const SYNC_FORMAT = 'tirelire-etat';
+
+interface Envelope {
+  format: typeof SYNC_FORMAT;
+  version: number;
+  site: string;
+}
 
 export type SyncMessage =
-  | { type: 'hello'; site: string; name?: string }
-  | { type: 'request'; site: string; cursor: number }
-  | { type: 'changes'; site: string; entries: ChangeEntry[]; upTo: number }
-  | { type: 'done'; site: string }
-  /** Envoyé quand chacun a tout reçu : position finale du journal, pour le curseur du pair. */
-  | { type: 'bye'; site: string; lastSeq: number };
+  | (Envelope & { type: 'hello'; name?: string; knowledge: Knowledge })
+  | (Envelope & { type: 'request' })
+  | (Envelope & { type: 'changes'; rows: RowState[]; knowledge: Knowledge })
+  | (Envelope & { type: 'done' })
+  /** Fin de l'échange ; `refused` dit pourquoi l'autre l'arrête. */
+  | (Envelope & { type: 'bye'; refused?: string });
 
 export interface Transport {
   send(msg: SyncMessage): void | Promise<void>;
@@ -33,24 +46,41 @@ export interface SyncResult {
   sent: number;
   received: number;
   applied: number;
+  /** Lignes modifiées des deux côtés : la version retenue et l'écartée. */
+  conflicts: Conflict[];
 }
 
-const CURSOR_PREFIX = 'peer_cursor:';
+const ANCIEN_FORMAT = 'Le paquet vient d’une version antérieure de Tirelire, qui ne parle plus le même format : mettez à jour Tirelire sur cet appareil-là. Rien n’a été écrit.';
 
-export function getPeerCursor(store: LedgerStore, peer: string): number {
-  const r = store.query(`SELECT value FROM meta WHERE key = ?`, [CURSOR_PREFIX + peer]);
-  return Number(r[0]?.['value'] ?? 0);
+/**
+ * Vérifie le format d'un message ou d'un paquet reçu ; lève `FormatRefused` sinon, avant toute
+ * écriture.
+ */
+export function checkSyncFormat(msg: unknown): void {
+  const m = msg as Partial<Envelope> & { format?: unknown; version?: unknown } | null;
+  if (!m || typeof m !== 'object') throw new FormatRefused('etranger', 'Paquet illisible : ce n’est pas un paquet de synchronisation Tirelire. Rien n’a été écrit.');
+  if (m.format === SYNC_FORMAT) {
+    if (m.version === FORMAT_VERSION) return;
+    const plusRecent = typeof m.version === 'number' && m.version > FORMAT_VERSION;
+    throw new FormatRefused(
+      plusRecent ? 'recent' : 'ancien',
+      plusRecent
+        ? `Le paquet vient d’une version plus récente de Tirelire (format ${String(m.version)}, ici ${FORMAT_VERSION}) : mettez à jour Tirelire sur cet appareil. Rien n’a été écrit.`
+        : `Le paquet vient d’une version antérieure de Tirelire (format ${String(m.version)}, ici ${FORMAT_VERSION}) : mettez à jour Tirelire sur l’autre appareil. Rien n’a été écrit.`,
+    );
+  }
+  // Le format d'avant D58 : un journal de changements (`tirelire-changes`, ou des messages sans format).
+  if (m.format === 'tirelire-changes' || m.format === undefined) throw new FormatRefused('ancien', ANCIEN_FORMAT);
+  throw new FormatRefused('etranger', 'Ce paquet n’est pas au format de synchronisation de Tirelire. Rien n’a été écrit.');
 }
 
-export function setPeerCursor(store: LedgerStore, peer: string, seq: number): void {
-  store.query(`INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`, [CURSOR_PREFIX + peer, String(seq)]);
+function envelope(store: LedgerStore): Envelope {
+  return { format: SYNC_FORMAT, version: FORMAT_VERSION, site: store.siteId };
 }
 
-/** Pairs connus (ceux avec lesquels on a déjà échangé). */
-export function knownPeers(store: LedgerStore): Array<{ site: string; cursor: number }> {
-  return store
-    .query(`SELECT key, value FROM meta WHERE key LIKE ?`, [CURSOR_PREFIX + '%'])
-    .map((r) => ({ site: String(r['key']).slice(CURSOR_PREFIX.length), cursor: Number(r['value']) }));
+/** Pairs rencontrés (direct, relais ou fichier), avec la date du dernier échange. */
+export function knownPeers(store: LedgerStore): Array<{ site: string; name?: string; at: string; knowledge: Knowledge }> {
+  return store.listPeers();
 }
 
 /**
@@ -61,80 +91,130 @@ export function runSync(store: LedgerStore, transport: Transport, opts: { name?:
   return new Promise((resolve, reject) => {
     let peer: string | undefined;
     let peerName: string | undefined;
+    let peerKnowledge: Knowledge | undefined;
     let sent = 0;
     let received = 0;
     let applied = 0;
+    const conflicts: Conflict[] = [];
     let weAreDone = false;
     let theyAreDone = false;
     let byeSent = false;
-    const timer = setTimeout(() => reject(new Error('Synchronisation : délai dépassé')), opts.timeoutMs ?? 30_000);
+    let settled = false;
+    const timer = setTimeout(() => fail(new Error('Synchronisation : délai dépassé')), opts.timeoutMs ?? 30_000);
+    function fail(err: unknown) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    }
     const finish = () => {
       if (weAreDone && theyAreDone && !byeSent) {
         byeSent = true;
-        void transport.send({ type: 'bye', site: store.siteId, lastSeq: store.lastSeq });
+        void transport.send({ ...envelope(store), type: 'bye' });
       }
     };
     transport.onMessage((msg) => {
+      if (settled) return;
+      try {
+        checkSyncFormat(msg);
+      } catch (err) {
+        // Dire à l'autre pourquoi l'échange s'arrête, s'il sait le lire ; ne rien écrire ici.
+        try {
+          void Promise.resolve(transport.send({ ...envelope(store), type: 'bye', refused: (err as Error).message })).catch(() => undefined);
+        } catch {
+          /* transport fermé */
+        }
+        return fail(err);
+      }
       try {
         if (msg.type === 'hello') {
           peer = msg.site;
           peerName = msg.name;
-          void transport.send({ type: 'request', site: store.siteId, cursor: getPeerCursor(store, msg.site) });
+          peerKnowledge = msg.knowledge ?? {};
+          void transport.send({ ...envelope(store), type: 'request' });
         } else if (msg.type === 'request') {
-          // Inutile de renvoyer au pair ses propres changements relayés.
-          const entries = store.changesSince(msg.cursor).filter((e) => e.site !== msg.site);
-          sent = entries.length;
-          void transport.send({ type: 'changes', site: store.siteId, entries, upTo: store.lastSeq });
-          void transport.send({ type: 'done', site: store.siteId });
+          const rows = store.rowsNewerThan(peerKnowledge ?? {});
+          sent = rows.length;
+          void transport.send({ ...envelope(store), type: 'changes', rows, knowledge: store.getKnowledge() });
+          void transport.send({ ...envelope(store), type: 'done' });
           weAreDone = true;
           finish();
         } else if (msg.type === 'changes') {
-          received += msg.entries.length;
-          const res = store.applyRemote(msg.entries);
+          received += msg.rows.length;
+          // Les lignes ont été choisies d'après ce que nous avions annoncé : les recevoir toutes
+          // nous apprend tout ce que le pair savait.
+          const res = store.receive(msg.rows, { senderKnowledge: msg.knowledge, learn: msg.knowledge });
           applied += res.applied;
-          setPeerCursor(store, msg.site, Math.max(getPeerCursor(store, msg.site), msg.upTo));
+          conflicts.push(...res.conflicts);
+          store.notePeer(msg.site, msg.knowledge, peerName);
         } else if (msg.type === 'done') {
           theyAreDone = true;
           finish();
         } else if (msg.type === 'bye') {
-          setPeerCursor(store, msg.site, Math.max(getPeerCursor(store, msg.site), msg.lastSeq));
+          if (msg.refused) return fail(new FormatRefused('etranger', `L’autre appareil a arrêté la synchronisation : ${msg.refused}`));
+          settled = true;
           clearTimeout(timer);
-          resolve({ peer: peer ?? msg.site, ...(peerName ? { peerName } : {}), sent, received, applied });
+          resolve({ peer: peer ?? msg.site, ...(peerName ? { peerName } : {}), sent, received, applied, conflicts });
         }
       } catch (err) {
-        clearTimeout(timer);
-        reject(err);
+        fail(err);
       }
     });
-    void transport.send({ type: 'hello', site: store.siteId, ...(opts.name ? { name: opts.name } : {}) });
+    void transport.send({ ...envelope(store), type: 'hello', ...(opts.name ? { name: opts.name } : {}), knowledge: store.getKnowledge() });
   });
 }
 
 // ---------------------------------------------------------------------------
-// Échange par fichier
+// Paquets : échange par fichier, dépôts sur le relais
 // ---------------------------------------------------------------------------
 
-export interface ChangeBundle {
-  format: 'tirelire-changes';
-  version: 1;
-  site: string;
+export interface StateBundle extends Envelope {
+  type: 'paquet';
   name?: string;
-  /** Premier seq inclus dans le paquet (exclusif : entries.seq > from). */
-  from: number;
-  upTo: number;
-  entries: ChangeEntry[];
+  /** Ce que l'émetteur supposait déjà connu du destinataire : les lignes vont au-delà. */
+  base: Knowledge;
+  /** Ce que l'émetteur savait en faisant le paquet. */
+  knowledge: Knowledge;
+  rows: RowState[];
 }
 
-/** Paquet de tous les changements après `since` (0 = tout), à envoyer à un autre appareil. */
-export function exportBundle(store: LedgerStore, since = 0, name?: string): ChangeBundle {
-  const entries = store.changesSince(since);
-  return { format: 'tirelire-changes', version: 1, site: store.siteId, ...(name ? { name } : {}), from: since, upTo: store.lastSeq, entries };
+/**
+ * Paquet des lignes qu'ignore une instance qui sait `since` (rien : tout l'état). Un nombre, forme
+ * d'un ancien curseur, vaut « tout ».
+ */
+export function exportBundle(store: LedgerStore, since?: Knowledge | number, name?: string): StateBundle {
+  const base = typeof since === 'object' && since ? { ...since } : {};
+  return { ...envelope(store), type: 'paquet', ...(name ? { name } : {}), base, knowledge: store.getKnowledge(), rows: store.rowsNewerThan(base) };
 }
 
-export function importBundle(store: LedgerStore, bundle: ChangeBundle): { applied: number; ignored: number; stale: number } {
-  if (bundle.format !== 'tirelire-changes') throw new Error('Ce fichier n’est pas un paquet de changements Tirelire.');
-  const res = store.applyRemote(bundle.entries);
-  setPeerCursor(store, bundle.site, Math.max(getPeerCursor(store, bundle.site), bundle.upTo));
+/** Paquet pour un pair déjà rencontré : seulement ce qu'il n'avait pas au dernier échange. */
+export function exportBundleFor(store: LedgerStore, peer: string | undefined, name?: string): StateBundle {
+  const known = peer ? store.listPeers().find((p) => p.site === peer)?.knowledge : undefined;
+  return exportBundle(store, known, name);
+}
+
+export interface BundleResult {
+  applied: number;
+  ignored: number;
+  stale: number;
+  conflicts: Conflict[];
+}
+
+/** Vérifie un paquet reçu (format, forme) sans rien écrire. */
+export function checkBundle(bundle: unknown): asserts bundle is StateBundle {
+  checkSyncFormat(bundle);
+  const b = bundle as Partial<StateBundle>;
+  if (b.type !== 'paquet' || !Array.isArray(b.rows) || !b.knowledge || typeof b.knowledge !== 'object' || !b.base || typeof b.base !== 'object')
+    throw new FormatRefused('etranger', 'Ce paquet n’est pas un paquet de synchronisation Tirelire complet. Rien n’a été écrit.');
+}
+
+export function importBundle(store: LedgerStore, bundle: StateBundle): BundleResult {
+  checkBundle(bundle);
+  // Ce que le paquet apprend ne vaut que si l'on savait déjà ce qu'il supposait connu : sinon il
+  // peut manquer des lignes entre les deux, qu'un autre échange apportera.
+  const complete = knowledgeCovers(store.getKnowledge(), bundle.base);
+  const res = store.receive(bundle.rows, { senderKnowledge: bundle.knowledge, ...(complete ? { learn: bundle.knowledge } : {}) });
+  store.notePeer(bundle.site, bundle.knowledge, bundle.name);
   return res;
 }
 

@@ -1,6 +1,7 @@
 /**
- * Description des tables : une seule source pour créer le schéma SQLite,
- * lire et écrire les lignes, et journaliser les changements colonne par colonne.
+ * Description des tables : une seule source pour créer le schéma SQLite, lire et écrire les
+ * lignes, et les échanger entre instances. Chaque table porte en plus une colonne `hlc` :
+ * l'horloge de la dernière écriture de la ligne, appareil compris (D58).
  */
 
 export type ColumnType = 'text' | 'integer' | 'real' | 'json' | 'boolean';
@@ -238,32 +239,29 @@ export function liveColumns(t: TableDef): ColumnDef[] {
 export const LEDGER_KEYS = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
 export type LedgerKey = (typeof LEDGER_KEYS)[number];
 
+/** Colonne de chaque table, réglages compris : l'horloge logique de la dernière écriture (D58). */
+export const HLC_COLUMN = 'hlc';
+
 export function createTableSQL(t: TableDef): string {
   const cols = t.columns.map((col) => {
     const sqlType = col.type === 'integer' || col.type === 'boolean' ? 'INTEGER' : col.type === 'real' ? 'REAL' : 'TEXT';
     return col.col === 'id' ? `${col.col} TEXT PRIMARY KEY` : `${col.col} ${sqlType}`;
   });
-  return `CREATE TABLE IF NOT EXISTS ${t.name} (${cols.join(', ')})`;
+  return `CREATE TABLE IF NOT EXISTS ${t.name} (${cols.join(', ')}, ${HLC_COLUMN} TEXT)`;
 }
 
+/** Marqueur du fichier, dans `meta` : ce qui distingue un dépôt Tirelire de toute autre base. */
+export const FILE_FORMAT = 'tirelire';
+/**
+ * Version du format du fichier et des paquets de synchronisation. Un fichier ou un paquet d'une
+ * autre version est refusé en le disant, sans rien écrire (D30, D58).
+ */
+export const FORMAT_VERSION = 1;
+
 export const SYSTEM_SQL = [
-  // Réglages : une ligne par clé, valeur JSON.
-  `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`,
-  // Journal de changements : artefact de synchronisation, chaîné par empreinte, par appareil.
-  `CREATE TABLE IF NOT EXISTS changes (
-     seq INTEGER PRIMARY KEY AUTOINCREMENT,
-     hlc TEXT NOT NULL,
-     site TEXT NOT NULL,
-     tbl TEXT NOT NULL,
-     row_id TEXT NOT NULL,
-     col TEXT NOT NULL,
-     value TEXT,
-     prev_hash TEXT NOT NULL,
-     hash TEXT NOT NULL UNIQUE
-   )`,
-  `CREATE INDEX IF NOT EXISTS changes_site_seq ON changes(site, seq)`,
-  // Version courante de chaque cellule : sert à décider si un changement reçu l'emporte.
-  `CREATE TABLE IF NOT EXISTS cell_versions (tbl TEXT, row_id TEXT, col TEXT, hlc TEXT, PRIMARY KEY (tbl, row_id, col))`,
-  // Métadonnées locales (jamais synchronisées) : appareil, tête de chaîne, dernier HLC.
+  // Réglages : une ligne par clé, valeur JSON, horloge de la dernière écriture ; synchronisés.
+  `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT, ${HLC_COLUMN} TEXT)`,
+  // Le format du fichier et sa version, rien d'autre : ce qui décrit l'instance n'est pas dans le
+  // fichier (D58).
   `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)`,
 ];

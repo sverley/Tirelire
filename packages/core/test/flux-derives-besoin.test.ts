@@ -252,14 +252,6 @@ describe('#14 · la ventilation est recalculée, pas mémorisée', () => {
     expect(vAprès).toEqual(attendue(l, aprèsÉchéance));
     expect(vAprès).not.toEqual(vAvant);
   });
-
-  it('une vieille photo écrite par un pair non migré (plannedAllocation) est ignorée', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    const photo = { ...ordre(l), plannedAllocation: [{ tirelireId: 'env-auto', share: { kind: 'fixed', amount: -euros(650) } }] } as PlannedFlow;
-    const avecPhoto: Ledger = { ...l, plannedFlows: l.plannedFlows.map((f) => (f.id === photo.id ? photo : f)) };
-    const op = ligneBancaire(l, euros(650));
-    expect(ventilation(importer(avecPhoto, op).patch)).toEqual(attendue(l, op));
-  });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -659,16 +651,6 @@ it.fails('témoin rouge · un plan qui réécrit l’ordre chez la banque au lie
 
   expect(ordre(après).amount).toBe(-euros(650));
   expect(alertes(après, AVANT)).toHaveLength(1);
-});
-
-it.fails('témoin rouge · une vieille photo de pair non migré prise pour la ventilation', () => {
-  const l = enregistrerOrdre(exampleLedger(), euros(650));
-  const op = ligneBancaire(l, euros(650));
-  // Version cassée : `plannedAllocation`, écrit par un pair resté au modèle d'avant, est lu comme
-  // la ventilation du virement au lieu d'être ignoré.
-  const photo: Record<string, number> = { 'env-auto': euros(650) };
-
-  expect(photo).toEqual(attendue(l, op));
 });
 
 // ─── I10 · le plan est un résultat (#162) ────────────────────────────────────────────────────────

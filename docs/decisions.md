@@ -77,14 +77,13 @@ avec Capacitor pour Android. Cœur en TypeScript pur (`packages/core`) sans dép
 l'interface. Interface Svelte 5 (`apps/web`). Choix du framework jugé secondaire tant que le
 cœur reste indépendant.
 
-### D08 · Stockage option D : tables SQLite + journal de changements
+### D08 · Stockage : tables SQLite, un état
 
 Les tables SQLite (sql.js en WebAssembly, persisté dans IndexedDB, exportable en un fichier)
-sont la vérité. Chaque écriture laisse une trace *(table, ligne, colonne, valeur, horloge
-logique hybride, appareil)* dans `changes`, chaînée par empreinte SHA-256 par appareil
-(`store.ts`). Fusion colonne par colonne, la plus récente gagne ; suppressions logiques
-(`deletedAt`) ; ce qui se recalcule ne se stocke pas. Le journal d'événements comme *stockage*
-(option B), les CRDT génériques (C) et la blockchain ont été examinés et écartés (voir `docs/synchronisation.md`).
+sont la vérité, et le fichier n'est qu'un état : chaque ligne porte l'horloge de sa dernière
+écriture, et rien ne garde ce qu'elle a remplacé (D58). Suppressions logiques (`deletedAt`) ; ce
+qui se recalcule ne se stocke pas. Le journal d'événements comme stockage, les CRDT génériques et
+la blockchain ont été examinés et écartés (`docs/synchronisation.md`).
 
 ### D09 · Deux familles d'identifiants
 
@@ -135,9 +134,10 @@ Une tirelire par objectif, chacune avec son solde. Le nom public se décidera pl
 
 ### D16 · Synchronisation : protocole unique, transports interchangeables
 
-`sync.ts` : hello / request / changes / done / bye, curseur par pair, relais des changements de
-tiers. Transports : fichier (main), WebRTC à signalisation manuelle et relais privé chiffré
-(branche `feature/sync-p2p`). Wi‑Fi Direct et Bluetooth demanderaient un module natif Capacitor.
+`sync.ts` : hello / request / changes / done / bye. Chaque instance annonce au `hello` ce qu'elle
+sait des autres ; l'autre lui envoie les lignes plus récentes (D58). Transports : fichier, direct
+WebRTC à signalisation manuelle, relais privé chiffré (Node, ou PHP servi avec le site). Wi‑Fi
+Direct et Bluetooth demanderaient un module natif Capacitor.
 
 ### D18 · Numéro de compte mémorisé sur le compte, indépendant du profil d'import
 
@@ -278,15 +278,14 @@ Le solde d'une tirelire s'attribue à ses besoins dans l'ordre des priorités (u
 retient jusqu'à sa cible, un objectif jusqu'à la sienne, le récurrent prend le reste) ; un déficit
 pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin.
 
-### D30 · Colonnes dépréciées et version de modèle
+### D30 · Version du format, et ce qu'une version inconnue devient
 
-Une colonne retirée du modèle n'est jamais supprimée du schéma : elle est marquée **dépréciée**
-dans `schema.ts`, ignorée à la lecture et à l'écriture locale, mais toujours acceptée par
-`applyRemote`, pour qu'un appareil non migré puisse encore envoyer son journal (D08). Une
-**version de modèle** (`meta.model_version`) déclenche à l'ouverture une migration locale
-idempotente qui lit les colonnes dépréciées et écrit les nouvelles via `upsert`, donc journalisées
-et propagées ; deux appareils qui migrent chacun produisent les mêmes valeurs, la fusion colonne par
-colonne converge. Le compactage du journal, plus tard, purgera les colonnes dépréciées.
+Le fichier et chaque paquet de synchronisation portent leur format et sa version (D58). Une
+version que l'application ne lit pas est refusée en le disant, sans rien ouvrir, écrire ni
+effacer : l'utilisateur garde le fichier tel quel et choisit la suite (C1, C8). Une migration
+s'écrit quand une version publiée l'exige, et seulement alors : elle lit l'ancienne version et
+écrit la nouvelle, et une colonne retirée d'un format publié n'est plus lue qu'à cette occasion.
+Tolérer l'écart entre deux instances de versions différentes se décide à part (C8).
 
 ### D31 · Rang d'une règle = clé triable
 
@@ -1042,55 +1041,58 @@ dise.
 
 ### D58 · Le fichier est un état : pas de journal, une horloge par ligne
 
-Le journal de changements de D08 (`changes`, `cell_versions`, chaîne d'empreintes) ne servait qu'à
-la synchronisation, et il faisait grossir le fichier avec les gestes et non avec les données : une
-opération importée, quinze colonnes, pesait quinze entrées d'environ 300 octets — dix fois la
-donnée — et chaque reclassement en ajoutait sans que rien ne s'efface. À l'usage prévu (un import
-par mois, deux retouches du plan par an, une ou deux synchronisations par mois entre deux ou trois
-appareils, le calcul des écarts et des virements n'écrivant rien), cela faisait 15 à 20 Mo par an,
-réécrits en entier dans IndexedDB à chaque correction, pour environ 1 Mo de données.
+Un journal de changements ne sert qu'à la synchronisation, et fait grossir le fichier avec les
+gestes plutôt qu'avec les données : chaque reclassement s'y ajoute sans que rien ne s'efface, et
+tout le fichier se réécrit dans IndexedDB à chaque correction. À l'usage projeté du domaine
+(`docs/domaines/donnees-et-synchro.md`), c'est le poids du fichier qui compte, pas l'historique.
 
-Le fichier SQLite est désormais un **état** : les tables, plus une colonne `hlc` par ligne
-(horloge logique hybride, qui porte l'appareil), `settings` compris. Fusion par ligne entière, la
-plus récente gagne, `deleted_at` inclus. Synchronisation par delta d'état : chaque appareil garde
-un vecteur d'horloges (le maximum vu par appareil) ; au `hello` les pairs échangent leurs vecteurs,
-chacun envoie les lignes plus récentes que le vecteur de l'autre, et le relais entre appareils qui
-ne se croisent pas est gratuit puisque l'état d'un pair contient ce qu'il a reçu des autres. Une
-ligne modifiée des deux côtés depuis la dernière synchronisation est signalée, pas tue. Le
-protocole et les transports de D16 restent ; seul le contenu des paquets change. Ce qu'on
-abandonne : l'historique des valeurs remplacées — un « annuler » futur passera par un journal
-séparé, régénérable pour le présent, qui ne touchera pas à ce format — et la preuve de chaîne,
-superflue pour un foyer sur relais chiffré. La granularité par cellule a été chiffrée et écartée :
-1,7 Ko de versions par opération pour des conflits que l'usage ne produit pas.
+Le fichier SQLite est donc un **état** : les tables, plus une colonne `hlc` par ligne (horloge
+logique hybride, qui porte l'appareil), `settings` compris. Fusion par ligne entière, la plus
+récente gagne, `deleted_at` inclus. Synchronisation par delta d'état : chaque instance sait, pour
+chaque autre, la plus grande horloge qu'elle en a vue ; au `hello` les pairs l'échangent, chacun
+envoie les lignes plus récentes que ce que l'autre sait, et le relais entre appareils qui ne se
+croisent pas est gratuit puisque l'état d'un pair contient ce qu'il a reçu des autres. Un paquet
+déposé ou échangé par fichier dit aussi ce qu'il suppose connu : il n'apprend à qui le reçoit que ce
+que celui-ci savait déjà compléter. Le protocole et les transports de D16 restent ; seul le contenu
+des paquets change.
 
-Ce que la synchronisation exige du fichier pour venir sans migration cassante, tenu dès qu'il porte
-de vraies données, pour toutes les tables et sans structure propre à un usage (I3) :
+Une ligne modifiée des deux côtés sans que l'un ait vu la version de l'autre est un **conflit** :
+les deux instances retiennent la même version, la plus récente, et la synchronisation qui le
+détecte montre à l'utilisateur la ligne, la version retenue et l'écartée (I10, principe 4). Une
+suppression contre une modification en est un. Le conflit est résolu sans être gardé, ni dans le
+fichier ni à côté : c'est au protocole de ne pas en laisser passer un sans le montrer. Ce qu'on abandonne : l'historique des valeurs
+remplacées — un « annuler » futur passera par un journal séparé, régénérable pour le présent, qui
+ne touchera pas à ce format — et la preuve de chaîne, superflue pour un foyer sur relais chiffré.
+La granularité par cellule a été chiffrée et écartée : elle alourdit chaque ligne pour des
+conflits que l'usage ne produit pas.
+
+Ce que la synchronisation exige du fichier, pour toutes les tables et sans structure propre à un
+usage (I3) :
 
 - **Une ligne a la même identité sur toutes les instances.** Une opération importée a celle de D09
   sur toute instance qui importe le même relevé sur le même compte ; le compte principal, qu'il naisse
   d'office ou par l'assistant, et les réglages ont la même partout.
 - **Chaque écriture se date et se garde.** Chaque ligne porte l'horloge de sa dernière écriture et
   l'instance qui l'a faite ; une suppression est une écriture : rien d'une ligne synchronisable ne
-  disparaît physiquement.
-- **Ce qui décrit une instance reste à l'instance.** Son identité, ce qu'elle sait des autres, les
-  secrets du relais et ce qui ne concerne qu'elle ne voyagent ni par la synchronisation ni dans un
-  fichier ouvert ailleurs. Deux instances ouvertes depuis le même fichier sont deux instances, qui
-  convergent sans perte ; restaurer une sauvegarde plus ancienne puis synchroniser ne perd rien de ce
-  que les autres ont reçu entre-temps.
+  disparaît physiquement. Une ligne réécrite ne laisse rien d'elle dans le fichier.
+- **Ce qui décrit une instance reste à l'instance.** Son identité, son horloge, ce qu'elle sait des
+  autres, les secrets et curseurs du relais et ce qui ne concerne qu'elle ne voyagent ni par la
+  synchronisation ni dans un fichier : l'application les garde à côté du fichier. Deux instances ouvertes depuis le même fichier sont deux
+  instances, qui convergent sans perte ; un fichier restauré garde l'identité de l'instance qui le
+  restaure, sans rien croire savoir de plus que ses lignes, si bien que synchroniser ne perd rien de
+  ce que les autres ont reçu entre-temps.
 - **Le format se dit.** Le fichier et chaque paquet portent leur format et sa version ; un format
-  inconnu est refusé sans rien perdre ni écrire (C8).
+  inconnu est refusé sans rien perdre ni écrire (D30, C8).
 
-Rupture sans migration, le produit n'ayant pas d'utilisateur : un fichier antérieur est refusé
-avec un message clair, `meta` porte un marqueur de format et une version, `MODEL_VERSION` repart
-à 1, `migration.ts` et les colonnes dépréciées disparaissent — le mécanisme D30 resservira après
-la première version publiée. La même passe renomme ce que le domaine avait renommé sans le
-stockage : `envelopes` → `tirelires`, `envelope_id` → `tirelire_id` (la réserve de D42 tombait
-dès que le nom SQL devenait une interface, issue #18), `makes_rule` → `makes_automation` (D39), et
-sépare les deux sens de `rank`. La clé d'une opération importée (D09) se raccourcit à `op_` + 16
-hexadécimaux. L'écriture par ligne entière autorise `NOT NULL` et `CHECK` ; les références et les
-autres invariants sont vérifiés par une fonction du cœur, qui sert aussi à l'ouverture d'un
-fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` pour pouvoir être
-fabriqué depuis l'extérieur.
+Le format d'état ne reprend pas celui du journal : le produit n'a pas encore d'utilisateur, et un
+fichier au format du journal est refusé comme tout format inconnu. Le format parle le vocabulaire du
+domaine : `envelopes` → `tirelires`, `envelope_id` → `tirelire_id` (D42), `makes_rule` →
+`makes_automation` (D39), et les deux sens de `rank` se séparent ; les colonnes dépréciées et les
+migrations disparaissent, `MODEL_VERSION` repart à 1. La clé d'une opération importée (D09) se
+raccourcit à `op_` + 16 hexadécimaux. L'écriture par ligne entière autorise `NOT NULL` et `CHECK` ;
+les références et les autres invariants sont vérifiés par une fonction du cœur, qui sert aussi à
+l'ouverture d'un fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` pour
+pouvoir être fabriqué depuis l'extérieur.
 
 ### D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
 
@@ -1366,8 +1368,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 - Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
   (vitest, `pnpm test`). L'interface (`apps/web`) ne fait qu'afficher et saisir.
 - Montants en centimes entiers signés ; dates `AAAA-MM-JJ` ; `deletedAt` au lieu de supprimer ;
-  jamais stocker ce qui se recalcule (soldes, plan, soldes à régler). Écritures uniquement via
-  `LedgerStore.upsert/remove/setSetting` (journal de changements).
+  jamais stocker ce qui se recalcule (soldes, plan, soldes à régler). Écritures locales uniquement
+  via `LedgerStore.upsert/remove/setSetting`, qui datent la ligne entière (D58) ; ce qui vient d'une
+  autre instance passe par `LedgerStore.receive`.
 - **Aucune donnée bancaire réelle dans le dépôt.** Les fichiers bancaires servent à vérifier l'import
   en local et ne se versionnent jamais (`*.csv`, `*.sqlite` ignorés) ; exemples et tests sur données
   inventées.
@@ -1378,8 +1381,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
 ### D85 · La langue, et la lecture sur téléphone
 
-Français partout : code, commentaires, commits, interface, documents. Le porteur lit surtout sur
-téléphone : réponses courtes, en prose, une question à la fois.
+Français partout : code, commentaires, commits, interface, documents. L'outil vouvoie
+l'utilisateur, partout où il s'adresse à lui : écrans, boutons, messages, aides, documentation qui
+lui est destinée ; le tutoiement n'y a pas cours. Le porteur lit surtout sur téléphone : réponses
+courtes, en prose, une question à la fois.
 
 ### D86 · Des domaines, des issues de conception
 

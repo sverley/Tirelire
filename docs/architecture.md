@@ -17,12 +17,12 @@ Tirelire/
 │   ├── src/matching.ts     virements internes, virements par compte, rapprochement de flux, pipeline
 │   ├── src/rules.ts        moteur de règles, aperçu, actions groupées, règles issues des flux
 │   ├── src/edit.ts         édition manuelle : verrouillage, ventilation à parts
-│   ├── src/migration.ts    migrations du modèle (versions 1 → 4)
+│   ├── src/migration.ts    anciennes migrations du modèle, plus appelées (retrait : #197)
 │   ├── src/review.ts       bilan par catégorie, calibrage, provisions prévu vs payé
 │   ├── src/hlc.ts          horloge logique hybride
-│   ├── src/schema.ts       définition des tables (une source pour SQL, lecture, écriture, journal)
-│   ├── src/store.ts        dépôt sql.js : upsert/remove journalisés, applyRemote, chaîne d'empreintes
-│   ├── src/sync.ts         protocole de synchronisation, paquets par fichier
+│   ├── src/schema.ts       définition des tables (une source pour SQL, lecture, écriture, échange), format du fichier
+│   ├── src/store.ts        dépôt sql.js : état daté par ligne, réception et conflits, refus d'un autre format
+│   ├── src/sync.ts         synchronisation par delta d'état, paquets par fichier et par relais
 │   └── src/example.ts      jeu de données de l'analyse
 ├── apps/web/               PWA Svelte 5 + Vite
 │   ├── src/lib/db.ts       ouverture du dépôt, persistance IndexedDB
@@ -104,11 +104,13 @@ automatique des flux sûrs → moteur de règles → file de tri (interface).
 
 ## Dépôt et synchronisation
 
-`LedgerStore` (sql.js) : `upsert` journalise chaque colonne modifiée avec un HLC et une empreinte
-chaînée ; `applyRemote` n'écrase une cellule que si l'horodatage reçu est plus récent
-(`cell_versions`), conserve les entrées reçues pour les relayer, vérifie les empreintes.
-`sync.ts` : protocole symétrique par curseurs, transport abstrait ; fichier JSON sur `main`,
-WebRTC, relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`).
+`LedgerStore` (sql.js) : le fichier est un état (D58). `upsert`, `remove` et `setSetting`
+réécrivent la ligne entière avec une nouvelle horloge ; `receive` fusionne des lignes venues d'une
+autre instance, la plus récente gagne, et rend l'écartée d'un conflit sans la garder. Ce qui décrit l'instance
+(`InstanceState`) n'est pas dans le fichier : `apps/web/src/lib/db.ts` le garde à côté.
+`sync.ts` : protocole symétrique par delta d'état, transport abstrait ; fichier JSON, WebRTC,
+relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`). Détail :
+`docs/synchronisation.md`.
 
 ## Vérification
 

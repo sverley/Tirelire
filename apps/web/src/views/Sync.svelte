@@ -5,6 +5,8 @@
   import { relaySync, newRoomId, type RelayConfig } from '../lib/relay';
   import { isNative } from '../lib/platform';
   import QRCode from 'qrcode';
+  import Conflits from '../lib/Conflits.svelte';
+  import { shortDate } from '../lib/format';
 
   // --- Appareil et utilisateur ---------------------------------------------
   let deviceName = $state('');
@@ -94,6 +96,7 @@
     phase = 'syncing';
     result = await runSync(app.store, peer.transport(), { ...(deviceName ? { name: deviceName } : {}), timeoutMs: 60_000 });
     app.reload();
+    app.showConflicts(result.conflicts);
     peer.close();
     peer = undefined;
     phase = 'done';
@@ -194,7 +197,8 @@
     try {
       const r = await relaySync(app.store, $state.snapshot(relay), deviceName || undefined);
       app.reload();
-      msg = `Relais : ${r.pushed} changements envoyés, ${r.pulledBundles} paquets reçus, ${r.applied} changements appliqués.`;
+      app.showConflicts(r.conflicts);
+      msg = `Relais : ${r.pushed} lignes déposées, ${r.pulledBundles} paquets reçus, ${r.applied} lignes mises à jour${r.conflicts.length ? `, ${r.conflicts.length} modifiées des deux côtés (ci-dessus)` : ''}.`;
     } catch (err) {
       msg = err instanceof Error ? err.message : String(err);
     } finally {
@@ -206,6 +210,8 @@
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.view = 'more'; }}>‹ Configuration</a></p>
 <h1>Synchronisation</h1>
 
+<Conflits />
+
 <h2>Cet appareil</h2>
 <div class="card">
   <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -216,7 +222,7 @@
   {#if devices.length}
     <h3>Appareils du foyer</h3>
     {#each devices as d (d.id)}
-      <div class="row"><div class="label">{d.name}{d.user ? ` · ${d.user}` : ''}<span class="sub num">{d.id}{peers.find((p) => p.site === d.id) ? ` · dernier échange : seq ${peers.find((p) => p.site === d.id)!.cursor}` : ''}</span></div></div>
+      <div class="row"><div class="label">{d.name}{d.user ? ` · ${d.user}` : ''}<span class="sub num">{d.id}{peers.find((p) => p.site === d.id) ? ` · dernier échange le ${shortDate(peers.find((p) => p.site === d.id)!.at.slice(0, 10))}` : ''}</span></div></div>
     {/each}
   {/if}
 </div>
@@ -265,6 +271,7 @@
       <strong>Synchronisé avec {result.peerName ?? result.peer}</strong>
       <div class="row"><div class="label">Envoyés</div><div class="num">{result.sent}</div></div>
       <div class="row"><div class="label">Reçus / appliqués</div><div class="num">{result.received} / {result.applied}</div></div>
+      {#if result.conflicts.length}<div class="row"><div class="label">Modifiées des deux côtés</div><div class="num">{result.conflicts.length}</div></div>{/if}
     </div>
     <div class="actions" style="margin-bottom:0"><button class="btn" onclick={resetDirect}>Terminer</button></div>
   {:else if phase === 'error'}

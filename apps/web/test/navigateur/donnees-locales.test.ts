@@ -12,7 +12,7 @@
  * 1. Un parcours complet sans toucher à la synchronisation (exemple, Opérations, Bilan, import
  *    d'un relevé inventé, export) : le journal réseau du navigateur doit rester vide.
  * 2. Le relais activé : seules des requêtes vers l'adresse renseignée partent, leur corps ne porte
- *    que `{ site, upTo, iv, blob }` (aucun champ en clair de plus), et `blob` ne se relit pas comme
+ *    que `{ site, iv, blob }` (aucun champ en clair de plus), et `blob` ne se relit pas comme
  *    du JSON en clair.
  *
  * Portée tranchée avec le porteur le 13 septembre 2026 : remplir l'adresse, le salon et la phrase
@@ -76,13 +76,15 @@ interface RequêteRelais {
 function vérifierRelaisChiffré(avantAccord: RequêteRelais[], aprèsAccord: RequêteRelais[]) {
   expect(avantAccord, `une requête part avant l'accord explicite (remplissage + clic) : ${JSON.stringify(avantAccord)}`).toEqual([]);
   expect(aprèsAccord.length, 'aucune requête n’est partie après le clic explicite sur « Synchroniser maintenant »').toBeGreaterThan(0);
+  expect(
+    aprèsAccord.filter((r) => r.méthode === 'POST' && r.corps).length,
+    `aucun dépôt (POST) n’est parti vers le relais : rien du paquet envoyé n’a pu être vérifié (${aprèsAccord.map((r) => r.méthode).join(', ')})`,
+  ).toBeGreaterThan(0);
   for (const r of aprèsAccord) {
     expect(r.url.startsWith(RELAIS), `requête vers une adresse imprévue : ${r.url}`).toBe(true);
     if (r.méthode !== 'POST' || !r.corps) continue;
     const corps = JSON.parse(r.corps) as Record<string, unknown>;
-    expect(Object.keys(corps).sort(), `le paquet envoyé porte des clés en plus de site/upTo/iv/blob : ${Object.keys(corps).join(', ')}`).toEqual(
-      ['blob', 'iv', 'site', 'upTo'].sort(),
-    );
+    expect(Object.keys(corps).sort(), `le paquet envoyé ne porte pas exactement site/iv/blob : ${Object.keys(corps).join(', ')}`).toEqual(['blob', 'iv', 'site']);
     const enClair = JSON.stringify(corps);
     for (const motPossible of ['Alimentation', 'Compte principal', 'Assurance', 'TIRELIRE']) {
       expect(enClair.includes(motPossible), `le paquet envoyé contient « ${motPossible} » en clair`).toBe(false);
@@ -97,7 +99,7 @@ function vérifierRelaisChiffré(avantAccord: RequêteRelais[], aprèsAccord: Re
  */
 it.fails('témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair', () => {
   const enClair = JSON.stringify({ tirelire: 'Alimentation', montant: -1234 });
-  const corps = JSON.stringify({ site: 's1', upTo: 3, iv: 'abc', blob: btoa(enClair) });
+  const corps = JSON.stringify({ site: 's1', iv: 'abc', blob: btoa(enClair) });
   vérifierRelaisChiffré([], [{ méthode: 'POST', url: `${RELAIS}/r/salon`, corps }]);
 });
 
@@ -180,12 +182,24 @@ describe.skipIf(!navigateur)('I7 · les données restent en local (issue #72)', 
         void req.continue();
         return;
       }
+      // Le relais factice répond comme un vrai relais d'une autre origine : en CORS, preflight
+      // compris. Sans cela, le retrait échoue dans la page et aucun dépôt ne part.
+      const cors = {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, POST, OPTIONS',
+        'access-control-allow-headers': 'content-type',
+      };
+      if (req.method() === 'OPTIONS') {
+        void req.respond({ status: 204, headers: cors, body: '' });
+        return;
+      }
       const entrée = { méthode: req.method(), url, corps: req.postData() };
       (accordé ? aprèsAccord : avantAccord).push(entrée);
       void req.respond({
         status: 200,
+        headers: cors,
         contentType: 'application/json',
-        body: req.method() === 'GET' ? JSON.stringify({ records: [] }) : '{}',
+        body: req.method() === 'GET' ? JSON.stringify({ records: [] }) : JSON.stringify({ id: 1 }),
       });
     });
 
@@ -194,7 +208,9 @@ describe.skipIf(!navigateur)('I7 · les données restent en local (issue #72)', 
 
     accordé = true;
     await cliquer(page, 'Synchroniser maintenant');
-    await pause(600);
+    // Le dépôt suit le retrait et le chiffrement (dérivation de clé) : l'attendre, sans s'y fier.
+    for (let i = 0; i < 50 && !aprèsAccord.some((r) => r.méthode === 'POST'); i++) await pause(100);
+    await pause(200);
 
     await page.close();
     vérifierRelaisChiffré(avantAccord, aprèsAccord);

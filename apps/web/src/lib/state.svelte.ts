@@ -14,10 +14,11 @@ import {
   type LedgerStore,
   type Patch,
   type Plan,
+  type Conflict,
   type Settings,
 } from '@tirelire/core';
 import type { LedgerKey } from '@tirelire/core';
-import { eraseStore, openStore, type OpenedStore } from './db';
+import { eraseStore, openStore, OuvertureRefusee, type OpenedStore } from './db';
 
 export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'tirelires' | 'categories' | 'flows' | 'entries' | 'settings' | 'sync' | 'wizard';
 
@@ -30,6 +31,18 @@ class AppState {
   history = $state<View[]>([]);
   ready = $state(false);
   error = $state<string | undefined>(undefined);
+  /**
+   * Le fichier enregistré n'est pas au format de cette version (D58) : il n'est pas ouvert, et rien
+   * n'en est effacé tant que l'utilisateur n'a pas choisi — l'enregistrer tel quel, repartir d'un
+   * fichier neuf ou de l'exemple.
+   */
+  refused = $state<{ message: string; bytes: Uint8Array } | undefined>(undefined);
+  /**
+   * Lignes modifiées des deux côtés, rendues par la synchronisation qui les a détectées (D58). Le
+   * conflit est déjà résolu ; il n'est gardé nulle part, ni dans le fichier ni à côté : cette liste
+   * ne vit que le temps de la session.
+   */
+  conflicts = $state<Conflict[]>([]);
   private opened: OpenedStore | undefined;
 
   plan: Plan = $derived(computePlan(this.ledger, this.asOf));
@@ -67,12 +80,33 @@ class AppState {
       this.reload();
       this.ready = true;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : String(err);
+      if (err instanceof OuvertureRefusee) this.refused = { message: err.message, bytes: err.bytes };
+      else this.error = err instanceof Error ? err.message : String(err);
     }
+  }
+
+  /** Après un refus : repartir d'un fichier neuf, ou de l'exemple. C'est ici seulement que l'ancien est effacé. */
+  async startOver(example: boolean): Promise<void> {
+    await eraseStore();
+    this.opened = await openStore();
+    this.refused = undefined;
+    this.reload();
+    this.ready = true;
+    if (example) await this.loadExample();
   }
 
   reload(): void {
     this.ledger = this.store.load();
+  }
+
+  /** Montre les conflits qu'une synchronisation vient de rendre. */
+  showConflicts(conflicts: Conflict[]): void {
+    if (conflicts.length) this.conflicts = [...this.conflicts, ...conflicts];
+  }
+
+  /** L'utilisateur a vu un conflit. */
+  dismissConflict(id: string): void {
+    this.conflicts = this.conflicts.filter((c) => c.id !== id);
   }
 
   upsert<K extends LedgerKey>(key: K, row: Ledger[K][number]): void {
@@ -151,8 +185,8 @@ class AppState {
    * à la main avait oublié les besoins (D28), et charger l'exemple donnait des tirelires vides,
    * donc un plan sans une seule ligne. Une table ajoutée au modèle est reprise ici d'office.
    *
-   * Les réglages suivent le même principe, à une exception près : `siteId` désigne *cet* appareil
-   * dans le journal de changements (D08) et n'appartient pas au grand livre recopié.
+   * Les réglages suivent le même principe, à une exception près : `siteId` désigne *cette*
+   * instance (D58) et n'appartient pas au grand livre recopié.
    */
   async replaceWith(l: Ledger): Promise<void> {
     await this.eraseAll();
@@ -162,7 +196,7 @@ class AppState {
     // un plan vide. Ajouter une table au modèle ne peut plus laisser cette fonction en arrière.
     for (const key of LEDGER_KEYS) for (const row of l[key]) s.upsert(key, row as never);
     // Les réglages suivent la même règle, pour la même raison : on les parcourt au lieu de les
-    // citer un par un. Seul `siteId` reste dehors — il désigne cet appareil, pas les données (D08).
+    // citer un par un. Seul `siteId` reste dehors — il désigne cette instance, pas les données (D58).
     for (const key of Object.keys(l.settings) as Array<keyof Settings>) {
       if (key === 'siteId') continue;
       s.setSetting(key, l.settings[key]);
@@ -172,6 +206,7 @@ class AppState {
 
   /** Efface tout et repart d'un dépôt vide. */
   async eraseAll(): Promise<void> {
+    await this.opened?.flush();
     this.opened?.store.close();
     await eraseStore();
     this.opened = await openStore();
@@ -184,11 +219,15 @@ class AppState {
     return this.store.export();
   }
 
-  /** Remplace la base par un fichier SQLite importé. */
+  /**
+   * Remplace la base par un fichier SQLite importé. Le fichier est ouvert avant que rien ne soit
+   * remplacé : refusé (autre format), les données courantes restent telles quelles.
+   */
   async importFile(bytes: Uint8Array): Promise<void> {
+    await this.opened?.flush();
+    const next = await openStore(bytes);
     this.opened?.store.close();
-    await eraseStore();
-    this.opened = await openStore(bytes);
+    this.opened = next;
     this.reload();
   }
 }
