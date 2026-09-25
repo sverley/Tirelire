@@ -87,9 +87,11 @@ la blockchain ont été examinés et écartés (`docs/synchronisation.md`).
 
 ### D09 · Deux familles d'identifiants
 
-Opérations importées : clé déterministe `op_` + SHA-256(compte, date, montant, libellé
-normalisé, rang parmi les identiques du jour) → identiques sur tous les appareils, fusion sans
-conflit. Tout ce que l'utilisateur crée : UUID v7. Les exports bancaires n'ayant ni heure ni
+Opérations importées : clé déterministe `op_` + les 16 premiers hexadécimaux d'un SHA-256(compte,
+date, montant, libellé normalisé, rang parmi les identiques du jour) → identiques sur tous les
+appareils, fusion sans conflit. Le rang n'entre que dans la clé et ne se garde pas. Soixante-quatre
+bits suffisent largement à l'usage projeté, un import par mois : sur cent mille opérations, le risque
+que deux clés se confondent reste inférieur à un sur un milliard. Tout ce que l'utilisateur crée : UUID v7. Les exports bancaires n'ayant ni heure ni
 identifiant de transaction, un **détecteur de doublons probables** (même compte, même montant,
 ±3 jours, libellé proche) compense les changements de libellé ou de date entre sources
 (Linxo ↔ banque, attente ↔ comptabilisé).
@@ -285,7 +287,11 @@ version que l'application ne lit pas est refusée en le disant, sans rien ouvrir
 effacer : l'utilisateur garde le fichier tel quel et choisit la suite (C1, C8). Une migration
 s'écrit quand une version publiée l'exige, et seulement alors : elle lit l'ancienne version et
 écrit la nouvelle, et une colonne retirée d'un format publié n'est plus lue qu'à cette occasion.
-Tolérer l'écart entre deux instances de versions différentes se décide à part (C8).
+Avant la première version publiée, aucune donnée réelle n'est à reprendre : un changement de format
+passe par une nouvelle version du format, l'ancienne est refusée comme une version inconnue, et le
+code ne garde rien d'elle — ni colonne retirée, ni table laissée pour un pair en arrière, ni étape de
+migration, ni synonyme d'une valeur ancienne. Tolérer l'écart entre deux instances de versions
+différentes se décide à part (C8).
 
 ### D31 · Rang d'une règle = clé triable
 
@@ -317,21 +323,6 @@ Conséquence : un flux qui engendre une règle (D24) et le rapprochement de ce m
 même chose, ce qui est cohérent — la règle verrouille et gagne, le rapprochement reste la trace
 de l'échéance servie.
 
-### D34 · Une classification que rien ne reproduit est verrouillée d'office à la migration
-
-Corrige la migration 2 → 3 décidée au lot 2. Puisque le moteur de D23 recalcule tout ce qui n'est
-pas verrouillé, une opération *rapprochée* que plus aucune règle ne sélectionne perd sa
-classification au premier passage. C'est la conséquence assumée de D22 pour ce que les règles
-produisent — mais l'historique d'avant D23 n'a pas été produit par des règles : il a été saisi.
-Le laisser en *rapproché* ne le rendrait pas malléable, cela le détruirait.
-
-À la migration, une opération qui portait une ventilation devient donc **verrouillée** : dans
-l'ancien modèle, rien ne la reproduisait, elle était de la vérité de fait. Celles qui n'en
-portaient pas gardent leur état de traitement. Verrouiller de trop se défait en une action groupée
-(D26) ; effacer ne se défait pas.
-
-Vaut pour la migration seule. Une opération classée par une règle après D23 reste rapprochée et
-donc reprise à chaque passage, comme D22 le prévoit.
 ### D35 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
 
 Pour être utilisable depuis un hébergement web mutualisé (OVHcloud sans VPS : Apache, PHP,
@@ -445,12 +436,10 @@ Le rôle ne change pas : c'est le compte par lequel tout transite, celui dont le
 celui qui porte le jour de paie (D02) et qui reçoit les dotations (D29). D04 reste vraie, avec le
 mot corrigé.
 
-Deux valeurs stockées portaient le mot — le genre du compte et la clé du coussin. La migration
-5 → 6 les réécrit (`migrateTo6`), et la lecture accepte `pivot` comme synonyme de `principal`
-pour qu'un appareil resté en arrière, qui réécrirait l'ancienne valeur, ne rende pas le compte
-méconnaissable (D08, D30).
+Le fichier dit le même mot : le genre du compte vaut `principal` et le réglage du coussin
+s'appelle `principalCushion`, sans autre valeur lue à leur place (D30, D58).
 
-### D42 · Une enveloppe s'appelle une tirelire ; le stockage garde ses noms
+### D42 · Une enveloppe s'appelle une tirelire, jusque dans le stockage
 
 Le mot « enveloppe » venait de la méthode budgétaire dont l'application s'inspire ; il ne disait rien
 à qui découvrait l'écran, et l'application s'appelle déjà Tirelire (D13). Une tirelire, tout le monde
@@ -461,14 +450,13 @@ voit ce que c'est : on y met de côté, on la casse le jour venu. Renommage dans
 Ce que le mot désigne est inchangé : le pot à solde unique de D28, porteur de besoins, réparti sur
 des comptes (D19) avec un placement voulu (D38).
 
-En revanche **les noms de tables et de colonnes ne bougent pas** : la table reste `envelopes`, les
-colonnes restent `envelope_id`. Le journal de changements porte ces noms (D08) ; les renommer
-obligerait à déprécier et migrer chaque colonne (D30) et casserait la fusion avec un pair non migré,
-pour un gain nul puisque personne ne les lit. `schema.ts` sépare donc explicitement la propriété
-TypeScript du nom SQL (`cAs`), ce que le schéma permettait déjà sans que ce soit utilisé.
+Le stockage dit le même mot : la table `tirelires`, les colonnes `tirelire_id` (D58). Le nom d'une
+colonne est celui de sa propriété, en snake_case, sans exception : un fichier se lit, et se fabrique
+depuis l'extérieur, avec le vocabulaire de l'écran.
 
-La règle générale qui en découle : **le domaine se renomme librement, le stockage ne se renomme que
-s'il faut aussi changer la donnée.**
+La règle générale qui en découle : **le stockage parle le vocabulaire du domaine.** Avant la
+première version publiée, un renommage du domaine descend jusque dans le fichier, par une nouvelle
+version du format (D30) ; après, il se pèse contre la migration qu'il demande.
 
 ### D43 · L'assistant propose, et ce qu'il propose vient de l'exemple
 
@@ -527,9 +515,7 @@ du jour du plus gros revenu déclaré — « commencer au jour de ma paie » ou 
 calendaire » — au lieu de le demander à froid avant que le moindre revenu existe.
 
 Le vocabulaire suit : `payPeriodContaining` devient `budgetPeriodContaining`, et le paramètre
-`payDay` devient `startDay` dans tout le cœur. La colonne `accounts.pay_day` reste déclarée et
-dépréciée (D30) ; la migration 6 → 7 reprend la valeur du compte principal telle quelle, pour que les
-périodes ne se décalent pas au premier lancement.
+`payDay` devient `startDay` dans tout le cœur. Un compte ne porte aucun jour de paie.
 
 Remplace la partie de D02 qui situait le jour de paie sur le compte ; tout le reste de D02 — la
 période de paie à paie, son nom pris au mois de son milieu, le lissage du rattrapage — est inchangé.
@@ -551,8 +537,6 @@ Dans l'interface, le choix du type se réduit à deux options sans texte d'aide 
 « Épargne ») ; le suivi d'un solde à régler devient une case à cocher dans l'écran Comptes, avec ses
 réglages de seuil et de sens. L'import ne filtre plus aucun compte.
 
-Migration 7 → 8 : `third` devient `courant` avec `tracksSettlement`, `holding` devient `epargne`.
-
 Corrige aussi une scorie de D42 : le renommage automatique avait laissé un identifiant de travail,
 `tirelliresById_TMP`, mal orthographié et jamais rétabli. Il devient `tireliresById`. Le typage ne
 pouvait pas le voir — il était cohérent partout — ce qui rappelle qu'un renommage mécanique demande
@@ -567,9 +551,8 @@ grave, écrivait des genres périmés.
 
 Deux garde-fous en découlent. Le select de l'assistant est **engendré** à partir d'une liste typée
 (`Array<Exclude<AccountKind, 'principal'>>`), comme le faisait déjà l'écran Comptes : renommer un
-genre casse désormais la compilation. Et la lecture d'un compte **traduit les anciens genres**
-(`pivot`, `holding`, `third`), comme D41 le faisait déjà pour le seul `pivot` — sauf en lecture
-brute, sinon les migrations ne verraient plus la valeur qu'elles doivent interpréter.
+genre casse désormais la compilation. Et le fichier **refuse un genre hors de son énumération**
+(D58) : une valeur périmée ne s'écrit plus, ni localement ni reçue d'une autre instance.
 
 ### D46 · Des lignes déjà là, pas des pastilles à cliquer
 
@@ -618,10 +601,6 @@ périodes — et n'est jamais employée pour dater une occurrence, qui reste du 
 Dans l'interface, revenus et charges portent « tous les [N] [unité] », modifiable sur la ligne comme
 le reste. Les tirelires gardent le mois : un besoin s'exprime naturellement par période budgétaire,
 et rien ne demandait autre chose.
-
-`intervalMonths` reste lu mais n'est plus jamais écrit (`stepOf`) ; la migration 8 → 9 convertit
-besoins et flux. Un rythme envoyé par un appareil non migré garde donc son sens, ce qu'un test
-vérifie.
 
 ### D48 · Une tirelire peut verser au budget au lieu de le consommer
 
@@ -1086,12 +1065,29 @@ usage (I3) :
 
 Le format d'état ne reprend pas celui du journal : le produit n'a pas encore d'utilisateur, et un
 fichier au format du journal est refusé comme tout format inconnu. Le format parle le vocabulaire du
-domaine : `envelopes` → `tirelires`, `envelope_id` → `tirelire_id` (D42), `makes_rule` →
-`makes_automation` (D39), et les deux sens de `rank` se séparent ; les colonnes dépréciées et les
-migrations disparaissent, `MODEL_VERSION` repart à 1. La clé d'une opération importée (D09) se
-raccourcit à `op_` + 16 hexadécimaux. L'écriture par ligne entière autorise `NOT NULL` et `CHECK` ;
-les références et les autres invariants sont vérifiés par une fonction du cœur, qui sert aussi à
-l'ouverture d'un fichier étranger. Le format est documenté dans `docs/format-depot-sqlite.md` pour
+domaine : la table `tirelires` et les colonnes `tirelire_id` (D42), `makes_automation` (D39) ; aucun
+nom de table ni de colonne ne dit « enveloppe » ni « règle », et un même nom désigne la même chose
+d'une table à l'autre — `rank` n'est que la clé triable d'un automatisme (D31). Il ne porte ni
+colonne dépréciée, ni table laissée pour un pair en arrière, ni version du modèle à côté de celle du
+format : `FORMAT_VERSION` seule dit le format, et le code n'a aucune migration (D30). La clé d'une
+opération importée (D09) est `op_` + 16 hexadécimaux. L'écriture par ligne entière autorise
+`NOT NULL` et `CHECK` : une colonne obligatoire est `NOT NULL`, une colonne énumérée porte un
+`CHECK` nommé `table.colonne`, et le cœur vérifie la même chose avant d'écrire, localement comme à la
+réception, si bien qu'une ligne incohérente est refusée sans rien écrire, en nommant la table et la
+colonne. Les références et les autres invariants sont vérifiés par une fonction du cœur, qui sert
+aussi à l'ouverture d'un fichier étranger.
+
+Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'y stocke qui se
+recalcule (D84). Importées : `account_id`, `date`, `label`, `details`, `amount` et
+`suggested_category`, la catégorie que propose la source. Saisies : `state` et `one_off`, et toutes
+les colonnes d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit
+pas dans la forme de l'identifiant, qui n'est qu'une identité (D09). Trois colonnes dérivées sont
+gardées : `planned_flow_id`, `transfer_account_id` et `transfer_operation_id`, que le rapprochement
+établit. Elles ne se recalculent pas à l'identique : le rapprochement dépend des flux et des
+opérations du jour où il a eu lieu, une proposition confirmée est une décision de l'utilisateur
+(D12), et le moteur d'automatismes repart de ce qu'elles établissent (D33). Le libellé normalisé,
+lui, se déduit du libellé seul (`normalizeLabel`) : il ne se stocke pas, il se recalcule à la
+lecture du fichier. Le rang parmi les identiques du jour n'entre que dans la clé (D09). Le format est documenté dans `docs/format-depot-sqlite.md` pour
 pouvoir être fabriqué depuis l'extérieur.
 
 ### D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
@@ -1180,9 +1176,8 @@ part fixe ne suit pas le budget, et son écart avec ce que le budget demande pou
 propose comme celui du montant, au-delà du même pas, sans être réécrit (I10). À l'import, ce que les
 parts n'absorbent pas se répartit par l'ordre de financement au jour de l'opération (D06, D21),
 planchers d'abord (`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée se
-répartit ainsi en entier. `PlannedFlow.plannedAllocation` reste une colonne dépréciée (D30) : ce
-qu'elle figeait, des montants tirés du plan au moment de l'enregistrement, n'est pas une ventilation
-choisie.
+répartit ainsi en entier. Le flux ne fige pas de montants tirés du plan au moment de
+l'enregistrement : ce ne serait pas une ventilation choisie.
 
 Un virement saisi à la main est un flux déclaré comme un autre : il n'est pas pris pour l'ordre
 permanent, que le plan ne compare qu'à un flux dérivé, et rien ne le réécrit (D57).
