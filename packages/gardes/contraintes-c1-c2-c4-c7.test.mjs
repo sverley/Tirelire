@@ -144,7 +144,7 @@ function verifierPromessesNommees(id, texteDuRegistre, sourceDuFichier) {
   }
 }
 
-describe('[niveau 1] harnais de la garde', () => {
+describe('[niveau 1] harnais de la garde · C1, C2, C4 et C7 gardés au registre (#73)', () => {
   test('#73 · témoin vert — chaque garantie promise par C1 et C2 est nommée au registre, témoin rouge en it.fails à l’appui', () => {
     for (const id of Object.keys(PROMESSES)) verifierPromessesNommees(id, registre(), lire(PROMESSES[id].fichier));
   });

@@ -225,7 +225,7 @@ function garderOuRenoncer(texte, ids = SANS_HARNAIS) {
   assert.deepEqual(manquants, [], `des invariants restent sans garde programmée et sans renonciation :\n${manquants.join('\n')}`);
 }
 
-describe('[niveau 1] harnais de la garde', () => {
+describe('[niveau 1] harnais de la garde · I4, I5 et I6 gardés au registre (#71)', () => {
   test('#71 · I4 et I5 sont gardés par un harnais, ou par une renonciation écrite et datée', () => {
     garderOuRenoncer(registre());
   });

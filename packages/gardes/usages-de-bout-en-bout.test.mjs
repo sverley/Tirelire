@@ -190,7 +190,7 @@ function parcoursDeBoutEnBout(texte, ids = PORTENT_UN_PARCOURS) {
   assert.deepEqual(manquants, [], `des usages n'ont pas leur harnais de bout en bout au registre :\n${manquants.join('\n')}`);
 }
 
-describe('[niveau 1] harnais de la garde', () => {
+describe('[niveau 1] harnais de la garde · I3 : U1 à U5 gardés de bout en bout au registre (#70)', () => {
   test('#70 · U1, U2 et U5 portent au registre un harnais de bout en bout, avec son témoin rouge', () => {
     parcoursDeBoutEnBout(registre());
   });

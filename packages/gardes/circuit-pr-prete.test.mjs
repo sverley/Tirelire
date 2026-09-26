@@ -31,7 +31,7 @@ const sansGuillemets = (v) => v.trim().replace(/^(['"])(.*)\1$/, '$2');
 const valeurs = (v) => v.replace(/^\[|\]$/g, '').split(',').map(sansGuillemets).filter(Boolean);
 
 /** Le bloc `on:` : événement → { types }. Formes lues : `on: x`, `on: [x, y]`, bloc renfoncé de deux espaces. */
-describe('[niveau 1] harnais de la garde', () => {
+describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aperçu, changement signalé (#150, #168, #175)', () => {
   function déclencheurs(yaml) {
     const lignes = yaml
       .split(/\njobs:\s*\n/)[0]
@@ -214,7 +214,7 @@ describe('[niveau 1] harnais de la garde', () => {
   const cocher = (draft) =>
     surLaPR('edited', draft, { pull_request: { ...PR(draft), body: CASE('x') }, changes: { body: { from: CASE(' ') } } });
 
-  test('#175 · cocher la case de l’aperçu sur une PR prête lance le dépôt, lu sur main', () => {
+  test('#175 · cocher la case de l’aperçu sur une PR prête lance le dépôt, lu sur main [niveau 0]', () => {
     const exé = exécutions(cocher(false), TENUE);
     const jobs = tournent(exé);
     assert.ok(fait(jobs, DÉPÔT_DE_LA_VERSION_DE_DEV), 'case cochée sur une PR prête : aucun job ne dépose l’aperçu');
