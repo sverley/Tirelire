@@ -81,7 +81,7 @@ function distributionsSurChaquePR(yaml) {
   }
 }
 
-describe('[niveau 1] harnais de la garde', () => {
+describe('[niveau 1] harnais de la garde · I9 ; D83, une fois par passage (#153) ; D81, la garde de main juge (#159)', () => {
   test("I9 · sur chaque PR, le web et le site d'hébergement se construisent ; l'APK attend la fusion", () => {
     distributionsSurChaquePR(lire(CI));
   });
@@ -374,11 +374,11 @@ describe('[niveau 1] harnais de la garde', () => {
     return g ? interpoler(g.replace(/^ {2}group:/, ''), ctx) : null;
   }
 
-  test('#159 · sur pull_request_target, seul « Validation » tourne ; sur pull_request, il ne tourne plus', () => {
+  test('#159 · sur pull_request_target, seul « Validation » tourne ; sur pull_request, il ne tourne plus [niveau 0]', () => {
     validationDepuisMain(lire(workflowDeValidation()));
   });
 
-  test('#159 · « Validation » ne lance rien de la PR : lecture seule, aucun secret, aucun pnpm, aucune extraction de la tête', () => {
+  test('#159 · « Validation » ne lance rien de la PR : lecture seule, aucun secret, aucun pnpm, aucune extraction de la tête [niveau 0]', () => {
     validationSansRienDeLaPR(lire(workflowDeValidation()));
   });
 
@@ -392,7 +392,7 @@ describe('[niveau 1] harnais de la garde', () => {
     }
   });
 
-  test('#159 · témoin rouge · des jobs sans condition tourneraient aussi sur pull_request_target', () => {
+  test('#159 · témoin rouge · des jobs sans condition tourneraient aussi sur pull_request_target [niveau 0]', () => {
     // Un job sans condition ajouté au workflow de la validation : il tournerait avec elle.
     const cassé = `${lire(workflowDeValidation()).replace(/\s*$/, '')}\n  intrus:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo intrus\n`;
     assert.throws(() => validationDepuisMain(cassé), /seul le job « Validation » doit tourner/);

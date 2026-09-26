@@ -121,7 +121,7 @@ function leResteDuDépôtEstIntact(yaml) {
   );
 }
 
-describe('[niveau 1] harnais de la garde', () => {
+describe('[niveau 1] harnais de la garde · #145 : le résumé du dépôt FTP ignoré', () => {
   test("#145 · le résumé du dépôt FTP ignoré dit où l'archive du site se trouve vraiment", () => {
     résuméDitOùEstLArchive(lire());
   });
