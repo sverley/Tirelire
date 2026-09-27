@@ -36,6 +36,8 @@ const checkout = (ref) => `      - uses: actions/checkout@v4\n        with:\n   
 /** Les extractions de la PR que le témoin fait faire à chaque workflow. */
 const EXTRACTIONS = [
   ['la tête de la PR', checkout('${{ github.event.pull_request.head.sha }}')],
+  ['la tête de la PR, `with:` en mappage sur une ligne', '      - uses: actions/checkout@v4\n        with: { ref: "${{ github.event.pull_request.head.sha }}" }'],
+  ['la référence de fusion, `with:` en mappage sur une ligne', '      - uses: actions/checkout@v4\n        with: { fetch-depth: 0, ref: refs/pull/${{ github.event.pull_request.number }}/merge }'],
   ['la branche de la PR', checkout('${{ github.head_ref }}')],
   ['la référence de fusion', checkout('refs/pull/${{ github.event.pull_request.number }}/merge')],
   ['la tête de la PR, par git', '      - run: git checkout "${{ github.event.pull_request.head.sha }}"'],
@@ -89,5 +91,6 @@ describe('[niveau 0] D83, « Workflows » : un workflow déclenché par pull_req
     // Extraire main, lire la tête par git, lire la description par l'API : rien n'est extrait.
     assert.deepEqual(extractionsSurPullRequestTarget('inventé.yml', inventé('on:\n  pull_request_target:', LIRE_LA_PR)), []);
     assert.deepEqual(extractionsSurPullRequestTarget('inventé.yml', inventé('on:\n  pull_request_target:', checkout('main'))), []);
+    assert.deepEqual(extractionsSurPullRequestTarget('inventé.yml', inventé('on:\n  pull_request_target:', '      - uses: actions/checkout@v4\n        with: { ref: main, fetch-depth: 0 }')), []);
   });
 });

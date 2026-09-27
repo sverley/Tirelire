@@ -6,8 +6,9 @@
  *
  * Lecture statique, par renfoncement (`workflow-a-blanc.mjs`) : dans un tel workflow, chaque étape de
  * chaque job est lue, quel que soit l'événement qui la fait tourner. Une extraction est :
- * - `actions/checkout` avec une `ref` autre que `main`, ou un `repository` ; sans `ref`, GitHub
- *   extrait la branche par défaut, `main`, la version même du workflow ;
+ * - `actions/checkout` avec une `ref` autre que `main`, ou un `repository`, que `with:` soit écrit en
+ *   bloc ou en mappage sur une ligne ; sans `ref`, GitHub extrait la branche par défaut, `main`, la
+ *   version même du workflow ;
  * - une commande qui met un autre arbre à la place de celui extrait (`git checkout`, `git switch`,
  *   `git worktree`…, `gh pr checkout`), quelle que soit la référence visée : aucun workflow n'en a
  *   besoin pour lire la PR.
@@ -32,17 +33,28 @@ export function déclenchéParPullRequestTarget(yaml) {
 const REF_DE_MAIN = /^(?:main|refs\/heads\/main)$/;
 const CHANGE_L_ARBRE = /\bgit\b[^\n;&|]*?\s(checkout|switch|restore|reset|worktree|read-tree|stash|apply|am|cherry-pick|rebase|merge|pull)\b|\bgh\s+pr\s+checkout\b/;
 
+/**
+ * Les clés `ref` et `repository` passées à une action, sous les deux formes de `with:` : en bloc
+ * (`ref: x` sur sa ligne) ou en mappage sur une ligne (`with: { ref: x }`).
+ */
+function entréesDeWith(c) {
+  const entrées = [];
+  for (const [, clé, v] of c.matchAll(/^\s+(ref|repository):\s*(.*)$/gm)) entrées.push([clé, sansGuillemets(sansCommentaire(v))]);
+  for (const [, mappage] of c.matchAll(/^\s*with:\s*\{(.*)\}\s*(?:#.*)?$/gm)) {
+    const valeur = /(?:^|,)\s*(ref|repository)\s*:\s*("[^"]*"|'[^']*'|\$\{\{[\s\S]*?\}\}|[^,]*)/g;
+    for (const [, clé, v] of mappage.matchAll(valeur)) entrées.push([clé, sansGuillemets(v)]);
+  }
+  return entrées;
+}
+
 /** Ce qu'une étape extrait d'autre que `main` : une liste de raisons, vide si rien. */
 function extractions(étape) {
   const c = commande(étape);
   const raisons = [];
   if (/^\s*(?:- )?\s*uses:\s*['"]?actions\/checkout@/m.test(c)) {
-    for (const [, v] of c.matchAll(/^\s+ref:\s*(.*)$/gm)) {
-      const ref = sansGuillemets(sansCommentaire(v));
-      if (!REF_DE_MAIN.test(ref)) raisons.push(`actions/checkout extrait « ${ref} », pas main`);
-    }
-    for (const [, v] of c.matchAll(/^\s+repository:\s*(.*)$/gm)) {
-      raisons.push(`actions/checkout extrait le dépôt « ${sansGuillemets(sansCommentaire(v))} »`);
+    for (const [clé, v] of entréesDeWith(c)) {
+      if (clé === 'ref' && !REF_DE_MAIN.test(v)) raisons.push(`actions/checkout extrait « ${v} », pas main`);
+      if (clé === 'repository') raisons.push(`actions/checkout extrait le dépôt « ${v} »`);
     }
   }
   for (const l of c.split('\n').map(sansCommentaire)) {
