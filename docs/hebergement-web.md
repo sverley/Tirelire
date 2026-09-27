@@ -26,7 +26,7 @@ Cloud Web et les VPS) ; le relais est donc réécrit en PHP, sans dépendance.
 | `deposer.sh` | dépôt du site par FTPS ou SFTP (`lftp`), utilisé par la CI et à la main |
 | `deposer.test.mjs` | vérifie le dépôt contre un vrai serveur FTP local (sauté si `lftp` ou `pyftpdlib` manquent) |
 | `verifier.sh` | vérifie un site en ligne (accueil, relais, protections, commit servi) ; la CI de production publie son diagnostic |
-| `apercu.sh` | aperçu d'une PR sur l'instance de recette : dépôt dans `<dossier>/pr-<numéro>`, retrait à la fermeture |
+| `apercu.sh` | l'instance de recette : aperçu d'une PR, déposé dans `<dossier>/pr-<numéro>` et retiré à la fermeture ; à sa racine, la version de développement |
 | `case-apercu.sh` | la case de l'aperçu dans la description d'une PR : son état, et ce qu'elle dit du commit en ligne (#175) |
 
 ## Installer
@@ -48,9 +48,12 @@ qu'avec le serveur intégré de PHP.
 
 ## Mises à jour et dépôt automatique
 
-À chaque push sur `main`, la CI assemble le site et le **dépose par FTP** si les secrets sont
-renseignés ; à un tag `v*`, elle joint `tirelire-hebergement.zip` à la release, avec l'APK. Sans secrets, le job de dépôt le dit dans son résumé et ne fait rien
-d'autre : l'archive reste téléchargeable.
+La production ne suit que les versions publiées (#233) : à un tag `v*`, après les tests au seuil 3,
+la CI assemble le site, le **dépose par FTP en production** si les secrets sont renseignés, et joint
+`tirelire-hebergement.zip` à la release, avec l'APK. À chaque push sur `main`, elle dépose `main` à
+la racine de la recette, la version de développement (plus bas) ; ni un push sur `main`, ni un
+lancement manuel ne touchent la production. Sans secrets, le job de dépôt le dit dans son résumé et
+ne fait rien d'autre : l'archive reste téléchargeable.
 
 ### Où vivent les identifiants, et le risque accepté (#176)
 
@@ -83,11 +86,13 @@ Dans cet ordre, dépôt encore public :
    `OVH_FTP_USER`, `OVH_FTP_PASSWORD`, `TIRELIRE_DEV_SITE_URL` et les variables relevées. Tant que le dépôt est public,
    l'environnement garde la priorité : rien ne change encore.
 4. Settings → General → *Danger Zone* → *Change visibility* → privé.
-5. Constater : le prochain push sur `main` dépose et vérifie la production (le résumé du job « Dépôt
-   FTP » ne dit pas que des secrets manquent) ; l'aperçu d'une PR, case cochée, se dépose.
+5. Constater : le prochain push sur `main` dépose et vérifie la racine de la recette, la prochaine
+   version publiée la production (le résumé de leur job ne dit pas que des secrets manquent) ;
+   l'aperçu d'une PR, case cochée, se dépose.
 
 Laisser l'environnement `depot-ftp` en place : il ne gêne pas en privé et reprend effet au retour en
-public — il faudrait alors supprimer les secrets du niveau du dépôt pour refermer #155. En privé, les
+public — il faudrait alors supprimer les secrets du niveau du dépôt pour refermer #155, et lui faire
+admettre, outre `main`, les tags `v*`, qui déposent la production. En privé, les
 minutes d'Actions (2 000 par mois) et le stockage des artefacts (500 Mo, rétention 30 jours sur `main`,
 7 jours pour les aperçus) sont comptés ; les dépasser arrête la CI jusqu'au mois suivant.
 
@@ -107,12 +112,12 @@ principal.
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `TIRELIRE_BASE` | `/` | sous-dossier d'installation (`/tirelire/` par exemple) |
-| `TIRELIRE_FTP_DOSSIER` | `www` | dossier distant (`www/tirelire` pour un sous-dossier) |
+| `TIRELIRE_BASE` | `/` | sous-dossier d'installation de la production (`/tirelire/` par exemple) ; la recette est toujours à la racine de son sous-domaine |
+| `TIRELIRE_FTP_DOSSIER` | `www` | dossier distant de la production (`www/tirelire` pour un sous-dossier) |
 | `TIRELIRE_FTP_PROTOCOLE` | `ftps` | `ftps` (FTP chiffré, port 21) ou `sftp` (port 22) |
 | `TIRELIRE_FTP_VERIFIER_CERTIFICAT` | `oui` | passer à `non` seulement si le certificat du serveur FTP ne correspond pas à son nom |
-| `TIRELIRE_FTP_NETTOYER` | `non` | `oui` supprime du serveur les fichiers absents du site (les anciens fragments restent utiles aux appareils pas encore rechargés) |
-| `TIRELIRE_SITE_URL` | aucun | adresse publique vérifiée après chaque dépôt ; sans elle, le site est déposé mais pas vérifié en ligne |
+| `TIRELIRE_FTP_NETTOYER` | `non` | `oui` supprime du serveur les fichiers absents du site, en production comme à la racine de la recette (les anciens fragments restent utiles aux appareils pas encore rechargés) |
+| `TIRELIRE_SITE_URL` | aucun | adresse publique de la production, vérifiée après chaque dépôt en production ; sans elle, le site est déposé mais pas vérifié en ligne |
 
 Le dossier visé (`TIRELIRE_FTP_DOSSIER`) doit être celui qu'un domaine sert vraiment. Chez
 OVHcloud, la racine FTP contient `www`, racine du domaine principal ; tout autre dossier n'est
@@ -127,7 +132,8 @@ en deux passes : d'abord tout sauf `index.html`, `sw.js`, `registerSW.js` et
 `manifest.webmanifest`, puis ces fichiers d'entrée — ainsi personne ne charge une page qui
 pointerait vers des ressources pas encore montées. Sont **toujours** exclus, à l'envoi comme au
 nettoyage : `donnees/*.jsonl` (les paquets de synchronisation des appareils) et
-`relais.config.php` (la configuration locale du relais).
+`relais.config.php` (la configuration locale du relais), plus ce que l'appelant désigne par
+`GARDER` : à la racine de la recette, les aperçus et le `robots.txt`.
 
 La CI vérifie ensuite le site en ligne avec `apps/hebergement/verifier.sh` : la page d'accueil
 répond et parle bien de Tirelire, `/r/<salon>` répond `200` en JSON (donc la réécriture
@@ -143,8 +149,9 @@ téléphone. Le même script se lance à la main :
 ADRESSE_SITE=https://tirelire.sim-dev.eu bash apps/hebergement/verifier.sh
 ```
 
-L'entrée manuelle du workflow (onglet Actions → *Lancer le workflow*) propose `essai-a-blanc`,
-qui liste ce qui serait transféré sans rien envoyer, et `ignorer`, qui saute le dépôt.
+L'entrée manuelle du workflow (onglet Actions → *Lancer le workflow*), sur `main`, redépose `main` à
+la racine de la recette, jamais la production ; elle propose `essai-a-blanc`, qui liste ce qui serait
+transféré sans rien envoyer, et `ignorer`, qui saute le dépôt.
 
 À la main, sans la CI :
 
@@ -208,10 +215,27 @@ l'aperçu de la PR ») : pour le sous-dossier `pr-<numéro>`, sans lire les rég
 se construit donc même quand ces réglages manquent ; seul le dépôt n'a pas lieu. L'assemblage pour la racine, son artefact
 et sa publication restent à `main`, aux tags `v*` et au lancement manuel (#153).
 
-La recette est une origine distincte de la production (un sous-domaine, en HTTPS) : les aperçus y
-partagent un même stockage navigateur, jamais celui de la production. Chaque aperçu enregistre son
-service worker sur la portée de son sous-dossier. Le `robots.txt` de la racine de la recette se pose à
-la main ; aucun job n'y touche.
+La recette est une origine distincte de la production (un sous-domaine, en HTTPS) : les aperçus et
+la version de développement y partagent un même stockage navigateur, jamais celui de la production.
+Chaque aperçu enregistre son service worker sur la portée de son sous-dossier. Le `robots.txt` de la
+racine de la recette se pose à la main ; aucun job n'y touche.
+
+## La version de développement à la racine de la recette
+
+À chaque push sur `main` (#233), le job « Version de développement à la racine de la recette » de
+`ci.yml` dépose `main`, assemblé pour `/`, à la racine de la recette (`TIRELIRE_DEV_FTP_DOSSIER`)
+par `apercu.sh racine-deposer`, puis le vérifie en ligne à `TIRELIRE_DEV_SITE_URL` par
+`verifier.sh`, comme la production. Mêmes réglages que les aperçus, mêmes refus avant tout transfert
+(`apercu.sh`, ci-dessus), et le dossier de la production ne peut pas être sous cette racine. Le
+diagnostic reste dans le journal de la CI : l'adresse de recette ne s'écrit nulle part.
+
+Cette racine porte aussi ce qui ne vient pas du site : les aperçus (`pr-<numéro>`), le `robots.txt`
+posé à la main, les paquets du relais de la recette et sa configuration. Le dépôt les laisse en
+place, nettoyage compris (`TIRELIRE_FTP_NETTOYER`) : `deposer.sh` les exclut de l'envoi comme du
+nettoyage. Chaque aperçu reste servi par lui-même : le service worker de la version de
+développement, dont la portée couvre toute la recette, laisse au serveur les navigations vers
+`pr-<numéro>` (`navigateFallbackDenylist`, `apps/web/vite.config.ts`), et l'aperçu enregistre
+ensuite le sien, sur son sous-dossier.
 
 Mêmes secrets `OVH_FTP_*` que la production, au même endroit. La recette n'a qu'un secret propre,
 par exception : son adresse, que le dépôt ne doit pas montrer (#156). Une variable s'écrit en clair

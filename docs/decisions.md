@@ -1448,10 +1448,14 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 - Un harnais joué en local ne lit que des fichiers suivis et ne sort pas de la machine : la boucle
   locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans son
   en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
-- **Livraison.** Un push sur `main` construit et dépose le site. L'APK et les releases ne sortent
-  qu'à un tag `v*` : le job le plus lourd ne tourne plus à chaque fusion. Un tag publie une version
-  (D87) et porte son nom (`docs/versions.md`) ; ses tests se jouent au seuil 3, tests navigateur
-  activés, avant de publier.
+- **Livraison.** Un push sur `main` construit le site et le dépose à la racine de la recette : la
+  version de développement, vérifiée en ligne ; les aperçus (`pr-<numéro>`), le `robots.txt` posé à
+  la main et les paquets du relais y restent en place, et chaque aperçu reste servi par lui-même. La
+  production ne suit que les versions publiées : seul un tag `v*` la dépose ; ni un push sur `main`,
+  ni un lancement manuel ne la touchent. L'APK et les releases ne sortent qu'à un tag `v*` : le job
+  le plus lourd ne tourne plus à chaque fusion. Un tag publie une version (D87) et porte son nom
+  (`docs/versions.md`) ; ses tests se jouent au seuil 3, tests navigateur activés, avant de publier
+  et de déposer en production.
 
 ### D84 · Le code, les données et les commits
 

@@ -362,7 +362,8 @@ Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`
 Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**`, `apps/hebergement/**`, `.github/workflows/**`
 
 - **Harnais** · `apps/hebergement/verifier.sh`, `apps/hebergement/verifier.test.mjs` — après chaque
-  dépôt depuis `main`, le site en ligne redirige HTTP vers HTTPS, et le script échoue sinon (#78).
+  dépôt — `main` à la racine de la recette, une version publiée en production (#233) —, le site en
+  ligne redirige HTTP vers HTTPS, et le script échoue sinon (#78).
   La redirection se constate sur le site réel, par le script ; le harnais garde ce dont ce constat
   dépend — que le script sonde bien l'adresse en `http://`, relève où elle mène, et compte son échec
   (tranché dans #69, complété par #78).
@@ -386,7 +387,8 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
   la PR porte l'étiquette « touche un workflow » ; dans Settings → Secrets and variables → Actions,
   constater que les secrets `OVH_FTP_*` sont au niveau du dépôt (dépôt privé, offre gratuite, #176) ;
   sur l'aperçu de la PR, constater que le dépôt a tourné avec les scripts de `main` et reste dans
-  `<dossier>/pr-<numéro>` (#155) ; après la fusion, constater que le dépôt de production a tourné.
+  `<dossier>/pr-<numéro>` (#155) ; après la fusion, constater que `main` s'est déposé à la racine de
+  la recette, vérifié en ligne, et que la production n'a pas été redéposée (#233).
 - **À bâtir** · le refus ou le signalement d'un relais en HTTP (besoin #67, harnais #38).
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer

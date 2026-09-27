@@ -581,3 +581,19 @@ plutôt qu'un nombre exact de tests engendrés, qui demanderait de lancer le nav
 > tu parlles de "compagnons". C'est un nouveau terme que je n'ai pas validé. Il faut ajouter que le codeur n'est pas tenu de faire des tests. Uniquement si besoin.
 
 > Le codeur me dit que son rôle ne prévoit qu'un unique commentaire. Il faut préciser un par tour
+
+## 27 septembre 2026 · la production suit les versions publiées
+
+Dans #233, à la question du 25 septembre « Acceptez-vous que la production ne se mette à jour qu'à
+la publication d'une version ? » :
+
+> point 1 : ok
+
+Puis, le 27 septembre, à la question « après une fusion sur `main`, que devient le site ? a. Il se
+dépose à la racine de la recette, comme version de développement ; b. Il ne se dépose nulle part :
+seule la publication d'une version dépose, en production » :
+
+> 233. Choix a.
+
+Puis, à la question du harnais, sur le point 7 du « Fait quand » (ce qu'un test peut vérifier est
+testé, par le codeur) et « Harnais : aucun », proposés par l'auditeur : « Oui ».
