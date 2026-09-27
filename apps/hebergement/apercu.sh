@@ -1,21 +1,28 @@
 #!/usr/bin/env bash
-# Aperçu d'une PR sur l'instance de recette (#141) : le site de la PR vit dans
+# L'instance de recette. L'aperçu d'une PR (#141) : le site de la PR vit dans
 # <TIRELIRE_DEV_FTP_DOSSIER>/pr-<NUMERO>, servi à <TIRELIRE_DEV_SITE_URL>/pr-<NUMERO>/, construit
-# pour la base /pr-<NUMERO>/ : la recette est la racine d'un sous-domaine.
+# pour la base /pr-<NUMERO>/ : la recette est la racine d'un sous-domaine. À cette racine, la version
+# de développement, le site de `main` (#233), construit pour la base /.
 #
 #   bash apps/hebergement/apercu.sh reglages   # vérifie les réglages, affiche adresse=… de l'aperçu
 #   bash apps/hebergement/apercu.sh deposer    # dépose SOURCE par deposer.sh, dans ce sous-dossier seul
 #   bash apps/hebergement/apercu.sh retirer    # supprime ce sous-dossier entier, paquets du relais compris
+#   bash apps/hebergement/apercu.sh racine-reglages  # vérifie les réglages, affiche adresse=… de la racine
+#   bash apps/hebergement/apercu.sh racine-deposer   # dépose SOURCE à la racine de la recette, sans
+#                                                    # toucher aux aperçus, au robots.txt ni aux paquets
 #
-# Environnement : NUMERO (numéro de la PR), TIRELIRE_DEV_FTP_DOSSIER, TIRELIRE_DEV_SITE_URL (un secret :
+# Environnement : NUMERO (numéro de la PR, pour les trois premières), TIRELIRE_DEV_FTP_DOSSIER,
+# TIRELIRE_DEV_SITE_URL (un secret :
 # l'adresse de recette ne se lit pas depuis le dépôt, #156) ; pour
 # comparaison, TIRELIRE_FTP_DOSSIER (défaut www, comme la production) et TIRELIRE_SITE_URL ;
-# SOURCE pour deposer ; l'accès FTP comme deposer.sh (HOTE, UTILISATEUR, MOTDEPASSE, PROTOCOLE,
-# VERIFIER_CERTIFICAT).
+# SOURCE pour deposer et racine-deposer ; NETTOYER et BLANC pour racine-deposer ; l'accès FTP comme
+# deposer.sh (HOTE, UTILISATEUR, MOTDEPASSE, PROTOCOLE, VERIFIER_CERTIFICAT).
 #
 # La recette n'a aucune valeur par défaut : une variable manquante, ou qui vaut celle de la
 # production, arrête tout avant le moindre transfert, en la nommant. Les identifiants FTP sont ceux
-# de la production (D37) : rien ne se dépose ni ne se supprime ailleurs que dans <dossier>/pr-<n>.
+# de la production (D37) : rien ne se dépose ni ne se supprime ailleurs que dans <dossier>/pr-<n>
+# pour un aperçu, ailleurs que dans <dossier> pour la racine ; là, les aperçus (pr-<n>), le
+# robots.txt posé à la main et les paquets du relais restent en place, nettoyage compris (#233).
 set -euo pipefail
 
 ici="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,13 +35,14 @@ arreter() {
 }
 
 case "$action" in
-  reglages | deposer | retirer) ;;
-  *) arreter "action « $action » inconnue : reglages, deposer ou retirer." ;;
+  reglages | deposer | retirer) apercu=oui ;;
+  racine-reglages | racine-deposer) apercu=non ;;
+  *) arreter "action « $action » inconnue : reglages, deposer, retirer, racine-reglages ou racine-deposer." ;;
 esac
 
 # --- Numéro de la PR ---------------------------------------------------------------------------
 NUMERO="${NUMERO:-}"
-if ! [[ "$NUMERO" =~ ^[1-9][0-9]{0,8}$ ]]; then
+if [ "$apercu" = oui ] && ! [[ "$NUMERO" =~ ^[1-9][0-9]{0,8}$ ]]; then
   arreter "NUMERO « $NUMERO » n'est pas un numéro de PR (entier positif)."
 fi
 
@@ -65,16 +73,24 @@ if [ "$cle_dev" = "$cle_prod" ]; then
   arreter "TIRELIRE_DEV_FTP_DOSSIER vaut le dossier de la production (TIRELIRE_FTP_DOSSIER, « $PROD_DOSSIER »)."
 fi
 
-DOSSIER_APERCU="${DEV_DOSSIER%/}"
-while [[ "$DOSSIER_APERCU" == */ ]]; do DOSSIER_APERCU="${DOSSIER_APERCU%/}"; done
-DOSSIER_APERCU="$DOSSIER_APERCU/pr-$NUMERO"
-cle_apercu="$cle_dev/pr-$NUMERO"
-# Le seul chemin que ce script touche : <dossier>/pr-<n>, qui ne contient pas la production.
-if ! [[ "$DOSSIER_APERCU" =~ ^[A-Za-z0-9._/-]+/pr-[1-9][0-9]*$ ]]; then
-  arreter "chemin d'aperçu inattendu « $DOSSIER_APERCU »."
-fi
-if [ "$cle_prod" = "$cle_apercu" ] || [[ "$cle_prod" == "$cle_apercu"/* ]] || [ -z "$cle_prod" ]; then
-  arreter "le dossier de la production (TIRELIRE_FTP_DOSSIER, « $PROD_DOSSIER ») serait dans « $DOSSIER_APERCU »."
+DOSSIER_RACINE="${DEV_DOSSIER%/}"
+while [[ "$DOSSIER_RACINE" == */ ]]; do DOSSIER_RACINE="${DOSSIER_RACINE%/}"; done
+if [ "$apercu" = oui ]; then
+  DOSSIER_APERCU="$DOSSIER_RACINE/pr-$NUMERO"
+  cle_apercu="$cle_dev/pr-$NUMERO"
+  # Le seul chemin qu'un aperçu touche : <dossier>/pr-<n>, qui ne contient pas la production.
+  if ! [[ "$DOSSIER_APERCU" =~ ^[A-Za-z0-9._/-]+/pr-[1-9][0-9]*$ ]]; then
+    arreter "chemin d'aperçu inattendu « $DOSSIER_APERCU »."
+  fi
+  if [ "$cle_prod" = "$cle_apercu" ] || [[ "$cle_prod" == "$cle_apercu"/* ]] || [ -z "$cle_prod" ]; then
+    arreter "le dossier de la production (TIRELIRE_FTP_DOSSIER, « $PROD_DOSSIER ») serait dans « $DOSSIER_APERCU »."
+  fi
+else
+  # Le seul chemin que la racine touche : <dossier>, qui ne contient pas la production — un
+  # nettoyage l'effacerait.
+  if [[ "$cle_prod" == "$cle_dev"/* ]] || [ -z "$cle_prod" ]; then
+    arreter "le dossier de la production (TIRELIRE_FTP_DOSSIER, « $PROD_DOSSIER ») serait dans « $DOSSIER_RACINE »."
+  fi
 fi
 
 # --- Adresse de la recette ---------------------------------------------------------------------
@@ -124,11 +140,23 @@ if [ -n "$PROD_URL" ]; then
   fi
 fi
 
-ADRESSE="$(cle_adresse "$DEV_URL")/pr-$NUMERO/"
+if [ "$apercu" = oui ]; then
+  ADRESSE="$(cle_adresse "$DEV_URL")/pr-$NUMERO/"
+else
+  ADRESSE="$(cle_adresse "$DEV_URL")/"
+fi
 
 case "$action" in
-  reglages)
+  reglages | racine-reglages)
     echo "adresse=$ADRESSE"
+    ;;
+
+  racine-deposer)
+    # Les aperçus (pr-<n>) et le robots.txt vivent à cette racine sans venir du site : deposer.sh ne
+    # les touche pas, nettoyage compris, pas plus que les paquets du relais et sa configuration.
+    # L'adresse n'est pas écrite (#156).
+    echo "Version de développement : dépôt à la racine de la recette, « $DOSSIER_RACINE » ; aperçus, robots.txt et paquets du relais laissés en place."
+    env DOSSIER="$DOSSIER_RACINE" GARDER='robots.txt pr-[1-9]*/' bash "$ici/deposer.sh"
     ;;
 
   deposer)
