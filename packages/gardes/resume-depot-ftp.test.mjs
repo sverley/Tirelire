@@ -121,12 +121,12 @@ function leResteDuDépôtEstIntact(yaml) {
   );
 }
 
-describe('[niveau 1] harnais de la garde', () => {
+describe('[niveau 3] #145 : le résumé du dépôt FTP ignoré dit où est l’archive du site', () => {
   test("#145 · le résumé du dépôt FTP ignoré dit où l'archive du site se trouve vraiment", () => {
     résuméDitOùEstLArchive(lire());
   });
 
-  test('#145 · le job de dépôt garde par ailleurs ses étapes et son artefact', () => {
+  test('#145 · le job de dépôt garde par ailleurs ses étapes et son artefact [niveau 1]', () => {
     leResteDuDépôtEstIntact(lire());
   });
 
