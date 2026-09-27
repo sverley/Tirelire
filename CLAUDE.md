@@ -9,3 +9,7 @@ jamais (D77).
 - La méthode est dans `docs/decisions.md`, partie « Le travail ».
 - Chaque session tient un rôle, décrit dans `docs/roles/` : `architecte.md`, `auditeur.md`,
   `codeur.md`, `porteur.md`.
+- Sois précis et vérifie tes paroles, pour ne pas entrer dans une spirale de complications née des
+  approximations : cite les documents au lieu de les résumer, nomme chaque chose par ce qu'elle fait
+  et non par l'endroit où elle est rangée, et relis chaque affirmation contre sa source avant de
+  l'écrire.
