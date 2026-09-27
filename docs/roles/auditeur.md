@@ -34,6 +34,10 @@ audit commence à son compte rendu (étape 4).
    (`pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'`, D81), et dis-le. Refais la
    suite de questions de D83 sur les tests du codeur, et sur tout niveau changé dans le diff : un
    test qui garderait une promesse remonte à son vrai niveau, et un écart se discute dans la PR.
+   Ta relecture se règle sur le type du besoin (glossaire, « Besoin ») : pour un besoin
+   organisationnel ou d'outil, cherche les erreurs de processus, ce qu'une session pourrait casser
+   par erreur, pas les attaques, en gardant un œil sur une faille sérieuse d'un workflow ; pour un
+   besoin fonctionnel, ta relecture inclut la sécurité de l'application finale.
    Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur.
 5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
    survivre à la fusion n'y reste pas : il va dans une issue ouverte ou dans un catalogue (D78).
