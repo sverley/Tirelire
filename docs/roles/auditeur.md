@@ -32,8 +32,8 @@ audit commence à son compte rendu (étape 4).
    l'issue, sans contredire les autres entrées de son catalogue ni les fondamentaux (D82). Si le
    codage modifie une fonction de la garde, joue aussi ses tests de développement, à la main
    (`pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'`, D81), et dis-le. Refais la
-   suite de questions de D83 sur les tests du codeur : un test qui garderait une promesse remonte à
-   son vrai niveau, et un écart se discute dans la PR. Écris ta vérification dans la PR, sans
-   rapport à part : le compte rendu est celui du codeur.
+   suite de questions de D83 sur les tests du codeur, et sur tout niveau changé dans le diff : un
+   test qui garderait une promesse remonte à son vrai niveau, et un écart se discute dans la PR.
+   Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur.
 5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
    survivre à la fusion n'y reste pas : il va dans une issue ouverte ou dans un catalogue (D78).

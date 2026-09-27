@@ -1406,9 +1406,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
-- **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck` et le harnais du besoin ;
-  l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready. Aucune CI ne tourne en
-  brouillon. Les crochets font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
+- **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck` et le harnais du besoin, plus,
+  s'il modifie une fonction de la garde, ses tests de développement (D81) ; l'auditeur vérifie en
+  local ce qu'il relit, au seuil 2 avant le Ready. Aucune CI ne tourne en brouillon. Les crochets
+  font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
   tests de niveau 0 des paquets que touchent les fichiers indexés — cœur ; garde ; relais ;
   hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
   commit ; le harnais du besoin est joué à part, en entier, hors budget, et le pré-commit ne fait
