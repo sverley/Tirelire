@@ -16,6 +16,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test, { describe } from 'node:test';
 import { RACINE } from './gardes.mjs';
+import { extractionsSurPullRequestTarget } from './rien-de-la-pr.mjs';
 import { commande, jouer, étapes } from './workflow-a-blanc.mjs';
 
 const lire = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').replace(/\r\n?/g, '\n');
@@ -220,6 +221,8 @@ describe('[niveau 2] D82 et D83 : brouillon, Ready, aperçu, changement signalé
     assert.ok(fait(jobs, DÉPÔT_DE_LA_VERSION_DE_DEV), 'case cochée sur une PR prête : aucun job ne dépose l’aperçu');
     for (const x of exé.filter((e) => e.jobs.some((j) => j.tourne && fait([j], DÉPÔT_DE_LA_VERSION_DE_DEV)))) {
       assert.equal(x.événement, 'pull_request_target', `${x.workflow} : le dépôt tourne sur ${x.événement}, lu dans la branche`);
+      // Le workflow est lu sur main ; les scripts qu'il lance aussi : il n'extrait rien de la PR (#248).
+      assert.deepEqual(extractionsSurPullRequestTarget(x.workflow, lire(x.workflow)), [], `${x.workflow} : le dépôt extrait la PR`);
     }
     for (const [quoi, motif] of LOURDS.filter(([, m]) => m !== DÉPÔT_DE_LA_VERSION_DE_DEV)) {
       assert.ok(!fait(jobs, motif), `case cochée : un job joue ${quoi}`);

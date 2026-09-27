@@ -1436,7 +1436,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   exécutions d'`apercu.yml` et de `depot-apercu.yml` en montrent). Ne rien sauter de ce qui décide de
   la fusion, ne pas alourdir ce qui n'en décide pas (principe 10.1).
 - **Workflows.** Un agent ne crée ni ne modifie aucun workflow (`.github/workflows/`,
-  `.github/actions/`), sauf quand l'issue le demande. Dépôt privé sur l'offre gratuite, les
+  `.github/actions/`), sauf quand l'issue le demande. Un workflow déclenché par
+  `pull_request_target` tourne avec les droits du dépôt et ses secrets : il n'exécute rien de la PR ;
+  il peut en lire les données — description, cases, fichiers lus par git ou par l'API —, jamais
+  extraire sa tête ni sa référence de fusion (#248). Dépôt privé sur l'offre gratuite, les
   identifiants FTP sont au niveau du dépôt : un workflow qu'une branche ajoute les lit dès son premier
   `push`, avant toute PR (#176, risque accepté par le porteur). Au Ready, une PR qui en touche un
   porte l'étiquette « touche un workflow » (`pret.yml`).
