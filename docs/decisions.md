@@ -1297,18 +1297,26 @@ dans la garde. Un changement de comportement de la garde est expliqué et justif
 rendu du codeur : il nomme les tests de la garde de `main` qui rougissent avec la garde proposée, et
 ceux qu'il modifie ; la validation du porteur le couvre.
 
-Les harnais de la garde (`packages/gardes/*.test.mjs`) et ceux du registre servent le même but —
-que les principes et les règles ne soient pas enfreints — et se traitent de la même manière : tout
-leur test est de niveau 0 ou 1 (D83), témoins compris, donc joué à chaque fusion. Quand une ligne
-`Harnais` nomme un test, la règle vaut pour ce test, sa suite et son témoin ; quand elle cite un
-fichier, pour tout le fichier. Un harnais de la garde ou du registre n'accueille donc jamais de test
-de niveau 4. La règle est un harnais de la garde, celui de #232 (`niveaux-des-tests.test.mjs`), pas
-une logique de l'outil ; tout ce qui y entre se jouant à chaque fusion, la garde reste petite
-(principe 12).
+Les tests de la garde sont ceux qui vérifient la garde elle-même : ses trois vérifications et la
+règle des harnais ; ils vivent dans `packages/gardes/gardes.test.mjs`. Eux et les harnais du registre
+servent le même but — que les principes et les règles ne soient pas enfreints — et se traitent de la
+même manière : tout leur test est de niveau 0 ou 1 (D83), témoins compris, donc joué à chaque fusion.
+Quand une ligne `Harnais` nomme un test, la règle vaut pour ce test, sa suite et son témoin ; quand
+elle cite un fichier, pour tout le fichier. Les tests de la garde et les harnais du registre
+n'accueillent donc jamais de test de niveau 4. La règle est un test de la garde, pas une logique de
+l'outil ; tout ce qui y entre se jouant à chaque fusion, la garde reste petite (principe 12).
 
-Un harnais du registre ou de la garde a une forme normale : un fichier de tests de niveau 0 et 1,
-que le registre cite en entier, et, s'il le faut, un second fichier, hors registre, pour les tests
-de niveau 2 à 4 du même besoin. Les données lourdes (instantanés, jeux d'essai) vont dans des
+Tout autre test, même rangé dans `packages/gardes`, appartient au harnais d'un besoin et se joue par
+`pnpm test`, à son niveau (D83) : un test se range selon le besoin qu'il vérifie, jamais selon ce que
+son fichier regarde, ni selon l'extension ou l'en-tête de ce fichier. Seuls les tests de
+développement de fonctions de la garde, qui ne servent qu'à la développer, sont mis à part : ils
+vivent dans `packages/gardes/dev/`, en fichiers `*.dev.mjs`, hors de `pnpm test` ; ils portent le
+niveau que leur donne D83, de 0 à 4, et se jouent à la main, par la commande des rôles du codeur et
+de l'auditeur, par qui développe une fonction de la garde et par l'auditeur qui la vérifie.
+
+Un harnais du registre a une forme normale : un fichier de tests de niveau 0 et 1, que le registre
+cite en entier, et, s'il le faut, un second fichier, hors registre, pour les tests de niveau 2 à 4
+du même besoin. Les données lourdes (instantanés, jeux d'essai) vont dans des
 fichiers de données, que seuls les tests qui en ont besoin chargent.
 
 ### D82 · Vérifier, valider : brouillon, Ready, aperçu
@@ -1383,6 +1391,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | CI au Ready | 1, plus les tests navigateur de niveau 2 |
   | Publication d'une version (tag `v*`) | 3, tests navigateur activés |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
+
+  Les tests de développement de fonctions de la garde (D81) ne se jouent à aucun de ces moments :
+  hors de `pnpm test`, ils se jouent à la main. Aucun autre ensemble n'a de tests joués à la main.
 
 - **Le harnais du besoin** est le ou les fichiers de l'auditeur — son harnais et, s'il y en a un,
   son second fichier éventuel (D81) —, et eux seuls : l'auditeur les nomme dans l'issue (« Harnais :

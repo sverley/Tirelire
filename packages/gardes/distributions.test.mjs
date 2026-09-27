@@ -81,7 +81,7 @@ function distributionsSurChaquePR(yaml) {
   }
 }
 
-describe('[niveau 1] harnais de la garde · I9 ; D83, une fois par passage (#153) ; D81, la garde de main juge (#159)', () => {
+describe('[niveau 1] I9 ; D83, une fois par passage (#153) ; D81, la garde de main juge (#159)', () => {
   test("I9 · sur chaque PR, le web et le site d'hébergement se construisent ; l'APK attend la fusion", () => {
     distributionsSurChaquePR(lire(CI));
   });

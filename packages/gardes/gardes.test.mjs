@@ -1,19 +1,18 @@
 /**
- * Harnais de la garde (#58) : la garde se vérifie elle-même.
+ * Les tests de la garde (#58, D81) : la garde se vérifie elle-même — ses trois vérifications et la
+ * règle des harnais. Ce sont les seuls tests de la garde ; ils ne portent que les niveaux 0 et 1.
+ * Tout autre fichier de test de `packages/gardes` est le harnais d'un besoin (D81).
  *
  * Le premier test tient le dépôt réel : chaque invariant, usage et contrainte a son harnais, sa
  * vérification manuelle ou un renvoi gardé. Les autres tiennent la règle sur des documents
  * inventés, pour qu'elle ne dépende pas du contenu du jour : un ajout sans garde, un harnais
- * renommé, une case non cochée ou une garde retirée doivent se voir.
+ * renommé, une case non cochée ou une garde retirée doivent se voir. La règle des harnais se joue
+ * sur le dépôt réel, puis sur ses témoins (`regle-des-harnais.mjs`).
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname } from 'node:path';
 import * as V from './gardes.mjs';
 import {
   DOCUMENTS,
@@ -26,11 +25,7 @@ import {
   verifierCouvertureTextes,
   verifierPr,
 } from './gardes.mjs';
-import { spawnSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-import net from 'node:net';
-import { existsSync } from 'node:fs';
-import { cibleDe, designer, estLocal, message, tentatives, vider } from './sans-sortie.mjs';
+import { TESTS_DE_LA_GARDE, harnais, manquements, niveauxDesTests } from './regle-des-harnais.mjs';
 
 const lire = (chemin) => readFileSync(join(RACINE, chemin), 'utf8');
 const texte = (problemes) => problemes.join('\n');
@@ -93,7 +88,7 @@ const couverture = (modif = {}) =>
 
 // Depuis #162, les usages vivent dans la description, et leurs gardes dans l'entrée d'I3 : le dépôt
 // n'a plus d'identifiant U… à lire. La garde sait toujours en lire (jeu inventé ci-dessous).
-describe('[niveau 1] harnais de la garde · D81 : la garde se vérifie elle-même (#58)', () => {
+describe('[niveau 1] tests de la garde · D81 : la garde se vérifie elle-même, ses trois vérifications et la règle des harnais (#58)', () => {
   describe('D81, point 1 · chaque invariant et chaque contrainte a son entrée, gardée', () => {
     test('le dépôt tient sa garde : chaque invariant et chaque contrainte est gardé', () => {
       const { problemes, ids } = verifierCouverture();
@@ -410,165 +405,60 @@ describe('[niveau 1] harnais de la garde · D81 : la garde se vérifie elle-mêm
     });
   });
 
-  describe('[niveau 0] D83 · un harnais joué en local ne sort pas de la machine (#113)', () => {
-    // ── #113 : un harnais joué en local ne sort pas de la machine ─────────────────────────────
-
-
-    const PRECHARGE = pathToFileURL(join(RACINE, V.SANS_SORTIE)).href;
-
-    /** Joue `node --test` avec la garde préchargée, dans un dossier jetable garni de `fichiers`. */
-    function jouerSousGarde(fichiers) {
-      const dossier = mkdtempSync(join(tmpdir(), 'tirelire-113-'));
-      try {
-        for (const [nom, contenu] of Object.entries(fichiers)) writeFileSync(join(dossier, nom), contenu);
-        // Sans ce retrait, le `node --test` enfant se croit dans celui-ci et ne joue rien.
-        const env = { ...process.env };
-        delete env.NODE_TEST_CONTEXT;
-        const r = spawnSync(process.execPath, ['--import', PRECHARGE, '--test'], { cwd: dossier, env, encoding: 'utf8', timeout: 30_000 });
-        return { code: r.status, sortie: `${r.stdout}\n${r.stderr}` };
-      } finally {
-        rmSync(dossier, { recursive: true, force: true });
-      }
-    }
-
-    test('#113 : la boucle locale est la machine, le reste non', () => {
-      for (const h of [undefined, '', 'localhost', 'LOCALHOST.', 'app.localhost', '127.0.0.1', '127.8.0.3', '::1', '[::1]', '::ffff:127.0.0.1', '0.0.0.0', '::']) {
-        assert.equal(estLocal(h), true, String(h));
-      }
-      // #118 : la même adresse écrite autrement reste la machine — l'analyseur d'URL réécrit
-      // `[::ffff:127.0.0.1]` en `[::ffff:7f00:1]`, et `::1` s'écrit de plusieurs façons.
-      for (const h of ['::ffff:7f00:1', '0:0:0:0:0:ffff:7f00:1', '[::ffff:7f00:1]', '0::1', '::0:1', '0:0:0:0:0:0:0:1', '::ffff:127.255.255.254']) {
-        assert.equal(estLocal(h), true, h);
-      }
-      for (const h of ['::ffff:c000:20a', '::ffff:128.0.0.1', '2001:db8::1', 'ffff::1', '::1:0', ':::1', '1:2:3:4:5:6:7']) {
-        assert.equal(estLocal(h), false, h);
-      }
-      for (const h of ['exemple.com', 'api.github.com', '10.0.0.1', '192.168.1.2', '128.0.0.1', '::2', 'localhost.exemple.com', '127.0.0.1.nip.io']) {
-        assert.equal(estLocal(h), false, h);
-      }
+  describe('D81 · la règle des harnais : les tests de la garde et les harnais du registre ne portent que les niveaux 0 et 1 (#232)', () => {
+    test('le niveau se lit dans le fichier : marque du test, sinon de la suite qui l’englobe, sinon 2', () => {
+      const source = [
+        "test('n0 [niveau 0]', () => {});",
+        "test('n3 [niveau 3]', () => {});",
+        "test('s sans marque', () => {});",
+        "describe('groupe [niveau 3]', () => {",
+        "  test('g3 hérite de sa suite', () => {});",
+        "  test('g0 [niveau 0]', () => {});",
+        '});',
+        "describe('groupe sans marque', () => { test('gs hérite du défaut', () => {}); });",
+      ].join('\n');
+      const lus = Object.fromEntries(niveauxDesTests(source).filter((t) => !t.suite).map((t) => [t.titre.split(' ')[0], t.niveau]));
+      assert.deepEqual(lus, { n0: 0, n3: 3, s: 2, g3: 3, g0: 0, gs: 2 });
     });
 
-    test('#113 : la cible se lit sous toutes les formes de connect, et un path vide n’est pas un socket de fichier', () => {
-      assert.deepEqual(cibleDe([{ host: 'exemple.com', port: 443 }]), { hote: 'exemple.com', port: 443 });
-      assert.deepEqual(cibleDe([[{ host: 'exemple.com', port: 80, path: null }, () => {}]]), { hote: 'exemple.com', port: 80 });
-      assert.deepEqual(cibleDe([80, 'exemple.com', () => {}]), { hote: 'exemple.com', port: 80 });
-      assert.deepEqual(cibleDe(['8080']), { hote: undefined, port: '8080' });
-      assert.deepEqual(cibleDe(['/tmp/prise.sock']), { chemin: '/tmp/prise.sock' });
-      assert.deepEqual(cibleDe([{ path: '/tmp/prise.sock' }]), { chemin: '/tmp/prise.sock' });
-      assert.match(message([{ hote: 'exemple.com', port: 80 }, { hote: '2001:db8::1', port: 443 }]), /exemple\.com:80, \[2001:db8::1\]:443 \(#113/);
-      assert.equal(designer({ hote: 'exemple.com' }), 'exemple.com');
-      assert.equal(designer({ hote: '[::2]', port: 1 }), '[::2]:1');
+    test('tout test de la garde ou d’un harnais du registre est de niveau 0 ou 1', () => {
+      const liste = harnais();
+      assert.ok(liste.some((h) => h.source !== 'garde'), 'aucun harnais du registre trouvé : la règle des harnais est à relire');
+      assert.ok(liste.some((h) => h.fichier === TESTS_DE_LA_GARDE && existsSync(join(RACINE, h.fichier))), `${TESTS_DE_LA_GARDE} introuvable : la règle des harnais est à relire`);
+      const m = [...new Set(liste.flatMap((h) => manquements(lire(h.fichier), h)))];
+      assert.deepEqual(m, [], `règle des harnais (D81) :\n${m.join('\n')}`);
     });
 
-    test('#113 : dans ce processus même, la connexion sortante est refusée et retenue avant toute résolution, puis oubliée par vider', async () => {
-      const avant = tentatives().length;
-      const erreur = await new Promise((r) => net.connect({ host: 'retenue.invalid', port: 80 }).on('error', r).on('connect', () => r(null)));
-      try {
-        assert.equal(erreur?.code, 'ERR_TIRELIRE_HORS_MACHINE');
-        assert.match(erreur.message, /retenue\.invalid:80/);
-        assert.deepEqual(tentatives().slice(avant), [{ hote: 'retenue.invalid', port: 80 }]);
-      } finally {
-        // Oublier la sonde, sans quoi ce fichier sortirait en échec : c'est la garde qui le veut.
-        vider();
-      }
-      assert.deepEqual(tentatives(), []);
+    const gardé = `
+  describe('garde [niveau 1]', () => {
+    it('tient', () => {});
+    it('témoin rouge · casse', () => {});
+    it('irréparable [niveau 0]', () => {});
+  });
+  test('rétrocompatibilité [niveau 3]', () => {});
+  `;
+
+    test('témoin vert · un harnais en niveaux 0 et 1, et un test hors de la portée nommée', () => {
+      assert.deepEqual(manquements(gardé.replace(/test\('rétro[^\n]*\n/, ''), { fichier: 'vert' }), []);
+      assert.deepEqual(manquements(gardé, { fichier: 'vert', noms: ['tient', 'témoin rouge · casse'] }), []);
     });
 
-    test('#113 : une connexion hors de la machine fait échouer node --test en nommant l’hôte, par fetch comme par node:http, depuis le code testé et erreur avalée', () => {
-      const { code, sortie } = jouerSousGarde({
-        'code.mjs': [
-          "import http from 'node:http';",
-          "export const parFetch = () => fetch('http://hors-machine.invalid:80/').then(() => 'passé', () => 'avalé');",
-          "export const parHttp = () => new Promise((r) => http.get('http://autre-hors-machine.invalid:80/', { agent: false }, (x) => { x.resume(); r('passé'); }).on('error', () => r('avalé')));",
-        ].join('\n'),
-        'sonde.test.mjs': [
-          "import test from 'node:test';",
-          "import assert from 'node:assert/strict';",
-          "import { parFetch, parHttp } from './code.mjs';",
-          "test('fetch avalé', async () => assert.equal(await parFetch(), 'avalé'));",
-          "test('http avalé', async () => assert.equal(await parHttp(), 'avalé'));",
-        ].join('\n'),
-      });
-      assert.notEqual(code, 0, sortie);
-      assert.match(sortie, /# pass 2/, 'les deux tests passent : c’est la garde, pas une assertion, qui fait échouer');
-      assert.match(sortie, /hors-machine\.invalid:80/);
-      assert.match(sortie, /autre-hors-machine\.invalid:80/);
+    test('témoin rouge · un test de la garde sans marque, donc de niveau 2', () => {
+      assert.equal(manquements(`${gardé.replace(/test\('rétro[^\n]*\n/, '')}\ntest('oublié', () => {});`, { fichier: 'rouge' }).length, 1);
     });
 
-    test('#113 : témoin — la boucle locale passe sous la même garde, par fetch comme par node:http', () => {
-      const { code, sortie } = jouerSousGarde({
-        'boucle.test.mjs': [
-          "import test from 'node:test';",
-          "import assert from 'node:assert/strict';",
-          "import http from 'node:http';",
-          "test('boucle locale', async () => {",
-          "  const serveur = http.createServer((q, r) => r.end('ok')).listen(0, '127.0.0.1');",
-          "  await new Promise((r) => serveur.once('listening', r));",
-          "  const { port } = serveur.address();",
-          "  for (const h of ['127.0.0.1', 'localhost']) assert.equal(await (await fetch(`http://${h}:${port}/`)).text(), 'ok');",
-          "  const recu = await new Promise((r) => http.get(`http://127.0.0.1:${port}/`, { agent: false }, (x) => { let t = ''; x.on('data', (d) => (t += d)); x.on('end', () => r(t)); }));",
-          "  assert.equal(recu, 'ok');",
-          "  serveur.close();",
-          "});",
-        ].join('\n'),
-      });
-      assert.equal(code, 0, sortie);
-      assert.match(sortie, /# pass 1\b/, 'le témoin a bien joué son test');
-      assert.doesNotMatch(sortie, /hors de la machine/);
+    test('témoin rouge · un test de niveau 3 dans un fichier de la garde', () => {
+      assert.equal(manquements(gardé, { fichier: 'rouge' }).length, 1);
     });
 
-    test('#113 : chaque lanceur local du dépôt est branché sur la garde', () => {
-      assert.ok(existsSync(join(RACINE, V.SANS_SORTIE)) && existsSync(join(RACINE, V.SANS_SORTIE_VITEST)));
-      assert.deepEqual(V.paquetsDuWorkspace(), ['packages/core', 'packages/gardes', 'apps/hebergement', 'apps/relay', 'apps/web']);
-      assert.deepEqual(V.verifierLanceursLocaux(), []);
+    test('témoin rouge · un test nommé au registre dont le témoin est de niveau 2', () => {
+      const source = `${gardé}\ntest('témoin rouge · hors de la suite', () => {});`;
+      assert.equal(manquements(source, { fichier: 'rouge', noms: ['tient', 'témoin rouge · hors de la suite'] }).length, 1);
     });
 
-    test('#113 : sous vitest aussi, une connexion hors de la machine fait échouer le fichier en nommant l’hôte, erreur avalée', () => {
-      const vitest = join(RACINE, 'packages/core/node_modules/.bin/vitest');
-      const dossier = mkdtempSync(join(tmpdir(), 'tirelire-113-vitest-'));
-      try {
-        const setup = JSON.stringify(join(RACINE, V.SANS_SORTIE_VITEST));
-        writeFileSync(join(dossier, 'vitest.config.mjs'), `export default { test: { include: ['*.test.mjs'], setupFiles: [${setup}] } };\n`);
-        writeFileSync(join(dossier, 'sonde.test.mjs'), [
-          "import { describe, test, expect } from 'vitest';",
-          "test('avalé', async () => expect(await fetch('http://vitest-hors-machine.invalid:80/').then(() => 'passé', () => 'avalé')).toBe('avalé'));",
-        ].join('\n'));
-        writeFileSync(join(dossier, 'boucle.test.mjs'), "import { test } from 'vitest';\ntest('rien ne sort', () => {});\n");
-        const r = spawnSync(vitest, ['run', '--root', dossier], { encoding: 'utf8', timeout: 60_000, env: { ...process.env, CI: '1', NO_COLOR: '1' } });
-        const sortie = `${r.stdout}\n${r.stderr}`.replace(/\x1b\[[0-9;]*m/g, '');
-        assert.notEqual(r.status, 0, sortie);
-        assert.match(sortie, /vitest-hors-machine\.invalid:80/);
-        assert.match(sortie, /1 failed \| 1 passed/, 'seul le fichier qui sort échoue');
-      } finally {
-        rmSync(dossier, { recursive: true, force: true });
-      }
-    });
-
-    test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node --test, vitest ou inconnu', () => {
-      const racine = mkdtempSync(join(tmpdir(), 'tirelire-113-depot-'));
-      try {
-        const ecrire = (chemin, contenu) => {
-          mkdirSync(dirname(join(racine, chemin)), { recursive: true });
-          writeFileSync(join(racine, chemin), typeof contenu === 'string' ? contenu : JSON.stringify(contenu));
-        };
-        ecrire('pnpm-workspace.yaml', 'packages:\n  - paquets/*\n\nonlyBuiltDependencies:\n  - esbuild\n');
-        ecrire('package.json', { scripts: {} });
-        ecrire('paquets/branche/package.json', { name: 'branche', scripts: { test: 'node --import ../../packages/gardes/sans-sortie.mjs --test' } });
-        ecrire('paquets/nu/package.json', { name: 'nu', scripts: { test: 'node --test' } });
-        ecrire('paquets/ailleurs/package.json', { name: 'ailleurs', scripts: { test: 'node --import ./sans-sortie.mjs --test' } });
-        ecrire('paquets/vite-branche/package.json', { name: 'vite-branche', scripts: { test: 'vitest run' } });
-        ecrire('paquets/vite-branche/vitest.config.ts', "export default { test: { setupFiles: ['../../packages/gardes/sans-sortie-vitest.mjs'] } };");
-        ecrire('paquets/vite-commente/package.json', { name: 'vite-commente', scripts: { test: 'vitest run' } });
-        ecrire('paquets/vite-commente/vitest.config.ts', "export default { test: {\n // setupFiles: ['../../packages/gardes/sans-sortie-vitest.mjs'],\n} };");
-        ecrire('paquets/vite-sans-config/package.json', { name: 'vite-sans-config', scripts: { test: 'vitest run' } });
-        ecrire('paquets/jest/package.json', { name: 'jest', scripts: { test: 'jest' } });
-        ecrire('paquets/sans-test/package.json', { name: 'sans-test', scripts: {} });
-        const problemes = V.verifierLanceursLocaux(racine);
-        const noms = problemes.map((p) => /^`([^`]+)`/.exec(p)?.[1]);
-        assert.deepEqual(noms.sort(), ['ailleurs', 'jest', 'nu', 'vite-commente', 'vite-sans-config'], problemes.join('\n'));
-      } finally {
-        rmSync(racine, { recursive: true, force: true });
-      }
+    test('témoin rouge · une suite nommée au registre qui contient un test de niveau 4', () => {
+      const source = gardé.replace("it('tient', () => {});", "it('tient', () => {});\n  it('trace [niveau 4]', () => {});");
+      assert.equal(manquements(source, { fichier: 'rouge', noms: ['garde [niveau 1]'] }).length, 1);
     });
   });
 });

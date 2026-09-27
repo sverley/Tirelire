@@ -31,7 +31,7 @@ const sansGuillemets = (v) => v.trim().replace(/^(['"])(.*)\1$/, '$2');
 const valeurs = (v) => v.replace(/^\[|\]$/g, '').split(',').map(sansGuillemets).filter(Boolean);
 
 /** Le bloc `on:` : événement → { types }. Formes lues : `on: x`, `on: [x, y]`, bloc renfoncé de deux espaces. */
-describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aperçu, changement signalé (#150, #168, #175)', () => {
+describe('[niveau 2] D82 et D83 : brouillon, Ready, aperçu, changement signalé (#150, #168, #175)', () => {
   function déclencheurs(yaml) {
     const lignes = yaml
       .split(/\njobs:\s*\n/)[0]
@@ -180,7 +180,7 @@ describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aper�
 
   // ─── Le Ready joue toute la CI, une fois ─────────────────────────────────────────────────────────
 
-  test('#150 · le passage en Ready lance toute la CI et assemble la version de dev, sans la déposer ni commenter', () => {
+  test('#150 · le passage en Ready lance toute la CI et assemble la version de dev, sans la déposer ni commenter [niveau 1]', () => {
     const référence = clés(tournent(exécutions(surLaPR('ready_for_review', false))));
     for (const a of PASSAGES) {
       const jobs = tournent(exécutions(surLaPR(a, false)));
@@ -196,7 +196,7 @@ describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aper�
     }
   });
 
-  test('#168 · au passage en Ready, l’issue reçoit l’étiquette « PR prête » et le statut de toute la CI est posé', () => {
+  test('#168 · au passage en Ready, l’issue reçoit l’étiquette « PR prête » et le statut de toute la CI est posé [niveau 1]', () => {
     for (const a of PASSAGES) {
       const jobs = tournent(exécutions(surLaPR(a, false)));
       assert.ok(fait(jobs, AJOUT), `passage en Ready (${a}) : aucun job ne pose l'étiquette « ${ÉTIQUETTE} »`);
@@ -265,7 +265,7 @@ describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aper�
 
   // ─── B1 · aucun vert trompeur ────────────────────────────────────────────────────────────────────
 
-  test('#150 · B1 · au passage en Ready, aucune exécution ne montre sauté un job qu’une autre joue', () => {
+  test('#150 · B1 · au passage en Ready, aucune exécution ne montre sauté un job qu’une autre joue [niveau 1]', () => {
     for (const a of PASSAGES) {
       const exé = exécutions(surLaPR(a, false));
       const joués = new Set(clés(tournent(exé)));
@@ -276,7 +276,7 @@ describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aper�
     }
   });
 
-  test('#150 · B1 · sur une PR prête, ce qui ne la change pas ne montre sauté aucun job du Ready', () => {
+  test('#150 · B1 · sur une PR prête, ce qui ne la change pas ne montre sauté aucun job du Ready [niveau 1]', () => {
     const duReady = new Set(PASSAGES.flatMap((a) => clés(tournent(exécutions(surLaPR(a, false))))));
     for (const a of SANS_CHANGEMENT) {
       for (const x of exécutions(surLaPR(a, false))) {
@@ -286,7 +286,7 @@ describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aper�
     }
   });
 
-  test('#168 · B1 · aucun job ne porte le nom du statut de toute la CI : sauté, il passerait pour elle', () => {
+  test('#168 · B1 · aucun job ne porte le nom du statut de toute la CI : sauté, il passerait pour elle [niveau 1]', () => {
     for (const { nom, yaml } of workflows()) {
       for (const j of jouer(yaml, contexte(surLaPR('ready_for_review', false)[1]))) {
         const affiché = (j.lignes.find((l) => /^ {4}name:/.test(l)) ?? '').replace(/^ {4}name:\s*/, '').replace(/^(['"])(.*)\1$/, '$2');
@@ -297,7 +297,7 @@ describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aper�
 
   // ─── Un changement après le Ready se signale, sans rien bloquer ──────────────────────────────────
 
-  test('#168 · un commit sur une PR prête passe le statut en échec et dit quoi faire, sans rien lancer de lourd', () => {
+  test('#168 · un commit sur une PR prête passe le statut en échec et dit quoi faire, sans rien lancer de lourd [niveau 1]', () => {
     const jobs = tournent(exécutions(surLaPR('synchronize', false)));
     assert.ok(surLeStatut(jobs).length, `commit sur une PR prête : le statut « ${CONTEXTE} » n'est pas touché`);
     assert.ok(fait(jobs, COMMENTAIRE), 'commit sur une PR prête : aucun commentaire ne le signale');
@@ -337,7 +337,7 @@ describe('[niveau 1] harnais de la garde · D82 et D83 : brouillon, Ready, aper�
     }
   });
 
-  test('témoin · le lecteur de conditions suit le filtre d’objets `.*` comme GitHub', () => {
+  test('témoin · le lecteur de conditions suit le filtre d’objets `.*` comme GitHub [niveau 4]', () => {
     const yaml = `name: t\non: issues\njobs:\n  j:\n    if: contains(github.event.issue.labels.*.name, 'PR prête')\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo j\n`;
     const joue = (prête) => jouer(yaml, contexte(['issues', { action: 'edited', issue: ISSUE_SEULE(prête) }]))[0].tourne;
     assert.equal(joue(true), true);
