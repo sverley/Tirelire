@@ -413,17 +413,19 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
 
 ## C4 · Les données d'un navigateur tiennent à son adresse, et peuvent s'effacer
 
-Analyse (audit #73) : la partie de C4 que #42 doit encore construire — demander
-`navigator.storage.persist()` et dire si elle est obtenue — n'existe pas dans le code
-(`apps/web/src/lib/db.ts` ne l'appelle pas). Un harnais ne peut garder un comportement qui n'existe
-pas : coder son témoin rouge demanderait de coder le comportement lui-même, ce qui sort de l'audit
-(#73 ne touche pas au code produit). Le harnais revient donc à #42, qui construit la demande de
-persistance et son harnais dans la même PR ; la ligne « À bâtir » ci-dessous le porte tant que #42
-n'est pas fusionnée, la vérification manuelle gardant la part déjà en place (les données déjà
-écrites survivent).
+Analyse (audit #73, puis #42) : la partie de C4 qui dépend de l'application — demander au
+navigateur de rendre les données persistantes, savoir s'il l'a accordé et, tant qu'il ne l'a pas,
+le dire — se garde dans le navigateur, sur le site construit ; la vérification manuelle garde ce
+qu'aucun test ne rejoue, les données d'une version antérieure retrouvées à la même adresse.
 
-Chemins : `apps/web/src/lib/db.ts`, `apps/web/vite.config.ts`, `apps/hebergement/assembler.mjs`
+Chemins : `apps/web/src/lib/db.ts`, `apps/web/src/lib/persistance.ts`, `apps/web/vite.config.ts`, `apps/hebergement/assembler.mjs`
 
+- **Harnais** · `apps/web/test/navigateur/stockage-persistant.test.ts` — à chaque ouverture où
+  les données ne sont pas persistantes, l'application demande au navigateur de les garder, sans
+  geste ; elle distingue accordée, refusée et impossible, et le dit dans Réglages ; refusée ou
+  impossible, l'accueil le signale sans rien bloquer et mène en un geste à une copie du fichier ;
+  accordée, le signal disparaît ; la demande ne touche pas aux données déjà écrites (#42).
+  Témoin rouge : « témoin rouge · une ouverture qui ne demande pas au navigateur de garder les données »
 - **Vérification manuelle** · `VM-C4-effacement` — Dans l'application web sur Chromium (la
   distribution vérifiée, une cible active de `cibles.md` ; ni l'APK ni Safari ne se vérifient ici) : ouvrir la version de la
   branche là où celle de `main` a des données, même adresse et même navigateur, et constater
@@ -431,7 +433,6 @@ Chemins : `apps/web/src/lib/db.ts`, `apps/web/vite.config.ts`, `apps/hebergement
   locale, l'utilisateur est prévenu et guidé pour les reprendre. Ce que Safari efface après sept
   jours sans visite ne se constate pas ici : Webapp · Safari sur iPhone et iPad n'est pas une cible
   active ([`cibles.md`](cibles.md)).
-- **À bâtir** · la demande de persistance du stockage (#42).
 
 ## C5 · Sans serveur, aucune sauvegarde n'est implicite
 
