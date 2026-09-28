@@ -20,3 +20,9 @@ journal d'erreur ou son constat, repasse la PR en brouillon, et la boucle repren
 Quand il le veut, `pnpm test 4 --navigateur` joue toute la chaîne, diagnostic compris. La
 publication d'une version, par son tag, joue le seuil 3, tests navigateur compris, et ne publie que
 s'il est vert (D83, D87).
+
+Lui seul publie une version (D83) : il pousse le tag d'une version numérotée, ou déclenche à la main
+une version forcée du dernier commit de `main` (Actions → « Version forcée » → Run workflow, sans
+autre saisie). Son nom : le dernier numéro de version publié, un tiret, puis le hash court du commit
+— `v0.2-1a2b3c4` après `v0.2`, `v0.0-…` tant qu'aucune version numérotée n'est publiée. Elle ne pose
+son tag qu'après le seuil 3 vert, et ne se publie pas sur un commit qui porte déjà une version.
