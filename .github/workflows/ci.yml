@@ -19,11 +19,18 @@ name: CI et livraison
 # production, après les tests au seuil 3. Le lancement manuel, sur `main`, redépose la recette ; il ne
 # touche jamais la production.
 #
+# La version forcée (#274) : `version-forcee.yml`, déclenché à la main par le porteur, appelle ce
+# workflow (`workflow_call`, `version_forcee: true`) sur le dernier commit de `main`. Elle se joue
+# comme un tag poussé à la main — seuil 3, tests navigateur compris, rien ne se saute — et le job
+# `etiquette` ne pose son tag qu'après : le dépôt en production, l'APK et la release l'attendent. Son nom
+# (`packages/gardes/version-forcee.mjs`) : le dernier numéro de version publié, un tiret, le hash
+# court du commit. Un tag posé avec le jeton du job ne déclenche aucun workflow : rien ne se rejoue.
+#
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
 #   l'archive du site qu'il dépose ensuite ne juge rien. Ses seuils (#232, D83) : au Ready et sur
 #   `main`, seuil 1, plus les tests navigateur au seuil 2, et le harnais du besoin en entier sur une
-#   PR ; au tag `v*`, seuil 3, tests navigateur activés, avant de publier. Le moins cher d'abord
+#   PR ; au tag `v*` et pour une version forcée, seuil 3, tests navigateur activés, avant de publier. Le moins cher d'abord
 #   (#264) : typecheck, seuil 1, harnais du besoin, puis les tests navigateur de non-régression, qui
 #   ne partent que si tout le reste est vert. Il ne joue que le manque (#237, #266) : au Ready, une
 #   branche qui ne contient pas le dernier `main` est à mettre à jour et rien d'autre ne se joue ;
@@ -40,6 +47,7 @@ name: CI et livraison
 #   `vars.TIRELIRE_BASE`) ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).
 # - `recette` lit hors des fichiers suivis : après le dépôt de `main` à la racine de la recette,
 #   l'étape « Vérifier la racine de la recette en ligne » (`verifier.sh`) lit le site déployé.
+# - `etiquette` est hors harnais : il pose le tag d'une version forcée, sans rien vérifier.
 # - `production` lit hors des fichiers suivis : après le dépôt d'une version publiée, l'étape
 #   « Vérifier le site en ligne » (`verifier.sh`) lit le site déployé.
 # - `android` est hors harnais : il construit l'APK, sans rien vérifier.
@@ -67,6 +75,13 @@ on:
         type: choice
         options: [automatique, essai-a-blanc, ignorer]
         default: automatique
+  # La version forcée (#274) : seul `version-forcee.yml` l'appelle, sans autre saisie.
+  workflow_call:
+    inputs:
+      version_forcee:
+        description: "Publier une version forcée du dernier commit de main"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -86,12 +101,21 @@ jobs:
       contents: read
       pull-requests: read # la PR d'un commit arrivé sur `main` (#237)
       statuses: read # « Toute la CI sur ce commit » de sa tête (#237)
+    outputs:
+      version_forcee: ${{ steps.version_forcee.outputs.nom }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Toute l'histoire : le harnais du besoin se lit depuis la base commune avec `main` (#232),
-          # et la tête de la PR doit contenir le dernier `main` (#237).
+          # et la tête de la PR doit contenir le dernier `main` (#237) ; les tags aussi, pour le nom
+          # d'une version forcée (#274).
           fetch-depth: 0
+      # Une version forcée (#274), avant tout test : son nom, et rien ne se joue si le déclenchement
+      # ne vise pas `main` ou si le commit porte déjà une version. Aucun tag ne se pose ici.
+      - name: Version forcée, son nom
+        id: version_forcee
+        if: inputs.version_forcee
+        run: node packages/gardes/version-forcee.mjs nom
       # Au Ready (#237, #266) : une branche qui ne contient pas le dernier `main` est à mettre à jour,
       # et rien d'autre ne se joue ; sinon, les empreintes vertes de chaque ensemble — attestation de
       # la branche, têtes de la branche vertes au Ready, `main`. `$RUNNER_TEMP/attestation.json` : ce
@@ -105,7 +129,7 @@ jobs:
       # Sur `main` (#237, #266) : chaque ensemble dont l'empreinte est celle d'une tête de PR verte au
       # Ready, ou du premier parent, se saute.
       - name: Empreintes vertes après la fusion
-        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee
         env:
           GH_TOKEN: ${{ github.token }}
         run: node .githooks/attestation.mjs apres-fusion "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$RUNNER_TEMP/attestation.json" "$GITHUB_STEP_SUMMARY"
@@ -140,7 +164,7 @@ jobs:
       # joue. Aucun moment ne fait exception, le seuil 1 du Ready non plus (#266, point 4).
       - name: Tests au seuil 1, sauf empreinte verte
         id: seuil1
-        if: "!startsWith(github.ref, 'refs/tags/v')"
+        if: "!startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee"
         run: pnpm test 1 --attestation "$RUNNER_TEMP/attestation.json"
         env:
           TIRELIRE_STRICT: '1'
@@ -154,23 +178,23 @@ jobs:
           TIRELIRE_STRICT: '1'
       - name: Tests navigateur au seuil 2
         id: navigateur
-        if: "!startsWith(github.ref, 'refs/tags/v')"
+        if: "!startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee"
         run: pnpm --dir apps/web run test 2 --navigateur --attestation "$RUNNER_TEMP/attestation.json" test/navigateur
         env:
           TIRELIRE_STRICT: '1'
-      # Avant de publier une version : les tests jusqu'au niveau 3, le dégradé compris, tests
-      # navigateur activés (D87), le moins cher d'abord : les tests navigateur ne partent que si le
-      # reste est vert (#264). Sans fichier d'empreintes : aucun moment ne trouve une empreinte verte
-      # au seuil 3, rien ne se saute (#266, point 4).
+      # Avant de publier une version, poussée à la main ou forcée (#274) : les tests jusqu'au niveau 3,
+      # le dégradé compris, tests navigateur activés (D87), le moins cher d'abord : les tests
+      # navigateur ne partent que si le reste est vert (#264). Sans fichier d'empreintes : aucun moment
+      # ne trouve une empreinte verte au seuil 3, rien ne se saute (#266, point 4).
       - name: Tests au seuil 3, avant de publier
         id: seuil3
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
         run: pnpm test 3
         env:
           TIRELIRE_STRICT: '1'
       - name: Tests navigateur au seuil 3, avant de publier
         id: navigateur3
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
         run: pnpm --dir apps/web run test 3 --navigateur test/navigateur
         env:
           TIRELIRE_STRICT: '1'
@@ -181,7 +205,7 @@ jobs:
       - name: Ce que ce passage a joué
         if: always()
         env:
-          TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee }}
           TYPECHECK: ${{ steps.typecheck.outcome }}
           SEUIL1: ${{ steps.seuil1.outcome }}
           HARNAIS: ${{ steps.harnais.outcome }}
@@ -236,8 +260,9 @@ jobs:
       - name: Assembler (PWA + relais PHP + .htaccess + .ovhconfig)
         env:
           # Sous-dossier où le site sera installé (« / » par défaut = racine du domaine ou sous-domaine) :
-          # celui de la production à un tag `v*`, la racine de la recette sinon (#233).
-          TIRELIRE_BASE: ${{ startsWith(github.ref, 'refs/tags/v') && (vars.TIRELIRE_BASE || '/') || '/' }}
+          # celui de la production à un tag `v*` et pour une version forcée (#274), la racine de la
+          # recette sinon (#233).
+          TIRELIRE_BASE: ${{ (startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee) && (vars.TIRELIRE_BASE || '/') || '/' }}
         run: pnpm --filter @tirelire/hebergement assembler
       - uses: actions/upload-artifact@v4
         with:
@@ -252,8 +277,9 @@ jobs:
     # recette, jamais en production (#233). `apercu.sh` s'arrête avant tout transfert si un réglage de
     # recette manque ou vaut celui de la production, et laisse en place les aperçus (`pr-<numéro>`),
     # le `robots.txt` posé à la main et les paquets du relais. L'adresse de recette est un secret (#156) :
-    # aucune sortie d'étape ni aucun commentaire ne la porte, le diagnostic reste dans ce journal.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.deploiement != 'ignorer'
+    # aucune sortie d'étape ni aucun commentaire ne la porte, le diagnostic reste dans ce journal. Une
+    # version forcée, lancée sur `main`, ne la touche pas (#274).
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.deploiement != 'ignorer' && !inputs.version_forcee
     runs-on: ubuntu-latest
     environment: depot-ftp
     # Un seul dépôt à la fois : deux transferts simultanés laisseraient le site à moitié à jour.
@@ -350,14 +376,60 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # Le tag de la version (#274). Pour une version forcée, il ne se pose qu'après le seuil 3 vert
+  # (`test`), sur le commit joué, avec le nom que `test` a trouvé libre, s'il l'est encore ; un tag
+  # déjà là fait échouer la pose. Pour un tag poussé à la main, il est déjà là : le job le nomme. Le
+  # dépôt en production, l'APK et la release l'attendent.
+  etiquette:
+    name: Étiquette de la version
+    needs: test
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # poser le tag d'une version forcée, par l'API
+    outputs:
+      nom: ${{ steps.poussee.outputs.nom || steps.posee.outputs.nom }}
+    steps:
+      - name: Tag poussé à la main
+        id: poussee
+        if: startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee
+        run: echo "nom=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: inputs.version_forcee
+        with:
+          fetch-depth: 0 # les tags, pour relire le nom
+          persist-credentials: false
+      - name: Version forcée, son nom relu
+        id: relu
+        if: inputs.version_forcee
+        run: node packages/gardes/version-forcee.mjs nom
+      # Le jeton du job pose le tag : aucun workflow ne se déclenche sur ce tag, rien ne se rejoue.
+      - name: Poser le tag de la version forcée
+        id: posee
+        if: inputs.version_forcee
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOM: ${{ steps.relu.outputs.nom }}
+          ATTENDU: ${{ needs.test.outputs.version_forcee }}
+        run: |
+          set -euo pipefail
+          if [ -z "$NOM" ] || [ "$NOM" != "$ATTENDU" ]; then
+            echo "::error title=Version forcée refusée::le nom a changé pendant les tests (« $ATTENDU », puis « $NOM ») : une version a été publiée entre-temps ; rien ne se publie"
+            exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$NOM" -f sha="$GITHUB_SHA" > /dev/null
+          echo "nom=$NOM" >> "$GITHUB_OUTPUT"
+          echo "- Tag \`$NOM\` posé sur \`$GITHUB_SHA\`, après le seuil 3 vert." >> "$GITHUB_STEP_SUMMARY"
+
   production:
     name: Dépôt FTP en production
-    needs: hebergement
-    # À la publication d'une version seulement : le push de son tag `v*`, après les tests au seuil 3
-    # (`test`, dont dépend `hebergement`) ; jamais sur `main` ni à la main (#233, D83, D87).
+    needs: [hebergement, etiquette]
+    # À la publication d'une version seulement : le push de son tag `v*`, ou une version forcée (#274),
+    # après les tests au seuil 3 (`test`, dont dépendent `hebergement` et `etiquette`) et le tag ;
+    # jamais sur `main` ni au lancement manuel de ce workflow (#233, D83, D87).
     # L'environnement `depot-ftp` : dépôt privé sur l'offre gratuite, déclaré sans effet (#176) ; s'il
     # reprend effet (dépôt public, #155), il doit admettre les tags `v*`.
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.version_forcee
     runs-on: ubuntu-latest
     environment: depot-ftp
     # Un seul dépôt à la fois : deux transferts simultanés laisseraient le site à moitié à jour.
@@ -541,9 +613,10 @@ jobs:
 
   android:
     name: APK Android
-    needs: test
-    # Le job le plus lourd : seulement à un tag, plus à chaque fusion.
-    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v')
+    needs: [test, etiquette]
+    # Le job le plus lourd : seulement à un tag, poussé ou posé pour une version forcée après le seuil 3
+    # vert (#274), plus à chaque fusion.
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee)
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.name }}
@@ -568,9 +641,13 @@ jobs:
 
       - name: Numéro de version
         id: version
+        env:
+          VERSION_FORCEE: ${{ needs.test.outputs.version_forcee }}
         run: |
           BASE=$(node -p "require('./apps/web/package.json').version")
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+          if [ -n "$VERSION_FORCEE" ]; then
+            echo "name=${VERSION_FORCEE#v}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             echo "name=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           else
             echo "name=${BASE}-dev.${GITHUB_RUN_NUMBER}+${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
@@ -632,8 +709,8 @@ jobs:
 
   publication:
     name: Publication des releases
-    needs: [hebergement, android]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [hebergement, android, etiquette]
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -651,9 +728,11 @@ jobs:
           path: ${{ runner.temp }}/publication
 
       - name: Release taguée
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
         uses: softprops/action-gh-release@v2
         with:
+          # Le tag poussé, ou celui de la version forcée, posé par `etiquette` (#274).
+          tag_name: ${{ needs.etiquette.outputs.nom }}
           name: Tirelire ${{ needs.android.outputs.version }}
           generate_release_notes: true
           files: |

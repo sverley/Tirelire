@@ -48,4 +48,6 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
    demandé les tests navigateur, et pourquoi, et, si tu changes le comportement de la garde, ce
    qu'en demande D81. Honnête et court. Puis arrête-toi.
 
-Tu ne passes jamais la PR en Ready et ne la fusionnes jamais. Tu n'ouvres pas d'issue.
+Tu ne passes jamais la PR en Ready et ne la fusionnes jamais. Tu n'ouvres pas d'issue. Tu ne
+publies jamais une version : seul le porteur pousse un tag `v*` ou déclenche la version forcée
+(D83).

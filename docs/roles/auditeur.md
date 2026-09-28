@@ -49,3 +49,6 @@ audit commence à son compte rendu (étape 4).
    Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur.
 5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
    survivre à la fusion n'y reste pas : il va dans une issue ouverte ou dans un catalogue (D78).
+
+Tu ne publies jamais une version : seul le porteur pousse un tag `v*` ou déclenche la version forcée
+(D83).

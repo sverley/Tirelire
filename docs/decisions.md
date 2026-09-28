@@ -1423,7 +1423,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; rien ne se saute |
   | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
   | CI après la fusion, sur `main` | comme au Ready, hors harnais ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
-  | Publication d'une version (tag `v*`) | 3, tests navigateur activés ; rien ne se saute |
+  | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
 
   Les tests de développement de fonctions de la garde (D81) ne se jouent à aucun de ces moments :
@@ -1521,7 +1521,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   vert sur son empreinte se saute, seuil 1 compris, et elle dit ce qu'elle saute et pourquoi. Avant
   toute fusion, les niveaux 0 à 2 ont donc été joués, par la livraison et par l'auditeur — les tests
   navigateur, par la CI au Ready ou à la demande, en local —, et chaque ensemble a été trouvé vert au
-  seuil 1 au moins sur son empreinte finale. Neuf workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
+  seuil 1 au moins sur son empreinte finale. Dix workflows : `ci.yml` (tests, version de dev, livraison), `version-forcee.yml` (la version forcée, que le porteur déclenche à la main ; elle appelle `ci.yml`), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
   d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un
@@ -1557,10 +1557,22 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   rejouent ; les aperçus (`pr-<numéro>`), le `robots.txt` posé à
   la main et les paquets du relais y restent en place, et chaque aperçu reste servi par lui-même. La
   production ne suit que les versions publiées : seul un tag `v*` la dépose ; ni un push sur `main`,
-  ni un lancement manuel ne la touchent. L'APK et les releases ne sortent qu'à un tag `v*` : le job
-  le plus lourd ne tourne plus à chaque fusion. Un tag publie une version (D87) et porte son nom
-  (`docs/versions.md`) ; ses tests se jouent au seuil 3, tests navigateur activés, avant de publier
-  et de déposer en production.
+  ni le lancement manuel de `ci.yml` ne la touchent. L'APK et les releases ne sortent qu'à un tag
+  `v*` : le job le plus lourd ne tourne plus à chaque fusion. Un tag publie une version (D87) et porte
+  son nom (`docs/versions.md`) ; ses tests se jouent au seuil 3, tests navigateur activés, avant de
+  publier et de déposer en production.
+- **Seul le porteur publie une version** (#274). Il pousse le tag d'une version numérotée — `v`
+  suivi de nombres séparés par des points, sans rien d'autre —, ou déclenche à la main, sans autre
+  saisie, une **version forcée** du dernier commit de `main` (`version-forcee.yml`). Aucun agent ne
+  pousse un tag `v*` ni ne déclenche une publication. La version forcée se joue comme un tag poussé :
+  le seuil 3, tests navigateur compris, sans rien sauter ; seulement s'il est vert, son tag est posé
+  sur ce commit, puis le site est déposé en production et vérifié en ligne, l'APK est construit et
+  la release publiée. Si quelque chose rougit, aucun tag n'est posé, rien n'est publié, et le
+  déclenchement dit ce qui a rougi. Son nom : le dernier numéro de version publié, un tiret, puis le
+  hash court du commit — `v0.2-1a2b3c4` si la dernière version numérotée est `v0.2`, `v0.0-…` tant
+  qu'aucune n'est publiée. Une version forcée n'est pas numérotée et ne sert jamais de base ; le
+  déclenchement ne crée jamais une version numérotée. Un commit qui porte déjà une version, forcée
+  ou numérotée, ne se republie pas, et le déclenchement le dit.
 
 ### D84 · Le code, les données et les commits
 

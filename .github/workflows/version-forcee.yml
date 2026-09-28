@@ -1,0 +1,34 @@
+name: Version forcée
+
+# Publier une version forcée du dernier commit de `main` (#274), d'un déclenchement manuel, sans
+# autre saisie : Actions → « Version forcée » → Run workflow, sur `main`. Seul le porteur la
+# déclenche ; aucun agent ne déclenche une publication (D83, « Livraison »).
+#
+# Le workflow appelle `ci.yml` (`version_forcee: true`), qui la joue comme un tag poussé à la main :
+# le seuil 3, tests navigateur compris, sans rien sauter ; seulement si tout est vert, le tag est
+# posé sur ce commit, le site est déposé en production et vérifié en ligne, l'APK est construit et
+# la release publiée. Son nom : le dernier numéro de version publié, un tiret, puis le hash court du
+# commit — `v0.2-1a2b3c4` après `v0.2`, `v0.0-…` tant qu'aucune version numérotée n'est publiée
+# (`packages/gardes/version-forcee.mjs`). Rien ne se publie si le déclenchement ne vise pas `main`
+# ou si le commit porte déjà une version, forcée ou numérotée ; le résumé de l'exécution dit ce qui
+# a rougi. Les versions numérotées restent manuelles : le porteur pousse leur tag.
+#
+# Place du job sur le second axe des harnais (#113) : `publier` n'a pas d'étapes à lui ; ses jobs
+# sont ceux de `ci.yml`, situés dans son en-tête.
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  publier:
+    name: Version forcée du dernier main
+    permissions:
+      contents: write # poser le tag, publier la release
+      pull-requests: read # ceux que `ci.yml` demande pour ses tests
+      statuses: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      version_forcee: true
+    secrets: inherit
