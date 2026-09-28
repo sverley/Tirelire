@@ -32,16 +32,16 @@ name: CI et livraison
 #   `main`, seuil 1, plus les tests navigateur au seuil 2, et le harnais du besoin en entier sur une
 #   PR ; au tag `v*` et pour une version forcée, seuil 3, tests navigateur activés, avant de publier. Le moins cher d'abord
 #   (#264) : typecheck, seuil 1, harnais du besoin, puis les tests navigateur de non-régression, qui
-#   ne partent que si tout le reste est vert. Il ne joue que le manque (#237) : au Ready, une branche
-#   qui ne contient pas le dernier `main` est à mettre à jour et rien d'autre ne se joue ; sinon le
-#   seuil 1 se joue toujours, et ce que l'attestation de la livraison couvre sur cet arbre se saute —
-#   les tests navigateur demandés et joués verts en local compris (#264, point 7). Sur `main`, un
-#   arbre que toute la CI a trouvé vert au Ready ne rejoue pas ses tests. Même sans attestation, les
-#   tests navigateur se sautent quand ce qui change — depuis le dernier `main` au Ready, depuis le
-#   premier parent sur `main` — ne peut pas les changer (`SANS_NAVIGATEUR`,
-#   `packages/gardes/attestation.mjs`). La décision passe par
-#   `pnpm test --attestation <fichier>` ; au tag, rien ne se saute. Il lit l'API (statuts, PR d'un
-#   commit) en lecture seule.
+#   ne partent que si tout le reste est vert. Il ne joue que le manque (#237, #266) : au Ready, une
+#   branche qui ne contient pas le dernier `main` est à mettre à jour et rien d'autre ne se joue ;
+#   sinon un ensemble de tests se saute, seuil 1 compris, si son empreinte — l'état des chemins qu'il
+#   lit (`packages/gardes/attestation.mjs`) — est déjà trouvée verte à un seuil au moins égal : par
+#   l'attestation de la branche (les tests navigateur demandés et joués verts en local compris), par
+#   la CI sur une tête de la branche verte au Ready, ou parce que `main` a la même. Sur `main`, un
+#   ensemble se saute si son empreinte est celle d'une tête de PR verte au Ready, ou celle du premier
+#   parent. La décision passe par `pnpm test --attestation <fichier>`. Au tag, rien ne se saute :
+#   aucun moment ne trouve une empreinte verte au seuil 3. Il lit l'API (statuts, PR d'un commit) en
+#   lecture seule.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
 #   `main` et à la main (la racine de la recette, `/`), à un tag `v*` (la production,
 #   `vars.TIRELIRE_BASE`) ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).
@@ -116,17 +116,19 @@ jobs:
         id: version_forcee
         if: inputs.version_forcee
         run: node packages/gardes/version-forcee.mjs nom
-      # Au Ready (#237) : une branche qui ne contient pas le dernier `main` est à mettre à jour, et
-      # rien d'autre ne se joue ; sinon, l'attestation de la livraison, si elle vise l'arbre de la
-      # tête. `$RUNNER_TEMP/attestation.json` : ce que l'arbre a déjà joué, que les étapes de tests
-      # passent à `pnpm test`.
-      - name: Branche à jour, et attestation de la livraison
+      # Au Ready (#237, #266) : une branche qui ne contient pas le dernier `main` est à mettre à jour,
+      # et rien d'autre ne se joue ; sinon, les empreintes vertes de chaque ensemble — attestation de
+      # la branche, têtes de la branche vertes au Ready, `main`. `$RUNNER_TEMP/attestation.json` : ce
+      # qui se saute, que les étapes de tests passent à `pnpm test`.
+      - name: Branche à jour, et empreintes vertes
         if: github.event_name == 'pull_request'
         env:
           TETE: ${{ github.event.pull_request.head.sha }}
-        run: node .githooks/attestation.mjs ready "$TETE" "$GITHUB_HEAD_REF" origin/main "$RUNNER_TEMP/attestation.json" "$GITHUB_STEP_SUMMARY"
-      # Sur `main` (#237) : l'arbre arrivé est-il celui d'une tête de PR trouvée verte au Ready ?
-      - name: Arbre vérifié au Ready
+          GH_TOKEN: ${{ github.token }}
+        run: node .githooks/attestation.mjs ready "$TETE" "$GITHUB_HEAD_REF" origin/main "$RUNNER_TEMP/attestation.json" "$GITHUB_STEP_SUMMARY" --depot "$GITHUB_REPOSITORY"
+      # Sur `main` (#237, #266) : chaque ensemble dont l'empreinte est celle d'une tête de PR verte au
+      # Ready, ou du premier parent, se saute.
+      - name: Empreintes vertes après la fusion
         if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee
         env:
           GH_TOKEN: ${{ github.token }}
@@ -157,23 +159,17 @@ jobs:
       # vérifié au seuil 2 avant le Ready, la livraison aussi, hors tests navigateur sauf demande —,
       # hors tests navigateur, que seule l'option `--navigateur` active ; puis le harnais du besoin,
       # puis les tests navigateur au seuil 2, qui ne partent que si tout le reste est vert (#264).
-      # `--attestation` (#237) : le lanceur saute ce que l'arbre a déjà joué, et dit ce qu'il saute ;
-      # sans fichier, tout se joue. Au Ready, le seuil 1 se joue toujours : son étape ne lit pas
-      # d'attestation. Sur `main`, il se saute si l'arbre a été trouvé vert au Ready.
-      - name: Tests au seuil 1
+      # `--attestation` (#237, #266) : le lanceur saute, ensemble par ensemble, ce dont l'empreinte
+      # est déjà trouvée verte à un seuil au moins égal, et dit ce qu'il saute ; sans fichier, tout se
+      # joue. Aucun moment ne fait exception, le seuil 1 du Ready non plus (#266, point 4).
+      - name: Tests au seuil 1, sauf empreinte verte
         id: seuil1
-        if: github.event_name == 'pull_request'
-        run: pnpm test 1
-        env:
-          TIRELIRE_STRICT: '1'
-      - name: Tests au seuil 1, sauf arbre vert au Ready
-        id: seuil1main
-        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee
+        if: "!startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee"
         run: pnpm test 1 --attestation "$RUNNER_TEMP/attestation.json"
         env:
           TIRELIRE_STRICT: '1'
       # Le harnais du besoin en cours, en entier (seuil 4), par sa définition commune (D83) ; sauté
-      # si la livraison l'a joué vert sur cet arbre (#237).
+      # si son empreinte est déjà trouvée verte (#237, #266).
       - name: Harnais du besoin, en entier
         id: harnais
         if: github.event_name == 'pull_request'
@@ -187,24 +183,35 @@ jobs:
         env:
           TIRELIRE_STRICT: '1'
       # Avant de publier une version, poussée à la main ou forcée (#274) : les tests jusqu'au niveau 3,
-      # le dégradé compris, tests navigateur activés (D87). Sans attestation : rien ne se saute (#237).
+      # le dégradé compris, tests navigateur activés (D87), le moins cher d'abord : les tests
+      # navigateur ne partent que si le reste est vert (#264). Sans fichier d'empreintes : aucun moment
+      # ne trouve une empreinte verte au seuil 3, rien ne se saute (#266, point 4).
       - name: Tests au seuil 3, avant de publier
         id: seuil3
         if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
-        run: pnpm test 3 --navigateur
+        run: pnpm test 3
         env:
           TIRELIRE_STRICT: '1'
-      # Ce que ce passage a joué, ensemble par ensemble (#264, point 9) ; ce qui s'est sauté, et
-      # pourquoi, est dit plus haut dans le résumé, et par le lanceur dans le journal de chaque étape.
+      - name: Tests navigateur au seuil 3, avant de publier
+        id: navigateur3
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
+        run: pnpm --dir apps/web run test 3 --navigateur test/navigateur
+        env:
+          TIRELIRE_STRICT: '1'
+      # Ce que ce passage a joué, étape par étape (#264, point 9 ; #266, point 7) ; ce qui s'est sauté,
+      # ensemble par ensemble, et pourquoi — par qui l'empreinte a été trouvée verte, sur quel commit,
+      # à quel seuil —, est dit plus haut dans le résumé, et par le lanceur dans le journal de chaque
+      # étape.
       - name: Ce que ce passage a joué
         if: always()
         env:
           TAG: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee }}
           TYPECHECK: ${{ steps.typecheck.outcome }}
-          SEUIL1: ${{ github.event_name == 'pull_request' && steps.seuil1.outcome || steps.seuil1main.outcome }}
+          SEUIL1: ${{ steps.seuil1.outcome }}
           HARNAIS: ${{ steps.harnais.outcome }}
           NAVIGATEUR: ${{ steps.navigateur.outcome }}
           SEUIL3: ${{ steps.seuil3.outcome }}
+          NAVIGATEUR3: ${{ steps.navigateur3.outcome }}
         run: |
           dit() {
             case $1 in
@@ -219,11 +226,11 @@ jobs:
             echo
             echo "- typecheck : $(dit "$TYPECHECK")"
             if [ "$TAG" = true ]; then
-              echo "- au tag, rien ne se saute : seuil 3 en entier, sur chaque ensemble, tests navigateur compris : $(dit "$SEUIL3")"
+              echo "- au tag, rien ne se saute (aucun moment ne trouve une empreinte verte au seuil 3) : seuil 3 en entier, sur chaque ensemble : $(dit "$SEUIL3") ; tests navigateur au seuil 3 : $(dit "$NAVIGATEUR3")"
             else
-              echo "- seuil 1 — garde, cœur, relais, hébergement, interface sans navigateur : $(dit "$SEUIL1" ", ou sauté sur main pour un arbre vert au Ready (voir plus haut)")"
-              [ "$GITHUB_EVENT_NAME" = pull_request ] && echo "- harnais du besoin, en entier : $(dit "$HARNAIS" ", ou sauté si la livraison le couvre (voir plus haut)")"
-              echo "- interface dans le navigateur, seuil 2 : $(dit "$NAVIGATEUR" ", ou sautée si la livraison la couvre ou si rien de ce qu'elle lit n'a changé (voir plus haut)")"
+              echo "- seuil 1 — garde, cœur, relais, hébergement, interface sans navigateur : $(dit "$SEUIL1" ", chaque ensemble joué ou sauté sur une empreinte verte (voir plus haut)")"
+              [ "$GITHUB_EVENT_NAME" = pull_request ] && echo "- harnais du besoin, en entier : $(dit "$HARNAIS" ", joué ou sauté sur une empreinte verte (voir plus haut)")"
+              echo "- interface dans le navigateur, seuil 2 : $(dit "$NAVIGATEUR" ", jouée ou sautée sur une empreinte verte — la couvre ce que l'outillage de la branche ou une tête verte au Ready a trouvé vert, ou rien de ce qu'elle lit n'a changé (voir plus haut)")"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
       - run: pnpm build

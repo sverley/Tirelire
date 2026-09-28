@@ -1325,11 +1325,13 @@ ceux qu'il modifie ; la validation du porteur le couvre.
 Les tests de la garde sont ceux qui vérifient la garde elle-même : ses trois vérifications et la
 règle des harnais ; ils vivent dans `packages/gardes/gardes.test.mjs`. Eux et les harnais du registre
 servent le même but — que les principes et les règles ne soient pas enfreints — et se traitent de la
-même manière : tout leur test est de niveau 0 ou 1 (D83), témoins compris, donc joué à chaque fusion.
+même manière : tout leur test est de niveau 0 ou 1 (D83), témoins compris, donc joué à chaque fusion,
+sauf sur une empreinte déjà trouvée verte à un seuil au moins égal (D83, « Les empreintes »).
 Quand une ligne `Harnais` nomme un test, la règle vaut pour ce test, sa suite et son témoin ; quand
 elle cite un fichier, pour tout le fichier. Les tests de la garde et les harnais du registre
 n'accueillent donc jamais de test de niveau 4. La règle est un test de la garde, pas une logique de
-l'outil ; tout ce qui y entre se jouant à chaque fusion, la garde reste petite (principe 12).
+l'outil ; tout ce qui y entre se jouant à chaque fusion, hors empreinte verte, la garde reste petite
+(principe 12).
 
 Tout autre test, même rangé dans `packages/gardes`, appartient au harnais d'un besoin et se joue par
 `pnpm test`, à son niveau (D83) : un test se range selon le besoin qu'il vérifie, jamais selon ce que
@@ -1406,7 +1408,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   sans elle, ils sont écartés, et comptés tels qu'ils sont écrits dans leurs fichiers, sans être
   exécutés : un test écrit dans une boucle compte pour un, et la sortie dit ce qu'elle compte, pour
   que ce nombre ne passe pas pour celui des tests exécutés. L'option `--attestation <fichier>`, que
-  seule la CI passe, saute ce que l'attestation de l'arbre couvre (voir « L'attestation »), et le dit.
+  seule la CI passe, saute ce qui est vert sur son empreinte dans l'arbre extrait (voir « Les
+  empreintes »), et le dit.
   Aucune variable d'environnement ne change ce qui se
   joue : tout passe par les arguments. Un test appelé nommément (`-t` de vitest,
   `--test-name-pattern` de `node --test`) se joue quel que soit son niveau. Le script `test` de
@@ -1414,12 +1417,12 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
   | Moment | Seuil |
   |---|---|
-  | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur |
-  | Livraison (pré-fusion, pré-push) | 2, sans les tests navigateur de non-régression |
-  | Demande des tests navigateur (`pnpm livraison --navigateur`) | 2, tests navigateur compris |
+  | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur ; sauf ce qui est vert sur son empreinte |
+  | Livraison (pré-fusion, pré-push) | 2, sans les tests navigateur de non-régression ; sauf ce qui est vert sur son empreinte |
+  | Demande des tests navigateur (`pnpm livraison --navigateur`) | 2, tests navigateur compris ; sauf ce qui est vert sur son empreinte |
   | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; rien ne se saute |
-  | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin, sauf ce que l'attestation couvre et les tests navigateur que la PR ne peut pas changer ; le seuil 1 toujours |
-  | CI après la fusion, sur `main` | comme au Ready, hors harnais, les chemins comparés au premier parent ; rien si toute la CI a trouvé l'arbre vert au Ready |
+  | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
+  | CI après la fusion, sur `main` | comme au Ready, hors harnais ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
   | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
 
@@ -1431,41 +1434,63 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   chemins »), à côté de la branche, et inscrit dans les trois premières lignes de chacun « Harnais
   d'audit de #<n> », le numéro de l'issue, que porte aussi le nom de la branche (`audit/<n>-…`) :
   les crochets et la CI les reconnaissent ainsi sans lire l'issue (`.githooks/harnais-du-besoin.sh`,
-  définition commune). Il se joue en entier, niveau 4 compris, à chaque moment. Les autres fichiers
+  définition commune). Il se joue en entier, niveau 4 compris, à chaque moment, sauf vert sur la même
+  empreinte (voir « Les empreintes ») ; rouge, il se rejoue toujours. Les autres fichiers
   de test que la branche ajoute ou modifie, ceux du codeur compris, n'en font pas partie : ils se
   jouent à leur niveau.
-- **L'attestation.** Une livraison verte (pré-fusion, pré-push, ou demande des tests navigateur),
-  hors sous-branche, atteste ce qu'elle a joué sur l'arbre qu'elle a jugé : l'arbre, le seuil, les
-  ensembles joués, le harnais du besoin et son état, la présence du navigateur.
-  Elle ne se produit qu'à la livraison, par
-  l'outillage (`.githooks/attestation.mjs`) : aucune session ne l'écrit. Le pré-push l'envoie avec le
-  push, sur la branche `<branche>--attestation`, qu'elle remplace ; cette branche n'est jamais jugée.
-  Le risque visé est l'erreur, pas la fraude. Au Ready, la CI lit l'attestation qui vise l'arbre de
-  la tête, et saute ce qu'elle couvre : les tests navigateur joués au seuil 2 avec un navigateur, le
-  harnais du besoin joué vert ; jamais le seuil 1. Ce qu'elle ne couvre pas se joue, et sans
-  attestation, tout ce que la table prévoit. Même sans attestation, les tests navigateur ne se
-  jouent que si ce qui arrive peut les changer : une PR qui ne change, depuis le dernier `main`, que
-  des fichiers sous `docs/`, `.github/`, `.githooks/`, `packages/gardes/`, `apps/hebergement/` ou
-  `apps/relay/`, des fichiers `*.md` ou `.gitignore`, les saute, et le dit ; tout autre fichier les
-  fait jouer, et un chemin oublié de la liste fait jouer plus, jamais moins. La garde y figure : les
-  tests navigateur la lisent par leur lanceur, mais le seuil 1 la joue sur l'interface, navigateur
-  compris. Sur `main`, quand les tests se rejouent, la même règle compare le commit arrivé à son
-  premier parent ; au tag, rien ne se saute.
+- **Les empreintes** (#266). Chaque ensemble de tests — garde, cœur, relais, hébergement, interface
+  sans navigateur, interface dans le navigateur, harnais du besoin — a une empreinte : l'état, dans
+  l'arbre jugé, des chemins qu'il lit. Elle couvre tout le dépôt, sauf les chemins que la liste de
+  l'ensemble écarte (`ENSEMBLES`, `packages/gardes/attestation.mjs`), chacun avec sa raison :
+  l'ensemble ne le lit pas, ou ce qu'il en lit est vérifié par ce qui se joue quand il change. Un
+  chemin oublié de la liste fait jouer plus, jamais moins : tout fichier qu'elle n'écarte pas change
+  l'empreinte. La garde et l'hébergement lisent tout le dépôt. Pour les tests navigateur, la liste
+  est celle du point 9 de #237 : `docs/`, `.github/`, `.githooks/`, `packages/gardes/`,
+  `apps/hebergement/`, `apps/relay/`, les fichiers `*.md` et `.gitignore`. La garde y figure : les
+  tests navigateur la lisent par leur lanceur, mais l'interface sans navigateur, qui la lit par le
+  même lanceur, et la garde, qui lit tout, se rejouent quand elle change. Le harnais du besoin a
+  pour empreinte ses fichiers et ce que lisent les ensembles de leurs paquets.
+
+  Un ensemble ne se rejoue pas sur une empreinte déjà trouvée verte, à un seuil au moins égal : par
+  l'outillage sur la branche — à la livraison ou à la demande du codeur ou de l'auditeur, dans cette
+  session ou dans une autre (chaque session a son clone, voir « Crochets ») —, ou par la CI sur une
+  tête de la branche dont toute la CI a fini verte au Ready. L'empreinte qu'il a sur la base commune
+  de la branche avec `main` compte aussi comme verte, jusqu'au seuil 2 : la branche ne change rien de
+  ce qu'il lit. Aucun moment ne fait exception (porteur, 28/09 : « si l'empreinte est verte, on ne
+  joue pas les tests, c'est universel ») : au Ready, le seuil 1 non plus. Sur `main`, un ensemble ne
+  se rejoue pas si son empreinte est celle qu'il a sur la tête d'une PR dont toute la CI a fini verte
+  au Ready, ou sur le premier parent du commit arrivé. N'est pas vert sur son empreinte un ensemble
+  dont un test a rougi, ou s'est sauté faute d'outil : il se rejoue au moment suivant qui le prévoit.
+  Aucun moment ne trouve d'empreinte verte au seuil 3 : au tag, rien ne se saute. Chaque moment —
+  pré-commit, pré-fusion, pré-push, demande, CI au Ready, CI sur `main`, tag — dit, pour chaque
+  ensemble, s'il l'a joué, à quel seuil et avec quel verdict, ou pourquoi il ne l'a pas joué :
+  empreinte trouvée verte (par qui, sur quel commit ou arbre, à quel seuil), ou rien de ce qu'il lit
+  n'a changé depuis `main` ou depuis le premier parent ; au tag, que rien ne se saute.
+- **L'attestation** (#237, #266) porte les empreintes trouvées vertes par l'outillage. Elle ne se
+  produit qu'à la livraison (pré-fusion, pré-push) et à la demande, hors sous-branche, par
+  l'outillage (`.githooks/attestation.mjs`) : aucune session ne l'écrit. Le pré-commit, qui joue sur
+  la copie de travail, n'atteste rien. Elle se garde d'un push et d'une session à l'autre : un push
+  ne retire pas les empreintes vertes d'un push précédent. Le pré-push et la demande l'envoient sur
+  la branche `<branche>--attestation`, qui n'est jamais jugée et disparaît à la fermeture de la PR.
+  Le risque visé est l'erreur, pas la fraude. Au Ready, la CI lit l'attestation, les têtes de la
+  branche vertes au Ready et l'empreinte de `main`, et saute ce qui est vert sur son empreinte ; sans
+  attestation — une PR rouverte, dont l'attestation a disparu, par exemple —, ce que la table prévoit,
+  hors ce qui est inchangé depuis `main` ou vert au Ready sur une tête précédente.
 - **Les tests navigateur au Ready, le moins cher d'abord** (#264). Les tests navigateur de
   non-régression ne se jouent pas à chaque push : ni la livraison ni la vérification de l'auditeur
   ne les jouent d'elles-mêmes, navigateur présent ou non. Ils se jouent une fois, au Ready, en CI,
-  sur l'état final, sauf si l'attestation les couvre. Plus tôt, en local, seulement quand c'est
+  sur l'état final, sauf sur une empreinte déjà verte. Plus tôt, en local, seulement quand c'est
   justifié : le harnais du besoin qui vit dans le navigateur se joue à la livraison ; le codeur ou
   l'auditeur peut demander la non-régression dans le navigateur par `pnpm livraison --navigateur`,
   qui juge le dernier commit de la branche comme un premier push, tests navigateur compris ; verts,
-  ils sont attestés sur l'arbre joué, l'attestation part sur `origin`, et la CI ne les rejoue pas
-  sur ce même arbre. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
+  ils sont attestés sur leur empreinte, l'attestation part sur `origin`, et la CI ne les rejoue pas
+  tant que ce qu'ils lisent n'a pas changé. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
   demandés, et pourquoi. À chaque moment qui joue le typecheck, il se joue avant les tests ; les
   tests navigateur — de non-régression, ou du harnais du besoin qui vit dans le navigateur — ne
   partent que si le typecheck et les tests sans navigateur de ce moment ont fini verts ; un harnais
   du besoin rouge qui ne bloque pas ne les retient pas. Chaque moment qui ne joue pas les tests
-  navigateur dit pourquoi : laissés au Ready faute de demande, palier moins cher rouge, couverts par
-  l'attestation, ou rien de ce qu'ils lisent n'a changé ; au tag, il dit que rien ne se saute.
+  navigateur dit pourquoi : laissés au Ready faute de demande, palier moins cher rouge, empreinte
+  trouvée verte, ou rien de ce qu'ils lisent n'a changé ; au tag, il dit que rien ne se saute.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
@@ -1475,14 +1500,16 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   ne tourne en brouillon. Les crochets
   font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
   tests de niveau 0 des paquets que touchent les fichiers indexés — cœur ; garde ; relais ;
-  hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
+  hébergement —, et rien pour la seule documentation, sauf ce qui est vert sur son empreinte. Au pré-commit, la non-régression bloque le
   commit ; le harnais du besoin est joué à part, en entier, hors budget, et le pré-commit ne fait
   qu'en afficher le verdict, sans bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le
   bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
   l'interface sans navigateur, 40 s ; 270 s de plus avec les tests navigateur demandés) ou
-  organisationnel (garde, 45 s) —, les tests navigateur de non-régression
+  organisationnel (garde, 45 s) —, et de ce qu'elle retient ne se joue que ce qui n'est pas vert sur
+  son empreinte (voir « Les empreintes ») ; ce qu'elle ne retient pas, la CI le joue au Ready s'il
+  n'est pas vert sur son empreinte. Les tests navigateur de non-régression
   (`apps/web/test/navigateur/`) sont laissés au Ready sauf demande, et la livraison le dit, et le
   harnais du besoin est joué à part, en entier, et bloque quand du code arrive.
 - **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, les
@@ -1490,10 +1517,11 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   activés, puis les tests navigateur au seuil 2 (`--navigateur`), qui ne partent que si le reste est
   vert, build, version de dev ; un outil manquant y fait échouer le job.
   Elle vérifie d'abord que la tête de la PR contient le dernier `main` : sinon la branche est à
-  mettre à jour, le job échoue et rien d'autre ne se joue. Elle ne joue que le manque : ce que
-  l'attestation couvre se saute, et elle dit ce qu'elle saute et pourquoi. Avant toute fusion, les niveaux 0 à 2 ont
-  donc été joués, par la livraison et par l'auditeur — les tests navigateur, par la CI au Ready ou
-  à la demande, en local —, et la CI rejoue 0 et 1 sur l'état final. Dix workflows : `ci.yml` (tests, version de dev, livraison), `version-forcee.yml` (la version forcée, que le porteur déclenche à la main ; elle appelle `ci.yml`), `validation.yml` (la
+  mettre à jour, le job échoue et rien d'autre ne se joue. Elle ne joue que le manque : ce qui est
+  vert sur son empreinte se saute, seuil 1 compris, et elle dit ce qu'elle saute et pourquoi. Avant
+  toute fusion, les niveaux 0 à 2 ont donc été joués, par la livraison et par l'auditeur — les tests
+  navigateur, par la CI au Ready ou à la demande, en local —, et chaque ensemble a été trouvé vert au
+  seuil 1 au moins sur son empreinte finale. Dix workflows : `ci.yml` (tests, version de dev, livraison), `version-forcee.yml` (la version forcée, que le porteur déclenche à la main ; elle appelle `ci.yml`), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
   d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un
@@ -1504,7 +1532,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   supprimées par leur nom exact, jamais par préfixe, chacune nommée avec son dernier commit ; la
   tête n'est pas touchée ; à son arrivée sur `main` et à la main, celles qui traînent sans PR ouverte
   de leur tête).
-- **Aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait rougi.** Un rouge découvert
+- **Aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait rougi.** Un ensemble ne se
+  saute que vert sur la même empreinte, jamais s'il a rougi ou s'est sauté faute d'outil, et un
+  chemin oublié de sa liste fait jouer plus. Un rouge découvert
   après la fusion (#149) relance tout un tour de relecture et de code ; un job sauté qui ne décide pas
   de la fusion, et dont le rouge éventuel reste visible ailleurs, ne coûte rien et reste permis (les
   exécutions d'`apercu.yml` et de `depot-apercu.yml` en montrent). Ne rien sauter de ce qui décide de
@@ -1521,9 +1551,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   locale est permise, le reste fait échouer le lanceur. Chaque workflow situe ses jobs dans son
   en-tête : « lit des fichiers suivis », « lit hors des fichiers suivis » ou « hors harnais ».
 - **Livraison.** Un push sur `main` construit le site et le dépose à la racine de la recette : la
-  version de développement, vérifiée en ligne. Un arbre arrivé sur `main` que toute la CI a trouvé
-  vert au Ready — le statut « Toute la CI sur ce commit » d'une tête de PR du même arbre — ne rejoue
-  pas ses tests ; tout autre arbre les rejoue ; les aperçus (`pr-<numéro>`), le `robots.txt` posé à
+  version de développement, vérifiée en ligne. Un ensemble dont l'empreinte, dans le commit arrivé,
+  est celle qu'il a sur une tête de PR que toute la CI a trouvée verte au Ready — le statut « Toute la
+  CI sur ce commit » —, ou sur le premier parent, ne rejoue pas ses tests ; les autres les
+  rejouent ; les aperçus (`pr-<numéro>`), le `robots.txt` posé à
   la main et les paquets du relais y restent en place, et chaque aperçu reste servi par lui-même. La
   production ne suit que les versions publiées : seul un tag `v*` la dépose ; ni un push sur `main`,
   ni le lancement manuel de `ci.yml` ne la touchent. L'APK et les releases ne sortent qu'à un tag

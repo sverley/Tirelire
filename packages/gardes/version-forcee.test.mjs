@@ -76,7 +76,9 @@ function réécrireJob(yaml, nom, changer) {
 function seuil3PuisPublication(yaml) {
   const partie = jouer(yaml, FORCÉE);
   const l = lancementsDeTests(partie);
-  assert.ok(l.some((c) => /\bpnpm test 3 --navigateur\b/.test(c)), `${CI} : une version forcée ne joue pas le seuil 3, tests navigateur compris\n${l.join('\n')}`);
+  // Le seuil 3, puis les tests navigateur au seuil 3, en une étape ou en deux (#266 : le moins cher
+  // d'abord, et `pnpm test 3` seul reste l'étape stricte que lit la garde).
+  assert.ok(l.some((c) => /\bpnpm test 3\b/.test(c)) && l.some((c) => /\btest 3 --navigateur\b/.test(c)), `${CI} : une version forcée ne joue pas le seuil 3, tests navigateur compris\n${l.join('\n')}`);
   for (const c of l) assert.doesNotMatch(c, /--attestation/, `${CI} : pour une version forcée, rien ne se saute : « ${c.trim()} »`);
 
   const faites = publications(partie);
@@ -123,7 +125,7 @@ describe('[niveau 1] #274, D83 · une version forcée joue le seuil 3 en entier 
   });
 
   test('témoin rouge · un seuil 3 qui saute ce que l’attestation couvre', () => {
-    const cassé = lire(CI).replace(/pnpm test 3 --navigateur/, 'pnpm test 3 --navigateur --attestation "$RUNNER_TEMP/attestation.json"');
+    const cassé = lire(CI).replace(/pnpm test 3\b/, 'pnpm test 3 --attestation "$RUNNER_TEMP/attestation.json"');
     assert.notEqual(cassé, lire(CI), 'le workflow n’a pas pu être cassé : le témoin de #274 est à relire');
     assert.throws(() => seuil3PuisPublication(cassé), /rien ne se saute/);
   });
