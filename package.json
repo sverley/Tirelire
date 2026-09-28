@@ -8,7 +8,8 @@
     "build": "pnpm -r build",
     "dev": "pnpm --filter @tirelire/web dev",
     "typecheck": "pnpm -r typecheck",
-    "crochets": "node .githooks/activer.mjs"
+    "crochets": "node .githooks/activer.mjs",
+    "livraison": "sh .githooks/livraison.sh demande"
   },
   "packageManager": "pnpm@10.28.0"
 }

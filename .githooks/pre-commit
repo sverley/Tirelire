@@ -12,7 +12,12 @@
 #   le reste (documentation, interface, configuration) → rien ; la livraison et la CI jugent le reste.
 # Le harnais du besoin (`harnais-du-besoin.sh` : le fichier de l'auditeur, qui porte le numéro de
 # l'issue) se joue à part, en entier (seuil 4), dès que des tests se jouent, hors budget ; le reste
-# est la non-régression, jouée à son niveau.
+# est la non-régression, jouée à son niveau. L'interface, sans ou dans le navigateur, ne s'y joue
+# jamais.
+# Un ensemble dont l'empreinte, dans l'index, est déjà trouvée verte par l'attestation locale de la
+# branche ne se rejoue pas (#264, `attestation.mjs plan`) ; le pré-commit n'atteste rien, puisqu'il
+# joue sur la copie de travail. Il dit, pour chaque ensemble, s'il l'a joué, à quel seuil, avec quel
+# verdict, ou pourquoi il ne l'a pas joué (`attestation.mjs bilan`).
 # `verdict.mjs` trie les échecs par fichier :
 #   - un échec de la non-régression refuse le commit ;
 #   - le harnais du besoin est affiché sans bloquer (la livraison le bloque, #121), sauf une erreur de
@@ -44,7 +49,7 @@ $fichiers
 FIN
 
 if [ -z "$coeur$garde$relais$hebergement" ]; then
-  echo "pré-commit : aucun test concerné par ces fichiers (le pré-push et la CI jugent le reste)."
+  echo "pré-commit : aucun test concerné par ces fichiers — garde, cœur, relais, hébergement et harnais du besoin non joués ; l'interface, sans ou dans le navigateur, ne se joue jamais au pré-commit (le pré-push et la CI jugent le reste)."
   exit 0
 fi
 
@@ -61,6 +66,31 @@ debut=$(date +%s)
 # Le harnais du besoin se lit dans l'index : avant de retirer GIT_INDEX_FILE.
 . "$racine/.githooks/harnais-du-besoin.sh"
 harnais_du_besoin "$journaux/harnais.txt" >"$journaux/harnais.note" || exit 1
+# Ce que l'attestation locale a déjà trouvé vert sur l'empreinte de l'index (#264).
+branche=$(git symbolic-ref --short -q HEAD) || branche=''
+echo '[]' >"$journaux/verts"
+[ -n "$branche" ] && node "$racine/.githooks/attestation.mjs" verts "$branche" "$journaux/verts" >/dev/null 2>&1
+arbre=$(git write-tree) || exit 1
+node "$racine/.githooks/attestation.mjs" plan "$arbre" 0 "$journaux/verts" "$journaux/harnais.txt" - non "$journaux/plan" pré-commit || exit 1
+joue() { awk -F '\t' -v id="$1" '$1 == id && $2 == 1 { ok = 1 } END { exit !ok }' "$journaux/plan"; }
+# Un ensemble que le pré-commit ne joue pas sort du plan, en le disant.
+ecarte() { # id nom raison
+  echo "pré-commit : $2 : non joué — $3."
+  awk -F '\t' -v OFS='\t' -v id="$1" '$1 == id { $2 = 0 } { print }' "$journaux/plan" >"$journaux/plan.n" && mv "$journaux/plan.n" "$journaux/plan"
+}
+for p in coeur:cœur garde:garde relais:relais hebergement:hébergement; do
+  eval "touche=\$${p%%:*}"
+  if [ -z "$touche" ]; then
+    joue "${p%%:*}" && ecarte "${p%%:*}" "${p#*:}" "le commit ne touche aucun fichier qui le fasse jouer au pré-commit"
+  elif ! joue "${p%%:*}"; then
+    eval "${p%%:*}=''"
+  fi
+done
+joue interface && ecarte interface 'interface sans navigateur' "l'interface ne se joue pas au pré-commit"
+if [ -z "$coeur$garde$relais$hebergement" ]; then
+  joue harnais && ecarte harnais 'harnais du besoin' 'il ne se joue que quand des tests se jouent'
+  exit 0
+fi
 # Fichiers de test `node --test` de chaque paquet, copie de travail comprise.
 for d in packages/gardes apps/relay apps/hebergement; do
   git ls-files -co --exclude-standard -- "$d" | grep -E "^$d/[^/]*\.test\.[cm]?js\$" >"$journaux/$(basename "$d").fichiers"
@@ -74,6 +104,8 @@ lance() {
   nom=$1 dossier=$2
   shift 2
   (pnpm --dir "$dossier" run test "$@" >"$journaux/$nom.log" 2>&1; echo $? >"$journaux/$nom.code") &
+  case $nom in harnais-*) id=harnais ;; cœur) id=coeur ;; hébergement) id=hebergement ;; *) id=$nom ;; esac
+  printf '%s\t%s\n' "$id" "$nom" >>"$journaux/lances"
 }
 # Un lanceur node:test écrit aussi un rapport par fichier ; vitest, un rapport JSON.
 lance_node() { # nom dossier seuil [fichiers…]
@@ -106,8 +138,10 @@ non_regression_node() { # nom dossier
 [ -n "$relais" ] && non_regression_node relais apps/relay
 [ -n "$hebergement" ] && non_regression_node hébergement apps/hebergement
 
-# Harnais du besoin, en entier (seuil 4).
-for d in $(grep -Eo '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | sed 's#/$##' | sort -u); do
+# Harnais du besoin, en entier (seuil 4), sauf déjà vert sur son empreinte.
+joue harnais || : >"$journaux/harnais.lances"
+joue harnais && cp "$journaux/harnais.txt" "$journaux/harnais.lances"
+for d in $(grep -Eo '^(apps|packages)/[^/]+/' "$journaux/harnais.lances" | sed 's#/$##' | sort -u); do
   liste=$(dans "$d")
   case $d in
     packages/core)
@@ -133,3 +167,6 @@ wait
 
 # shellcheck disable=SC2086 # les lancements n'ont pas d'espace
 node "$racine/.githooks/verdict.mjs" "$racine" "$journaux" "$debut" $lances
+verdict=$?
+node "$racine/.githooks/attestation.mjs" bilan "$journaux/plan" "$journaux" pré-commit "$arbre" - "${branche:-?}" "$journaux/verts"
+exit $verdict

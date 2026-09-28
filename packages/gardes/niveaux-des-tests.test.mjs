@@ -60,7 +60,8 @@ function source(exécuteur, nom, entête) {
     ...(entête ? [`// ${entête}`] : []),
     "import { appendFileSync } from 'node:fs';",
     `import { describe, test } from '${module}';`,
-    `const note = (id) => { if (process.env.NIVEAUX_TEMOIN) appendFileSync(process.env.NIVEAUX_TEMOIN, '${nom}:' + id + '\\n'); };`,
+    // Typé pour vitest : le fichier est du TypeScript, que le typecheck de la livraison lit (#264).
+    `const note = (id${exécuteur === 'vitest' ? ': string' : ''}) => { if (process.env.NIVEAUX_TEMOIN) appendFileSync(process.env.NIVEAUX_TEMOIN, '${nom}:' + id + '\\n'); };`,
   ];
   const suites = new Map();
   for (const t of FIXTURE) {
@@ -241,9 +242,10 @@ const crochets = mémo(async () => {
     return { ancien: de('ancien'), nouveau: de('nouveau'), codeur: de('codeur'), web: de('web'), nav: de('nav') };
   };
 
-  // Un besoin fonctionnel : le relais touché, la livraison joue l'interface (#232, point 6).
+  // Un besoin fonctionnel : l'interface touchée, la livraison la joue sans navigateur (#232, point 6 ;
+  // #264, point 6 : les tests navigateur sont laissés au Ready faute de demande).
   git('checkout', '-q', '-b', BRANCHE_FONCTIONNELLE, 'main');
-  writeFileSync(join(dépôt, 'apps/relay/README.md'), `${readFileSync(join(dépôt, 'apps/relay/README.md'), 'utf8')}\nUne ligne de plus.\n`);
+  writeFileSync(join(dépôt, 'apps/web/index.html'), `${readFileSync(join(dépôt, 'apps/web/index.html'), 'utf8')}\n<!-- Une ligne de plus. -->\n`);
   git('commit', '-q', '--no-verify', '-am', 'besoin fonctionnel #998');
   const témoinFonctionnel = join(temporaire(), 'pre-push-fonctionnel.temoin');
   writeFileSync(témoinFonctionnel, '');
@@ -439,12 +441,12 @@ describe('[niveau 2] D83 · les seuils, l’appel nommé et les crochets (#232)'
       assert.deepEqual(r.codeur, attendus(2), 'livraison : un autre fichier de test que la branche ajoute n’est pas le harnais du besoin ; il se joue à son niveau, au seuil 2 (#232, point 9)');
     });
 
-    test('la livraison d’un besoin fonctionnel vérifie l’interface au seuil 2, tests navigateur compris quand un navigateur est là', async () => {
+    test('la livraison d’un besoin fonctionnel vérifie l’interface au seuil 2, et laisse les tests navigateur au Ready faute de demande', async () => {
       const { fonctionnel: r } = await crochets();
       assert.equal(r.code, 0, `livraison (pré-push) d'un besoin fonctionnel refusée\n${r.sortie.slice(-2000)}`);
       assert.deepEqual(r.web, attendus(2), 'livraison : les tests headless de l’interface se jouent au seuil 2 (#232, point 6)');
-      if (r.nav.length) assert.deepEqual(r.nav, attendus(2), 'livraison : avec un navigateur, les tests navigateur se jouent au seuil 2 (#232, point 6)');
-      else assert.ok(r.sortie.split('\n').some((l) => /navigateur/i.test(l)), `livraison : sans navigateur, elle le dit et laisse les tests navigateur à la CI (#232, point 6)\n${r.sortie.slice(-1500)}`);
+      assert.deepEqual(r.nav, [], 'livraison : sans demande, les tests navigateur ne se jouent pas, navigateur présent ou non (#264, point 6)');
+      assert.ok(r.sortie.split('\n').some((l) => /navigateur/i.test(l) && /Ready faute de demande/.test(l)), `livraison : elle le dit et laisse les tests navigateur au Ready (#264, point 9)\n${r.sortie.slice(-1500)}`);
     });
   });
 });
