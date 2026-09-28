@@ -409,8 +409,10 @@ sujet — écrit une tirelire, un besoin à échéance et le flux attendu à la 
 suite le montant à mettre de côté par période. Les mots « tirelire », « besoin » et « flux » ne
 sont jamais demandés à l'utilisateur, seulement expliqués.
 
-Le **compte principal est créé en silence** à la première réponse : il existe toujours, le faire
-saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
+Le **compte principal existe dès la naissance de la base**, même vide, avant tout assistant, sous la
+même identité sur toutes les instances (D58) : l'assistant ne le crée pas, il en renseigne les
+informations — nom, solde, date d'ouverture —, et ce qui est renseigné l'emporte sur le défaut à la
+synchronisation. Le faire saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
 un budget entier tient sans eux (une tirelire sans placement déclaré ne produit aucun écart, D38).
 S'ils existent, l'assistant demande seulement où chaque réserve devrait dormir, ce qui remplit le
 placement de D38 sans exposer les parts.
@@ -430,7 +432,8 @@ s'affiche vide, ce qui était le cas de la première version.
 « Pivot » décrivait un rôle dans un raisonnement comptable, pas un objet que quelqu'un possède.
 Personne n'a de compte pivot ; tout le monde a un compte principal. Renommage partout où un humain
 lit : interface, types, variables, commentaires, documentation (`AccountKind = 'principal'`,
-`principalCushion`, `principalUnallocated`, avertissements `noPrincipal` et `principalOverdrawn`).
+`principalCushion`, `principalUnallocated`, avertissement `principalOverdrawn`). L'avertissement
+d'absence de compte principal n'existe plus : le compte principal existe dans toute base (D40).
 
 Le rôle ne change pas : c'est le compte par lequel tout transite, celui dont le relevé est importé,
 celui qui porte le jour de paie (D02) et qui reçoit les dotations (D29). D04 reste vraie, avec le

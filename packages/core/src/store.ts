@@ -11,11 +11,17 @@
  * Ce qui décrit l'instance — son identité, son horloge, ce qu'elle sait des autres, ses curseurs de
  * relais — n'est pas dans le fichier : c'est `InstanceState`, que l'appelant garde à côté
  * (`instanceState()`) et rend à l'ouverture. Un fichier ouvert sans elle donne une instance neuve.
+ *
+ * Le compte principal naît avec la base (D40), sous la même identité partout (D58), avant toute
+ * écriture : sa ligne par défaut porte une horloge vide, celle d'une ligne que personne n'a écrite.
+ * Elle ne voyage pas (`rowsNewerThan` ne l'envoie pas) et s'efface devant toute ligne reçue, sans
+ * conflit, quel que soit l'âge des deux bases : ce qui est renseigné l'emporte sur le défaut. La
+ * première écriture locale lui donne une horloge, et elle voyage alors comme toute autre ligne.
  */
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
 import { formatTimestamp, HLC, parseTimestamp } from './hlc.js';
 import { normalizeLabel, uuidv7 } from './ids.js';
-import { DEFAULT_SETTINGS, emptyLedger, type Ledger, type Settings } from './model.js';
+import { DEFAULT_SETTINGS, defaultMainAccount, emptyLedger, MAIN_ACCOUNT_ID, type Ledger, type Settings } from './model.js';
 import {
   createTableSQL,
   FILE_FORMAT,
@@ -204,6 +210,7 @@ export class LedgerStore {
     }
     // Une ligne remplacée ne laisse rien d'elle dans le fichier : pas de trace de ce qui a changé.
     db.run('PRAGMA secure_delete = ON');
+    bornWithMainAccount(db);
     const instance: InstanceState = opts.instance ?? { siteId: opts.siteId ?? newSiteId() };
     return new LedgerStore(db, instance, opts.now ?? (() => Date.now()));
   }
@@ -288,14 +295,20 @@ export class LedgerStore {
     this.notify();
   }
 
-  /** Suppression logique : la ligne reste, datée, et la suppression voyage comme une écriture. */
+  /**
+   * Suppression logique : la ligne reste, datée, et la suppression voyage comme une écriture. Le
+   * compte principal ne se supprime pas : il existe dans toute base (D40), et le refus le dit.
+   */
   remove(key: LedgerKey, id: string): void {
     const t = TABLES[key]!;
     const col = t.columns.find((c) => c.prop === 'deletedAt');
     if (!col) throw new Error(`${t.name} ne supporte pas la suppression logique`);
     const existing = this.readRowState(t.name, id);
     if (!existing || existing.v[col.col]) return;
-    this.transaction(() => this.writeRow({ ...existing, hlc: this.tick(), v: { ...existing.v, [col.col]: new Date().toISOString() } }));
+    const v = { ...existing.v, [col.col]: new Date().toISOString() };
+    const problem = rowProblem(t, id, v);
+    if (problem) throw new RowRefused(t.name, problem);
+    this.transaction(() => this.writeRow({ ...existing, hlc: this.tick(), v }));
     this.notify();
   }
 
@@ -543,6 +556,20 @@ export class LedgerStore {
 
 function newSiteId(): string {
   return uuidv7().slice(-12);
+}
+
+/**
+ * Toute base a son compte principal, dès sa naissance et sans aucun geste (D40) : s'il manque, sa
+ * ligne par défaut est posée avec une horloge vide — jamais écrite, elle cède devant toute ligne
+ * renseignée. Une base qui l'a déjà, renseigné ou non, n'est pas touchée.
+ */
+function bornWithMainAccount(db: Database): void {
+  const t = TABLES['accounts']!;
+  const account = defaultMainAccount() as unknown as Row;
+  const cols = t.columns.filter((c) => c.col !== 'id');
+  const names = [...cols.map((c) => c.col), HLC_COLUMN];
+  const values: SqlValue[] = [MAIN_ACCOUNT_ID, ...cols.map((c) => toSql(c, account[c.prop])), ''];
+  db.run(`INSERT OR IGNORE INTO ${t.name} (id, ${names.join(', ')}) VALUES (${values.map(() => '?').join(', ')})`, values);
 }
 
 /**

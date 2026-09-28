@@ -259,7 +259,10 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
   puis par le relais quand elles ne sont pas ouvertes ensemble, et l'avertissement sur le dépôt de
   données chiffrées paraît à la première mise en lien.
 - **À bâtir** · deux instances en direct et par relais, y compris entre deux personnes (#31).
-- **À bâtir** · le compte principal a la même identité sur toutes les instances (#209).
+- **Harnais** · `apps/web/test/compte-principal.test.ts` — le compte principal existe dans toute
+  base, même vide, sous la même identité partout ; ce qui est renseigné l'emporte sur le défaut,
+  quel que soit l'ordre de naissance des deux bases (#209).
+  Témoin rouge : « témoin rouge · un défaut plus récent qui écrase ce qui est renseigné »
 
 ## I9 · Plusieurs distributions
 

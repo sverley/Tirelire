@@ -58,7 +58,7 @@ function leParcoursSeLit(plan: Plan): void {
   expect(virement!.breakdown.map((b) => b.tirelireName).sort()).toEqual(['Taxe foncière', 'Vacances']);
   expect(virement!.breakdown.reduce((s, b) => s + b.cruise, 0)).toBe(virement!.permanent);
 
-  const gênants = ['noPrincipal', 'noIncome', 'negativeMargin', 'unfunded'];
+  const gênants = ['noIncome', 'negativeMargin', 'unfunded'];
   expect(plan.warnings.map((w) => w.code).filter((c) => gênants.includes(c))).toEqual([]);
 }
 

@@ -40,7 +40,8 @@
 
   const accounts = $derived(alive(app.ledger.accounts));
   const idx = $derived(indexLedger(app.ledger));
-  const hasPivot = $derived(accounts.some((a) => a.kind === 'principal'));
+  /** Le compte principal existe dans toute base, unique (D40) : l'écran n'en crée pas, il le renseigne. */
+  const isMain = (a: Account) => a.kind === 'principal';
 
   // Un compte n'a pas de besoins : son état est celui de ses propres dates d'ouverture et de
   // clôture (D56).
@@ -65,7 +66,7 @@
   }
 
   function startNew() {
-    editing = { id: app.newId(), name: '', kind: hasPivot ? 'epargne' : 'principal', openingBalance: 0, openingDate: app.asOf };
+    editing = { id: app.newId(), name: '', kind: 'epargne', openingBalance: 0, openingDate: app.asOf };
     form = { name: '', kind: editing.kind, bank: '', accountNumber: '', openingBalance: '0,00', openingDate: app.asOf, tracksSettlement: false, settlementThreshold: '10,00', settlementDirection: 'both', activeFrom: '', activeTo: '' };
     titre = 'Ajouter un compte';
     error = '';
@@ -96,8 +97,9 @@
     const openingBalance = inputToCents(form.openingBalance);
     if (!form.name.trim()) return void (error = 'Le nom est obligatoire.');
     if (openingBalance === undefined) return void (error = 'Solde initial invalide.');
-    if (form.kind === 'principal' && accounts.some((a) => a.kind === 'principal' && a.id !== editing!.id))
-      return void (error = 'Il ne peut y avoir qu’un seul compte principal.');
+    if (form.kind === 'principal' && !isMain(editing))
+      return void (error = 'Il ne peut y avoir qu’un seul compte principal : il existe déjà.');
+    if (form.kind !== 'principal' && isMain(editing)) return void (error = 'Le compte principal reste le compte principal.');
     if (form.activeFrom && form.activeTo && form.activeFrom > form.activeTo)
       return void (error = 'La clôture est avant l’ouverture.');
     const row: Account = {
@@ -118,11 +120,16 @@
           }
         : {}),
     };
-    app.upsert('accounts', row);
+    try {
+      app.upsert('accounts', row);
+    } catch (err) {
+      return void (error = err instanceof Error ? err.message : String(err));
+    }
     editing = undefined;
   }
 
   function remove(a: Account) {
+    if (isMain(a)) return;
     if (confirm(`Supprimer le compte « ${a.name} » ?`)) app.remove('accounts', a.id);
   }
 </script>
@@ -143,9 +150,13 @@
     <div class="grid">
       <label class="f">Nom <input bind:value={form.name} placeholder="Compte courant" /></label>
       <label class="f">Type
-        <select bind:value={form.kind}>
-          {#each Object.entries(ACCOUNT_KINDS) as [k, label]}<option value={k}>{label}</option>{/each}
-        </select>
+        {#if editing && isMain(editing)}
+          <input value={ACCOUNT_KINDS.principal} disabled />
+        {:else}
+          <select bind:value={form.kind}>
+            {#each Object.entries(ACCOUNT_KINDS) as [k, label]}{#if k !== 'principal'}<option value={k}>{label}</option>{/if}{/each}
+          </select>
+        {/if}
       </label>
       <label class="f">Banque (facultatif) <input bind:value={form.bank} /></label>
       <label class="f">Numéro de compte ou IBAN (facultatif) <input bind:value={form.accountNumber} placeholder="FR76 1234 5678 90…" /></label>
@@ -202,7 +213,7 @@
       </div>
       <div class="actions" style="margin:0">
         <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>
-        <button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>
+        {#if !isMain(a)}<button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>{/if}
       </div>
     </div>
     {#if a.kind === 'courant'}
@@ -221,6 +232,6 @@
   {/if}
 {:else}
   <div class="empty">
-    {#if masqués > 0}Tout est masqué par le filtre : {masqués} compte(s) rangé(s).{:else}Aucun compte. Commence par le compte principal.{/if}
+    {#if masqués > 0}Tout est masqué par le filtre : {masqués} compte(s) rangé(s).{:else}Aucun compte.{/if}
   </div>
 {/each}

@@ -2,7 +2,8 @@
   Assistant de configuration (D40) : construire un budget en répondant à des questions simples,
   pas en remplissant les écrans de configuration. Chaque réponse crée les objets du modèle
   (tirelires, besoins, flux prévus) sans que l'utilisateur ait à connaître ces mots.
-  Le compte principal est créé en silence ; les autres comptes sont proposés, jamais imposés.
+  Le compte principal existe dans toute base : l'assistant en renseigne les informations, il ne le
+  crée pas ; les autres comptes sont proposés, jamais imposés.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -22,6 +23,8 @@
     nextDueDate,
     monthsOf,
     DEFAULT_PRIORITY,
+    DEFAULT_MAIN_ACCOUNT,
+    MAIN_ACCOUNT_ID,
     type Account,
     type PeriodUnit,
     type AccountKind,
@@ -84,29 +87,17 @@
   const perPeriod = (amount: Cents, months: number) => divideCents(amount, Math.max(1, months));
 
   /**
-   * Le compte principal existe toujours : s'il n'a jamais été créé, on le crée en silence
-   * plutôt que de faire remplir un formulaire de compte pour commencer un budget.
+   * Le compte principal existe dans toute base, sous la même identité partout (D40, D58) :
+   * l'assistant ne le crée jamais, il y rattache ce qu'il écrit et en renseigne les informations.
    */
-  function ensureMainAccount(): string {
-    if (principal) return principal.id;
-    const row: Account = {
-      id: app.newId(),
-      name: 'Compte principal',
-      kind: 'principal',
-      openingBalance: 0,
-      openingDate: periodStart(),
-    };
-    app.upsert('accounts', row);
-    return row.id;
+  function mainAccountId(): string {
+    return principal?.id ?? MAIN_ACCOUNT_ID;
   }
 
   function goStep(s: Step) {
     step = s;
     semer(s);
   }
-  $effect(() => {
-    if (step === 'accounts') ensureMainAccount();
-  });
   function next() {
     if (stepIndex < STEPS.length - 1) goStep(STEPS[stepIndex + 1]!.id);
   }
@@ -137,7 +128,7 @@
       name: nom,
       kind: 'income',
       amount: montant,
-      accountId: compte || ensureMainAccount(),
+      accountId: compte || mainAccountId(),
       periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
       dateWindowDays: 5,
     };
@@ -161,7 +152,7 @@
       name: nom,
       kind: 'fixedCharge',
       amount: -montant,
-      accountId: compte || ensureMainAccount(),
+      accountId: compte || mainAccountId(),
       periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
       dateWindowDays: 5,
     };
@@ -237,7 +228,7 @@
         name: nom,
         kind: 'dueDate',
         amount: -montant,
-        accountId: compte || ensureMainAccount(),
+        accountId: compte || mainAccountId(),
         tirelireId,
         periodicity: { interval: mois, unit: 'month' as const, anchorDate: echeance },
         dateWindowDays: 7,
@@ -300,7 +291,6 @@
     if (!acc.name.trim()) return void (accError = 'Donne un nom à ce compte.');
     const openingBalance = inputToCents(acc.balance);
     if (openingBalance === undefined) return void (accError = 'Solde invalide.');
-    ensureMainAccount();
     const row: Account = {
       id: app.newId(),
       name: acc.name.trim(),
@@ -438,17 +428,21 @@
   function editAccount(a: Account, champ: 'name' | 'bank' | 'accountNumber', v: string) {
     const valeur = v.trim();
     if (valeur === (a[champ] ?? '')) return;
-    ensureMainAccount();
     app.upsert('accounts', { ...a, [champ]: valeur || undefined });
   }
   function editAccountKind(a: Account, v: string) {
     if (v !== a.kind) app.upsert('accounts', { ...a, kind: v as AccountKind });
   }
-  /** La date d'ouverture n'est jamais retouchée : elle cale les soldes d'un compte déjà importé. */
+  /**
+   * Le solde saisi est celui du début de la période. La date d'ouverture n'est jamais retouchée —
+   * elle cale les soldes d'un compte déjà importé —, sauf celle que le compte principal porte à sa
+   * naissance, qui dit « à renseigner » : le solde saisi la renseigne au début de la période.
+   */
   function editAccountBalance(a: Account, v: string) {
     const c = inputToCents(v);
     if (c === undefined || c === a.openingBalance) return;
-    app.upsert('accounts', { ...a, openingBalance: c });
+    const openingDate = a.id === MAIN_ACCOUNT_ID && a.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate ? periodStart() : a.openingDate;
+    app.upsert('accounts', { ...a, openingBalance: c, openingDate });
   }
 
   function removeFlow(f: PlannedFlow) {

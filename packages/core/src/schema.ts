@@ -6,12 +6,15 @@
  * Les noms SQL sont ceux du domaine (D39, D42, D58) : la propriété `tirelireId` est la colonne
  * `tirelire_id`, sans exception. Une colonne obligatoire est `NOT NULL`, une colonne à valeurs
  * énumérées porte un `CHECK` nommé `table.colonne` : le fichier refuse ce qui ne se lit pas, et
- * `rowProblem` dit la même chose avant d'écrire.
+ * `rowProblem` dit la même chose avant d'écrire. Une règle qui lie plusieurs colonnes d'une ligne
+ * — le compte principal, unique et présent — est une contrainte de table, nommée de même, que
+ * `rowProblem` vérifie aussi, localement comme à la réception.
  */
 import {
   ACCOUNT_KINDS,
   CATEGORY_NATURES,
   FLOW_ORIGINS,
+  MAIN_ACCOUNT_ID,
   NEED_KINDS,
   OPERATION_ORIGINS,
   OPERATION_STATES,
@@ -35,9 +38,20 @@ export interface ColumnDef {
   values?: readonly string[];
 }
 
+/** Une règle qui lie plusieurs colonnes d'une ligne : son `CHECK` dans le fichier, et le même refus dit en français. */
+export interface TableConstraint {
+  /** Nom du `CHECK`, `table.règle`. */
+  name: string;
+  /** L'expression SQL du `CHECK`, sur les colonnes de la ligne. */
+  sql: string;
+  /** Ce qui empêche d'écrire la ligne, en nommant la table et la colonne ; `undefined` si elle s'écrit. */
+  problem: (id: string, v: Record<string, string | number | null>) => string | undefined;
+}
+
 export interface TableDef {
   name: string;
   columns: ColumnDef[];
+  constraints?: TableConstraint[];
 }
 
 interface Options {
@@ -78,6 +92,24 @@ export const TABLES: Record<string, TableDef> = {
       c('activeFrom'), // D56
       c('activeTo'),
       DELETED_AT,
+    ],
+    constraints: [
+      {
+        // Le compte principal existe dans toute base et il est unique (D40, D58) : le genre
+        // `principal` et l'identifiant `acc-principal` vont ensemble, et cette ligne ne se
+        // supprime pas.
+        name: 'accounts.principal',
+        sql: `(kind = 'principal') = (id = '${MAIN_ACCOUNT_ID}') AND (id <> '${MAIN_ACCOUNT_ID}' OR deleted_at IS NULL)`,
+        problem: (id, v) => {
+          const principal = v['kind'] === 'principal';
+          if (principal && id !== MAIN_ACCOUNT_ID)
+            return `accounts.kind vaut « principal » pour « ${id} » : le compte principal existe déjà, unique, sous « ${MAIN_ACCOUNT_ID} ».`;
+          if (!principal && id === MAIN_ACCOUNT_ID)
+            return `accounts.kind vaut « ${String(v['kind'])} » pour le compte principal : il reste « principal ».`;
+          if (principal && v['deleted_at'] != null) return `accounts.deleted_at est posé sur le compte principal : il ne se supprime pas.`;
+          return undefined;
+        },
+      },
     ],
   },
   tirelires: {
@@ -203,7 +235,8 @@ function columnSQL(t: TableDef, col: ColumnDef): string {
 }
 
 export function createTableSQL(t: TableDef): string {
-  return `CREATE TABLE IF NOT EXISTS ${t.name} (${t.columns.map((col) => columnSQL(t, col)).join(', ')}, ${HLC_COLUMN} TEXT NOT NULL)`;
+  const constraints = (t.constraints ?? []).map((k) => `, CONSTRAINT "${k.name}" CHECK (${k.sql})`).join('');
+  return `CREATE TABLE IF NOT EXISTS ${t.name} (${t.columns.map((col) => columnSQL(t, col)).join(', ')}, ${HLC_COLUMN} TEXT NOT NULL${constraints})`;
 }
 
 /**
@@ -223,6 +256,10 @@ export function rowProblem(t: TableDef, id: unknown, v: Record<string, string | 
     if (col.type === 'boolean' && val !== 0 && val !== 1) return `${t.name}.${col.col} vaut « ${String(val)} », hors de 0 et 1.`;
     if (col.values && !col.values.includes(val as string))
       return `${t.name}.${col.col} vaut « ${String(val)} », hors de son énumération (${col.values.join(', ')}).`;
+  }
+  for (const k of t.constraints ?? []) {
+    const problem = k.problem(id, v);
+    if (problem) return problem;
   }
   return undefined;
 }

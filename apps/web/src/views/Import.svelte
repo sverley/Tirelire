@@ -178,12 +178,8 @@
 
 {#if step === 'file'}
   <p class="muted small">CSV ou Excel exporté de la banque ou de Linxo. Le fichier est lu sur cet appareil et n'est envoyé nulle part. Un profil (colonnes, formats, correspondance des comptes) est mémorisé par type de fichier.</p>
-  {#if accounts.length === 0}
-    <div class="empty">Crée d'abord ton compte principal.</div>
-  {:else}
-    <label class="btn primary">Choisir un fichier… <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv" onchange={onFile} hidden /></label>
-    {#if busy}<p class="muted">Lecture…</p>{/if}
-  {/if}
+  <label class="btn primary">Choisir un fichier… <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv" onchange={onFile} hidden /></label>
+  {#if busy}<p class="muted">Lecture…</p>{/if}
   {#if profiles.length}
     <h2>Profils enregistrés</h2>
     <div class="card">
