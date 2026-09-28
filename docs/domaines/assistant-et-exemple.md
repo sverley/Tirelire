@@ -113,7 +113,7 @@ en vigueur se propose). L'avertissement de D41 sur l'absence de compte principal
 ## Usages
 
 - **U1** d'abord (principe 2.1) : les propositions rendent facile un budget construit ex nihilo ;
-  le budget seul (v1) en dépend. Le parcours U1 d'I3 n'en dépend pas.
+  le budget seul (v0.1) en dépend. Le parcours U1 d'I3 n'en dépend pas.
 - **U2** : les mêmes propositions ; les virements de l'exemple se proposent comme flux.
 - **U5** : des catégories proposées qui servent sans tirelire.
 - **U3, U4** : non concernés.

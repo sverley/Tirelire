@@ -1,7 +1,7 @@
 # Domaine · Données et synchro
 
 Le stockage local, les migrations, le fichier d'état, la sauvegarde, la synchronisation et son
-relais. Le premier incrément du socle, `v0 · Données sûres` (`docs/versions.md`), en porte
+relais. Le premier incrément du socle, `v0.0 · Données sûres` (`docs/versions.md`), en porte
 l'essentiel.
 
 ## Intention
