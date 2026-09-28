@@ -67,7 +67,9 @@ function vérifier(r: ReturnType<typeof mesurer>, largeur: number) {
  * échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur : c'est la règle
  * qu'on garde ici, pas une seconde mesure de l'application.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est C9, nommé au registre, qui cite tout ce fichier (D54) ; un écran
+// qui déborde ne perd aucune donnée.
+describe('[niveau 1] C9 · harnais du registre : l’écran Plan ne déborde pas à 320 et 375 px (D54)', () => {
   it.fails('témoin rouge · une page dont une ligne insécable déborde de l’écran', () => {
     vérifier(
       {

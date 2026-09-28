@@ -90,7 +90,9 @@ function vérifierBalayage(quoi: string, textes: string[], lire: (texte: string)
   expect(fautifs, `geste technique trouvé dans ${quoi} :\n${fautifs.join('\n')}`).toEqual([]);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est C1, nommé au registre ; un geste technique demandé à l'utilisateur
+// ne perd aucune donnée. Les deux témoins, plus bas, prennent ce niveau.
+describe('[niveau 1] C1 · harnais du registre', () => {
   describe('C1 · aucun geste technique dans les textes de l’interface (issue #73)', () => {
     it('aucun fichier de apps/web/src ne porte un des motifs interdits', () => {
       const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map(depuisLaRacine);
@@ -125,7 +127,7 @@ describe('[niveau 1] harnais du registre', () => {
  * Témoin rouge du balayage de l'interface : les mêmes assertions rejouées sur un écran inventé qui
  * invite à ouvrir un terminal. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] C1 · harnais du registre', () => {
   it.fails('témoin rouge · un texte d’interface qui invite à ouvrir un terminal', () => {
     vérifierBalayage('l’interface', ['src/views/Reglages.svelte'], () => '<p>Ouvrez un terminal et lancez `pnpm install` puis `node serveur.js`.</p>');
   });
@@ -135,7 +137,7 @@ describe('[niveau 1] harnais du registre', () => {
  * Témoin rouge du second temps : les mêmes assertions rejouées sur un manifeste inventé dont la
  * description fait ouvrir un terminal. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] C1 · harnais du registre', () => {
   it.fails('témoin rouge · un manifeste dont la description fait ouvrir un terminal', () => {
     vérifierBalayage(
       'un texte affiché hors de l’interface',

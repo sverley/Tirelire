@@ -63,7 +63,9 @@ function vérifierParcoursSansSynchro(requêtes: string[]) {
  * Témoin rouge : la même assertion rejouée sur un journal volontairement non vide — une requête
  * qui serait partie pendant le parcours. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-describe('[niveau 0] harnais du registre', () => {
+// Niveau 0 (D83) : le besoin est I7, nommé au registre (les deux tests et leurs témoins) ; une
+// donnée sortie de l'appareil, ou un paquet lisible en clair, l'est pour de bon.
+describe('[niveau 0] I7 · harnais du registre', () => {
   it.fails('témoin rouge · une requête réseau partie pendant un parcours sans synchronisation', () => {
     vérifierParcoursSansSynchro(['https://un-serveur-quelconque.exemple/inventé']);
   });
@@ -99,7 +101,7 @@ function vérifierRelaisChiffré(avantAccord: RequêteRelais[], aprèsAccord: Re
  * Témoin rouge : la même vérification rejouée sur un paquet volontairement en clair — un `blob`
  * qui contient du JSON lisible, avec le nom d'une tirelire de l'exemple. Doit échouer.
  */
-describe('[niveau 0] harnais du registre', () => {
+describe('[niveau 0] I7 · harnais du registre', () => {
   it.fails('témoin rouge · un paquet envoyé au relais dont le contenu se relit en clair', () => {
     const enClair = JSON.stringify({ tirelire: 'Alimentation', montant: -1234 });
     const corps = JSON.stringify({ site: 's1', iv: 'abc', blob: btoa(enClair) });
@@ -131,7 +133,7 @@ async function remplirRelais(page: Page, url: string, salon: string, phrase: str
   );
 }
 
-describe('[niveau 0] harnais du registre', () => {
+describe('[niveau 0] I7 · harnais du registre', () => {
   describe.skipIf(!navigateur)('I7 · les données restent en local (issue #72)', () => {
     let site: Site;
 

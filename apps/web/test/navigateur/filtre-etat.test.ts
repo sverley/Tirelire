@@ -24,7 +24,11 @@ function lire() {
   };
 }
 
-describe.skipIf(!navigateur)('filtre d’état des écrans de cartes', () => {
+// Niveau 2 (D83) : des cas de D56. S'il tombait, un écran de cartes montrerait ou rangerait à tort ce
+// qui est clos ou à venir : un résultat faux, l'usage restant possible, sans donnée perdue ni promesse
+// d'un usage, d'un principe, d'un invariant ou d'une contrainte qui tombe. Aucune ligne du registre ne
+// le nomme ; le cœur du calcul des états est gardé par `packages/core/test/etats.test.ts`.
+describe.skipIf(!navigateur)('[niveau 2] D56 · filtre d’état des écrans de cartes', () => {
   let site: Site;
 
   beforeAll(async () => {

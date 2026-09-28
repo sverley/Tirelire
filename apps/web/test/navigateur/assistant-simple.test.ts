@@ -77,7 +77,9 @@ function vérifierLeParcours(p: Parcours) {
  * attendu (#66). Il se joue sans navigateur : c'est la règle qu'on garde ici, pas une seconde
  * traversée.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est I4, nommé au registre (« parcours simple · … » et son témoin) ;
+// un réglage exigé pour avancer ne perd aucune donnée.
+describe('[niveau 1] I4 · harnais du registre', () => {
   it.fails('témoin rouge · un parcours simple qui exige un réglage pour avancer', () => {
     vérifierLeParcours({
       routes: [{ depuis: 'accueil', gestes: 1, ouvre: true }],
@@ -185,7 +187,7 @@ async function traverser(page: Page): Promise<Parcours> {
   };
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] I4 · harnais du registre', () => {
   describe.skipIf(!navigateur)('I4 · le chemin simple mène au plan (issue #71)', () => {
     let site: Site;
     let contexte: BrowserContext;

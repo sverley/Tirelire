@@ -1394,9 +1394,11 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
   Départage : on nomme d'abord le besoin couvert (phrase du « Fait quand », entrée du registre,
   décision) ; deux tests du même besoin ont le même niveau ; un témoin rouge prend le niveau de ce
-  qu'il garde ; dans le doute, le plus critique. Un test déclare son niveau par la marque
-  `[niveau N]` dans son titre, ou dans celui de la suite la plus proche qui l'englobe ; sans marque,
-  il est de niveau 2. Le niveau se lit ainsi dans le fichier, sans l'exécuter.
+  qu'il garde ; dans le doute, le plus critique. Chaque test déclare son niveau par la marque
+  `[niveau N]` dans son titre, ou dans celui d'une suite qui l'englobe, la plus proche l'emportant.
+  Un test sans marque, ni sur lui ni sur une suite qui l'englobe, fait échouer `pnpm test` dès le
+  seuil 1, qui le nomme (#236) ; jusqu'à ce qu'il en reçoive une, l'outil de test le joue au niveau
+  2. Le niveau se lit ainsi dans le fichier, sans l'exécuter.
 
   L'outil de test prend un seuil N en entrée — `pnpm test N`, ou `pnpm --dir <paquet> run test N`,
   2 sans entrée — et ne joue, dans tous les ensembles (cœur, interface headless et dans le

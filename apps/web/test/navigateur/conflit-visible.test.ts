@@ -169,7 +169,11 @@ function verifierConflitAffiche(texte: string): void {
   expect(texte.includes(VERSION_A) && texte.includes(VERSION_B), `l’écran ne montre pas le retenu et l’écarté (${VERSION_A}, ${VERSION_B}) : « ${resume} »`).toBe(true);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 0 (D83) : le besoin est « #196 · 5. un conflit se voit », nommé au registre sous I8, que
+// `fichier-etat.test.ts` garde au niveau 0 : deux tests du même besoin ont le même niveau. Un
+// conflit tranché sans que l'écran le dise perd la version écartée, que rien ne garde (D58), et elle
+// reste perdue après correction du code.
+describe('[niveau 0] I8 · harnais du registre', () => {
   it.fails('témoin rouge · un conflit tranché sans que l’écran en dise rien', () => {
     // Version cassée : l'écran de synchronisation ne montre que le nombre de changements reçus, et
     // la catégorie sous la version retenue.
@@ -179,7 +183,7 @@ describe('[niveau 1] harnais du registre', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 0] I8 · harnais du registre', () => {
   describe.skipIf(!navigateur)('#196 · 5. un conflit se voit à l’écran', () => {
     let site: Site;
 

@@ -64,7 +64,9 @@ function vérifierÉquivalence(rapport: Équivalence[]) {
  * l'échec attendu (#66). Il se joue sans navigateur : c'est la règle qu'on garde ici, pas une
  * seconde traversée.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est I11, nommé au registre, qui cite tout ce fichier ; une ligne de
+// l'assistant introuvable hors de lui ne perd aucune donnée.
+describe('[niveau 1] I11 · harnais du registre', () => {
   it.fails('témoin rouge · une ligne créée par l’assistant introuvable hors assistant', () => {
     vérifierÉquivalence([{ nom: 'Vacances', écran: 'Tirelires', trouvé: false, bouton: false, éditable: false }]);
   });

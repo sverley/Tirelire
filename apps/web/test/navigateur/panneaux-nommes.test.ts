@@ -324,7 +324,9 @@ function vérifierUneOuverture(écran: string, o: Ouverture, tous: string[]) {
  * gris pâle et renommé à chaque frappe. Il doit échouer ; `it.fails` tient l'échec attendu (#66).
  * Il se joue sans navigateur : c'est la règle qu'on garde ici, pas une seconde visite des écrans.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est C9, nommé au registre, qui cite tout ce fichier (D59) ; un panneau
+// mal nommé ne perd aucune donnée.
+describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme ce qu’il modifie (D59)', () => {
   it.fails('témoin rouge · un panneau intitulé « Modifier » tout court, qui suit la frappe', () => {
     vérifierUneOuverture(
       'Tirelires',
