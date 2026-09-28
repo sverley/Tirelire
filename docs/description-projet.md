@@ -618,3 +618,21 @@ Et, à l'audit de #259 (« pour sauter les tests navigateur quand la PR ne touch
 j'ouvre une issue à part, à traiter après la fusion de #259 ? ») :
 
 > non, on traite ici
+
+## 28 septembre 2026 · la version forcée
+
+Dans #274, sur la production, que seul le tag d'une version dépose depuis #233 :
+
+> Or je veux pouvoir pousser (meme manuellement) une version en prod
+
+À la proposition de l'architecte, un déclenchement manuel qui dépose en production sans publier de
+version :
+
+> ok, je préfère une version. Est-il possible de faire une CI pour ajoute une version ?
+
+Puis, sur le nom de la version :
+
+> on tag avec le dernier numero de version publié + un hash court du commit. Si la derniere est v0.2, le forcage passe à v0.2-#id_commit. l'ajout de version "numérotée" reste manuelle
+
+Puis, aux deux lectures de l'architecte — le « # » marque la place du hash et ne s'écrit pas dans
+le tag ; tant qu'aucune version numérotée n'est publiée, la base est `v0.0` : « oui ».
