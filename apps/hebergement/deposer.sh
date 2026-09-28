@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # Dépôt du site assemblé sur un hébergement web, par FTPS ou SFTP (lftp).
-# Utilisé par la CI (job « Dépôt FTP sur l'hébergement ») et utilisable à la main :
+# Utilisé par la CI (dépôt en production à la publication d'une version, et, par `apercu.sh`, sur la
+# recette) et utilisable à la main :
 #
 #   HOTE=ftp.clusterXXX.hosting.ovh.net UTILISATEUR=moncompte MOTDEPASSE=… \
 #   SOURCE=apps/hebergement/dist bash apps/hebergement/deposer.sh
 #
 # Variables : HOTE, UTILISATEUR, MOTDEPASSE (obligatoires) ; SOURCE (défaut apps/hebergement/dist),
 # DOSSIER (défaut www), PROTOCOLE (ftps | sftp | ftp), VERIFIER_CERTIFICAT (oui | non),
-# NETTOYER (non | oui : supprime du serveur ce qui n'est plus dans le site), BLANC (1 = essai à blanc).
+# NETTOYER (non | oui : supprime du serveur ce qui n'est plus dans le site), BLANC (1 = essai à blanc),
+# GARDER (motifs lftp, séparés par des espaces, de ce qui vit dans le dossier sans venir du site et
+# que le dépôt ne touche jamais, nettoyage compris : à la racine de la recette, les aperçus et le
+# robots.txt, #233).
 set -euo pipefail
 
 : "${HOTE:?adresse du serveur manquante}"
@@ -42,6 +46,16 @@ fi
 # Ce qui vit sur le serveur et ne doit jamais être écrasé ni supprimé :
 # les paquets de synchronisation des appareils et la configuration locale du relais.
 EXCLUSIONS='--exclude-glob donnees/*.jsonl --exclude-glob relais.config.php'
+# Et ce que l'appelant désigne (GARDER), exclu de même, à l'envoi comme au nettoyage. `read` ne
+# développe pas les motifs : ils arrivent tels quels à lftp.
+read -r -a garder <<< "${GARDER:-}"
+for motif in "${garder[@]}"; do
+  if [[ "$motif" == *[!]A-Za-z0-9._*/[-]* ]]; then
+    echo "GARDER : motif « $motif » refusé (lettres, chiffres et « . _ - / * [ ] » seulement)." >&2
+    exit 1
+  fi
+  EXCLUSIONS="$EXCLUSIONS --exclude-glob $motif"
+done
 # Fichiers d'entrée : montés en dernier pour qu'aucun visiteur ne charge un index.html
 # qui pointerait vers des ressources pas encore transférées.
 ENTREE='--exclude-glob index.html --exclude-glob sw.js --exclude-glob registerSW.js --exclude-glob manifest.webmanifest'

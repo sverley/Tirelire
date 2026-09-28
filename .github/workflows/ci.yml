@@ -11,8 +11,13 @@ name: CI et livraison
 #
 # Les identifiants FTP (`OVH_FTP_*`) : dépôt public, dans l'environnement `depot-ftp`, qui n'admet
 # que `main` (#155) ; dépôt privé sur l'offre gratuite, au niveau du dépôt, lisibles par tout workflow
-# d'une branche, risque accepté (#176, `docs/hebergement-web.md`). Seul `deploiement` les lit ici,
-# sur `main`.
+# d'une branche, risque accepté (#176, `docs/hebergement-web.md`). Les lisent ici `recette`, sur
+# `main`, et `production`, au tag `v*`.
+#
+# Où se dépose le site (#233, D83) : un push sur `main` dépose `main` à la racine de la recette, la
+# version de développement ; seule la publication d'une version, par son tag `v*`, dépose en
+# production, après les tests au seuil 3. Le lancement manuel, sur `main`, redépose la recette ; il ne
+# touche jamais la production.
 #
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
@@ -20,9 +25,12 @@ name: CI et livraison
 #   `main`, seuil 1, plus les tests navigateur au seuil 2, et le harnais du besoin en entier sur une
 #   PR ; au tag `v*`, seuil 3, tests navigateur activés, avant de publier.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
-#   `main`, à un tag `v*` et à la main ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).
-# - `deploiement` lit hors des fichiers suivis : après le dépôt FTP, l'étape « Vérifier le site en
-#   ligne » (`verifier.sh`) lit le site déployé.
+#   `main` et à la main (la racine de la recette, `/`), à un tag `v*` (la production,
+#   `vars.TIRELIRE_BASE`) ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).
+# - `recette` lit hors des fichiers suivis : après le dépôt de `main` à la racine de la recette,
+#   l'étape « Vérifier la racine de la recette en ligne » (`verifier.sh`) lit le site déployé.
+# - `production` lit hors des fichiers suivis : après le dépôt d'une version publiée, l'étape
+#   « Vérifier le site en ligne » (`verifier.sh`) lit le site déployé.
 # - `android` est hors harnais : il construit l'APK, sans rien vérifier.
 # - `publication` est hors harnais : il publie les releases.
 # - `assemblage-apercu` est hors harnais : il assemble le site de la PR pour son sous-dossier de
@@ -44,7 +52,7 @@ on:
   workflow_dispatch:
     inputs:
       deploiement:
-        description: "Dépôt FTP sur l'hébergement"
+        description: "Dépôt FTP de main à la racine de la recette (jamais en production)"
         type: choice
         options: [automatique, essai-a-blanc, ignorer]
         default: automatique
@@ -125,8 +133,9 @@ jobs:
   hebergement:
     name: Site pour hébergement mutualisé
     needs: test
-    # Pour la racine, à déposer et publier : sur `main`, à un tag `v*` et à la main. Sur une PR, le
-    # site ne s'assemble qu'une fois, dans `assemblage-apercu`, pour son sous-dossier de recette (#153).
+    # Pour la racine, à déposer et publier : sur `main` et à la main, la racine de la recette, qui est
+    # celle d'un sous-domaine (#233) ; à un tag `v*`, la production. Sur une PR, le site ne s'assemble
+    # qu'une fois, dans `assemblage-apercu`, pour son sous-dossier de recette (#153).
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -139,8 +148,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Assembler (PWA + relais PHP + .htaccess + .ovhconfig)
         env:
-          # Sous-dossier où le site sera installé (« / » par défaut = racine du domaine ou sous-domaine).
-          TIRELIRE_BASE: ${{ vars.TIRELIRE_BASE || '/' }}
+          # Sous-dossier où le site sera installé (« / » par défaut = racine du domaine ou sous-domaine) :
+          # celui de la production à un tag `v*`, la racine de la recette sinon (#233).
+          TIRELIRE_BASE: ${{ startsWith(github.ref, 'refs/tags/v') && (vars.TIRELIRE_BASE || '/') || '/' }}
         run: pnpm --filter @tirelire/hebergement assembler
       - uses: actions/upload-artifact@v4
         with:
@@ -148,12 +158,119 @@ jobs:
           path: apps/hebergement/tirelire-hebergement.zip
           retention-days: 30
 
-  deploiement:
-    name: Dépôt FTP sur l'hébergement
+  recette:
+    name: Version de développement à la racine de la recette
     needs: hebergement
-    # Depuis `main` seulement. L'environnement `depot-ftp` n'admet que `main` quand GitHub l'applique
-    # (dépôt public, #155) ; dépôt privé sur l'offre gratuite, il reste déclaré, sans effet (#176). Un tag `v*` publie la release sans redéposer le site, déjà déposé au push.
+    # Un push sur `main`, ou le lancement manuel sur `main` : `main` se dépose à la racine de la
+    # recette, jamais en production (#233). `apercu.sh` s'arrête avant tout transfert si un réglage de
+    # recette manque ou vaut celui de la production, et laisse en place les aperçus (`pr-<numéro>`),
+    # le `robots.txt` posé à la main et les paquets du relais. L'adresse de recette est un secret (#156) :
+    # aucune sortie d'étape ni aucun commentaire ne la porte, le diagnostic reste dans ce journal.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && inputs.deploiement != 'ignorer'
+    runs-on: ubuntu-latest
+    environment: depot-ftp
+    # Un seul dépôt à la fois : deux transferts simultanés laisseraient le site à moitié à jour.
+    concurrency:
+      group: depot-recette-racine
+      cancel-in-progress: false
+    env:
+      HOTE: ${{ secrets.OVH_FTP_HOST }}
+      UTILISATEUR: ${{ secrets.OVH_FTP_USER }}
+      MOTDEPASSE: ${{ secrets.OVH_FTP_PASSWORD }}
+      # Recette : aucune valeur par défaut (`apercu.sh`), comme pour les aperçus.
+      TIRELIRE_DEV_FTP_DOSSIER: ${{ vars.TIRELIRE_DEV_FTP_DOSSIER }}
+      TIRELIRE_DEV_SITE_URL: ${{ secrets.TIRELIRE_DEV_SITE_URL }}
+      TIRELIRE_FTP_DOSSIER: ${{ vars.TIRELIRE_FTP_DOSSIER }}
+      TIRELIRE_SITE_URL: ${{ vars.TIRELIRE_SITE_URL }}
+      PROTOCOLE: ${{ vars.TIRELIRE_FTP_PROTOCOLE || 'ftps' }}
+      VERIFIER_CERTIFICAT: ${{ vars.TIRELIRE_FTP_VERIFIER_CERTIFICAT || 'oui' }}
+      NETTOYER: ${{ vars.TIRELIRE_FTP_NETTOYER || 'non' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets présents ?
+        id: pret
+        run: |
+          if [ -n "$HOTE" ] && [ -n "$UTILISATEUR" ] && [ -n "$MOTDEPASSE" ]; then
+            echo "pret=oui" >> "$GITHUB_OUTPUT"
+          else
+            echo "pret=non" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Dépôt de la version de développement ignoré"
+              echo
+              echo "Les secrets \`OVH_FTP_HOST\`, \`OVH_FTP_USER\` et \`OVH_FTP_PASSWORD\` ne sont pas tous"
+              echo "renseignés dans le dépôt. Le site reste téléchargeable dans l'artefact"
+              echo "\`tirelire-hebergement\` de ce passage. Voir \`docs/hebergement-web.md\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Avant tout transfert : sans réglages de recette, rien ne se dépose. L'adresse n'en sort pas.
+      - name: Réglages de la recette
+        if: steps.pret.outputs.pret == 'oui'
+        run: bash apps/hebergement/apercu.sh racine-reglages > /dev/null
+
+      - name: Récupérer le site assemblé
+        if: steps.pret.outputs.pret == 'oui'
+        uses: actions/download-artifact@v4
+        with:
+          name: tirelire-hebergement
+          path: ${{ runner.temp }}/archive
+
+      - name: Ouvrir l'archive
+        if: steps.pret.outputs.pret == 'oui'
+        run: |
+          mkdir -p "$RUNNER_TEMP/site"
+          unzip -q "$RUNNER_TEMP/archive/tirelire-hebergement.zip" -d "$RUNNER_TEMP/site"
+          # Garde-fou : ni configuration locale du relais ni paquets de synchronisation dans ce qui part.
+          rm -f "$RUNNER_TEMP/site/relais.config.php"
+          rm -f "$RUNNER_TEMP/site/donnees/"*.jsonl
+          test -f "$RUNNER_TEMP/site/index.html"
+          test -f "$RUNNER_TEMP/site/relais.php"
+          test -f "$RUNNER_TEMP/site/.htaccess"
+
+      - name: Installer lftp
+        if: steps.pret.outputs.pret == 'oui'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Déposer à la racine de la recette
+        if: steps.pret.outputs.pret == 'oui'
+        env:
+          SOURCE: ${{ runner.temp }}/site
+          BLANC: ${{ inputs.deploiement == 'essai-a-blanc' && '1' || '' }}
+        run: bash apps/hebergement/apercu.sh racine-deposer
+
+      # L'adresse se recalcule ici plutôt que de passer par une sortie d'étape : elle dérive d'un
+      # secret, et reste dans ce job, sous les masques posés par apercu.sh (#156).
+      - name: Vérifier la racine de la recette en ligne
+        if: steps.pret.outputs.pret == 'oui' && inputs.deploiement != 'essai-a-blanc'
+        run: |
+          set -euo pipefail
+          ADRESSE_SITE="$(bash apps/hebergement/apercu.sh racine-reglages | sed -n 's/^adresse=//p')"
+          export ADRESSE_SITE
+          bash apps/hebergement/verifier.sh
+
+      - name: Résumé
+        if: always() && steps.pret.outputs.pret == 'oui'
+        run: |
+          {
+            echo "### Version de développement à la racine de la recette"
+            echo
+            if [ "${{ job.status }}" = success ]; then
+              echo "- Mode : ${{ inputs.deploiement == 'essai-a-blanc' && 'essai à blanc (rien transféré)' || 'transfert réel, vérifié en ligne' }}"
+              echo "- Anciens fichiers : $([ "$NETTOYER" = oui ] && echo supprimés || echo conservés)"
+              echo "- Jamais touchés : les aperçus \`pr-<numéro>\`, \`robots.txt\`, \`donnees/*.jsonl\`, \`relais.config.php\`"
+            else
+              echo "Pas de version de développement à jour : le diagnostic est dans le journal de ce job."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  production:
+    name: Dépôt FTP en production
+    needs: hebergement
+    # À la publication d'une version seulement : le push de son tag `v*`, après les tests au seuil 3
+    # (`test`, dont dépend `hebergement`) ; jamais sur `main` ni à la main (#233, D83, D87).
+    # L'environnement `depot-ftp` : dépôt privé sur l'offre gratuite, déclaré sans effet (#176) ; s'il
+    # reprend effet (dépôt public, #155), il doit admettre les tags `v*`.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     environment: depot-ftp
     # Un seul dépôt à la fois : deux transferts simultanés laisseraient le site à moitié à jour.
@@ -187,7 +304,8 @@ jobs:
               echo "Les secrets \`OVH_FTP_HOST\`, \`OVH_FTP_USER\` et \`OVH_FTP_PASSWORD\` ne sont pas tous"
               echo "renseignés dans le dépôt. Le site reste téléchargeable dans l'artefact"
               echo "\`tirelire-hebergement\` de ce passage (\`tirelire-hebergement.zip\`, gardé 30 jours),"
-              echo "déposé par le job « Site pour hébergement mutualisé ». Voir \`docs/hebergement-web.md\`."
+              echo "déposé par le job « Site pour hébergement mutualisé », et joint à la release du tag."
+              echo "Voir \`docs/hebergement-web.md\`."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -218,7 +336,6 @@ jobs:
         if: steps.pret.outputs.pret == 'oui'
         env:
           SOURCE: ${{ runner.temp }}/site
-          BLANC: ${{ inputs.deploiement == 'essai-a-blanc' && '1' || '' }}
         run: |
           set -o pipefail
           bash apps/hebergement/deposer.sh 2>&1 | tee "$RUNNER_TEMP/depot.log"
@@ -257,7 +374,7 @@ jobs:
 
       - name: Vérifier le site en ligne
         id: verification
-        if: steps.pret.outputs.pret == 'oui' && inputs.deploiement != 'essai-a-blanc' && env.ADRESSE_SITE != ''
+        if: steps.pret.outputs.pret == 'oui' && env.ADRESSE_SITE != ''
         run: |
           set -o pipefail
           bash apps/hebergement/verifier.sh 2>&1 | tee "$RUNNER_TEMP/verification.log"
@@ -283,10 +400,9 @@ jobs:
         if: steps.pret.outputs.pret == 'oui'
         run: |
           {
-            echo "### Site déposé sur l'hébergement"
+            echo "### Version publiée, déposée en production"
             echo
             echo "- Protocole : \`$PROTOCOLE\` vers \`$HOTE\`, dossier \`$DOSSIER\`"
-            echo "- Mode : ${{ inputs.deploiement == 'essai-a-blanc' && 'essai à blanc (rien transféré)' || 'transfert réel' }}"
             echo "- Anciens fichiers : $([ "$NETTOYER" = oui ] && echo supprimés || echo conservés)"
             echo "- Jamais touchés : \`donnees/*.jsonl\`, \`relais.config.php\`"
             if [ -n "$ADRESSE_SITE" ]; then

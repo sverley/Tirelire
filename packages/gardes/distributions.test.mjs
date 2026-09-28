@@ -213,40 +213,139 @@ describe('[niveau 1] I9 ; D83, une fois par passage (#153) ; D81, la garde de ma
     assert.throws(() => unSeulAssemblageSurPR(cassé), /s'assemble [2-9] fois/);
   });
 
-  /** Sur `main` et au tag : le site pour la racine s'assemble, se garde, se dépose et se publie. */
+  // ─── #153, #233 · où le site pour la racine s'assemble, se dépose et se publie ───────────────────
+  //
+  // Un push sur `main` dépose `main` à la racine de la recette, la version de développement, par
+  // `apercu.sh racine-deposer`, qui laisse en place aperçus, `robots.txt` et paquets du relais ; seule
+  // la publication d'une version, le push de son tag `v*`, dépose en production (`deposer.sh`), après
+  // les tests au seuil 3 ; ni un lancement manuel ni une PR ne la touchent (#233, D83, D87).
+
+  /** Les jobs dont dépend `nom`, de proche en proche. */
   function amonts(partie, nom, vus = new Set()) {
     for (const n of partie.find((j) => j.nom === nom)?.besoins ?? []) if (!vus.has(n)) vus.add(n), amonts(partie, n, vus);
     return vus;
   }
 
-  test('#153 · sur main et au tag v*, le site pour la racine se construit, se dépose et se publie comme avant', () => {
-    const cas = [
-      ['main', 'refs/heads/main', /deposer\.sh/, 'dépose'],
-      ['tag v*', 'refs/tags/v9.9.9', /action-gh-release/, 'publie'],
-    ];
-    for (const [où, ref, aval, verbe] of cas) {
-      for (const base of [undefined, '/sous-dossier/']) {
-        const ctx = push(ref, base ? { TIRELIRE_BASE: base } : {});
-        const partie = jouer(lire(CI), ctx);
-        const a = assemblages(partie);
-        assert.equal(a.length, 1, `${CI} : sur ${où}, le site s'assemble ${a.length} fois (${liste(a)}) ; une seule attendue`);
-        const [{ job, étape }] = a;
-        const env = étape.texte.match(/^ +TIRELIRE_BASE:\s*(.+)$/m) ?? job.lignes.slice(0, job.lignes.findIndex((l) => /^ {4}steps:/.test(l))).join('\n').match(/^ +TIRELIRE_BASE:\s*(.+)$/m);
-        const obtenue = env ? interpoler(env[1], ctx) || '/' : '/';
-        assert.equal(obtenue, base ?? '/', `${CI} : sur ${où}, le site ne s'assemble plus pour \`vars.TIRELIRE_BASE\`, « / » par défaut`);
-        assert.ok(
-          job.joués.slice(job.joués.indexOf(étape) + 1).some((é) => artefact(é, 'upload') === ARCHIVE),
-          `${CI} : sur ${où}, le job « ${job.nom} » ne garde plus le site dans l'artefact \`${ARCHIVE}\``,
-        );
-        const receveur = partie.find((j) => j.tourne && étapes(j.lignes).some((é) => aval.test(commande(é))));
-        assert.ok(receveur, `${CI} : sur ${où}, plus aucun job ne ${verbe} le site`);
-        assert.ok(
-          étapes(receveur.lignes).some((é) => artefact(é, 'download') === ARCHIVE),
-          `${CI} : sur ${où}, le job « ${receveur.nom} » ne reprend plus l'artefact \`${ARCHIVE}\``,
-        );
-        assert.ok(amonts(partie, receveur.nom).has(job.nom), `${CI} : sur ${où}, le job « ${receveur.nom} » n'attend plus « ${job.nom} », qui assemble le site`);
+  // Les réglages de dépôt, distincts : la production dans `prod`, la recette dans `recette`.
+  const DÉPÔTS = { TIRELIRE_FTP_DOSSIER: 'prod', TIRELIRE_DEV_FTP_DOSSIER: 'recette' };
+  const PRODUCTION = 'la production';
+  const RACINE_RECETTE = 'la racine de la recette';
+  const lancement = (ref, deploiement, vars = {}) => ({ github: { event_name: 'workflow_dispatch', ref, event: {} }, vars: { ...DÉPÔTS, ...vars }, secrets: {}, inputs: { deploiement } });
+  const pousser = (ref, vars = {}) => push(ref, { ...DÉPÔTS, ...vars });
+
+  /** La valeur d'une variable d'environnement de l'étape, ou de son job, interpolée ; `undefined` sinon. */
+  function variable(job, é, nom, ctx) {
+    const motif = new RegExp(`^ +${nom}:\\s*(.+)$`, 'm');
+    const enLigne = commande(é).match(new RegExp(`\\b${nom}=(\\S+)`));
+    if (enLigne) return interpoler(enLigne[1], ctx);
+    const m = é.texte.match(motif) ?? job.lignes.slice(0, job.lignes.findIndex((l) => /^ {4}steps:/.test(l))).join('\n').match(motif);
+    return m ? interpoler(m[1], ctx) : undefined;
+  }
+
+  /**
+   * Où dépose une étape : la racine de la recette (par `apercu.sh racine-deposer`), un aperçu, ou le
+   * dossier que reçoit `deposer.sh` lancé directement — la production quand c'est le sien. Toutes les
+   * étapes d'un job qui tourne comptent, quelle que soit leur condition : un dépôt possible est un dépôt.
+   */
+  function dépôt(job, é, ctx) {
+    const c = commande(é);
+    if (/apercu\.sh\s+racine-deposer\b/.test(c)) return RACINE_RECETTE;
+    if (/apercu\.sh\s+deposer\b/.test(c)) return 'un aperçu';
+    if (!/deposer\.sh/.test(c)) return undefined;
+    const dossier = variable(job, é, 'DOSSIER', ctx) || 'www';
+    return dossier === (ctx.vars.TIRELIRE_FTP_DOSSIER || 'www') ? PRODUCTION : `le dossier « ${dossier} », sans les protections de la recette`;
+  }
+  const dépôts = (partie, ctx) =>
+    partie.filter((j) => j.tourne).flatMap((job) => étapes(job.lignes).flatMap((é) => (dépôt(job, é, ctx) ? [{ job, é, où: dépôt(job, é, ctx) }] : [])));
+  const lesquels = (d) => d.map(({ job, où }) => `${où} (« ${job.nom} »)`).join(', ') || 'aucun dépôt';
+
+  /** Les tests au seuil 3 : une étape qui lance `pnpm test 3`. */
+  const auSeuil3 = (é) => /\bpnpm\s+test\s+3\b/.test(commande(é));
+
+  /** Ce que #153 et #233 demandent au workflow, rejoué aussi sur des workflows cassés. */
+  function oùSeDéposeLeSite(yaml) {
+    // Sur `main` : assemblé pour `/`, la racine de la recette étant celle d'un sous-domaine, et déposé là.
+    for (const base of [undefined, '/sous-dossier/']) {
+      const ctx = pousser('refs/heads/main', base ? { TIRELIRE_BASE: base } : {});
+      const partie = jouer(yaml, ctx);
+      const a = assemblages(partie);
+      assert.equal(a.length, 1, `${CI} : sur main, le site s'assemble ${a.length} fois (${liste(a)}) ; une seule attendue`);
+      const [{ job, étape }] = a;
+      assert.equal(variable(job, étape, 'TIRELIRE_BASE', ctx) || '/', '/', `${CI} : sur main, le site ne s'assemble plus pour la racine de la recette, « / »`);
+      const d = dépôts(partie, ctx);
+      assert.deepEqual(d.map((x) => x.où), [RACINE_RECETTE], `${CI} : sur main, le site doit se déposer à la racine de la recette, et là seulement ; dépôts : ${lesquels(d)}`);
+      const [{ job: receveur, é }] = d;
+      const suite = étapes(receveur.lignes).slice(étapes(receveur.lignes).findIndex((x) => x.k === é.k) + 1);
+      assert.ok(suite.some((x) => /verifier\.sh/.test(commande(x))), `${CI} : sur main, le job « ${receveur.nom} » ne vérifie plus en ligne la racine de la recette`);
+      assert.ok(étapes(receveur.lignes).some((x) => artefact(x, 'download') === ARCHIVE), `${CI} : sur main, le job « ${receveur.nom} » ne reprend plus l'artefact \`${ARCHIVE}\``);
+      assert.ok(amonts(partie, receveur.nom).has(job.nom), `${CI} : sur main, le job « ${receveur.nom} » n'attend plus « ${job.nom} », qui assemble le site`);
+    }
+
+    // À la main : la racine de la recette, sur main, et jamais la production, ni sur main ni à un tag.
+    for (const choix of ['automatique', 'essai-a-blanc', 'ignorer']) {
+      for (const ref of ['refs/heads/main', 'refs/tags/v9.9.9']) {
+        const ctx = lancement(ref, choix);
+        const d = dépôts(jouer(yaml, ctx), ctx);
+        const attendu = ref === 'refs/heads/main' && choix !== 'ignorer' ? [RACINE_RECETTE] : [];
+        assert.deepEqual(d.map((x) => x.où), attendu, `${CI} : lancé à la main (${choix}, ${ref}), dépôts : ${lesquels(d)} ; attendu : ${attendu.join(', ') || 'aucun'}`);
       }
     }
+
+    // Sur une PR : rien ne se dépose ici ; l'aperçu se dépose depuis `depot-apercu.yml` (#175).
+    for (const s of scénariosPR()) {
+      const ctx = pr(s.action, s.recette);
+      const d = dépôts(jouer(yaml, ctx, s.échoue), { ...ctx, vars: { ...DÉPÔTS, ...ctx.vars } });
+      assert.deepEqual(d, [], `${CI} : sur une PR (${s.nom}), dépôts : ${lesquels(d)}`);
+    }
+
+    // Au tag `v*` : assemblé pour la production, déposé en production après les tests au seuil 3, publié.
+    for (const base of [undefined, '/sous-dossier/']) {
+      const ctx = pousser('refs/tags/v9.9.9', base ? { TIRELIRE_BASE: base } : {});
+      const partie = jouer(yaml, ctx);
+      const a = assemblages(partie);
+      assert.equal(a.length, 1, `${CI} : au tag v*, le site s'assemble ${a.length} fois (${liste(a)}) ; une seule attendue`);
+      const [{ job, étape }] = a;
+      assert.equal(variable(job, étape, 'TIRELIRE_BASE', ctx) || '/', base ?? '/', `${CI} : au tag v*, le site ne s'assemble plus pour \`vars.TIRELIRE_BASE\`, « / » par défaut`);
+      assert.ok(
+        job.joués.slice(job.joués.indexOf(étape) + 1).some((é) => artefact(é, 'upload') === ARCHIVE),
+        `${CI} : au tag v*, le job « ${job.nom} » ne garde plus le site dans l'artefact \`${ARCHIVE}\``,
+      );
+      const d = dépôts(partie, ctx);
+      assert.deepEqual(d.map((x) => x.où), [PRODUCTION], `${CI} : au tag v*, le site doit se déposer en production, et là seulement ; dépôts : ${lesquels(d)}`);
+      const receveurs = [d[0].job, partie.find((j) => j.tourne && étapes(j.lignes).some((é) => /action-gh-release/.test(commande(é))))];
+      assert.ok(receveurs[1], `${CI} : au tag v*, plus aucun job ne publie le site`);
+      for (const receveur of receveurs) {
+        assert.ok(étapes(receveur.lignes).some((é) => artefact(é, 'download') === ARCHIVE), `${CI} : au tag v*, le job « ${receveur.nom} » ne reprend plus l'artefact \`${ARCHIVE}\``);
+        assert.ok(amonts(partie, receveur.nom).has(job.nom), `${CI} : au tag v*, le job « ${receveur.nom} » n'attend plus « ${job.nom} », qui assemble le site`);
+      }
+      assert.ok(partie.some((j) => j.joués.some(auSeuil3)), `${CI} : au tag v*, aucune étape ne joue les tests au seuil 3 ; le harnais de #233 est à relire`);
+      const rouge = dépôts(jouer(yaml, ctx, auSeuil3), ctx).filter((x) => x.où === PRODUCTION);
+      assert.deepEqual(rouge, [], `${CI} : au tag v*, des tests rouges au seuil 3 n'empêchent pas le dépôt en production (${lesquels(rouge)})`);
+    }
+  }
+
+  test('#153, #233 · sur main, le site se construit pour la racine de la recette et s’y dépose ; au tag v*, pour la production, où il se dépose après les tests au seuil 3, et se publie', () => {
+    oùSeDéposeLeSite(lire(CI));
+  });
+
+  /** Le job qui dépose en production au tag, réécrit par `changer(lignes)`. */
+  function productionRéécrite(yaml, changer) {
+    const ctx = pousser('refs/tags/v9.9.9');
+    const [cible] = dépôts(jouer(yaml, ctx), ctx).filter((x) => x.où === PRODUCTION);
+    assert.ok(cible, 'aucun job ne dépose en production au tag : le témoin de #233 est à relire');
+    return réécrire(yaml, (job) => (job.nom === cible.job.nom ? changer(job.lignes) : undefined));
+  }
+
+  test('témoin rouge · une CI qui dépose main en production', () => {
+    const cassé = productionRéécrite(lire(CI), (lignes) => ["    if: github.event_name != 'pull_request'", ...sansCondition(lignes)]);
+    assert.notEqual(cassé, lire(CI), 'le workflow n’a pas pu être cassé : le harnais de #233 est à relire');
+    assert.throws(() => oùSeDéposeLeSite(cassé), /sur main, le site doit se déposer à la racine de la recette, et là seulement ; dépôts : .*la production/);
+  });
+
+  test('témoin rouge · une CI qui dépose en production sans attendre les tests au seuil 3', () => {
+    const cassé = productionRéécrite(lire(CI), (lignes) => lignes.filter((l) => !/^ {4}needs:/.test(l)));
+    assert.notEqual(cassé, lire(CI), 'le workflow n’a pas pu être cassé : le harnais de #233 est à relire');
+    assert.throws(() => oùSeDéposeLeSite(cassé), /n'empêchent pas le dépôt en production|n'attend plus/);
   });
 
   // ─── #159 · La garde qui juge une PR est celle de main ───────────────────────────────────────────
