@@ -284,14 +284,18 @@ pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin.
 
 Le fichier et chaque paquet de synchronisation portent leur format et sa version (D58). Une
 version que l'application ne lit pas est refusée en le disant, sans rien ouvrir, écrire ni
-effacer : l'utilisateur garde le fichier tel quel et choisit la suite (C1, C8). Une migration
-s'écrit quand une version publiée l'exige, et seulement alors : elle lit l'ancienne version et
-écrit la nouvelle, et une colonne retirée d'un format publié n'est plus lue qu'à cette occasion.
-Avant la première version publiée, aucune donnée réelle n'est à reprendre : un changement de format
-passe par une nouvelle version du format, l'ancienne est refusée comme une version inconnue, et le
-code ne garde rien d'elle — ni colonne retirée, ni table laissée pour un pair en arrière, ni étape de
-migration, ni synonyme d'une valeur ancienne. Tolérer l'écart entre deux instances de versions
-différentes se décide à part (C8).
+effacer : l'utilisateur garde le fichier tel quel et choisit la suite (C1, C8).
+
+La liberté du format vaut pour les bêtas (D87). Avant `v1`, la première version publique, une
+version publiée peut refuser un fichier d'un format antérieur en le disant, sans migration : un
+changement de format passe par une nouvelle version du format, l'ancienne est refusée comme une
+version inconnue, et le code ne garde rien d'elle — ni colonne retirée, ni table laissée pour un pair
+en arrière, ni étape de migration, ni synonyme d'une valeur ancienne. À partir de `v1`, toute
+version lit les formats publiés depuis `v1` : un changement de format fournit une migration ou reste
+rétrocompatible. Une migration s'écrit quand un format publié depuis `v1` l'exige, et seulement
+alors : elle lit l'ancienne version et écrit la nouvelle, et une colonne retirée d'un tel format
+n'est plus lue qu'à cette occasion. Tolérer l'écart entre deux instances de versions différentes se
+décide à part (C8).
 
 ### D31 · Rang d'une règle = clé triable
 
@@ -1613,7 +1617,7 @@ tâches, ni ordre, ni état.
 Une réflexion d'ensemble sur un domaine se mène dans une **issue de conception**, par un architecte,
 en pensant aux cinq usages ; son produit va dans les décisions et dans l'analyse du domaine. Les
 choix réversibles se reprennent au fil des versions ; les choix structurels, qui engagent tous les
-usages et toutes les cibles, se posent avant, dans le socle (`v0`).
+usages et toutes les cibles, se posent avant, dans le socle (`v0.0`).
 
 Chaque spécification porte une ligne « Usages » : ce que la tâche fait à U1, U2, U3, U4 et U5 —
 sert, indifférent, ou à surveiller. C'est ce qui garde les autres usages dans le regard quand une
@@ -1632,7 +1636,7 @@ PR.
 
 Le socle ne garantit aucun usage : il intègre les contraintes structurelles de tous les usages et de
 toutes les cibles actives — données, sauvegarde, synchronisation, versions d'instances,
-distribution. Il s'étale en incréments, dont le premier est `v0` : un incrément ne contient que ce
+distribution. Il s'étale en incréments, dont le premier est `v0.0` : un incrément ne contient que ce
 qu'aucune version d'usage ne peut éviter d'avoir avant elle, et se place juste avant la première
 version d'usage qui l'exerce, pour que ses choix se confrontent aussitôt à un usage réel. Une
 contrainte structurelle se conçoit tôt, dans une issue de conception, pour ne fermer aucune porte ;
@@ -1640,6 +1644,14 @@ elle se code dans la première version qui l'exerce. Le socle est l'exception à
 croisement d'une cible et d'un usage : son entrée énumère ses contraintes, et son critère de fin
 porte sur leurs harnais et vérifications manuelles, sur ses issues de conception, et sur ce qu'elles
 demandent de vérifier en attendant le codage réel de ce qu'elles conçoivent.
+
+Un numéro de version porte une promesse. Les versions `v0.x`, socle et versions d'usage, sont des
+**bêtas** : publiées par leur tag et utilisables, elles laissent le format du fichier libre de
+changer d'une version à la suivante sans migration (D30), et le disent à l'utilisateur avant qu'il y
+mette de vraies données (C4, C5). `v1` est la **première version publique** : elle pose le
+**verrou** du format — à partir d'elle, tout changement de format fournit une migration ou reste
+rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été exercé : son entrée dans
+`docs/versions.md` le nomme.
 
 Le travail est tiré par les versions : une tâche appartient au jalon de la version qui en a besoin,
 quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,

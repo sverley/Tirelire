@@ -464,6 +464,23 @@ qu'elles barrent.
 
 > il faut ensuite que les taches soient rattachées à des chantiers mais leur ordre de traitement est résolu au regard de la version qui regroupe les taches nécessaire pour y parvenir
 
+Le 28 septembre 2026, dans #277, sur les numéros des versions et le format du fichier :
+
+> Le format de la vase de données ne pourra pas rester figé sans être aller plus loin, notamment sans un usage inversé (opérations vers budget), ni sans la synchro multiplateforme, ni sans import diverse (banques,linxo,bankin,ofx,money). Il faut donc prévoir soit des versions intermédiaires avant v1 pour que v1 soit déjà stable, soit prévoir que le format pourra évoluer librement jusqune version plus avancée (ça peut meme être un jalon en soi),soit prévoir un mécanismede mise a jour du format suffisamment ouvert pour éviter d'être bloqué
+
+> En fait, je pense qu'il faut prévoir un jalon de publication de la première version publique qui soit indépendante des numéros de version de publication qu'on a aujourd'hui. Ça permet de repousser le moment où on considéré qu'on ne peut plus changer le format sans fournir une migration ou être rétrocompatible
+
+> Mais c'est ce que j'entendais par version intermédiaire. Au lieu de nommer v1, v2..  Les versions actuelles, on les nomme v0.1,v0.2... Et v1 et celle qui fige le format de données quand les versions d'avant auront permis de stabiliser le format
+
+> Et rester avec v0 v1... Comme aujourd'hui mais on posant un concept de verrou à partir d'une version de diffusion publique (celles avant ne seraient que des beta)
+
+> D'un point de vue methode de travail et de dev, est-ce ok ? Il me semble qu'une version estampillée v1 devrait être la première publique, non ?
+
+Puis, à la proposition de l'architecte — le socle `v0.0`, les versions d'usage `v0.1` à `v0.5`,
+des bêtas au format libre, et `v1`, la première version publique, qui pose le verrou du format :
+
+> Ok on part la dessus
+
 ### Le modèle de PR
 
 > quand il ne faut editer que de la documentation, il n'est pas nécessaire de coder un harnais. Dans ce cas, c'est le codeur qui ouvre le PR. Or il ne respecte pas les formats (notamment le "Close ") donc les test sont rouges. Il faut corriger le role du codeur pour que l'auditeur et le codeur utilise le meme template de pr

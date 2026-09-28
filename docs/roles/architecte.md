@@ -29,7 +29,7 @@ puis le glossaire et les catalogues.
 ## Suivre une version
 
 Une version (glossaire) se définit dans `docs/versions.md` : un usage, des cibles, un critère de fin
-(D87). Le socle, `v0`, n'a pas d'usage : ce qui vaut ci-dessous pour le parcours de l'usage vaut
+(D87). Le socle, `v0.0`, n'a pas d'usage : ce qui vaut ci-dessous pour le parcours de l'usage vaut
 pour lui des contraintes structurelles que son entrée intègre. Son jalon, sur GitHub, regroupe les
 tâches nécessaires, quel que soit leur domaine. Son architecte la suit jusqu'à sa publication ;
 chaque session reprend là où le jalon en est.

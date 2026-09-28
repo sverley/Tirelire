@@ -5,7 +5,15 @@ section « Usages ») sur un ensemble de cibles (`docs/cibles.md`) ; elle se tra
 de la matrice des cibles devient « prioritaire », et peut être prévue avant. Le socle, lui, ne
 garantit aucun usage : il intègre les contraintes structurelles de tous les usages et de toutes les
 cibles actives, par incréments, chacun placé juste avant la première version d'usage qui l'exerce
-(D87). Le premier est `v0 · Données sûres`.
+(D87). Le premier est `v0.0 · Données sûres`.
+
+Un numéro de version porte une promesse (D87). Une version `v0.x` est une **bêta** : publiée par son
+tag et utilisable, mais le format du fichier peut changer à la version suivante sans migration,
+l'ancien étant refusé en le disant (D30) ; elle le dit à l'utilisateur avant qu'il y mette de vraies
+données. `v1` est la **première version publique** : elle pose le **verrou** du format — à partir
+d'elle, tout changement de format fournit une migration ou reste rétrocompatible (D30). Le socle est
+`v0.0`, les versions d'usage `v0.1` à `v0.5` ; `v1 · Format figé` vient quand ce qui fait bouger le
+format a été exercé.
 
 Une version se termine quand son critère de fin est atteint et que le porteur a fait ses
 vérifications manuelles ; elle se publie alors par le tag de son nom (D83). Une version livrée ne
@@ -18,7 +26,7 @@ ce catalogue ne les liste pas.
 Une entrée donne l'usage, les cibles, le critère de fin et le tag. L'ordre des entrées est l'ordre
 de travail : une version prévue attend que les précédentes soient publiées (D87).
 
-## v0 · Données sûres
+## v0.0 · Données sûres
 
 - **Usage** · aucun : ce qu'une version d'usage qui porte de vraies données ne peut éviter d'avoir
   avant elle.
@@ -29,44 +37,54 @@ de travail : une version prévue attend que les précédentes soient publiées (
 - **Fin** · les harnais et vérifications manuelles d'I7, C4 et C5 sont tenus sur ces cibles ; les
   issues de conception de la version sont fermées, et ce qu'elles demandent de vérifier est tenu —
   pour la synchro, ce qui la garde possible en attendant son codage réel.
-- **Tag** · `v0`.
+- **Tag** · `v0.0`.
 
-## v1 · Budget seul sur la webapp
+## v0.1 · Budget seul sur la webapp
 
 - **Usage** · U1 · Budget seul.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
 - **Fin** · le parcours U1 d'I3 (`packages/core/test/parcours-u1.test.ts`) est vert, et le porteur a
   fait `VM-I3-u1-parcours` sur chacune des deux cibles.
-- **Tag** · `v1`.
+- **Tag** · `v0.1`.
 
-## v2 · Budget et virements permanents
+## v0.2 · Budget et virements permanents
 
 - **Usage** · U2 · Budget et virements permanents.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
 - **Fin** · le parcours U2 d'I3 (`packages/core/test/parcours-u2.test.ts`) est vert, et le porteur a
   fait `VM-I3-u2-ordres` sur chacune des deux cibles.
-- **Tag** · `v2`.
+- **Tag** · `v0.2`.
 
-## v3 · Budget puis import
+## v0.3 · Budget puis import
 
 - **Usage** · U3 · Budget sans virements validés, puis import.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
 - **Fin** · le parcours U3 d'I3 est vert — son harnais reste à bâtir (dette d'I3 au registre), et le
   porteur a fait `VM-I3-u3-rapprochement` sur chacune des deux cibles.
-- **Tag** · `v3`.
+- **Tag** · `v0.3`.
 
-## v4 · Budget reconstruit
+## v0.4 · Budget reconstruit
 
 - **Usage** · U4 · Budget reconstruit depuis l'historique.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
 - **Fin** · le parcours U4 d'I3 est vert — son harnais reste à bâtir (dette d'I3 au registre), et le
   porteur a fait `VM-I3-u4-reconstruction` sur chacune des deux cibles.
-- **Tag** · `v4`.
+- **Tag** · `v0.4`.
 
-## v5 · Import seul
+## v0.5 · Import seul
 
 - **Usage** · U5 · Import seul.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
 - **Fin** · le parcours U5 d'I3 (`packages/core/test/parcours-u5.test.ts`) est vert, et le porteur a
   fait `VM-I3-u5-sans-tirelire` sur chacune des deux cibles.
-- **Tag** · `v5`.
+- **Tag** · `v0.5`.
+
+## v1 · Format figé
+
+- **Usage** · aucun en propre : la première version publique, qui pose le verrou du format (D30,
+  D87).
+- **Cibles** · les cibles actives quand elle se travaille (`docs/cibles.md`).
+- **Fin** · les bêtas `v0.0` à `v0.5` sont publiées, et l'usage inversé (U4), l'import de sources
+  diverses (U3, U5) et la synchronisation entre plateformes ont été exercés ; ce qu'elle exige
+  au-delà — migration, harnais des formats publiés — se spécifie quand elle se travaille.
+- **Tag** · `v1`.

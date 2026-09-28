@@ -109,8 +109,8 @@ l'APK… —, active, de côté ou à venir, au catalogue `docs/cibles.md`.
 
 Un usage garanti sur un ensemble de cibles, défini dans `docs/versions.md` (D87). Elle se termine
 quand le parcours de l'usage est vert sur ses cibles, et se publie par un tag ; le socle, sans
-usage, s'étale en incréments placés avant les versions qui les exercent, le premier étant `v0`. Sur
-GitHub, un jalon du même nom regroupe ses tâches, quel que soit leur domaine : c'est elle qui
+usage, s'étale en incréments placés avant les versions qui les exercent, le premier étant `v0.0`.
+Sur GitHub, un jalon du même nom regroupe ses tâches, quel que soit leur domaine : c'est elle qui
 ordonne leur traitement.
 
 ## Visée
