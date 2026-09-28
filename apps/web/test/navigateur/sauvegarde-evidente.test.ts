@@ -67,6 +67,10 @@
  *    lignes, valeur pour valeur ; pendant ces parcours sans relais, seules des lectures (GET) de
  *    l'origine qui sert l'application partent.
  * 9. Le registre : en relisant (D81).
+ * 10. Tant que la version est une bêta (`v0.x`, #277), le signal, qu'il paraisse pour le rappel ou
+ *    pour la persistance refusée (#42), dit, avec les mots de l'issue, qu'un fichier peut « ne plus
+ *    s'ouvrir » à la « version suivante », et que la sauvegarde en garde une copie « telle quelle ».
+ *    La version publique `v1` retire ce point : son issue retire ce test.
  *
  * Les assertions sont dans des fonctions à part, pour que les témoins rouges, en fin de chaque
  * point, rejouent les mêmes sur une version volontairement cassée du besoin ; les témoins se jouent
@@ -76,9 +80,10 @@
  * - 0 : points 3, 6, 7 et 8 — un rappel qui se tait, ou qui se tait parce qu'une date venue d'une
  *   autre instance ou d'autres données le trompe, laisse perdre des données que rien ne rendra ; un
  *   fichier qui ne rouvre pas tout, ou une requête sortie, le sont pour de bon (C5, I7).
- * - 1 : points 1, 2, 4 et 5 — la promesse de C5 et d'I4 tombe (savoir sans chercher où en sont ses
- *   données, un signal qui ne bloque rien, sauvegarder en un geste), sans qu'une donnée soit perdue
- *   par là.
+ * - 1 : points 1, 2, 4, 5 et 10 — la promesse de C5 et d'I4 tombe (savoir sans chercher où en sont
+ *   ses données, un signal qui ne bloque rien, sauvegarder en un geste, savoir qu'une bêta peut ne
+ *   plus rouvrir son fichier), sans qu'une donnée soit perdue par là : un fichier d'un autre format
+ *   est refusé sans être effacé, et l'application propose de l'enregistrer tel quel (D30, D58).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -181,6 +186,18 @@ function vérifierUnSeulSignal(a: Accueil): void {
   const t = a.signaux[0]!.texte;
   expect(DIT_LE_RISQUE(t), `${a.où} : le signal ne dit plus que les données peuvent être effacées par le navigateur (#42) : « ${résumé(t)} »`).toBe(true);
   expect(/sauvegard/i.test(t), `${a.où} : le signal ne dit rien de la sauvegarde : « ${résumé(t)} »`).toBe(true);
+}
+
+/** Point 10, avec les mots de l'issue : « un fichier peut ne plus s'ouvrir à la version suivante », « une copie telle quelle ». */
+function vérifierBêta(a: Accueil): void {
+  expect(a.signaux.length, `${a.où} : pas de signal sur l'accueil`).toBeGreaterThan(0);
+  const t = a.signaux[0]!.texte;
+  const manque = [
+    [/ne plus s['’]ouvrir/i, '« ne plus s’ouvrir »'],
+    [/version suivante/i, '« version suivante »'],
+    [/tel(le)?s? quel(le)?s?/i, '« telle quelle »'],
+  ].filter(([m]) => !(m as RegExp).test(t)).map(([, d]) => d as string);
+  expect(manque, `${a.où} : en bêta, le signal ne dit pas qu'un fichier peut ne plus s'ouvrir à la version suivante, ni que la sauvegarde en garde une copie telle quelle : « ${résumé(t)} »`).toEqual([]);
 }
 
 interface Étape {
@@ -1224,5 +1241,26 @@ describe('[niveau 0] C5 · #41 · 8. rien ne se perd, rien ne sort', () => {
   });
   it.fails('témoin rouge · une requête sortie pendant la sauvegarde', () => {
     vérifierRienNeSort('sauvegarde', 'http://localhost:4173', [{ méthode: 'POST', url: 'https://sauvegarde.exemple.invalid/depot', corps: true }]);
+  });
+});
+
+describe('[niveau 1] C5 · #41 · 10. une bêta le dit', () => {
+  describe.skipIf(!navigateur)('dans le navigateur', () => {
+    for (const réponse of ['accordée', 'refusée'] as const) {
+      it(`${réponse === 'accordée' ? 'le rappel' : 'le signal de la persistance refusée'} dit qu'en bêta un fichier peut ne plus s'ouvrir à la version suivante, et que la sauvegarde le garde tel quel`, async () => {
+        const a = await instance(site, J, réponse);
+        try {
+          await chargerLExemple(a);
+          await rouvrir(a);
+          vérifierBêta(await lireLAccueil(a, `persistance ${réponse}, jamais sauvegardé`, true));
+        } finally {
+          await fermer(a);
+        }
+      }, 120_000);
+    }
+  });
+
+  it.fails('témoin rouge · un signal de bêta qui tait que le fichier peut ne plus s’ouvrir', () => {
+    vérifierBêta({ où: 'rappel', signaux: [{ texte: 'Pensez à enregistrer une copie de vos données\nDernière sauvegarde : jamais\nDernière synchronisation : jamais', commandes: ['Enregistrer une copie', 'Masquer'] }] });
   });
 });
