@@ -42,12 +42,17 @@
  *
  * Niveaux (#232, D83), marqués dans chaque titre ; un témoin a le niveau de ce qu'il garde :
  * - 0 : point 3, les deux tests sans doublon ; point 4, une ligne refusée, écrite ou reçue, n'écrit
- *   rien ; point 6, les quatre tests ; point 7, l'export qui se rouvre à l'identique, et la
- *   convergence (I8), au niveau de « #196 · 2. deux instances convergent » (`fichier-etat.test.ts`) :
- *   deux tests du même besoin ont le même niveau (#246).
+ *   rien ; point 6, les quatre tests ; point 7, l'export qui se rouvre à l'identique.
  * - 2 : points 1, 2 et 5 ; point 3, la forme de la clé ; point 4, chaque colonne refusée et le refus
  *   par le fichier lui-même ; point 7, le plan et l'import.
  * - 3 : point 4, les deux refus qui nomment la table et la colonne.
+ *
+ * Au point 7, la convergence (I8) est retirée, en doublon (#246) : « #196 · 2. deux instances
+ * convergent » (`fichier-etat.test.ts`, niveau 0, au registre) la couvre, en direct, par le relais
+ * et par fichier, avec créations, modifications et suppressions dans toutes les tables, tirelires,
+ * automatismes et besoins compris. L'export qui se rouvre à l'identique reste : il compare le
+ * contenu de chaque table du fichier, horloges des lignes et table `meta` comprises, que
+ * « #196 · 8 » ne lit que par `load()`.
  */
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
@@ -773,19 +778,6 @@ describe('#197 · 7. ce qui tenait tient encore', () => {
     const b = await instance(bytes.slice());
     expect(etat(b)).toEqual(etat(a));
     expect(contenu(b.export())).toBe(contenu(bytes));
-  });
-
-  it('deux instances convergent [niveau 0]', async () => {
-    const a = await semee();
-    const b = await instance();
-    await direct(a, b);
-    a.upsert('tirelires', { ...lignes(a, 'tirelires')[0]!, name: 'Renommée par A' } as never);
-    b.upsert('automations', { ...lignes(b, 'automations')[0]!, name: 'Renommé par B' } as never);
-    b.remove('needs', lignes(b, 'needs')[0]!.id);
-    await direct(a, b);
-    expect(etat(b)).toEqual(etat(a));
-    expect(lignes(b, 'tirelires')[0]!['name']).toBe('Renommée par A');
-    expect(lignes(a, 'automations')[0]!['name']).toBe('Renommé par B');
   });
 
   it('l’exemple se charge et donne le même plan qu’avant [niveau 2]', async () => {
