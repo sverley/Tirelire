@@ -106,9 +106,11 @@ de son test.
   de la période en cours se lit en entier — dotations, lissage de l'échéance, marge, virement à
   faire — et le bilan ne fabrique aucun observé, sans une seule opération.
   Témoin rouge : « témoin rouge · un plan dont les dotations viennent de ce que les opérations montrent »
-- **Vérification manuelle** · `VM-I3-u1-parcours` — (U1) Sur une base vide, construire un budget
-  avec l'assistant jusqu'au plan sans importer de relevé : aucun écran ne bloque ni n'insiste pour
-  importer, et le plan se lit.
+- **Vérification manuelle** · `VM-I3-u1-parcours` — Si la PR touche l'application : (U1) Sur une
+  base vide, construire un budget avec l'assistant jusqu'au plan sans importer de relevé : aucun
+  écran ne bloque ni n'insiste pour importer, et le plan se lit. Si elle ne touche que des tests, de
+  l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi l'application
+  n'est pas atteinte.
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — (U2) le virement permanent
   enregistre le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le
   budget se signale sans rien réécrire (#14, D60).
@@ -121,23 +123,29 @@ de son test.
   survit au redémarrage comme fait bancaire — un par couple de comptes, libellé à recopier — et le
   plan lit sa ventilation sans jamais la figer.
   Témoin rouge : « témoin rouge · un ordre validé qui ne laisse aucune trace dans la base »
-- **Vérification manuelle** · `VM-I3-u2-ordres` — (U2) Construire un budget, puis valider la mise
-  en place des virements permanents proposés : chaque ordre est enregistré, et sa ventilation sur
-  les tirelires se lit dans le plan.
+- **Vérification manuelle** · `VM-I3-u2-ordres` — Si la PR touche l'application : (U2) Construire un
+  budget, puis valider la mise en place des virements permanents proposés : chaque ordre est
+  enregistré, et sa ventilation sur les tirelires se lit dans le plan. Si elle ne touche que des
+  tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi
+  l'application n'est pas atteinte.
 - **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » (U3) : virements
   « TIRELIRE … » reconnus et répartis par l'ordre de financement (D21), flux rapprochés quand
   libellé et montant concordent.
   Témoin rouge : « témoin rouge · un virement reconnu versé en entier à une seule tirelire »
-- **Vérification manuelle** · `VM-I3-u3-rapprochement` — (U3) Construire un budget sans valider
-  les virements, puis importer un relevé inventé qui les contient : l'application propose de les
-  rapprocher et reprend la ventilation prévue par le budget.
+- **Vérification manuelle** · `VM-I3-u3-rapprochement` — Si la PR touche l'application : (U3)
+  Construire un budget sans valider les virements, puis importer un relevé inventé qui les
+  contient : l'application propose de les rapprocher et reprend la ventilation prévue par le budget.
+  Si elle ne touche que des tests, de l'outillage ou de la documentation : dire dans le compte rendu
+  du codeur pourquoi l'application n'est pas atteinte.
 - **À bâtir** · (U3) le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
 - **Harnais** · `packages/core/test/review.test.ts` — (U4) bilans par catégorie et des provisions
   tirés des opérations ; une proposition d'ajustement ne s'applique jamais seule.
   Témoin rouge : « témoin rouge · un bilan qui compte les dépenses ponctuelles dans la moyenne »
-- **Vérification manuelle** · `VM-I3-u4-reconstruction` — (U4) Sans budget, importer un historique
-  inventé et reconstruire un budget depuis les opérations : chaque lien entre une opération et un
-  flux se valide, rien ne s'applique sans accord, et la ventilation est demandée, jamais supposée.
+- **Vérification manuelle** · `VM-I3-u4-reconstruction` — Si la PR touche l'application : (U4) Sans
+  budget, importer un historique inventé et reconstruire un budget depuis les opérations : chaque
+  lien entre une opération et un flux se valide, rien ne s'applique sans accord, et la ventilation
+  est demandée, jamais supposée. Si elle ne touche que des tests, de l'outillage ou de la
+  documentation : dire dans le compte rendu du codeur pourquoi l'application n'est pas atteinte.
 - **À bâtir** · (U4) le parcours complet, des opérations importées au budget reconstruit (#16).
 - **Harnais** · `packages/core/test/import.test.ts` — (U5) lecture des relevés, doublons exacts et
   probables.
@@ -149,9 +157,11 @@ de son test.
   appliqué et relu après redémarrage ; le bilan par catégorie se lit et le plan ne réclame rien,
   sans qu'aucune tirelire, aucun besoin ni aucun budget n'existe jamais.
   Témoin rouge : « témoin rouge · un bilan qui ne compte que les opérations rattachées à une tirelire »
-- **Vérification manuelle** · `VM-I3-u5-sans-tirelire` — (U5) Sur une base vide, importer un
-  relevé inventé, classer ses opérations et lire l'analyse par catégorie sans jamais créer de
-  tirelire ni de budget : aucun écran ne l'exige, aucun ne reste vide faute d'en avoir.
+- **Vérification manuelle** · `VM-I3-u5-sans-tirelire` — Si la PR touche l'application : (U5) Sur
+  une base vide, importer un relevé inventé, classer ses opérations et lire l'analyse par catégorie
+  sans jamais créer de tirelire ni de budget : aucun écran ne l'exige, aucun ne reste vide faute
+  d'en avoir. Si elle ne touche que des tests, de l'outillage ou de la documentation : dire dans le
+  compte rendu du codeur pourquoi l'application n'est pas atteinte.
 
 ## I4 · Simple par défaut, souple sur demande
 
@@ -200,9 +210,11 @@ reste devant le produit, et le seuil interdit la hausse.
   comparé à son seuil ; une opération remise à zéro par le harnais avant chaque mesure, et la
   sous-catégorie créée par l'interface.
   Témoin rouge : « témoin rouge · un classement qui coûte un geste de plus que le seuil »
-- **Vérification manuelle** · `VM-I6-gestes` — Sur la version de dev, compter les gestes pour classer une
-  opération importée, puis toutes les opérations semblables, et constater qu'aucun des deux nombres
-  ne dépasse celui de `main`.
+- **Vérification manuelle** · `VM-I6-gestes` — Si la PR touche l'application : sur la version de
+  dev, compter les gestes pour classer une opération importée, puis toutes les opérations
+  semblables, et constater qu'aucun des deux nombres ne dépasse celui de `main`. Si elle ne touche
+  que des tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur
+  pourquoi l'application n'est pas atteinte.
 
 ## I7 · Les données restent en local
 
@@ -254,10 +266,12 @@ Chemins : `packages/core/src/sync.ts`, `packages/core/src/store.ts`, `packages/c
 - **Harnais** · `apps/relay/server.test.mjs`, `apps/hebergement/relais.test.mjs` — relais Node et
   PHP : dépôt, puis retrait filtré par appareil.
   Témoin rouge : « témoin rouge · un relais qui rend à chaque appareil ce qu’il a lui-même déposé »
-- **Vérification manuelle** · `VM-I8-deux-instances` — Relier deux instances par QR code, puis deux
-  sessions d'ordinateur sans appareil photo ; modifier des deux côtés : elles convergent en direct,
-  puis par le relais quand elles ne sont pas ouvertes ensemble, et l'avertissement sur le dépôt de
-  données chiffrées paraît à la première mise en lien.
+- **Vérification manuelle** · `VM-I8-deux-instances` — Si la PR touche l'application ou le relais :
+  relier deux instances par QR code, puis deux sessions d'ordinateur sans appareil photo ; modifier
+  des deux côtés : elles convergent en direct, puis par le relais quand elles ne sont pas ouvertes
+  ensemble, et l'avertissement sur le dépôt de données chiffrées paraît à la première mise en lien.
+  Si elle ne touche que des tests, de l'outillage ou de la documentation : dire dans le compte rendu
+  du codeur pourquoi ni l'application ni le relais ne sont atteints.
 - **À bâtir** · deux instances en direct et par relais, y compris entre deux personnes (#31).
 - **Harnais** · `apps/web/test/compte-principal.test.ts` — le compte principal existe dans toute
   base, même vide, sous la même identité partout ; ce qui est renseigné l'emporte sur le défaut,
