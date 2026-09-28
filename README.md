@@ -101,16 +101,17 @@ niveau :
   a besoin, avec un message.
 - **pré-fusion** (`pre-merge-commit`, et le pré-commit pendant un conflit) et **pré-push** : la
   livraison, jugée sur l'état commis — l'index ou le commit poussé, jamais la copie de travail.
-  - Chaque ensemble de tests (garde, cœur, relais, hébergement, interface) ne se joue que si son
-    empreinte — l'état des chemins qu'il lit — n'est pas déjà verte, ni celle de `main` ; le moins
-    cher d'abord : typecheck, puis tests. Les tests navigateur (`apps/web/test/navigateur/`) restent
-    au Ready, sauf demande : `pnpm livraison --navigateur` (D83, « L'empreinte et l'attestation »).
+  - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
+    `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
+    touchés, tests headless de l'interface ; durée attendue 30 s) ou **organisationnel** (tests de la
+    garde ; durée attendue 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
+    restent au Ready, en CI, sauf demande : `pnpm livraison --navigateur` (D83). Le typecheck se
+    joue avant les tests, et les tests navigateur ne partent que si le reste est vert. Un dépassement de plus de 20 % s'affiche, sans bloquer.
   - Le harnais du besoin est toujours joué, à part et hors durée attendue. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.
-  - Ce qui a été trouvé vert, à un crochet ou à une demande, ne se rejoue pas : l'attestation le
-    porte, sur `<branche>--attestation`. Un push vers une sous-branche (`<branche>--codeur`,
-    `<branche>--auditeur`) ne joue que la non-régression.
+  - Le pré-push ne rejoue pas un arbre déjà vérifié à la fusion. Un push vers une sous-branche
+    (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la non-régression.
 - **CI** : au passage en Ready de chaque PR, jamais en brouillon, typecheck, tests (navigateur compris), build, en mode strict
   (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job.
 

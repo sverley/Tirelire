@@ -19,12 +19,11 @@
  * ligne le dit, pour que ce nombre ne passe pas pour celui des tests exécutés (#232, point 3). Tout
  * paquet accepte l'option, puisque `pnpm test` la passe à chacun ; hors vitest, elle ne change rien.
  *
- * `--attestation <fichier>` (#237, #264) : le fichier que la CI écrit d'après les empreintes vertes
- * de l'arbre (`.githooks/attestation.mjs`). S'il vise l'arbre extrait et que chaque ensemble de ce
- * lancement — d'après le paquet, les cibles et `--navigateur` — y est vert à un seuil au moins égal,
- * le lanceur ne joue rien et dit pourquoi ; sinon il joue tout, et le dit aussi. Un fichier absent
- * vaut « aucune empreinte verte ». La décision de la CI passe ainsi par les arguments, jamais par une
- * variable d'environnement (D83).
+ * `--attestation <fichier>` (#237) : le fichier que la CI écrit d'après l'attestation de la livraison
+ * (`.githooks/attestation.mjs`). Si l'attestation vise l'arbre extrait et couvre ce lancement —
+ * paquet, seuil, cibles, tests navigateur —, le lanceur ne joue rien et dit pourquoi ; sinon il joue
+ * tout, et le dit aussi. Un fichier absent vaut « aucune attestation ». La décision de la CI passe
+ * ainsi par les arguments, jamais par une variable d'environnement (D83).
  *
  * - vitest : le seuil devient un filtre de nom complet (`-t`), et un rapporteur de plus compte les
  *   tests écartés (`niveaux-vitest-rapport.mjs`).
@@ -63,7 +62,7 @@ for (let i = 0; i < lu.reste.length; i++) {
 const nomme = reste.some((a) => (vitest ? /^(?:-t|--testNamePattern|--test-name-pattern)(?:=|$)/ : /^--test-name-pattern(?:=|$)/).test(a));
 const filtre = !nomme && seuil < NIVEAU_MAX;
 
-// Les empreintes vertes (#237, #264) : ce lancement est-il couvert ?
+// L'attestation (#237) : ce lancement est-il couvert par ce que la livraison a joué sur cet arbre ?
 if (fichierAttestation !== null) {
   const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   let couverture = null;
