@@ -337,7 +337,9 @@ describe('[niveau 1] I9 ; D83, une fois par passage (#153) ; D81, la garde de ma
   }
 
   test('témoin rouge · une CI qui dépose main en production', () => {
-    const cassé = productionRéécrite(lire(CI), (lignes) => ["    if: github.event_name != 'pull_request'", ...sansCondition(lignes)]);
+    // Le dépôt n'attend plus que l'assemblage : sans cela, l'attente du tag (#274) le retiendrait sur main.
+    const sansTag = (lignes) => lignes.map((l) => (/^ {4}needs:/.test(l) ? '    needs: hebergement' : l));
+    const cassé = productionRéécrite(lire(CI), (lignes) => ["    if: github.event_name != 'pull_request'", ...sansTag(sansCondition(lignes))]);
     assert.notEqual(cassé, lire(CI), 'le workflow n’a pas pu être cassé : le harnais de #233 est à relire');
     assert.throws(() => oùSeDéposeLeSite(cassé), /sur main, le site doit se déposer à la racine de la recette, et là seulement ; dépôts : .*la production/);
   });

@@ -136,8 +136,9 @@ describe('[niveau 2] D82 et D83 : brouillon, Ready, aperçu, changement signalé
   const clés = (jobs) => jobs.map((j) => j.clé).sort();
 
   const TYPECHECK = /\bpnpm\s+(?:-r\s+)?typecheck\b/;
-  // `pnpm test`, ou `pnpm test N` : toute la suite, jusqu'au seuil N (#232).
-  const SUITE = /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test(?:\s+[0-4])?\s*$/m;
+  // `pnpm test`, ou `pnpm test N` : toute la suite, jusqu'au seuil N (#232), avec le fichier des
+  // empreintes vertes, qui n'en saute que ce qui est vert sur son empreinte (#266).
+  const SUITE = /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test(?:\s+[0-4])?(?:\s+--attestation\s+\S+)?\s*$/m;
   const BUILD = /\bpnpm\s+(?:-r\s+)?(?:run\s+)?build\b/;
   const GARDE = /packages\/gardes\/cli\.mjs/;
   const DÉPÔT_DE_LA_VERSION_DE_DEV = /apercu\.sh\s+deposer/;

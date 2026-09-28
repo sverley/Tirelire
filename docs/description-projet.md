@@ -618,3 +618,53 @@ Et, à l'audit de #259 (« pour sauter les tests navigateur quand la PR ne touch
 j'ouvre une issue à part, à traiter après la fusion de #259 ? ») :
 
 > non, on traite ici
+
+## 28 septembre 2026 · la version forcée
+
+Dans #274, sur la production, que seul le tag d'une version dépose depuis #233 :
+
+> Or je veux pouvoir pousser (meme manuellement) une version en prod
+
+À la proposition de l'architecte, un déclenchement manuel qui dépose en production sans publier de
+version :
+
+> ok, je préfère une version. Est-il possible de faire une CI pour ajoute une version ?
+
+Puis, sur le nom de la version :
+
+> on tag avec le dernier numero de version publié + un hash court du commit. Si la derniere est v0.2, le forcage passe à v0.2-#id_commit. l'ajout de version "numérotée" reste manuelle
+
+Puis, aux deux lectures de l'architecte — le « # » marque la place du hash et ne s'écrit pas dans
+le tag ; tant qu'aucune version numérotée n'est publiée, la base est `v0.0` : « oui ».
+
+## 28 septembre 2026 · les empreintes des tests
+
+Dans #264 :
+
+> je souhaite qu'on soit econome et efficace. Donc les tests lourds ne doivent tourner qu'en cas de besoin, au moment où on la le plus de chance qu'ils soient OK (on vérifie tout avant de les lancer, on ne les lance que si OK ou de manière justifiée). Le processus complet de la CI et des hook git doit être pris en compte. Les attestions devait permettre par exemple de ne pas faire tourner en CI ou en hook des tests qui ont déjà tournés (et dont le code n'a pas eté modifié entre temps) à une étape antérieur
+
+Puis, à la construction proposée par l'architecte — chaque ensemble de tests connaît les chemins
+qu'il lit, et son empreinte est l'état de ces chemins ; un ensemble vert sur une empreinte ne se
+rejoue plus, ni au crochet suivant, ni en CI, tant que ces chemins n'ont pas changé :
+
+> oui
+
+Puis, à la proposition de réduire #264 à ses parties A et C, et d'en sortir la partie B, les
+empreintes, dans #266 :
+
+> ok
+
+> mais il ne faut pas perdre ce qu'il a déja fait (et peut etre non commité)
+
+Puis, après l'audit de #264 réduit :
+
+> specifie la partie B dasn son ticket
+
+Puis, à la question de l'architecte (au Ready, la CI rejoue-t-elle toujours le seuil 1, ou le
+« ni en CI » de la construction le saute-t-il aussi quand l'empreinte est verte ?) :
+
+> si l'empreinte est verte, on ne joue pas les tests, c'est universel
+
+Puis, au codeur de #266 qui attendait la fusion de #264 réduit et le passage de l'auditeur :
+
+> reprends, et code sans harnais
