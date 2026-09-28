@@ -608,3 +608,13 @@ fusion, sans attestation locale, ou garder la construction complète.
 Puis, le 28 septembre, au codeur qui attendait le harnais de l'auditeur :
 
 > pas de harnais necessaire, code
+
+Le même jour, à la proposition d'alléger l'audit, où le navigateur ne sert que si l'interface est
+touchée :
+
+> ne pas oublié que le but est de moins consommer de CI aussi... mais les test nvigateur quand c'est inutile doivent sauter c'est sur
+
+Et, à l'audit de #259 (« pour sauter les tests navigateur quand la PR ne touche pas l'interface,
+j'ouvre une issue à part, à traiter après la fusion de #259 ? ») :
+
+> non, on traite ici
