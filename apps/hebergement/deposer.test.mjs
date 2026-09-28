@@ -2,7 +2,7 @@
 // serveur : paquets de synchronisation (`donnees/*.jsonl`) et configuration locale du relais.
 // Joué contre un vrai serveur FTP local (pyftpdlib). Sauté si `lftp` ou `pyftpdlib` manquent, sauf si
 // `TIRELIRE_STRICT` est posé, comme en CI : il échoue alors (#59).
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -71,57 +71,62 @@ function deposer(source, racineDistante, env = {}) {
   return r.stdout + r.stderr;
 }
 
-test('dépôt FTP : le site monte, les données du serveur restent', { skip: !strict && raison }, async (t) => {
-  assert.equal(raison, false, `${raison}, alors que TIRELIRE_STRICT rend l'outil obligatoire`);
-  const base = mkdtempSync(path.join(tmpdir(), 'depot-'));
-  const source = path.join(base, 'site');
-  const distant = path.join(base, 'serveur');
-  siteDeTest(source);
-  serveurDeTest(distant);
-  const serveur = demarrerServeur(distant);
-  await new Promise((r) => setTimeout(r, 600));
+// Niveau 2 (D83) : un cas de D37. Un dépôt qui écraserait les paquets du relais ne perdrait rien
+// pour de bon — les données restent sur les appareils, un dépôt manqué se retrouve par un échange
+// direct ou par fichier (docs/synchronisation.md) —, et aucun énoncé du registre ne le nomme.
+describe('[niveau 2] D37 · le dépôt par lftp : le site monte, ce qui vit sur le serveur reste', () => {
+  test('dépôt FTP : le site monte, les données du serveur restent', { skip: !strict && raison }, async (t) => {
+    assert.equal(raison, false, `${raison}, alors que TIRELIRE_STRICT rend l'outil obligatoire`);
+    const base = mkdtempSync(path.join(tmpdir(), 'depot-'));
+    const source = path.join(base, 'site');
+    const distant = path.join(base, 'serveur');
+    siteDeTest(source);
+    serveurDeTest(distant);
+    const serveur = demarrerServeur(distant);
+    await new Promise((r) => setTimeout(r, 600));
 
-  try {
-    await t.test('essai à blanc : rien ne bouge', () => {
-      deposer(source, distant, { BLANC: '1' });
-      assert.equal(existsSync(path.join(distant, 'www/index.html')), false);
-    });
-
-    await t.test('transfert : fichiers cachés compris, données intactes', () => {
-      deposer(source, distant);
-      for (const f of ['index.html', 'relais.php', '.htaccess', '.ovhconfig', 'assets/index-neuf.js', 'donnees/.htaccess']) {
-        assert.ok(existsSync(path.join(distant, 'www', f)), `${f} manquant sur le serveur`);
-      }
-      assert.equal(readFileSync(path.join(distant, 'www/donnees/salon-1234.jsonl'), 'utf8'), '{"id":1}\n');
-      assert.equal(readFileSync(path.join(distant, 'www/relais.config.php'), 'utf8'), '<?php return [];');
-      // Sans nettoyage, l'ancien fichier reste : les appareils encore sur l'ancienne version
-      // peuvent charger leurs ressources.
-      assert.ok(existsSync(path.join(distant, 'www/assets/index-vieux.js')));
-    });
-
-    await t.test('nettoyage : les anciens fichiers partent, jamais les paquets ni la configuration', () => {
-      deposer(source, distant, { NETTOYER: 'oui' });
-      assert.equal(existsSync(path.join(distant, 'www/assets/index-vieux.js')), false);
-      assert.ok(existsSync(path.join(distant, 'www/donnees/salon-1234.jsonl')));
-      assert.ok(existsSync(path.join(distant, 'www/relais.config.php')));
-      assert.ok(existsSync(path.join(distant, 'www/index.html')));
-    });
-
-    await t.test('adresse copiée avec un schéma ou un chemin : nettoyée', () => {
-      const journal = deposer(source, distant, { HOTE: `ftp://127.0.0.1:${PORT}/www` });
-      assert.match(journal, /ramenée à « 127\.0\.0\.1:2121 »/);
-      assert.ok(existsSync(path.join(distant, 'www/index.html')));
-    });
-
-    await t.test('source qui n’est pas un site assemblé : refus', () => {
-      const r = spawnSync('bash', [path.join(ici, 'deposer.sh')], {
-        env: { ...process.env, HOTE: '127.0.0.1', UTILISATEUR: 'x', MOTDEPASSE: 'y', SOURCE: base },
-        encoding: 'utf8',
+    try {
+      await t.test('essai à blanc : rien ne bouge', () => {
+        deposer(source, distant, { BLANC: '1' });
+        assert.equal(existsSync(path.join(distant, 'www/index.html')), false);
       });
-      assert.notEqual(r.status, 0);
-      assert.match(r.stderr, /site assemblé/);
-    });
-  } finally {
-    serveur.kill();
-  }
+
+      await t.test('transfert : fichiers cachés compris, données intactes', () => {
+        deposer(source, distant);
+        for (const f of ['index.html', 'relais.php', '.htaccess', '.ovhconfig', 'assets/index-neuf.js', 'donnees/.htaccess']) {
+          assert.ok(existsSync(path.join(distant, 'www', f)), `${f} manquant sur le serveur`);
+        }
+        assert.equal(readFileSync(path.join(distant, 'www/donnees/salon-1234.jsonl'), 'utf8'), '{"id":1}\n');
+        assert.equal(readFileSync(path.join(distant, 'www/relais.config.php'), 'utf8'), '<?php return [];');
+        // Sans nettoyage, l'ancien fichier reste : les appareils encore sur l'ancienne version
+        // peuvent charger leurs ressources.
+        assert.ok(existsSync(path.join(distant, 'www/assets/index-vieux.js')));
+      });
+
+      await t.test('nettoyage : les anciens fichiers partent, jamais les paquets ni la configuration', () => {
+        deposer(source, distant, { NETTOYER: 'oui' });
+        assert.equal(existsSync(path.join(distant, 'www/assets/index-vieux.js')), false);
+        assert.ok(existsSync(path.join(distant, 'www/donnees/salon-1234.jsonl')));
+        assert.ok(existsSync(path.join(distant, 'www/relais.config.php')));
+        assert.ok(existsSync(path.join(distant, 'www/index.html')));
+      });
+
+      await t.test('adresse copiée avec un schéma ou un chemin : nettoyée', () => {
+        const journal = deposer(source, distant, { HOTE: `ftp://127.0.0.1:${PORT}/www` });
+        assert.match(journal, /ramenée à « 127\.0\.0\.1:2121 »/);
+        assert.ok(existsSync(path.join(distant, 'www/index.html')));
+      });
+
+      await t.test('source qui n’est pas un site assemblé : refus', () => {
+        const r = spawnSync('bash', [path.join(ici, 'deposer.sh')], {
+          env: { ...process.env, HOTE: '127.0.0.1', UTILISATEUR: 'x', MOTDEPASSE: 'y', SOURCE: base },
+          encoding: 'utf8',
+        });
+        assert.notEqual(r.status, 0);
+        assert.match(r.stderr, /site assemblé/);
+      });
+    } finally {
+      serveur.kill();
+    }
+  });
 });
