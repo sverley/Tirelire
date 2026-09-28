@@ -6,7 +6,7 @@ import { activeAt, alive, budgetSuggestions, exampleLedger, euros, nextDueDate }
  * d'exemple. Ce test fige cet engagement — si quelqu'un ajoute une proposition écrite en dur, il
  * échoue, et c'est bien le but : c'est l'exemple qu'il faut étoffer.
  */
-describe("propositions de l'assistant (D43)", () => {
+describe("[niveau 2] propositions de l'assistant (D43)", () => {
   // Date explicite : l'exemple porte plusieurs versions d'un même budget (D51) et les propositions
   // suivent celle qui est en vigueur. Sans date figée, ce test changerait de résultat tout seul.
   const asOf = '2026-09-06';

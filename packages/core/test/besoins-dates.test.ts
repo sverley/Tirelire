@@ -59,7 +59,7 @@ const dotations = (l: Ledger, jusqua: string) => {
   return tirelireTimeline(idx.tireliresById.get('tir')!, idx, jusqua).map((s) => [s.period.key, s.dotation] as const);
 };
 
-describe('période de validité d’un besoin (D50)', () => {
+describe('[niveau 2] période de validité d’un besoin (D50)', () => {
   it('dote chaque période au budget qui était le sien', () => {
     expect(dotations(foyer(true), '2025-04-15')).toEqual([
       ['2025-01', euros(300)],
