@@ -1,10 +1,11 @@
 #!/bin/sh
 # Pré-push de Tirelire (#121) : chaque référence poussée est jugée sur son commit, par
 # livraison.sh. Un arbre déjà vérifié à la fusion n'est pas rejoué ; un push vers une sous-branche
-# (`--codeur`, `--auditeur`) ne joue que la non-régression. Le build est laissé à la CI.
+# (`--codeur`, `--auditeur`) ne joue que la non-régression. Le build est laissé à la CI. L'attestation
+# d'un arbre vérifié part vers le même dépôt distant ($1), sur `<branche>--attestation` (#237).
 set -u
 code=0
 while read -r lref lsha rref rsha; do
-  sh "$(dirname "$0")/livraison.sh" push "$lref" "$lsha" "$rref" "$rsha" </dev/null || code=1
+  sh "$(dirname "$0")/livraison.sh" push "$lref" "$lsha" "$rref" "$rsha" "${1:-}" </dev/null || code=1
 done
 exit $code

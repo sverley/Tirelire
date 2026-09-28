@@ -44,7 +44,7 @@ function relèveLaRedirectionHttps(script) {
   assert.match(bloc, /echecs=\$\(\(echecs \+ 1\)\)/, `${SCRIPT} : une redirection absente ne compte pas son échec`);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] C3 · harnais du registre : après chaque dépôt, le site en ligne redirige HTTP vers HTTPS', () => {
   test('C3 · le script de vérification sonde l’adresse en http:// et relève la redirection', () => {
     relèveLaRedirectionHttps(lire());
   });

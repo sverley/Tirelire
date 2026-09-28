@@ -18,6 +18,8 @@
 # Exécuté (`sh .githooks/harnais-du-besoin.sh --jouer`), il joue le harnais du besoin en entier, au
 # seuil 4, tests navigateur activés, dans le paquet de chaque fichier, et sort en échec si l'un
 # rougit : c'est l'étape de la CI au Ready. Sans harnais du besoin, il le dit et sort en succès.
+# `--jouer --attestation <fichier>` passe le fichier à `pnpm test` (#237) : ce que la livraison a
+# joué sur cet arbre, harnais vert, n'est pas rejoué, et le lanceur le dit.
 
 # Nom de la branche : celle qui est extraite, sinon celle de la PR en CI.
 branche_du_besoin() {
@@ -65,6 +67,8 @@ harnais_du_besoin() {
 
 if [ "${1:-}" = --jouer ]; then
   set -u
+  hdb_attestation=''
+  [ "${2:-}" = --attestation ] && hdb_attestation=${3:-}
   hdb_racine=$(git rev-parse --show-toplevel) || exit 1
   cd "$hdb_racine" || exit 1
   hdb_liste=$(mktemp) || exit 1
@@ -79,7 +83,11 @@ if [ "${1:-}" = --jouer ]; then
     hdb_fichiers=$(grep -E "^$hdb_d/" "$hdb_liste" | sed "s#^$hdb_d/##" | tr '\n' ' ')
     echo "harnais du besoin, en entier (seuil 4) — $hdb_d : $hdb_fichiers"
     # shellcheck disable=SC2086 # un fichier par mot
-    pnpm --dir "$hdb_d" run test 4 --navigateur $hdb_fichiers || hdb_code=1
+    if [ -n "$hdb_attestation" ]; then
+      pnpm --dir "$hdb_d" run test 4 --navigateur --attestation "$hdb_attestation" $hdb_fichiers || hdb_code=1
+    else
+      pnpm --dir "$hdb_d" run test 4 --navigateur $hdb_fichiers || hdb_code=1
+    fi
   done
   hdb_autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$hdb_liste" | tr '\n' ' ')
   if [ -n "$hdb_autres" ]; then

@@ -145,137 +145,156 @@ function lancer(commande, args, env) {
 
 // ─── Dépôt et retrait, contre un vrai serveur FTP ───────────────────────────────────────────────
 
-test('#141 · aperçu : déposé et retiré dans <dossier>/pr-<numéro>, jamais ailleurs', { skip: !strict && raison }, async (t) => {
-  assert.equal(raison, false, `${raison}, alors que TIRELIRE_STRICT rend l'outil obligatoire`);
-  const base = mkdtempSync(path.join(tmpdir(), 'apercu-'));
-  const source = path.join(base, 'site');
-  const distant = path.join(base, 'serveur');
-  siteDeTest(source);
-  serveurDeTest(distant);
-  const serveur = démarrerServeurFtp(distant);
-  await new Promise((r) => setTimeout(r, 600));
+// Niveau 1 (D83), même besoin que « témoin rouge · une CI qui dépose main en production »
+// (packages/gardes/distributions.test.mjs, niveau 1) : la production ne change que par une version
+// publiée — D83, « Livraison » ; D37, « seul un chemin <dossier>/pr-<numéro> peut l'être ; la
+// production ne change pas » —, ce que constate aussi `VM-C3-depot-main` au registre (C3). Les
+// mêmes identifiants FTP servent : un chemin faux déposerait le code d'une PR en production, ou la
+// retirerait. Pas plus bas : ni les données, qui restent sur les appareils, ni un secret n'y sont
+// perdus pour de bon. Ses cas nominaux (le site arrive dans pr-12, pr-12 part) vont avec : les en
+// sortir ne ferait gagner aucun seuil de façon mesurable, le démarrage du serveur FTP pesant seul.
+describe('[niveau 1] D37, D83 · un aperçu ne se dépose et ne se retire que dans <dossier>/pr-<numéro>, jamais en production', () => {
+  test('#141 · aperçu : déposé et retiré dans <dossier>/pr-<numéro>, jamais ailleurs', { skip: !strict && raison }, async (t) => {
+    assert.equal(raison, false, `${raison}, alors que TIRELIRE_STRICT rend l'outil obligatoire`);
+    const base = mkdtempSync(path.join(tmpdir(), 'apercu-'));
+    const source = path.join(base, 'site');
+    const distant = path.join(base, 'serveur');
+    siteDeTest(source);
+    serveurDeTest(distant);
+    const serveur = démarrerServeurFtp(distant);
+    await new Promise((r) => setTimeout(r, 600));
 
-  const inchangé = (avant, message) => assert.deepEqual(instantané(distant), avant, message);
+    const inchangé = (avant, message) => assert.deepEqual(instantané(distant), avant, message);
 
-  try {
-    await t.test('deposer : le site monte dans recette/pr-12, et rien d’autre ne bouge', () => {
-      serveurDeTest(distant);
-      const avant = instantané(distant);
-      const r = apercu('deposer', { ...RECETTE, SOURCE: source });
-      const après = instantané(distant);
-      assert.equal(après['recette/pr-12/index.html'], '<html>Tirelire, l’aperçu neuf de la PR 12</html>', `le site n'est pas arrivé dans recette/pr-12 :\n${r.sortie}`);
-      assert.equal(après['recette/pr-12/.htaccess'], 'RewriteEngine On', 'les fichiers cachés du site ne sont pas partis');
-      assert.deepEqual(horsDe(après, 'recette/pr-12/'), horsDe(avant, 'recette/pr-12/'), 'un dépôt a touché hors de recette/pr-12');
-      assert.doesNotMatch(r.sortie, /recette\.exemple\.test/i, `le dépôt écrit l'adresse de recette au journal (#156) :\n${r.sortie}`);
-    });
-
-    for (const variable of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_DEV_SITE_URL']) {
-      await t.test(`deposer et retirer : sans ${variable}, rien ne bouge et la variable est nommée`, () => {
-        for (const action of ['deposer', 'retirer']) {
-          serveurDeTest(distant);
-          const avant = instantané(distant);
-          const r = apercu(action, { ...RECETTE, SOURCE: source, [variable]: undefined });
-          inchangé(avant, `${action} sans ${variable} a modifié le serveur`);
-          assert.match(r.sortie, new RegExp(variable), `${action} sans ${variable} ne le dit pas`);
-        }
+    try {
+      await t.test('deposer : le site monte dans recette/pr-12, et rien d’autre ne bouge', () => {
+        serveurDeTest(distant);
+        const avant = instantané(distant);
+        const r = apercu('deposer', { ...RECETTE, SOURCE: source });
+        const après = instantané(distant);
+        assert.equal(après['recette/pr-12/index.html'], '<html>Tirelire, l’aperçu neuf de la PR 12</html>', `le site n'est pas arrivé dans recette/pr-12 :\n${r.sortie}`);
+        assert.equal(après['recette/pr-12/.htaccess'], 'RewriteEngine On', 'les fichiers cachés du site ne sont pas partis');
+        assert.deepEqual(horsDe(après, 'recette/pr-12/'), horsDe(avant, 'recette/pr-12/'), 'un dépôt a touché hors de recette/pr-12');
+        assert.doesNotMatch(r.sortie, /recette\.exemple\.test/i, `le dépôt écrit l'adresse de recette au journal (#156) :\n${r.sortie}`);
       });
-    }
 
-    const commeLaProduction = [
-      ['dossier de recette = www, défaut de la production', { TIRELIRE_DEV_FTP_DOSSIER: 'www' }, 'TIRELIRE_DEV_FTP_DOSSIER'],
-      ['dossier de recette = dossier de production, à la barre près', { TIRELIRE_FTP_DOSSIER: 'recette', TIRELIRE_DEV_FTP_DOSSIER: 'recette/' }, 'TIRELIRE_DEV_FTP_DOSSIER'],
-      ['adresse de recette = adresse de production, à la barre près', { TIRELIRE_DEV_SITE_URL: `${RECETTE.TIRELIRE_SITE_URL}/` }, 'TIRELIRE_DEV_SITE_URL'],
-    ];
-    for (const [cas, réglage, variable] of commeLaProduction) {
-      await t.test(`deposer et retirer : ${cas}, rien ne bouge`, () => {
-        for (const action of ['deposer', 'retirer']) {
-          serveurDeTest(distant);
-          const avant = instantané(distant);
-          const r = apercu(action, { ...RECETTE, SOURCE: source, ...réglage });
-          inchangé(avant, `${action} (${cas}) a modifié le serveur`);
-          assert.match(r.sortie, new RegExp(variable), `${action} (${cas}) ne nomme pas ${variable}`);
-        }
-      });
-    }
-
-    await t.test('deposer et retirer : un numéro qui n’est pas un entier positif ne fait rien', () => {
-      for (const numéro of [undefined, '', '0', '-3', 'abc', '12/..', '../www', '12 13', '1e2']) {
-        for (const action of ['deposer', 'retirer']) {
-          serveurDeTest(distant);
-          const avant = instantané(distant);
-          apercu(action, { ...RECETTE, SOURCE: source, NUMERO: numéro });
-          inchangé(avant, `${action} avec NUMERO=${JSON.stringify(numéro)} a modifié le serveur`);
-        }
+      for (const variable of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_DEV_SITE_URL']) {
+        await t.test(`deposer et retirer : sans ${variable}, rien ne bouge et la variable est nommée`, () => {
+          for (const action of ['deposer', 'retirer']) {
+            serveurDeTest(distant);
+            const avant = instantané(distant);
+            const r = apercu(action, { ...RECETTE, SOURCE: source, [variable]: undefined });
+            inchangé(avant, `${action} sans ${variable} a modifié le serveur`);
+            assert.match(r.sortie, new RegExp(variable), `${action} sans ${variable} ne le dit pas`);
+          }
+        });
       }
-    });
 
-    await t.test('retirer : recette/pr-12 disparaît, paquets compris, et seulement lui', () => {
-      serveurDeTest(distant);
-      const avant = instantané(distant);
-      const r = apercu('retirer', RECETTE);
-      const après = instantané(distant);
-      const restes = Object.keys(après).filter((k) => k.startsWith('recette/pr-12'));
-      assert.deepEqual(restes, [], `recette/pr-12 n'est pas retiré :\n${r.sortie}`);
-      assert.deepEqual(après, horsDe(avant, 'recette/pr-12'), 'le retrait a touché hors de recette/pr-12');
-    });
-  } finally {
-    serveur.kill();
-  }
+      const commeLaProduction = [
+        ['dossier de recette = www, défaut de la production', { TIRELIRE_DEV_FTP_DOSSIER: 'www' }, 'TIRELIRE_DEV_FTP_DOSSIER'],
+        ['dossier de recette = dossier de production, à la barre près', { TIRELIRE_FTP_DOSSIER: 'recette', TIRELIRE_DEV_FTP_DOSSIER: 'recette/' }, 'TIRELIRE_DEV_FTP_DOSSIER'],
+        ['adresse de recette = adresse de production, à la barre près', { TIRELIRE_DEV_SITE_URL: `${RECETTE.TIRELIRE_SITE_URL}/` }, 'TIRELIRE_DEV_SITE_URL'],
+      ];
+      for (const [cas, réglage, variable] of commeLaProduction) {
+        await t.test(`deposer et retirer : ${cas}, rien ne bouge`, () => {
+          for (const action of ['deposer', 'retirer']) {
+            serveurDeTest(distant);
+            const avant = instantané(distant);
+            const r = apercu(action, { ...RECETTE, SOURCE: source, ...réglage });
+            inchangé(avant, `${action} (${cas}) a modifié le serveur`);
+            assert.match(r.sortie, new RegExp(variable), `${action} (${cas}) ne nomme pas ${variable}`);
+          }
+        });
+      }
+
+      await t.test('deposer et retirer : un numéro qui n’est pas un entier positif ne fait rien', () => {
+        for (const numéro of [undefined, '', '0', '-3', 'abc', '12/..', '../www', '12 13', '1e2']) {
+          for (const action of ['deposer', 'retirer']) {
+            serveurDeTest(distant);
+            const avant = instantané(distant);
+            apercu(action, { ...RECETTE, SOURCE: source, NUMERO: numéro });
+            inchangé(avant, `${action} avec NUMERO=${JSON.stringify(numéro)} a modifié le serveur`);
+          }
+        }
+      });
+
+      await t.test('retirer : recette/pr-12 disparaît, paquets compris, et seulement lui', () => {
+        serveurDeTest(distant);
+        const avant = instantané(distant);
+        const r = apercu('retirer', RECETTE);
+        const après = instantané(distant);
+        const restes = Object.keys(après).filter((k) => k.startsWith('recette/pr-12'));
+        assert.deepEqual(restes, [], `recette/pr-12 n'est pas retiré :\n${r.sortie}`);
+        assert.deepEqual(après, horsDe(avant, 'recette/pr-12'), 'le retrait a touché hors de recette/pr-12');
+      });
+    } finally {
+      serveur.kill();
+    }
+  });
 });
 
 // ─── Le commit servi ─────────────────────────────────────────────────────────────────────────────
 
-test('#156 · en CI, apercu.sh masque toutes les formes de l’adresse de recette', () => {
-  const brute = 'https://Recette.Exemple.test:8443/';
-  const masques = (env) => [...apercu('reglages', { ...RECETTE, TIRELIRE_DEV_SITE_URL: brute, ...env }).sortie.matchAll(/^::add-mask::(.*)$/gm)].map((m) => m[1]);
-  const posés = masques({ GITHUB_ACTIONS: 'true' });
-  for (const forme of [brute, 'https://recette.exemple.test:8443', 'Recette.Exemple.test:8443', 'recette.exemple.test:8443', 'Recette.Exemple.test']) {
-    assert.ok(posés.includes(forme), `« ${forme} » n'est pas masquée (masques : ${posés.join(', ')})`);
-  }
-  assert.deepEqual(masques({}), [], 'hors CI, aucune commande de masquage n’est écrite');
+// Niveau 2 (D83), un cas de #156 (« aucun journal de la CI … ne montre l'adresse de recette ») : un
+// secret GitHub, mais que les registres publics de certificats laissent découvrir (#156) ; l'écrire
+// dans un journal n'expose rien d'irréparable.
+describe('[niveau 2] #156 · l’adresse de recette ne s’écrit dans aucun journal de la CI', () => {
+  test('#156 · en CI, apercu.sh masque toutes les formes de l’adresse de recette', () => {
+    const brute = 'https://Recette.Exemple.test:8443/';
+    const masques = (env) => [...apercu('reglages', { ...RECETTE, TIRELIRE_DEV_SITE_URL: brute, ...env }).sortie.matchAll(/^::add-mask::(.*)$/gm)].map((m) => m[1]);
+    const posés = masques({ GITHUB_ACTIONS: 'true' });
+    for (const forme of [brute, 'https://recette.exemple.test:8443', 'Recette.Exemple.test:8443', 'recette.exemple.test:8443', 'Recette.Exemple.test']) {
+      assert.ok(posés.includes(forme), `« ${forme} » n'est pas masquée (masques : ${posés.join(', ')})`);
+    }
+    assert.deepEqual(masques({}), [], 'hors CI, aucune commande de masquage n’est écrite');
+  });
 });
 
-test('#141 · verifier.sh constate le commit servi quand COMMIT_ATTENDU est donné', async (t) => {
-  let page = '';
-  const serveur = createServer((req, res) => {
-    if (req.url === '/') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(page);
-    } else {
-      res.writeHead(404);
-      res.end();
+// Niveau 2 (D83) : un cas de #141 (« puis verifier.sh le vérifie en HTTPS et constate le commit
+// servi ») et de D82 (la case cochée dit que l'aperçu en ligne est celui du dernier commit).
+describe('[niveau 2] #141, D82 · l’aperçu se vérifie en ligne : le commit servi est constaté', () => {
+  test('#141 · verifier.sh constate le commit servi quand COMMIT_ATTENDU est donné', async (t) => {
+    let page = '';
+    const serveur = createServer((req, res) => {
+      if (req.url === '/') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(page);
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise((r) => serveur.listen(0, '127.0.0.1', r));
+    const adresse = `http://127.0.0.1:${serveur.address().port}/`;
+    const verifier = (commit) => lancer('bash', [path.join(ICI, 'verifier.sh')], { ADRESSE_SITE: adresse, COMMIT_ATTENDU: commit });
+    const lignesCommit = (sortie) => sortie.split('\n').filter((l) => /commit/i.test(l) && /[✓✗]/.test(l));
+    const avecCommit = (c) => `<html><head><meta name="tirelire-commit" content="${c}"></head><body>Tirelire</body></html>`;
+
+    try {
+      await t.test('le commit servi est celui attendu : la ligne « commit » est réussie', async () => {
+        page = avecCommit('abc1234');
+        const { sortie } = await verifier('abc1234');
+        const lignes = lignesCommit(sortie);
+        assert.ok(lignes.some((l) => l.includes('✓')), `aucune ligne réussie ne parle du commit :\n${sortie}`);
+        assert.ok(!lignes.some((l) => l.includes('✗')), `le bon commit est compté en échec :\n${sortie}`);
+      });
+
+      await t.test('un autre commit est servi : échec compté', async () => {
+        page = avecCommit('abc1234');
+        const { code, sortie } = await verifier('fff9999');
+        assert.ok(lignesCommit(sortie).some((l) => l.includes('✗')), `un commit différent n'est pas relevé :\n${sortie}`);
+        assert.notEqual(code, 0);
+      });
+
+      await t.test('la page ne dit pas son commit : échec compté', async () => {
+        page = '<html><body>Tirelire</body></html>';
+        const { sortie } = await verifier('abc1234');
+        assert.ok(lignesCommit(sortie).some((l) => l.includes('✗')), `une page sans commit n'est pas relevée :\n${sortie}`);
+      });
+    } finally {
+      serveur.close();
     }
   });
-  await new Promise((r) => serveur.listen(0, '127.0.0.1', r));
-  const adresse = `http://127.0.0.1:${serveur.address().port}/`;
-  const verifier = (commit) => lancer('bash', [path.join(ICI, 'verifier.sh')], { ADRESSE_SITE: adresse, COMMIT_ATTENDU: commit });
-  const lignesCommit = (sortie) => sortie.split('\n').filter((l) => /commit/i.test(l) && /[✓✗]/.test(l));
-  const avecCommit = (c) => `<html><head><meta name="tirelire-commit" content="${c}"></head><body>Tirelire</body></html>`;
-
-  try {
-    await t.test('le commit servi est celui attendu : la ligne « commit » est réussie', async () => {
-      page = avecCommit('abc1234');
-      const { sortie } = await verifier('abc1234');
-      const lignes = lignesCommit(sortie);
-      assert.ok(lignes.some((l) => l.includes('✓')), `aucune ligne réussie ne parle du commit :\n${sortie}`);
-      assert.ok(!lignes.some((l) => l.includes('✗')), `le bon commit est compté en échec :\n${sortie}`);
-    });
-
-    await t.test('un autre commit est servi : échec compté', async () => {
-      page = avecCommit('abc1234');
-      const { code, sortie } = await verifier('fff9999');
-      assert.ok(lignesCommit(sortie).some((l) => l.includes('✗')), `un commit différent n'est pas relevé :\n${sortie}`);
-      assert.notEqual(code, 0);
-    });
-
-    await t.test('la page ne dit pas son commit : échec compté', async () => {
-      page = '<html><body>Tirelire</body></html>';
-      const { sortie } = await verifier('abc1234');
-      assert.ok(lignesCommit(sortie).some((l) => l.includes('✗')), `une page sans commit n'est pas relevée :\n${sortie}`);
-    });
-  } finally {
-    serveur.close();
-  }
 });
 
 // ─── Les workflows ───────────────────────────────────────────────────────────────────────────────
@@ -352,49 +371,54 @@ function trouver(motif) {
 const voit = ({ w, bloc }, motif) => motif.test(bloc) || motif.test(w.entête);
 const PUBLIE = /\/comments|gh\s+(pr|issue)\s+comment/;
 
-test('#141 · workflows : le dépôt de l’aperçu, sur une PR prête', () => {
-  const dépôt = trouver(/apercu\.sh\s+deposer/);
-  assert.ok(dépôt, 'aucun job ne lance `apercu.sh deposer`');
-  assert.ok(dépôt.w.types.length > 0, `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne tourne pas sur les PR`);
-  assert.ok(sauté(dépôt.w, dépôt.nom, écarteBrouillon), `${dépôt.w.fichier} : le job « ${dépôt.nom} » dépose aussi un brouillon`);
-  for (const v of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_FTP_DOSSIER', 'TIRELIRE_SITE_URL']) {
-    assert.ok(voit(dépôt, new RegExp(`vars\\.${v}\\b`)), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`vars.${v}\``);
-  }
-  // L'adresse de recette est un secret : une variable s'écrirait en clair dans les journaux (#156).
-  assert.ok(voit(dépôt, /secrets\.TIRELIRE_DEV_SITE_URL\b/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`secrets.TIRELIRE_DEV_SITE_URL\``);
-  assert.ok(voit(dépôt, /NUMERO:.*pull_request\.number/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne passe pas le numéro de la PR dans NUMERO`);
-  assert.ok(
-    workflows().some((w) => /TIRELIRE_BASE:.*pull_request\.number/.test(w.texte)),
-    'aucun job ne construit le site pour le sous-dossier de la PR (`TIRELIRE_BASE` avec le numéro de la PR)',
-  );
-
-  const vérif = trouver(/verifier\.sh[\s\S]*COMMIT_ATTENDU|COMMIT_ATTENDU[\s\S]*verifier\.sh/);
-  assert.ok(vérif && voit(vérif, /secrets\.TIRELIRE_DEV_SITE_URL\b/), 'aucun job ne lance `verifier.sh` sur l’aperçu avec `COMMIT_ATTENDU`');
-  for (const w of workflows()) assert.doesNotMatch(w.texte, /vars\.TIRELIRE_DEV_SITE_URL\b/, `${w.fichier} : l’adresse de recette est lue d’une variable, écrite en clair dans les journaux (#156)`);
-  for (const j of [dépôt, vérif]) assert.doesNotMatch(j.bloc, PUBLIE, `${j.w.fichier} : le job « ${j.nom} » publie un commentaire`);
-});
-
-test('#141 · workflows : à la fermeture, le retrait seul', () => {
-  const retrait = trouver(/apercu\.sh\s+retirer/);
-  assert.ok(retrait, 'aucun job ne lance `apercu.sh retirer`');
-  assert.ok(retrait.w.types.includes('closed'), `${retrait.w.fichier} : le workflow ne se déclenche pas à la fermeture d’une PR`);
-  assert.ok(!sauté(retrait.w, retrait.nom, écarteFermeture), `${retrait.w.fichier} : le job « ${retrait.nom} » est sauté à la fermeture`);
-  assert.ok(voit(retrait, /vars\.TIRELIRE_DEV_FTP_DOSSIER\b/), `${retrait.w.fichier} : le job « ${retrait.nom} » ne reçoit pas \`vars.TIRELIRE_DEV_FTP_DOSSIER\``);
-  assert.doesNotMatch(retrait.bloc, PUBLIE, `${retrait.w.fichier} : le job « ${retrait.nom} » publie un commentaire`);
-
-  const lourd = /pnpm (test|build|typecheck)\b|hebergement assembler|gradlew/;
-  for (const w of workflows().filter((x) => x.types.includes('closed'))) {
-    for (const [nom, bloc] of w.jobs) {
-      if (lourd.test(bloc)) assert.ok(sauté(w, nom, écarteFermeture), `${w.fichier} : le job « ${nom} » relance tests ou build à la fermeture d’une PR (#131)`);
+// Niveau 2 (D83) : des cas de #141 — le dépôt sur une PR prête, le retrait seul à la fermeture sans
+// tests ni build (#131), aucune adresse en dur en repli — et de #156 (l'adresse de recette lue d'un
+// secret, jamais d'une variable ; niveau 2 pour la raison dite plus haut).
+describe('[niveau 2] #141 · les workflows de l’aperçu', () => {
+  test('#141 · workflows : le dépôt de l’aperçu, sur une PR prête', () => {
+    const dépôt = trouver(/apercu\.sh\s+deposer/);
+    assert.ok(dépôt, 'aucun job ne lance `apercu.sh deposer`');
+    assert.ok(dépôt.w.types.length > 0, `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne tourne pas sur les PR`);
+    assert.ok(sauté(dépôt.w, dépôt.nom, écarteBrouillon), `${dépôt.w.fichier} : le job « ${dépôt.nom} » dépose aussi un brouillon`);
+    for (const v of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_FTP_DOSSIER', 'TIRELIRE_SITE_URL']) {
+      assert.ok(voit(dépôt, new RegExp(`vars\\.${v}\\b`)), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`vars.${v}\``);
     }
-  }
-});
+    // L'adresse de recette est un secret : une variable s'écrirait en clair dans les journaux (#156).
+    assert.ok(voit(dépôt, /secrets\.TIRELIRE_DEV_SITE_URL\b/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`secrets.TIRELIRE_DEV_SITE_URL\``);
+    assert.ok(voit(dépôt, /NUMERO:.*pull_request\.number/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne passe pas le numéro de la PR dans NUMERO`);
+    assert.ok(
+      workflows().some((w) => /TIRELIRE_BASE:.*pull_request\.number/.test(w.texte)),
+      'aucun job ne construit le site pour le sous-dossier de la PR (`TIRELIRE_BASE` avec le numéro de la PR)',
+    );
 
-test('#141 · workflows : aucune adresse en dur en repli', () => {
-  for (const w of workflows()) {
-    assert.doesNotMatch(w.texte, /vars\.TIRELIRE_SITE_URL\s*\|\|/, `${w.fichier} : \`TIRELIRE_SITE_URL\` a encore une valeur de repli`);
-    assert.doesNotMatch(w.texte, /vars\.TIRELIRE_DEV_[A-Z_]+\s*\|\|/, `${w.fichier} : une variable de recette a une valeur de repli`);
-  }
+    const vérif = trouver(/verifier\.sh[\s\S]*COMMIT_ATTENDU|COMMIT_ATTENDU[\s\S]*verifier\.sh/);
+    assert.ok(vérif && voit(vérif, /secrets\.TIRELIRE_DEV_SITE_URL\b/), 'aucun job ne lance `verifier.sh` sur l’aperçu avec `COMMIT_ATTENDU`');
+    for (const w of workflows()) assert.doesNotMatch(w.texte, /vars\.TIRELIRE_DEV_SITE_URL\b/, `${w.fichier} : l’adresse de recette est lue d’une variable, écrite en clair dans les journaux (#156)`);
+    for (const j of [dépôt, vérif]) assert.doesNotMatch(j.bloc, PUBLIE, `${j.w.fichier} : le job « ${j.nom} » publie un commentaire`);
+  });
+
+  test('#141 · workflows : à la fermeture, le retrait seul', () => {
+    const retrait = trouver(/apercu\.sh\s+retirer/);
+    assert.ok(retrait, 'aucun job ne lance `apercu.sh retirer`');
+    assert.ok(retrait.w.types.includes('closed'), `${retrait.w.fichier} : le workflow ne se déclenche pas à la fermeture d’une PR`);
+    assert.ok(!sauté(retrait.w, retrait.nom, écarteFermeture), `${retrait.w.fichier} : le job « ${retrait.nom} » est sauté à la fermeture`);
+    assert.ok(voit(retrait, /vars\.TIRELIRE_DEV_FTP_DOSSIER\b/), `${retrait.w.fichier} : le job « ${retrait.nom} » ne reçoit pas \`vars.TIRELIRE_DEV_FTP_DOSSIER\``);
+    assert.doesNotMatch(retrait.bloc, PUBLIE, `${retrait.w.fichier} : le job « ${retrait.nom} » publie un commentaire`);
+
+    const lourd = /pnpm (test|build|typecheck)\b|hebergement assembler|gradlew/;
+    for (const w of workflows().filter((x) => x.types.includes('closed'))) {
+      for (const [nom, bloc] of w.jobs) {
+        if (lourd.test(bloc)) assert.ok(sauté(w, nom, écarteFermeture), `${w.fichier} : le job « ${nom} » relance tests ou build à la fermeture d’une PR (#131)`);
+      }
+    }
+  });
+
+  test('#141 · workflows : aucune adresse en dur en repli', () => {
+    for (const w of workflows()) {
+      assert.doesNotMatch(w.texte, /vars\.TIRELIRE_SITE_URL\s*\|\|/, `${w.fichier} : \`TIRELIRE_SITE_URL\` a encore une valeur de repli`);
+      assert.doesNotMatch(w.texte, /vars\.TIRELIRE_DEV_[A-Z_]+\s*\|\|/, `${w.fichier} : une variable de recette a une valeur de repli`);
+    }
+  });
 });
 
 // ─── #155 : les identifiants de production hors de portée du code des PR ──────────────────────────
@@ -410,6 +434,9 @@ test('#141 · workflows : aucune adresse en dur en repli', () => {
 //    n'assemble ; le site lui arrive en artefact ;
 // 4. un job de `pull_request_target` qui exécute le code de la PR n'a ni cache (celui de `main`) ni
 //    permission en écriture, et ses permissions sont déclarées.
+
+// Niveau 0 (D83) : si l'écart tombait sans qu'on le voie, un secret serait exposé — les identifiants
+// FTP de la production, à portée du code d'une PR —, et le resterait après la correction du code.
 
 const SECRET_FTP = /secrets\.OVH_FTP_/;
 const CODE_DE_LA_PR = /pull_request\.head\.(?:sha|ref)|\bhead_(?:sha|branch)\b|\bpnpm\s+(?:i|install|run|exec|test|build|typecheck|--filter)\b|\bnpm\s+(?:ci|install|run|test)\b|hebergement\s+assembler/;
@@ -440,7 +467,7 @@ function écartsDépôt(liste) {
   return écarts;
 }
 
-describe('[niveau 0] harnais du registre', () => {
+describe('[niveau 0] C3 · harnais du registre : les identifiants FTP restent hors de portée du code des PR (#155)', () => {
   test('#155 · les identifiants FTP restent hors de portée du code des PR', () => {
     const liste = workflows();
     assert.deepEqual(écartsDépôt(liste), [], 'des identifiants FTP sont à portée du code d’une PR');
@@ -466,7 +493,7 @@ ${extra}
         env:
           MOTDEPASSE: \${{ secrets.OVH_FTP_PASSWORD }}`;
 
-describe('[niveau 0] harnais du registre', () => {
+describe('[niveau 0] C3 · harnais du registre : les identifiants FTP restent hors de portée du code des PR (#155)', () => {
   test('témoin rouge · un aperçu qui dépose avec des identifiants que le code de la PR peut atteindre', () => {
     const cas = [
       // Avant #155 : workflow de la branche, extraction de la PR, installation, sans environnement.
@@ -499,19 +526,23 @@ describe('[niveau 0] harnais du registre', () => {
 
 // ─── L'adresse de recette ────────────────────────────────────────────────────────────────────────
 
-test('#141 · aucun fichier suivi ne nomme un autre hôte du domaine que la production', () => {
-  // Le domaine de la production est public (`docs/`, #45) ; tout autre hôte de ce domaine serait
-  // l'adresse de recette, qui ne s'écrit nulle part. Le motif ne la contient pas.
-  const suivis = spawnSync('git', ['ls-files', '-z'], { cwd: RACINE, encoding: 'utf8' }).stdout.split('\0').filter(Boolean);
-  const trouvés = [];
-  for (const f of suivis) {
-    const p = path.join(RACINE, f);
-    if (!existsSync(p) || statSync(p).size > 2_000_000) continue;
-    for (const [hôte] of readFileSync(p, 'utf8').matchAll(/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.sim-dev\.eu/gi)) {
-      if (hôte.toLowerCase() !== 'tirelire.sim-dev.eu') trouvés.push(`${f} : ${hôte}`);
+// Niveau 2 (D83) : un cas de #141 (« l'adresse de recette n'apparaît en clair ni dans un fichier
+// suivi … »), pour la même raison que #156 plus haut.
+describe('[niveau 2] #141 · l’adresse de recette ne s’écrit dans aucun fichier suivi', () => {
+  test('#141 · aucun fichier suivi ne nomme un autre hôte du domaine que la production', () => {
+    // Le domaine de la production est public (`docs/`, #45) ; tout autre hôte de ce domaine serait
+    // l'adresse de recette, qui ne s'écrit nulle part. Le motif ne la contient pas.
+    const suivis = spawnSync('git', ['ls-files', '-z'], { cwd: RACINE, encoding: 'utf8' }).stdout.split('\0').filter(Boolean);
+    const trouvés = [];
+    for (const f of suivis) {
+      const p = path.join(RACINE, f);
+      if (!existsSync(p) || statSync(p).size > 2_000_000) continue;
+      for (const [hôte] of readFileSync(p, 'utf8').matchAll(/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.sim-dev\.eu/gi)) {
+        if (hôte.toLowerCase() !== 'tirelire.sim-dev.eu') trouvés.push(`${f} : ${hôte}`);
+      }
     }
-  }
-  assert.deepEqual(trouvés, [], 'un fichier suivi nomme un hôte qui n’est pas la production');
+    assert.deepEqual(trouvés, [], 'un fichier suivi nomme un hôte qui n’est pas la production');
+  });
 });
 
 // ─── #175 · la case de l'aperçu ──────────────────────────────────────────────────────────────────
@@ -523,28 +554,32 @@ const caseApercu = (corps, ...args) => {
   return r.stdout.replace(/\n$/, '');
 };
 
-test('#175 · case de l’aperçu : ajoutée si elle manque, cochée seulement quand le dernier commit est en ligne', () => {
-  const [a, b] = ['a'.repeat(40), 'b'.repeat(40)];
-  assert.equal(caseApercu('Close #175', 'etat'), 'absente');
-  const neuve = caseApercu('Close #175', 'rafraichir', a);
-  assert.match(neuve, /^Close #175\n\n- \[ \] Aperçu du dernier commit en recette — en ligne : rien <!-- apercu: -->$/);
-  const déposée = caseApercu(neuve, 'deposee', a, a);
-  assert.equal(caseApercu(déposée, 'etat'), 'coche');
-  assert.equal(caseApercu(déposée, 'en-ligne'), a);
-  assert.match(déposée, /en ligne : `aaaaaaa`, le dernier commit/);
-  // Un commit de plus : la case se décoche et dit ce qui est en ligne.
-  const dépassée = caseApercu(déposée, 'rafraichir', b);
-  assert.equal(caseApercu(dépassée, 'etat'), 'vide');
-  assert.match(dépassée, /en ligne : `aaaaaaa`, pas le dernier commit \(`bbbbbbb`\)/);
-  // Déposé pendant qu'un commit arrivait : en ligne, mais pas cochée.
-  assert.equal(caseApercu(caseApercu(neuve, 'deposee', a, b), 'etat'), 'vide');
-  // Refus et échec décochent ; l'échec rend ce qui est en ligne incertain.
-  assert.equal(caseApercu(caseApercu(déposée, 'refusee', a), 'en-ligne'), a);
-  assert.equal(caseApercu(caseApercu(déposée, 'refusee', a), 'etat'), 'vide');
-  assert.match(caseApercu(déposée, 'echec', a, a), /- \[ \] .*incertain, le dépôt de `aaaaaaa` a échoué <!-- apercu: -->/);
-  // Une seule ligne, le reste de la description intact.
-  const corps = `Close #175\n\nUn mot.\n\n${déposée.split('\n').at(-1)}\n\nFin.`;
-  const r = caseApercu(corps, 'rafraichir', b);
-  assert.equal(r.split('\n').filter((l) => l.includes('<!-- apercu:')).length, 1);
-  assert.ok(r.startsWith('Close #175\n\nUn mot.\n\n- [ ]') && r.endsWith('\n\nFin.'));
+// Niveau 2 (D83) : un cas de D82, « La case de l'aperçu » (#175) : cochée, elle dit que l'aperçu
+// en ligne est celui du dernier commit.
+describe('[niveau 2] D82 · la case de l’aperçu (#175)', () => {
+  test('#175 · case de l’aperçu : ajoutée si elle manque, cochée seulement quand le dernier commit est en ligne', () => {
+    const [a, b] = ['a'.repeat(40), 'b'.repeat(40)];
+    assert.equal(caseApercu('Close #175', 'etat'), 'absente');
+    const neuve = caseApercu('Close #175', 'rafraichir', a);
+    assert.match(neuve, /^Close #175\n\n- \[ \] Aperçu du dernier commit en recette — en ligne : rien <!-- apercu: -->$/);
+    const déposée = caseApercu(neuve, 'deposee', a, a);
+    assert.equal(caseApercu(déposée, 'etat'), 'coche');
+    assert.equal(caseApercu(déposée, 'en-ligne'), a);
+    assert.match(déposée, /en ligne : `aaaaaaa`, le dernier commit/);
+    // Un commit de plus : la case se décoche et dit ce qui est en ligne.
+    const dépassée = caseApercu(déposée, 'rafraichir', b);
+    assert.equal(caseApercu(dépassée, 'etat'), 'vide');
+    assert.match(dépassée, /en ligne : `aaaaaaa`, pas le dernier commit \(`bbbbbbb`\)/);
+    // Déposé pendant qu'un commit arrivait : en ligne, mais pas cochée.
+    assert.equal(caseApercu(caseApercu(neuve, 'deposee', a, b), 'etat'), 'vide');
+    // Refus et échec décochent ; l'échec rend ce qui est en ligne incertain.
+    assert.equal(caseApercu(caseApercu(déposée, 'refusee', a), 'en-ligne'), a);
+    assert.equal(caseApercu(caseApercu(déposée, 'refusee', a), 'etat'), 'vide');
+    assert.match(caseApercu(déposée, 'echec', a, a), /- \[ \] .*incertain, le dépôt de `aaaaaaa` a échoué <!-- apercu: -->/);
+    // Une seule ligne, le reste de la description intact.
+    const corps = `Close #175\n\nUn mot.\n\n${déposée.split('\n').at(-1)}\n\nFin.`;
+    const r = caseApercu(corps, 'rafraichir', b);
+    assert.equal(r.split('\n').filter((l) => l.includes('<!-- apercu:')).length, 1);
+    assert.ok(r.startsWith('Close #175\n\nUn mot.\n\n- [ ]') && r.endsWith('\n\nFin.'));
+  });
 });
