@@ -11,7 +11,8 @@ const phpPresent = spawnSync('php', ['-v'], { stdio: 'ignore' }).status === 0;
 
 const strict = Boolean(process.env.TIRELIRE_STRICT);
 
-describe('[niveau 0] harnais du registre', () => {
+// Même besoin que le relais Node, donc même niveau (D83) : I8, nommé au registre, niveau 1.
+describe('[niveau 1] I8 · harnais du registre : le relais PHP ne rend à un appareil que ce que les autres ont déposé', () => {
   test('relais PHP : push puis pull filtré par appareil', { skip: !phpPresent && !strict && 'php absent' }, async () => {
     assert.ok(phpPresent, 'php absent, alors que TIRELIRE_STRICT le rend obligatoire');
     const dir = mkdtempSync(path.join(tmpdir(), 'relais-php-'));
