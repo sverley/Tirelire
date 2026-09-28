@@ -59,7 +59,7 @@ function ledgerWithBank(): { ledger: Ledger; profile: ReturnType<typeof bankMult
 }
 
 describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
-  describe('lecture CSV', () => {
+  describe('[niveau 0] lecture CSV : un relevé mal lu s’écrit en opérations fausses (D09, D57)', () => {
     it('décode le latin-1 et détecte le point-virgule', () => {
       const text = decodeBytes(latin1(CSV));
       expect(text).toContain('Libellé opération');
@@ -249,7 +249,7 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
     });
   });
 
-  describe('correspondance des comptes par numéro (D18)', () => {
+  describe('[niveau 0] correspondance des comptes par numéro (D18)', () => {
     const principal: Account = { id: 'acc-principal', name: 'Principal', kind: 'principal', openingBalance: 0, openingDate: '2026-01-01', accountNumber: 'FR76 1234 5678 9012 3456 7890 123' };
     const livret: Account = { id: 'acc-livret', name: 'Livret', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01', accountNumber: '00012345678' };
     const sansNumero: Account = { id: 'acc-autre', name: 'Autre', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01' };
