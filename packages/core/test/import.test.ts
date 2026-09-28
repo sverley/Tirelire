@@ -249,7 +249,7 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
     });
   });
 
-  describe('correspondance des comptes par numéro', () => {
+  describe('correspondance des comptes par numéro (D18)', () => {
     const principal: Account = { id: 'acc-principal', name: 'Principal', kind: 'principal', openingBalance: 0, openingDate: '2026-01-01', accountNumber: 'FR76 1234 5678 9012 3456 7890 123' };
     const livret: Account = { id: 'acc-livret', name: 'Livret', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01', accountNumber: '00012345678' };
     const sansNumero: Account = { id: 'acc-autre', name: 'Autre', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01' };
