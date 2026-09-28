@@ -28,7 +28,8 @@ construisent.
 - **État** : active
 - **Construction** : `pnpm build`, `pnpm --filter @tirelire/hebergement assembler`
 - **Livraison** : le site assemblé (PWA, relais PHP, réglages du serveur) se dépose par FTP sur
-  l'hébergement mutualisé à chaque push sur `main` (D35, D37).
+  l'hébergement mutualisé à chaque version publiée, par son tag `v*` ; chaque push sur `main` le
+  dépose à la racine de la recette (D35, D37, D83).
 - **Étiquette** : `cible:webapp`
 
 ## Webapp · Chromium sur ordinateur
