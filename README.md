@@ -105,7 +105,8 @@ niveau :
     `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
     touchés, tests headless de l'interface ; durée attendue 30 s) ou **organisationnel** (tests de la
     garde ; durée attendue 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
-    restent à la CI. Un dépassement de plus de 20 % s'affiche, sans bloquer.
+    restent au Ready, en CI, sauf demande : `pnpm livraison --navigateur` (D83). Le typecheck se
+    joue avant les tests, et les tests navigateur ne partent que si le reste est vert. Un dépassement de plus de 20 % s'affiche, sans bloquer.
   - Le harnais du besoin est toujours joué, à part et hors durée attendue. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.

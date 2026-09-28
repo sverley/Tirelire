@@ -26,9 +26,12 @@ audit commence à son compte rendu (étape 4).
    remplacé par le numéro de l'issue, rien d'autre (D82) ; par l'API, recopie-le.
 3. Réponds aux commentaires du codeur : corrige le harnais, ou renvoie la question du besoin au
    porteur dans l'issue.
-4. Quand le codeur a rendu son compte rendu, vérifie son travail en local, au seuil 2 (`pnpm test
-   2`, avec `--navigateur` si un navigateur est disponible ; dis dans ta vérification si tu l'as
-   fait) avant le Ready, garde comprise (`node packages/gardes/cli.mjs pr --issue <n>`) : conforme à
+4. Quand le codeur a rendu son compte rendu, vérifie son travail en local, au seuil 2, en entier,
+   sans les tests navigateur (`pnpm test 2` : rien n'en est sauté), avant le Ready, garde comprise
+   (`node packages/gardes/cli.mjs pr --issue <n>`). Les tests navigateur se jouent au Ready, en CI ;
+   si tu les juges utiles plus tôt, demande-les sur le dernier commit de la branche
+   (`pnpm livraison --navigateur`) : verts, ils sont attestés sur cet arbre et la CI ne les y rejoue
+   pas. Dis dans ta vérification si tu les as demandés, et pourquoi. Le travail doit être conforme à
    l'issue, sans contredire les autres entrées de son catalogue ni les fondamentaux (D82). Si le
    codage modifie une fonction de la garde, joue aussi ses tests de développement, à la main
    (`pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'`, D81), et dis-le. Refais la
@@ -38,8 +41,8 @@ audit commence à son compte rendu (étape 4).
    organisationnel ou d'outil, cherche les erreurs de processus, ce qu'une session pourrait casser
    par erreur, pas les attaques, en gardant un œil sur une faille sérieuse d'un workflow ; pour un
    besoin fonctionnel, ta relecture inclut la sécurité de l'application finale.
-   L'attestation de la livraison ne se produit qu'au pré-push et à la pré-fusion, par l'outillage :
-   la CI saute ce qu'elle couvre ; tu ne l'écris jamais (D83).
+   L'attestation de la livraison ne se produit qu'au pré-push, à la pré-fusion et à la demande des
+   tests navigateur, par l'outillage : la CI saute ce qu'elle couvre ; tu ne l'écris jamais (D83).
    Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur.
 5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
    survivre à la fusion n'y reste pas : il va dans une issue ouverte ou dans un catalogue (D78).
