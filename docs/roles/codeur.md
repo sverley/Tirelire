@@ -11,9 +11,13 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
    `#…` remplacé par le numéro de l'issue, rien d'autre (D82). Par l'API, le modèle ne s'applique
    pas : recopie-le.
 1. **Ne lis pas le harnais.** Code depuis ta propre lecture du besoin (principe 11.1).
-2. Code sur la branche, commets, pousse : la livraison (pré-push) atteste ce qu'elle a joué et
-   envoie l'attestation avec le push, sur `<branche>--attestation` ; seul l'outillage la produit,
-   tu ne l'écris ni ne la pousses jamais toi-même (D83). En brouillon, le verdict est local :
+2. Code sur la branche, commets, pousse : la livraison (pré-push) joue ce qui n'est pas déjà vert
+   sur son empreinte, le moins cher d'abord, sans les tests navigateur de non-régression, et envoie
+   l'attestation avec le push, sur `<branche>--attestation` ; seul l'outillage la produit, tu ne
+   l'écris ni ne la pousses jamais toi-même (D83). Les tests navigateur se jouent au Ready, en CI ;
+   plus tôt seulement si c'est justifié, à ta demande, sur ton dernier commit :
+   `pnpm livraison --navigateur` ; verts, ils sont attestés et la CI ne les rejoue pas tant que leur
+   empreinte ne change pas. En brouillon, le verdict est local :
    `pnpm typecheck`, le harnais du besoin et, si tu modifies une fonction de la garde, ses tests de
    développement (D81), joués à la main : `pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'` ;
    rien d'autre (D83).
@@ -35,7 +39,8 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
 7. Quand le typecheck et le harnais sont verts, écris un commentaire sur la PR, un seul par tour —
    un compte rendu à chaque fois que tu rends le travail, au premier tour comme après chaque retour
    de l'auditeur ou du porteur : ce qui appelle une validation humaine — pour chaque vérification
-   manuelle demandée, ce que tes modifications changent et ce qui reste à constater —, et, si tu
-   changes le comportement de la garde, ce qu'en demande D81. Honnête et court. Puis arrête-toi.
+   manuelle demandée, ce que tes modifications changent et ce qui reste à constater —, si tu as
+   demandé les tests navigateur, et pourquoi, et, si tu changes le comportement de la garde, ce
+   qu'en demande D81. Honnête et court. Puis arrête-toi.
 
 Tu ne passes jamais la PR en Ready et ne la fusionnes jamais. Tu n'ouvres pas d'issue.
