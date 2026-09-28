@@ -19,6 +19,7 @@ import {
   computePlan,
   euros,
   lastPeriods,
+  MAIN_ACCOUNT_ID,
   parseCsv,
   parseRows,
   prepareImport,
@@ -28,7 +29,7 @@ import {
 } from '../src/index.js';
 import { AS_OF, DEBUT, PAIE, baseVide, ecrire, relire } from './parcours.js';
 
-const COMPTE = 'cpt-courant';
+const COMPTE = MAIN_ACCOUNT_ID;
 const NUMÉRO = '00099999999';
 
 /** Relevé inventé, dans la forme des exports bancaires français (aucune donnée réelle). */

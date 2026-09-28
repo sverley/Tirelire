@@ -3,11 +3,21 @@
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
   import { revealed } from '../lib/actions';
   import { centsToInput, inputToCents } from '../lib/format';
-  import { computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
+  import { alive, computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
-  const hasData = $derived(app.ledger.accounts.some((a) => !a.deletedAt));
+  /**
+   * La base porte-t-elle quelque chose de l'utilisateur ? Le compte principal naît avec toute base
+   * (D40) : lui seul n'est pas une donnée. Un autre compte, une tirelire, un flux ou une opération
+   * en sont.
+   */
+  const hasData = $derived(
+    alive(app.ledger.accounts).some((a) => a.kind !== 'principal') ||
+      alive(app.ledger.tirelires).length > 0 ||
+      alive(app.ledger.plannedFlows).length > 0 ||
+      alive(app.ledger.operations).length > 0,
+  );
 
   /*
    * Deux dates, à ne pas confondre (D52). La **date de lecture** (`app.asOf`) dit jusqu'où les
