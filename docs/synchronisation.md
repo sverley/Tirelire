@@ -39,9 +39,9 @@ session ; le conflit n'est gardé nulle part (D58).
 
 ## Ce qui reste à l'instance
 
-Son identité, son horloge, ce qu'elle sait des autres, les curseurs et secrets du relais ne sont pas
-dans le fichier : l'application les garde à côté, dans IndexedDB ou le stockage du navigateur. Un
-fichier exporté puis ouvert ailleurs y devient une autre instance ; restauré sur la même, il en garde
+Son identité, son horloge, ce qu'elle sait des autres, les curseurs et secrets du relais, les dates
+de sa dernière sauvegarde et de sa dernière synchronisation ne sont pas dans le fichier :
+l'application les garde à côté, dans IndexedDB ou le stockage du navigateur. Un fichier exporté puis ouvert ailleurs y devient une autre instance ; restauré sur la même, il en garde
 l'identité et redéduit de ses lignes ce qu'il sait, ce qui ne perd rien de ce que les autres ont reçu.
 
 ## Multi-utilisateur

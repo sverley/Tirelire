@@ -444,7 +444,12 @@ Chemins : `apps/web/src/lib/db.ts`, `apps/web/src/views/Settings.svelte`
   Témoin rouge : « témoin rouge · une sauvegarde qui rejoue les tables et en oublie une »
 - **Vérification manuelle** · `VM-C5-sauvegarde` — Depuis l'accueil, trouver comment sauvegarder
   sans le chercher ; exporter, vider le navigateur, réimporter le fichier : tout revient.
-- **À bâtir** · l'absence de sauvegarde récente signalée (#41).
+- **Harnais** · `apps/web/test/navigateur/sauvegarde-evidente.test.ts` — Réglages et le signal de
+  l'accueil disent la date de la dernière sauvegarde et celle de la dernière synchronisation, avec
+  son moyen, ou « jamais » ; l'accueil rappelle la sauvegarde à faire, en un seul signal qui ne bloque
+  rien et se masque ; un geste l'enregistre et la date aussitôt ; ces dates restent à l'instance, et
+  remplacer les données oublie la sauvegarde (#41).
+  Témoin rouge : « témoin rouge · des données jamais sauvegardées que l’accueil ne rappelle pas »
 
 ## C6 · Une application web ne compte pas sur l'arrière-plan
 
