@@ -1213,6 +1213,22 @@ demande, alors que ce plan est celui de l'analyse au centime près.
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
 (virement SEPA, QR code), et l'assistant ne le propose pas encore.
 
+### D61 · Deux catégories d'une même nature ne portent pas le même nom
+
+Parmi les catégories vivantes d'une même nature, deux ne portent pas le même nom. Les noms se
+comparent sans tenir compte de la casse, des accents ni des espaces autour ; une catégorie supprimée
+ne compte plus (`findCategoryByName`, `model.ts`). L'écran Catégories refuse le doublon, à la
+création comme au renommage ; une catégorie créée à la volée depuis les écrans Opérations ou Saisie
+reprend celle qui existe déjà au lieu d'en créer une seconde.
+
+À la question « `findCategoryByName` empêche deux catégories du même nom pour une même nature ;
+aucun document fondateur n'écrit ce besoin : l'écrire, ou retirer le code et ses tests ? », le
+porteur a répondu : « on le garde ».
+
+Ce que l'hypothèse d'un nom libre cachait : taper « alimentation » en classant une opération, quand
+« Alimentation » existe, créerait une seconde catégorie, et le Bilan compterait en deux lignes ce qui
+en fait une.
+
 ## Le travail
 
 ### D77 · Les documents fondateurs, et ce qui fait foi

@@ -8,10 +8,11 @@ const categories: Category[] = [
 ];
 
 /**
- * `findCategoryByName` évite une catégorie en double quand on en crée une à la volée (écrans
- * Opérations, Saisie, Catégories). Aucun document fondateur n'écrit ce besoin.
+ * D61 : parmi les catégories vivantes d'une même nature, deux ne portent pas le même nom, comparé
+ * sans tenir compte de la casse, des accents ni des espaces autour. Niveau 0 (D83) : un doublon que
+ * la recherche manque s'écrit dans la base, et y reste une fois le code corrigé.
  */
-describe('[niveau 2] findCategoryByName : une catégorie créée à la volée retrouve celle qui porte déjà son nom', () => {
+describe('[niveau 0] D61 · deux catégories d’une même nature ne portent pas le même nom', () => {
   it('retrouve une catégorie existante malgré la casse et les accents', () => {
     expect(findCategoryByName(categories, 'sante', 'expense')?.id).toBe('c1');
     expect(findCategoryByName(categories, '  SANTÉ  ', 'expense')?.id).toBe('c1');
