@@ -14,28 +14,35 @@
 # 1. Arbre jugé. L'index (fusion) ou le commit (push, demande), jamais la copie de travail : les tests
 #    tournent sur place si la copie est identique à cet arbre, sinon dans une extraction à part
 #    (`extraire.mjs`), dont les dépendances pointent vers celles du clone.
-# 2. Empreintes (`attestation.mjs plan`, #266). Chaque ensemble de tests — garde, cœur, relais,
+# 2. Nature du besoin (#121). Les fichiers modifiés des deux côtés depuis la base commune — celle du
+#    dernier push de la branche, ou de `main` à un premier push et à la demande — sont comparés à
+#    `packages/gardes/chemins-ignores` de l'arbre jugé (syntaxe de `.gitignore`) : un fichier listé
+#    est fonctionnel (les ensembles de ses paquets, et l'interface sans navigateur), un fichier absent
+#    est organisationnel (la garde). Les deux peuvent se cumuler. Le harnais du besoin se joue toujours.
+# 3. Empreintes (`attestation.mjs plan`, #266). Chaque ensemble de tests — garde, cœur, relais,
 #    hébergement, interface sans navigateur, interface dans le navigateur, harnais du besoin — a une
 #    empreinte : l'état, dans l'arbre jugé, des chemins qu'il lit (`packages/gardes/attestation.mjs`,
-#    `ENSEMBLES`). Il ne se joue pas si elle est déjà trouvée verte, à un seuil au moins égal — par
-#    l'attestation locale ou distante de la branche, écrite par l'outillage à un crochet ou à une
-#    demande, dans cette session ou dans une autre —, ou si elle est celle de la base commune avec
-#    `main` : rien de ce qu'il lit n'a changé. Un ensemble qui se joue est dit, avec son seuil et son
-#    verdict ; un ensemble qui ne se joue pas l'est aussi, avec sa raison.
-# 3. Seuil 2 (#232 : les tests de niveau 0 à 2), le moins cher d'abord :
+#    `ENSEMBLES`). Parmi ceux que la nature du besoin retient, il ne se joue pas si elle est déjà
+#    trouvée verte, à un seuil au moins égal — par l'attestation locale ou distante de la branche,
+#    écrite par l'outillage à la livraison ou à la demande, dans cette session ou dans une autre —, ou
+#    si elle est celle de la base commune avec `main` : rien de ce qu'il lit n'a changé. Un ensemble
+#    qui se joue est dit, avec son seuil et son verdict ; un ensemble qui ne se joue pas l'est aussi,
+#    avec sa raison. Ce que la livraison ne joue pas, la CI le joue au Ready s'il n'est pas vert sur
+#    son empreinte.
+# 4. Seuil 2 (#232 : les tests de niveau 0 à 2), le moins cher d'abord :
 #    - le typecheck des paquets dont un ensemble se joue ; rouge, rien d'autre ne se joue ;
 #    - puis les tests sans navigateur, et le harnais du besoin qui ne vit pas dans le navigateur ;
 #    - puis, seulement si tout cela est vert, les tests navigateur : le harnais du besoin qui vit dans
 #      le navigateur (`apps/web/test/navigateur/`) et, sur demande seulement, la non-régression dans
 #      le navigateur ; sans demande, elle est laissée au Ready, et la livraison le dit. Un harnais du
 #      besoin rouge qui ne bloque pas ne les retient pas.
-# 4. Harnais du besoin (`harnais-du-besoin.sh` : le fichier de l'auditeur, qui porte le numéro de
+# 5. Harnais du besoin (`harnais-du-besoin.sh` : le fichier de l'auditeur, qui porte le numéro de
 #    l'issue). Joué à part, en entier (seuil 4), quelle que soit sa finalité. Il bloque si ce qui
 #    arrive (commits absents de `main` et de la branche d'arrivée) touche autre chose que le harnais
 #    et la documentation (`**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon son verdict
 #    s'affiche. La non-régression bloque toujours.
-# 5. Sous-branche (`<branche>--codeur`, `<branche>--auditeur`) : non-régression seule, sans attestation.
-# 6. Bilan et attestation (#237, #264) : chaque ensemble est dit — joué, à quel seuil, avec quel
+# 6. Sous-branche (`<branche>--codeur`, `<branche>--auditeur`) : non-régression seule, sans attestation.
+# 7. Bilan et attestation (#237, #266) : chaque ensemble est dit — joué, à quel seuil, avec quel
 #    verdict, ou pourquoi il ne l'est pas. Les ensembles joués verts s'ajoutent à l'attestation
 #    locale (`attestation.mjs bilan`) ; un ensemble rouge, ou dont un test s'est sauté faute d'outil,
 #    n'y entre pas. Une livraison verte l'envoie sur `<branche>--attestation` (`attestation.mjs
@@ -87,6 +94,12 @@ case $mode in
     # Base commune de main et de l'arbre fusionné (HEAD et les têtes).
     # shellcheck disable=SC2086
     hbase=$([ -n "$main" ] && git merge-base "$main" HEAD $tetes 2>/dev/null) || hbase=''
+    # Les fichiers modifiés des deux côtés depuis leur base commune : la nature du besoin.
+    # shellcheck disable=SC2086
+    base=$(git merge-base --octopus HEAD $tetes 2>/dev/null) || base=''
+    {
+      [ -n "$base" ] && for t in HEAD $tetes; do git diff --name-only --no-renames "$base" "$t"; done
+    } | sort -u >"$travail/modifies"
     # shellcheck disable=SC2086
     git log --no-merges --no-renames --format= --name-only $tetes --not HEAD $main >"$travail/entrants" || exit 1
     surplace=''
@@ -119,6 +132,20 @@ case $mode in
     nul "$rsha" || { git cat-file -e "$rsha^{commit}" 2>/dev/null && distant=$rsha; }
     [ "$branche" = main ] && surmain=1 || surmain=''
     hbase=$([ -n "$main" ] && git merge-base "$main" "$lsha" 2>/dev/null) || hbase=''
+    # Les fichiers modifiés depuis le dernier push de la branche, ou depuis `main` : la nature du besoin.
+    if [ -n "$distant" ]; then
+      base=$(git merge-base "$distant" "$lsha" 2>/dev/null) || base=''
+    else
+      base=$hbase
+    fi
+    {
+      if [ -n "$base" ]; then
+        git diff --name-only --no-renames "$base" "$lsha"
+        [ -n "$distant" ] && git diff --name-only --no-renames "$base" "$distant"
+      else
+        git ls-tree -r --name-only "$lsha"
+      fi
+    } | sort -u >"$travail/modifies"
     # shellcheck disable=SC2086
     git log --no-merges --no-renames --format= --name-only "$lsha" --not $distant $main >"$travail/entrants" || exit 1
     surplace=''
@@ -150,6 +177,7 @@ elif [ -z "$sous" ]; then
   harnais_retenus "$travail/candidats" "$journaux/harnais.txt" "$arbre:" "$branche" || exit 1
 fi
 git ls-tree -r --name-only "$arbre" >"$travail/fichiers" || exit 1
+git cat-file -p "$arbre:packages/gardes/chemins-ignores" >"$travail/chemins-ignores" 2>/dev/null || : >"$travail/chemins-ignores"
 
 # Les empreintes vertes de la branche, puis ce qui se joue (#264).
 echo '[]' >"$travail/verts"
@@ -181,6 +209,33 @@ if [ "$juge" != "$racine" ]; then
   node "$crochets/extraire.mjs" "$racine" "$juge" || exit 1
   dit "copie de travail différente de l'arbre jugé : tests joués sur une extraction"
 fi
+
+# ─── Nature du besoin : ce que la livraison retient, parmi ce que les empreintes n'ont pas sauté ──
+classe="$travail/classe"
+git init -q "$classe" || exit 1
+cp "$travail/chemins-ignores" "$classe/.git/info/exclude"
+git -C "$classe" check-ignore --no-index --stdin <"$travail/modifies" >"$travail/fonctionnels" 2>/dev/null
+grep -vxF -f "$travail/fonctionnels" "$travail/modifies" | grep -v '^$' >"$travail/organisationnels"
+retenus=''
+[ -s "$travail/organisationnels" ] && retenus="$retenus garde"
+if [ -s "$travail/fonctionnels" ]; then
+  retenus="$retenus interface"
+  for p in $(grep -Eo '^(apps|packages)/[^/]+/' "$travail/fonctionnels" | sed 's#/$##' | sort -u); do
+    case $p in packages/core) retenus="$retenus coeur" ;; apps/relay) retenus="$retenus relais" ;; apps/hebergement) retenus="$retenus hebergement" ;; esac
+  done
+fi
+[ "$demande_nav" = oui ] && retenus="$retenus interface"
+nature=''
+[ -s "$travail/fonctionnels" ] && nature="fonctionnel ($(grep -Eo '^(apps|packages)/[^/]+' "$travail/fonctionnels" | sort -u | tr '\n' ',' | sed 's/,$//'))"
+[ -s "$travail/organisationnels" ] && nature="${nature:+$nature + }organisationnel"
+dit "besoin ${nature:-sans fichier modifié} : la livraison retient${retenus:- rien d'autre que le harnais du besoin}"
+for id in garde coeur relais hebergement interface; do
+  case " $retenus " in *" $id "*) continue ;; esac
+  joue "$id" || continue
+  awk -F '\t' -v OFS='\t' -v id="$id" '$1 == id { $2 = 0 } { print }' "$travail/plan" >"$travail/plan.n" && mv "$travail/plan.n" "$travail/plan"
+  case $id in coeur) n='cœur' ;; hebergement) n='hébergement' ;; interface) n='interface sans navigateur' ;; *) n=$id ;; esac
+  dit "$n : non joué — ce qui arrive ne le fait pas jouer à la livraison (packages/gardes/chemins-ignores) ; au Ready, la CI le joue s'il n'est pas vert sur son empreinte."
+done
 
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "$niveau : pnpm introuvable, les tests ne peuvent pas être joués." >&2
@@ -263,11 +318,16 @@ autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | tr '\n' ' 
 [ -z "$autres" ] || dit "harnais du besoin hors de tout paquet, non joué : $autres"
 
 debut=$(date +%s)
-# Palier 1 : le typecheck des paquets dont un ensemble se joue.
-{
-  for p in $DOSSIERS; do joue "${p%%:*}" && echo "${p#*:}"; done
-  joue harnais && grep -Eo '^(apps|packages)/[^/]+' "$journaux/harnais.txt"
-} | sort -u >"$travail/paquets"
+# Durée attendue de ce qui se joue (mesurée le 25/09) : 40 s pour les paquets fonctionnels et
+# l'interface sans navigateur, 270 s de plus pour les tests navigateur demandés, 45 s pour la garde.
+# Un dépassement de plus de 20 % se dit, sans bloquer ; le harnais du besoin est hors durée attendue.
+attendue=0
+{ joue coeur || joue relais || joue hebergement || joue interface; } && attendue=$((attendue + 40))
+joue navigateur && attendue=$((attendue + 270))
+joue garde && attendue=$((attendue + 45))
+# Palier 1 : le typecheck des paquets fonctionnels dont un ensemble se joue ; la garde n'en a pas à la
+# livraison (#121).
+for p in $DOSSIERS; do [ "${p%%:*}" != garde ] && joue "${p%%:*}" && echo "${p#*:}"; done | sort -u >"$travail/paquets"
 typechecks=''
 while read -r d; do
   [ -f "$juge/$d/package.json" ] || continue
@@ -319,6 +379,10 @@ if [ -n "$retenu" ] && { joue navigateur || { joue harnais && harnais_nav; }; };
 fi
 
 # shellcheck disable=SC2086 # les lancements n'ont pas d'espace
+duree=$(($(date +%s) - debut))
+if [ "$attendue" -gt 0 ] && [ $((duree * 10)) -gt $((attendue * 12)) ]; then
+  dit "la sélection a pris $duree s, au-delà de sa durée attendue de $attendue s (+20 %) — sans bloquer"
+fi
 TIRELIRE_NIVEAU=$niveau TIRELIRE_HARNAIS=$bloque node "$crochets/verdict.mjs" "$juge" "$journaux" "$debut" $lances
 verdict=$?
 node "$crochets/attestation.mjs" bilan "$travail/plan" "$journaux" "$niveau" "$arbre" "$commit" "${branche:-?}" "$travail/verts" ${attester:+--enregistrer}

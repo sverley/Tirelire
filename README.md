@@ -101,15 +101,19 @@ niveau :
   a besoin, avec un message.
 - **pré-fusion** (`pre-merge-commit`, et le pré-commit pendant un conflit) et **pré-push** : la
   livraison, jugée sur l'état commis — l'index ou le commit poussé, jamais la copie de travail.
-  - Chaque ensemble de tests — garde, cœur, relais, hébergement, interface sans ou dans le
-    navigateur, harnais du besoin — a une **empreinte**, l'état des chemins qu'il lit
-    (`packages/gardes/attestation.mjs`). Se joue, au seuil 2, chaque ensemble qui n'est pas déjà vert
-    sur son empreinte — dans l'attestation de la branche, d'un push ou d'une session à l'autre, ou
-    parce que `main` a la même — ; la livraison dit chacun, joué ou non, et pourquoi (D83, « Les
-    empreintes »). Les tests navigateur (`apps/web/test/navigateur/`) restent au Ready, en CI, sauf
-    demande : `pnpm livraison --navigateur` (D83). Le typecheck se joue avant les tests, et les tests
+  - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
+    `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
+    touchés, tests headless de l'interface ; durée attendue 40 s) ou **organisationnel** (tests de la
+    garde ; durée attendue 45 s), ou les deux. Un dépassement de plus de 20 % s'affiche, sans bloquer.
+  - De ce que la nature retient, ne se joue que ce qui n'est pas déjà vert sur son **empreinte** —
+    l'état des chemins que lit chaque ensemble de tests (`packages/gardes/attestation.mjs`) —, dans
+    l'attestation de la branche, d'un push ou d'une session à l'autre, ou parce que `main` a la
+    même ; la livraison dit chaque ensemble, joué ou non, et pourquoi (D83, « Les empreintes »). Les
+    tests navigateur (`apps/web/test/navigateur/`) restent au Ready, en CI, sauf demande :
+    `pnpm livraison --navigateur` (D83). Le typecheck se joue avant les tests, et les tests
     navigateur ne partent que si le reste est vert.
-  - Le harnais du besoin est toujours joué, à part, sauf vert sur son empreinte. Il **bloque** quand ce qui arrive
+  - Le harnais du besoin est toujours joué, à part et hors durée attendue, sauf vert sur son
+    empreinte. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.
   - Un push vers une sous-branche (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la

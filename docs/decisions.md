@@ -1504,11 +1504,14 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   commit ; le harnais du besoin est joué à part, en entier, hors budget, et le pré-commit ne fait
   qu'en afficher le verdict, sans bloquer, sauf une erreur de syntaxe ; c'est la livraison qui le
   bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la
-  livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : chaque ensemble qui n'est pas
-  vert sur son empreinte se joue, le typecheck de son paquet d'abord (voir « Les empreintes ») ; les
-  tests navigateur de non-régression (`apps/web/test/navigateur/`) sont laissés au Ready sauf
-  demande, et la livraison le dit ; le harnais du besoin est joué à part, en entier, et bloque quand
-  du code arrive.
+  livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
+  `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
+  l'interface sans navigateur, 40 s ; 270 s de plus avec les tests navigateur demandés) ou
+  organisationnel (garde, 45 s) —, et de ce qu'elle retient ne se joue que ce qui n'est pas vert sur
+  son empreinte (voir « Les empreintes ») ; ce qu'elle ne retient pas, la CI le joue au Ready s'il
+  n'est pas vert sur son empreinte. Les tests navigateur de non-régression
+  (`apps/web/test/navigateur/`) sont laissés au Ready sauf demande, et la livraison le dit, et le
+  harnais du besoin est joué à part, en entier, et bloque quand du code arrive.
 - **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, les
   harnais et la garde : typecheck, `pnpm test 1`, le harnais du besoin en entier, tests navigateur
   activés, puis les tests navigateur au seuil 2 (`--navigateur`), qui ne partent que si le reste est

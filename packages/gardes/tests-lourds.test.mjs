@@ -77,7 +77,7 @@ function dépôtFactice(nom) {
   writeFileSync(témoin, '');
   for (const f of readdirSync(join(RACINE, '.githooks'))) cpSync(join(RACINE, '.githooks', f), join(dépôt, '.githooks', f));
   for (const f of readdirSync(join(RACINE, 'packages/gardes'))) {
-    if (/\.mjs$|^package\.json$/.test(f) && !/\.test\.mjs$/.test(f)) cpSync(join(RACINE, 'packages/gardes', f), join(dépôt, 'packages/gardes', f));
+    if (/\.mjs$|^package\.json$|^chemins-ignores$/.test(f) && !/\.test\.mjs$/.test(f)) cpSync(join(RACINE, 'packages/gardes', f), join(dépôt, 'packages/gardes', f));
   }
   const écrire = (f, texte) => {
     mkdirSync(dirname(join(dépôt, f)), { recursive: true });
@@ -182,8 +182,7 @@ describe('[niveau 2] #264, points 5 à 8 · le moins cher d’abord, les tests n
   test('point 6 · la livraison ne joue pas les tests navigateur de non-régression sans demande, navigateur présent', async () => {
     const r = await livraisonVerte();
     assert.equal(r.push.code, 0, r.push.sortie);
-    // La garde lit tout le dépôt (#266) : elle se joue aussi.
-    assert.deepEqual(tests(r.notesPush).map((x) => x.quoi).sort(), ['coeur', 'garde', 'interface'], `le cœur, la garde et l'interface sans navigateur se jouent, pas les tests navigateur\n${r.push.sortie}`);
+    assert.deepEqual(tests(r.notesPush).map((x) => x.quoi).sort(), ['coeur', 'interface'], `le cœur et l'interface sans navigateur se jouent, pas les tests navigateur\n${r.push.sortie}`);
   });
 
   test('point 5 · à la livraison, le typecheck se joue avant les tests', async () => {

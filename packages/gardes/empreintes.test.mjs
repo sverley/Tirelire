@@ -318,7 +318,7 @@ function dépôtFactice(nom) {
   const témoin = join(temporaire(), `${nom}.temoin`);
   writeFileSync(témoin, '');
   for (const f of readdirSync(join(RACINE, '.githooks'))) cpSync(join(RACINE, '.githooks', f), join(dépôt, '.githooks', f));
-  for (const f of readdirSync(join(RACINE, 'packages/gardes'))) if (/\.mjs$|^package\.json$/.test(f) && !/\.test\.mjs$/.test(f)) cpSync(join(RACINE, 'packages/gardes', f), join(dépôt, 'packages/gardes', f));
+  for (const f of readdirSync(join(RACINE, 'packages/gardes'))) if (/\.mjs$|^package\.json$|^chemins-ignores$/.test(f) && !/\.test\.mjs$/.test(f)) cpSync(join(RACINE, 'packages/gardes', f), join(dépôt, 'packages/gardes', f));
   const écrire = (f, texte) => {
     mkdirSync(dirname(join(dépôt, f)), { recursive: true });
     writeFileSync(join(dépôt, f), texte);
@@ -412,11 +412,11 @@ const parcoursDuCoeur = () =>
   })());
 
 describe('[niveau 2] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue pas', { concurrency: true }, () => {
-  test('point 2 · au premier push, seuls se jouent les ensembles dont l’empreinte a changé depuis main, et ils sont attestés', async () => {
+  test('point 2 · au premier push, se joue ce que la nature du besoin retient, et ils sont attestés', async () => {
     const { premier } = await parcoursDuCoeur();
     assert.equal(premier.code, 0, premier.sortie);
-    assert.deepEqual(premier.joués, ['coeur', 'garde', 'interface'], `le cœur, l'interface qui le lit, et la garde qui lit tout ; ni le navigateur sans demande, ni rien d'inchangé depuis main\n${premier.sortie}`);
-    assert.deepEqual(premier.attestation.verts.map((v) => `${v.ensemble}:${v.seuil}`).sort(), ['coeur:2', 'garde:2', 'interface:2'], 'l’attestation envoyée porte ce qui a été joué vert');
+    assert.deepEqual(premier.joués, ['coeur', 'interface'], `le cœur et l'interface, que retient un besoin fonctionnel du cœur ; ni le navigateur sans demande\n${premier.sortie}`);
+    assert.deepEqual(premier.attestation.verts.map((v) => `${v.ensemble}:${v.seuil}`).sort(), ['coeur:2', 'interface:2'], 'l’attestation envoyée porte ce qui a été joué vert');
   });
 
   test('points 2 et 6 · un push qui ne change que la documentation ne rejoue que ce qui la lit, et garde les empreintes vertes d’avant', async () => {
@@ -426,10 +426,10 @@ describe('[niveau 2] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue p
     for (const v of premier.attestation.verts) assert.ok(doc.attestation.verts.some((w) => w.ensemble === v.ensemble && w.empreinte === v.empreinte), `${v.ensemble} : son empreinte verte se garde d'un push à l'autre`);
   });
 
-  test('point 5 · la demande des tests navigateur ne joue qu’eux, et les atteste sur leur empreinte', async () => {
+  test('point 5 · la demande, qui juge comme un premier push, ne rejoue rien de ce qui est vert : elle ne joue que les tests navigateur, et les atteste', async () => {
     const { demande: d } = await parcoursDuCoeur();
     assert.equal(d.code, 0, d.sortie);
-    assert.deepEqual(d.joués, ['navigateur'], `la demande ne rejoue rien de ce qui est déjà vert\n${d.sortie}`);
+    assert.deepEqual(d.joués, ['navigateur'], `la demande retient le cœur, l'interface et la garde, déjà verts sur leur empreinte, et ne joue que les tests navigateur\n${d.sortie}`);
     assert.ok(d.attestation.verts.some((v) => v.ensemble === 'navigateur' && v.seuil === 2), 'les tests navigateur demandés et verts sont attestés sur leur empreinte');
   });
 
@@ -521,8 +521,10 @@ describe('[niveau 2] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue p
 describe('[niveau 3] #266, point 7 · chaque moment dit, pour chaque ensemble, ce qu’il a joué ou pourquoi il ne l’a pas joué', () => {
   test('la livraison dit chaque ensemble : joué, à quel seuil, avec quel verdict ; ou non joué, et pourquoi', async () => {
     const { premier, doc, demande: d } = await parcoursDuCoeur();
-    for (const nom of ['cœur', 'interface sans navigateur', 'garde']) assert.match(premier.sortie, new RegExp(`pré-push : ${nom} : joué au seuil 2 : vert\\.`), `${nom}\n${premier.sortie}`);
+    for (const nom of ['cœur', 'interface sans navigateur']) assert.match(premier.sortie, new RegExp(`pré-push : ${nom} : joué au seuil 2 : vert\\.`), `${nom}\n${premier.sortie}`);
     assert.match(premier.sortie, /pré-push : relais : non joué — rien de ce qu'il lit n'a changé depuis main \([0-9a-f]{10}\)\./, premier.sortie);
+    assert.match(premier.sortie, /pré-push : garde : non joué — ce qui arrive ne le fait pas jouer à la livraison \(packages\/gardes\/chemins-ignores\) ; au Ready, la CI le joue s'il n'est pas vert sur son empreinte\./, premier.sortie);
+    assert.match(doc.sortie, /pré-push : garde : joué au seuil 2 : vert\./, doc.sortie);
     assert.ok(premier.sortie.includes(`pré-push : interface dans le navigateur : non joué — ${SANS_DEMANDE}.`), premier.sortie);
     assert.match(premier.sortie, /pré-push : harnais du besoin : non joué — aucun harnais du besoin\./);
     assert.match(doc.sortie, /pré-push : cœur : non joué — empreinte trouvée verte par pré-push, sur le commit [0-9a-f]{10}, au seuil 2\./, doc.sortie);
