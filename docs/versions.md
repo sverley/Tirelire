@@ -7,13 +7,8 @@ garantit aucun usage : il intègre les contraintes structurelles de tous les usa
 cibles actives, par incréments, chacun placé juste avant la première version d'usage qui l'exerce
 (D87). Le premier est `v0.0 · Données sûres`.
 
-Un numéro de version porte une promesse (D87). Une version `v0.x` est une **bêta** : publiée par son
-tag et utilisable, mais le format du fichier peut changer à la version suivante sans migration,
-l'ancien étant refusé en le disant (D30) ; elle le dit à l'utilisateur avant qu'il y mette de vraies
-données. `v1` est la **première version publique** : elle pose le **verrou** du format — à partir
-d'elle, tout changement de format fournit une migration ou reste rétrocompatible (D30). Le socle est
-`v0.0`, les versions d'usage `v0.1` à `v0.5` ; `v1 · Format figé` vient quand ce qui fait bouger le
-format a été exercé.
+Les versions `v0.x` sont des bêtas ; `v1`, la première version publique, pose le verrou du format
+(D87, D30). Le socle est `v0.0`, les versions d'usage `v0.1` à `v0.5`.
 
 Une version se termine quand son critère de fin est atteint et que le porteur a fait ses
 vérifications manuelles ; elle se publie alors par le tag de son nom (D83). Une version livrée ne
