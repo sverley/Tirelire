@@ -19,6 +19,8 @@ import {
 } from '@tirelire/core';
 import type { LedgerKey } from '@tirelire/core';
 import { eraseStore, openStore, OuvertureRefusee, type OpenedStore } from './db';
+import { demanderPersistance, type EtatPersistance } from './persistance';
+import { saveFile } from './platform';
 
 export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'tirelires' | 'categories' | 'flows' | 'entries' | 'settings' | 'sync' | 'wizard';
 
@@ -43,6 +45,15 @@ class AppState {
    * ne vit que le temps de la session.
    */
   conflicts = $state<Conflict[]>([]);
+  /**
+   * Ce que le navigateur a répondu à la demande de garder les données (C4). Refusée ou impossible,
+   * l'accueil le signale et Réglages le redit ; accordée, le signal disparaît.
+   */
+  persistance = $state<EtatPersistance>('inconnue');
+  /** Le signal de l'accueil, masqué par l'utilisateur pour cette ouverture ; Réglages le redit. */
+  signalPersistanceMasque = $state(false);
+  /** Les données peuvent-elles encore être effacées par le navigateur faute de place ? */
+  effacable: boolean = $derived(this.persistance === 'refusee' || this.persistance === 'impossible');
   private opened: OpenedStore | undefined;
 
   plan: Plan = $derived(computePlan(this.ledger, this.asOf));
@@ -75,6 +86,8 @@ class AppState {
   }
 
   async init(): Promise<void> {
+    void this.demanderPersistance();
+    if (typeof window !== 'undefined') window.addEventListener('appinstalled', () => void this.demanderPersistance());
     try {
       this.opened = await openStore();
       this.reload();
@@ -83,6 +96,15 @@ class AppState {
       if (err instanceof OuvertureRefusee) this.refused = { message: err.message, bytes: err.bytes };
       else this.error = err instanceof Error ? err.message : String(err);
     }
+  }
+
+  /**
+   * Demande au navigateur de garder les données, sans geste de l'utilisateur : à chaque ouverture
+   * tant qu'elles ne sont pas persistantes, et à l'installation, qu'il accorde plus volontiers.
+   */
+  async demanderPersistance(): Promise<void> {
+    if (this.persistance === 'accordee') return;
+    this.persistance = await demanderPersistance();
   }
 
   /** Après un refus : repartir d'un fichier neuf, ou de l'exemple. C'est ici seulement que l'ancien est effacé. */
@@ -217,6 +239,11 @@ class AppState {
   async exportBytes(): Promise<Uint8Array> {
     await this.opened?.flush();
     return this.store.export();
+  }
+
+  /** Remet à l'utilisateur une copie du fichier : sa sauvegarde (C5), qui se réimporte dans Réglages. */
+  async saveBackup(): Promise<void> {
+    await saveFile(`tirelire-${this.asOf}.sqlite`, await this.exportBytes(), 'application/x-sqlite3');
   }
 
   /**

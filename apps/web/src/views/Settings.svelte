@@ -79,8 +79,7 @@
   }
 
   async function exportFile() {
-    const bytes = await app.exportBytes();
-    await saveFile(`tirelire-${app.asOf}.sqlite`, bytes, 'application/x-sqlite3');
+    await app.saveBackup();
   }
 
   async function importFile(e: Event) {
@@ -99,7 +98,7 @@
   }
 
   async function erase() {
-    if (!confirm('Effacer toutes les données de cet appareil ? (pense à exporter avant)')) return;
+    if (!confirm('Effacer toutes les données de cet appareil ? (pensez à exporter avant)')) return;
     await app.eraseAll();
     msg = 'Données effacées.';
   }
@@ -138,7 +137,7 @@
 
 <h2>Arrondi des ordres permanents</h2>
 <div class="card">
-  <p class="small muted">Un ordre permanent se pose rond chez une banque. Le Plan propose donc le multiple au-dessus de ce que le budget demande, et ne signale pas un ordre arrondi au-dessus dans ce pas : il couvre ce qui est demandé. Un ordre trop court, lui, est toujours signalé. Mets 0 pour proposer le montant au centime près.</p>
+  <p class="small muted">Un ordre permanent se pose rond chez une banque. Le Plan propose donc le multiple au-dessus de ce que le budget demande, et ne signale pas un ordre arrondi au-dessus dans ce pas : il couvre ce qui est demandé. Un ordre trop court, lui, est toujours signalé. Mettez 0 pour proposer le montant au centime près.</p>
   <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
     <label class="f">Pas d’arrondi <input bind:value={arrondi} inputmode="decimal" /></label>
     <button class="btn" onclick={saveArrondi}>Enregistrer</button>
@@ -147,7 +146,16 @@
 
 <h2>Données</h2>
 <div class="card">
-  <p class="small muted">Tout est stocké dans ce navigateur, dans un fichier SQLite. Exporte-le régulièrement : c'est ta sauvegarde, et le moyen de passer d'un appareil à l'autre en attendant la synchronisation.</p>
+  <p class="small muted">Tout est stocké dans ce navigateur, dans un fichier SQLite. Exportez-le régulièrement : c'est votre sauvegarde, et le moyen de passer d'un appareil à l'autre en attendant la synchronisation.</p>
+  {#if app.persistance === 'accordee'}
+    <p class="small"><strong>Données gardées par le navigateur.</strong> Il a accepté de les conserver, même quand il manque de place. Vider le navigateur ou désinstaller l'application les retire toujours : l'export reste votre sauvegarde.</p>
+  {:else if app.effacable}
+    <p class="small"><strong>Vos données peuvent être effacées par le navigateur.</strong>
+      {app.persistance === 'impossible'
+        ? 'Ce navigateur ne permet pas de les mettre à l’abri'
+        : 'Votre navigateur n’a pas accepté de les mettre à l’abri'} : s'il manque de place, il peut les effacer sans prévenir.
+      Exportez le fichier régulièrement pour tout retrouver.{app.persistance === 'refusee' ? ' La demande se refait à chaque ouverture ; une application installée depuis le menu du navigateur l’obtient plus souvent.' : ''}</p>
+  {/if}
   <div class="actions">
     <button class="btn primary" onclick={exportFile}>Exporter le fichier SQLite</button>
     <label class="btn">Importer un fichier… <input type="file" accept=".sqlite,.db,application/x-sqlite3" onchange={importFile} hidden /></label>
