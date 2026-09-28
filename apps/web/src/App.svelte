@@ -81,13 +81,33 @@
             <strong>Dernière opération connue le {shortDate(app.lastOperationDate)}</strong>
             <span class="sub">
               Il y a {app.staleDays} jours. Les soldes et le plan au {shortDate(app.asOf)} supposent
-              qu'il ne s'est rien passé depuis : importe un relevé, ou lis à cette date.
+              qu'il ne s'est rien passé depuis : importez un relevé, ou lisez à cette date.
             </span>
           </div>
         </div>
         <div class="actions" style="margin:6px 0 0">
           <button class="btn small primary" onclick={() => app.switchTab('import')}>Importer un relevé</button>
           <button class="btn small" onclick={() => (app.asOf = app.lastOperationDate!)}>Lire au {shortDate(app.lastOperationDate)}</button>
+        </div>
+      </div>
+    {/if}
+    {#if app.effacable && app.view === 'plan' && !app.signalPersistanceMasque}
+      <div class="card warn" aria-live="polite">
+        <div class="row">
+          <div class="label">
+            <strong>Vos données peuvent être effacées par le navigateur</strong>
+            <span class="sub">
+              {app.persistance === 'impossible'
+                ? 'Ce navigateur ne permet pas de les mettre à l’abri'
+                : 'Votre navigateur n’a pas accepté de les mettre à l’abri'} : s'il manque de place, il
+              peut les effacer sans prévenir. Une copie du fichier, enregistrée sur votre appareil, vous
+              permet de tout retrouver.
+            </span>
+          </div>
+        </div>
+        <div class="actions" style="margin:6px 0 0">
+          <button class="btn small primary" onclick={() => app.saveBackup()}>Enregistrer une copie</button>
+          <button class="btn small" onclick={() => (app.signalPersistanceMasque = true)}>Masquer</button>
         </div>
       </div>
     {/if}

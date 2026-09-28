@@ -10,8 +10,9 @@
  * se range selon le besoin qu'il vérifie, jamais selon ce que le fichier regarde.
  *
  * #73 demandait, pour C1, C2, C4 et C7, un harnais — ou une vérification manuelle assumée par écrit
- * qui dise pourquoi il n'y en a pas. C1 et C2 ont reçu le leur ; C4 et C7 gardent leur vérification
- * manuelle, avec une analyse écrite sous leur titre.
+ * qui dise pourquoi il n'y en a pas. C1 et C2 ont reçu le leur ; C4 et C7 ont gardé leur vérification
+ * manuelle, avec une analyse écrite sous leur titre. C4 a reçu depuis son harnais, avec #42 ; C7
+ * garde la sienne.
  *
  * Ce que la couverture générale (#59, #66, #69) ne voit pas, et que ce fichier tient :
  *
@@ -42,9 +43,9 @@
  * 2. **Aucune garantie muette** : tout test actif de ces fichiers, hors témoins rouges et titres de
  *    suite, est nommé par une ligne du registre. Une garantie ajoutée au code sans être écrite au
  *    registre rougit ici — c'est ce qui manquait quand le classement des documents est arrivé.
- * 3. **Les analyses de C4 et C7 renvoient à ce qui les lèvera** : celle de C4 cite #42, qui bâtira
- *    la demande de persistance ; celle de C7 cite le catalogue des cibles (`cibles.md`), où une cible native deviendra active. Un paragraphe de
- *    remplissage ne les cite pas.
+ * 3. **L'analyse de C7 renvoie à ce qui la lèvera** : elle cite le catalogue des cibles
+ *    (`cibles.md`), où une cible native deviendra active. Un paragraphe de remplissage ne le cite
+ *    pas.
  *
  * Chaque règle a ici son **témoin vert** — le registre réel, qui doit passer — et son **témoin
  * rouge** — le même contrôle rejoué sur un registre volontairement régressé, qui doit échouer. Le
@@ -80,11 +81,11 @@ const PROMESSES = Object.freeze({
 });
 
 /**
- * Analyses de C4 et C7 : ce qu'elles doivent citer, faute de quoi elles ne disent rien d'utile — pour
- * C4, l'issue qui bâtira la persistance ; pour C7, le catalogue des cibles, où une cible native
- * deviendra active (#162 : aucun document ne renvoie plus une cible à une issue).
+ * Analyse de C7 : ce qu'elle doit citer, faute de quoi elle ne dit rien d'utile — le catalogue des
+ * cibles, où une cible native deviendra active (#162 : aucun document ne renvoie plus une cible à une
+ * issue).
  */
-const RENVOIS_ATTENDUS = Object.freeze({ C4: Object.freeze(['#42']), C7: Object.freeze(['cibles.md']) });
+const RENVOIS_ATTENDUS = Object.freeze({ C7: Object.freeze(['cibles.md']) });
 
 // ─── Lecture ─────────────────────────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ describe('[niveau 1] C1, C2, C4 et C7 gardés au registre (#73)', () => {
     assert.throws(() => verifierAucuneGarantieMuette('C2', registre(), source), /qu'aucune ligne du registre ne nomme/);
   });
 
-  // ─── Règle 3 · les analyses de C4 et C7 renvoient à ce qui les lèvera ────────────────────────
+  // ─── Règle 3 · l'analyse de C7 renvoie à ce qui la lèvera ────────────────────────────────────
 
   /**
    * L'entrée porte, avant sa première ligne d'étiquette, un paragraphe d'analyse qui cite les issues
@@ -209,16 +210,16 @@ describe('[niveau 1] C1, C2, C4 et C7 gardés au registre (#73)', () => {
     }
   }
 
-  test('#73 · témoin vert — les analyses de C4 et C7 sont écrites et renvoient aux issues qui les lèveront', () => {
+  test("#73 · témoin vert — l'analyse de C7 est écrite et renvoie à ce qui la lèvera", () => {
     for (const id of Object.keys(RENVOIS_ATTENDUS)) verifierAnalyseEcrite(id, registre());
   });
 
   test('#73 · témoin rouge — une analyse réduite à du remplissage, sans renvoi à son issue, fait échouer la règle 3', () => {
     const remplissage = registre().replace(
-      analyseDe('C4', registre()),
+      analyseDe('C7', registre()),
       'Rien de particulier à signaler ici, mais il faut bien écrire quelques lignes pour remplir la place.',
     );
-    assert.throws(() => verifierAnalyseEcrite('C4', remplissage), /ne renvoie pas à #42/);
+    assert.throws(() => verifierAnalyseEcrite('C7', remplissage), /ne renvoie pas à cibles\.md/);
   });
 
   test('#73 · témoin rouge — une entrée réduite à sa seule vérification manuelle fait échouer la règle 3', () => {
