@@ -729,8 +729,8 @@ async function synchroniserParLeRelais(i: Instance): Promise<void> {
   await pause(800);
 }
 
-/** Relie deux instances en direct, par le code texte copié et collé (C2), et attend la fin de l'échange. */
-async function synchroniserEnDirect(a: Instance, b: Instance): Promise<void> {
+/** Un essai de liaison directe, par le code texte copié et collé (C2) : `null` s'il aboutit, sinon ce qui a manqué. */
+async function unEssaiDirect(a: Instance, b: Instance): Promise<string | null> {
   for (const i of [a, b]) {
     await allerÀ(i.page, 'Plus');
     expect(await cliquer(i.page, 'Synchronisation'), 'écran Synchronisation introuvable').toBe(true);
@@ -763,11 +763,33 @@ async function synchroniserEnDirect(a: Instance, b: Instance): Promise<void> {
   expect(await coller(a, 'Réponse (code texte)', réponse), 'champ de la réponse introuvable').toBe(true);
   await pause(100);
   expect(await cliquer(a.page, 'Connecter'), '« Connecter » introuvable').toBe(true);
-  for (const [i, nom] of [[a, 'A'], [b, 'B']] as const)
-    await i.page.waitForFunction(() => document.body.innerText.includes('Synchronisé avec'), { timeout: 30_000 }).catch(() => {
-      throw new Error(`l'échange direct n'a pas abouti sur ${nom}`);
-    });
+  for (const [i, nom] of [[a, 'A'], [b, 'B']] as const) {
+    const abouti = await i.page
+      .waitForFunction(() => document.body.innerText.includes('Synchronisé avec'), { timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!abouti) {
+      const vu = await i.page.evaluate(() => (document.querySelector('main')?.textContent ?? '').replace(/\s+/g, ' ').slice(0, 400)).catch(() => '');
+      return `l'échange direct n'a pas abouti sur ${nom} : « ${vu} »`;
+    }
+  }
   await pause(800);
+  return null;
+}
+
+/**
+ * Relie deux instances en direct et attend la fin de l'échange. Sans serveur STUN, sur une machine
+ * chargée, la connexion peut ne pas s'établir (candidats rassemblés en 2,5 s au plus, `webrtc.ts`) :
+ * un second essai part alors de deux ouvertures neuves. Un essai qui échoue ne date rien (point 2),
+ * et le test ne lit les dates qu'après l'essai qui a abouti.
+ */
+async function synchroniserEnDirect(a: Instance, b: Instance): Promise<void> {
+  const premier = await unEssaiDirect(a, b);
+  if (premier === null) return;
+  await rouvrir(a);
+  await rouvrir(b);
+  const second = await unEssaiDirect(a, b);
+  if (second !== null) throw new Error(`${premier} ; au second essai, ${second}`);
 }
 
 /** Importe un fichier par le champ de fichier de Réglages (ou de Synchronisation) que `motif` désigne. */
