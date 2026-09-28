@@ -505,7 +505,7 @@ des bêtas au format libre, et `v1`, la première version publique, qui pose le 
 
 > Il faut de la cohérence globale du projet
 
-> Il faut aussi prévoir un certain étalement des tâches. Il ne faut pas que la v0 soit énorme à coder sans avoir la possibilité de confronter les choix aux usages
+> Il faut aussi prévoir un certain étalement des tâches. Il ne faut pas que la v0.0 soit énorme à coder sans avoir la possibilité de confronter les choix aux usages
 
 > Ok
 
@@ -513,9 +513,9 @@ des bêtas au format libre, et `v1`, la première version publique, qui pose le 
 
 > Non sinon elle se fermera avant d'être codé.
 
-> En fait, si, elle doit être traitée dans le jalon v0 pour inclure ce qui doit être vérifié en attendant le codage réel
+> En fait, si, elle doit être traitée dans le jalon v0.0 pour inclure ce qui doit être vérifié en attendant le codage réel
 
-> oui, construit les versions jusqu'a v5.
+> oui, construit les versions jusqu'a v0.5.
 > si tu analyses le contenue des issues, et au regard du changement de structuration du projet orientée "version", je pense que beaucoup d'issue peuvent aller dans des versions qui a l'époque du traitement de l'issue n'existaient pas (donc aucune référence)
 
 ## 25 septembre 2026 · les niveaux des tests
