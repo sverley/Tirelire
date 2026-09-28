@@ -1052,8 +1052,8 @@ Ce que la synchronisation exige du fichier, pour toutes les tables et sans struc
 usage (I3) :
 
 - **Une ligne a la même identité sur toutes les instances.** Une opération importée a celle de D09
-  sur toute instance qui importe le même relevé sur le même compte ; le compte principal, qu'il naisse
-  d'office ou par l'assistant, et les réglages ont la même partout.
+  sur toute instance qui importe le même relevé sur le même compte ; le compte principal, qui naît
+  d'office avec toute base (D40), et les réglages ont la même partout.
 - **Chaque écriture se date et se garde.** Chaque ligne porte l'horloge de sa dernière écriture et
   l'instance qui l'a faite ; une suppression est une écriture : rien d'une ligne synchronisable ne
   disparaît physiquement. Une ligne réécrite ne laisse rien d'elle dans le fichier.

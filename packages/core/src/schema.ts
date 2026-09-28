@@ -268,10 +268,12 @@ export function rowProblem(t: TableDef, id: unknown, v: Record<string, string | 
 export const FILE_FORMAT = 'tirelire';
 /**
  * Version du format du fichier et des paquets de synchronisation. Un fichier ou un paquet d'une
- * autre version est refusé en le disant, sans rien écrire (D30, D58). La version 2 parle le
- * domaine et contraint ses colonnes ; la version 1 n'est plus lue.
+ * autre version est refusé en le disant, sans rien écrire (D30, D58). La version 3 lie le compte
+ * principal à son identifiant, présent dans toute base (contrainte `accounts.principal`, #209) ;
+ * la version 2 parlait le domaine et contraignait ses colonnes ; ni elle ni la version 1 ne sont
+ * plus lues.
  */
-export const FORMAT_VERSION = 2;
+export const FORMAT_VERSION = 3;
 
 export const SYSTEM_SQL = [
   // Réglages : une ligne par clé, valeur JSON, horloge de la dernière écriture ; synchronisés.
