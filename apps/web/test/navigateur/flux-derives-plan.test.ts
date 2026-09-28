@@ -119,7 +119,14 @@ function vérifierOrdrePosé(c: Carte, posé: number, demandé: number, alertes:
  * n'a pas bougé. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans
  * navigateur : c'est la règle qu'on garde ici, pas une seconde visite de l'écran.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est I3, pour U2, nommé au registre, qui cite tout ce fichier — « à
+// 375 px, l'écran Plan enregistre l'ordre, qui survit au rechargement ». Un ordre mal enregistré ne
+// perd pas la donnée : l'ordre vit chez la banque, et se ressaisit. Certains tests de la traversée ne
+// vaudraient seuls que le niveau 2, des cas de D60 et D57 (le pas d'arrondi, le flux dérivé à l'écran Flux) :
+// ils restent ici au niveau 1, que D81 impose à tout ce fichier, car les en sortir demanderait de
+// construire et servir le site une seconde fois, ce qui allongerait la phase du navigateur au lieu de
+// la raccourcir (#246, point 6).
+describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l’écran Plan (D60)', () => {
   it.fails('témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire', () => {
     const demandé = 65000;
     const posé = demandé - 7000;
@@ -296,12 +303,15 @@ describe('[niveau 1] harnais du registre', () => {
     });
 
     // Arbitrage du 10 septembre, suite : « simple pour le plus grand nombre, souple pour les
-    // exigeants ». Sorti de #14 : c'est l'issue #25. À rendre concrètes quand l'écran existe (les
-    // libellés ne sont pas encore choisis).
-    it.todo('sans rien toucher, la carte montre une seule ligne de virement permanent et un seul ordre à poser');
-    it.todo('depuis « Détail », diviser le virement ne demande pas de quitter la carte, et Annuler revient à la somme');
-    it.todo('depuis « Détail », regrouper des tirelires en plusieurs ordres : chaque ordre affiche sa demande, son fait bancaire et son écart');
-    it.todo('à 375 px, un compte divisé en quatre ordres reste lisible sans débordement');
-    it.todo('à l’écran Flux, chaque ordre d’un compte divisé est un flux dérivé distinct, non modifiable à la main');
+    // exigeants ». Sorti de #14 : c'est l'issue #25, ouverte. À rendre concrètes quand l'écran existe
+    // (les libellés ne sont pas encore choisis). Niveau 1, celui de ce fichier : #25 porte I4 (un ordre
+    // par compte par défaut, le diviser sur demande) et U2.
+    describe('#25 · diviser un virement permanent en plusieurs ordres, simple par défaut, souple sur demande (D60) — en attente de #25', () => {
+      it.todo('sans rien toucher, la carte montre une seule ligne de virement permanent et un seul ordre à poser');
+      it.todo('depuis « Détail », diviser le virement ne demande pas de quitter la carte, et Annuler revient à la somme');
+      it.todo('depuis « Détail », regrouper des tirelires en plusieurs ordres : chaque ordre affiche sa demande, son fait bancaire et son écart');
+      it.todo('à 375 px, un compte divisé en quatre ordres reste lisible sans débordement');
+      it.todo('à l’écran Flux, chaque ordre d’un compte divisé est un flux dérivé distinct, non modifiable à la main');
+    });
   });
 });

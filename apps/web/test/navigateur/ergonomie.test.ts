@@ -170,7 +170,9 @@ function vérifierLeTexte(r: { tropPetits: string[]; tropPâles: string[] }, éc
  * gris pâle. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur :
  * ce sont les seuils qu'on garde ici, pas une seconde mesure de l'application.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est C9, nommé au registre, qui cite tout ce fichier (D55) ; aucun de
+// ces seuils ne perd de donnée.
+describe('[niveau 1] C9 · harnais du registre : cibles, texte et contraste mesurés (D55)', () => {
   it.fails('témoin rouge · un écran aux cibles de 20 px et au texte gris pâle', () => {
     vérifierLesCibles({ tropPetites: ['Modifier — 20×20'], collés: ['Supprimer à 2 px de Modifier'] }, 'inventé');
     vérifierLeTexte({ tropPetits: ['« Solde à régler » à 9 px'], tropPâles: ['« Solde à régler » 2.10:1 (rgb(180, 180, 180) sur fond)'] }, 'inventé');

@@ -116,7 +116,9 @@ function vérifierLInventaire(r: Relevé) {
  * muet. Il doit échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur : c'est
  * la règle qu'on garde ici, pas une seconde visite des écrans.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est I5, nommé au registre (« inventaire des fonctions · … » et son
+// témoin) ; une fonction mal amenée ne perd aucune donnée.
+describe('[niveau 1] I5 · harnais du registre', () => {
   it.fails('témoin rouge · une fonction sans point d entrée depuis l accueil', () => {
     vérifierLInventaire({
       vuesDuShell: [...INVENTAIRE.map((f) => f.vue), 'automatismes'],
@@ -215,7 +217,7 @@ async function visiter(page: Page, f: Fonction): Promise<Visite> {
   };
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] I5 · harnais du registre', () => {
   describe.skipIf(!navigateur)('I5 · inventaire des fonctions et de leur point d’entrée (issue #71)', () => {
     let site: Site;
     let contexte: BrowserContext;

@@ -71,7 +71,9 @@ function vérifierUneMesure(m: Mesure) {
  * échouer ; `it.fails` tient l'échec attendu (#66). Il se joue sans navigateur : c'est la règle
  * qu'on garde ici, pas une seconde visite de l'écran.
  */
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est I6, nommé au registre (« gestes de classement · … » et son
+// témoin) ; un geste de trop ne perd aucune donnée.
+describe('[niveau 1] I6 · harnais du registre', () => {
   it.fails('témoin rouge · un classement qui coûte un geste de plus que le seuil', () => {
     vérifierUneMesure({
       cas: 'automatiser les semblables',
@@ -256,7 +258,7 @@ async function mesurer(page: Page, c: Consigne): Promise<Mesure> {
   };
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] I6 · harnais du registre', () => {
   describe.skipIf(!navigateur)('I6 · catégoriser en peu de gestes (issue #71)', () => {
     let site: Site;
     let contexte: BrowserContext;

@@ -55,7 +55,10 @@ function nommeCeQuIlModifie(vue: string, texte: string) {
   expect(texte, `${vue} : titre non figé à l’ouverture`).toMatch(/^\s*(need)?[Tt]itre = /m);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est C9, nommé au registre, qui cite tout ce fichier — « un formulaire
+// s’ouvre sous la ligne qu’il modifie et vient dans le champ de vision » — et D59, dont le panneau qui
+// nomme ce qu’il modifie est aussi au registre (C9, panneaux-nommes.test.ts). Le témoin prend ce niveau.
+describe('[niveau 1] C9 · harnais du registre : le panneau d’édition s’ouvre sous sa ligne, et la nomme (D59)', () => {
   describe('panneaux d’édition de la Configuration', () => {
     it.each(VUES)('%s : chaque panneau est un extrait rendu au point d’usage', (vue) => {
       extraitAuPointDUsage(vue, source(vue));

@@ -6,8 +6,14 @@ import { revealed } from '../src/lib/actions';
  * `revealed` est ce qui empêche le défaut de revenir : le panneau s'ouvre sous la ligne modifiée,
  * donc sous le pli dès qu'on édite une ligne en bas d'écran. jsdom n'implémente pas
  * `scrollIntoView` — on l'espionne, ce qui suffit à vérifier le contrat.
+ *
+ * Niveau 1 (D83) : le besoin est C9, nommé au registre, qui cite tout ce fichier — le panneau « vient
+ * dans le champ de vision » — et D59, qui décrit `revealed`. Le dernier test, « sans animation quand le
+ * mouvement est réduit » (D59), ne vaudrait seul que le niveau 3 : le panneau viendrait quand même à
+ * l'écran, moins accessible. Il reste ici au niveau 1, que D81 impose à tout ce fichier : le sortir dans
+ * un second fichier ne ferait gagner aucune phase (#246, point 6).
  */
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] C9 · harnais du registre : le panneau d’édition vient dans le champ de vision (D59)', () => {
   describe('action revealed', () => {
     let noeud: HTMLElement;
     let amene: ReturnType<typeof vi.fn>;
