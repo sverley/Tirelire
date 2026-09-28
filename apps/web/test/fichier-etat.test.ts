@@ -316,7 +316,11 @@ async function deuxInstances(): Promise<[LedgerStore, LedgerStore]> {
 
 const nom = (i: number) => `Nom ${String(i).padStart(3, '0')}`;
 
-describe('[niveau 0] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est « #196 · 1. le fichier ne grossit qu’avec les données », nommé au
+// registre sous I8 (D58 : « Une ligne réécrite ne laisse rien d’elle dans le fichier »). S’il
+// tombait, le fichier grossirait des gestes sans qu’aucune donnée soit perdue, altérée ni sortie de
+// l’appareil : pas de niveau 0. Son témoin rouge le suit.
+describe('[niveau 1] I8 · harnais du registre : le fichier ne grossit qu’avec les données (D58, #196)', () => {
   describe('#196 · 1. le fichier ne grossit qu’avec les données', () => {
     it('cent modifications d’une même ligne laissent le fichier à la taille d’une seule', async () => {
       const a = await instance();
@@ -341,6 +345,39 @@ describe('[niveau 0] harnais du registre', () => {
     });
   });
 
+  it.fails('témoin rouge · un fichier qui garde une trace de chaque modification', async () => {
+    const a = await instance();
+    semer(a);
+    const compte = lignes(a, 'accounts')[0]!;
+    ecrire(a, 'accounts', { ...compte, name: nom(0) });
+    const apresUne = a.export();
+    // Version cassée : le même fichier, où chaque modification de la ligne réécrit la ligne et laisse
+    // en plus une entrée de journal, comme le faisait main (D08).
+    const db = new SQL.Database(apresUne);
+    db.run(`CREATE TABLE journal_casse (seq INTEGER PRIMARY KEY, hlc TEXT, site TEXT, tbl TEXT, row_id TEXT, col TEXT, value TEXT, prev_hash TEXT, hash TEXT)`);
+    for (let i = 1; i <= 100; i++) {
+      const empreinte = createHash('sha256').update(String(i)).digest('hex');
+      db.run(`INSERT INTO journal_casse (hlc, site, tbl, row_id, col, value, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+        `17900000000${String(i).padStart(2, '0')}:0000:casse`, 'casse', 'accounts', compte.id, 'name', JSON.stringify(nom(i)), empreinte, empreinte,
+      ]);
+    }
+    const apresCent = db.export();
+    db.close();
+    verifierMemeTaille(apresUne.length, apresCent.length);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// 2 à 8. Rien ne se perd
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+// Niveau 0 (D83) : chaque point garde ce qui, tombé, laisserait des données de l’utilisateur perdues
+// ou altérées même après correction — une écriture ou une suppression qui ne converge pas (I8), une
+// version écartée sans le dire (D58 : le conflit n’est pas gardé), un fichier ou un paquet d’un autre
+// format ouvert ou appliqué (C8), une sauvegarde qui ne se rouvre pas à l’identique (C5). Les points 2
+// à 7 sont nommés au registre (I8, C8) ; le point 8 ne l’est pas, et vaut 0 pour la même raison. Les
+// témoins rouges, en fin de suite, prennent ce niveau.
+describe('[niveau 0] I8, C8 · harnais du registre : le fichier est un état, synchronisé sans perte (D58, #196)', () => {
   // ─────────────────────────────────────────────────────────────────────────────────────────────
   // 2. Deux instances convergent, par chaque transport, et rejouer ne change rien
   // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -648,27 +685,6 @@ describe('[niveau 0] harnais du registre', () => {
   // ─────────────────────────────────────────────────────────────────────────────────────────────
   // Témoins rouges : les mêmes assertions, sur une version volontairement cassée du besoin.
   // ─────────────────────────────────────────────────────────────────────────────────────────────
-
-  it.fails('témoin rouge · un fichier qui garde une trace de chaque modification', async () => {
-    const a = await instance();
-    semer(a);
-    const compte = lignes(a, 'accounts')[0]!;
-    ecrire(a, 'accounts', { ...compte, name: nom(0) });
-    const apresUne = a.export();
-    // Version cassée : le même fichier, où chaque modification de la ligne réécrit la ligne et laisse
-    // en plus une entrée de journal, comme le faisait main (D08).
-    const db = new SQL.Database(apresUne);
-    db.run(`CREATE TABLE journal_casse (seq INTEGER PRIMARY KEY, hlc TEXT, site TEXT, tbl TEXT, row_id TEXT, col TEXT, value TEXT, prev_hash TEXT, hash TEXT)`);
-    for (let i = 1; i <= 100; i++) {
-      const empreinte = createHash('sha256').update(String(i)).digest('hex');
-      db.run(`INSERT INTO journal_casse (hlc, site, tbl, row_id, col, value, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
-        `17900000000${String(i).padStart(2, '0')}:0000:casse`, 'casse', 'accounts', compte.id, 'name', JSON.stringify(nom(i)), empreinte, empreinte,
-      ]);
-    }
-    const apresCent = db.export();
-    db.close();
-    verifierMemeTaille(apresUne.length, apresCent.length);
-  });
 
   it.fails('témoin rouge · une ligne partagée effacée au lieu d’être supprimée', async () => {
     const a = await instance();

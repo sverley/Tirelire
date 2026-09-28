@@ -18,7 +18,11 @@ import { navigateur, ouvrirLExemple, type Site } from '../harnais.js';
 const pageDe = (corps: string) =>
   'data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><title>Tirelire</title><main>${corps}</main>`);
 
-describe.skipIf(!navigateur)('chargement de l’exemple · une panne se dit', () => {
+// Niveau 4 (D83) : un contrôle du harnais lui-même (#149). Il garde le message qu'un autre test
+// d'interface donne quand l'exemple ne se charge pas, pour qu'un rouge se lise ; rien du produit n'en
+// dépend, et un message moins clair ne change pas le verdict des autres tests. Il reste dans le dépôt,
+// joué nommément ou au seuil 4 ; il ne coûte plus à la phase du navigateur au Ready (#246, point 6).
+describe.skipIf(!navigateur)('[niveau 4] #149 · chargement de l’exemple : une panne se dit', () => {
   let chrome: Browser;
 
   beforeAll(async () => {

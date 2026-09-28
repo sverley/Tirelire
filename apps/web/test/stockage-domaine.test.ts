@@ -42,8 +42,9 @@
  *
  * Niveaux (#232, D83), marqués dans chaque titre ; un témoin a le niveau de ce qu'il garde :
  * - 0 : point 3, les deux tests sans doublon ; point 4, une ligne refusée, écrite ou reçue, n'écrit
- *   rien ; point 6, les quatre tests ; point 7, l'export qui se rouvre à l'identique.
- * - 1 : point 7, la convergence (I8).
+ *   rien ; point 6, les quatre tests ; point 7, l'export qui se rouvre à l'identique, et la
+ *   convergence (I8), au niveau de « #196 · 2. deux instances convergent » (`fichier-etat.test.ts`) :
+ *   deux tests du même besoin ont le même niveau (#246).
  * - 2 : points 1, 2 et 5 ; point 3, la forme de la clé ; point 4, chaque colonne refusée et le refus
  *   par le fichier lui-même ; point 7, le plan et l'import.
  * - 3 : point 4, les deux refus qui nomment la table et la colonne.
@@ -774,7 +775,7 @@ describe('#197 · 7. ce qui tenait tient encore', () => {
     expect(contenu(b.export())).toBe(contenu(bytes));
   });
 
-  it('deux instances convergent [niveau 1]', async () => {
+  it('deux instances convergent [niveau 0]', async () => {
     const a = await semee();
     const b = await instance();
     await direct(a, b);

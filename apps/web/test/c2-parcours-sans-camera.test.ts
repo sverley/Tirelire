@@ -59,7 +59,9 @@ function vérifierAbsenceCaméra(fichiers: string[], lire: (f: string) => string
   expect(fautifs, `dépendance caméra/QR trouvée hors synchronisation :\n${fautifs.join('\n')}`).toEqual([]);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est C2, nommé au registre ; une capacité propre à une plateforme
+// exigée ne perd aucune donnée. Le témoin, plus bas, prend ce niveau.
+describe('[niveau 1] C2 · harnais du registre', () => {
   describe('C2 · les parcours essentiels passent sans caméra ni QR code (issue #73)', () => {
     it('aucun fichier essentiel ne fait appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts', () => {
       const balayés = fichiers(SOURCE, ['.svelte', '.ts']).map((c) => relative(RACINE, c).split('\\').join('/'));
@@ -72,7 +74,7 @@ describe('[niveau 1] harnais du registre', () => {
  * Témoin rouge : les mêmes assertions rejouées sur un écran essentiel inventé — un Plan qui
  * appellerait `BarcodeDetector`. Doit échouer ; `it.fails` tient l'échec attendu (#66).
  */
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] C2 · harnais du registre', () => {
   it.fails('témoin rouge · un écran essentiel qui dépend de BarcodeDetector', () => {
     vérifierAbsenceCaméra(
       ['src/views/Plan.svelte'],

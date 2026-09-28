@@ -48,7 +48,10 @@ function laisséeAuServeur(sw: string, chemin: string): boolean {
   return motifs.some((m) => m.test(chemin));
 }
 
-describe('[niveau 2] #233 · chaque aperçu reste servi par lui-même, pas par la version de développement', () => {
+// Niveau 2 (D83) : un cas de D83, « Livraison » (#233) — « chaque aperçu reste servi par lui-même ».
+// S'il tombait, l'aperçu montrerait la version de développement : un résultat faux, sans donnée
+// perdue, et sans usage, principe, invariant ni contrainte qui tombe.
+describe('[niveau 2] D83, livraison (#233) · chaque aperçu reste servi par lui-même, pas par la version de développement', () => {
   test('à la racine, le service worker laisse au serveur les navigations vers un aperçu, et garde les siennes', async () => {
     const sw = await serviceWorker('/');
     expect(sw, 'le service worker ne répond plus aux navigations de la version de développement').toMatch(/NavigationRoute\(/);
