@@ -114,12 +114,17 @@ export const TOUS = Object.freeze([...ENSEMBLES.map((e) => e.id), HARNAIS.id]);
 export const nomDe = (id) => (id === HARNAIS.id ? HARNAIS.nom : (ENSEMBLES.find((e) => e.id === id)?.nom ?? id));
 const ensemble = (id) => ENSEMBLES.find((e) => e.id === id);
 
+const MOTIFS = new Map();
 /** Un motif s'applique-t-il à un chemin ? (`!` retiré par l'appelant.) */
 export function correspond(motif, chemin) {
-  const echappe = (s) => s.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\?/g, '[^/]').replace(/\*/g, '[^/]*');
-  if (motif.endsWith('/')) return new RegExp(`^${echappe(motif)}`).test(chemin);
-  if (!motif.includes('/')) return new RegExp(`^${echappe(motif)}$`).test(chemin.split('/').at(-1));
-  return new RegExp(`^${echappe(motif)}$`).test(chemin);
+  let m = MOTIFS.get(motif);
+  if (!m) {
+    const echappe = (s) => s.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\?/g, '[^/]').replace(/\*/g, '[^/]*');
+    const nom = !motif.endsWith('/') && !motif.includes('/');
+    m = { nom, motif: new RegExp(motif.endsWith('/') ? `^${echappe(motif)}` : `^${echappe(motif)}$`) };
+    MOTIFS.set(motif, m);
+  }
+  return m.motif.test(m.nom ? chemin.split('/').at(-1) : chemin);
 }
 
 /** L'ensemble lit-il ce chemin ? Tout chemin qu'aucun motif n'écarte est lu. */

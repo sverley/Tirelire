@@ -193,7 +193,7 @@ if (commande === 'verts') {
     console.log(`aucune attestation locale de ${branche} : rien à envoyer.`);
   } else {
     try {
-      git(['push', '-q', '--no-verify', distant, `+${REF(branche)}:refs/heads/${BRANCHE_D_ATTESTATION(branche)}`]);
+      git(['push', '-q', distant, `+${REF(branche)}:refs/heads/${BRANCHE_D_ATTESTATION(branche)}`]);
       console.log(`attestation de ${branche} envoyée (${BRANCHE_D_ATTESTATION(branche)}).`);
     } catch (e) {
       console.log(`attestation de ${branche} non envoyée, la CI jouera ce que D83 prévoit : ${derniereLigne(e)}`);

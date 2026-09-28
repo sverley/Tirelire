@@ -309,7 +309,7 @@ function dépôtFactice(nom) {
   return { dépôt, distant, env, git, écrire, notes, vider, livrer, pousser, attestationDistante };
 }
 
-describe('[niveau 2] #264 · le moins cher d’abord, le navigateur au Ready, rien de rejoué sur du code inchangé', () => {
+describe('[niveau 2] #264 · le moins cher d’abord, le navigateur au Ready, rien de rejoué sur du code inchangé', { concurrency: true }, () => {
   test('point 2 · une empreinte verte se garde d’un push à l’autre : un push de documentation ne rejoue que ce qui la lit', () => {
     const avant = entrees(TYPES);
     const apres = entrees([...TYPES, 'docs/nouveau.md']);
