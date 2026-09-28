@@ -13,10 +13,13 @@
  *   node attestation.mjs ready <tête> <branche> <main> <sortie> [<résumé>]
  *       La CI au Ready : si la tête de la PR ne contient pas `<main>`, la branche est à mettre à
  *       jour, et la commande échoue sans rien jouer. Sinon elle lit l'attestation de la branche et, si
- *       elle vise l'arbre de la tête, écrit dans `<sortie>` ce que la CI peut sauter.
+ *       elle vise l'arbre de la tête, écrit dans `<sortie>` ce que la CI peut sauter. Même sans
+ *       attestation, si la PR ne change, depuis `<main>`, que des chemins que les tests navigateur ne
+ *       lisent pas, ou la garde, ils se sautent (point 9 de #237).
  *   node attestation.mjs apres-fusion <commit> <dépôt GitHub> <sortie> [<résumé>]
  *       La CI sur `main` : si l'arbre arrivé est celui d'une tête de PR dont le statut « Toute la CI
  *       sur ce commit » est vert, écrit dans `<sortie>` que les tests se sautent. Lit l'API par `gh`.
+ *       Sinon, la même règle des chemins compare le commit à son premier parent (point 9).
  *
  * `<sortie>` est le fichier que la CI passe à `pnpm test --attestation` ; sans attestation, il n'est
  * pas écrit, et tout se joue. `<résumé>` reçoit, en plus de la sortie standard, ce que la CI saute.
@@ -25,9 +28,10 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  STATUT_DU_READY,
+  avecLesChemins,
   couvertureApresFusion,
   couvertureAuReady,
+  etatDuStatut,
   lireLAttestation,
   lireLesLancements,
   resume,
@@ -112,6 +116,11 @@ if (commande === 'ecrire') {
     else raison = lu.raison;
   }
   if (raison) console.log(`Pas d'attestation utilisable : ${raison}.`);
+  // Point 9 : ce que la PR change par rapport au dernier main, qu'elle contient.
+  if (extrait === arbre) {
+    const fichiers = git(['-c', 'core.quotePath=false', 'diff', '--name-only', '--no-renames', main, tete]).split('\n').filter(Boolean);
+    couverture = avecLesChemins(couverture, { arbre, fichiers, base: 'le dernier main', toujours: 1 });
+  }
   conclure(couverture, sortie, fichierResume, titre);
 } else if (commande === 'apres-fusion') {
   const [commit, depot, sortie, fichierResume] = args;
@@ -123,10 +132,15 @@ if (commande === 'ecrire') {
   const tetes = [...new Set([...parents, ...prs])].map((sha) => ({
     sha,
     arbre: essaie(() => git(['rev-parse', `${sha}^{tree}`])) ?? essaie(() => gh(`git/commits/${sha}`, '.tree.sha')),
-    statut: essaie(() => gh(`commits/${sha}/status`, `.statuses[] | select(.context == "${STATUT_DU_READY}") | .state`)),
+    statut: etatDuStatut(essaie(() => JSON.parse(gh(`commits/${sha}/status`, '.statuses')))),
   }));
-  const couverture = couvertureApresFusion(arbre, tetes);
-  if (!couverture) console.log(`Arbre ${arbre.slice(0, 10)} : aucune tête de PR de cet arbre n'a été trouvée verte au Ready (${tetes.map((t) => `${t.sha.slice(0, 7)} ${t.statut ?? 'sans statut'}`).join(', ') || 'aucune tête'}) : les tests se rejouent.`);
+  let couverture = couvertureApresFusion(arbre, tetes);
+  // Point 9 : quand les tests se rejouent, ce que le commit change par rapport à son premier parent.
+  if (!couverture && essaie(() => git(['rev-parse', '-q', '--verify', `${commit}^1`]))) {
+    const fichiers = git(['-c', 'core.quotePath=false', 'diff', '--name-only', '--no-renames', `${commit}^1`, commit]).split('\n').filter(Boolean);
+    couverture = avecLesChemins(null, { arbre, fichiers, base: 'le premier parent', toujours: -1 });
+  }
+  if (!couverture?.tout) console.log(`Arbre ${arbre.slice(0, 10)} : aucune tête de PR de cet arbre n'a été trouvée verte au Ready (${tetes.map((t) => `${t.sha.slice(0, 7)} ${t.statut ?? 'sans statut'}`).join(', ') || 'aucune tête'}) : les tests se rejouent.`);
   conclure(couverture, sortie, fichierResume, 'Arbre vérifié au Ready');
 } else {
   console.error('usage : attestation.mjs ecrire | envoyer | ready | apres-fusion …');

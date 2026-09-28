@@ -5,11 +5,13 @@
  * joué aurait rougi ») : la CI ne saute que ce que l'attestation couvre, sur l'arbre même qu'elle
  * teste ; le seuil 1 se joue toujours au Ready ; une branche qui ne contient pas le dernier `main`
  * est à mettre à jour, et la commande échoue avant toute étape de tests ; après la fusion, seul un
- * arbre trouvé vert au Ready saute ses tests ; au tag `v*`, rien ne se saute.
+ * arbre trouvé vert au Ready saute ses tests ; au tag `v*`, rien ne se saute ; une PR qui change
+ * ce que les tests navigateur lisent (point 9) les fait jouer.
  *
  * **Au niveau 2** — le cas nominal de la décision, dont l'échec ne coûterait que de la CI : la
  * livraison verte écrit son attestation et l'envoie avec le push ; la CI la lit, et le lanceur saute
- * ce qu'elle couvre en le disant.
+ * ce qu'elle couvre en le disant ; une PR qui ne change que des chemins que les tests navigateur ne
+ * lisent pas, ou la garde, les saute sans attestation (point 9).
  *
  * `node:test` n'a pas de `test.fails` : l'échec attendu d'un témoin tient dans une assertion
  * (docs/gardes.md, #66).
@@ -21,12 +23,15 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import {
+  avecLesChemins,
   ciblesDesArguments,
   couvertureApresFusion,
   couvertureAuReady,
   couvre,
+  etatDuStatut,
   lireLAttestation,
   lireLesLancements,
+  navigateurInutile,
   texteDeLAttestation,
 } from './attestation.mjs';
 import { RACINE } from './gardes.mjs';
@@ -84,6 +89,31 @@ function petitDépôt(nom) {
 const ATTESTATION_MJS = join(RACINE, '.githooks/attestation.mjs');
 const attester = (cwd, ...args) => spawnSync('node', [ATTESTATION_MJS, ...args], { cwd, env: environnement(), encoding: 'utf8' });
 
+/**
+ * La CI au Ready sur une branche qui change `fichier` depuis `main`, sans attestation : rend le code
+ * de sortie et la couverture écrite pour `pnpm test`, ou `null`.
+ */
+function readySur(nom, fichier) {
+  const { dépôt, git } = petitDépôt(nom);
+  writeFileSync(join(dépôt, 'a.txt'), '1\n');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  git('checkout', '-q', '-b', 'codage/999-essai');
+  mkdirSync(dirname(join(dépôt, fichier)), { recursive: true });
+  writeFileSync(join(dépôt, fichier), 'changé\n');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'branche');
+  const sortie = join(dépôt, 'attestation.json');
+  const r = attester(dépôt, 'ready', git('rev-parse', 'HEAD'), 'codage/999-essai', 'main', sortie);
+  const couverture = existsSync(sortie) ? JSON.parse(readFileSync(sortie, 'utf8')) : null;
+  return { ...r, couverture, arbre: git('rev-parse', 'HEAD^{tree}') };
+}
+
+/** Point 9 : des chemins que les tests navigateur lisent, ou qui ne sont pas dans la liste. */
+const LUS_PAR_LE_NAVIGATEUR = ['apps/web/src/App.svelte', 'apps/web/test/navigateur/acces.test.ts', 'packages/core/src/plan.ts', 'package.json', 'pnpm-lock.yaml', 'tsconfig.base.json', 'apps/web/vite.config.ts'];
+/** Point 9 : des chemins qu'ils ne lisent pas, ou la garde. */
+const NON_LUS = ['docs/decisions.md', '.github/workflows/ci.yml', '.githooks/livraison.sh', 'packages/gardes/lanceur.mjs', 'apps/hebergement/apercu.sh', 'apps/relay/relais.php', 'README.md', 'apps/web/README.md', '.gitignore'];
+
 // La CI jouée à blanc.
 const auReady = {
   github: { event_name: 'pull_request', ref: 'refs/pull/237/merge', event: { action: 'ready_for_review', pull_request: { number: 237, draft: false, head: { sha: A } } } },
@@ -133,6 +163,38 @@ describe('[niveau 1] #237, principe 10.1 · la CI ne saute que ce que la livrais
     assert.equal(couvertureApresFusion(A, [{ sha: B, arbre: B, statut: 'success' }]), null, 'tête verte, mais autre arbre');
     for (const statut of ['failure', 'pending', null]) assert.equal(couvertureApresFusion(A, [{ sha: B, arbre: A, statut }]), null, `statut ${statut}`);
     assert.equal(couvre(couvertureApresFusion(A, [{ sha: B, arbre: A, statut: 'success' }]), demande({ arbre: B, seuil: 1 })).couvert, false, 'fichier pour un autre arbre que celui extrait');
+  });
+
+  test('le statut lu après la fusion est « Toute la CI sur ce commit », et lui seul', () => {
+    assert.equal(etatDuStatut([{ context: 'autre', state: 'success' }]), null, 'un autre statut vert ne vaut pas le vert du Ready');
+    assert.equal(etatDuStatut([{ context: 'autre', state: 'success' }, { context: 'Toute la CI sur ce commit', state: 'failure' }]), 'failure');
+    assert.equal(etatDuStatut(null), null);
+  });
+
+  test('point 9 · une PR qui change l’interface, le cœur ou la racine hors *.md et .gitignore fait jouer les tests navigateur', () => {
+    for (const f of LUS_PAR_LE_NAVIGATEUR) {
+      assert.equal(navigateurInutile([f]), false, `${f} : lu par les tests navigateur, ils se jouent`);
+      assert.equal(navigateurInutile(['docs/decisions.md', f]), false, `docs/decisions.md et ${f} : ils se jouent`);
+      const c = avecLesChemins(null, { arbre: A, fichiers: [f], base: 'main', toujours: 1 });
+      assert.equal(couvre(c, NAVIGATEUR).couvert, false, `${f} : sans attestation, les tests navigateur ne se sautent pas`);
+    }
+    const r = readySur('interface-touchee', 'apps/web/src/App.svelte');
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(couvre(r.couverture, { ...NAVIGATEUR, arbre: r.arbre }).couvert, false, `apps/web touché : la CI au Ready ne doit pas sauter les tests navigateur\n${r.stdout}`);
+  });
+
+  test('point 9 · la règle des chemins ne saute que les tests navigateur : ni le seuil 1, ni le harnais du besoin', () => {
+    const c = avecLesChemins(null, { arbre: A, fichiers: NON_LUS, base: 'main', toujours: 1 });
+    assert.equal(couvre(c, SEUIL_1('apps/web')).couvert, false, 'le seuil 1 se joue');
+    assert.equal(couvre(c, HARNAIS).couvert, false, 'le harnais du besoin se joue');
+    assert.equal(couvre({ ...c, toujours: -1 }, demande({ dossier: 'apps/web', seuil: 2 })).couvert, false, "l'interface headless se joue");
+    assert.equal(couvre(c, { ...NAVIGATEUR, arbre: B }).couvert, false, 'pour un autre arbre, rien ne se saute');
+  });
+
+  test('témoin rouge · une règle qui prendrait tout `packages/` ou toute la racine sauterait les tests navigateur à tort', () => {
+    const laxiste = (fichiers) => fichiers.every((f) => f.startsWith('packages/') || !f.includes('/') || NON_LUS.includes(f));
+    assert.ok(LUS_PAR_LE_NAVIGATEUR.some((f) => laxiste([f])), 'témoin : cette règle devrait sauter un chemin lu par les tests navigateur');
+    assert.ok(LUS_PAR_LE_NAVIGATEUR.every((f) => !navigateurInutile([f])), 'la règle du point 9 ne le fait pas');
   });
 
   test('au Ready, une branche qui ne contient pas le dernier main est à mettre à jour : échec, et rien d’écrit', () => {
@@ -195,6 +257,19 @@ describe('[niveau 2] #237 · la livraison atteste, la CI saute ce qui est couver
     assert.equal(couvre(c, HARNAIS).couvert, true, 'le harnais du besoin vert se saute');
     assert.equal(couvre(c, demande({ seuil: 2 })).couvert, true, 'le paquet joué au seuil 2, harnais vert, se saute au seuil 2');
     assert.equal(couvre(couvertureApresFusion(A, [{ sha: B, arbre: A, statut: 'success' }]), SEUIL_1('packages/core')).couvert, true, 'sur main, un arbre vert au Ready saute tout');
+  });
+
+  test('point 9 · une PR qui ne change que des chemins que les tests navigateur ne lisent pas, ou la garde, les saute sans attestation', () => {
+    for (const f of NON_LUS) {
+      const c = avecLesChemins(null, { arbre: A, fichiers: [f], base: 'main', toujours: 1 });
+      assert.equal(couvre(c, NAVIGATEUR).couvert, true, `${f} : les tests navigateur se sautent`);
+    }
+    assert.equal(couvre(avecLesChemins(couvertureAuReady(attestation({ navigateur: false })), { arbre: A, fichiers: NON_LUS, base: 'main', toujours: 1 }), NAVIGATEUR).couvert, true, 'avec une attestation sans navigateur aussi');
+    const r = readySur('docs-seuls', 'docs/decisions.md');
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const d = couvre(r.couverture, { ...NAVIGATEUR, arbre: r.arbre });
+    assert.equal(d.couvert, true, `docs seuls : la CI au Ready saute les tests navigateur\n${r.stdout}`);
+    assert.match(r.stdout, /Tests navigateur sautés/, 'et le dit');
   });
 
   test('les cibles d’un lancement : ses arguments, hors options et valeurs d’options', () => {

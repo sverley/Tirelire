@@ -11,6 +11,8 @@
  * - `texteDeLAttestation` / `lireLAttestation` : la forme de l'attestation, un message de commit ;
  * - `couvertureAuReady` / `couvertureApresFusion` : ce que la CI peut sauter, écrit dans un fichier
  *   qu'elle passe à `pnpm test` (`--attestation <fichier>`) ;
+ * - `navigateurInutile` / `avecLesChemins` : les tests navigateur ne se jouent que si ce qui arrive
+ *   peut les changer (point 9 de #237), même sans attestation ;
  * - `couvre` : la décision du lanceur (`lanceur.mjs`) pour un lancement donné.
  */
 
@@ -107,6 +109,34 @@ export function couvertureApresFusion(arbre, tetes) {
   };
 }
 
+/** L'état du statut « Toute la CI sur ce commit » parmi les statuts d'un commit (API), ou `null`. */
+export function etatDuStatut(statuts) {
+  return (statuts ?? []).find((s) => s?.context === STATUT_DU_READY)?.state ?? null;
+}
+
+/**
+ * Point 9 de #237 : les chemins que les tests navigateur ne lisent pas, et la garde, qu'ils lisent
+ * mais que le seuil 1 joue sur l'interface, navigateur compris. Un chemin oublié fait jouer plus,
+ * jamais moins.
+ */
+export const SANS_NAVIGATEUR = Object.freeze(['docs/', '.github/', '.githooks/', 'packages/gardes/', 'apps/hebergement/', 'apps/relay/']);
+
+/** Les fichiers changés ne sont-ils que des chemins que les tests navigateur ne lisent pas ? */
+export function navigateurInutile(fichiers) {
+  return fichiers.every((f) => SANS_NAVIGATEUR.some((d) => f.startsWith(d)) || f.endsWith('.md') || f.split('/').at(-1) === '.gitignore');
+}
+
+/**
+ * Ajoute à une couverture, ou à une couverture vide pour `arbre`, le saut des tests navigateur
+ * quand les fichiers changés depuis `base` ne peuvent pas les changer (point 9). `toujours` : le
+ * seuil joué quoi qu'il arrive (1 au Ready, -1 sur `main`). Rend la couverture inchangée sinon.
+ */
+export function avecLesChemins(couverture, { arbre, fichiers, base, toujours }) {
+  if (!navigateurInutile(fichiers)) return couverture;
+  const raison = `rien de ce qui change depuis ${base} n'est lu par les tests navigateur (${fichiers.length} fichier(s) sous ${SANS_NAVIGATEUR.join(', ')}, *.md ou .gitignore)`;
+  return { ...(couverture ?? { origine: 'chemins', arbre, toujours, tout: false, ensembles: [], raison }), navigateurInutile: raison };
+}
+
 /** Options du lanceur qui prennent une valeur dans l'argument suivant. */
 const AVEC_VALEUR = new Set(['--dir', '-t', '--testNamePattern', '--test-name-pattern', '--exclude', '--reporter', '--outputFile', '--config', '-c', '--root', '-r', '--project', '--test-reporter', '--test-reporter-destination', '--import']);
 
@@ -141,6 +171,10 @@ export function couvre(couverture, demande) {
   if (demande.nomme) return { couvert: false, raison: 'appel nommé : il se joue' };
   if (demande.seuil <= couverture.toujours) return { couvert: false, raison: `le seuil ${demande.seuil} se joue toujours` };
   if (couverture.tout) return { couvert: true, raison: couverture.raison };
+  const seulementNavigateur = demande.cibles.length && demande.cibles.every((c) => c === 'test/navigateur' || c.startsWith('test/navigateur/'));
+  if (couverture.navigateurInutile && demande.navigateur && demande.dossier === 'apps/web' && seulementNavigateur) {
+    return { couvert: true, raison: couverture.navigateurInutile };
+  }
 
   const ensembles = couverture.ensembles.filter((e) => e.dossier === demande.dossier && e.seuil >= demande.seuil);
   const paquet = ensembles.filter((e) => e.sorte === 'non-regression');
@@ -168,7 +202,9 @@ export function couvre(couverture, demande) {
 export function resume(couverture) {
   if (!couverture) return ["Aucune attestation pour cet arbre : la CI joue tout ce que D83 prévoit."];
   if (couverture.tout) return [`Tests sautés : ${couverture.raison}.`];
-  const lignes = [`Attestation : ${couverture.raison}.`, 'Le seuil 1 se joue toujours. Couvert par la livraison, donc sauté si la CI le demande :'];
+  const lignes = couverture.navigateurInutile ? [`Tests navigateur sautés : ${couverture.navigateurInutile}.`] : [];
+  if (couverture.origine === 'chemins') return [...lignes, 'Aucune attestation pour cet arbre : le reste se joue.'];
+  lignes.push(`Attestation : ${couverture.raison}.`, couverture.toujours >= 1 ? 'Le seuil 1 se joue toujours. Couvert par la livraison, donc sauté si la CI le demande :' : 'Couvert, donc sauté si la CI le demande :');
   for (const e of couverture.ensembles) {
     if (e.sorte === 'harnais') lignes.push(`- harnais du besoin, ${e.dossier} : ${e.fichiers.join(', ')} (seuil ${e.seuil}${e.navigateur ? ', navigateur' : ''})`);
     else lignes.push(`- ${e.dossier}, seuil ${e.seuil}${e.navigateur ? ', tests navigateur compris' : ''}${e.exclus.length ? ` (hors ${e.exclus.join(', ')})` : ''}`);
