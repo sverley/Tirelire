@@ -53,7 +53,7 @@ function lOrdreEstEnregistré(ledger: Ledger, plan: Plan, permanent: Cents): voi
   expect(plan.warnings.filter((w) => w.code === 'bankOrderDrift')).toEqual([]);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U2)', () => {
   describe('U2 · budget et virements permanents, de bout en bout (#13)', () => {
     it('parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation', async () => {
       const store = await baseVide('parcours-u2');
@@ -81,23 +81,25 @@ describe('[niveau 1] harnais du registre', () => {
       lOrdreEstEnregistré(ledger, computePlan(ledger, AS_OF), permanent);
     });
 
-    it('un ordre posé plus court que le budget ne se réécrit pas : le plan dit lequel changer', async () => {
-      const store = await baseVide('parcours-u2-écart');
-      ecrireLeBudget(store);
-      const avant = computePlan(store.load(), AS_OF);
-      const virement = virementDuLivret(avant)!;
-      const posé = virement.permanent - euros(20);
+    describe('[niveau 0] I10 · un ordre enregistré n’est jamais réécrit', () => {
+      it('un ordre posé plus court que le budget ne se réécrit pas : le plan dit lequel changer', async () => {
+        const store = await baseVide('parcours-u2-écart');
+        ecrireLeBudget(store);
+        const avant = computePlan(store.load(), AS_OF);
+        const virement = virementDuLivret(avant)!;
+        const posé = virement.permanent - euros(20);
 
-      // Ce que la banque exécute, et non ce que le budget demande (D60).
-      store.upsert('plannedFlows', standingTransferFlow(avant, virement, PRINCIPAL, 'flux-ordre-livret', posé)!);
-      const ledger = await relire(store, 'parcours-u2-écart');
-      store.close();
+        // Ce que la banque exécute, et non ce que le budget demande (D60).
+        store.upsert('plannedFlows', standingTransferFlow(avant, virement, PRINCIPAL, 'flux-ordre-livret', posé)!);
+        const ledger = await relire(store, 'parcours-u2-écart');
+        store.close();
 
-      const après = virementDuLivret(computePlan(ledger, AS_OF))!;
-      expect(après.bankOrder?.amount).toBe(posé);
-      expect(après.permanent).toBe(virement.permanent);
-      expect(après.bankOrder?.drift).toBe(virement.permanent - posé);
-      expect(computePlan(ledger, AS_OF).warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(1);
+        const après = virementDuLivret(computePlan(ledger, AS_OF))!;
+        expect(après.bankOrder?.amount).toBe(posé);
+        expect(après.permanent).toBe(virement.permanent);
+        expect(après.bankOrder?.drift).toBe(virement.permanent - posé);
+        expect(computePlan(ledger, AS_OF).warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(1);
+      });
     });
 
     it.fails('témoin rouge · un ordre validé qui ne laisse aucune trace dans la base', async () => {

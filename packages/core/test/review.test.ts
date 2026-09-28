@@ -23,7 +23,7 @@ function withHistory(): Ledger {
   return l;
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U4)', () => {
   describe('bilan par catégorie', () => {
     it('moyennes hors ponctuel, min, max, suggestion arrondie', () => {
       const l = withHistory();

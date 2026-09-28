@@ -204,8 +204,10 @@ const dotationRevue = (l: Ledger): Ledger => ({
 // 1. « La ventilation d'un virement dérivé du budget est recalculée, pas mémorisée. »
 // ---------------------------------------------------------------------------------------------
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
   describe('#14 · la ventilation est recalculée, pas mémorisée', () => {
+    // Dette de #203 (principe 9.3) : D60 amendée enregistre la ventilation choisie avec l'ordre ;
+    // ce test le garde tel que le code le fait aujourd'hui, sans ventilation enregistrée.
     it('le flux enregistré ne garde que ce qui reconnaît la ligne bancaire : aucune tirelire, aucune part', () => {
       const l = enregistrerOrdre(exampleLedger(), euros(650));
       const f = ordre(l);
@@ -261,12 +263,14 @@ describe('[niveau 1] harnais du registre', () => {
   // ---------------------------------------------------------------------------------------------
 
   describe('#14 · le budget bouge, le plan suit sans geste et le dit', () => {
-    it('ce que le budget demande se relit sans qu’aucune écriture ne soit nécessaire', () => {
-      const l = gelé(enregistrerOrdre(exampleLedger(), roundOrderUp(demande(exampleLedger(), AVANT), euros(10))));
-      const après = besoinAjouté(l);
-      // Aucune fonction du parcours ne modifie le dépôt (un objet gelé lèverait).
-      expect(() => computePlan(après, AVANT)).not.toThrow();
-      expect(demande(après, AVANT)).toBeGreaterThan(demande(l, AVANT));
+    describe('[niveau 0] I10 · calculer le plan n’écrit rien', () => {
+      it('ce que le budget demande se relit sans qu’aucune écriture ne soit nécessaire', () => {
+        const l = gelé(enregistrerOrdre(exampleLedger(), roundOrderUp(demande(exampleLedger(), AVANT), euros(10))));
+        const après = besoinAjouté(l);
+        // Aucune fonction du parcours ne modifie le dépôt (un objet gelé lèverait).
+        expect(() => computePlan(après, AVANT)).not.toThrow();
+        expect(demande(après, AVANT)).toBeGreaterThan(demande(l, AVANT));
+      });
     });
 
     it('un budget qui monte fait dire au plan l’ancien montant de l’ordre et le nouveau montant demandé', () => {
@@ -296,8 +300,8 @@ describe('[niveau 1] harnais du registre', () => {
   //    quand il diverge, l'application signale qu'un ordre est à modifier. »
   // ---------------------------------------------------------------------------------------------
 
-  describe('[niveau 0]', () => {
-    describe('#14 · l’ordre chez la banque diverge : signalé, jamais réécrit', () => {
+  describe('#14 · l’ordre chez la banque diverge : signalé, jamais réécrit', () => {
+    describe('[niveau 0] I10 · un ordre enregistré n’est jamais réécrit', () => {
       it('le montant enregistré ne suit pas le budget', () => {
         const l = enregistrerOrdre(exampleLedger(), euros(650));
         const après = dotationRevue(besoinAjouté(l));
@@ -305,25 +309,27 @@ describe('[niveau 1] harnais du registre', () => {
         expect(ordre(après).amount).toBe(-euros(650));
         expect(t?.bankOrder?.amount).toBe(euros(650));
       });
+    });
 
-      it('un ordre trop court d’un centime est signalé, quel que soit le pas', () => {
-        const base = exampleLedger();
-        for (const pas of [0, euros(10), euros(50)]) {
-          const l = enregistrerOrdre({ ...base, settings: { ...base.settings, orderRounding: pas } }, demande(base, AVANT) - 1);
-          expect(alertes(l, AVANT), `pas ${pas}`).toHaveLength(1);
-        }
-      });
+    // Dette de #204 (principe 9.3) : D60 amendée ne propose un écart qu'au-delà du pas d'arrondi,
+    // dans les deux sens ; ce test le garde tel que le code le fait aujourd'hui.
+    it('un ordre trop court d’un centime est signalé, quel que soit le pas', () => {
+      const base = exampleLedger();
+      for (const pas of [0, euros(10), euros(50)]) {
+        const l = enregistrerOrdre({ ...base, settings: { ...base.settings, orderRounding: pas } }, demande(base, AVANT) - 1);
+        expect(alertes(l, AVANT), `pas ${pas}`).toHaveLength(1);
+      }
+    });
 
-      it('un ordre que le budget ne demande plus est signalé, même s’il est petit', () => {
-        // Plus aucune tirelire ne veut d'argent sur le Livret A : tout ordre vers lui est à supprimer.
-        const base = exampleLedger();
-        const vide: Ledger = { ...base, needs: base.needs.filter((n) => !['env-tf', 'env-auto', 'env-vac', 'env-precaution'].includes(n.tirelireId)) };
-        for (const montant of [euros(300), euros(10), euros(5)]) {
-          const l = enregistrerOrdre(vide, montant);
-          expect(demande(l, AVANT)).toBe(0);
-          expect(alertes(l, AVANT), `ordre de ${formatCents(montant)} devenu inutile, non signalé`).toHaveLength(1);
-        }
-      });
+    it('un ordre que le budget ne demande plus est signalé, même s’il est petit', () => {
+      // Plus aucune tirelire ne veut d'argent sur le Livret A : tout ordre vers lui est à supprimer.
+      const base = exampleLedger();
+      const vide: Ledger = { ...base, needs: base.needs.filter((n) => !['env-tf', 'env-auto', 'env-vac', 'env-precaution'].includes(n.tirelireId)) };
+      for (const montant of [euros(300), euros(10), euros(5)]) {
+        const l = enregistrerOrdre(vide, montant);
+        expect(demande(l, AVANT)).toBe(0);
+        expect(alertes(l, AVANT), `ordre de ${formatCents(montant)} devenu inutile, non signalé`).toHaveLength(1);
+      }
     });
   });
 
@@ -395,7 +401,7 @@ describe('[niveau 1] harnais du registre', () => {
       expect(transfert(avec, AVANT).t?.bankOrder).toBeUndefined();
     });
 
-    describe('[niveau 0]', () => {
+    describe('[niveau 0] D57 · un flux déclaré n’est jamais réécrit', () => {
       it('ni le plan, ni le rapprochement, ni la reconnaissance par libellé ne réécrivent un flux', () => {
         const l = gelé(dotationRevue(enregistrerOrdre(exampleLedger(), euros(650))));
         const op = ligneBancaire(l, euros(650));
@@ -494,10 +500,10 @@ describe('[niveau 1] harnais du registre', () => {
   //    Sorti du périmètre de #14 le 10 septembre : la division est l'issue #25, et ces gardes en sont
   //    la vérification. À écrire dès que la forme du modèle existe : les écrire maintenant obligerait
   //    à inventer des noms que le développement choisira. Elles restent listées ici pour qu'aucune ne
-  //    soit oubliée ; `vitest` les affiche comme « todo ».
+  //    soit oubliée, tant que #25 est ouverte ; `vitest` les affiche comme « todo ».
   // ---------------------------------------------------------------------------------------------
 
-  describe('#14 · arbitrage : diviser le virement, simple par défaut, souple sur demande', () => {
+  describe('#14 · arbitrage : diviser le virement, simple par défaut, souple sur demande — attend #25', () => {
     // Simple
     it.todo('sans aucun réglage, un compte a un seul ordre voulu : la somme des dotations de ses tirelires');
     it.todo('un budget qui n’a jamais été divisé se comporte exactement comme aujourd’hui (aucune migration de sens)');
@@ -630,8 +636,9 @@ describe('[niveau 1] harnais du registre', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────────────────────
-  // Témoins rouges des harnais U2, I10 et C8 (docs/gardes.md) : les assertions des sections 1, 2
-  // et 3 ci-dessus, rejouées sur des versions volontairement cassées du besoin.
+  // Témoins rouges des harnais U2 et I10 (docs/gardes.md) : les assertions des sections 1, 2 et 3
+  // ci-dessus, rejouées sur des versions volontairement cassées du besoin. Chacun prend le niveau de
+  // ce qu'il garde : la ventilation recalculée (niveau 1), l'ordre enregistré jamais réécrit (niveau 0).
   // ─────────────────────────────────────────────────────────────────────────────────────────────
 
   it.fails('témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer', () => {
@@ -647,15 +654,17 @@ describe('[niveau 1] harnais du registre', () => {
     expect(vAprès).not.toEqual(vAvant);
   });
 
-  it.fails('témoin rouge · un plan qui réécrit l’ordre chez la banque au lieu de le signaler', () => {
-    const l = enregistrerOrdre(exampleLedger(), euros(650));
-    const budgetBougé = dotationRevue(besoinAjouté(l));
-    // Version cassée : le montant enregistré suit le budget tout seul. Plus rien ne diverge, donc
-    // plus rien n'est signalé — et l'ordre chez la banque, lui, n'a pas bougé.
-    const après = enregistrerOrdre(budgetBougé, demande(budgetBougé, AVANT));
+  describe('[niveau 0] I10 · témoin de l’ordre enregistré jamais réécrit', () => {
+    it.fails('témoin rouge · un plan qui réécrit l’ordre chez la banque au lieu de le signaler', () => {
+      const l = enregistrerOrdre(exampleLedger(), euros(650));
+      const budgetBougé = dotationRevue(besoinAjouté(l));
+      // Version cassée : le montant enregistré suit le budget tout seul. Plus rien ne diverge, donc
+      // plus rien n'est signalé — et l'ordre chez la banque, lui, n'a pas bougé.
+      const après = enregistrerOrdre(budgetBougé, demande(budgetBougé, AVANT));
 
-    expect(ordre(après).amount).toBe(-euros(650));
-    expect(alertes(après, AVANT)).toHaveLength(1);
+      expect(ordre(après).amount).toBe(-euros(650));
+      expect(alertes(après, AVANT)).toHaveLength(1);
+    });
   });
 
   // ─── I10 · le plan est un résultat (#162) ────────────────────────────────────────────────────────
@@ -681,11 +690,9 @@ describe('[niveau 1] harnais du registre', () => {
     for (const jour of [AS_OF, '2026-10-20', '2026-11-20']) computePlan(ledger, jour);
   };
 
-  describe('I10 · le plan est un résultat', () => {
-    describe('[niveau 0]', () => {
-      it('I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base', async () => {
-        await calculerNeModifieRien(planSurTroisPeriodes);
-      });
+  describe('[niveau 0] I10 · le plan est un résultat', () => {
+    it('I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base', async () => {
+      await calculerNeModifieRien(planSurTroisPeriodes);
     });
 
     it.fails('témoin rouge · un plan qui réécrit un besoin en se calculant', async () => {

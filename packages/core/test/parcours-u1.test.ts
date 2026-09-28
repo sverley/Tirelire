@@ -76,7 +76,7 @@ function planDeLObservé(plan: Plan): Plan {
   };
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U1)', () => {
   describe('U1 · budget seul, de bout en bout (#15)', () => {
     it('parcours U1 · de la base vide au plan, sans une seule opération', async () => {
       const store = await baseVide('parcours-u1');
