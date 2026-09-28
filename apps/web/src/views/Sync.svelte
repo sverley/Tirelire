@@ -96,6 +96,7 @@
     phase = 'syncing';
     result = await runSync(app.store, peer.transport(), { ...(deviceName ? { name: deviceName } : {}), timeoutMs: 60_000 });
     app.reload();
+    app.noteSynchronisation('direct');
     app.showConflicts(result.conflicts);
     peer.close();
     peer = undefined;
@@ -197,6 +198,8 @@
     try {
       const r = await relaySync(app.store, $state.snapshot(relay), deviceName || undefined);
       app.reload();
+      // L'aller-retour a abouti : le relais a accepté notre dépôt, ou avait déjà tout ce que nous avons.
+      app.noteSynchronisation('relais');
       app.showConflicts(r.conflicts);
       msg = `Relais : ${r.pushed} lignes déposées, ${r.pulledBundles} paquets reçus, ${r.applied} lignes mises à jour${r.conflicts.length ? `, ${r.conflicts.length} modifiées des deux côtés (ci-dessus)` : ''}.`;
     } catch (err) {

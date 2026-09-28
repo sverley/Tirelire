@@ -3,6 +3,7 @@
   import { app, type View } from './lib/state.svelte';
   import { shortDate } from './lib/format';
   import { isNative, saveFile } from './lib/platform';
+  import { BETA, texteSauvegarde, texteSynchronisation } from './lib/sauvegarde';
 
   /**
    * Au-delà de cet écart entre la dernière opération connue et la date de lecture, l'application
@@ -91,23 +92,44 @@
         </div>
       </div>
     {/if}
-    {#if app.effacable && app.view === 'plan' && !app.signalPersistanceMasque}
+    {#if (app.effacable || app.rappelSauvegarde) && app.view === 'plan' && !app.signalDonneesMasque}
+      <!-- Un seul signal sur la sûreté des données (#41) : ce que le navigateur peut effacer (C4,
+           #42), la sauvegarde à faire et les deux dates (C5). Il ne bloque rien, et se masque
+           pour cette ouverture. -->
       <div class="card warn" aria-live="polite">
         <div class="row">
           <div class="label">
-            <strong>Vos données peuvent être effacées par le navigateur</strong>
-            <span class="sub">
-              {app.persistance === 'impossible'
-                ? 'Ce navigateur ne permet pas de les mettre à l’abri'
-                : 'Votre navigateur n’a pas accepté de les mettre à l’abri'} : s'il manque de place, il
-              peut les effacer sans prévenir. Une copie du fichier, enregistrée sur votre appareil, vous
-              permet de tout retrouver.
-            </span>
+            {#if app.effacable}
+              <strong>Vos données peuvent être effacées par le navigateur</strong>
+              <span class="sub">
+                {app.persistance === 'impossible'
+                  ? 'Ce navigateur ne permet pas de les mettre à l’abri'
+                  : 'Votre navigateur n’a pas accepté de les mettre à l’abri'} : s'il manque de place, il
+                peut les effacer sans prévenir. Une copie du fichier, enregistrée sur votre appareil, vous
+                permet de tout retrouver.
+              </span>
+            {:else}
+              <strong>Pensez à enregistrer une copie de vos données</strong>
+              <span class="sub">
+                {app.sauvegarde
+                  ? 'Elles ont changé depuis votre dernière copie, qui date de plus d’une période budgétaire.'
+                  : 'Vous n’en avez encore enregistré aucune copie.'} Elles ne vivent que sur vos
+                appareils : si vous perdez celui-ci, une copie du fichier vous permet de tout retrouver.
+              </span>
+            {/if}
           </div>
         </div>
+        <div class="small">Dernière sauvegarde : {texteSauvegarde(app.sauvegarde)}</div>
+        <div class="small">Dernière synchronisation : {texteSynchronisation(app.synchronisation)}</div>
+        {#if BETA}
+          <p class="small" style="margin:6px 0 0">
+            Version bêta : à la version suivante de Tirelire, un fichier d'aujourd'hui peut ne plus
+            s'ouvrir. La copie que vous enregistrez garde vos données telles quelles.
+          </p>
+        {/if}
         <div class="actions" style="margin:6px 0 0">
           <button class="btn small primary" onclick={() => app.saveBackup()}>Enregistrer une copie</button>
-          <button class="btn small" onclick={() => (app.signalPersistanceMasque = true)}>Masquer</button>
+          <button class="btn small" onclick={() => (app.signalDonneesMasque = true)}>Masquer</button>
         </div>
       </div>
     {/if}
