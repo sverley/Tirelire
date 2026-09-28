@@ -38,6 +38,8 @@ audit commence à son compte rendu (étape 4).
    organisationnel ou d'outil, cherche les erreurs de processus, ce qu'une session pourrait casser
    par erreur, pas les attaques, en gardant un œil sur une faille sérieuse d'un workflow ; pour un
    besoin fonctionnel, ta relecture inclut la sécurité de l'application finale.
+   L'attestation de la livraison ne se produit qu'au pré-push et à la pré-fusion, par l'outillage :
+   la CI saute ce qu'elle couvre ; tu ne l'écris jamais (D83).
    Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur.
 5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
    survivre à la fusion n'y reste pas : il va dans une issue ouverte ou dans un catalogue (D78).

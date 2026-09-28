@@ -3,8 +3,8 @@
 #
 #   livraison.sh fusion
 #       `pre-merge-commit`, et `pre-commit` pendant une fusion (conflit) : juge l'index.
-#   livraison.sh push <ref locale> <sha local> <ref distante> <sha distant>
-#       une ligne du pré-push : juge le commit poussé.
+#   livraison.sh push <ref locale> <sha local> <ref distante> <sha distant> [<dépôt distant>]
+#       une ligne du pré-push : juge le commit poussé ; le dépôt distant reçoit l'attestation.
 #
 # 1. Arbre jugé. L'index (fusion) ou le commit poussé, jamais la copie de travail : les tests
 #    tournent sur place si la copie est identique à cet arbre, sinon dans une extraction à part
@@ -26,6 +26,11 @@
 # 5. Sous-branche (`<branche>--codeur`, `<branche>--auditeur`) : non-régression seule.
 # 6. Un arbre vérifié est noté dans `tirelire-arbres-verifies`, sous le dossier commun de git, avec
 #    l'état de son harnais : le pré-push ne rejoue pas un arbre noté.
+# 7. Attestation (#237) : une livraison verte, hors sous-branche, atteste ce qu'elle a joué sur
+#    l'arbre — seuil, ensembles joués, harnais du besoin et son état, navigateur présent ou non —
+#    (`attestation.mjs ecrire`), et le pré-push l'envoie avec le push, sur `<branche>--attestation`
+#    (`attestation.mjs envoyer`), même pour un arbre déjà vérifié. La CI la lit pour ne jouer que le
+#    manque (D83). Une branche `…--attestation` n'est jamais jugée.
 # Limite : une résolution de fusion qui ajoute du code (commit de fusion) ne compte pas comme code
 # qui arrive ; la CI la juge.
 set -u
@@ -82,10 +87,13 @@ case $mode in
     git diff --quiet && [ -z "$(git ls-files --others --exclude-standard | head -n 1)" ] && surplace=1
     ;;
   push)
-    lref=${1:-} lsha=${2:-} rref=${3:-} rsha=${4:-}
+    lref=${1:-} lsha=${2:-} rref=${3:-} rsha=${4:-} depot=${5:-}
     case $rref in refs/heads/*) ;; *) exit 0 ;; esac
     nul "$lsha" && exit 0
     nom=${rref#refs/heads/}
+    poussee=$nom # `nom` sert aussi aux lancements
+    # L'attestation voyage sur sa propre branche : rien à y juger.
+    case $nom in *--attestation) exit 0 ;; esac
     case $nom in *--codeur | *--auditeur) sous=1 ;; esac
     arbre=$(git rev-parse "$lsha^{tree}") || exit 1
     distant=''
@@ -111,7 +119,7 @@ case $mode in
     git diff --quiet "$lsha" -- && [ -z "$(git ls-files --others --exclude-standard | head -n 1)" ] && surplace=1
     ;;
   *)
-    echo "usage : livraison.sh fusion | push <ref locale> <sha local> <ref distante> <sha distant>" >&2
+    echo "usage : livraison.sh fusion | push <ref locale> <sha local> <ref distante> <sha distant> [<dépôt distant>]" >&2
     exit 2
     ;;
 esac
@@ -119,9 +127,16 @@ esac
 # Le code qui arrive : un fichier hors du harnais et de la documentation.
 code=$(grep -Ev '(^|/)test/|\.test\.[^/]+$|^docs/|\.md$|^$' "$travail/entrants" | sort -u | head -n 3 | tr '\n' ' ')
 
+# L'attestation de l'arbre poussé part avec le push (#237), hors sous-branche.
+envoie_attestation() {
+  [ "$mode" = push ] && [ -n "$depot" ] && [ -z "$sous" ] && [ -z "$surmain" ] || return 0
+  dit "$(node "$crochets/attestation.mjs" envoyer "$depot" "$arbre" "$poussee" 2>&1)"
+}
+
 if [ "$mode" = push ] && [ -n "$etat" ]; then
   if [ -n "$sous" ] || [ "$etat" = vert ] || [ -z "$code" ]; then
     dit "arbre déjà vérifié ($etat), rien à rejouer — $nom"
+    envoie_attestation
     exit 0
   fi
   echo "✗ $niveau : cet arbre a été vérifié avec le harnais du besoin rouge, et le push apporte du code ($code)." >&2
@@ -200,6 +215,8 @@ lance() { # nom dossier commande…
   shift 2
   (cd "$juge/$dossier" && "$@" >"$journaux/$nom.log" 2>&1; echo $? >"$journaux/$nom.code") &
 }
+# Ce que la livraison lance, pour son attestation (#237) : sorte, dossier, seuil, navigateur, fichiers.
+note() { printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$(echo $5 | tr ' ' ',')" >>"$journaux/joues"; }
 rapports_node() { echo "--test-reporter=tap" "--test-reporter-destination=stdout" "--test-reporter=$crochets/rapport-node.mjs" "--test-reporter-destination=$journaux/$1.rapport"; }
 lances=''
 ajoute() { lances="$lances $1"; }
@@ -207,17 +224,20 @@ ajoute() { lances="$lances $1"; }
 # Non-régression d'un paquet de tests, au seuil 2, sans ses fichiers du harnais du besoin.
 non_regression() { # nom dossier
   nom=$1 dossier=$2
+  nav=0
   if vitest_de "$dossier"; then
     set -- 2 --passWithNoTests --reporter=default --reporter=json "--outputFile.json=$journaux/$nom.rapport"
     [ "$dossier" = packages/core ] && set -- "$@" --no-isolate
     if [ "$dossier" = apps/web ]; then
-      if navigateur; then set -- "$@" --navigateur
+      if navigateur; then set -- "$@" --navigateur; nav=1
       else dit "aucun navigateur (TIRELIRE_NAV, CHROME_BIN…) : les tests navigateur de l'interface sont laissés à la CI"; fi
     fi
+    note non-regression "$dossier" 2 "$nav" "$(dans "$dossier")"
     for f in $(dans "$dossier"); do set -- "$@" --exclude "$f"; done
     lance "$nom" "$dossier" pnpm run test "$@"
     ajoute "$nom:$dossier:vitest"
   else
+    note non-regression "$dossier" 2 0 "$(dans "$dossier")"
     if [ -n "$(dans "$dossier")" ]; then
       liste=$(grep -E "^$dossier/[^/]*\\.test\\.[cm]?js$" "$travail/fichiers" | grep -vxF -f "$journaux/harnais.txt" | sed "s#^$dossier/##")
       [ -n "$liste" ] || { dit "$nom : aucun test hors du harnais du besoin"; return 0; }
@@ -232,6 +252,7 @@ non_regression() { # nom dossier
 }
 
 typecheck() { # nom dossier
+  note typecheck "$2" - 0 ''
   lance "$1" "$2" pnpm run typecheck
   ajoute "$1:$2:typecheck"
 }
@@ -273,6 +294,7 @@ if [ -z "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
     liste=$(dans "$d")
     [ -n "$liste" ] || continue
     n="harnais-$(basename "$d")"
+    if navigateur; then note harnais "$d" 4 1 "$liste"; else note harnais "$d" 4 0 "$liste"; fi
     # shellcheck disable=SC2086
     lance "$n" "$d" pnpm run test 4 $(navigateur && echo --navigateur) --reporter=default --reporter=json "--outputFile.json=$journaux/$n.rapport" $liste
     harnais_lances="$harnais_lances $n:$d:vitest"
@@ -281,6 +303,7 @@ if [ -z "$sous" ] && [ -s "$journaux/harnais.txt" ]; then
     case $d in packages/core | apps/web) continue ;; esac
     [ -f "$juge/$d/package.json" ] || continue
     n="harnais-$(basename "$d")"
+    note harnais "$d" 4 0 "$(dans "$d")"
     # shellcheck disable=SC2046,SC2086
     lance "$n" "$d" pnpm run test 4 $(rapports_node "$n") $(dans "$d")
     harnais_lances="$harnais_lances $n:$d:node"
@@ -307,5 +330,9 @@ TIRELIRE_NIVEAU=$niveau TIRELIRE_HARNAIS=$bloque node "$crochets/verdict.mjs" "$
 verdict=$?
 if [ "$verdict" -eq 0 ] && [ -z "$sous" ]; then
   echo "$arbre $(cat "$journaux/harnais.etat" 2>/dev/null || echo vert)" >>"$registre"
+  if navigateur; then nav=oui; else nav=non; fi
+  [ "$mode" = push ] && branche=$poussee
+  dit "$(node "$crochets/attestation.mjs" ecrire "$arbre" "$journaux" "${branche:-$(git symbolic-ref --short -q HEAD)}" "$nav" 2>&1)"
+  envoie_attestation
 fi
 exit "$verdict"
