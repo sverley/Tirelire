@@ -415,8 +415,9 @@ Chemins : `apps/web/src/lib/relay.ts`, `apps/web/vite.config.ts`, `apps/relay/**
 
 Analyse (audit #73, puis #42) : la partie de C4 qui dépend de l'application — demander au
 navigateur de rendre les données persistantes, savoir s'il l'a accordé et, tant qu'il ne l'a pas,
-le dire — se garde dans le navigateur, sur le site construit ; la vérification manuelle garde ce
-qu'aucun test ne rejoue, les données d'une version antérieure retrouvées à la même adresse.
+le dire — se garde dans le navigateur, sur le site construit, données de `main` écrites à leur
+adresse comprises ; la vérification manuelle garde ce que le harnais ne rejoue pas : les données
+d'une vraie version antérieure, retrouvées à la même adresse.
 
 Chemins : `apps/web/src/lib/db.ts`, `apps/web/src/lib/persistance.ts`, `apps/web/vite.config.ts`, `apps/hebergement/assembler.mjs`
 
