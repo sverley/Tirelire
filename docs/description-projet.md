@@ -597,3 +597,14 @@ seule la publication d'une version dépose, en production » :
 
 Puis, à la question du harnais, sur le point 7 du « Fait quand » (ce qu'un test peut vérifier est
 testé, par le codeur) et « Harnais : aucun », proposés par l'auditeur : « Oui ».
+
+## 27 septembre 2026 · les attestations de la livraison
+
+Dans #237, à la question de l'architecte : réduire le besoin au seul non-rejeu des tests après la
+fusion, sans attestation locale, ou garder la construction complète.
+
+> Il ne faut pas avoir peur des attestations si elles sont générées par une CI. Je ne fais pas confiance aux agents pour correctement verrier qu'ils on fait le travail ou n'ont pas dévier de leur mission mais je ne me méfie pas d'eux. Ils ne vont pas générer une attestation spontanément pour passer des tests. Ils n'en ont aucuns intérêts
+
+Puis, le 28 septembre, au codeur qui attendait le harnais de l'auditeur :
+
+> pas de harnais necessaire, code
