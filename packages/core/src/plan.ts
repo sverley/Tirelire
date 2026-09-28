@@ -134,7 +134,7 @@ export interface PlanTransfer {
 }
 
 export interface PlanWarning {
-  code: 'noPrincipal' | 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'principalOverdrawn'
+  code: 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'principalOverdrawn'
     | 'payoutShort' | 'bankOrderDrift';
   message: string;
   tirelireId?: Id;
@@ -192,7 +192,6 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   // Au-delà d'aujourd'hui, aucun relevé ne dit ce que les comptes portent : ce qui se lit sur le
   // réel (non affecté, soldes à régler) se lit à la dernière date connue, pas à une date inventée.
   const known = simulated ? today : asOf;
-  if (!principal) warnings.push({ code: 'noPrincipal', message: 'Aucun compte principal défini.' });
 
   const flows = alive(ledger.plannedFlows).filter((f) => isActive(f, period));
   const incomes = flowLines(flows.filter((f) => f.kind === 'income'), period);

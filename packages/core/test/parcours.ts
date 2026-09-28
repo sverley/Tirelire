@@ -11,7 +11,7 @@
  * par les harnais d'interface, qui demandent un navigateur.
  */
 import initSqlJs from 'sql.js';
-import { LedgerStore, euros, type Ledger, type Patch } from '../src/index.js';
+import { LedgerStore, MAIN_ACCOUNT_ID, euros, type Ledger, type Patch } from '../src/index.js';
 
 const SQL = await initSqlJs();
 
@@ -20,7 +20,7 @@ export const PAIE = 28;
 export const DEBUT = '2026-08-28';
 export const AS_OF = '2026-09-20';
 
-export const PRINCIPAL = 'cpt-principal';
+export const PRINCIPAL = MAIN_ACCOUNT_ID;
 export const LIVRET = 'cpt-livret';
 
 /** Ouvre une base neuve, comme au premier lancement de l'application. */
