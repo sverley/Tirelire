@@ -19,16 +19,23 @@
  * ligne le dit, pour que ce nombre ne passe pas pour celui des tests exécutés (#232, point 3). Tout
  * paquet accepte l'option, puisque `pnpm test` la passe à chacun ; hors vitest, elle ne change rien.
  *
+ * `--attestation <fichier>` (#237) : le fichier que la CI écrit d'après l'attestation de la livraison
+ * (`.githooks/attestation.mjs`). Si l'attestation vise l'arbre extrait et couvre ce lancement —
+ * paquet, seuil, cibles, tests navigateur —, le lanceur ne joue rien et dit pourquoi ; sinon il joue
+ * tout, et le dit aussi. Un fichier absent vaut « aucune attestation ». La décision de la CI passe
+ * ainsi par les arguments, jamais par une variable d'environnement (D83).
+ *
  * - vitest : le seuil devient un filtre de nom complet (`-t`), et un rapporteur de plus compte les
  *   tests écartés (`niveaux-vitest-rapport.mjs`).
  * - node --test : un préchargement (`niveaux-node.mjs`) substitue à `node:test` une enveloppe qui
  *   n'inscrit pas les tests au-dessus du seuil et les compte.
  */
-import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ciblesDesArguments, couvre } from './attestation.mjs';
 import { appelsDeTests } from './gardes.mjs';
 import { NIVEAU_MAX, ligneEcartes, lireSeuil, motifDuSeuil } from './niveaux.mjs';
 
@@ -43,9 +50,47 @@ if (fin < 0) {
 const lu = lireSeuil(argv.slice(fin + 1));
 const { seuil } = lu;
 const navigateur = lu.reste.includes('--navigateur');
-const reste = lu.reste.filter((a) => a !== '--navigateur');
+let fichierAttestation = null;
+const reste = [];
+for (let i = 0; i < lu.reste.length; i++) {
+  const a = lu.reste[i];
+  if (a === '--navigateur') continue;
+  if (a === '--attestation') fichierAttestation = lu.reste[++i] ?? '';
+  else if (a.startsWith('--attestation=')) fichierAttestation = a.slice('--attestation='.length);
+  else reste.push(a);
+}
 const nomme = reste.some((a) => (vitest ? /^(?:-t|--testNamePattern|--test-name-pattern)(?:=|$)/ : /^--test-name-pattern(?:=|$)/).test(a));
 const filtre = !nomme && seuil < NIVEAU_MAX;
+
+// L'attestation (#237) : ce lancement est-il couvert par ce que la livraison a joué sur cet arbre ?
+if (fichierAttestation !== null) {
+  const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  let couverture = null;
+  try {
+    couverture = JSON.parse(readFileSync(fichierAttestation, 'utf8'));
+  } catch {
+    // pas de fichier : aucune attestation
+  }
+  let demande;
+  try {
+    demande = {
+      arbre: git('rev-parse', 'HEAD^{tree}'),
+      dossier: relative(realpathSync(git('rev-parse', '--show-toplevel')), realpathSync(process.cwd())).split('\\').join('/') || '.',
+      seuil,
+      navigateur,
+      cibles: ciblesDesArguments(reste),
+      nomme,
+    };
+  } catch {
+    demande = null;
+  }
+  const { couvert, raison } = demande ? couvre(couverture, demande) : { couvert: false, raison: "l'arbre extrait ne se lit pas : tout se joue" };
+  if (couvert) {
+    console.log(`attestation : sauté, seuil ${seuil}${navigateur ? ', tests navigateur' : ''}, ${demande.dossier}${demande.cibles.length ? ` (${demande.cibles.join(' ')})` : ''} — ${raison}.`);
+    process.exit(0);
+  }
+  console.log(`attestation : ${raison}.`);
+}
 
 const travail = mkdtempSync(join(tmpdir(), 'tirelire-seuil-'));
 const compte = join(travail, 'ecartes');
