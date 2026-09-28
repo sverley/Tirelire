@@ -77,7 +77,7 @@ function dépôtFactice(nom) {
   writeFileSync(témoin, '');
   for (const f of readdirSync(join(RACINE, '.githooks'))) cpSync(join(RACINE, '.githooks', f), join(dépôt, '.githooks', f));
   for (const f of readdirSync(join(RACINE, 'packages/gardes'))) {
-    if (/\.mjs$|^package\.json$|^chemins-ignores$/.test(f) && !/\.test\.mjs$/.test(f)) cpSync(join(RACINE, 'packages/gardes', f), join(dépôt, 'packages/gardes', f));
+    if (/\.mjs$|^package\.json$/.test(f) && !/\.test\.mjs$/.test(f)) cpSync(join(RACINE, 'packages/gardes', f), join(dépôt, 'packages/gardes', f));
   }
   const écrire = (f, texte) => {
     mkdirSync(dirname(join(dépôt, f)), { recursive: true });

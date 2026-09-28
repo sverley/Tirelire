@@ -11,12 +11,17 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
    `#…` remplacé par le numéro de l'issue, rien d'autre (D82). Par l'API, le modèle ne s'applique
    pas : recopie-le.
 1. **Ne lis pas le harnais.** Code depuis ta propre lecture du besoin (principe 11.1).
-2. Code sur la branche, commets, pousse : la livraison (pré-push) joue le typecheck avant les tests,
-   sans les tests navigateur de non-régression, atteste ce qu'elle a joué et envoie l'attestation
-   avec le push, sur `<branche>--attestation` ; seul l'outillage la produit, tu ne l'écris ni ne la
-   pousses jamais toi-même (D83). Les tests navigateur se jouent au Ready, en CI ; plus tôt
-   seulement si c'est justifié, à ta demande, sur ton dernier commit : `pnpm livraison --navigateur`
-   ; verts, ils sont attestés sur cet arbre et la CI ne les y rejoue pas. En brouillon, le verdict
+2. Code sur la branche, commets, pousse : chaque ensemble de tests a son empreinte, l'état des
+   chemins qu'il lit, et ne se rejoue pas sur une empreinte déjà trouvée verte, ni aux crochets
+   suivants, dans cette session ou une autre, ni en CI (D83, « Les empreintes »). La livraison
+   (pré-push) joue le typecheck avant les tests, sans les tests navigateur de non-régression, dit
+   chaque ensemble — joué, à quel seuil, avec quel verdict, ou pourquoi non —, ajoute à
+   l'attestation les empreintes jouées vertes et l'envoie avec le push, sur `<branche>--attestation`,
+   où elle se garde d'un push à l'autre ; seul l'outillage la produit, tu ne l'écris ni ne la pousses
+   jamais toi-même (D83). Les tests navigateur se jouent au Ready, en CI ; plus tôt seulement si
+   c'est justifié, à ta demande, sur ton dernier commit : `pnpm livraison --navigateur` ; verts, ils
+   sont attestés sur leur empreinte et la CI ne les rejoue pas tant que ce qu'ils lisent n'a pas
+   changé. En brouillon, le verdict
    est local :
    `pnpm typecheck`, le harnais du besoin et, si tu modifies une fonction de la garde, ses tests de
    développement (D81), joués à la main : `pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'` ;

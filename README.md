@@ -101,19 +101,22 @@ niveau :
   a besoin, avec un message.
 - **pré-fusion** (`pre-merge-commit`, et le pré-commit pendant un conflit) et **pré-push** : la
   livraison, jugée sur l'état commis — l'index ou le commit poussé, jamais la copie de travail.
-  - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
-    `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
-    touchés, tests headless de l'interface ; durée attendue 30 s) ou **organisationnel** (tests de la
-    garde ; durée attendue 45 s), ou les deux. Les tests navigateur (`apps/web/test/navigateur/`)
-    restent au Ready, en CI, sauf demande : `pnpm livraison --navigateur` (D83). Le typecheck se
-    joue avant les tests, et les tests navigateur ne partent que si le reste est vert. Un dépassement de plus de 20 % s'affiche, sans bloquer.
-  - Le harnais du besoin est toujours joué, à part et hors durée attendue. Il **bloque** quand ce qui arrive
+  - Chaque ensemble de tests — garde, cœur, relais, hébergement, interface sans ou dans le
+    navigateur, harnais du besoin — a une **empreinte**, l'état des chemins qu'il lit
+    (`packages/gardes/attestation.mjs`). Se joue, au seuil 2, chaque ensemble qui n'est pas déjà vert
+    sur son empreinte — dans l'attestation de la branche, d'un push ou d'une session à l'autre, ou
+    parce que `main` a la même — ; la livraison dit chacun, joué ou non, et pourquoi (D83, « Les
+    empreintes »). Les tests navigateur (`apps/web/test/navigateur/`) restent au Ready, en CI, sauf
+    demande : `pnpm livraison --navigateur` (D83). Le typecheck se joue avant les tests, et les tests
+    navigateur ne partent que si le reste est vert.
+  - Le harnais du besoin est toujours joué, à part, sauf vert sur son empreinte. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.
-  - Le pré-push ne rejoue pas un arbre déjà vérifié à la fusion. Un push vers une sous-branche
-    (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la non-régression.
+  - Un push vers une sous-branche (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la
+    non-régression, sans rien attester.
 - **CI** : au passage en Ready de chaque PR, jamais en brouillon, typecheck, tests (navigateur compris), build, en mode strict
-  (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job.
+  (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job. Un ensemble déjà vert sur son empreinte
+  ne s'y rejoue pas, seuil 1 compris ; au tag, rien ne se saute.
 
 `git commit --no-verify` est un contournement : il fait sauter la non-régression avec le
 reste, et aucune consigne ne le propose. Un harnais rouge ne le justifie pas : il ne bloque pas le
