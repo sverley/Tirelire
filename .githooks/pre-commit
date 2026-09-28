@@ -12,7 +12,9 @@
 #   le reste (documentation, interface, configuration) → rien ; la livraison et la CI jugent le reste.
 # Le harnais du besoin (`harnais-du-besoin.sh` : le fichier de l'auditeur, qui porte le numéro de
 # l'issue) se joue à part, en entier (seuil 4), dès que des tests se jouent, hors budget ; le reste
-# est la non-régression, jouée à son niveau.
+# est la non-régression, jouée à son niveau. Sans tests navigateur (D83) : ses fichiers de
+# `apps/web/test/navigateur/` ne se jouent pas au commit, qui les nomme ; ils se jouent à la
+# livraison (#264, point 7). Un paquet dont il ne reste aucun fichier à jouer ne se lance pas (#272).
 # `verdict.mjs` trie les échecs par fichier :
 #   - un échec de la non-régression refuse le commit ;
 #   - le harnais du besoin est affiché sans bloquer (la livraison le bloque, #121), sauf une erreur de
@@ -61,6 +63,11 @@ debut=$(date +%s)
 # Le harnais du besoin se lit dans l'index : avant de retirer GIT_INDEX_FILE.
 . "$racine/.githooks/harnais-du-besoin.sh"
 harnais_du_besoin "$journaux/harnais.txt" >"$journaux/harnais.note" || exit 1
+# Ses fichiers qui vivent dans le navigateur quittent la liste du commit (#272) : ils ne s'y jouent
+# pas, et ne sont ni du harnais joué ni de la non-régression.
+grep '^apps/web/test/navigateur/' "$journaux/harnais.txt" >"$journaux/harnais-navigateur.txt"
+grep -v '^apps/web/test/navigateur/' "$journaux/harnais.txt" >"$journaux/harnais.joue"
+mv "$journaux/harnais.joue" "$journaux/harnais.txt" || exit 1
 # Fichiers de test `node --test` de chaque paquet, copie de travail comprise.
 for d in packages/gardes apps/relay apps/hebergement; do
   git ls-files -co --exclude-standard -- "$d" | grep -E "^$d/[^/]*\.test\.[cm]?js\$" >"$journaux/$(basename "$d").fichiers"
@@ -106,9 +113,11 @@ non_regression_node() { # nom dossier
 [ -n "$relais" ] && non_regression_node relais apps/relay
 [ -n "$hebergement" ] && non_regression_node hébergement apps/hebergement
 
-# Harnais du besoin, en entier (seuil 4).
+# Harnais du besoin, en entier (seuil 4), paquet par paquet ; un paquet sans fichier à jouer ne se
+# lance pas (#272).
 for d in $(grep -Eo '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | sed 's#/$##' | sort -u); do
   liste=$(dans "$d")
+  [ -n "$liste" ] || continue
   case $d in
     packages/core)
       # shellcheck disable=SC2086
@@ -130,6 +139,10 @@ for d in $(grep -Eo '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | sed 's#/
   esac
 done
 wait
+
+if [ -s "$journaux/harnais-navigateur.txt" ]; then
+  echo "pré-commit : harnais du besoin dans le navigateur, non joué au commit (sans tests navigateur, D83) ; il se joue à la livraison (#264, point 7) : $(paste -sd ',' "$journaux/harnais-navigateur.txt" | sed 's/,/, /g')."
+fi
 
 # shellcheck disable=SC2086 # les lancements n'ont pas d'espace
 node "$racine/.githooks/verdict.mjs" "$racine" "$journaux" "$debut" $lances
