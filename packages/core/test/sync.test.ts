@@ -14,7 +14,7 @@ async function seeded(site: string) {
 }
 const lignes = (l: ReturnType<typeof exampleLedger>) => l.accounts.length + l.tirelires.length + l.needs.length + l.plannedFlows.length;
 
-describe('[niveau 0] harnais du registre', () => {
+describe('[niveau 0] harnais du registre · I8', () => {
   describe('synchronisation', () => {
     it('deux appareils convergent par le protocole, puis n’échangent plus que le delta', async () => {
       const a = await seeded('A');

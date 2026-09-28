@@ -58,7 +58,7 @@ function ledgerWithBank(): { ledger: Ledger; profile: ReturnType<typeof bankMult
   return { ledger, profile };
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
   describe('lecture CSV', () => {
     it('décode le latin-1 et détecte le point-virgule', () => {
       const text = decodeBytes(latin1(CSV));
@@ -94,7 +94,7 @@ describe('[niveau 1] harnais du registre', () => {
     });
   });
 
-  describe('préparation de l’import', () => {
+  describe('[niveau 0] préparation de l’import : une opération n’est ni doublée ni écrasée (D09)', () => {
     it('clés déterministes, rang pour les identiques, comptes non mappés', () => {
       const { ledger, profile } = ledgerWithBank();
       const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
@@ -111,16 +111,14 @@ describe('[niveau 1] harnais du registre', () => {
       expect(prep.candidates.find((c) => c.operation.amount === euros(-950))!.operation.details).toContain('CAPITAL 700');
     });
 
-    describe('[niveau 0]', () => {
-      it('réimporter le même fichier : tout est en doublon exact', () => {
-        const { ledger, profile } = ledgerWithBank();
-        const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
-        const first = prepareImport(ledger, rows, profile);
-        const l2 = { ...ledger, operations: first.candidates.map((c) => c.operation) };
-        const second = prepareImport(l2, rows, profile);
-        expect(second.counts.exact).toBe(8);
-        expect(second.counts.new).toBe(0);
-      });
+    it('réimporter le même fichier : tout est en doublon exact', () => {
+      const { ledger, profile } = ledgerWithBank();
+      const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
+      const first = prepareImport(ledger, rows, profile);
+      const l2 = { ...ledger, operations: first.candidates.map((c) => c.operation) };
+      const second = prepareImport(l2, rows, profile);
+      expect(second.counts.exact).toBe(8);
+      expect(second.counts.new).toBe(0);
     });
 
     it('doublon probable : même montant à ±3 jours, libellé réécrit', () => {
@@ -306,16 +304,18 @@ describe('[niveau 1] harnais du registre', () => {
     expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
   });
 
-  it.fails('témoin rouge · un import qui ne cherche les doublons que dans le fichier', () => {
-    const { ledger, profile } = ledgerWithBank();
-    const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
-    const l2 = { ...ledger, operations: prepareImport(ledger, rows, profile).candidates.map((c) => c.operation) };
-    // Version cassée : le grand livre n'est pas consulté. Ni doublon exact au réimport, ni doublon
-    // probable quand une autre source réécrit le libellé et décale la date.
-    const oublieuse = (lignes: Parameters<typeof prepareImport>[1]) => prepareImport({ ...l2, operations: [] }, lignes, profile);
+  describe('[niveau 0] témoin de la préparation de l’import (D09)', () => {
+    it.fails('témoin rouge · un import qui ne cherche les doublons que dans le fichier', () => {
+      const { ledger, profile } = ledgerWithBank();
+      const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
+      const l2 = { ...ledger, operations: prepareImport(ledger, rows, profile).candidates.map((c) => c.operation) };
+      // Version cassée : le grand livre n'est pas consulté. Ni doublon exact au réimport, ni doublon
+      // probable quand une autre source réécrit le libellé et décale la date.
+      const oublieuse = (lignes: Parameters<typeof prepareImport>[1]) => prepareImport({ ...l2, operations: [] }, lignes, profile);
 
-    const encore = oublieuse([{ line: 2, date: '2026-09-05', label: 'Eau du village', amount: euros(-76), accountKey: '00011111111' }]);
-    expect(encore.counts.probable).toBe(1);
-    expect(oublieuse(rows).counts.exact).toBe(8);
+      const encore = oublieuse([{ line: 2, date: '2026-09-05', label: 'Eau du village', amount: euros(-76), accountKey: '00011111111' }]);
+      expect(encore.counts.probable).toBe(1);
+      expect(oublieuse(rows).counts.exact).toBe(8);
+    });
   });
 });

@@ -84,7 +84,7 @@ function leBilanParCatégorieSeLit(ledger: Ledger): void {
   expect(plan.warnings.filter((w) => w.tirelireId || w.needId)).toEqual([]);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U5)', () => {
   describe('U5 · import seul, de bout en bout (#39)', () => {
     it('parcours U5 · du relevé importé au bilan par catégorie, sans aucune tirelire', async () => {
       const store = await baseVide('parcours-u5');

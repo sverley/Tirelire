@@ -27,7 +27,7 @@ const AU_MILIEU = {
   janvier: '2027-01-06',
 };
 
-describe('changements datés du jeu d’exemple (D51)', () => {
+describe('[niveau 2] changements datés du jeu d’exemple (D51)', () => {
   it('la période en cours est intacte : une seule version de chaque budget', () => {
     const plan = computePlan(l, AU_MILIEU.septembre);
     expect(plan.period.label).toBe('septembre 2026');

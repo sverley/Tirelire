@@ -18,7 +18,7 @@ import { computePlan } from '../src/plan.js';
  * D56 : l'état d'une ligne datée, et le filtre qui s'en sert. `activeAt` répondait par oui ou non,
  * ce qui confond ce qui est fini et ce qui n'a pas commencé.
  */
-describe('état d’une ligne datée', () => {
+describe('[niveau 2] état d’une ligne datée (D56)', () => {
   it('distingue ce qui est clos, en vigueur et à venir, bornes incluses', () => {
     const ligne = { activeFrom: '2026-03-01', activeTo: '2026-08-31' };
     expect(validityState(ligne, '2026-02-28')).toBe('upcoming');
@@ -50,7 +50,7 @@ describe('état d’une ligne datée', () => {
 });
 
 /** Une tirelire ne porte pas de dates : son état se lit sur ses besoins et sur son solde. */
-describe('état d’une tirelire', () => {
+describe('[niveau 2] état d’une tirelire (D56)', () => {
   function foyer(
     besoins: Array<{ id: string; activeFrom?: string; activeTo?: string }>,
     rollover: 'none' | 'unlimited' = 'none',
@@ -115,7 +115,7 @@ describe('état d’une tirelire', () => {
  * L'exemple doit montrer le filtre sans qu'on saisisse quoi que ce soit : sans les trois états sur
  * les trois écrans, la fonction n'est visible nulle part au chargement.
  */
-describe('l’exemple porte les trois états (D56)', () => {
+describe('[niveau 2] l’exemple porte les trois états (D56)', () => {
   const l = exampleLedger();
   const asOf = '2026-09-06';
   const compte = (états: ValidityState[], items: Array<{ activeFrom?: string; activeTo?: string }>) =>

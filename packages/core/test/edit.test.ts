@@ -32,7 +32,7 @@ function withOperation(amount = euros(-100)): { ledger: Ledger; op: Operation } 
   return { ledger, op };
 }
 
-describe('ventilation à parts (D27)', () => {
+describe('[niveau 2] ventilation à parts (D27)', () => {
   it('la part variable prend le reste, dans le signe de l’opération', () => {
     const { op } = withOperation(euros(-100));
     const allocs: Allocation[] = [
@@ -94,27 +94,6 @@ describe('ventilation à parts (D27)', () => {
       ]),
     ).toThrow(EditError);
   });
-});
-
-describe('états d’une opération (D22)', () => {
-  it('une modification manuelle verrouille, l’ouverture de l’éditeur non', () => {
-    const { ledger, op } = withOperation();
-    // Lire la ventilation ne change rien : aucun patch n'est produit tant qu'on n'écrit pas.
-    expect(op.state).toBe('untreated');
-    const patch = editAllocations(ledger, op.id, [{ categoryId: 'cat-alim', share: { kind: 'variable' } }]);
-    expect(patch.operations[0]!.state).toBe('locked');
-  });
-
-  describe('[niveau 0]', () => {
-    it('le déverrouillage rend l’opération aux règles sans rien lui retirer', () => {
-      const { op } = withOperation();
-      const locked = manualEdit(op, { oneOff: true });
-      expect(locked.state).toBe('locked');
-      const freed = unlock(locked);
-      expect(freed.state).toBe('untreated');
-      expect(freed.oneOff).toBe(true);
-    });
-  });
 
   it('une ligne retirée à la main disparaît vraiment', () => {
     const { ledger, op } = withOperation(euros(-100));
@@ -130,5 +109,24 @@ describe('états d’une opération (D22)', () => {
     const rest = l.allocations.filter((a) => a.operationId === op.id);
     expect(rest.length).toBe(1);
     expect(rest[0]!.share).toEqual({ kind: 'variable' });
+  });
+});
+
+describe('[niveau 0] états d’une opération : la vérité est ce qui est verrouillé (D22)', () => {
+  it('une modification manuelle verrouille, l’ouverture de l’éditeur non', () => {
+    const { ledger, op } = withOperation();
+    // Lire la ventilation ne change rien : aucun patch n'est produit tant qu'on n'écrit pas.
+    expect(op.state).toBe('untreated');
+    const patch = editAllocations(ledger, op.id, [{ categoryId: 'cat-alim', share: { kind: 'variable' } }]);
+    expect(patch.operations[0]!.state).toBe('locked');
+  });
+
+  it('le déverrouillage rend l’opération aux règles sans rien lui retirer', () => {
+    const { op } = withOperation();
+    const locked = manualEdit(op, { oneOff: true });
+    expect(locked.state).toBe('locked');
+    const freed = unlock(locked);
+    expect(freed.state).toBe('untreated');
+    expect(freed.oneOff).toBe(true);
   });
 });

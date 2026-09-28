@@ -41,7 +41,7 @@ function withOps(...ops: Operation[]): Ledger {
 
 const rule = (r: Partial<Automation> & Pick<Automation, 'id' | 'rank'>): Automation => ({ selection: {}, action: {}, ...r });
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
   describe('rangs triables (D31)', () => {
     it('insère toujours une clé entre deux voisines, même serrées', () => {
       const a = rankBetween(undefined, undefined);
@@ -120,7 +120,7 @@ describe('[niveau 1] harnais du registre', () => {
       expect(l.allocations.filter((a) => a.operationId === 'o1').length).toBe(0);
     });
 
-    describe('[niveau 0]', () => {
+    describe('[niveau 0] D22 · la vérité est ce qui est verrouillé', () => {
       it('une opération verrouillée est hors d’atteinte', () => {
         const l = withOps(op('o1', 'SUPERMARCHE', euros(-40), { state: 'locked' }));
         l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
@@ -129,7 +129,7 @@ describe('[niveau 1] harnais du registre', () => {
       });
     });
 
-    describe('[niveau 0]', () => {
+    describe('[niveau 0] D33 · ce que l’import a établi ne se perd pas', () => {
       it('ce que l’import a établi survit au passage des règles (D33)', () => {
         const l = withOps(op('o1', 'VIR LIVRET', euros(-100), { transferAccountId: 'acc-livret' }));
         l.allocations.push({ id: 'al1', operationId: 'o1', tirelireId: 'env-vacances', share: { kind: 'variable' } });
@@ -162,12 +162,14 @@ describe('[niveau 1] harnais du registre', () => {
   });
 
   describe('actions groupées (D26)', () => {
-    it('verrouille par défaut, et peut déverrouiller — ce qu’une règle ne peut pas', () => {
-      const l = withOps(op('o1', 'A', euros(-10)), op('o2', 'B', euros(-20), { state: 'locked' }));
-      const lock = applyBulkAction(l, ['o1'], { categoryId: 'cat-alim' });
-      expect(lock.operations[0]!.state).toBe('locked');
-      const free = applyBulkAction(l, ['o2'], { state: 'unlock' });
-      expect(free.operations[0]!.state).toBe('untreated');
+    describe('[niveau 0] D22 · la vérité est ce qui est verrouillé', () => {
+      it('verrouille par défaut, et peut déverrouiller — ce qu’une règle ne peut pas', () => {
+        const l = withOps(op('o1', 'A', euros(-10)), op('o2', 'B', euros(-20), { state: 'locked' }));
+        const lock = applyBulkAction(l, ['o1'], { categoryId: 'cat-alim' });
+        expect(lock.operations[0]!.state).toBe('locked');
+        const free = applyBulkAction(l, ['o2'], { state: 'unlock' });
+        expect(free.operations[0]!.state).toBe('untreated');
+      });
     });
 
     it('ne laisse que ses effets : rien n’est enregistré qui puisse se rejouer', () => {
@@ -197,7 +199,7 @@ describe('[niveau 1] harnais du registre', () => {
       expect(patch.automations[0]!.flowId).toBe('flow-credit');
     });
 
-    describe('[niveau 0]', () => {
+    describe('[niveau 0] D24 · le passé déjà classé n’est pas réécrit', () => {
       it('modifier le flux archive la règle et en crée une nouvelle, sans réécrire le passé', () => {
         let l = withOps();
         const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
