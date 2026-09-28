@@ -243,11 +243,11 @@ const crochets = mémo(async () => {
     return { ancien: de('ancien'), nouveau: de('nouveau'), codeur: de('codeur'), web: de('web'), nav: de('nav') };
   };
 
-  // Un besoin fonctionnel : l'interface touchée, la livraison la joue sans navigateur (#232, point 6 ;
-  // #264 : les tests navigateur sont laissés au Ready faute de demande ; #266 : seul se joue ce dont
-  // l'empreinte a changé depuis main).
+  // Un besoin fonctionnel : le cœur touché, la livraison joue l'interface qui le lit, sans navigateur
+  // (#232, point 6 ; #264 : les tests navigateur sont laissés au Ready faute de demande ; #266 : seul
+  // se joue ce dont l'empreinte a changé depuis main).
   git('checkout', '-q', '-b', BRANCHE_FONCTIONNELLE, 'main');
-  writeFileSync(join(dépôt, 'apps/web/index.html'), `${readFileSync(join(dépôt, 'apps/web/index.html'), 'utf8')}\n<!-- Une ligne de plus. -->\n`);
+  writeFileSync(join(dépôt, 'packages/core/src/dates.ts'), `${readFileSync(join(dépôt, 'packages/core/src/dates.ts'), 'utf8')}\n// Une ligne de plus.\n`);
   git('commit', '-q', '--no-verify', '-am', 'besoin fonctionnel #998');
   const témoinFonctionnel = join(temporaire(), 'pre-push-fonctionnel.temoin');
   writeFileSync(témoinFonctionnel, '');

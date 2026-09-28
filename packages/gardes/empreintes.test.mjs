@@ -5,16 +5,18 @@
  * **Au niveau 1** — principe 10.1 et D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job
  * joué aurait rougi ») : l'empreinte de chaque ensemble change avec tout fichier qu'il lit, un chemin
  * oublié de la liste compris (point 1) ; un ensemble ne se saute que vert sur la même empreinte, à un
- * seuil au moins égal (point 2) ; un ensemble rouge, ou dont un test s'est sauté faute d'outil, n'est
- * pas vert (point 3) ; au Ready, sur `main` et au tag, rien ne se saute hors d'une empreinte verte à un
- * seuil au moins égal, et au tag, aucune ne l'est au seuil 3 (point 4).
+ * seuil au moins égal (point 2), et un lancement ne se saute que si chaque ensemble qu'il joue l'est ;
+ * un ensemble rouge, non joué, ou dont un test s'est sauté faute d'outil, n'est pas attesté vert —
+ * par la livraison elle-même, sous son nom (point 3) ; au Ready, sur `main` et au tag, rien ne se
+ * saute hors d'une empreinte verte à un seuil au moins égal, et au tag, aucune ne l'est au seuil 3
+ * (point 4).
  *
- * **Au niveau 2** — le cas nominal, dont l'échec ne coûterait que du temps : ce qui a tourné vert ne se
- * rejoue pas — au crochet suivant, dans une autre session, au Ready, seuil 1 compris, sur `main` ;
- * une empreinte verte se garde d'un push à l'autre ; les tests navigateur demandés et joués verts ne
- * se rejouent pas en CI sur la même empreinte (points 2, 4 à 6).
- *
- * **Au niveau 3** — le dégradé : ce que chaque moment dit, pour chaque ensemble (point 7).
+ * **Au niveau 3** — le dégradé : si ces tests tombent, le résultat reste juste, obtenu plus lentement
+ * ou moins lisiblement. Ce qui a tourné vert ne se rejoue pas — au crochet suivant, dans une autre
+ * session, au Ready, seuil 1 compris, sur `main` ; une empreinte verte se garde d'un push à l'autre ;
+ * les tests navigateur demandés et joués verts ne se rejouent pas en CI sur la même empreinte (points
+ * 2, 4 à 6) ; chaque moment dit, pour chaque ensemble, ce qu'il a joué ou pourquoi il ne l'a pas joué
+ * (point 7). Les parcours qui montent de vrais dépôts y vivent : ils ne coûtent qu'au seuil 3.
  *
  * Les livraisons se jouent dans un petit dépôt factice, avec les crochets et la garde du dépôt.
  * `node:test` n'a pas de `test.fails` : l'échec attendu d'un témoin tient dans une assertion
@@ -42,6 +44,7 @@ import {
   ensemblesDeLaDemande,
   fusionner,
   lireLAttestation,
+  lireLesEntrees,
   lit,
   nomDe,
   planifier,
@@ -161,6 +164,8 @@ function bilanSur(nom, lancements, seuil = 2) {
   const dit = execFileSync('node', [ATTESTATION_MJS, 'bilan', join(dépôt, 'plan'), journaux, 'pré-push', 'a'.repeat(40), 'b'.repeat(40), 'codage/999-bilan', join(dépôt, 'verts'), '--enregistrer'], { cwd: dépôt, env: environnement(), encoding: 'utf8' });
   return { e, dit, attestation: lireLAttestation(git('log', '-1', '--format=%B', 'refs/attestations/codage/999-bilan')).attestation };
 }
+/** Les entrées de l'arbre d'un commit du dépôt factice. */
+const lireLesEntreesDe = (f, commit) => lireLesEntrees(f.git('ls-tree', '-r', '-z', '--full-tree', commit));
 /** Un rapport vitest : `[ancêtres, titre, statut]` par test. */
 const rapportVitest = (tests) => ({ testResults: [{ assertionResults: tests.map(([ancestorTitles, title, status]) => ({ ancestorTitles, title, status })) }] });
 
@@ -292,6 +297,36 @@ describe('[niveau 1] #266, principe 10.1 · un ensemble ne se saute que vert sur
     for (const c of l) assert.doesNotMatch(c, /--attestation/, `au tag, aucun lancement ne lit d’empreintes : « ${c.trim()} »`);
   });
 
+  test('point 3 · la livraison n’atteste que les ensembles qu’elle a joués verts, chacun sous son nom : ni un rouge, ni un ensemble non joué', async () => {
+    const f = dépôtFactice('rouge-non-atteste');
+    const B = 'codage/995-rouge';
+    f.git('checkout', '-q', '-b', B);
+    f.écrire('packages/core/lib.mjs', 'export const un = 2;\n');
+    f.écrire('apps/web/etat.txt', 'rouge\n');
+    f.git('commit', '-q', '-am', 'cœur, et une interface rouge');
+    const r = await f.pousser(B);
+    assert.notEqual(r.code, 0, `l'interface rouge refuse le push\n${r.sortie}`);
+    const { attestation } = lireLAttestation(f.git('log', '-1', '--format=%B', `refs/attestations/${B}`));
+    assert.deepEqual(attestation.verts.map((v) => `${v.ensemble}:${v.seuil}`), ['coeur:2'], `seul le cœur, joué vert, est attesté ; ni l'interface rouge, ni la garde ou les tests navigateur, non joués\n${r.sortie}`);
+    assert.equal(attestation.verts[0].empreinte, empreintes(lireLesEntreesDe(f, 'HEAD')).coeur, 'sur l’empreinte du cœur de l’arbre jugé');
+    assert.throws(() => f.attestationDistante(B), 'une livraison rouge n’envoie pas d’attestation');
+  });
+
+  test('un lancement ne se saute que si chaque ensemble qu’il joue est vert : le lanceur les reconnaît tous', () => {
+    const d = (dossier, navigateur, cibles) => ensemblesDeLaDemande({ dossier, navigateur, cibles }, ['packages/gardes/h.test.mjs', 'apps/web/test/navigateur/h.test.ts']);
+    assert.deepEqual(d('packages/core', false, []), ['coeur']);
+    assert.deepEqual(d('apps/web', false, []), ['interface']);
+    assert.deepEqual(d('apps/web', true, []), ['interface', 'navigateur'], 'l’interface lancée avec --navigateur joue aussi les tests navigateur : les deux doivent être verts');
+    assert.deepEqual(d('apps/web', true, ['test/navigateur']), ['navigateur']);
+    assert.deepEqual(d('apps/web', true, ['test/navigateur/h.test.ts']), [HARNAIS.id]);
+    assert.deepEqual(d('packages/gardes', true, ['h.test.mjs']), [HARNAIS.id]);
+    assert.deepEqual(d('packages/gardes', true, ['h.test.mjs', 'autre.test.mjs']), ['garde'], 'un fichier hors du harnais : le paquet');
+    assert.equal(d('ailleurs', false, []), null);
+    const e = E('l');
+    const seulInterface = couvertureAuReady({ arbre: A, empreintes: e, verts: [vert('interface', e.interface, 2)] });
+    assert.equal(couvre(seulInterface, demande('apps/web', { seuil: 2, navigateur: true })).couvert, false, 'interface verte, navigateur non : le lancement avec --navigateur se joue');
+  });
+
   test('témoin rouge · une empreinte du seul paquet, une décision sans seuil ou un verdict sans les tests sautés feraient rougir ces tests', () => {
     const duPaquet = (id, chemin) => chemin.startsWith(`${ENSEMBLES.find((x) => x.id === id).dossier}/`);
     assert.ok(Object.entries(LUS).some(([id, fs]) => fs.some((f) => !duPaquet(id, f))), 'témoin : une empreinte du seul paquet laisserait passer un fichier lu ailleurs (pnpm-lock.yaml, le cœur pour l’interface)');
@@ -411,8 +446,8 @@ const parcoursDuCoeur = () =>
     return r;
   })());
 
-describe('[niveau 2] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue pas', { concurrency: true }, () => {
-  test('point 2 · au premier push, se joue ce que la nature du besoin retient, et ils sont attestés', async () => {
+describe('[niveau 3] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue pas', { concurrency: true }, () => {
+  test('point 2 · au premier push, se joue ce que la nature du besoin retient, sauf ce que main a déjà vert, et c’est attesté', async () => {
     const { premier } = await parcoursDuCoeur();
     assert.equal(premier.code, 0, premier.sortie);
     assert.deepEqual(premier.joués, ['coeur', 'interface'], `le cœur et l'interface, que retient un besoin fonctionnel du cœur ; ni le navigateur sans demande\n${premier.sortie}`);
@@ -504,16 +539,6 @@ describe('[niveau 2] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue p
     }
   });
 
-  test('le lanceur reconnaît les ensembles de chaque lancement', () => {
-    const d = (dossier, navigateur, cibles) => ensemblesDeLaDemande({ dossier, navigateur, cibles }, ['packages/gardes/h.test.mjs', 'apps/web/test/navigateur/h.test.ts']);
-    assert.deepEqual(d('packages/core', false, []), ['coeur']);
-    assert.deepEqual(d('apps/web', false, []), ['interface']);
-    assert.deepEqual(d('apps/web', true, []), ['interface', 'navigateur']);
-    assert.deepEqual(d('apps/web', true, ['test/navigateur']), ['navigateur']);
-    assert.deepEqual(d('apps/web', true, ['test/navigateur/h.test.ts']), [HARNAIS.id]);
-    assert.deepEqual(d('packages/gardes', true, ['h.test.mjs']), [HARNAIS.id]);
-    assert.equal(d('ailleurs', false, []), null);
-  });
 });
 
 // ─── Niveau 3 : ce que chaque moment dit ───────────────────────────────────────────────────────

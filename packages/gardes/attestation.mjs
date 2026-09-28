@@ -138,16 +138,22 @@ export function correspond(motif, chemin) {
   return m.motif.test(m.nom ? chemin.split('/').at(-1) : chemin);
 }
 
-/** L'ensemble lit-il ce chemin ? Tout chemin qu'aucun motif n'écarte est lu. */
+const LUS = new WeakMap();
+/** L'ensemble lit-il ce chemin ? Tout chemin qu'aucun motif n'écarte est lu. Mis en cache par ensemble. */
 export function lit(ensembleOuId, chemin) {
   const e = typeof ensembleOuId === 'string' ? ensemble(ensembleOuId) : ensembleOuId;
-  let lu = true;
+  let cache = LUS.get(e);
+  if (!cache) LUS.set(e, (cache = new Map()));
+  let lu = cache.get(chemin);
+  if (lu !== undefined) return lu;
+  lu = true;
   for (const { motifs } of e.ecartes) {
     for (const m of motifs) {
       const reintegre = m.startsWith('!');
       if (correspond(reintegre ? m.slice(1) : m, chemin)) lu = reintegre;
     }
   }
+  cache.set(chemin, lu);
   return lu;
 }
 

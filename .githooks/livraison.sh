@@ -217,6 +217,7 @@ cp "$travail/chemins-ignores" "$classe/.git/info/exclude"
 git -C "$classe" check-ignore --no-index --stdin <"$travail/modifies" >"$travail/fonctionnels" 2>/dev/null
 grep -vxF -f "$travail/fonctionnels" "$travail/modifies" | grep -v '^$' >"$travail/organisationnels"
 retenus=''
+grep -Eo '^(apps|packages)/[^/]+' "$travail/fonctionnels" | sort -u >"$travail/touches"
 [ -s "$travail/organisationnels" ] && retenus="$retenus garde"
 if [ -s "$travail/fonctionnels" ]; then
   retenus="$retenus interface"
@@ -325,9 +326,9 @@ attendue=0
 { joue coeur || joue relais || joue hebergement || joue interface; } && attendue=$((attendue + 40))
 joue navigateur && attendue=$((attendue + 270))
 joue garde && attendue=$((attendue + 45))
-# Palier 1 : le typecheck des paquets fonctionnels dont un ensemble se joue ; la garde n'en a pas à la
-# livraison (#121).
-for p in $DOSSIERS; do [ "${p%%:*}" != garde ] && joue "${p%%:*}" && echo "${p#*:}"; done | sort -u >"$travail/paquets"
+# Palier 1 : le typecheck des paquets touchés (fonctionnels) dont un ensemble se joue ; la garde n'en
+# a pas à la livraison (#121). La CI le rejoue toujours.
+for p in $DOSSIERS; do [ "${p%%:*}" != garde ] && joue "${p%%:*}" && grep -qxF "${p#*:}" "$travail/touches" && echo "${p#*:}"; done | sort -u >"$travail/paquets"
 typechecks=''
 while read -r d; do
   [ -f "$juge/$d/package.json" ] || continue

@@ -197,8 +197,10 @@ describe('[niveau 2] #264, points 5 à 8 · le moins cher d’abord, les tests n
     assert.equal(r.demande.code, 0, r.demande.sortie);
     const nav = r.notesDemande.filter((x) => x.quoi === 'navigateur');
     assert.equal(nav.length, 1, `la demande joue les tests navigateur\n${r.demande.sortie}`);
+    // Depuis #266, ce qui est déjà vert sur son empreinte ne se rejoue pas : ce qui se joue d'autre à
+    // ce moment, s'il y en a, part avant.
     const autres = r.notesDemande.filter((x) => x.quoi !== 'navigateur');
-    assert.ok(autres.length > 0 && Math.max(...autres.map((x) => x.t)) <= nav[0].t, `ils partent après le reste\n${JSON.stringify(r.notesDemande)}`);
+    assert.ok(autres.every((x) => x.t <= nav[0].t), `ils partent après le reste\n${JSON.stringify(r.notesDemande)}`);
   });
 
   test('point 5 · un test sans navigateur rouge retient les tests navigateur demandés', async () => {
