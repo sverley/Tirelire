@@ -1,10 +1,11 @@
 /**
  * Tests de #264 (réduit le 28/09 aux parties A et C) : les tests navigateur au Ready, le moins cher
- * d'abord, et les branches d'une PR fermée (D83).
+ * d'abord, et les branches d'une PR fermée (D83). Depuis #266, ce qui se joue suit les empreintes :
+ * le seuil 1 du Ready se saute sur une empreinte verte, et ce que #266 ajoute a ses tests
+ * (`empreintes.test.mjs`).
  *
  * **Au niveau 1** — D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait
- * rougi », « jamais le seuil 1 », « au tag, rien ne se saute ») : au Ready, le seuil 1 se joue sans
- * rien sauter ; au tag, rien ne se saute.
+ * rougi », « au tag, rien ne se saute ») : au tag, rien ne se saute.
  *
  * **Au niveau 2** — les règles de #264, dont l'erreur ne coûterait que du temps ou une branche à
  * recréer : la livraison joue le typecheck, puis les tests sans navigateur, et les tests navigateur
@@ -31,7 +32,7 @@ const lireFichier = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').repla
 const CI = '.github/workflows/ci.yml';
 const WORKFLOW_BRANCHES = '.github/workflows/branches.yml';
 const ATTESTATION_MJS = join(RACINE, '.githooks/attestation.mjs');
-const FAUTE_DE_DEMANDE = /tests navigateur de non-régression non joués : laissés au Ready faute de demande/;
+const FAUTE_DE_DEMANDE = /interface dans le navigateur : non joué — tests navigateur de non-régression laissés au Ready faute de demande/;
 const PALIER_ROUGE = /tests navigateur non joués : un test sans navigateur, palier moins cher, a rougi/;
 
 let dossierTemporaire;
@@ -166,17 +167,11 @@ const NAVIGATEUR_CI = /--navigateur .*test\/navigateur/;
 
 // ─── Niveau 1 : au Ready, le seuil 1 ; au tag, rien ne se saute ─────────────────────────────────
 
-describe('[niveau 1] #264, D83 · au Ready, le seuil 1 se joue sans rien sauter ; au tag, rien ne se saute', () => {
-  test('au Ready, le seuil 1 se joue, sans attestation qui en saute quoi que ce soit', () => {
-    const l = lancementsDeTests(étapesDuTest(AU_READY));
-    const seuil1 = l.filter((c) => /\bpnpm test 1\b/.test(c));
-    assert.equal(seuil1.length, 1, `au Ready, une étape joue \`pnpm test 1\`\n${l.join('\n')}`);
-    assert.doesNotMatch(seuil1[0], /--attestation/, 'au Ready, le seuil 1 ne lit pas d’attestation : il ne se saute jamais');
-  });
-
+describe('[niveau 1] #264, D83 · au tag, rien ne se saute', () => {
   test('au tag, le seuil 3 se joue tests navigateur compris, et aucune étape ne lit d’attestation', () => {
     const l = lancementsDeTests(étapesDuTest(AU_TAG));
-    assert.ok(l.some((c) => /\bpnpm test 3 --navigateur\b/.test(c)), `au tag, le seuil 3 se joue, tests navigateur compris\n${l.join('\n')}`);
+    assert.ok(l.some((c) => /\bpnpm test 3\b/.test(c)), `au tag, le seuil 3 se joue\n${l.join('\n')}`);
+    assert.ok(l.some((c) => /\btest 3 --navigateur\b.*test\/navigateur/.test(c)), `au tag, les tests navigateur se jouent au seuil 3\n${l.join('\n')}`);
     for (const c of l) assert.doesNotMatch(c, /--attestation/, `au tag, rien ne se saute : « ${c.trim()} »`);
   });
 });
@@ -187,7 +182,8 @@ describe('[niveau 2] #264, points 5 à 8 · le moins cher d’abord, les tests n
   test('point 6 · la livraison ne joue pas les tests navigateur de non-régression sans demande, navigateur présent', async () => {
     const r = await livraisonVerte();
     assert.equal(r.push.code, 0, r.push.sortie);
-    assert.deepEqual(tests(r.notesPush).map((x) => x.quoi).sort(), ['coeur', 'interface'], `le cœur et l'interface sans navigateur se jouent, pas les tests navigateur\n${r.push.sortie}`);
+    // La garde lit tout le dépôt (#266) : elle se joue aussi.
+    assert.deepEqual(tests(r.notesPush).map((x) => x.quoi).sort(), ['coeur', 'garde', 'interface'], `le cœur, la garde et l'interface sans navigateur se jouent, pas les tests navigateur\n${r.push.sortie}`);
   });
 
   test('point 5 · à la livraison, le typecheck se joue avant les tests', async () => {
@@ -214,9 +210,9 @@ describe('[niveau 2] #264, points 5 à 8 · le moins cher d’abord, les tests n
     assert.ok(!n.includes('navigateur'), `les tests navigateur ne partent pas après un rouge sans navigateur\n${r.sortie}`);
   });
 
-  test('point 7 · demandés et verts, les tests navigateur sont attestés sur l’arbre joué, et la CI ne les y rejoue pas', async () => {
+  test('point 7 · demandés et verts, les tests navigateur sont attestés sur leur empreinte (#266), et la CI ne les y rejoue pas', async () => {
     const r = await livraisonVerte();
-    assert.ok(r.attestation.ensembles.some((e) => e.sorte === 'non-regression' && e.dossier === 'apps/web' && e.navigateur), `l'attestation envoyée couvre les tests navigateur\n${JSON.stringify(r.attestation)}`);
+    assert.ok(r.attestation.verts.some((v) => v.ensemble === 'navigateur' && v.seuil === 2), `l'attestation envoyée couvre les tests navigateur\n${JSON.stringify(r.attestation)}`);
     assert.equal(r.nav.code, 0, r.nav.sortie);
     assert.deepEqual(r.notesReady.map((x) => x.quoi), [], `au Ready, les tests navigateur attestés sur le même arbre ne se rejouent pas\n${r.ready}\n${r.nav.sortie}`);
   });

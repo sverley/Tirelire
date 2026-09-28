@@ -60,7 +60,9 @@ function source(exécuteur, nom, entête) {
     ...(entête ? [`// ${entête}`] : []),
     "import { appendFileSync } from 'node:fs';",
     `import { describe, test } from '${module}';`,
-    `const note = (id) => { if (process.env.NIVEAUX_TEMOIN) appendFileSync(process.env.NIVEAUX_TEMOIN, '${nom}:' + id + '\\n'); };`,
+    // Typé pour vitest : le fichier est du TypeScript, que le typecheck de la livraison lit quand
+    // l'interface se joue (#266).
+    `const note = (id${exécuteur === 'vitest' ? ': string' : ''}) => { if (process.env.NIVEAUX_TEMOIN) appendFileSync(process.env.NIVEAUX_TEMOIN, '${nom}:' + id + '\\n'); };`,
   ];
   const suites = new Map();
   for (const t of FIXTURE) {
@@ -241,9 +243,11 @@ const crochets = mémo(async () => {
     return { ancien: de('ancien'), nouveau: de('nouveau'), codeur: de('codeur'), web: de('web'), nav: de('nav') };
   };
 
-  // Un besoin fonctionnel : le relais touché, la livraison joue l'interface (#232, point 6).
+  // Un besoin fonctionnel : l'interface touchée, la livraison la joue sans navigateur (#232, point 6 ;
+  // #264 : les tests navigateur sont laissés au Ready faute de demande ; #266 : seul se joue ce dont
+  // l'empreinte a changé depuis main).
   git('checkout', '-q', '-b', BRANCHE_FONCTIONNELLE, 'main');
-  writeFileSync(join(dépôt, 'apps/relay/README.md'), `${readFileSync(join(dépôt, 'apps/relay/README.md'), 'utf8')}\nUne ligne de plus.\n`);
+  writeFileSync(join(dépôt, 'apps/web/index.html'), `${readFileSync(join(dépôt, 'apps/web/index.html'), 'utf8')}\n<!-- Une ligne de plus. -->\n`);
   git('commit', '-q', '--no-verify', '-am', 'besoin fonctionnel #998');
   const témoinFonctionnel = join(temporaire(), 'pre-push-fonctionnel.temoin');
   writeFileSync(témoinFonctionnel, '');
