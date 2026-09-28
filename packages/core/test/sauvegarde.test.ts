@@ -1,7 +1,8 @@
 /**
  * Tests du codeur de #41 : le rappel de sauvegarde et la marque des données qui le fonde. Hors du
- * harnais du besoin ; ils gardent les cas de la règle (D83, niveau 2 : la règle donnerait un
- * résultat faux, l'usage restant possible).
+ * harnais du besoin ; ils gardent le besoin du point 3, que le harnais classe au niveau 0 (D83) :
+ * une marque qui ne change plus, ou une période mal comptée, fait taire le rappel, et des données
+ * peuvent se perdre.
  */
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
@@ -9,7 +10,7 @@ import { exampleLedger, LedgerStore, marqueDesDonnees, sauvegardeARappeler, uneP
 
 const SQL = await initSqlJs();
 
-describe('[niveau 2] #41 · une période budgétaire plus tard (D02)', () => {
+describe('[niveau 0] #41 · une période budgétaire plus tard (D02)', () => {
   it('le même jour du mois suivant, au mois calendaire', () => {
     expect(unePeriodeApres('2026-09-20', 1)).toBe('2026-10-20');
     expect(unePeriodeApres('2026-01-31', 1)).toBe('2026-02-28');
@@ -21,7 +22,7 @@ describe('[niveau 2] #41 · une période budgétaire plus tard (D02)', () => {
   });
 });
 
-describe('[niveau 2] #41 · le rappel de sauvegarde', () => {
+describe('[niveau 0] #41 · le rappel de sauvegarde', () => {
   const base = { aujourdhui: '2026-09-28', debutPeriode: 1 };
   it('rien de saisi : pas de rappel', () => {
     expect(sauvegardeARappeler({ ...base, derniere: undefined, marque: '' })).toBe(false);
@@ -41,7 +42,7 @@ describe('[niveau 2] #41 · le rappel de sauvegarde', () => {
   });
 });
 
-describe('[niveau 2] #41 · la marque des données', () => {
+describe('[niveau 0] #41 · la marque des données', () => {
   it('vide sur une base neuve, elle change à chaque écriture, locale ou reçue, et se retrouve à la réouverture', async () => {
     const a = await LedgerStore.create({ sqlJs: SQL, siteId: 'aaaaaaaaaaaa' });
     expect(marqueDesDonnees(a)).toBe('');
