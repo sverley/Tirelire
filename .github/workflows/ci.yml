@@ -27,8 +27,11 @@ name: CI et livraison
 #   (#237) : au Ready, une branche qui ne contient pas le dernier `main` est à mettre à jour et rien
 #   d'autre ne se joue ; sinon le seuil 1 se joue toujours, et ce que l'attestation de la livraison
 #   couvre sur cet arbre se saute. Sur `main`, un arbre que toute la CI a trouvé vert au Ready ne
-#   rejoue pas ses tests. La décision passe par `pnpm test --attestation <fichier>` ; au tag, rien ne
-#   se saute. Il lit l'API (statuts, PR d'un commit) en lecture seule.
+#   rejoue pas ses tests. Même sans attestation, les tests navigateur se sautent quand ce qui change —
+#   depuis le dernier `main` au Ready, depuis le premier parent sur `main` — ne peut pas les changer
+#   (`SANS_NAVIGATEUR`, `packages/gardes/attestation.mjs`). La décision passe par
+#   `pnpm test --attestation <fichier>` ; au tag, rien ne se saute. Il lit l'API (statuts, PR d'un
+#   commit) en lecture seule.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
 #   `main` et à la main (la racine de la recette, `/`), à un tag `v*` (la production,
 #   `vars.TIRELIRE_BASE`) ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).

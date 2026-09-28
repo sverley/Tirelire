@@ -1390,8 +1390,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur |
   | Livraison (pré-fusion, pré-push) | 2, tests navigateur activés quand un navigateur est là |
   | Vérification de l'auditeur, avant le Ready | 2 |
-  | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin, sauf ce que l'attestation couvre ; le seuil 1 toujours |
-  | CI après la fusion, sur `main` | comme au Ready, hors harnais ; rien si toute la CI a trouvé l'arbre vert au Ready |
+  | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin, sauf ce que l'attestation couvre et les tests navigateur que la PR ne peut pas changer ; le seuil 1 toujours |
+  | CI après la fusion, sur `main` | comme au Ready, hors harnais, les chemins comparés au premier parent ; rien si toute la CI a trouvé l'arbre vert au Ready |
   | Publication d'une version (tag `v*`) | 3, tests navigateur activés ; rien ne se saute |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
 
@@ -1414,7 +1414,14 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   Le risque visé est l'erreur, pas la fraude. Au Ready, la CI lit l'attestation qui vise l'arbre de
   la tête, et saute ce qu'elle couvre : les tests navigateur joués au seuil 2 avec un navigateur, le
   harnais du besoin joué vert ; jamais le seuil 1. Ce qu'elle ne couvre pas se joue, et sans
-  attestation, tout ce que la table prévoit.
+  attestation, tout ce que la table prévoit. Même sans attestation, les tests navigateur ne se
+  jouent que si ce qui arrive peut les changer : une PR qui ne change, depuis le dernier `main`, que
+  des fichiers sous `docs/`, `.github/`, `.githooks/`, `packages/gardes/`, `apps/hebergement/` ou
+  `apps/relay/`, des fichiers `*.md` ou `.gitignore`, les saute, et le dit ; tout autre fichier les
+  fait jouer, et un chemin oublié de la liste fait jouer plus, jamais moins. La garde y figure : les
+  tests navigateur la lisent par leur lanceur, mais le seuil 1 la joue sur l'interface, navigateur
+  compris. Sur `main`, quand les tests se rejouent, la même règle compare le commit arrivé à son
+  premier parent ; au tag, rien ne se saute.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
