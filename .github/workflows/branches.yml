@@ -1,0 +1,60 @@
+name: Branches d'une PR fermée
+
+# À la fermeture d'une PR, fusionnée ou non, `<tête>--attestation`, et `<tête>--codeur` et
+# `<tête>--auditeur` s'il y en a, sont supprimées du dépôt, par leur nom exact, jamais par préfixe ;
+# la tête elle-même n'est pas touchée (#264). Le résumé du job nomme chacune avec son dernier commit,
+# pour qu'elle puisse être recréée. Une PR rouverte, dont l'attestation a disparu, rejoue ce que la
+# table de D83 prévoit.
+#
+# À son arrivée sur `main`, et à la main, le même job supprime de même toute branche
+# `…--attestation`, `…--codeur` ou `…--auditeur` sans PR ouverte de sa tête : celles qui traînaient
+# avant lui.
+#
+# GitHub lit ce workflow sur `main` (`pull_request_target`) ; le job extrait `main`, rien de la PR, et
+# n'appelle que l'API (`packages/gardes/branches-fermees.mjs`), avec le seul nom de la tête, lu dans
+# l'événement (`GITHUB_EVENT_PATH`). Une PR venue d'un fork n'a pas ses branches sur ce dépôt : rien
+# n'y est touché.
+#
+# Place du job sur le second axe des harnais (#113) :
+# - `branches` est hors harnais : il range des branches, ne juge rien et ne fait échouer aucune PR ;
+#   il rougit s'il ne parvient pas à supprimer une branche qui existe.
+
+on:
+  pull_request_target:
+    types: [closed]
+  push:
+    branches: [main]
+    paths: ['.github/workflows/branches.yml']
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: branches-${{ github.event.pull_request.number || 'depot' }}
+  cancel-in-progress: false
+
+jobs:
+  branches:
+    name: Branches d'une PR fermée
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # supprimer les branches, par l'API
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: packages/gardes
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Supprimer les branches de la PR fermée
+        if: github.event_name == 'pull_request_target'
+        run: node packages/gardes/branches-fermees.mjs fermeture
+      - name: Supprimer les branches sans PR ouverte de leur tête
+        if: github.event_name != 'pull_request_target'
+        run: node packages/gardes/branches-fermees.mjs orphelines

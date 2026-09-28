@@ -35,7 +35,7 @@ function ordre(p: Plan, accountId: string, tirelireId: string) {
   return p.transfers.find((x) => x.accountId === accountId)?.orders.find((o) => o.tirelireId === tirelireId);
 }
 
-describe('les deux blocs du plan découlent du même calcul (D52)', () => {
+describe('[niveau 2] les deux blocs du plan découlent du même calcul (D52)', () => {
   it('septembre 2026 : la période courante était déjà cohérente', () => {
     const p = plan(SEPTEMBRE);
     expect(p.period.label).toBe('septembre 2026');

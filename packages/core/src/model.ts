@@ -92,6 +92,31 @@ export interface Account {
   deletedAt?: string;
 }
 
+/**
+ * Le compte principal existe dans toute base, même vide, avant tout assistant (D40), et il a la
+ * même identité sur toutes les instances (D58) : deux bases nées séparément n'en ont qu'un après
+ * synchronisation. Son identifiant est fixe ; c'est aussi celui de l'exemple.
+ */
+export const MAIN_ACCOUNT_ID: Id = 'acc-principal';
+
+/**
+ * Le compte principal tel qu'il naît avec la base : un nom, un solde nul et une date d'ouverture
+ * qui dit « à renseigner », assez ancienne pour qu'aucune opération importée ne lui échappe.
+ * L'assistant et l'écran Comptes en renseignent les informations ; ils ne le créent pas.
+ */
+export const DEFAULT_MAIN_ACCOUNT: Readonly<Account> = Object.freeze({
+  id: MAIN_ACCOUNT_ID,
+  name: 'Compte principal',
+  kind: 'principal' as const,
+  openingBalance: 0,
+  openingDate: '1970-01-01',
+});
+
+/** Une copie du compte principal par défaut, à écrire ou à modifier. */
+export function defaultMainAccount(): Account {
+  return { ...DEFAULT_MAIN_ACCOUNT };
+}
+
 // ---------------------------------------------------------------------------
 // Tirelires et besoins
 // ---------------------------------------------------------------------------

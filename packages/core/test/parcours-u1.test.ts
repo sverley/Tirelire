@@ -58,7 +58,7 @@ function leParcoursSeLit(plan: Plan): void {
   expect(virement!.breakdown.map((b) => b.tirelireName).sort()).toEqual(['Taxe foncière', 'Vacances']);
   expect(virement!.breakdown.reduce((s, b) => s + b.cruise, 0)).toBe(virement!.permanent);
 
-  const gênants = ['noPrincipal', 'noIncome', 'negativeMargin', 'unfunded'];
+  const gênants = ['noIncome', 'negativeMargin', 'unfunded'];
   expect(plan.warnings.map((w) => w.code).filter((c) => gênants.includes(c))).toEqual([]);
 }
 
@@ -76,7 +76,7 @@ function planDeLObservé(plan: Plan): Plan {
   };
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U1)', () => {
   describe('U1 · budget seul, de bout en bout (#15)', () => {
     it('parcours U1 · de la base vide au plan, sans une seule opération', async () => {
       const store = await baseVide('parcours-u1');

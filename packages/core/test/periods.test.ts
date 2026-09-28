@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addMonths, nextOccurrence, occurrencesBetween, budgetPeriodContaining, periodsUntil, previousOccurrence, nextPeriod } from '../src/index.js';
 
-describe('dates', () => {
+describe('[niveau 2] dates : un mois ajouté borne le jour (D47)', () => {
   it('borne le jour en ajoutant des mois', () => {
     expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
     expect(addMonths('2028-01-31', 1)).toBe('2028-02-29');
@@ -10,7 +10,7 @@ describe('dates', () => {
   });
 });
 
-describe('périodes de paie', () => {
+describe('[niveau 2] périodes de paie (D02)', () => {
   it('jour de paie 28 : du 28 au 27, nommée d’après le mois du milieu', () => {
     const p = budgetPeriodContaining('2026-09-06', 28);
     expect(p.start).toBe('2026-08-28');
@@ -51,7 +51,7 @@ describe('périodes de paie', () => {
   });
 });
 
-describe('périodicités', () => {
+describe('[niveau 2] périodicités au calendrier, sans dérive (D47)', () => {
   const annual = { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' };
   const quarterly = { interval: 3, unit: 'month' as const, anchorDate: '2026-01-05' };
   const monthly31 = { interval: 1, unit: 'month' as const, anchorDate: '2026-01-31' };
@@ -79,7 +79,7 @@ describe('périodicités', () => {
   });
 });
 
-describe('rythmes en jours, semaines et années (D47)', () => {
+describe('[niveau 2] rythmes en jours, semaines et années (D47)', () => {
   it('compte les semaines en jours exacts, sans passer par les mois', () => {
     const toutesLesDeuxSemaines = { interval: 2, unit: 'week' as const, anchorDate: '2026-09-04' };
     expect(nextOccurrence(toutesLesDeuxSemaines, '2026-09-04')).toBe('2026-09-04');

@@ -409,8 +409,10 @@ sujet — écrit une tirelire, un besoin à échéance et le flux attendu à la 
 suite le montant à mettre de côté par période. Les mots « tirelire », « besoin » et « flux » ne
 sont jamais demandés à l'utilisateur, seulement expliqués.
 
-Le **compte principal est créé en silence** à la première réponse : il existe toujours, le faire
-saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
+Le **compte principal existe dès la naissance de la base**, même vide, avant tout assistant, sous la
+même identité sur toutes les instances (D58) : l'assistant ne le crée pas, il en renseigne les
+informations — nom, solde, date d'ouverture —, et ce qui est renseigné l'emporte sur le défaut à la
+synchronisation. Le faire saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
 un budget entier tient sans eux (une tirelire sans placement déclaré ne produit aucun écart, D38).
 S'ils existent, l'assistant demande seulement où chaque réserve devrait dormir, ce qui remplit le
 placement de D38 sans exposer les parts.
@@ -430,7 +432,8 @@ s'affiche vide, ce qui était le cas de la première version.
 « Pivot » décrivait un rôle dans un raisonnement comptable, pas un objet que quelqu'un possède.
 Personne n'a de compte pivot ; tout le monde a un compte principal. Renommage partout où un humain
 lit : interface, types, variables, commentaires, documentation (`AccountKind = 'principal'`,
-`principalCushion`, `principalUnallocated`, avertissements `noPrincipal` et `principalOverdrawn`).
+`principalCushion`, `principalUnallocated`, avertissement `principalOverdrawn`). L'avertissement
+d'absence de compte principal n'existe plus : le compte principal existe dans toute base (D40).
 
 Le rôle ne change pas : c'est le compte par lequel tout transite, celui dont le relevé est importé,
 celui qui porte le jour de paie (D02) et qui reçoit les dotations (D29). D04 reste vraie, avec le
@@ -1049,8 +1052,8 @@ Ce que la synchronisation exige du fichier, pour toutes les tables et sans struc
 usage (I3) :
 
 - **Une ligne a la même identité sur toutes les instances.** Une opération importée a celle de D09
-  sur toute instance qui importe le même relevé sur le même compte ; le compte principal, qu'il naisse
-  d'office ou par l'assistant, et les réglages ont la même partout.
+  sur toute instance qui importe le même relevé sur le même compte ; le compte principal, qui naît
+  d'office avec toute base (D40), et les réglages ont la même partout.
 - **Chaque écriture se date et se garde.** Chaque ligne porte l'horloge de sa dernière écriture et
   l'instance qui l'a faite ; une suppression est une écriture : rien d'une ligne synchronisable ne
   disparaît physiquement. Une ligne réécrite ne laisse rien d'elle dans le fichier.
@@ -1209,6 +1212,28 @@ demande, alors que ce plan est celui de l'analyse au centime près.
 
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
 (virement SEPA, QR code), et l'assistant ne le propose pas encore.
+
+### D61 · Deux catégories d'une même nature ne portent pas le même nom
+
+Parmi les catégories vivantes d'une même nature, deux ne portent pas le même nom. Les noms se
+comparent sans tenir compte de la casse, des accents ni des espaces autour ; une catégorie supprimée
+ne compte plus (`findCategoryByName`, `model.ts`). L'écran Catégories refuse le doublon, à la
+création comme au renommage ; une catégorie créée à la volée depuis les écrans Opérations ou Saisie
+reprend celle qui existe déjà au lieu d'en créer une seconde.
+
+À la question « `findCategoryByName` […] empêche deux catégories du même nom pour une même nature,
+sans tenir compte de la casse, des accents ni des espaces autour, les catégories supprimées
+ignorées. […] Aucun document fondateur n'écrit ce besoin : l'écrire, ou retirer le code et ses
+tests par une nouvelle issue ? », le porteur a répondu : « on le garde ».
+
+Ce que l'hypothèse d'un nom libre cachait : taper « alimentation » en classant une opération, quand
+« Alimentation » existe, créerait une seconde catégorie, et le Bilan compterait en deux lignes ce qui
+en fait une.
+
+Ce que cela ne couvre pas encore : seuls ces trois écrans tiennent la règle. Deux instances qui
+créent chacune « Santé » avant de se synchroniser gardent les deux, puisque la synchronisation
+fusionne les lignes par identifiant (D58) ; un fichier fabriqué dehors peut aussi en porter deux,
+que son ouverture ne refuse pas.
 
 ## Le travail
 
@@ -1388,8 +1413,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Moment | Seuil |
   |---|---|
   | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur |
-  | Livraison (pré-fusion, pré-push) | 2, tests navigateur activés quand un navigateur est là |
-  | Vérification de l'auditeur, avant le Ready | 2 |
+  | Livraison (pré-fusion, pré-push) | 2, sans les tests navigateur de non-régression |
+  | Demande des tests navigateur (`pnpm livraison --navigateur`) | 2, tests navigateur compris |
+  | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; rien ne se saute |
   | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin, sauf ce que l'attestation couvre et les tests navigateur que la PR ne peut pas changer ; le seuil 1 toujours |
   | CI après la fusion, sur `main` | comme au Ready, hors harnais, les chemins comparés au premier parent ; rien si toute la CI a trouvé l'arbre vert au Ready |
   | Publication d'une version (tag `v*`) | 3, tests navigateur activés ; rien ne se saute |
@@ -1406,9 +1432,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   définition commune). Il se joue en entier, niveau 4 compris, à chaque moment. Les autres fichiers
   de test que la branche ajoute ou modifie, ceux du codeur compris, n'en font pas partie : ils se
   jouent à leur niveau.
-- **L'attestation.** Une livraison verte (pré-fusion, pré-push), hors sous-branche, atteste ce
-  qu'elle a joué sur l'arbre qu'elle a jugé : l'arbre, le seuil, les ensembles joués, le harnais du
-  besoin et son état, la présence du navigateur. Elle ne se produit qu'à la livraison, par
+- **L'attestation.** Une livraison verte (pré-fusion, pré-push, ou demande des tests navigateur),
+  hors sous-branche, atteste ce qu'elle a joué sur l'arbre qu'elle a jugé : l'arbre, le seuil, les
+  ensembles joués, le harnais du besoin et son état, la présence du navigateur.
+  Elle ne se produit qu'à la livraison, par
   l'outillage (`.githooks/attestation.mjs`) : aucune session ne l'écrit. Le pré-push l'envoie avec le
   push, sur la branche `<branche>--attestation`, qu'elle remplace ; cette branche n'est jamais jugée.
   Le risque visé est l'erreur, pas la fraude. Au Ready, la CI lit l'attestation qui vise l'arbre de
@@ -1422,12 +1449,28 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   tests navigateur la lisent par leur lanceur, mais le seuil 1 la joue sur l'interface, navigateur
   compris. Sur `main`, quand les tests se rejouent, la même règle compare le commit arrivé à son
   premier parent ; au tag, rien ne se saute.
+- **Les tests navigateur au Ready, le moins cher d'abord** (#264). Les tests navigateur de
+  non-régression ne se jouent pas à chaque push : ni la livraison ni la vérification de l'auditeur
+  ne les jouent d'elles-mêmes, navigateur présent ou non. Ils se jouent une fois, au Ready, en CI,
+  sur l'état final, sauf si l'attestation les couvre. Plus tôt, en local, seulement quand c'est
+  justifié : le harnais du besoin qui vit dans le navigateur se joue à la livraison ; le codeur ou
+  l'auditeur peut demander la non-régression dans le navigateur par `pnpm livraison --navigateur`,
+  qui juge le dernier commit de la branche comme un premier push, tests navigateur compris ; verts,
+  ils sont attestés sur l'arbre joué, l'attestation part sur `origin`, et la CI ne les rejoue pas
+  sur ce même arbre. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
+  demandés, et pourquoi. À chaque moment qui joue le typecheck, il se joue avant les tests ; les
+  tests navigateur — de non-régression, ou du harnais du besoin qui vit dans le navigateur — ne
+  partent que si le typecheck et les tests sans navigateur de ce moment ont fini verts ; un harnais
+  du besoin rouge qui ne bloque pas ne les retient pas. Chaque moment qui ne joue pas les tests
+  navigateur dit pourquoi : laissés au Ready faute de demande, palier moins cher rouge, couverts par
+  l'attestation, ou rien de ce qu'ils lisent n'a changé ; au tag, il dit que rien ne se saute.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
 - **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck` et le harnais du besoin, plus,
   s'il modifie une fonction de la garde, ses tests de développement (D81) ; l'auditeur vérifie en
-  local ce qu'il relit, au seuil 2 avant le Ready. Aucune CI ne tourne en brouillon. Les crochets
+  local ce qu'il relit, au seuil 2 avant le Ready, hors tests navigateur sauf sa demande. Aucune CI
+  ne tourne en brouillon. Les crochets
   font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
   tests de niveau 0 des paquets que touchent les fichiers indexés — cœur ; garde ; relais ;
   hébergement —, et rien pour la seule documentation. Au pré-commit, la non-régression bloque le
@@ -1436,24 +1479,29 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
-  l'interface, 40 s sans navigateur, 270 s avec) ou organisationnel (garde, 45 s) —, les tests navigateur
-  (`apps/web/test/navigateur/`) sont activés quand un navigateur est là, sinon la livraison le dit
-  et les laisse à la CI, et le harnais du besoin est joué à part, en entier, et bloque quand du code
-  arrive.
+  l'interface sans navigateur, 40 s ; 270 s de plus avec les tests navigateur demandés) ou
+  organisationnel (garde, 45 s) —, les tests navigateur de non-régression
+  (`apps/web/test/navigateur/`) sont laissés au Ready sauf demande, et la livraison le dit, et le
+  harnais du besoin est joué à part, en entier, et bloque quand du code arrive.
 - **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, les
-  harnais et la garde : typecheck, `pnpm test 1`, puis les tests navigateur au seuil 2
-  (`--navigateur`) — qu'une session sans navigateur ne peut pas jouer —, le harnais du besoin en
-  entier, tests navigateur activés, build, version de dev ; un outil manquant y fait échouer le job.
+  harnais et la garde : typecheck, `pnpm test 1`, le harnais du besoin en entier, tests navigateur
+  activés, puis les tests navigateur au seuil 2 (`--navigateur`), qui ne partent que si le reste est
+  vert, build, version de dev ; un outil manquant y fait échouer le job.
   Elle vérifie d'abord que la tête de la PR contient le dernier `main` : sinon la branche est à
   mettre à jour, le job échoue et rien d'autre ne se joue. Elle ne joue que le manque : ce que
   l'attestation couvre se saute, et elle dit ce qu'elle saute et pourquoi. Avant toute fusion, les niveaux 0 à 2 ont
-  donc été joués, par la livraison et par l'auditeur, et la CI rejoue 0 et 1 sur l'état final. Huit workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
+  donc été joués, par la livraison et par l'auditeur — les tests navigateur, par la CI au Ready ou
+  à la demande, en local —, et la CI rejoue 0 et 1 sur l'état final. Neuf workflows : `ci.yml` (tests, version de dev, livraison), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
   d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un
-  changement après le Ready, signalé), `fin.yml` (« en cours » quitte l'issue à sa fermeture) et
+  changement après le Ready, signalé), `fin.yml` (« en cours » quitte l'issue à sa fermeture),
   `nettoyage.yml` (le pied « Generated by Claude Code » quitte la PR fusionnée et les issues
-  qu'elle ferme, et chaque semaine tout le projet).
+  qu'elle ferme, et chaque semaine tout le projet) et `branches.yml` (à la fermeture d'une PR,
+  fusionnée ou non, `<tête>--attestation`, et `<tête>--codeur` et `<tête>--auditeur` s'il y en a,
+  supprimées par leur nom exact, jamais par préfixe, chacune nommée avec son dernier commit ; la
+  tête n'est pas touchée ; à son arrivée sur `main` et à la main, celles qui traînent sans PR ouverte
+  de leur tête).
 - **Aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait rougi.** Un rouge découvert
   après la fusion (#149) relance tout un tour de relecture et de code ; un job sauté qui ne décide pas
   de la fusion, et dont le rouge éventuel reste visible ailleurs, ne coûte rien et reste permis (les

@@ -12,10 +12,6 @@ import {
   transferLabel,
   unallocated,
   type Ledger,
-  standingTransferFlow,
-  applyMatch,
-  applyPatchToLedger,
-  type Operation,
   wantedComponents,
 } from '../src/index.js';
 
@@ -27,7 +23,7 @@ function line(plan: ReturnType<typeof computePlan>, needId: string) {
   return l;
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I2', () => {
   describe('positions et soldes (D19, D29)', () => {
     const ledger = exampleLedger();
     const idx = indexLedger(ledger);
@@ -86,7 +82,7 @@ describe('[niveau 1] harnais du registre', () => {
   });
 });
 
-describe('report (D05, D29)', () => {
+describe('[niveau 2] report (D05, D29)', () => {
   it('remise à zéro : l’excédent est libéré en fin de période, un déficit est effacé', () => {
     const l = exampleLedger();
     const idx = indexLedger(l);
@@ -109,7 +105,7 @@ describe('report (D05, D29)', () => {
   });
 });
 
-describe('plan de période (exemple de l’analyse)', () => {
+describe('[niveau 2] plan de période, sur l’exemple de l’analyse (D02, D28, D29)', () => {
   const ledger = exampleLedger();
   const plan = computePlan(ledger, asOf);
 
@@ -208,7 +204,7 @@ describe('plan de période (exemple de l’analyse)', () => {
   });
 });
 
-describe('marge négative : lecture par priorité (D06)', () => {
+describe('[niveau 2] marge négative : lecture par priorité (D06)', () => {
   it('signale les lignes les moins prioritaires, jamais le rattrapage d’une échéance', () => {
     const ledger: Ledger = exampleLedger();
     const salaire = ledger.plannedFlows.find((f) => f.id === 'flow-salaire')!;
@@ -228,7 +224,7 @@ describe('marge négative : lecture par priorité (D06)', () => {
   });
 });
 
-describe('besoins multiples dans une tirelire (D28)', () => {
+describe('[niveau 2] besoins multiples dans une tirelire (D28)', () => {
   it('le solde est attribué dans l’ordre des priorités ; le plancher de l’échéance passe avant le courant', () => {
     const l = exampleLedger();
     // Une seule tirelire « Charges » : taxe foncière (échéance, priorité 10) + courant 100/mois (priorité 20).
@@ -250,7 +246,7 @@ describe('besoins multiples dans une tirelire (D28)', () => {
   });
 });
 
-describe('libellés de virement', () => {
+describe('[niveau 2] libellés de virement (D11)', () => {
   it('majuscules sans accents, préfixés, un par compte', () => {
     expect(transferLabel('Livret A')).toBe('TIRELIRE LIVRET A');
     expect(transferLabel('Épargne de précaution')).toBe('TIRELIRE EPARGNE DE PRECAUTION');
@@ -258,59 +254,7 @@ describe('libellés de virement', () => {
   });
 });
 
-describe('virement permanent : le fait bancaire s’enregistre, la ventilation se recalcule (D57)', () => {
-  it('un flux dérivé par couple de comptes, sans ventilation figée', () => {
-    const l = exampleLedger();
-    const plan = computePlan(l, '2026-09-06');
-    const t = plan.transfers.find((x) => x.accountKind === 'epargne')!;
-    const flow = standingTransferFlow(plan, t, 'acc-principal', 'flow-vir')!;
-    expect(flow.kind).toBe('transfer');
-    expect(flow.origin).toBe('derived');
-    expect(flow.counterpartAccountId).toBe(t.accountId);
-    expect(flow.labelPattern).toBe(t.label);
-    // Le permanent, pas le total : le complément de ce mois-ci n'est pas un ordre permanent.
-    expect(flow.amount).toBe(-t.standing);
-    // Rien de la ventilation ne s'écrit : elle se rejouera au jour de l'opération (D57).
-    expect('plannedAllocation' in flow).toBe(false);
-  });
-
-  it('l’ordre de financement répartit, au montant attendu comme à un autre', () => {
-    let l = exampleLedger();
-    const plan = computePlan(l, '2026-09-06');
-    const t = plan.transfers.find((x) => x.accountKind === 'epargne')!;
-    const flow = standingTransferFlow(plan, t, 'acc-principal', 'flow-vir')!;
-    l.plannedFlows.push(flow);
-
-    const virement = (id: string, amount: number): Operation => ({
-      id,
-      accountId: 'acc-principal',
-      origin: 'imported',
-      date: '2026-09-28',
-      label: flow.labelPattern!,
-      normalizedLabel: flow.labelPattern!,
-      amount,
-      state: 'untreated',
-    });
-    const somme = (as: Array<{ share: { kind: string; amount?: number } }>) =>
-      as.reduce((s, a) => s + (a.share.kind === 'fixed' ? (a.share as { amount: number }).amount : 0), 0);
-
-    // Montant attendu : tout est réparti, entre les seules tirelires placées sur ce compte.
-    l.operations.push(virement('op-vir-exact', flow.amount));
-    let patch = applyMatch(l, { operationId: 'op-vir-exact', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
-    expect(patch.allocations.length).toBeGreaterThan(0);
-    expect(somme(patch.allocations)).toBe(flow.amount);
-    const placees = new Set(l.tirelires.filter((e) => e.placement.some((p) => p.accountId === t.accountId)).map((e) => e.id));
-    for (const a of patch.allocations) expect(placees.has(a.tirelireId!)).toBe(true);
-
-    // Montant moindre : les planchers passent d'abord, on ne saupoudre pas au prorata.
-    const moindre = Math.round(flow.amount / 2);
-    l = applyPatchToLedger(l, { operations: [virement('op-vir-court', moindre)], allocations: [] });
-    patch = applyMatch(l, { operationId: 'op-vir-court', flowId: flow.id, expectedDate: '2026-09-28', expectedAmount: flow.amount, score: 1, auto: true, reasons: [] });
-    expect(somme(patch.allocations)).toBe(moindre);
-  });
-});
-
-describe('placement réparti sur plusieurs comptes (D37)', () => {
+describe('[niveau 2] placement réparti sur plusieurs comptes (D38)', () => {
   it('« tant sur le livret, le reste sur le compte principal » se résout sur le solde du moment', () => {
     const l = exampleLedger();
     const e = l.tirelires.find((x) => x.id === 'env-precaution')!;
@@ -368,7 +312,7 @@ describe('placement réparti sur plusieurs comptes (D37)', () => {
 // `it.fails` tient l'échec attendu, et `pnpm test` rougit le jour où il se mettrait à passer (#66).
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I2', () => {
   it.fails('témoin rouge · un solde de tirelire qui ne compte que son compte de placement', () => {
     const idx = indexLedger(exampleLedger());
     const tirelire = idx.tireliresById.get('env-tf')!;

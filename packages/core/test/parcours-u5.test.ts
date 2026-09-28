@@ -19,6 +19,7 @@ import {
   computePlan,
   euros,
   lastPeriods,
+  MAIN_ACCOUNT_ID,
   parseCsv,
   parseRows,
   prepareImport,
@@ -28,7 +29,7 @@ import {
 } from '../src/index.js';
 import { AS_OF, DEBUT, PAIE, baseVide, ecrire, relire } from './parcours.js';
 
-const COMPTE = 'cpt-courant';
+const COMPTE = MAIN_ACCOUNT_ID;
 const NUMÉRO = '00099999999';
 
 /** Relevé inventé, dans la forme des exports bancaires français (aucune donnée réelle). */
@@ -84,7 +85,7 @@ function leBilanParCatégorieSeLit(ledger: Ledger): void {
   expect(plan.warnings.filter((w) => w.tirelireId || w.needId)).toEqual([]);
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U5)', () => {
   describe('U5 · import seul, de bout en bout (#39)', () => {
     it('parcours U5 · du relevé importé au bilan par catégorie, sans aucune tirelire', async () => {
       const store = await baseVide('parcours-u5');
