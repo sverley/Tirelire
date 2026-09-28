@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
-import { exampleLedger, LedgerStore, sauvegardeARappeler, unePeriodeApres } from '../src/index.js';
+import { exampleLedger, LedgerStore, marqueDesDonnees, sauvegardeARappeler, unePeriodeApres } from '../src/index.js';
 
 const SQL = await initSqlJs();
 
@@ -44,20 +44,20 @@ describe('[niveau 2] #41 · le rappel de sauvegarde', () => {
 describe('[niveau 2] #41 · la marque des données', () => {
   it('vide sur une base neuve, elle change à chaque écriture, locale ou reçue, et se retrouve à la réouverture', async () => {
     const a = await LedgerStore.create({ sqlJs: SQL, siteId: 'aaaaaaaaaaaa' });
-    expect(a.dataMark()).toBe('');
+    expect(marqueDesDonnees(a)).toBe('');
     const cat = exampleLedger().categories[0]!;
     a.upsert('categories', cat);
-    const m1 = a.dataMark();
+    const m1 = marqueDesDonnees(a);
     expect(m1).not.toBe('');
     a.upsert('categories', { ...cat, name: `${cat.name} bis` });
-    const m2 = a.dataMark();
+    const m2 = marqueDesDonnees(a);
     expect(m2).not.toBe(m1);
     a.setSetting('periodStartDay', 28);
-    const m3 = a.dataMark();
+    const m3 = marqueDesDonnees(a);
     expect(m3).not.toBe(m2);
     const b = await LedgerStore.create({ sqlJs: SQL, siteId: 'bbbbbbbbbbbb', bytes: a.export() });
-    expect(b.dataMark()).toBe(m3);
+    expect(marqueDesDonnees(b)).toBe(m3);
     a.setLocal('curseur', '1');
-    expect(a.dataMark()).toBe(m3);
+    expect(marqueDesDonnees(a)).toBe(m3);
   });
 });

@@ -8,6 +8,7 @@ import {
   emptyLedger,
   exampleLedger,
   LEDGER_KEYS,
+  marqueDesDonnees,
   sauvegardeARappeler,
   todayISO,
   uuidv7,
@@ -69,7 +70,7 @@ class AppState {
   /** La marque de l'état des données, relue à chaque changement ; vide tant que rien n'est saisi. */
   marqueDonnees: string = $derived.by(() => {
     void this.ledger;
-    return this.opened ? this.opened.store.dataMark() : '';
+    return this.opened ? marqueDesDonnees(this.opened.store) : '';
   });
 
   /**
@@ -285,7 +286,7 @@ class AppState {
    */
   async saveBackup(): Promise<void> {
     const bytes = await this.exportBytes();
-    const marque = this.store.dataMark();
+    const marque = marqueDesDonnees(this.store);
     await saveFile(`tirelire-${this.asOf}.sqlite`, bytes, 'application/x-sqlite3');
     noterSauvegarde(this.store, { date: todayISO(), marque });
     this.lireDates();

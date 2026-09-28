@@ -504,33 +504,6 @@ export class LedgerStore {
     return k;
   }
 
-  /**
-   * Une marque de l'état des données : elle change à chaque écriture qui touche le fichier, locale ou
-   * reçue d'une autre instance, et deux états identiques ont la même. Chaque écriture date sa ligne
-   * d'une horloge qui n'a jamais servi (D58) : l'ensemble des couples (ligne, horloge) dit l'état
-   * sans lire les valeurs. Vide tant que personne n'a rien écrit — le compte principal par défaut
-   * n'a pas d'horloge (D40). Sert à savoir si les données ont changé depuis une sauvegarde (C5).
-   */
-  dataMark(): string {
-    const tables = [...Object.values(TABLES).map((t) => ({ name: t.name, key: 'id' })), { name: SETTINGS_TABLE, key: 'key' }];
-    let count = 0;
-    let a = 0x811c9dc5;
-    let b = 0x9747b28c;
-    for (const { name, key } of tables) {
-      const r = this.db.exec(`SELECT ${key}, ${HLC_COLUMN} FROM ${name} WHERE ${HLC_COLUMN} <> '' ORDER BY ${key}`)[0];
-      for (const [id, h] of r?.values ?? []) {
-        count++;
-        const s = `${name}\u0000${String(id)}\u0000${String(h)}\u0001`;
-        for (let i = 0; i < s.length; i++) {
-          const c = s.charCodeAt(i);
-          a = Math.imul(a ^ c, 0x01000193) >>> 0;
-          b = Math.imul(b ^ c, 0x5bd1e995) >>> 0;
-        }
-      }
-    }
-    return count ? `${count}.${a.toString(16)}.${b.toString(16)}` : '';
-  }
-
   // -------------------------------------------------------------------------
   // Divers
   // -------------------------------------------------------------------------
