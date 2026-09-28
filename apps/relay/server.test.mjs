@@ -25,7 +25,11 @@ async function dépôtPuisRetraitFiltré(racine) {
   assert.equal(bad.status, 400);
 }
 
-describe('[niveau 0] harnais du registre', () => {
+// Niveau 1 (D83) : le besoin est I8, nommé au registre. Un relais qui rend mal les dépôts ne perd
+// rien pour de bon : les données restent sur les appareils, et un dépôt manqué se retrouve par un
+// échange direct ou par fichier (docs/synchronisation.md) ; et le relais ne voit que des paquets
+// chiffrés (I7, gardé ailleurs).
+describe('[niveau 1] I8 · harnais du registre : le relais ne rend à un appareil que ce que les autres ont déposé', () => {
   test('push puis pull filtré par appareil', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'relay-'));
     const child = spawn(process.execPath, ['server.mjs'], { env: { ...process.env, PORT: '18787', TIRELIRE_RELAY_DATA: dir }, stdio: 'ignore' });
