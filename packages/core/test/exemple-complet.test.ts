@@ -18,7 +18,7 @@ import { alive, computePlan, dueDateFlowForNeed, euros, exampleLedger, needForDu
 const asOf = '2026-09-06';
 const l: Ledger = exampleLedger();
 
-describe('le jeu d’exemple démontre l’application (garde)', () => {
+describe('[niveau 2] le jeu d’exemple démontre l’application (D53)', () => {
   it('chaque tirelire porte au moins un besoin', () => {
     const porteurs = new Set(alive(l.needs).map((n) => n.tirelireId));
     const muettes = alive(l.tirelires).filter((t) => !porteurs.has(t.id));
@@ -67,7 +67,7 @@ describe('le jeu d’exemple démontre l’application (garde)', () => {
   });
 });
 
-describe('une échéance et sa provision se répondent', () => {
+describe('[niveau 2] une échéance et sa provision se répondent (D53)', () => {
   it('tout flux d’échéance désigne une tirelire qui porte le besoin correspondant', () => {
     const echeances = alive(l.plannedFlows).filter((f) => f.kind === 'dueDate');
     expect(echeances.length).toBeGreaterThan(0);

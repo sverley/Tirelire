@@ -72,7 +72,7 @@ function budgetDeLAssistant(): Ledger {
   return l;
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U1)', () => {
   describe("budget construit par l'assistant (D40)", () => {
     it('se voit dès la période en cours, revenus comme réserves', () => {
       const plan = computePlan(budgetDeLAssistant(), asOf);
@@ -115,7 +115,7 @@ describe('[niveau 1] harnais du registre', () => {
  * Revenus concentrés sur une saison, dont on veut vivre toute l'année (D48). La tirelire encaisse
  * l'été et verse chaque période ; le reste à vivre doit être le même en février qu'en août.
  */
-describe('tirelire de saison (D48)', () => {
+describe('[niveau 2] tirelire de saison (D48)', () => {
   function saison(soldeSaison: number): Ledger {
     const l = emptyLedger();
     l.settings.periodStartDay = 1;
@@ -189,7 +189,7 @@ function budgetCassé(): Ledger {
   };
 }
 
-describe('[niveau 1] harnais du registre', () => {
+describe('[niveau 1] harnais du registre · I3 (U1)', () => {
   it.fails('témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir', () => {
     const plan = computePlan(budgetCassé(), asOf);
 

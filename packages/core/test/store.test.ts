@@ -22,8 +22,8 @@ async function seeded(site: string) {
   return s;
 }
 
-describe('[niveau 0] harnais du registre', () => {
-  describe('dépôt SQLite', () => {
+describe('[niveau 0] harnais du registre · C5', () => {
+  describe('dépôt SQLite : rien de ce qui s’écrit ne se perd (D08, D58)', () => {
     it('LEDGER_KEYS couvre toutes les tables du grand livre', () => {
       // Écrire un grand livre table par table, à la main, se paie : la fonction qui charge l'exemple
       // dans l'application avait oublié `needs`, donc chargeait des tirelires sans aucun besoin. Tout
@@ -74,37 +74,48 @@ describe('[niveau 0] harnais du registre', () => {
       expect(l.tirelires.find((e) => e.id === 'env-divers')?.deletedAt).toBeTruthy();
       expect(computePlan(l, '2026-09-06').lines.map((x) => x.tirelireId)).not.toContain('env-divers');
     });
-
-    it('requête SQL libre', async () => {
-      const s = await seeded('A');
-      const rows = s.query(`SELECT name FROM tirelires WHERE placement LIKE ? ORDER BY name`, ['%acc-livret%']);
-      expect(rows.map((r) => r['name'])).toEqual(['Assurance auto', 'Taxe foncière', 'Vacances', 'Épargne de précaution']);
-    });
   });
 });
 
-describe('identifiants', () => {
-  it('uuid v7 ordonnés dans le temps', () => {
-    const u1 = uuidv7(1000);
-    const u2 = uuidv7(2000);
-    expect(u1 < u2).toBe(true);
-    expect(u1).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+/**
+ * `LedgerStore.query` n'a pas d'usage dans l'application : c'est l'outil d'exploration des tests,
+ * qui s'en servent pour lire une colonne que `load` ne rend pas (l'horloge de chaque ligne). Ce test
+ * contrôle l'outil lui-même, rien du produit (D83, niveau 4).
+ */
+describe('[niveau 4] requête SQL libre, outil des tests du dépôt', () => {
+  it('requête SQL libre', async () => {
+    const s = await seeded('A');
+    const rows = s.query(`SELECT name FROM tirelires WHERE placement LIKE ? ORDER BY name`, ['%acc-livret%']);
+    expect(rows.map((r) => r['name'])).toEqual(['Assurance auto', 'Taxe foncière', 'Vacances', 'Épargne de précaution']);
+  });
+});
+
+describe('identifiants (D09)', () => {
+  describe('[niveau 2] tout ce que l’utilisateur crée porte un UUID v7', () => {
+    it('uuid v7 ordonnés dans le temps', () => {
+      const u1 = uuidv7(1000);
+      const u2 = uuidv7(2000);
+      expect(u1 < u2).toBe(true);
+      expect(u1).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    });
   });
 
-  it('normalisation des libellés', () => {
-    expect(normalizeLabel('CARTE X2009 02/09 SUPERMARCHE LYON')).toBe('SUPERMARCHE LYON');
-    expect(normalizeLabel('Prélèvement européen 6303920409 DE: EAU DU VILLAGE')).toBe('PRELEVEMENT EUROPEEN DE EAU DU VILLAGE');
-    expect(normalizeLabel('VIR RECU    6584639237S DE: DUPONT')).toBe('VIR RECU DE DUPONT');
-    expect(normalizeLabel('VIR PERM TIRELIRE TAXE FONCIERE')).toBe('VIR PERM TIRELIRE TAXE FONCIERE');
-  });
+  describe('[niveau 0] une opération importée a la même clé sur toute instance (D09, D58)', () => {
+    it('normalisation des libellés', () => {
+      expect(normalizeLabel('CARTE X2009 02/09 SUPERMARCHE LYON')).toBe('SUPERMARCHE LYON');
+      expect(normalizeLabel('Prélèvement européen 6303920409 DE: EAU DU VILLAGE')).toBe('PRELEVEMENT EUROPEEN DE EAU DU VILLAGE');
+      expect(normalizeLabel('VIR RECU    6584639237S DE: DUPONT')).toBe('VIR RECU DE DUPONT');
+      expect(normalizeLabel('VIR PERM TIRELIRE TAXE FONCIERE')).toBe('VIR PERM TIRELIRE TAXE FONCIERE');
+    });
 
-  it('clé d’opération déterministe', () => {
-    const k1 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 0);
-    const k2 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 0);
-    const k3 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 1);
-    expect(k1).toBe(k2);
-    expect(k1).not.toBe(k3);
-    expect(k1).toMatch(/^op_[0-9a-f]{16}$/);
+    it('clé d’opération déterministe', () => {
+      const k1 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 0);
+      const k2 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 0);
+      const k3 = operationKey('acc', '2026-09-04', -7600, 'PRELEVEMENT EUROPEEN DE EAU DU VILLAGE', 1);
+      expect(k1).toBe(k2);
+      expect(k1).not.toBe(k3);
+      expect(k1).toMatch(/^op_[0-9a-f]{16}$/);
+    });
   });
 });
 
@@ -113,7 +124,7 @@ describe('identifiants', () => {
 // version volontairement cassée du besoin.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-describe('[niveau 0] harnais du registre', () => {
+describe('[niveau 0] harnais du registre · C5', () => {
   it.fails('témoin rouge · une sauvegarde qui rejoue les tables et en oublie une', async () => {
     const s = await seeded('A');
     // Version cassée : au lieu du fichier exporté, la sauvegarde réécrit les tables une à une — et
