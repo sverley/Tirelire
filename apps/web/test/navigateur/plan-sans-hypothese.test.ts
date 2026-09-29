@@ -450,7 +450,7 @@ describe.skipIf(!navigateur)('#183 · le plan sans hypothèse, à 375 px', () =>
       return { surLePlan, surLesFlux, ...états([...surLePlan, ...surLesFlux]) };
     }
 
-    it('l’écran se lit au 20 septembre, dans la période de septembre', async () => {
+    it('[niveau 1] point 5 — l’écran se lit au 20 septembre, dans la période de septembre : le grand livre du harnais est celui qu’on croit', async () => {
       const écran = await lireLÉcran(page);
       expect(écran.période).toBe('septembre 2026');
       expect(écran.légende).toMatch(/soldes au 20 sept/i);
