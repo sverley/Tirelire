@@ -50,8 +50,14 @@ name: CI et livraison
 # - `etiquette` est hors harnais : il pose le tag d'une version forcée, sans rien vérifier.
 # - `production` lit hors des fichiers suivis : après le dépôt d'une version publiée, l'étape
 #   « Vérifier le site en ligne » (`verifier.sh`) lit le site déployé.
-# - `android` est hors harnais : il construit l'APK, sans rien vérifier.
-# - `publication` est hors harnais : il publie les releases.
+# - `android` est hors harnais : il construit l'APK, sans rien vérifier ; s'il échoue, il dit dans le
+#   résumé de l'exécution que la release sort sans APK (#289).
+# - `publication` est hors harnais : il publie la release du tag avec `tirelire-hebergement.zip`. Il
+#   n'attend que le site assemblé et le tag posé, jamais l'APK (#289). Quand le porteur crée la release à
+#   la main dans GitHub, ce qui pose le tag, l'exécution du tag met cette release à jour au lieu d'en
+#   créer une autre.
+# - `apk-de-la-release` est hors harnais : il joint l'APK à la release, quand `android` l'a construit
+#   (#289).
 # - `assemblage-apercu` est hors harnais : il assemble le site de la PR pour son sous-dossier de
 #   recette — le seul assemblage d'une PR, sans réglage de recette ni identifiant, pour que le site
 #   se construise toujours (I9, #153) — et le passe en artefact (`apercu-pr-<numéro>`) au job de
@@ -696,6 +702,16 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/tirelire-${TIRELIRE_VERSION_NAME}.apk"
           echo "APK=$RUNNER_TEMP/tirelire-${TIRELIRE_VERSION_NAME}.apk" >> "$GITHUB_ENV"
 
+      # La release ne l'attend pas (#289) : elle sort avec le ZIP d'hébergement, et ce résumé le dit.
+      - name: En cas d'échec, dire que la release sort sans APK
+        if: failure()
+        run: |
+          {
+            echo "### Release publiée sans APK"
+            echo
+            echo "La construction de l'APK a échoué : la release de cette version porte \`tirelire-hebergement.zip\` (job « Publication des releases »), sans APK. La cause est dans le journal de ce job (« APK Android »)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: En cas d'échec, publier la fin du journal Gradle en commentaire du commit
         if: failure()
         env:
@@ -716,19 +732,15 @@ jobs:
           path: ${{ env.APK }}
           retention-days: 30
 
+  # La release porte le ZIP d'hébergement dès que le site est assemblé et le tag posé : elle n'attend pas
+  # `android`, dont l'échec ne doit pas la retenir (#289). L'APK vient après, dans `apk-de-la-release`.
   publication:
     name: Publication des releases
-    needs: [hebergement, android, etiquette]
+    needs: [hebergement, etiquette]
     if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Récupérer l'APK
-        uses: actions/download-artifact@v4
-        with:
-          name: tirelire-apk
-          path: ${{ runner.temp }}/publication
 
       - name: Récupérer le site pour hébergement
         uses: actions/download-artifact@v4
@@ -736,14 +748,42 @@ jobs:
           name: tirelire-hebergement
           path: ${{ runner.temp }}/publication
 
+      # Le titre se lit dans le nom du tag, comme celui de l'APK : il ne dépend pas d'`android`.
+      - name: Titre de la release
+        id: titre
+        env:
+          TAG: ${{ needs.etiquette.outputs.nom }}
+        run: echo "nom=Tirelire ${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # Si la release du tag existe déjà, créée à la main dans GitHub, l'action la met à jour et y
+      # téléverse le fichier, au lieu d'en créer une autre.
       - name: Release taguée
         if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
         uses: softprops/action-gh-release@v2
         with:
           # Le tag poussé, ou celui de la version forcée, posé par `etiquette` (#274).
           tag_name: ${{ needs.etiquette.outputs.nom }}
-          name: Tirelire ${{ needs.android.outputs.version }}
+          name: ${{ steps.titre.outputs.nom }}
           generate_release_notes: true
-          files: |
-            ${{ runner.temp }}/publication/tirelire-${{ needs.android.outputs.version }}.apk
-            ${{ runner.temp }}/publication/tirelire-hebergement.zip
+          files: ${{ runner.temp }}/publication/tirelire-hebergement.zip
+
+  # Le job n'existe que si `android` a construit l'APK : sans lui, la release reste telle que
+  # `publication` l'a publiée, et le résumé d'`android` le dit (#289). Ni le titre ni les notes de la
+  # release ne sont redonnés : l'action garde ceux de la release que `publication` vient de publier.
+  apk-de-la-release:
+    name: APK joint à la release
+    needs: [etiquette, android, publication]
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer l'APK
+        uses: actions/download-artifact@v4
+        with:
+          name: tirelire-apk
+          path: ${{ runner.temp }}/publication
+
+      - name: Joindre l'APK à la release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.etiquette.outputs.nom }}
+          files: ${{ runner.temp }}/publication/tirelire-${{ needs.android.outputs.version }}.apk

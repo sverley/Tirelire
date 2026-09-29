@@ -50,7 +50,9 @@ qu'avec le serveur intégré de PHP.
 
 La production ne suit que les versions publiées (#233) : à un tag `v*`, après les tests au seuil 3,
 la CI assemble le site, le **dépose par FTP en production** si les secrets sont renseignés, et joint
-`tirelire-hebergement.zip` à la release, avec l'APK. À chaque push sur `main`, elle dépose `main` à
+`tirelire-hebergement.zip` à la release, avec l'APK s'il est construit : un échec de l'APK ne retient
+pas la release, qui sort alors avec le ZIP seul, et le résumé de l'exécution le dit. À chaque push
+sur `main`, elle dépose `main` à
 la racine de la recette, la version de développement (plus bas) ; ni un push sur `main`, ni un
 lancement manuel ne touchent la production. Sans secrets, le job de dépôt le dit dans son résumé et
 ne fait rien d'autre : l'archive reste téléchargeable.
