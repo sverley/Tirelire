@@ -778,44 +778,55 @@ que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parco
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.
 
-### D52 · Une période à venir suppose exécuté le plan des périodes précédentes
+### D52 · Une période à venir dit ce qu'elle demande, sans rien supposer
 
-Précise D20 et D29. Le plan a maintenant deux dates : `asOf`, la période qu'on regarde, et
-`today`, la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf`, donc
-tout appelant à deux arguments garde le comportement d'avant ; l'interface y passe sa **date de
-lecture**).
+Précise D20 et D29. Le plan a maintenant deux dates : `asOf`, la période qu'on regarde, et `today`,
+la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf`, donc tout appelant à
+deux arguments garde le comportement d'avant ; l'interface y passe sa **date de lecture**).
 
-Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un virement des mois passés
-n'a pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est
-la raison d'être du « complément exceptionnel » de D21. Au-delà, il n'y a plus de relevé à lire,
-et le plan **suppose exécutés les virements qu'il a lui-même proposés** pour les périodes
-précédentes (`plannedComponents`) : ce qui a été doté avant la période affichée est à son
-placement voulu, seule la dotation de la période attend encore sur le compte de dotation.
+Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un virement des mois passés n'a
+pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est la
+raison d'être du « complément exceptionnel » de D21. Au-delà, il n'y a plus de relevé à lire, et le
+plan ne suppose rien à la place (principe 1.3, #183) : il ne montre aucune position de compte, ni
+lue, ni obtenue en supposant exécuté un virement non constaté. Il dit ce que chaque tirelire demande
+pour la période — sa dotation (D29) — et ce qu'il faut virer pour elle : cette dotation, répartie
+comme son placement la veut (`periodDemand`), calculée sur le seul solde de la tirelire, qui ne
+dépend d'aucun virement (D29).
 
-Conséquence, et invariant tenu par les tests : pour une période donnée, ce qu'on vire vers un
-compte d'accueil vaut exactement ce que les tirelires placées là demandent pour cette période,
-moins le non affecté qu'on en rapatrie. Sans cela, le bloc « Virements à faire » recalculait
-l'écart depuis la position réelle du jour — dotations des périodes antérieures comprises,
-puisque rien ne les avait virées — pendant que le bloc « Tirelires » simulait période par
+Conséquence, et invariant tenu par les tests : pour une période à venir, ce qu'on vire vers un
+compte d'accueil vaut exactement ce que les tirelires placées là demandent pour cette période ; dans
+la période où l'on lit, moins le non affecté qu'on en rapatrie. Sans cela, le bloc « Virements à
+faire » recalculait l'écart depuis la position réelle du jour — dotations des périodes antérieures
+comprises, puisque rien ne les avait virées — pendant que le bloc « Tirelires » simulait période par
 période. Les deux se contredisaient dès la période suivante et l'écart grossissait de période en
 période (sur l'exemple : 700 € demandés contre 1 400 € virés en octobre, 550 € contre 1 950 € en
 novembre, où une tirelire « en avance » ne demandait plus rien mais faisait toujours virer 300 €).
+Jusqu'à #183, la cohérence tenait par une supposition : le plan tenait pour exécutés les virements
+qu'il avait lui-même proposés aux périodes précédentes. #183 l'a retirée ; la cohérence tient sans
+elle, puisque la demande d'une période ne dépend que du solde des tirelires.
+
+La question « ce virement a-t-il eu lieu ? » ne se pose pas au plan : elle vit sur les flux, sa mise
+en œuvre dans le temps. Chaque occurrence d'un virement permanent enregistré (D60) se lit sur son
+flux au pointage de D12 — pointée, attendue dans sa fenêtre, ou attendue non reçue — et le plan de
+sa période la montre. Sans suivi des opérations (U1), rien ne se pointe : le plan est complet sans
+occurrences, et n'y montre ni supposition ni manquement. Commencer à importer n'ajoute que ces
+lectures du réel ; ni les besoins, ni les virements permanents proposés ne changent.
 
 Côté interface, les deux dates cessent d'être la même variable. `app.asOf` est la date de lecture :
 elle appartient à toute l'application, l'en-tête la montre, et c'est elle qui dit jusqu'où les
 soldes sont connus. La période regardée n'est plus qu'un curseur de l'écran Plan : la parcourir ne
 déplace plus la date de lecture de tous les écrans — ce qui, depuis que `main` prévient quand on ne
-lit pas au jour même, affichait « lecture à une autre date » au moindre clic sur une période — et
-la période où l'on lit s'affiche à la date de lecture plutôt qu'à son premier jour. Le jeu
-d'exemple, daté de septembre 2026, se lit donc à sa date : ses périodes suivantes restent des
-périodes à venir quelle que soit la date du jour.
+lit pas au jour même, affichait « lecture à une autre date » au moindre clic sur une période — et la
+période où l'on lit s'affiche à la date de lecture plutôt qu'à son premier jour. Le jeu d'exemple,
+daté de septembre 2026, se lit donc à sa date : ses périodes suivantes restent des périodes à venir
+quelle que soit la date du jour.
 
-Même raison pour ce qui se lit sur le réel — non affecté du compte principal, soldes à régler
-des comptes tiers, surplus des comptes d'accueil : sur une période à venir, ils se lisent à la
-dernière date connue, pas à une date inventée. L'alerte « le non affecté est négatif » ne se
-déclenche donc plus sur une position simulée, où elle finissait par apparaître à toutes les
-périodes lointaines. Projeter le solde du compte principal demanderait de dérouler revenus et
-charges période après période : ce n'est pas ce que le plan fait, et il ne le prétend plus.
+Ce qui se lit sur le réel — non affecté du compte principal, soldes à régler des comptes tiers,
+surplus des comptes d'accueil — se lit dans la période où l'on lit, à la date de lecture, pas à une
+date inventée ; une période à venir ne le redemande pas. L'alerte « le non affecté est négatif » ne
+se déclenche donc jamais sur une période à venir. Projeter le solde du compte principal demanderait
+de dérouler revenus et charges période après période : ce n'est pas ce que le plan fait, et il ne le
+prétend pas.
 
 ### D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
