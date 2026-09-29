@@ -234,6 +234,10 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
       - run: pnpm build
+        env:
+          # Le nom d'une version forcée, que la référence construite (`main`) ne porte pas : la version
+          # que l'application affiche (#142). Vide ailleurs : la construction lit sa référence.
+          TIRELIRE_VERSION: ${{ steps.version_forcee.outputs.nom }}
       - name: Archiver le site (à déposer tel quel sur un serveur privé)
         uses: actions/upload-artifact@v4
         with:
@@ -263,6 +267,8 @@ jobs:
           # celui de la production à un tag `v*` et pour une version forcée (#274), la racine de la
           # recette sinon (#233).
           TIRELIRE_BASE: ${{ (startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee) && (vars.TIRELIRE_BASE || '/') || '/' }}
+          # Le nom d'une version forcée, que l'application affiche (#142) ; vide ailleurs.
+          TIRELIRE_VERSION: ${{ needs.test.outputs.version_forcee }}
         run: pnpm --filter @tirelire/hebergement assembler
       - uses: actions/upload-artifact@v4
         with:
@@ -635,6 +641,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+        env:
+          # Le nom d'une version forcée, que l'application affiche (#142) ; vide ailleurs.
+          TIRELIRE_VERSION: ${{ needs.test.outputs.version_forcee }}
       - name: Synchroniser les fichiers web dans le projet Android
         working-directory: apps/web
         run: npx cap sync android
