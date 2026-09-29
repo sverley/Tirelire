@@ -67,7 +67,7 @@ describe('[niveau 4] #236 point 1, D83 · chaque test du dépôt porte sa marque
     assert.ok(fichiers.every((f) => !f.includes('node_modules/')));
   });
 
-  test('témoin rouge · un test sans marque, hors de toute suite ou dans une suite qui n’en porte pas, se voit', () => {
+  test('[niveau 1] témoin rouge · un test sans marque, hors de toute suite ou dans une suite qui n’en porte pas, se voit', () => {
     const source = [
       "import { describe, it, test } from 'vitest';",
       "test('seul', () => {});",
@@ -77,13 +77,13 @@ describe('[niveau 4] #236 point 1, D83 · chaque test du dépôt porte sa marque
     assert.deepEqual(testsSansMarque(source), ['seul', 'suite › dedans']);
   });
 
-  test('témoin rouge · une suite qui perd sa marque rend visibles tous les tests qu’elle englobait', () => {
+  test('[niveau 1] témoin rouge · une suite qui perd sa marque rend visibles tous les tests qu’elle englobait', () => {
     const avec = "describe('[niveau 0] a', () => { describe('b', () => { test('c', () => {}); test.todo('d'); }); });";
     assert.deepEqual(testsSansMarque(avec), []);
     assert.deepEqual(testsSansMarque(avec.replace('[niveau 0] ', '')), ['a › b › c', 'a › b › d']);
   });
 
-  test('témoin rouge · un titre calculé ne compte que par ce qu’il écrit en toutes lettres', () => {
+  test('[niveau 1] témoin rouge · un titre calculé ne compte que par ce qu’il écrit en toutes lettres', () => {
     const source = [
       'for (const n of noms) test(n, () => {});',
       'test(`${n} [niveau ${k}]`, () => {});',

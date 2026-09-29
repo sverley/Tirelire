@@ -150,7 +150,7 @@ describe('[niveau 4] D83 · un harnais joué en local ne sort pas de la machine 
     }
   });
 
-  test('#113 : témoin — un lanceur non branché est nommé, qu’il soit node --test, vitest ou inconnu', () => {
+  test('[niveau 2] #113 : témoin — un lanceur non branché est nommé, qu’il soit node --test, vitest ou inconnu', () => {
     const racine = mkdtempSync(join(tmpdir(), 'tirelire-113-depot-'));
     try {
       const ecrire = (chemin, contenu) => {
