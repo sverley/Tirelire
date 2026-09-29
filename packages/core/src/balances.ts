@@ -441,7 +441,8 @@ export function placementShares(e: Tirelire, amount: Cents, fromAccountId: Id): 
 
 /**
  * Répartition voulue d'une position donnée. Séparée de `wantedComponents` pour servir aussi bien
- * à la position réelle qu'à la position simulée d'une période à venir (D52).
+ * à la position réelle qu'à la demande d'une période, calculée sur le seul solde de la tirelire
+ * (`periodDemand`, D52).
  */
 function resolvePlacement(e: Tirelire, real: Components): Components {
   if (e.placement.length === 0) return real;
@@ -473,43 +474,38 @@ function resolvePlacement(e: Tirelire, real: Components): Components {
 }
 
 /**
- * Position d'une tirelire telle que le plan de la période contenant `asOf` doit la lire (D52).
- *
- * Jusqu'à `today`, c'est la position réelle : si un virement des mois passés n'a pas été fait,
- * l'argent est encore sur le compte de dotation et le plan doit le réclamer. Au-delà, il n'y a
- * plus de vérité bancaire à lire : le plan suppose exécutés les virements qu'il a lui-même
- * proposés pour les périodes précédentes. Tout ce qui a été doté avant la période affichée est
- * donc à son placement voulu, et seule la dotation de la période attend encore sur le compte de
- * dotation — ce qui fait du virement proposé exactement ce que la période demande.
+ * Écarts de placement (D20, D38), lus sur le réel : par compte, ce qui s'y trouve de trop (positif)
+ * ou y manque (négatif) au regard du placement voulu, à `asOf`. Ne sert qu'à une période où les
+ * soldes sont connus : au-delà, le plan ne lit ni ne suppose aucune position de compte (D52, #183).
  */
-export function plannedComponents(e: Tirelire, idx: LedgerIndex, asOf: ISODate, today: ISODate): Components {
+export function placementGaps(e: Tirelire, idx: LedgerIndex, asOf: ISODate): ComponentEffect[] {
   const real = tirelireComponents(e, idx, asOf);
-  if (budgetPeriodContaining(asOf, idx.startDay).start <= today) return real;
-  const snap = periodSnapshot(e, idx, asOf);
-  if (!snap) return real;
-  // Position d'avant la dotation de la période : c'est elle que les virements des périodes
-  // précédentes ont eu le temps de mettre en place.
-  const before: Components = new Map(real);
-  add(before, dotationAccount(e, idx), -snap.dotation);
-  for (const [k, v] of before) if (v === 0) before.delete(k);
-  const out = resolvePlacement(e, before);
-  add(out, dotationAccount(e, idx), snap.dotation);
-  for (const [k, v] of out) if (v === 0) out.delete(k);
-  return out;
-}
-
-/**
- * Écarts de placement (D20, D38) : par compte, ce qui s'y trouve de trop (positif) ou y manque
- * (négatif) au regard du placement voulu. `today` dit jusqu'où les soldes sont connus ; au-delà,
- * la position est celle que le plan simule (D52).
- */
-export function placementGaps(e: Tirelire, idx: LedgerIndex, asOf: ISODate, today: ISODate = asOf): ComponentEffect[] {
-  const real = plannedComponents(e, idx, asOf, today);
   const wanted = resolvePlacement(e, real);
   const out: ComponentEffect[] = [];
   for (const accountId of new Set([...real.keys(), ...wanted.keys()])) {
     const amount = (real.get(accountId) ?? 0) - (wanted.get(accountId) ?? 0);
     if (amount !== 0) out.push({ accountId, amount });
+  }
+  return out;
+}
+
+/**
+ * Ce que la tirelire demande pour la période contenant `asOf`, compte par compte (D52, #183) : sa
+ * dotation, répartie comme son placement la veut — la position voulue après la dotation, moins
+ * celle d'avant, toutes deux calculées sur le solde de la tirelire (D29), jamais sur une position
+ * de compte. Rien n'y suppose qu'un virement a eu lieu : c'est ce qu'il faut virer pour elle.
+ * Le compte de dotation garde ce qu'aucune part ne réclame.
+ */
+export function periodDemand(e: Tirelire, idx: LedgerIndex, asOf: ISODate): Components {
+  const snap = periodSnapshot(e, idx, asOf);
+  const out: Components = new Map();
+  if (!snap || snap.dotation === 0) return out;
+  const source = dotationAccount(e, idx);
+  const avant = resolvePlacement(e, new Map([[source, snap.balanceBefore]]));
+  const apres = resolvePlacement(e, new Map([[source, snap.balanceBefore + snap.dotation]]));
+  for (const accountId of new Set([...avant.keys(), ...apres.keys()])) {
+    const part = (apres.get(accountId) ?? 0) - (avant.get(accountId) ?? 0);
+    if (part !== 0) out.set(accountId, part);
   }
   return out;
 }

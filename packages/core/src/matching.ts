@@ -284,6 +284,51 @@ export interface MissingFlow {
   windowEnd: ISODate;
 }
 
+/** Ce qu'est devenue une occurrence attendue d'un flux, au pointage de D12. */
+export type OccurrenceStatus = 'pointee' | 'attendue' | 'nonRecue';
+
+export interface FlowOccurrence {
+  /** Date attendue de l'occurrence. */
+  date: ISODate;
+  /** Fin de sa fenêtre de rapprochement. */
+  windowEnd: ISODate;
+  /**
+   * `pointee` : une opération lui a été rapprochée ; `attendue` : sa fenêtre court encore à `asOf` ;
+   * `nonRecue` : la fenêtre est passée sans opération (D12).
+   */
+  status: OccurrenceStatus;
+  /** L'opération pointée, s'il y en a une. */
+  operationId?: Id;
+}
+
+/**
+ * Le suivi des opérations d'un compte : il porte au moins une opération importée. Sans suivi
+ * (U1), rien ne se pointe : une occurrence n'y est ni reçue ni manquante, et le plan n'en dit rien
+ * (#183, point 6).
+ */
+export function tracksOperations(ledger: Ledger, accountId: Id): boolean {
+  return alive(ledger.operations).some((o) => o.accountId === accountId && o.origin === 'imported');
+}
+
+/**
+ * Les occurrences d'un flux entre `from` et `to`, chacune avec ce qu'elle est devenue à `asOf`
+ * (D12) : pointée, attendue dans sa fenêtre, ou attendue non reçue. Même rapprochement que
+ * `missingFlows` : une opération rapprochée du flux pointe l'occurrence dont la fenêtre la contient.
+ */
+export function flowOccurrences(ledger: Ledger, flow: PlannedFlow, from: ISODate, to: ISODate, asOf: ISODate): FlowOccurrence[] {
+  const pointees = alive(ledger.operations).filter((o) => o.plannedFlowId === flow.id);
+  const out: FlowOccurrence[] = [];
+  for (const d of occurrencesBetween(flow.periodicity, from, to)) {
+    if (flow.activeFrom && d < flow.activeFrom) continue;
+    if (flow.activeTo && d > flow.activeTo) continue;
+    const windowEnd = addDays(d, flow.dateWindowDays);
+    const op = pointees.find((o) => o.date >= addDays(d, -flow.dateWindowDays - 1) && o.date <= addDays(d, flow.dateWindowDays + 1));
+    if (op) out.push({ date: d, windowEnd, status: 'pointee', operationId: op.id });
+    else out.push({ date: d, windowEnd, status: windowEnd >= asOf ? 'attendue' : 'nonRecue' });
+  }
+  return out;
+}
+
 /** Occurrences de flux dont la fenêtre est passée sans opération rapprochée. */
 export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): MissingFlow[] {
   const out: MissingFlow[] = [];

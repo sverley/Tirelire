@@ -76,13 +76,20 @@ describe('[niveau 2] les deux blocs du plan découlent du même calcul (D52)', (
     expect(plan(NOVEMBRE).lines.find((l) => l.needId === 'need-tf')!.held).toBe(euros(1200));
   });
 
-  it('le total net à sortir suit : demandé moins ce qu’on rapatrie du non affecté', () => {
-    for (const asOf of [SEPTEMBRE, OCTOBRE, NOVEMBRE]) {
+  it('le total net à sortir suit : demandé moins ce qu’on rapatrie du non affecté, dans la période où l’on lit', () => {
+    const p = plan(SEPTEMBRE);
+    const t = p.transfers.find((x) => x.accountId === 'acc-livret')!;
+    // 15 € dorment sur le livret sans appartenir à personne : ils reviennent au compte principal.
+    expect(t.surplus).toBe(euros(15));
+    expect(t.net).toBe(demande(p, 'acc-livret') - t.surplus);
+  });
+
+  it('une période à venir ne redemande pas le non affecté : aucune position de compte n’y entre (#183)', () => {
+    for (const asOf of [OCTOBRE, NOVEMBRE]) {
       const p = plan(asOf);
       const t = p.transfers.find((x) => x.accountId === 'acc-livret')!;
-      // 15 € dorment sur le livret sans appartenir à personne : ils reviennent au compte principal.
-      expect(t.surplus).toBe(euros(15));
-      expect(t.net).toBe(demande(p, 'acc-livret') - t.surplus);
+      expect(t.surplus).toBe(0);
+      expect(t.net).toBe(demande(p, 'acc-livret'));
     }
   });
 

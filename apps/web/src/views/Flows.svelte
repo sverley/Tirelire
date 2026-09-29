@@ -4,8 +4,11 @@
   import FiltreEtat from '../lib/FiltreEtat.svelte';
   import { money, shortDate, centsToInput, inputToCents, openAccounts, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
   import {
+    addMonths,
     alive,
     countStates,
+    flowOccurrences,
+    tracksOperations,
     isDerivedFlow,
     needForDueDateFlow,
     nextOccurrence,
@@ -254,6 +257,16 @@
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}{validite ? ` · ${validite}` : ''}</span>
           {#if provision}<span class="sub">{provision}</span>{/if}
           {#if isDerivedFlow(f)}<span class="sub">montant de l’ordre permanent chez la banque ; la ventilation se recalcule à l’import</span>{/if}
+          {#if isDerivedFlow(f) && tracksOperations(app.ledger, f.accountId)}
+            <!-- Les dernières occurrences de l'ordre, au pointage (D12, #183) ; sans suivi des
+                 opérations, rien ne se pointe et rien ne se dit. -->
+            {@const occurrences = flowOccurrences(app.ledger, f, addMonths(app.asOf, -3), app.asOf, app.asOf).slice(-3)}
+            {#if occurrences.length}
+              <span class="sub">{occurrences
+                .map((o) => `${shortDate(o.date)} : ${o.status === 'pointee' ? 'pointé' : o.status === 'attendue' ? 'attendu' : 'attendu, non reçu'}`)
+                .join(' · ')}</span>
+            {/if}
+          {/if}
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>
         <div class="actions" style="margin:0">

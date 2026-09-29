@@ -3,12 +3,13 @@
  * dire ce que la période dote (D29), ce que les revenus couvrent (D06, lecture), et quels
  * virements ramènent chaque tirelire à son placement voulu (D20, D21).
  */
-import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow } from './model.js';
+import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow, Tirelire } from './model.js';
 import { alive, isDerivedFlow, needActive, needName } from './model.js';
 import { formatCents } from './money.js';
 import {
   homeAccount,
   placementGaps,
+  periodDemand,
   dotationAccount,
   tirelireBalance,
   tirelireComponents,
@@ -22,6 +23,7 @@ import {
 } from './balances.js';
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, addMonths } from './dates.js';
+import { flowOccurrences, tracksOperations, type FlowOccurrence } from './matching.js';
 
 export interface PlanFlowLine {
   flowId: Id;
@@ -131,6 +133,12 @@ export interface PlanTransfer {
    * ne peut ni le connaître ni le changer toute seule.
    */
   bankOrder?: { flowId: Id; amount: Cents; drift: Cents; since: ISODate };
+  /**
+   * Les occurrences de l'ordre enregistré dans la période, lues sur son flux (D12, #183) : pointée,
+   * attendue dans sa fenêtre, ou attendue non reçue. Absentes sans suivi des opérations (U1) : rien
+   * ne s'y pointe, le plan n'y suppose ni réception ni manquement.
+   */
+  occurrences?: FlowOccurrence[];
 }
 
 export interface PlanWarning {
@@ -147,7 +155,12 @@ export interface Plan {
   asOf: ISODate;
   /** Date jusqu'à laquelle les soldes bancaires sont connus (D52). */
   today: ISODate;
-  /** Vrai quand la période affichée commence après `today` : les positions sont simulées (D52). */
+  /**
+   * Vrai quand la période affichée commence après `today` : une période à venir (D52, #183). Le plan
+   * y dit ce que chaque tirelire demande et ce qu'il faut virer pour elle, sans aucune position de
+   * compte — ni lue, ni supposée : rien n'y est plus simulé. Le nom reste, parce que des instantanés
+   * du plan (#197, #209) le fixent.
+   */
   simulated: boolean;
   incomes: PlanFlowLine[];
   fixedCharges: PlanFlowLine[];
@@ -177,10 +190,10 @@ const KIND_ORDER: Record<NeedKind, number> = { payout: -1, dueDate: 0, recurring
  * Calcule le plan de la période contenant `asOf`, avec les positions à `asOf`.
  *
  * `today` est la date jusqu'à laquelle les soldes bancaires sont connus (D52) ; par défaut `asOf`,
- * c'est-à-dire « tout est connu jusqu'à la date de calcul ». En regardant une période à venir,
- * l'interface passe la date du jour : au-delà, le plan cesse de lire le réel et suppose exécutés
- * les virements qu'il a proposés pour les périodes précédentes, sans quoi il redemanderait à
- * chaque période tout ce qu'il a déjà demandé aux précédentes.
+ * c'est-à-dire « tout est connu jusqu'à la date de calcul ». Jusqu'à la période qui la contient, les
+ * virements se lisent sur les positions réelles. Au-delà, le plan ne lit ni ne suppose aucune
+ * position de compte : ce qu'il faut virer vers un compte est ce que les tirelires placées là
+ * demandent pour la période (`periodDemand`), et rien d'autre (#183).
  */
 export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf): Plan {
   const idx = indexLedger(ledger);
@@ -188,10 +201,10 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   const principal = idx.principal;
   const startDay = idx.startDay;
   const period = budgetPeriodContaining(asOf, startDay);
-  const simulated = period.start > today;
+  const upcoming = period.start > today;
   // Au-delà d'aujourd'hui, aucun relevé ne dit ce que les comptes portent : ce qui se lit sur le
-  // réel (non affecté, soldes à régler) se lit à la dernière date connue, pas à une date inventée.
-  const known = simulated ? today : asOf;
+  // réel se lit à la dernière date connue, pas à une date inventée.
+  const known = upcoming ? today : asOf;
 
   const flows = alive(ledger.plannedFlows).filter((f) => isActive(f, period));
   const incomes = flowLines(flows.filter((f) => f.kind === 'income'), period);
@@ -288,7 +301,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   const gaps: PlacementGap[] = [];
   for (const e of idx.tireliresById.values()) {
     // Un excédent sur un compte doit rejoindre un compte où il manque (D38) : on apparie les deux.
-    const excess = placementGaps(e, idx, asOf, today).filter((g) => !idx.accountsById.get(g.accountId)?.tracksSettlement);
+    const excess = (upcoming ? demandGaps(e, idx, asOf) : placementGaps(e, idx, asOf)).filter((g) => !idx.accountsById.get(g.accountId)?.tracksSettlement);
     const surplus = excess.filter((g) => g.amount > 0).sort((a, b) => b.amount - a.amount);
     const missing = excess.filter((g) => g.amount < 0).sort((a, b) => a.amount - b.amount);
     let mi = 0;
@@ -373,7 +386,9 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     const exceptional = orders.reduce((s, o) => s + o.exceptional, 0);
     let settlement = 0;
     let surplus = 0;
-    if (a.tracksSettlement) {
+    // Règlements et surplus sont des positions de compte, lues sur le réel : ils appartiennent à la
+    // période où l'on lit, pas à une période à venir, qui les redemanderait (#183).
+    if (!upcoming && a.tracksSettlement) {
       const owes = settlementBalance(a, ledger, idx, known);
       const thr = a.settlementThreshold ?? 0;
       const dir = a.settlementDirection ?? 'both';
@@ -387,7 +402,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
             accountId: a.id,
           });
       }
-    } else if (a.kind === 'epargne') {
+    } else if (!upcoming && a.kind === 'epargne') {
       surplus = unallocated(a, ledger, idx, known);
     }
     /*
@@ -415,6 +430,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       });
     const net = standing + exceptional + settlement - surplus;
     if (orders.length === 0 && settlement === 0 && surplus === 0 && !bankOrder) continue;
+    const occurrences = flux && principal && tracksOperations(ledger, flux.accountId) ? flowOccurrences(ledger, flux, period.start, period.end, today) : undefined;
     transfers.push({
       accountId: a.id,
       accountName: a.name,
@@ -429,12 +445,13 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       surplus,
       net,
       ...(bankOrder ? { bankOrder } : {}),
+      ...(occurrences ? { occurrences } : {}),
     });
   }
   transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
 
   const principalUnallocated = principal ? unallocated(principal, ledger, idx, known) : 0;
-  if (principal && principalUnallocated < 0 && !simulated)
+  if (principal && principalUnallocated < 0 && !upcoming)
     warnings.push({
       code: 'principalOverdrawn',
       message: 'Les dotations dépassent ce que le compte principal contient : le non affecté est négatif.',
@@ -445,7 +462,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     period,
     asOf,
     today: known,
-    simulated,
+    simulated: upcoming,
     incomes,
     fixedCharges,
     lines,
@@ -462,6 +479,25 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     },
     warnings,
   };
+}
+
+/**
+ * La demande d'une période à venir, en écarts de placement (#183) : ce qui doit partir du compte de
+ * dotation vers chaque compte où la tirelire est placée (positif sur le compte de dotation, négatif
+ * sur le compte qui le reçoit), ou en revenir pour un besoin versant. Aucune position de compte
+ * n'y entre.
+ */
+function demandGaps(e: Tirelire, idx: LedgerIndex, asOf: ISODate): Array<{ accountId: Id; amount: Cents }> {
+  const source = dotationAccount(e, idx);
+  const out: Array<{ accountId: Id; amount: Cents }> = [];
+  let total = 0;
+  for (const [accountId, part] of periodDemand(e, idx, asOf)) {
+    if (accountId === source) continue;
+    out.push({ accountId, amount: -part });
+    total += part;
+  }
+  if (total !== 0) out.push({ accountId: source, amount: total });
+  return out;
 }
 
 /**
