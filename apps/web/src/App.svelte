@@ -5,6 +5,7 @@
   import { isNative, saveFile } from './lib/platform';
   import { BETA, texteSauvegarde, texteSynchronisation } from './lib/sauvegarde';
   import { miseAJour } from './lib/miseAJour.svelte';
+  import { installation } from './lib/installation.svelte';
 
   /**
    * Au-delà de cet écart entre la dernière opération connue et la date de lecture, l'application
@@ -171,6 +172,26 @@
     {/if}
     {#if app.view === 'plan'}
       <Plan />
+      {#if installation.proposee}
+        <!-- La proposition d'installer (#194) : sous l'accueil, pas parmi les signaux du haut de
+             l'écran (#279). Elle ne bloque rien ; écartée, elle ne revient plus d'elle-même et
+             reste dans Plus. -->
+        <div class="card accent" role="status">
+          <div class="row">
+            <div class="label">
+              <strong>Installer Tirelire sur cet appareil</strong>
+              <span class="sub">
+                Elle s'ouvrira comme une application, depuis votre écran d'accueil ou votre bureau.
+                Vous pourrez aussi l'installer plus tard, depuis Plus.
+              </span>
+            </div>
+          </div>
+          <div class="actions" style="margin:6px 0 0">
+            <button class="btn small primary" onclick={() => installation.installer()}>Installer</button>
+            <button class="btn small" onclick={() => installation.ecarter()}>Plus tard</button>
+          </div>
+        </div>
+      {/if}
     {:else if app.view === 'operations'}
       <Operations />
     {:else if app.view === 'import'}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app, type View } from '../lib/state.svelte';
   import { VERSION, texteVersion } from '../lib/version';
+  import { installation } from '../lib/installation.svelte';
   const items: Array<{ id: View; label: string; desc: string }> = [
     { id: 'accounts', label: 'Comptes', desc: 'Principal, comptes d’accueil, comptes tiers' },
     { id: 'tirelires', label: 'Tirelires', desc: 'Vos réserves et ce qu’elles doivent financer' },
@@ -33,6 +34,20 @@
     </button>
   {/each}
 </div>
+
+{#if installation.offerte}
+  <!-- L'installation, tant que le navigateur la permet et qu'elle n'est pas faite (#194) : la
+       proposition écartée sur l'accueil reste atteignable ici, en deux gestes depuis l'accueil. -->
+  <div class="card">
+    <div class="row">
+      <div class="label">
+        <strong>Installer Tirelire</strong>
+        <span class="sub">Comme une application, depuis votre écran d'accueil ou votre bureau</span>
+      </div>
+      <button class="btn" onclick={() => installation.installer()}>Installer</button>
+    </div>
+  </div>
+{/if}
 
 <!-- La version que cette page exécute (#142) : à relier à une vérification ou un signalement. -->
 <p class="muted small">{texteVersion(VERSION)}</p>
