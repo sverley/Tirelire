@@ -242,6 +242,17 @@ Modérées par le porteur les 21 et 22 septembre 2026 : ces deux paroles valent 
 documentation et la garde n'ont pas de harnais par défaut. Voir, plus bas, « Non. La garde peut être
 modifiée sans harnais… » (#150) et « il faut modéré le propos… » (section « La place des harnais »).
 
+Modérées de nouveau par le porteur le 29 septembre 2026, dans #283 : le codeur écrit les tests dont
+il a besoin, tous de niveau 4, et ouvre la PR ; l'auditeur ne code plus le harnais en premier : il le
+compose après le codage, parmi les tests du codeur, quitte à les compléter. La troisième parole est
+une question, que le porteur a tranchée le même jour en demandant d'en modifier les rôles.
+
+> un codeur ne peut pas faire un test de niveau inférieur à 4
+
+> ma règle est celle que j'ai donnée et qui n'a pas été retranscrite. Le codeur peut coder des tests pour ses propres besoins. Ce ne sont donc, par définition, pas des tests qui valident le besoin en lui-même que seul l'auditeur peut écrire.
+
+> Si on réfléchit à l'organisation du travail et à l'efficacité (je trouve qu'on ralentit beaucoup en avançant), je me pose la question de laisser au codeur le soin de faire le codage des tests (tous ceux dont il a besoin) et de ne plus demander à l'auditeur de coder le harnais en premier mais de faire la relecture et la selection des tests du codeur qu'il souhaite déplacer dans le harnais, quitte à les compléter, et ceux qu'il laisse ou pousse en 4. est-ce qu'on peut esperer gagner en efficacité et garder le controle dans une telle architecture ?
+
 > le codeur ne doit pas modifier une PR. Mais il peut mettre des commentaires
 
 > Le codeur doit aussi justifier dans un commentaire ce qu'il a fait comme modification qui nécessitent un validation humaine
