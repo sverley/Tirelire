@@ -1306,8 +1306,10 @@ l'**architecte** analyse le besoin et pose ses spécifications, et suit une vers
 publication sans spécifier ses tâches ; le **codeur** code, avec les tests dont il a besoin, et
 ouvre la PR ; l'**auditeur** vérifie le codage et compose le harnais parmi les tests du codeur,
 quitte à les compléter (#283) ; le **porteur** valide. L'analyse du besoin est indépendante de
-l'audit : l'architecte et l'auditeur sont deux sessions distinctes. Un descriptif de rôle dit ce que
-le rôle fait, dans quel ordre ; il renvoie à ce catalogue pour les décisions qu'il applique.
+l'audit : l'architecte et l'auditeur sont deux sessions distinctes ; l'auditeur complète dans
+l'issue ce que l'architecte a manqué, sans retirer ni réécrire ce qu'il a écrit (#286). Un
+descriptif de rôle dit ce que le rôle fait, dans quel ordre ; il renvoie à ce catalogue pour les
+décisions qu'il applique.
 
 ### D81 · La garde
 
