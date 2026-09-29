@@ -734,7 +734,12 @@ async function quitterEtRevenir(page: Page, pendant: () => void | Promise<void>)
   });
 }
 
-async function attendreLeServiceWorker(page: Page): Promise<boolean> {
+/**
+ * Attend que le service worker soit actif ; `contrôle` : qu'il contrôle aussi la page ouverte, ce qui
+ * n'arrive qu'à la visite suivante si rien ne le réclame (`clients.claim`). Actif, il répond déjà aux
+ * navigations : c'est ce dont l'ouverture hors ligne a besoin.
+ */
+async function attendreLeServiceWorker(page: Page, contrôle = false): Promise<boolean> {
   const fin = Date.now() + 20_000;
   while (Date.now() < fin) {
     const état = await page
@@ -744,7 +749,7 @@ async function attendreLeServiceWorker(page: Page): Promise<boolean> {
         return r?.active ? (navigator.serviceWorker.controller ? 'contrôle' : 'actif') : 'attente';
       })
       .catch(() => 'erreur');
-    if (état === 'contrôle') return true;
+    if (état === 'contrôle' || (!contrôle && état === 'actif')) return true;
     await pause(250);
   }
   return false;
@@ -819,7 +824,7 @@ const bacPrêt = () => {
 beforeAll(async () => {
   if (!navigateur) return;
   bac = créerLeBac();
-  chrome = await puppeteer.launch({ executablePath: navigateur, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  chrome = await puppeteer.launch({ executablePath: navigateur, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-features=BackForwardCache'] });
   // L'un après l'autre : ils partagent le dossier d'essai.
   for (const sorte of ['tag', 'forcée', 'main', 'main-suivant', 'pr'] as const) dossiers[sorte] = await jouerLaCI(bac, sorte);
   dossiers['local'] = await construireEnLocal(bac);
@@ -948,13 +953,16 @@ interface Observation {
   texteDuSignal?: string | undefined;
 }
 
+/** Les trois façons de jouer la mise à jour ; voir `scénario`. */
+type Mode = 'ignorer' | 'accepter' | 'accepter-à-la-première-visite';
+
 /**
  * Une page ouverte sur la version A (le commit C1 de main), l'exemple chargé et une donnée saisie ;
  * le serveur passe à la version B (C2) pendant que l'onglet est caché ; l'utilisateur revient.
  * `ignorer` : il ne touche pas au signal, travaille, puis rouvre l'application. `accepter` : il
  * recharge par la commande du signal.
  */
-async function scénario(mode: 'ignorer' | 'accepter'): Promise<Observation> {
+async function scénario(mode: Mode): Promise<Observation> {
   const { bac: b, chrome: c } = bacPrêt();
   const A = court(b.c1);
   const B = court(b.c2);
@@ -982,6 +990,14 @@ async function scénario(mode: 'ignorer' | 'accepter'): Promise<Observation> {
       if (f === p.mainFrame()) navigations += 1;
     });
     await attendreLeServiceWorker(p);
+    if (mode !== 'accepter-à-la-première-visite') {
+      // Un utilisateur qui revient : la page qu'il a sous les yeux est déjà sous le contrôle du service
+      // worker, comme après toute visite qui suit la première. À la première visite, sans rechargement
+      // depuis, elle ne l'est pas encore : c'est le troisième mode.
+      await p.reload({ waitUntil: 'networkidle0' });
+      await attendrePrête(p);
+      await attendreLeServiceWorker(p, true);
+    }
 
     await réglerLeCoussin(p, '137,42');
     obs.coussinAvant = await lireLeCoussin(p);
@@ -1033,7 +1049,9 @@ async function scénario(mode: 'ignorer' | 'accepter'): Promise<Observation> {
       obs.après.coussin = await lireLeCoussin(p);
       obs.après.plan = await plan(p);
 
-      // L'ouverture suivante : l'application est fermée, puis rouverte.
+      // L'ouverture suivante : la fenêtre quitte l'application, plus aucune page ne l'exécute (la page
+      // quittée n'est pas gardée en mémoire : voir le lancement du navigateur), puis elle y revient.
+      // Une autre fenêtre aurait sa propre base et ne prouverait rien : c'est la même.
       await p.goto('about:blank');
       await pause(1_500);
       await p.goto(serveur.url, { waitUntil: 'networkidle0' });
@@ -1076,7 +1094,7 @@ async function scénario(mode: 'ignorer' | 'accepter'): Promise<Observation> {
 }
 
 const scénarios = new Map<string, Promise<Observation>>();
-const jouer = (mode: 'ignorer' | 'accepter') => {
+const jouer = (mode: Mode) => {
   const déjà = scénarios.get(mode);
   if (déjà) return déjà;
   const p = scénario(mode);
@@ -1160,6 +1178,17 @@ describe.skipIf(!navigateur)('#142 · 2 à 4. une mise à jour prête', () => {
     });
   });
 
+  describe('[niveau 1] 4 · accepter recharge la page, même ouverte à la première visite et jamais rechargée depuis', () => {
+    it('la commande du signal recharge la page, qui dit la nouvelle version', async () => {
+      const o = await jouer('accepter-à-la-première-visite');
+      expect(o.signal, 'pas de signal à accepter').toBeDefined();
+      expect(o.cliquéSurLeSignal, 'la commande du signal n\'a pas pu être touchée').toBe(true);
+      expect(o.après.rechargé, 'la commande du signal ne fait rien : la page reste sur l\'ancienne version, et le signal aussi').toBe(true);
+      expect(o.après.nouvelle, 'rechargée, la page ne dit pas la nouvelle version').toBe(true);
+      expect(o.après.ancienne, 'rechargée, la page dit encore l\'ancienne version').toBe(false);
+    });
+  });
+
   describe('[niveau 3] la mise à jour faite, le signal ne revient pas', () => {
     it('après avoir rechargé, aucun signal ne demande de recharger encore', async () => {
       const o = await jouer('accepter');
@@ -1181,7 +1210,7 @@ describe.skipIf(!navigateur)('#142 · 5. ce qui tenait tient encore', () => {
       const serveur = await servir({ '/': dossiers['main'] });
       const page = await ouvrirVide(siteDe(serveur.url, c));
       try {
-        expect(await attendreLeServiceWorker(page), 'le service worker ne prend pas la main après la première visite').toBe(true);
+        expect(await attendreLeServiceWorker(page), 'le service worker n\'est pas actif après la première visite').toBe(true);
         await page.setOfflineMode(true);
         await page.reload({ waitUntil: 'domcontentloaded' });
         await attendrePrête(page);
@@ -1298,7 +1327,7 @@ describe.skipIf(!navigateur)('#142 · 5. ce qui tenait tient encore', () => {
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 
 /** Un tutoiement : un pronom de la deuxième personne du singulier, ou un impératif qui la porte. */
-const TUTOIEMENT = /\b(?:tu|toi|ton|ta|tes|t')|\b(?:recharge|actualise|mets|clique|appuie|relance|redémarre|profite|installe|choisis|attends)\b/i;
+const TUTOIEMENT = /\b(?:tu|toi|ton|ta|tes)\b|\bt['’]|\b(?:recharge|actualise|mets|clique|appuie|relance|redémarre|profite|installe|choisis|attends)\b/i;
 
 describe.skipIf(!navigateur)('#142 · D85', () => {
   describe('[niveau 3] les textes que la version et la mise à jour ajoutent vouvoient', () => {
