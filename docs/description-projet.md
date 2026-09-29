@@ -390,6 +390,27 @@ la validation par la fusion.
 
 > 9. un changement peut faire créer des tests rouges qu'il faudra traiter comme une dette de l'évolution
 
+Le 23 septembre, dans #183, sur D52, qui faisait supposer au plan d'une période à venir que ses
+propres virements des périodes précédentes avaient été faits :
+
+> Ecart 1 : la supposition ne tient que pendant la période de souplesse d'un flux. A la fin, il faut que le plan fasse remonter un manquement
+
+Puis, à la relecture de l'auditeur — le plan ne suppose rien de l'exécution des virements ; la
+question « a-t-il eu lieu ? » vit sur les flux, qui en sont la mise en œuvre dans le temps (D12) :
+
+> En effet, s'il n'y a pas de suivi des opérations, on ne peut pas pointer. Il faut un mécanisme fluide entre les usages. Le plan a une notion intemporelle, les flux sont sa mise en oeuvre. Est-ce que l'on ne regarderait pas au mauvais endroit ?
+
+> ok
+
+Et la correction :
+
+> Un erreur de ma part, le plan est le résultat du budget et des flux. Il n'est pas stocké.
+
+Puis, pour l'ordre du travail : « Oui, spécifie 183 pour une lecture commune de l'auditeur et du
+codeur », et :
+
+> Ma vision est chantier 1 puisqu'il permet d'obtenir le budget seul sinon on aura vite un problème de rapprochement
+
 ### La validation et l'aperçu
 
 Dans #168, à la question d'un signal sans blocage plutôt que d'une protection payante : « 2 ». Puis :
