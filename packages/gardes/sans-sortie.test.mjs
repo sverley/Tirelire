@@ -1,6 +1,9 @@
 /**
+ * Harnais d'audit de #113, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
  * #113 : un harnais joué en local ne sort pas de la machine (D83, docs/gardes.md, « Dans chaque
- * lanceur local »). Tests du codeur, au niveau 4 (D83, #285).
+ * lanceur local »).
  *
  * Sorti de `gardes.test.mjs` par #243 : il vérifie ce besoin, pas la garde elle-même (D81).
  */
@@ -77,7 +80,7 @@ describe('[niveau 4] D83 · un harnais joué en local ne sort pas de la machine 
     assert.deepEqual(tentatives(), []);
   });
 
-  test('#113 : une connexion hors de la machine fait échouer node --test en nommant l’hôte, par fetch comme par node:http, depuis le code testé et erreur avalée', () => {
+  test('[niveau 2] #113 : une connexion hors de la machine fait échouer node --test en nommant l’hôte, par fetch comme par node:http, depuis le code testé et erreur avalée', () => {
     const { code, sortie } = jouerSousGarde({
       'code.mjs': [
         "import http from 'node:http';",
@@ -120,13 +123,13 @@ describe('[niveau 4] D83 · un harnais joué en local ne sort pas de la machine 
     assert.doesNotMatch(sortie, /hors de la machine/);
   });
 
-  test('#113 : chaque lanceur local du dépôt est branché sur la garde', () => {
+  test('[niveau 2] #113 : chaque lanceur local du dépôt est branché sur la garde', () => {
     assert.ok(existsSync(join(RACINE, V.SANS_SORTIE)) && existsSync(join(RACINE, V.SANS_SORTIE_VITEST)));
     assert.deepEqual(V.paquetsDuWorkspace(), ['packages/core', 'packages/gardes', 'apps/hebergement', 'apps/relay', 'apps/web']);
     assert.deepEqual(V.verifierLanceursLocaux(), []);
   });
 
-  test('#113 : sous vitest aussi, une connexion hors de la machine fait échouer le fichier en nommant l’hôte, erreur avalée', () => {
+  test('[niveau 2] #113 : sous vitest aussi, une connexion hors de la machine fait échouer le fichier en nommant l’hôte, erreur avalée', () => {
     const vitest = join(RACINE, 'packages/core/node_modules/.bin/vitest');
     const dossier = mkdtempSync(join(tmpdir(), 'tirelire-113-vitest-'));
     try {

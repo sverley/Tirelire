@@ -1,8 +1,11 @@
 /**
+ * Harnais d'audit de #264, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
  * Tests de #264 (réduit le 28/09 aux parties A et C) : les tests navigateur au Ready, le moins cher
  * d'abord, et les branches d'une PR fermée (D83). Depuis #266, ce qui se joue suit les empreintes :
  * le seuil 1 du Ready se saute sur une empreinte verte, et ce que #266 ajoute a ses tests
- * (`empreintes.test.mjs`). Tests du codeur, au niveau 4 (D83, #285).
+ * (`empreintes.test.mjs`).
  *
  * **Qu'aucun rouge ne fusionne** — D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job
  * joué aurait rougi », « au tag, rien ne se saute ») : au tag, rien ne se saute.
@@ -185,7 +188,7 @@ describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests n
     assert.deepEqual(tests(r.notesPush).map((x) => x.quoi).sort(), ['coeur', 'interface'], `le cœur et l'interface sans navigateur se jouent, pas les tests navigateur\n${r.push.sortie}`);
   });
 
-  test('point 5 · à la livraison, le typecheck se joue avant les tests', async () => {
+  test('[niveau 3] point 5 · à la livraison, le typecheck se joue avant les tests', async () => {
     const r = await livraisonVerte();
     const tc = typechecks(r.notesPush);
     assert.ok(tc.length > 0, `le typecheck du paquet touché se joue\n${r.push.sortie}`);
@@ -203,7 +206,7 @@ describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests n
     assert.ok(autres.every((x) => x.t <= nav[0].t), `ils partent après le reste\n${JSON.stringify(r.notesDemande)}`);
   });
 
-  test('point 5 · un test sans navigateur rouge retient les tests navigateur demandés', async () => {
+  test('[niveau 3] point 5 · un test sans navigateur rouge retient les tests navigateur demandés', async () => {
     const r = await demandeRouge();
     assert.notEqual(r.code, 0, `la demande devait être refusée\n${r.sortie}`);
     const n = r.notes.map((x) => x.quoi);
@@ -218,7 +221,7 @@ describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests n
     assert.deepEqual(r.notesReady.map((x) => x.quoi), [], `au Ready, les tests navigateur attestés sur le même arbre ne se rejouent pas\n${r.ready}\n${r.nav.sortie}`);
   });
 
-  test('point 5 · en CI, les tests navigateur suivent le typecheck, le seuil 1 et le harnais, et ne partent pas après un rouge', () => {
+  test('[niveau 3] point 5 · en CI, les tests navigateur suivent le typecheck, le seuil 1 et le harnais, et ne partent pas après un rouge', () => {
     const c = étapesDuTest(AU_READY);
     const i = (motif) => c.findIndex((x) => motif.test(x));
     const nav = i(NAVIGATEUR_CI);
@@ -263,7 +266,7 @@ describe('[niveau 4] #264, points 10 et 11 · les branches, à la fermeture d’
   const TÊTE = 'codage/264-tests';
   const VOISINES = [TÊTE, `${TÊTE}-bis--attestation`, `${TÊTE}--attestation-2`, `codage/2640-tests--attestation`, `x/${TÊTE}--attestation`, 'main'];
 
-  test('point 10 · à la fermeture, les trois branches de la tête, par leur nom exact ; ni la tête, ni une voisine', async () => {
+  test('[niveau 2] point 10 · à la fermeture, les trois branches de la tête, par leur nom exact ; ni la tête, ni une voisine', async () => {
     const { d, gh } = apiDeBranches([...VOISINES, `${TÊTE}--attestation`, `${TÊTE}--codeur`, `${TÊTE}--auditeur`]);
     const lignes = await fermeture(gh, TÊTE);
     assert.deepEqual(d.supprimées.sort(), [`${TÊTE}--attestation`, `${TÊTE}--auditeur`, `${TÊTE}--codeur`], 'les trois branches de la PR fermée, et elles seules');
@@ -272,7 +275,7 @@ describe('[niveau 4] #264, points 10 et 11 · les branches, à la fermeture d’
     assert.deepEqual(branchesDeLaTete(TÊTE, VOISINES.map((nom) => ({ nom }))), [], 'aucune voisine ne passe pour une branche de la PR');
   });
 
-  test('point 11 · les branches sans PR ouverte de leur tête sont supprimées ; celles d’une PR ouverte restent', async () => {
+  test('[niveau 2] point 11 · les branches sans PR ouverte de leur tête sont supprimées ; celles d’une PR ouverte restent', async () => {
     const restent = ['main', 'codage/246-tests-interface', 'codage/246-tests-interface--attestation', 'codage/245-tests-coeur--attestation'];
     const partent = ['131--auditeur', 'audit/131-ci-filet-final--auditeur', 'audit/232-niveaux-des-tests--codeur', 'codage/244-tests-hebergement-relais--attestation'];
     const { d, gh } = apiDeBranches([...restent, ...partent, 'audit/131-ci-filet-final'], ['codage/246-tests-interface', 'codage/245-tests-coeur']);
@@ -284,12 +287,12 @@ describe('[niveau 4] #264, points 10 et 11 · les branches, à la fermeture d’
     assert.equal(teteDe('a/b--auditeur'), 'a/b');
   });
 
-  test('point 10 · la tête se lit dans l’événement ; une PR venue d’un autre dépôt ne touche rien ici', () => {
+  test('[niveau 2] point 10 · la tête se lit dans l’événement ; une PR venue d’un autre dépôt ne touche rien ici', () => {
     assert.equal(teteDeLEvenement({ pull_request: { head: { ref: TÊTE, repo: { full_name: 'o/r' } } } }, 'o/r'), TÊTE);
     assert.equal(teteDeLEvenement({ pull_request: { head: { ref: TÊTE, repo: { full_name: 'autre/r' } } } }, 'o/r'), null);
   });
 
-  test('points 10 et 11 · le workflow tourne à chaque fermeture, fusionnée ou non, et à son arrivée sur main, en n’extrayant que main', () => {
+  test('[niveau 2] points 10 et 11 · le workflow tourne à chaque fermeture, fusionnée ou non, et à son arrivée sur main, en n’extrayant que main', () => {
     const yaml = lireFichier(WORKFLOW_BRANCHES);
     const pr = (merged) => ({ number: 1, draft: false, merged, head: { ref: TÊTE, sha: 'a'.repeat(40), repo: { full_name: 'sverley/Tirelire' } } });
     const ctx = (event_name, event, ref = 'refs/heads/main') => ({ github: { event_name, ref, repository: 'sverley/Tirelire', event }, vars: {}, secrets: {}, inputs: {} });
@@ -311,15 +314,15 @@ describe('[niveau 4] #264, point 9 · chaque moment qui ne joue pas les tests na
     assert.match((await livraisonVerte()).push.sortie, FAUTE_DE_DEMANDE);
   });
 
-  test('la livraison dit qu’un palier moins cher rouge les a retenus', async () => {
+  test('[niveau 3] la livraison dit qu’un palier moins cher rouge les a retenus', async () => {
     assert.match((await demandeRouge()).sortie, PALIER_ROUGE);
   });
 
-  test('la CI dit qu’ils sont couverts par l’attestation', async () => {
+  test('[niveau 3] la CI dit qu’ils sont couverts par l’attestation', async () => {
     assert.match((await livraisonVerte()).nav.sortie, /attestation : sauté/);
   });
 
-  test('le workflow des tests dit ce que chaque passage a joué, et au tag que rien ne se saute', () => {
+  test('[niveau 3] le workflow des tests dit ce que chaque passage a joué, et au tag que rien ne se saute', () => {
     const étape = lireFichier(CI).split('\n      - ').find((é) => é.startsWith('name: Ce que ce passage a joué'));
     assert.ok(étape, 'aucune étape ne dit ce que le passage a joué');
     assert.match(étape, /if: always\(\)/, 'elle se joue même après un rouge');

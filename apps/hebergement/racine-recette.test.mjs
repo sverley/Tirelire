@@ -1,4 +1,7 @@
 /**
+ * Harnais d'audit de #233, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
  * #233 — la version de développement, le site de `main`, se dépose à la racine de la recette
  * (`apercu.sh racine-deposer`). Cette racine porte aussi ce qui ne vient pas du site : les aperçus
  * des PR (`pr-<numéro>`), le `robots.txt` posé à la main, les paquets du relais de la recette et sa
@@ -9,8 +12,6 @@
  *
  * Où chaque événement dépose (points 1 et 2 de #233) se lit dans le workflow joué à blanc :
  * `packages/gardes/distributions.test.mjs`. Aucune adresse réelle ici (#141).
- *
- * Tests du codeur de #233, au niveau 4 (D83, #285).
  */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -126,7 +127,7 @@ function apercu(action, env) {
 // Un cas de D83, « Livraison » (#233) — la version de développement se vérifie à la racine de la
 // recette.
 describe('[niveau 4] D83, livraison (#233) · l’adresse de la version de développement, sans numéro de PR', () => {
-  test('racine-reglages : l’adresse de la racine de la recette, sans numéro de PR', () => {
+  test('[niveau 2] racine-reglages : l’adresse de la racine de la recette, sans numéro de PR', () => {
     const r = apercu('racine-reglages', { ...RECETTE, TIRELIRE_DEV_SITE_URL: 'https://Recette.Exemple.test/' });
     assert.equal(r.code, 0, r.sortie);
     assert.equal(r.sortie.trim(), 'adresse=https://recette.exemple.test/');
@@ -141,7 +142,7 @@ describe('[niveau 4] D83, livraison (#233) · l’adresse de la version de déve
 // effacerait ce qui n'est pas dans le site. Les autres cas du dépôt (aperçus, robots.txt et paquets
 // laissés en place, adresse de recette manquante) vont avec, le démarrage du serveur FTP pesant seul.
 describe('[niveau 4] D83, livraison (#233) · main se dépose à la racine de la recette, jamais en production', () => {
-  test('racine-deposer : le site monte à la racine de la recette ; aperçus, robots.txt et paquets du relais restent, nettoyage compris', { skip: !strict && raison }, async (t) => {
+  test('[niveau 1] racine-deposer : le site monte à la racine de la recette ; aperçus, robots.txt et paquets du relais restent, nettoyage compris', { skip: !strict && raison }, async (t) => {
     assert.equal(raison, false, `${raison}, alors que TIRELIRE_STRICT rend l'outil obligatoire`);
     const base = mkdtempSync(path.join(tmpdir(), 'racine-recette-'));
     const source = path.join(base, 'site');

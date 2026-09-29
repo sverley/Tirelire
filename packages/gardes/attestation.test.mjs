@@ -1,8 +1,11 @@
 /**
+ * Harnais d'audit de #237, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
  * Tests de #237 : la livraison atteste ce qu'elle a joué, la CI ne joue que le manque (D83). Depuis
  * #266, l'attestation porte l'empreinte de chaque ensemble trouvé vert, et le seuil 1 du Ready se
  * saute lui aussi sur une empreinte verte ; ce que #266 ajoute a ses propres tests
- * (`empreintes.test.mjs`). Tests du codeur, au niveau 4 (D83, #285).
+ * (`empreintes.test.mjs`).
  *
  * **Qu'aucun rouge ne fusionne** — principe 10.1 et D83 (« aucun job sauté ne peut laisser
  * fusionner ce qu'un job joué aurait rougi ») : la CI ne saute que ce que l'attestation couvre, sur
@@ -182,7 +185,7 @@ describe('[niveau 4] #237, principe 10.1 · la CI ne saute que ce que la livrais
     assert.equal(couvre(après([{ sha: B, statut: 'success', empreintes: EA }]), demande({ arbre: B, seuil: 1 })).couvert, false, 'fichier pour un autre arbre que celui extrait');
   });
 
-  test('le statut lu après la fusion est « Toute la CI sur ce commit », et lui seul', () => {
+  test('[niveau 1] le statut lu après la fusion est « Toute la CI sur ce commit », et lui seul', () => {
     assert.equal(etatDuStatut([{ context: 'autre', state: 'success' }]), null, 'un autre statut vert ne vaut pas le vert du Ready');
     assert.equal(etatDuStatut([{ context: 'autre', state: 'success' }, { context: 'Toute la CI sur ce commit', state: 'failure' }]), 'failure');
     assert.equal(etatDuStatut(null), null);
@@ -211,7 +214,7 @@ describe('[niveau 4] #237, principe 10.1 · la CI ne saute que ce que la livrais
     assert.ok(LUS_PAR_LE_NAVIGATEUR.every((f) => lit('navigateur', f)), 'la liste du point 9 ne le fait pas');
   });
 
-  test('au Ready, une branche qui ne contient pas le dernier main est à mettre à jour : échec, et rien d’écrit', () => {
+  test('[niveau 1] au Ready, une branche qui ne contient pas le dernier main est à mettre à jour : échec, et rien d’écrit', () => {
     const { dépôt, git } = petitDépôt('pas-a-jour');
     writeFileSync(join(dépôt, 'a.txt'), '1\n');
     git('add', '-A');
@@ -233,7 +236,7 @@ describe('[niveau 4] #237, principe 10.1 · la CI ne saute que ce que la livrais
     assert.equal(existsSync(sortie), false, "rien ne doit rester à passer à `pnpm test`");
   });
 
-  test('au Ready, l’étape qui vérifie la branche et lit l’attestation bloque, avant toute étape de tests', () => {
+  test('[niveau 1] au Ready, l’étape qui vérifie la branche et lit l’attestation bloque, avant toute étape de tests', () => {
     const liste = joués(auReady);
     const i = liste.findIndex(({ c }) => /attestation\.mjs ready\b/.test(c));
     assert.ok(i >= 0, `${CI} : au Ready, aucune étape ne lance \`attestation.mjs ready\` (points 2 et 3)`);
@@ -273,7 +276,7 @@ describe('[niveau 4] #237 · la livraison atteste, la CI saute ce qui est couver
     assert.equal(couvre(couvertureApresFusion({ arbre: A, empreintes: EA, tetes: [{ sha: B, statut: 'success', empreintes: EA }] }), SEUIL_1('packages/core')).couvert, true, 'sur main, un ensemble vert au Ready sur la même empreinte se saute');
   });
 
-  test('point 9 · une PR qui ne change que des chemins que les tests navigateur ne lisent pas, ou la garde, les saute sans attestation', () => {
+  test('[niveau 3] point 9 · une PR qui ne change que des chemins que les tests navigateur ne lisent pas, ou la garde, les saute sans attestation', () => {
     for (const f of NON_LUS) assert.equal(navigateurSautéSiSeul(f), true, `${f} : les tests navigateur se sautent`);
     const r = readySur('docs-seuls', 'docs/decisions.md');
     assert.equal(r.status, 0, r.stdout + r.stderr);
