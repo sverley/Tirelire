@@ -1,6 +1,6 @@
 /**
- * Harnais de #113 : un harnais joué en local ne sort pas de la machine (D83, docs/gardes.md, « Dans
- * chaque lanceur local »). Niveau 0 : une donnée sortie de l'appareil le reste après correction.
+ * #113 : un harnais joué en local ne sort pas de la machine (D83, docs/gardes.md, « Dans chaque
+ * lanceur local »). Tests du codeur, au niveau 4 (D83, #285).
  *
  * Sorti de `gardes.test.mjs` par #243 : il vérifie ce besoin, pas la garde elle-même (D81).
  */
@@ -16,7 +16,7 @@ import * as V from './gardes.mjs';
 import { RACINE } from './gardes.mjs';
 import { cibleDe, designer, estLocal, message, tentatives, vider } from './sans-sortie.mjs';
 
-describe('[niveau 0] D83 · un harnais joué en local ne sort pas de la machine (#113)', () => {
+describe('[niveau 4] D83 · un harnais joué en local ne sort pas de la machine (#113)', () => {
   const PRECHARGE = pathToFileURL(join(RACINE, V.SANS_SORTIE)).href;
 
   /** Joue `node --test` avec la garde préchargée, dans un dossier jetable garni de `fichiers`. */

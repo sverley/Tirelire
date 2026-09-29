@@ -1,8 +1,8 @@
 /**
  * #248 · Un workflow déclenché par `pull_request_target` n'exécute rien de la PR ; il peut en lire les
  * données (D83, « Workflows »). Il tourne avec les droits du dépôt et ses secrets : extraire la tête
- * de la PR, ou sa référence de fusion, y ferait tourner les scripts de la PR avec eux. Niveau 0 : un
- * secret exposé.
+ * de la PR, ou sa référence de fusion, y ferait tourner les scripts de la PR avec eux : un secret
+ * serait exposé. Tests du codeur de #248, au niveau 4 (D83, #285).
  *
  * Les workflows se lisent dans `.github/workflows/`, sans être nommés : un workflow ajouté plus tard
  * est lu comme les autres. Le lecteur est `rien-de-la-pr.mjs`.
@@ -44,7 +44,7 @@ const EXTRACTIONS = [
   ['la PR, par gh', '      - run: gh pr checkout "${{ github.event.pull_request.number }}"'],
 ];
 
-describe('[niveau 0] D83, « Workflows » : un workflow déclenché par pull_request_target n’exécute rien de la PR (#248)', () => {
+describe('[niveau 4] D83, « Workflows » : un workflow déclenché par pull_request_target n’exécute rien de la PR (#248)', () => {
   test('#248 · aucun workflow déclenché par pull_request_target n’extrait la PR : il la lit comme une donnée', () => {
     const lus = workflows().filter(({ yaml }) => déclenchéParPullRequestTarget(yaml));
     assert.ok(lus.length > 0, `aucun workflow déclenché par pull_request_target dans ${DOSSIER}`);

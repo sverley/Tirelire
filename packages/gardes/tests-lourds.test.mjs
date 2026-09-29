@@ -2,20 +2,20 @@
  * Tests de #264 (réduit le 28/09 aux parties A et C) : les tests navigateur au Ready, le moins cher
  * d'abord, et les branches d'une PR fermée (D83). Depuis #266, ce qui se joue suit les empreintes :
  * le seuil 1 du Ready se saute sur une empreinte verte, et ce que #266 ajoute a ses tests
- * (`empreintes.test.mjs`).
+ * (`empreintes.test.mjs`). Tests du codeur, au niveau 4 (D83, #285).
  *
- * **Au niveau 1** — D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait
- * rougi », « au tag, rien ne se saute ») : au tag, rien ne se saute.
+ * **Qu'aucun rouge ne fusionne** — D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job
+ * joué aurait rougi », « au tag, rien ne se saute ») : au tag, rien ne se saute.
  *
- * **Au niveau 2** — les règles de #264, dont l'erreur ne coûterait que du temps ou une branche à
- * recréer : la livraison joue le typecheck, puis les tests sans navigateur, et les tests navigateur
- * sur demande seulement, après le reste ; demandés et verts, ils sont attestés et la CI ne les rejoue
- * pas sur le même arbre ; à la fermeture d'une PR, ses branches sont supprimées par leur nom exact.
+ * **Les règles de #264**, dont l'erreur ne coûterait que du temps ou une branche à recréer : la
+ * livraison joue le typecheck, puis les tests sans navigateur, et les tests navigateur sur demande
+ * seulement, après le reste ; demandés et verts, ils sont attestés et la CI ne les rejoue pas sur
+ * le même arbre ; à la fermeture d'une PR, ses branches sont supprimées par leur nom exact.
  *
- * **Au niveau 3** — le dégradé : ce que chaque moment dit (point 9).
+ * **Le dégradé** : ce que chaque moment dit (point 9).
  *
  * Les livraisons se jouent dans un petit dépôt factice, une fois chacune (`mémo`), et servent aux
- * tests des niveaux 2 et 3.
+ * tests des règles et du dégradé.
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
@@ -165,9 +165,9 @@ const étapesDuTest = (ctx, échoue) => jouer(lireFichier(CI), ctx, échoue).fin
 const lancementsDeTests = (étapes) => étapes.flatMap((c) => c.split('\n')).filter((l) => /\bpnpm\b.*\btest\b|harnais-du-besoin\.sh --jouer/.test(l));
 const NAVIGATEUR_CI = /--navigateur .*test\/navigateur/;
 
-// ─── Niveau 1 : au Ready, le seuil 1 ; au tag, rien ne se saute ─────────────────────────────────
+// ─── Au Ready, le seuil 1 ; au tag, rien ne se saute ────────────────────────────────────────────
 
-describe('[niveau 1] #264, D83 · au tag, rien ne se saute', () => {
+describe('[niveau 4] #264, D83 · au tag, rien ne se saute', () => {
   test('au tag, le seuil 3 se joue tests navigateur compris, et aucune étape ne lit d’attestation', () => {
     const l = lancementsDeTests(étapesDuTest(AU_TAG));
     assert.ok(l.some((c) => /\bpnpm test 3\b/.test(c)), `au tag, le seuil 3 se joue\n${l.join('\n')}`);
@@ -176,9 +176,9 @@ describe('[niveau 1] #264, D83 · au tag, rien ne se saute', () => {
   });
 });
 
-// ─── Niveau 2 : le moins cher d'abord, le navigateur au Ready ───────────────────────────────────
+// ─── Le moins cher d'abord, le navigateur au Ready ──────────────────────────────────────────────
 
-describe('[niveau 2] #264, points 5 à 8 · le moins cher d’abord, les tests navigateur au Ready ou sur demande', () => {
+describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests navigateur au Ready ou sur demande', () => {
   test('point 6 · la livraison ne joue pas les tests navigateur de non-régression sans demande, navigateur présent', async () => {
     const r = await livraisonVerte();
     assert.equal(r.push.code, 0, r.push.sortie);
@@ -236,7 +236,7 @@ describe('[niveau 2] #264, points 5 à 8 · le moins cher d’abord, les tests n
   });
 });
 
-// ─── Niveau 2 : les branches, à la fermeture d'une PR ───────────────────────────────────────────
+// ─── Les branches, à la fermeture d'une PR ──────────────────────────────────────────────────────
 
 function apiDeBranches(branches, prs = []) {
   const d = { branches: branches.map((nom, i) => ({ nom, commit: String(i + 1).repeat(40).slice(0, 40) })), supprimées: [] };
@@ -259,7 +259,7 @@ function apiDeBranches(branches, prs = []) {
   return { d, gh: client({ jeton: 'j', depot: 'o/r', appeler }) };
 }
 
-describe('[niveau 2] #264, points 10 et 11 · les branches, à la fermeture d’une PR', () => {
+describe('[niveau 4] #264, points 10 et 11 · les branches, à la fermeture d’une PR', () => {
   const TÊTE = 'codage/264-tests';
   const VOISINES = [TÊTE, `${TÊTE}-bis--attestation`, `${TÊTE}--attestation-2`, `codage/2640-tests--attestation`, `x/${TÊTE}--attestation`, 'main'];
 
@@ -304,9 +304,9 @@ describe('[niveau 2] #264, points 10 et 11 · les branches, à la fermeture d’
   });
 });
 
-// ─── Niveau 3 : ce que chaque moment dit ───────────────────────────────────────────────────────
+// ─── Ce que chaque moment dit ──────────────────────────────────────────────────────────────────
 
-describe('[niveau 3] #264, point 9 · chaque moment qui ne joue pas les tests navigateur dit pourquoi', () => {
+describe('[niveau 4] #264, point 9 · chaque moment qui ne joue pas les tests navigateur dit pourquoi', () => {
   test('la livraison sans demande les dit laissés au Ready faute de demande', async () => {
     assert.match((await livraisonVerte()).push.sortie, FAUTE_DE_DEMANDE);
   });

@@ -9,6 +9,8 @@
  *
  * Où chaque événement dépose (points 1 et 2 de #233) se lit dans le workflow joué à blanc :
  * `packages/gardes/distributions.test.mjs`. Aucune adresse réelle ici (#141).
+ *
+ * Tests du codeur de #233, au niveau 4 (D83, #285).
  */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -121,9 +123,9 @@ function apercu(action, env) {
   return { code: r.status, sortie: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 
-// Niveau 2 (D83) : un cas de D83, « Livraison » (#233) — la version de développement se vérifie à
-// la racine de la recette.
-describe('[niveau 2] D83, livraison (#233) · l’adresse de la version de développement, sans numéro de PR', () => {
+// Un cas de D83, « Livraison » (#233) — la version de développement se vérifie à la racine de la
+// recette.
+describe('[niveau 4] D83, livraison (#233) · l’adresse de la version de développement, sans numéro de PR', () => {
   test('racine-reglages : l’adresse de la racine de la recette, sans numéro de PR', () => {
     const r = apercu('racine-reglages', { ...RECETTE, TIRELIRE_DEV_SITE_URL: 'https://Recette.Exemple.test/' });
     assert.equal(r.code, 0, r.sortie);
@@ -131,16 +133,14 @@ describe('[niveau 2] D83, livraison (#233) · l’adresse de la version de déve
   });
 });
 
-// Niveau 1 (D83), même besoin que « témoin rouge · une CI qui dépose main en production »
+// Même besoin que « témoin rouge · une CI qui dépose main en production »
 // (packages/gardes/distributions.test.mjs, niveau 1) : D83, « Livraison » — « La production ne suit
 // que les versions publiées : seul un tag v* la dépose ; ni un push sur main, ni un lancement manuel
 // ne la touchent » —, ce que constate aussi `VM-C3-depot-main` au registre (C3). Les mêmes
 // identifiants FTP servent : un dossier faux, avec le nettoyage, déposerait main en production et en
-// effacerait ce qui n'est pas dans le site. Pas plus bas : les données restent sur les appareils, et
-// aucun secret n'y est exposé. Les autres cas du dépôt (aperçus, robots.txt et paquets laissés en
-// place, adresse de recette manquante) vont avec : les en sortir ne ferait gagner aucun seuil de
-// façon mesurable, le démarrage du serveur FTP pesant seul.
-describe('[niveau 1] D83, livraison (#233) · main se dépose à la racine de la recette, jamais en production', () => {
+// effacerait ce qui n'est pas dans le site. Les autres cas du dépôt (aperçus, robots.txt et paquets
+// laissés en place, adresse de recette manquante) vont avec, le démarrage du serveur FTP pesant seul.
+describe('[niveau 4] D83, livraison (#233) · main se dépose à la racine de la recette, jamais en production', () => {
   test('racine-deposer : le site monte à la racine de la recette ; aperçus, robots.txt et paquets du relais restent, nettoyage compris', { skip: !strict && raison }, async (t) => {
     assert.equal(raison, false, `${raison}, alors que TIRELIRE_STRICT rend l'outil obligatoire`);
     const base = mkdtempSync(path.join(tmpdir(), 'racine-recette-'));

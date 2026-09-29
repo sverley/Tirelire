@@ -7,8 +7,9 @@
  * navigateur », et « le pré-commit ne fait qu'en afficher le verdict, sans bloquer, sauf une erreur de
  * syntaxe ». Le harnais du besoin qui vit dans le navigateur se joue à la livraison (#264, point 7).
  *
- * Niveau 2 (D83) : si ces cas tombaient, le crochet refuserait à tort un commit ou jouerait ce que
- * D83 exclut ; l'usage resterait possible. Les trois points couvrent le même besoin : même niveau.
+ * Si ces cas tombaient, le crochet refuserait à tort un commit ou jouerait ce que D83 exclut ;
+ * l'usage resterait possible. Les trois points couvrent le même besoin. Tests du codeur, au niveau
+ * 4 (D83, #285).
  *
  * Chaque scénario est une branche d'audit inventée (`audit/<n>-…`) qui ajoute un harnais du besoin
  * — des fichiers de test qui portent « Harnais d'audit de #<n> » — et touche `docs/gardes.md`, ce qui
@@ -132,7 +133,7 @@ const détail = (r) => `\n--- sortie du pré-commit ---\n${r.sortie.slice(-2500)
 /** La ligne qui nomme le harnais du besoin non joué dans le navigateur, et dit qu'il se joue à la livraison. */
 const ligneNavigateur = (r) => r.sortie.split('\n').find((l) => l.includes(NAVIGATEUR) && /livraison/i.test(l));
 
-describe('[niveau 2] #272 · au commit, le harnais du besoin qui vit dans le navigateur ne se joue pas et ne bloque pas', () => {
+describe('[niveau 4] #272 · au commit, le harnais du besoin qui vit dans le navigateur ne se joue pas et ne bloque pas', () => {
   after(() => {
     if (dossierTemporaire) rmSync(dossierTemporaire, { recursive: true, force: true });
   });

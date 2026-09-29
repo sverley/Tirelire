@@ -2,19 +2,19 @@
  * Tests de #237 : la livraison atteste ce qu'elle a joué, la CI ne joue que le manque (D83). Depuis
  * #266, l'attestation porte l'empreinte de chaque ensemble trouvé vert, et le seuil 1 du Ready se
  * saute lui aussi sur une empreinte verte ; ce que #266 ajoute a ses propres tests
- * (`empreintes.test.mjs`).
+ * (`empreintes.test.mjs`). Tests du codeur, au niveau 4 (D83, #285).
  *
- * **Au niveau 1** — principe 10.1 et D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job
- * joué aurait rougi ») : la CI ne saute que ce que l'attestation couvre, sur l'arbre même qu'elle
- * teste ; au Ready, un ensemble qui n'est pas vert sur son empreinte se joue, seuil 1 compris ; une
- * branche qui ne contient pas le dernier `main` est à mettre à jour, et la commande échoue avant toute
- * étape de tests ; après la fusion, seul un ensemble trouvé vert au Ready, ou inchangé depuis le
- * premier parent, saute ses tests ; au tag `v*`, rien ne se saute ; une PR qui change ce que les tests
- * navigateur lisent (point 9) les fait jouer.
+ * **Qu'aucun rouge ne fusionne** — principe 10.1 et D83 (« aucun job sauté ne peut laisser
+ * fusionner ce qu'un job joué aurait rougi ») : la CI ne saute que ce que l'attestation couvre, sur
+ * l'arbre même qu'elle teste ; au Ready, un ensemble qui n'est pas vert sur son empreinte se joue,
+ * seuil 1 compris ; une branche qui ne contient pas le dernier `main` est à mettre à jour, et la
+ * commande échoue avant toute étape de tests ; après la fusion, seul un ensemble trouvé vert au
+ * Ready, ou inchangé depuis le premier parent, saute ses tests ; au tag `v*`, rien ne se saute ;
+ * une PR qui change ce que les tests navigateur lisent (point 9) les fait jouer.
  *
- * **Au niveau 2** — le cas nominal de la décision, dont l'échec ne coûterait que de la CI : la
- * livraison verte écrit son attestation et l'envoie avec le push ; la CI la lit, et le lanceur saute
- * ce qu'elle couvre en le disant, seuil 1 compris ; une PR qui ne change que des chemins que les tests
+ * **Le cas nominal de la décision**, dont l'échec ne coûterait que de la CI : la livraison verte
+ * écrit son attestation et l'envoie avec le push ; la CI la lit, et le lanceur saute ce qu'elle
+ * couvre en le disant, seuil 1 compris ; une PR qui ne change que des chemins que les tests
  * navigateur ne lisent pas, ou la garde, les saute sans attestation (point 9).
  *
  * `node:test` n'a pas de `test.fails` : l'échec attendu d'un témoin tient dans une assertion
@@ -143,7 +143,7 @@ const joués = (ctx) => jouer(lireFichier(CI), ctx).flatMap((job) => job.joués.
 const deTests = (c) => /\bpnpm\b[^\n]*\btest\b|harnais-du-besoin/.test(c);
 const laisseÉchouer = (job, é) => /^ +(?:- )?continue-on-error:\s*true/m.test(é.texte) || /^ {4}continue-on-error:\s*true/m.test(job.lignes.join('\n'));
 
-describe('[niveau 1] #237, principe 10.1 · la CI ne saute que ce que la livraison a joué sur cet arbre', () => {
+describe('[niveau 4] #237, principe 10.1 · la CI ne saute que ce que la livraison a joué sur cet arbre', () => {
   test('sans attestation, ou pour un autre arbre, tout se joue', () => {
     const c = auReadyDe(attestation());
     assert.equal(couvre(null, NAVIGATEUR).couvert, false, 'sans attestation, les tests navigateur se jouent');
@@ -263,7 +263,7 @@ describe('[niveau 1] #237, principe 10.1 · la CI ne saute que ce que la livrais
   });
 });
 
-describe('[niveau 2] #237 · la livraison atteste, la CI saute ce qui est couvert', () => {
+describe('[niveau 4] #237 · la livraison atteste, la CI saute ce qui est couvert', () => {
   test('ce que l’attestation couvre se saute : tests navigateur demandés, harnais vert, paquet joué au seuil 2', () => {
     const c = auReadyDe(attestation());
     assert.equal(couvre(c, NAVIGATEUR).couvert, true, 'les tests navigateur joués verts sur la même empreinte se sautent');

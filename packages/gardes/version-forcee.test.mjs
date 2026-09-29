@@ -1,15 +1,17 @@
 /**
- * Tests de #274 : publier une version forcée du dernier `main`, d'un déclenchement manuel.
+ * Tests de #274 : publier une version forcée du dernier `main`, d'un déclenchement manuel. Tests du
+ * codeur, au niveau 4 (D83, #285).
  *
- * **Au niveau 1** — D83 (« Publication d'une version : 3, tests navigateur activés ; rien ne se
- * saute »), comme au tag poussé à la main (`niveaux-des-tests.test.mjs`, `tests-lourds.test.mjs`) :
- * une version forcée joue le seuil 3 en entier, et rien ne se publie — ni tag, ni dépôt en
- * production, ni APK, ni release — tant qu'il n'est pas vert ; le tag et le dépôt viennent après.
+ * **Rien ne se publie sur un rouge** — D83 (« Publication d'une version : 3, tests navigateur
+ * activés ; rien ne se saute »), comme au tag poussé à la main (`niveaux-des-tests.test.mjs`,
+ * `tests-lourds.test.mjs`) : une version forcée joue le seuil 3 en entier, et rien ne se publie —
+ * ni tag, ni dépôt en production, ni APK, ni release — tant qu'il n'est pas vert ; le tag et le
+ * dépôt viennent après.
  *
- * **Au niveau 2** — les règles de #274, l'usage restant possible si elles tombaient : le nom (la
- * base, le hash, les versions forcées écartées, `v0.0` sans version publiée, jamais une version
- * numérotée) ; rien ne se publie sur un commit déjà publié, ni hors de `main`, et le déclenchement le
- * dit ; le déclenchement est manuel, sans autre saisie.
+ * **Les règles de #274** : l'usage restant possible si elles tombaient : le nom (la base, le hash,
+ * les versions forcées écartées, `v0.0` sans version publiée, jamais une version numérotée) ; rien
+ * ne se publie sur un commit déjà publié, ni hors de `main`, et le déclenchement le dit ; le
+ * déclenchement est manuel, sans autre saisie.
  *
  * `ci.yml` est joué à blanc (`workflow-a-blanc.mjs`) : une version forcée y arrive par
  * `workflow_call`, depuis `version-forcee.yml`, lancé à la main sur `main` ; le contexte `github` est
@@ -70,7 +72,7 @@ function réécrireJob(yaml, nom, changer) {
   return lignes.join('\n');
 }
 
-// ─── Niveau 1 : le seuil 3 en entier, puis le tag, puis la publication ──────────────────────────
+// ─── Le seuil 3 en entier, puis le tag, puis la publication ─────────────────────────────────────
 
 /** Ce que D83 demande à une version forcée, rejoué aussi sur des workflows cassés. */
 function seuil3PuisPublication(yaml) {
@@ -103,7 +105,7 @@ function seuil3PuisPublication(yaml) {
   }
 }
 
-describe('[niveau 1] #274, D83 · une version forcée joue le seuil 3 en entier ; le tag et le dépôt ne viennent qu’après, et rien ne se publie sur un rouge', () => {
+describe('[niveau 4] #274, D83 · une version forcée joue le seuil 3 en entier ; le tag et le dépôt ne viennent qu’après, et rien ne se publie sur un rouge', () => {
   test('le seuil 3, tests navigateur compris, sans rien sauter ; puis le tag ; puis le dépôt en production, l’APK et la release', () => {
     seuil3PuisPublication(lire(CI));
   });
@@ -136,9 +138,9 @@ describe('[niveau 1] #274, D83 · une version forcée joue le seuil 3 en entier 
   });
 });
 
-// ─── Niveau 2 : le nom, les refus, le déclenchement ─────────────────────────────────────────────
+// ─── Le nom, les refus, le déclenchement ────────────────────────────────────────────────────────
 
-describe('[niveau 2] #274 · le nom d’une version forcée', () => {
+describe('[niveau 4] #274 · le nom d’une version forcée', () => {
   test('le dernier numéro de version publié, un tiret, le hash court du commit', () => {
     assert.equal(nomDeLaVersionForcée(['v0.1', 'v0.2'], SHA), 'v0.2-1a2b3c4');
   });
@@ -169,7 +171,7 @@ describe('[niveau 2] #274 · le nom d’une version forcée', () => {
   });
 });
 
-describe('[niveau 2] #274 · rien ne se publie sur un commit déjà publié, ni hors de main, et le déclenchement le dit', () => {
+describe('[niveau 4] #274 · rien ne se publie sur un commit déjà publié, ni hors de main, et le déclenchement le dit', () => {
   test('un commit qui porte déjà une version, forcée ou numérotée, est refusé', () => {
     for (const tagsDuCommit of [['v0.2'], ['v0.2-1a2b3c4'], ['latest', 'v1.0-rc1']]) {
       const d = décider({ ref: 'refs/heads/main', sha: SHA, tags: ['v0.2', ...tagsDuCommit], tagsDuCommit });
@@ -230,7 +232,7 @@ describe('[niveau 2] #274 · rien ne se publie sur un commit déjà publié, ni 
   });
 });
 
-describe('[niveau 2] #274 · le déclenchement : manuel, sans autre saisie, et le tag porte le nom trouvé', () => {
+describe('[niveau 4] #274 · le déclenchement : manuel, sans autre saisie, et le tag porte le nom trouvé', () => {
   test('version-forcee.yml : un lancement manuel sans saisie, qui appelle ci.yml en version forcée', () => {
     const yaml = lire(DÉCLENCHEMENT);
     const entête = yaml.split('\njobs:')[0];
@@ -294,8 +296,8 @@ describe('[niveau 2] #274 · le déclenchement : manuel, sans autre saisie, et l
   });
 });
 
-// Le témoin du niveau 2 : l'étape du nom, qui se laisserait échouer.
-describe('[niveau 2] #274 · témoin rouge', () => {
+// Le témoin des règles de #274 : l'étape du nom, qui se laisserait échouer.
+describe('[niveau 4] #274 · témoin rouge', () => {
   test('témoin rouge · une étape du nom qui se laisse échouer : le commit déjà publié se republierait', () => {
     const yaml = lire(CI);
     const cassé = réécrireJob(yaml, 'test', (lignes) => lignes.flatMap((l) => (/^ {8}run: node packages\/gardes\/version-forcee\.mjs nom/.test(l) ? [l, '        continue-on-error: true'] : [l])));

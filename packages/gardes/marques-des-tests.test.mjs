@@ -1,15 +1,15 @@
 /**
- * Harnais final de #236, point 8 de #246 : sur tout le dépôt, chaque test porte sa marque de
- * niveau, `[niveau N]`, sur lui ou sur une suite qui l'englobe (D83).
+ * #236, point 8 de #246 : sur tout le dépôt, chaque test porte sa marque de niveau, `[niveau N]`,
+ * sur lui ou sur une suite qui l'englobe (D83).
  *
  * Ce n'est pas un test de la garde (D81 : « ses trois vérifications et la règle des harnais ») : il
- * appartient au harnais d'un besoin, et se joue par `pnpm test` à son niveau.
+ * appartient au codeur qui l'a écrit, tant qu'un auditeur ne le retient pas dans un harnais, et se
+ * joue par `pnpm test` à son niveau.
  *
- * **Au niveau 1** — D83 : le besoin couvert est « chaque test porte sa marque ». S'il cesse d'être
- * tenu sans que personne le voie, un test sans marque est lu au niveau 2 : s'il garde un invariant
- * ou un usage, il quitte le seuil 1 du Ready, et un rouge ne se découvre qu'après la fusion
- * (principe 10.1). Les témoins prennent ce niveau (D83 : « un témoin rouge prend le niveau de ce
- * qu'il garde »).
+ * Le besoin couvert (D83) : « chaque test porte sa marque ». S'il cesse d'être tenu sans que
+ * personne le voie, un test sans marque est lu au niveau 2 : s'il garde un invariant ou un usage,
+ * il quitte le seuil 1 du Ready, et un rouge ne se découvre qu'après la fusion (principe 10.1).
+ * Tests du codeur, au niveau 4 (D83, #285).
  *
  * Les fichiers lus sont ceux que les ensembles jouent — `*.test.*` du cœur, de l'interface (headless
  * et navigateur), de la garde, du relais et de l'hébergement — et les tests de développement de la
@@ -46,7 +46,7 @@ function testsSansMarque(source) {
 
 const fichiersDeTest = () => fichiersDuDepot(RACINE).filter((f) => FICHIER_DE_TEST.test(f));
 
-describe('[niveau 1] #236 point 1, D83 · chaque test du dépôt porte sa marque de niveau, sur lui ou sur une suite qui l’englobe', () => {
+describe('[niveau 4] #236 point 1, D83 · chaque test du dépôt porte sa marque de niveau, sur lui ou sur une suite qui l’englobe', () => {
   test('aucun test du dépôt n’est sans marque', () => {
     const sans = fichiersDeTest().flatMap((f) => testsSansMarque(readFileSync(join(RACINE, f), 'utf8')).map((t) => `${f} : ${t}`));
     assert.deepEqual(

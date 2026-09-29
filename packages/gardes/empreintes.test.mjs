@@ -1,22 +1,23 @@
 /**
- * Tests de #266 : chaque ensemble de tests a son empreinte, et rien ne se rejoue sur du code inchangé
- * (D83). Le travail conservé de #264 (`927a4ae`) en est le départ.
+ * Tests de #266 : chaque ensemble de tests a son empreinte, et rien ne se rejoue sur du code
+ * inchangé (D83). Le travail conservé de #264 (`927a4ae`) en est le départ. Tests du codeur, au
+ * niveau 4 (D83, #285).
  *
- * **Au niveau 1** — principe 10.1 et D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job
- * joué aurait rougi ») : l'empreinte de chaque ensemble change avec tout fichier qu'il lit, un chemin
- * oublié de la liste compris (point 1) ; un ensemble ne se saute que vert sur la même empreinte, à un
- * seuil au moins égal (point 2), et un lancement ne se saute que si chaque ensemble qu'il joue l'est ;
- * un ensemble rouge, non joué, ou dont un test s'est sauté faute d'outil, n'est pas attesté vert —
- * par la livraison elle-même, sous son nom (point 3) ; au Ready, sur `main` et au tag, rien ne se
- * saute hors d'une empreinte verte à un seuil au moins égal, et au tag, aucune ne l'est au seuil 3
- * (point 4).
+ * **Qu'aucun rouge ne fusionne** — principe 10.1 et D83 (« aucun job sauté ne peut laisser
+ * fusionner ce qu'un job joué aurait rougi ») : l'empreinte de chaque ensemble change avec tout
+ * fichier qu'il lit, un chemin oublié de la liste compris (point 1) ; un ensemble ne se saute que
+ * vert sur la même empreinte, à un seuil au moins égal (point 2), et un lancement ne se saute que
+ * si chaque ensemble qu'il joue l'est ; un ensemble rouge, non joué, ou dont un test s'est sauté
+ * faute d'outil, n'est pas attesté vert — par la livraison elle-même, sous son nom (point 3) ; au
+ * Ready, sur `main` et au tag, rien ne se saute hors d'une empreinte verte à un seuil au moins
+ * égal, et au tag, aucune ne l'est au seuil 3 (point 4).
  *
- * **Au niveau 3** — le dégradé : si ces tests tombent, le résultat reste juste, obtenu plus lentement
- * ou moins lisiblement. Ce qui a tourné vert ne se rejoue pas — au crochet suivant, dans une autre
- * session, au Ready, seuil 1 compris, sur `main` ; une empreinte verte se garde d'un push à l'autre ;
- * les tests navigateur demandés et joués verts ne se rejouent pas en CI sur la même empreinte (points
- * 2, 4 à 6) ; chaque moment dit, pour chaque ensemble, ce qu'il a joué ou pourquoi il ne l'a pas joué
- * (point 7). Les parcours qui montent de vrais dépôts y vivent : ils ne coûtent qu'au seuil 3.
+ * **Le dégradé** : si ces tests tombent, le résultat reste juste, obtenu plus lentement ou moins
+ * lisiblement. Ce qui a tourné vert ne se rejoue pas — au crochet suivant, dans une autre session,
+ * au Ready, seuil 1 compris, sur `main` ; une empreinte verte se garde d'un push à l'autre ; les
+ * tests navigateur demandés et joués verts ne se rejouent pas en CI sur la même empreinte (points
+ * 2, 4 à 6) ; chaque moment dit, pour chaque ensemble, ce qu'il a joué ou pourquoi il ne l'a pas
+ * joué (point 7). Les parcours qui montent de vrais dépôts y vivent.
  *
  * Les livraisons se jouent dans un petit dépôt factice, avec les crochets et la garde du dépôt.
  * `node:test` n'a pas de `test.fails` : l'échec attendu d'un témoin tient dans une assertion
@@ -181,9 +182,9 @@ const lancementsDeTests = (ctx) =>
     .flatMap((c) => c.split('\n'))
     .filter((l) => /\bpnpm\b.*\btest\b|harnais-du-besoin\.sh --jouer/.test(l));
 
-// ─── Niveau 1 ───────────────────────────────────────────────────────────────────────────────────
+// ─── Qu'aucun rouge ne fusionne ─────────────────────────────────────────────────────────────────
 
-describe('[niveau 1] #266, principe 10.1 · un ensemble ne se saute que vert sur la même empreinte', () => {
+describe('[niveau 4] #266, principe 10.1 · un ensemble ne se saute que vert sur la même empreinte', () => {
   test('point 1 · chaque ensemble a une empreinte, que change tout fichier qu’il lit, et tout fichier qu’aucune liste n’écarte', () => {
     for (const { id } of ENSEMBLES) {
       for (const f of LUS[id]) assert.ok(change(id, TYPES, f), `${id} : ${f} est lu, son changement doit changer l'empreinte`);
@@ -340,7 +341,7 @@ describe('[niveau 1] #266, principe 10.1 · un ensemble ne se saute que vert sur
   });
 });
 
-// ─── Niveau 2 : ce qui a tourné ne se rejoue pas ───────────────────────────────────────────────
+// ─── Ce qui a tourné ne se rejoue pas ──────────────────────────────────────────────────────────
 
 /**
  * Un petit dépôt, tel que la livraison le juge : les crochets et la garde du dépôt, un cœur et une
@@ -446,7 +447,7 @@ const parcoursDuCoeur = () =>
     return r;
   })());
 
-describe('[niveau 3] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue pas', { concurrency: true }, () => {
+describe('[niveau 4] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue pas', { concurrency: true }, () => {
   test('point 2 · au premier push, se joue ce que la nature du besoin retient, sauf ce que main a déjà vert, et c’est attesté', async () => {
     const { premier } = await parcoursDuCoeur();
     assert.equal(premier.code, 0, premier.sortie);
@@ -541,9 +542,9 @@ describe('[niveau 3] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue p
 
 });
 
-// ─── Niveau 3 : ce que chaque moment dit ───────────────────────────────────────────────────────
+// ─── Ce que chaque moment dit ──────────────────────────────────────────────────────────────────
 
-describe('[niveau 3] #266, point 7 · chaque moment dit, pour chaque ensemble, ce qu’il a joué ou pourquoi il ne l’a pas joué', () => {
+describe('[niveau 4] #266, point 7 · chaque moment dit, pour chaque ensemble, ce qu’il a joué ou pourquoi il ne l’a pas joué', () => {
   test('la livraison dit chaque ensemble : joué, à quel seuil, avec quel verdict ; ou non joué, et pourquoi', async () => {
     const { premier, doc, demande: d } = await parcoursDuCoeur();
     for (const nom of ['cœur', 'interface sans navigateur']) assert.match(premier.sortie, new RegExp(`pré-push : ${nom} : joué au seuil 2 : vert\\.`), `${nom}\n${premier.sortie}`);
