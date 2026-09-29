@@ -1,8 +1,11 @@
 /**
+ * Harnais d'audit de #248, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
  * #248 · Un workflow déclenché par `pull_request_target` n'exécute rien de la PR ; il peut en lire les
  * données (D83, « Workflows »). Il tourne avec les droits du dépôt et ses secrets : extraire la tête
- * de la PR, ou sa référence de fusion, y ferait tourner les scripts de la PR avec eux. Niveau 0 : un
- * secret exposé.
+ * de la PR, ou sa référence de fusion, y ferait tourner les scripts de la PR avec eux : un secret
+ * serait exposé.
  *
  * Les workflows se lisent dans `.github/workflows/`, sans être nommés : un workflow ajouté plus tard
  * est lu comme les autres. Le lecteur est `rien-de-la-pr.mjs`.
@@ -44,14 +47,14 @@ const EXTRACTIONS = [
   ['la PR, par gh', '      - run: gh pr checkout "${{ github.event.pull_request.number }}"'],
 ];
 
-describe('[niveau 0] D83, « Workflows » : un workflow déclenché par pull_request_target n’exécute rien de la PR (#248)', () => {
-  test('#248 · aucun workflow déclenché par pull_request_target n’extrait la PR : il la lit comme une donnée', () => {
+describe('[niveau 4] D83, « Workflows » : un workflow déclenché par pull_request_target n’exécute rien de la PR (#248)', () => {
+  test('[niveau 0] #248 · aucun workflow déclenché par pull_request_target n’extrait la PR : il la lit comme une donnée', () => {
     const lus = workflows().filter(({ yaml }) => déclenchéParPullRequestTarget(yaml));
     assert.ok(lus.length > 0, `aucun workflow déclenché par pull_request_target dans ${DOSSIER}`);
     assert.deepEqual(lus.flatMap(({ fichier, yaml }) => extractionsSurPullRequestTarget(fichier, yaml)), [], 'un workflow déclenché par pull_request_target extrait la PR');
   });
 
-  test('#248 · témoin rouge · la tête de la PR, ou sa référence de fusion, extraite par un workflow d’aujourd’hui', () => {
+  test('[niveau 0] #248 · témoin rouge · la tête de la PR, ou sa référence de fusion, extraite par un workflow d’aujourd’hui', () => {
     const aujourdhui = ['apercu.yml', 'depot-apercu.yml', 'pret.yml', 'suivi.yml', 'validation.yml'].map((f) => `${DOSSIER}/${f}`);
     const lus = new Map(workflows().filter(({ yaml }) => déclenchéParPullRequestTarget(yaml)).map(({ fichier, yaml }) => [fichier, yaml]));
     for (const fichier of aujourdhui) {
@@ -77,7 +80,7 @@ describe('[niveau 0] D83, « Workflows » : un workflow déclenché par pull_req
     '      - run: gh pr view "${{ github.event.pull_request.number }}" --json body --jq .body',
   ].join('\n');
 
-  test('#248 · témoin rouge · un workflow inventé, déclenché par pull_request_target, qui extrait la PR', () => {
+  test('[niveau 0] #248 · témoin rouge · un workflow inventé, déclenché par pull_request_target, qui extrait la PR', () => {
     for (const on of ['on:\n  pull_request_target:\n    types: [opened]', 'on: [push, pull_request_target]', 'on: pull_request_target']) {
       const sain = inventé(on, LIRE_LA_PR);
       assert.ok(déclenchéParPullRequestTarget(sain), `« ${on} » : non lu comme déclenché par pull_request_target`);

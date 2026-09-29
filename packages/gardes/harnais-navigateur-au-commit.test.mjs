@@ -1,4 +1,7 @@
 /**
+ * Harnais d'audit de #272, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
  * Au commit, le harnais du besoin qui vit dans le navigateur ne se joue pas et ne bloque pas (#272).
  * Tests du codeur de #272, point 4 : ses points 1 à 3, rejoués sur `.githooks/pre-commit` dans une
  * copie du dépôt.
@@ -7,8 +10,8 @@
  * navigateur », et « le pré-commit ne fait qu'en afficher le verdict, sans bloquer, sauf une erreur de
  * syntaxe ». Le harnais du besoin qui vit dans le navigateur se joue à la livraison (#264, point 7).
  *
- * Niveau 2 (D83) : si ces cas tombaient, le crochet refuserait à tort un commit ou jouerait ce que
- * D83 exclut ; l'usage resterait possible. Les trois points couvrent le même besoin : même niveau.
+ * Si ces cas tombaient, le crochet refuserait à tort un commit ou jouerait ce que D83 exclut ;
+ * l'usage resterait possible. Les trois points couvrent le même besoin.
  *
  * Chaque scénario est une branche d'audit inventée (`audit/<n>-…`) qui ajoute un harnais du besoin
  * — des fichiers de test qui portent « Harnais d'audit de #<n> » — et touche `docs/gardes.md`, ce qui
@@ -132,12 +135,12 @@ const détail = (r) => `\n--- sortie du pré-commit ---\n${r.sortie.slice(-2500)
 /** La ligne qui nomme le harnais du besoin non joué dans le navigateur, et dit qu'il se joue à la livraison. */
 const ligneNavigateur = (r) => r.sortie.split('\n').find((l) => l.includes(NAVIGATEUR) && /livraison/i.test(l));
 
-describe('[niveau 2] #272 · au commit, le harnais du besoin qui vit dans le navigateur ne se joue pas et ne bloque pas', () => {
+describe('[niveau 4] #272 · au commit, le harnais du besoin qui vit dans le navigateur ne se joue pas et ne bloque pas', () => {
   after(() => {
     if (dossierTemporaire) rmSync(dossierTemporaire, { recursive: true, force: true });
   });
 
-  test('point 1 · ses fichiers de apps/web/test/navigateur/ ne se jouent pas ; le pré-commit les nomme, et dit qu’ils se jouent à la livraison', async () => {
+  test('[niveau 2] point 1 · ses fichiers de apps/web/test/navigateur/ ne se jouent pas ; le pré-commit les nomme, et dit qu’ils se jouent à la livraison', async () => {
     const { navigateurSeul, mixteRouge } = await scénarios();
     for (const [nom, r] of Object.entries({ navigateurSeul, mixteRouge })) {
       assert.deepEqual(r.joués.filter((j) => j.startsWith('navigateur:')), [], `${nom} : un fichier du harnais dans apps/web/test/navigateur/ s'est joué au commit${détail(r)}`);
@@ -145,7 +148,7 @@ describe('[niveau 2] #272 · au commit, le harnais du besoin qui vit dans le nav
     }
   });
 
-  test('point 2 · un harnais sans fichier restant ne se lance pas ; ce qui reste hors du navigateur se joue, rouge affiché sans bloquer', async () => {
+  test('[niveau 2] point 2 · un harnais sans fichier restant ne se lance pas ; ce qui reste hors du navigateur se joue, rouge affiché sans bloquer', async () => {
     const { navigateurSeul, mixteRouge } = await scénarios();
     assert.doesNotMatch(navigateurSeul.sortie, /harnais-interface|No test files found/, `harnais tout entier dans le navigateur : le harnais de l'interface a été lancé sans fichier à jouer${détail(navigateurSeul)}`);
     assert.deepEqual(
@@ -163,7 +166,7 @@ describe('[niveau 2] #272 · au commit, le harnais du besoin qui vit dans le nav
     assert.match(r.sortie, /erreur de syntaxe — apps\/web\/test\/besoin-272\.test\.ts/, `erreur de syntaxe dans le harnais : le refus doit la nommer${détail(r)}`);
   });
 
-  test('point 3 · un commit de docs/gardes.md, harnais tout entier dans le navigateur, passe quand la non-régression est verte', async () => {
+  test('[niveau 2] point 3 · un commit de docs/gardes.md, harnais tout entier dans le navigateur, passe quand la non-régression est verte', async () => {
     const { navigateurSeul: r } = await scénarios();
     assert.ok(r.joués.includes('ancien:vert'), `la non-régression de la garde ne s'est pas jouée : le scénario ne vérifie rien${détail(r)}`);
     assert.equal(r.code, 0, `le commit est refusé${détail(r)}`);

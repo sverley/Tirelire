@@ -1,8 +1,11 @@
 /**
- * Tests du codeur de #41 : le rappel de sauvegarde et la marque des données qui le fonde. Hors du
- * harnais du besoin ; ils gardent le besoin du point 3, que le harnais classe au niveau 0 (D83) :
- * une marque qui ne change plus, ou une période mal comptée, fait taire le rappel, et des données
- * peuvent se perdre.
+ * Harnais d'audit de #41, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
+ * Tests du codeur de #41 : le rappel de sauvegarde et la marque des données qui le fonde. Le
+ * point 3 de #41 est gardé au niveau 0 dans le navigateur, loin des limites
+ * (`apps/web/test/navigateur/sauvegarde-evidente.test.ts`) ; ce fichier garde la limite d'une
+ * période budgétaire (D02), que ce harnais laisse au codeur.
  */
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
@@ -10,19 +13,19 @@ import { exampleLedger, LedgerStore, marqueDesDonnees, sauvegardeARappeler, uneP
 
 const SQL = await initSqlJs();
 
-describe('[niveau 0] #41 · une période budgétaire plus tard (D02)', () => {
+describe('[niveau 4] #41 · une période budgétaire plus tard (D02)', () => {
   it('le même jour du mois suivant, au mois calendaire', () => {
     expect(unePeriodeApres('2026-09-20', 1)).toBe('2026-10-20');
     expect(unePeriodeApres('2026-01-31', 1)).toBe('2026-02-28');
   });
-  it('la même place dans la période de paie suivante', () => {
+  it('[niveau 2] la même place dans la période de paie suivante', () => {
     // Période du 28 août au 27 septembre, puis du 28 septembre au 27 octobre.
     expect(unePeriodeApres('2026-09-01', 28)).toBe('2026-10-02'); // cinquième jour de chacune
     expect(unePeriodeApres('2026-08-28', 28)).toBe('2026-09-28');
   });
 });
 
-describe('[niveau 0] #41 · le rappel de sauvegarde', () => {
+describe('[niveau 4] #41 · le rappel de sauvegarde', () => {
   const base = { aujourdhui: '2026-09-28', debutPeriode: 1 };
   it('rien de saisi : pas de rappel', () => {
     expect(sauvegardeARappeler({ ...base, derniere: undefined, marque: '' })).toBe(false);
@@ -33,7 +36,7 @@ describe('[niveau 0] #41 · le rappel de sauvegarde', () => {
   it('rien de changé depuis la sauvegarde : pas de rappel, même ancienne', () => {
     expect(sauvegardeARappeler({ ...base, derniere: { date: '2025-01-01', marque: 'm1' }, marque: 'm1' })).toBe(false);
   });
-  it('changées depuis une sauvegarde de moins d’une période : pas encore', () => {
+  it('[niveau 2] changées depuis une sauvegarde de moins d’une période : pas encore', () => {
     expect(sauvegardeARappeler({ ...base, derniere: { date: '2026-09-01', marque: 'm1' }, marque: 'm2' })).toBe(false);
     expect(sauvegardeARappeler({ ...base, derniere: { date: '2026-08-28', marque: 'm1' }, marque: 'm2' })).toBe(false);
   });
@@ -42,7 +45,7 @@ describe('[niveau 0] #41 · le rappel de sauvegarde', () => {
   });
 });
 
-describe('[niveau 0] #41 · la marque des données', () => {
+describe('[niveau 4] #41 · la marque des données', () => {
   it('vide sur une base neuve, elle change à chaque écriture, locale ou reçue, et se retrouve à la réouverture', async () => {
     const a = await LedgerStore.create({ sqlJs: SQL, siteId: 'aaaaaaaaaaaa' });
     expect(marqueDesDonnees(a)).toBe('');

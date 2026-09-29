@@ -1,4 +1,7 @@
 /**
+ * Harnais d'audit de #233, composé par #285 parmi les tests du codeur (D83) : un test qui porte
+ * sa propre marque est retenu à ce niveau ; les autres restent au niveau 4.
+ *
  * #233 — à la racine de la recette, la version de développement (le site de `main`, construit pour
  * `/`) enregistre un service worker dont la portée couvre toute la recette, aperçus compris. Il ne
  * doit pas répondre aux navigations vers `pr-<numéro>` par sa propre page : chaque aperçu reste servi
@@ -48,11 +51,11 @@ function laisséeAuServeur(sw: string, chemin: string): boolean {
   return motifs.some((m) => m.test(chemin));
 }
 
-// Niveau 2 (D83) : un cas de D83, « Livraison » (#233) — « chaque aperçu reste servi par lui-même ».
+// Un cas de D83, « Livraison » (#233) — « chaque aperçu reste servi par lui-même ».
 // S'il tombait, l'aperçu montrerait la version de développement : un résultat faux, sans donnée
 // perdue, et sans usage, principe, invariant ni contrainte qui tombe.
-describe('[niveau 2] D83, livraison (#233) · chaque aperçu reste servi par lui-même, pas par la version de développement', () => {
-  test('à la racine, le service worker laisse au serveur les navigations vers un aperçu, et garde les siennes', async () => {
+describe('[niveau 4] D83, livraison (#233) · chaque aperçu reste servi par lui-même, pas par la version de développement', () => {
+  test('[niveau 2] à la racine, le service worker laisse au serveur les navigations vers un aperçu, et garde les siennes', async () => {
     const sw = await serviceWorker('/');
     expect(sw, 'le service worker ne répond plus aux navigations de la version de développement').toMatch(/NavigationRoute\(/);
     for (const chemin of ['/pr-12/', '/pr-12', '/pr-12/index.html', '/pr-307/budget', '/pr-12/?source=pwa', '/pr-12?x=1']) {
