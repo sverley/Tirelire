@@ -24,7 +24,8 @@ puis le glossaire et les catalogues.
    autres entrées de son catalogue, ni les documents fondateurs (principe 9.1, D78), et écris dans
    l'issue ce que tu as comparé et pourquoi cela tient. Une contradiction ne se spécifie pas : elle
    devient une question au porteur.
-6. Quand le besoin est spécifié, dis-le dans l'issue : l'auditeur prend la suite.
+6. Quand le besoin est spécifié, dis-le dans l'issue : le codeur prend la suite ; l'auditeur compose
+   le harnais après son compte rendu (#283).
 
 ## Suivre une version
 

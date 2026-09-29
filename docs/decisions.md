@@ -1303,8 +1303,9 @@ produit) ou par la relecture (le travail).
 
 Un besoin passe par quatre rôles, chacun décrit dans `docs/roles/`, en un texte qui sert de prompt :
 l'**architecte** analyse le besoin et pose ses spécifications, et suit une version jusqu'à sa
-publication sans spécifier ses tâches ; l'**auditeur** code le harnais s'il le faut et vérifie le
-codage ; le **codeur** code ; le **porteur** valide. L'analyse du besoin est indépendante de
+publication sans spécifier ses tâches ; le **codeur** code, avec les tests dont il a besoin, et
+ouvre la PR ; l'**auditeur** vérifie le codage et compose le harnais parmi les tests du codeur,
+quitte à les compléter (#283) ; le **porteur** valide. L'analyse du besoin est indépendante de
 l'audit : l'architecte et l'auditeur sont deux sessions distinctes. Un descriptif de rôle dit ce que
 le rôle fait, dans quel ordre ; il renvoie à ce catalogue pour les décisions qu'il applique.
 
@@ -1348,12 +1349,12 @@ n'accueillent donc jamais de test de niveau 4. La règle est un test de la garde
 l'outil ; tout ce qui y entre se jouant à chaque fusion, hors empreinte verte, la garde reste petite
 (principe 12).
 
-Tout autre test, même rangé dans `packages/gardes`, appartient au harnais d'un besoin et se joue par
-`pnpm test`, à son niveau (D83) : un test se range selon le besoin qu'il vérifie, jamais selon ce que
-son fichier regarde, ni selon l'extension ou l'en-tête de ce fichier. Seuls les tests de
+Tout autre test, même rangé dans `packages/gardes`, appartient au harnais d'un besoin, ou au codeur
+qui l'a écrit pour ses propres besoins, et se joue par `pnpm test`, à son niveau (D83) : un test se
+range selon le besoin qu'il vérifie, jamais selon ce que son fichier regarde, ni selon l'extension ou l'en-tête de ce fichier. Seuls les tests de
 développement de fonctions de la garde, qui ne servent qu'à la développer, sont mis à part : ils
-vivent dans `packages/gardes/dev/`, en fichiers `*.dev.mjs`, hors de `pnpm test` ; ils portent le
-niveau que leur donne D83, de 0 à 4, et se jouent à la main, par la commande des rôles du codeur et
+vivent dans `packages/gardes/dev/`, en fichiers `*.dev.mjs`, hors de `pnpm test` ; tests du
+codeur, ils sont de niveau 4 (D83), et se jouent à la main, par la commande des rôles du codeur et
 de l'auditeur, par qui développe une fonction de la garde et par l'auditeur qui la vérifie.
 
 Un harnais du registre a une forme normale : un fichier de tests de niveau 0 et 1, que le registre
@@ -1369,10 +1370,9 @@ fondamentaux ; il l'écrit dans la PR — et **la validation**, par le porteur, 
 autre geste (principe 11). Rien ne la bloque techniquement (dépôt privé, offre gratuite) : c'est
 au porteur de ne fusionner qu'au vert.
 
-Une PR s'ouvre en brouillon, avec le corps du modèle `.github/pull_request_template.md` — `Close #n`
-et la case de l'aperçu, rien d'autre —, qui que ce soit qui l'ouvre : l'auditeur, ou le codeur quand
-le besoin n'a pas de harnais (D81). Une PR ouverte par l'API ne reçoit pas le modèle : il se
-recopie. Le brouillon n'économise que la CI. Le porteur la passe en Ready à la main, ce qui lance
+Le codeur ouvre la PR en brouillon (D80), avec le corps du modèle
+`.github/pull_request_template.md` — `Close #n` et la case de l'aperçu, rien d'autre. Une PR ouverte
+par l'API ne reçoit pas le modèle : il se recopie. Le brouillon n'économise que la CI. Le porteur la passe en Ready à la main, ce qui lance
 toute la CI et assemble la version de dev depuis le dernier commit de la branche. À côté du bouton
 de fusion, le statut « Toute la CI sur ce commit » dit si toute la CI a tourné au vert sur le
 dernier commit. Un changement après le Ready est signalé par un commentaire de la PR, sans rien
@@ -1409,8 +1409,12 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
   Départage : on nomme d'abord le besoin couvert (phrase du « Fait quand », entrée du registre,
   décision) ; deux tests du même besoin ont le même niveau ; un témoin rouge prend le niveau de ce
-  qu'il garde ; dans le doute, le plus critique. Chaque test déclare son niveau par la marque
-  `[niveau N]` dans son titre, ou dans celui d'une suite qui l'englobe, la plus proche l'emportant.
+  qu'il garde ; dans le doute, le plus critique. Un codeur ne fait pas de test de niveau inférieur
+  à 4 (porteur, #283) : il écrit ses tests pour ses propres besoins ; seul l'auditeur donne un autre
+  niveau, aux tests qu'il retient dans le harnais du besoin, et un test du codeur qu'il ne retient
+  pas reste au niveau 4. Un test existant que le codeur adapte garde son niveau. Chaque test déclare
+  son niveau par la marque `[niveau N]` dans son titre, ou dans celui d'une suite qui l'englobe, la
+  plus proche l'emportant.
   Un test sans marque, ni sur lui ni sur une suite qui l'englobe, fait échouer `pnpm test` dès le
   seuil 1, qui le nomme (#236) ; jusqu'à ce qu'il en reçoive une, l'outil de test le joue au niveau
   2. Le niveau se lit ainsi dans le fichier, sans l'exécuter.
@@ -1447,7 +1451,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 - **Le harnais du besoin** est le ou les fichiers de l'auditeur — son harnais et, s'il y en a un,
   son second fichier éventuel (D81) —, et eux seuls : l'auditeur les nomme dans l'issue (« Harnais :
   chemins »), à côté de la branche, et inscrit dans les trois premières lignes de chacun « Harnais
-  d'audit de #<n> », le numéro de l'issue, que porte aussi le nom de la branche (`audit/<n>-…`) :
+  d'audit de #<n> », le numéro de l'issue, que porte aussi le nom de la branche (`codage/<n>-…`) :
   les crochets et la CI les reconnaissent ainsi sans lire l'issue (`.githooks/harnais-du-besoin.sh`,
   définition commune). Il se joue en entier, niveau 4 compris, à chaque moment, sauf vert sur la même
   empreinte (voir « Les empreintes ») ; rouge, il se rejoue toujours. Les autres fichiers
@@ -1509,10 +1513,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
-- **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck` et le harnais du besoin, plus,
-  s'il modifie une fonction de la garde, ses tests de développement (D81) ; l'auditeur vérifie en
-  local ce qu'il relit, au seuil 2 avant le Ready, hors tests navigateur sauf sa demande. Aucune CI
-  ne tourne en brouillon. Les crochets
+- **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck`, ses propres tests, à la main,
+  et le harnais du besoin s'il existe, plus, s'il modifie une fonction de la garde, ses tests de
+  développement (D81) ; l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready, hors
+  tests navigateur sauf sa demande. Aucune CI ne tourne en brouillon. Les crochets
   font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
   tests de niveau 0 des paquets que touchent les fichiers indexés — cœur ; garde ; relais ;
   hébergement —, et rien pour la seule documentation, sauf ce qui est vert sur son empreinte. Au pré-commit, la non-régression bloque le
