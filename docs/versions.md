@@ -80,6 +80,8 @@ de travail : une version prévue attend que les précédentes soient publiées (
   D87).
 - **Cibles** · les cibles actives quand elle se travaille (`docs/cibles.md`).
 - **Fin** · les bêtas `v0.0` à `v0.5` sont publiées, et l'usage inversé (U4), l'import de sources
-  diverses (U3, U5) et la synchronisation entre plateformes ont été exercés ; ce qu'elle exige
-  au-delà — migration, harnais des formats publiés — se spécifie quand elle se travaille.
+  diverses (U3, U5) et la synchronisation entre plateformes ont été exercés ; le signal sur la
+  sûreté des données ne dit plus qu'un fichier peut ne plus s'ouvrir à la version suivante (#41,
+  point 10) ; ce qu'elle exige au-delà — migration, harnais des formats publiés — se spécifie quand
+  elle se travaille.
 - **Tag** · `v1`.
