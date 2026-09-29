@@ -403,9 +403,10 @@ describe.skipIf(!navigateur)('#183 · le plan sans hypothèse, à 375 px', () =>
      * Ce que l'écran dit d'un compte ou de son virement : sa carte, et chaque ligne qui le nomme,
      * chacune précédée, sur le Plan, du titre de son bloc (« Attendus, non reçus » dit l'état de ses
      * lignes). Les titres de l'écran Flux prévus rangent les flux par nature (« … attendus ») et ne
-     * disent rien d'un état : ils ne comptent pas.
+     * disent rien d'un état : ils ne comptent pas. Un bloc qui réunit les lignes de plusieurs comptes
+     * (l'écran Flux prévus en a un) ne dit rien de l'un d'eux : seule la plus petite ligne compte.
      */
-    async function passages(compte: string, avecTitres = true): Promise<string[]> {
+    async function passages(compte: string, surLePlan = true): Promise<string[]> {
       return page.evaluate((nom: string, titres: boolean) => {
         const dit = (el: Element) => {
           const mots: string[] = [];
@@ -418,15 +419,22 @@ describe.skipIf(!navigateur)('#183 · le plan sans hypothèse, à 375 px', () =>
           return titres && h && h.tagName === 'H2' ? `${dit(h)} — ` : '';
         };
         const sorties: string[] = [];
-        for (const c of document.querySelectorAll('main .card')) {
-          if (c.querySelector(':scope > .row strong')?.textContent?.trim() === nom) sorties.push(titre(c.firstElementChild ?? c) + dit(c));
+        // La carte du compte n'existe que sur le Plan ; à l'écran Flux prévus, la première ligne d'un
+        // bloc porte le nom d'un flux, et le bloc réunit tous ceux de sa nature.
+        if (titres) {
+          for (const c of document.querySelectorAll('main .card')) {
+            if (c.querySelector(':scope > .row strong')?.textContent?.trim() === nom) sorties.push(titre(c.firstElementChild ?? c) + dit(c));
+          }
         }
-        for (const r of document.querySelectorAll('main .row, main li, main tr')) {
-          const t = dit(r);
-          if (t.includes(nom)) sorties.push(titre(r) + t);
+        // Les lignes seulement, et les plus petites : un bloc qui réunit les lignes de plusieurs
+        // comptes ne dit rien de l'un d'eux en particulier.
+        const lignes = [...document.querySelectorAll('main .row, main li, main tr')].filter((r) => dit(r).includes(nom));
+        for (const r of lignes) {
+          if (lignes.some((autre) => autre !== r && r.contains(autre))) continue;
+          sorties.push(titre(r) + dit(r));
         }
         return sorties;
-      }, compte, avecTitres);
+      }, compte, surLePlan);
     }
 
     /** Les états qu'un ensemble de passages dit. Le genre et le nombre importent peu. */

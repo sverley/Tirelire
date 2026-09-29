@@ -17,8 +17,9 @@
  *    période courante soit enregistré ou non, le plan d'une période à venir dit la même chose.
  * 3 et 4. Pour chaque période à venir et chaque compte d'accueil, ce qu'il faut virer vaut ce que les
  *    tirelires placées là demandent pour la période : ni l'argent qui dort sur le compte, ni un
- *    virement fait ou non ne le déplacent. **Rouge** aujourd'hui : D52 retranche du virement le
+ *    virement fait ou non ne le déplacent. **Rouge** avant le codage : D52 retranchait du virement le
  *    « non affecté » qu'on rapatrie, c'est-à-dire une position de compte, dans une période à venir.
+ *    Un règlement de compte tiers en est une aussi : il ne se lit que dans la période où l'on lit.
  * 5. Le pointage de D12 sur un virement permanent (garde du mécanisme que le point 5 s'appuie sur) :
  *    l'occurrence dont la fenêtre est close sans opération remonte en « attendu, non reçu » ; pointée
  *    ou encore dans sa fenêtre, non. Ce que l'écran en lit est dans le fichier du navigateur : le
@@ -219,6 +220,16 @@ describe('[niveau 1] points 3 et 4 — pour une période à venir, ce qu’il fa
           montant: demande(p, t.accountId),
         });
       }
+    }
+  });
+
+  it('un règlement de compte tiers est une position de compte : il ne se lit que dans la période où l’on lit', () => {
+    // Sur l'exemple, le compte de Marie doit 20 € au compte principal. Lu au 6 septembre, ce solde
+    // ne dit rien d'octobre : le redemander à chaque période à venir, c'est le supposer inchangé.
+    const courant = computePlan(exemple(), SEPTEMBRE, LECTURE);
+    expect(courant.transfers.filter((t) => t.settlement !== 0).map((t) => t.accountName)).toEqual(['Compte de Marie']);
+    for (const p of àVenir(exemple())) {
+      expect({ période: p.period.label, règlements: p.transfers.filter((t) => t.settlement !== 0).map((t) => t.accountName) }).toEqual({ période: p.period.label, règlements: [] });
     }
   });
 
