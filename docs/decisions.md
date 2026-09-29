@@ -1588,7 +1588,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   pousse un tag `v*` ni ne déclenche une publication. La version forcée se joue comme un tag poussé :
   le seuil 3, tests navigateur compris, sans rien sauter ; seulement s'il est vert, son tag est posé
   sur ce commit, puis le site est déposé en production et vérifié en ligne, l'APK est construit et
-  la release publiée. Si quelque chose rougit, aucun tag n'est posé, rien n'est publié, et le
+  la release publiée avec `tirelire-hebergement.zip`, et avec l'APK s'il est construit : un échec de
+  la construction de l'APK ne retient pas la release, et le résumé de l'exécution dit qu'elle sort
+  sans APK. Si quelque chose rougit avant le tag, aucun tag n'est posé, rien n'est publié, et le
   déclenchement dit ce qui a rougi. Son nom : le dernier numéro de version publié, un tiret, puis le
   hash court du commit — `v0.2-1a2b3c4` si la dernière version numérotée est `v0.2`, `v0.0-…` tant
   qu'aucune n'est publiée. Une version forcée n'est pas numérotée et ne sert jamais de base ; le
