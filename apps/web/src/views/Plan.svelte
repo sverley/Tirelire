@@ -129,7 +129,7 @@
   </div>
   <p class="muted small">
     Période du {shortDate(plan.period.start)} au {shortDate(plan.period.end)}, {plan.simulated
-      ? `période à venir : soldes projetés depuis le ${shortDate(plan.today)}, les virements des périodes précédentes étant supposés faits`
+      ? 'période à venir : ce que chaque tirelire demande et ce qu’il faut virer pour elle, sans rien supposer des virements à venir ni des soldes des comptes'
       : `soldes au ${shortDate(plan.asOf)}`}.
   </p>
 
@@ -187,6 +187,22 @@
               </div>
             {/each}
           </div>
+        {/if}
+        {#if t.occurrences}
+          <!-- Chaque occurrence de l'ordre, lue sur son flux (D12, #183) : seulement avec suivi des
+               opérations ; sans suivi, rien ne se pointe et le plan n'en dit rien. -->
+          {#each t.occurrences as o (o.date)}
+            <div class="row">
+              <div class="label">Virement du {shortDate(o.date)}
+                <span class="sub">{o.status === 'pointee'
+                  ? 'pointé sur le relevé'
+                  : o.status === 'attendue'
+                    ? `attendu, jusqu'au ${shortDate(o.windowEnd)}`
+                    : `attendu, non reçu : fenêtre close le ${shortDate(o.windowEnd)}`}</span>
+              </div>
+              <div class="num {o.status === 'nonRecue' ? 'neg' : ''}">{o.status === 'pointee' ? '✓' : o.status === 'attendue' ? '…' : '!'}</div>
+            </div>
+          {/each}
         {/if}
         {#if t.bankOrder}
           <div class="row">
@@ -312,5 +328,7 @@
     <div class="row total"><div class="label">Total</div><div class="num">{money(-plan.totals.fixedCharges)}</div></div>
   </div>
 
-  <p class="muted small">Non affecté sur le compte principal au {shortDate(plan.today)} : <span class="num">{money(plan.totals.principalUnallocated)}</span>.</p>
+  {#if !plan.simulated}
+    <p class="muted small">Non affecté sur le compte principal au {shortDate(plan.today)} : <span class="num">{money(plan.totals.principalUnallocated)}</span>.</p>
+  {/if}
 {/if}
