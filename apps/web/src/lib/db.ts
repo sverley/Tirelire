@@ -13,6 +13,7 @@ import initSqlJs from 'sql.js';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { FormatRefused, LedgerStore, type InstanceState } from '@tirelire/core';
 import { PULL_KEY } from './relay';
+import { CLE_SAUVEGARDE } from './sauvegarde';
 
 const DB_NAME = 'tirelire';
 const STORE = 'files';
@@ -105,12 +106,13 @@ export async function openStore(bytes?: Uint8Array): Promise<OpenedStore> {
   const source = bytes ?? saved;
   // L'instance garde son identité et son horloge. Ce qu'elle sait ne vaut que pour l'état qu'elle
   // a enregistré : un autre état (fichier importé, départ à neuf) le redéduit de ses lignes, et le
-  // relais se retire depuis le début.
+  // relais se retire depuis le début. La dernière sauvegarde ne vaut, elle aussi, que pour l'état
+  // qu'elle a copié : les données remplacées, elle redevient « jamais » (C5, #41).
   const continuing = !bytes && saved !== undefined;
   let instance: InstanceState | undefined;
   if (known && continuing) instance = known;
   else if (known) {
-    const { [PULL_KEY]: _oublie, ...local } = known.local ?? {};
+    const { [PULL_KEY]: _oublie, [CLE_SAUVEGARDE]: _copiePerimee, ...local } = known.local ?? {};
     instance = { siteId: known.siteId, ...(known.lastHlc ? { lastHlc: known.lastHlc } : {}), local };
   }
   let store: LedgerStore;

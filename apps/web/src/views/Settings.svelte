@@ -3,6 +3,7 @@
   import { centsToInput, inputToCents } from '../lib/format';
   import { exportBundleFor, importBundle, knownPeers, type StateBundle } from '@tirelire/core';
   import { saveFile } from '../lib/platform';
+  import { texteSauvegarde, texteSynchronisation } from '../lib/sauvegarde';
 
   let deviceName = $state(readDeviceName());
   let peerFilter = $state('');
@@ -36,6 +37,7 @@
       const bundle = JSON.parse(await file.text()) as StateBundle;
       const r = importBundle(app.store, bundle);
       app.reload();
+      app.noteSynchronisation('paquet');
       app.showConflicts(r.conflicts);
       msg = `Paquet de ${bundle.name ?? bundle.site} : ${r.applied} lignes mises à jour, ${r.ignored} déjà connues, ${r.stale} plus anciennes que les nôtres${r.conflicts.length ? `, ${r.conflicts.length} modifiées des deux côtés (voir Synchronisation)` : ''}.`;
     } catch (err) {
@@ -156,6 +158,9 @@
         : 'Votre navigateur n’a pas accepté de les mettre à l’abri'} : s'il manque de place, il peut les effacer sans prévenir.
       Exportez le fichier régulièrement pour tout retrouver.{app.persistance === 'refusee' ? ' La demande se refait à chaque ouverture ; une application installée depuis le menu du navigateur l’obtient plus souvent.' : ''}</p>
   {/if}
+  <div class="small">Dernière sauvegarde : {texteSauvegarde(app.sauvegarde)}</div>
+  <div class="small">Dernière synchronisation : {texteSynchronisation(app.synchronisation)}</div>
+  <p class="small muted">Ces dates sont celles de cet appareil. Une synchronisation ne remplace pas la sauvegarde, qui est une copie du fichier que vous gardez vous-même.</p>
   <div class="actions">
     <button class="btn primary" onclick={exportFile}>Exporter le fichier SQLite</button>
     <label class="btn">Importer un fichier… <input type="file" accept=".sqlite,.db,application/x-sqlite3" onchange={importFile} hidden /></label>

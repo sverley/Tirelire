@@ -8,6 +8,8 @@ import {
   emptyLedger,
   exampleLedger,
   LEDGER_KEYS,
+  marqueDesDonnees,
+  sauvegardeARappeler,
   todayISO,
   uuidv7,
   type Ledger,
@@ -16,8 +18,10 @@ import {
   type Plan,
   type Conflict,
   type Settings,
+  type DerniereSauvegarde,
 } from '@tirelire/core';
 import type { LedgerKey } from '@tirelire/core';
+import { lireSauvegarde, lireSynchronisation, noterSauvegarde, noterSynchronisation, type DerniereSynchronisation, type Moyen } from './sauvegarde';
 import { eraseStore, openStore, OuvertureRefusee, type OpenedStore } from './db';
 import { demanderPersistance, type EtatPersistance } from './persistance';
 import { saveFile } from './platform';
@@ -50,11 +54,33 @@ class AppState {
    * l'accueil le signale et Réglages le redit ; accordée, le signal disparaît.
    */
   persistance = $state<EtatPersistance>('inconnue');
-  /** Le signal de l'accueil, masqué par l'utilisateur pour cette ouverture ; Réglages le redit. */
-  signalPersistanceMasque = $state(false);
+  /**
+   * Le signal de l'accueil sur la sûreté des données, masqué par l'utilisateur pour cette ouverture ;
+   * Réglages le redit.
+   */
+  signalDonneesMasque = $state(false);
   /** Les données peuvent-elles encore être effacées par le navigateur faute de place ? */
   effacable: boolean = $derived(this.persistance === 'refusee' || this.persistance === 'impossible');
+  /** La dernière sauvegarde de cette instance, s'il y en a eu une depuis que ces données sont là (C5). */
+  sauvegarde = $state<DerniereSauvegarde | undefined>(undefined);
+  /** La dernière synchronisation de cette instance, et par où (C5). */
+  synchronisation = $state<DerniereSynchronisation | undefined>(undefined);
   private opened: OpenedStore | undefined;
+
+  /** La marque de l'état des données, relue à chaque changement ; vide tant que rien n'est saisi. */
+  marqueDonnees: string = $derived.by(() => {
+    void this.ledger;
+    return this.opened ? marqueDesDonnees(this.opened.store) : '';
+  });
+
+  /**
+   * Faut-il rappeler d'enregistrer une copie ? Jamais sauvegardé, dès qu'il y a des données ; sinon
+   * quand elles ont changé depuis et que la sauvegarde date de plus d'une période budgétaire (#41).
+   * Une synchronisation n'en dispense pas.
+   */
+  rappelSauvegarde: boolean = $derived(
+    sauvegardeARappeler({ derniere: this.sauvegarde, marque: this.marqueDonnees, aujourdhui: todayISO(), debutPeriode: this.ledger.settings.periodStartDay }),
+  );
 
   plan: Plan = $derived(computePlan(this.ledger, this.asOf));
 
@@ -119,6 +145,19 @@ class AppState {
 
   reload(): void {
     this.ledger = this.store.load();
+    this.lireDates();
+  }
+
+  /** Relit les dates que l'instance garde à côté du fichier. */
+  private lireDates(): void {
+    this.sauvegarde = lireSauvegarde(this.store);
+    this.synchronisation = lireSynchronisation(this.store);
+  }
+
+  /** Une synchronisation vient d'aboutir : elle se date, avec son moyen. Un essai qui échoue n'appelle pas ceci. */
+  noteSynchronisation(moyen: Moyen): void {
+    noterSynchronisation(this.store, { date: todayISO(), moyen });
+    this.lireDates();
   }
 
   /** Montre les conflits qu'une synchronisation vient de rendre. */
@@ -241,9 +280,16 @@ class AppState {
     return this.store.export();
   }
 
-  /** Remet à l'utilisateur une copie du fichier : sa sauvegarde (C5), qui se réimporte dans Réglages. */
+  /**
+   * Remet à l'utilisateur une copie du fichier : sa sauvegarde (C5), qui se réimporte dans Réglages.
+   * Elle se date aussitôt, avec la marque des données qu'elle porte : le rappel disparaît.
+   */
   async saveBackup(): Promise<void> {
-    await saveFile(`tirelire-${this.asOf}.sqlite`, await this.exportBytes(), 'application/x-sqlite3');
+    const bytes = await this.exportBytes();
+    const marque = marqueDesDonnees(this.store);
+    await saveFile(`tirelire-${this.asOf}.sqlite`, bytes, 'application/x-sqlite3');
+    noterSauvegarde(this.store, { date: todayISO(), marque });
+    this.lireDates();
   }
 
   /**
