@@ -1,15 +1,16 @@
 /**
  * Tests du codeur de #194 : la webapp propose de s'installer là où Chrome le permet.
  *
- * Hors du harnais du besoin, qui reste à l'auditeur. Chromium sans interface ne montre pas la
- * fenêtre d'installation : ces tests jouent le signal de Chrome (`beforeinstallprompt`), avec une
+ * Hors du harnais du besoin (`installation.test.ts`), qui seul le valide. Chromium sans interface ne
+ * montre pas la fenêtre d'installation : ces tests jouent le signal de Chrome (`beforeinstallprompt`), avec une
  * fenêtre simulée qui compte ses ouvertures et rend la réponse choisie ; l'installation réelle se
  * constate sur un téléphone et un ordinateur. Le point 5 lit, lui, ce que Chromium relève vraiment
  * sur le site construit.
  *
- * Niveau 2 (D83) : sans eux, un cas de la proposition peut devenir faux — proposée alors
- * qu'installée, revenue à chaque ouverture, introuvable après un refus —, l'usage restant possible
- * dans l'onglet (C2).
+ * Niveau 4 (D83) : les tests du codeur servent ses propres besoins, ils ne valident pas le besoin ;
+ * le harnais de l'auditeur garde les points 1 à 6 (règle du porteur, #283). Ils restent pour
+ * diagnostiquer, joués nommément ou au seuil 4 : ils disent aussi la place de la proposition, au bas
+ * de l'accueil, que le harnais lit autrement.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -76,7 +77,7 @@ const fenetres = (page: Page) => page.evaluate(() => (window as unknown as { __f
 const texte = (page: Page) => page.evaluate(() => document.querySelector('main')?.textContent?.replace(/\s+/g, ' ') ?? '');
 const PROPOSITION = 'Installer Tirelire sur cet appareil';
 
-describe.skipIf(!navigateur)('[niveau 2] #194 · la webapp propose de s’installer sur Chrome', () => {
+describe.skipIf(!navigateur)('[niveau 4] #194 · la webapp propose de s’installer sur Chrome', () => {
   it('1, 6. le signal de Chrome : proposée sur l’accueil, sous l’écran et non en tête ; accepter ouvre la fenêtre de Chrome', async () => {
     const page = await ouvrir();
     try {
