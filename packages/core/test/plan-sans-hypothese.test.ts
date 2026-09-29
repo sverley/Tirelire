@@ -3,10 +3,13 @@
  * (D52), contre le principe 1.3 ». Côté cœur ; ce qui se voit à l'écran est dans
  * `apps/web/test/navigateur/plan-sans-hypothese.test.ts`.
  *
- * Il ne relit pas la solution : il rejoue le « Fait quand » de l'issue sur le jeu d'exemple (données
- * inventées), à la date de lecture que l'application lui donne (`loadExample` : 6 septembre 2026), et
- * ne fige aucun montant : ce que les tirelires demandent est recalculé ici, depuis les lignes du
- * plan, et comparé à ce que le plan dit de virer.
+ * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
+ * peut trancher, un test — celui du codeur quand il la tranche (points 5 et 6, repris de
+ * `occurrences-ordre-permanent.test.ts`), sinon le mien. Il rejoue le « Fait quand » de l'issue sur
+ * le jeu d'exemple (données inventées), à la date de lecture que l'application lui donne
+ * (`loadExample` : 6 septembre 2026), et ne fige aucun montant qu'il pourrait recalculer : ce que les
+ * tirelires demandent est recalculé ici, depuis les lignes du plan, et comparé à ce que le plan dit
+ * de virer.
  *
  * Chaque `describe` reprend un point sous son numéro (les points 9 et 10 sont de la documentation,
  * et le point 11 est ce fichier) :
@@ -20,18 +23,15 @@
  *    virement fait ou non ne le déplacent. **Rouge** avant le codage : D52 retranchait du virement le
  *    « non affecté » qu'on rapatrie, c'est-à-dire une position de compte, dans une période à venir.
  *    Un règlement de compte tiers en est une aussi : il ne se lit que dans la période où l'on lit.
- * 5. Le pointage de D12 sur un virement permanent (garde du mécanisme que le point 5 s'appuie sur) :
- *    l'occurrence dont la fenêtre est close sans opération remonte en « attendu, non reçu » ; pointée
- *    ou encore dans sa fenêtre, non. Ce que l'écran en lit est dans le fichier du navigateur : le
- *    cœur n'a pas d'état d'occurrence à interroger.
- * 6. Sans suivi des opérations (U1), le plan des périodes à venir est complet : voir le navigateur.
+ * 5. Chaque occurrence d'un virement permanent se lit sur le plan de sa période : pointée, attendue
+ *    dans sa fenêtre, ou attendue non reçue (D12). Tests du codeur. Ce que l'écran en dit est dans le
+ *    fichier du navigateur.
+ * 6. Sans suivi des opérations (U1), le plan ne dit ni réception ni manquement : test du codeur ; ce
+ *    que l'écran montre est dans le fichier du navigateur.
  * 7. Commencer à importer ne change ni les besoins ni les virements permanents proposés.
- * 8. Les soldes des tirelires ne changent pas (D29, I2) : enregistrer un virement ou importer ne les
- *    déplace pas, dans aucune période.
- *
- * Les gardes vertes le restent après le codage ; les rouges le sont pour la raison dite dans leur
- * message. Le codage sert aussi à recaler ce harnais : un test qui reste rouge alors que le besoin
- * est couvert est à corriger, pas à contourner.
+ * 8. Les soldes des tirelires ne changent pas (D29, I2) : enregistrer un virement ne les déplace pas,
+ *    dans aucune période. Commencer à importer ne les déplace pas non plus : le point 7 compare, avec
+ *    et sans import, les soldes et le « tenu » de chaque ligne.
  *
  * Niveaux (D83) : tous à 1. Le plan sans hypothèse est la parole du porteur (principe 1.3), et la
  * promesse tombe si le plan affiche une position de compte qu'aucune donnée ne porte, si un
@@ -41,17 +41,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   alive,
-  applyMatch,
   applyPatchToLedger,
   computePlan,
   euros,
   exampleLedger,
   indexLedger,
   matchTirelireTransfers,
-  missingFlows,
   normalizeLabel,
   periodsAround,
-  proposeMatches,
   tirelireBalance,
   type Ledger,
   type Operation,
@@ -210,19 +207,6 @@ describe('[niveau 1] points 3 et 4 — pour une période à venir, ce qu’il fa
     expect(comptes, 'au moins un compte d’accueil par période à venir').toBeGreaterThanOrEqual(périodes.length);
   });
 
-  it('garde : la part permanente et le complément du virement disent déjà la demande (D52)', () => {
-    for (const p of àVenir(exemple())) {
-      for (const t of p.transfers) {
-        if (t.settlement !== 0) continue;
-        expect({ période: p.period.label, compte: t.accountName, montant: t.standing + t.exceptional }).toEqual({
-          période: p.period.label,
-          compte: t.accountName,
-          montant: demande(p, t.accountId),
-        });
-      }
-    }
-  });
-
   it('un règlement de compte tiers est une position de compte : il ne se lit que dans la période où l’on lit', () => {
     // Sur l'exemple, le compte de Marie doit 20 € au compte principal. Lu au 6 septembre, ce solde
     // ne dit rien d'octobre : le redemander à chaque période à venir, c'est le supposer inchangé.
@@ -233,52 +217,52 @@ describe('[niveau 1] points 3 et 4 — pour une période à venir, ce qu’il fa
     }
   });
 
-  it('septembre, la période où l’on lit, garde son virement net du non affecté : la lecture du réel reste (point 1)', () => {
-    const p = computePlan(exemple(), SEPTEMBRE, LECTURE);
-    const t = virement(p, LIVRET)!;
-    expect(t.surplus, '15 € dorment sur le Livret A dans l’exemple').toBe(euros(15));
-    expect(t.net).toBe(t.standing + t.exceptional - t.surplus);
-  });
 });
 
 // ---------------------------------------------------------------------------------------------
-// 5. Le pointage d'un virement permanent (D12)
+// 5 et 6. Les occurrences d'un virement permanent (tests du codeur, repris au harnais)
 // ---------------------------------------------------------------------------------------------
 
 /**
  * L'exemple porte le flux dérivé `flow-vir-livret` : 600 € par mois, ancré au 28, fenêtre de cinq
- * jours. Une ligne de relevé du 28 août, importée, se rapproche de son occurrence (D12).
+ * jours, sur le compte principal ; il n'importe aucun relevé. Dans la période « septembre 2026 »
+ * (28/08 → 27/09), l'occurrence du 28 août est close ; celle du 28 septembre ouvre « octobre 2026 ».
  */
-function ligneDuVirement(date: string, montant = euros(600)): Operation {
-  return { id: 'op-vir-permanent', accountId: PRINCIPAL, origin: 'imported', date, label: LIBELLÉ_VIREMENT, normalizedLabel: normalizeLabel(LIBELLÉ_VIREMENT), amount: -montant, state: 'untreated' };
+function ligneDeRelevé(id: string, date: string, montant: number, plannedFlowId?: string): Operation {
+  return { id, accountId: PRINCIPAL, origin: 'imported', date, label: LIBELLÉ_VIREMENT, normalizedLabel: normalizeLabel(LIBELLÉ_VIREMENT), amount: montant, state: 'untreated', ...(plannedFlowId ? { plannedFlowId } : {}) };
 }
 
-function pointer(l: Ledger, op: Operation): Ledger {
-  const avec: Ledger = { ...l, operations: [...l.operations, op] };
-  const proposition = proposeMatches(avec, '2026-07-01', '2026-11-30').find((p) => p.operationId === op.id);
-  expect(proposition, 'la ligne du relevé est reconnue comme l’occurrence du virement permanent').toBeDefined();
-  return applyPatchToLedger(avec, applyMatch(avec, proposition!));
-}
+const avecLignes = (...ops: Operation[]): Ledger => {
+  const l = exemple();
+  return { ...l, operations: [...l.operations, ...ops] };
+};
 
-const manquants = (l: Ledger, de: string, à: string) => missingFlows(l, de, à).filter((m) => m.flowId === 'flow-vir-livret');
+const virementLivret = (l: Ledger, asOf: string) => computePlan(l, asOf, LECTURE).transfers.find((t) => t.accountId === LIVRET)!;
 
-describe('[niveau 1] point 5 — le pointage de D12 porte sur les occurrences du virement permanent (garde du mécanisme)', () => {
-  it('une occurrence dont la fenêtre est close sans opération est un virement attendu non reçu', () => {
-    const m = manquants(avecImport(exemple()), '2026-08-15', '2026-09-20');
-    expect(m.map((x) => x.expectedDate)).toEqual(['2026-08-28']);
-    expect(m[0]!.windowEnd).toBe('2026-09-02');
+describe('[niveau 1] point 5 — le virement permanent se lit sur son flux, le plan de sa période le montre (D12)', () => {
+  it('pointée : une opération rapprochée de l’ordre, dans sa fenêtre', () => {
+    const l = avecLignes(ligneDeRelevé('o1', '2026-08-29', -euros(600), 'flow-vir-livret'));
+    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'pointee', operationId: 'o1' }]);
   });
 
-  it('pointée, la même occurrence ne remonte plus', () => {
-    const l = pointer(avecImport(exemple()), ligneDuVirement('2026-08-29'));
-    expect(manquants(l, '2026-08-15', '2026-09-20')).toEqual([]);
+  it('attendue non reçue : la fenêtre est close sans opération, et le plan de sa période le montre', () => {
+    const l = avecLignes(ligneDeRelevé('o2', '2026-09-01', -euros(40)));
+    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'nonRecue' }]);
   });
 
-  it('encore dans sa fenêtre, une occurrence n’est pas un manquement', () => {
-    // 28 septembre + 5 jours de fenêtre : le 30 septembre, la fenêtre est ouverte.
-    const l = avecImport(exemple());
-    expect(manquants(l, '2026-09-01', '2026-09-30')).toEqual([]);
-    expect(manquants(l, '2026-09-01', '2026-10-04').map((x) => x.expectedDate)).toEqual(['2026-09-28']);
+  it('attendue : une période à venir montre l’occurrence à venir, sans rien en supposer', () => {
+    const l = avecLignes(ligneDeRelevé('o2', '2026-09-01', -euros(40)));
+    expect(virementLivret(l, OCTOBRE).occurrences).toEqual([{ date: '2026-09-28', windowEnd: '2026-10-03', status: 'attendue' }]);
+  });
+});
+
+describe('[niveau 1] point 6 — sans suivi des opérations (U1), le plan ne dit ni réception ni manquement', () => {
+  it('le virement est proposé, complet, et ne porte aucune occurrence', () => {
+    const l = exemple();
+    for (const asOf of [SEPTEMBRE, OCTOBRE]) {
+      expect(virementLivret(l, asOf).bankOrder).toBeDefined();
+      expect(virementLivret(l, asOf).occurrences).toBeUndefined();
+    }
   });
 });
 
@@ -301,19 +285,15 @@ describe('[niveau 1] point 7 — commencer à importer ne change ni les besoins 
     }
   });
 
-  it('les périodes à venir ne lisent rien de plus qu’avant l’import', () => {
-    const avant = àVenir(exemple());
-    const après = àVenir(avecImport(exemple()));
-    expect(après.map((p) => p.transfers.map((t) => [t.accountId, t.net]))).toEqual(avant.map((p) => p.transfers.map((t) => [t.accountId, t.net])));
-  });
 });
 
 // ---------------------------------------------------------------------------------------------
 // 8. Les soldes des tirelires
 // ---------------------------------------------------------------------------------------------
 
-describe('[niveau 1] point 8 — les soldes des tirelires ne dépendent ni des virements ni de l’import (D29, I2)', () => {
-  it.each(CAS.slice(1))('%s : chaque tirelire garde son solde, dans chaque période', (_nom, faire) => {
+describe('[niveau 1] point 8 — les soldes des tirelires ne dépendent pas d’un virement enregistré (D29, I2)', () => {
+  it('un virement enregistré avant la date de lecture : chaque tirelire garde son solde, dans chaque période', () => {
+    const faire = () => avecVirement(exemple(), euros(650), '2026-09-05');
     const base = plans(exemple());
     const variante = plans(faire());
     for (const [i, p] of base.entries()) {

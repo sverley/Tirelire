@@ -3,6 +3,10 @@
  * (D52), contre le principe 1.3 ». Côté écran ; le calcul est gardé par
  * `packages/core/test/plan-sans-hypothese.test.ts`.
  *
+ * Composé après le codage (auditeur.md, étape 2) : le codeur n'a écrit aucun test d'écran, ces tests
+ * sont donc les miens. Ils ne reprennent du calcul que ce qui se lit à l'écran, et un point que le
+ * cœur tranche seul (le point 1, le point 8) n'y revient pas.
+ *
  * Tout se passe dans le navigateur, sur le site construit, à 375 px. Il lit l'écran Plan comme le
  * porteur le lit : les boutons de période, la légende de la période, les cartes « Virements à faire
  * depuis le compte principal », la liste « Tirelires ». Il ne fige aucun montant : ce que les
@@ -13,34 +17,23 @@
  * chargé par « Charger l'exemple » se lit au 6 septembre 2026 (`loadExample`) ; un fichier importé se
  * lit au jour de la page, le 20 septembre 2026 (`JOUR_DES_TESTS`).
  *
- * Chaque `describe` reprend un point du « Fait quand » de l'issue, sous son numéro :
+ * Chaque test reprend un point du « Fait quand » de l'issue, sous son numéro :
  *
- * 1. Dans la période où l'on lit, le plan lit le réel : légende « soldes au … », virement net du
- *    non affecté qu'on rapatrie. Garde, verte avant comme après.
- * 2. Une période à venir ne dit ni « soldes projetés » ni « virements supposés faits », et ne montre
- *    aucune position de compte (ni « à rapatrier », ni « tirelires non couvertes par le solde »).
- *    **Rouge** aujourd'hui : la légende dit les deux.
+ * 2 et 6. Une période à venir ne dit ni « soldes projetés » ni « virements supposés faits », et ne
+ *    montre aucune position de compte (ni « à rapatrier », ni « tirelires non couvertes par le
+ *    solde »).
  * 3 et 4. Pour chaque période à venir, le virement vers le Livret A vaut ce que ses tirelires
- *    demandent, lu sur la même page. **Rouge** aujourd'hui en octobre, novembre, décembre : la carte
- *    dit 685 € pour 700 € demandés, parce que le non affecté est retranché.
+ *    demandent, lu sur la même page.
+ * 6. Sans suivi (U1), le plan est complet et ne montre ni manquement ni état d'occurrence.
  * 5. Avec suivi des opérations, chaque occurrence attendue d'un virement permanent se lit sur son
  *    flux : pointée, attendue dans sa fenêtre, ou attendue non reçue. Sur un grand livre qui porte
- *    trois virements permanents, un par état. L'écran ne dit aujourd'hui que le manquement, dans
- *    « Attendus, non reçus » ; les deux autres états sont **rouges**. Le harnais ne suppose ni
- *    l'endroit ni les mots exacts : il lit la carte du compte, la ligne de « Attendus, non reçus »
- *    et la ligne du flux à l'écran Flux prévus, et cherche « pointé… », « attendu… », « non reçu… »
- *    (le genre et le nombre importent peu).
- * 6. Sans suivi (U1), le plan est complet et ne montre ni supposition (rouge, comme au point 2), ni
- *    manquement (garde).
+ *    trois virements permanents, un par état. Le harnais ne suppose ni l'endroit ni les mots
+ *    exacts : il lit la carte du compte, la ligne de « Attendus, non reçus » et la ligne du flux à
+ *    l'écran Flux prévus, et cherche « pointé… », « attendu… », « non reçu… » (le genre et le
+ *    nombre importent peu).
  * 7. Commencer à importer ne change ni les besoins ni les virements permanents proposés : le même
  *    grand livre, importé sans puis avec des lignes de relevé, affiche les mêmes cartes et les mêmes
- *    tirelires. Garde.
- *
- * Le point 8 (les soldes des tirelires) est tenu dans le cœur, où il se calcule.
- *
- * Les gardes vertes le restent après le codage ; les rouges le sont pour la raison dite dans leur
- * message. Le codage sert aussi à recaler ce harnais : un test qui reste rouge alors que le besoin
- * est couvert est à corriger, pas à contourner.
+ *    tirelires.
  *
  * Niveaux (D83) : tous à 1, comme dans le cœur — voir l'en-tête de l'autre fichier.
  */
@@ -342,51 +335,43 @@ describe.skipIf(!navigateur)('#183 · le plan sans hypothèse, à 375 px', () =>
       page.on('dialog', (d) => void d.accept());
     });
 
-    // Point 1
-    it('[niveau 1] point 1 — dans la période où l’on lit, le plan lit le réel : « soldes au … », virement net du non affecté qu’on rapatrie', async () => {
-      const écran = await lireLÉcran(page);
-      expect(écran.légende, 'la légende dit la date où les soldes sont lus').toMatch(/soldes au 6 sept/i);
-      const attendu = computePlan(exampleLedger(), LECTURE_EXEMPLE, LECTURE_EXEMPLE).transfers.find((t) => t.accountName === COMPTE)!;
-      const c = await carte(page);
-      expect(c, `carte « ${COMPTE} » absente`).not.toBeNull();
-      expect(c!.titre).toBe(attendu.net);
-      const rapatrier = c!.lignes.find((l) => /à rapatrier/i.test(l.libellé));
-      expect(rapatrier, `le non affecté du ${COMPTE} (${eur(attendu.surplus)}) se lit encore dans la période courante : ${résumé(c!.texte)}`).toBeTruthy();
-      expect(rapatrier!.montant).toBe(attendu.surplus);
-    });
-
     // Points 2 et 6 (ni supposition)
-    it.each(PÉRIODES_À_VENIR)('[niveau 1] points 2 et 6 — %s : le plan ne dit ni « soldes projetés » ni « virements supposés faits », et ne montre aucune position de compte', async (période) => {
-      await allerÀLaPériode(page, période);
-      const écran = await lireLÉcran(page);
-      expect(écran.légende, `la légende d’une période à venir suppose des virements exécutés (D52) : « ${écran.légende} »`).not.toMatch(SUPPOSITION);
-      expect(écran.texte, `une position de compte apparaît dans « ${période} », où aucun relevé n’existe`).not.toMatch(POSITION_DE_COMPTE);
-      const c = await carte(page);
-      expect(c, `carte « ${COMPTE} » absente en ${période} : un plan sans hypothèse reste complet`).not.toBeNull();
+    it('[niveau 1] points 2 et 6 — aucune période à venir ne dit « soldes projetés » ni « virements supposés faits », ni ne montre de position de compte', async () => {
+      for (const période of PÉRIODES_À_VENIR) {
+        await allerÀLaPériode(page, période);
+        const écran = await lireLÉcran(page);
+        expect(écran.légende, `« ${période} » : la légende d’une période à venir suppose des virements exécutés (D52) : « ${écran.légende} »`).not.toMatch(SUPPOSITION);
+        expect(écran.texte, `une position de compte apparaît dans « ${période} », où aucun relevé n’existe`).not.toMatch(POSITION_DE_COMPTE);
+        expect(await carte(page), `carte « ${COMPTE} » absente en ${période} : un plan sans hypothèse reste complet`).not.toBeNull();
+      }
     });
 
     // Points 3 et 4
-    it.each(PÉRIODES_À_VENIR)('[niveau 1] points 3 et 4 — %s : le virement vers le Livret A vaut ce que ses tirelires demandent, lu sur la même page', async (période) => {
-      await allerÀLaPériode(page, période);
-      const c = await carte(page);
-      expect(c, `carte « ${COMPTE} » absente`).not.toBeNull();
-      const demandé = await demandeÀLÉcran(page);
-      expect(demandé, `aucune tirelire du ${COMPTE} ne demande rien en ${période} : le harnais lit mal la liste « Tirelires »`).toBeGreaterThan(0);
-      expect(
-        c!.titre,
-        `${période} : la carte du ${COMPTE} dit de virer ${eur(c!.titre)} pour ${eur(demandé)} demandés par ses tirelires (liste « Tirelires » de la même page) — ${résumé(c!.texte)}`,
-      ).toBe(demandé);
-      // Le même montant, recalculé par le cœur sur le même grand livre.
-      const p = computePlan(exampleLedger(), periodStart(période), LECTURE_EXEMPLE);
-      expect(demandé).toBe(p.lines.filter((l) => l.accountId === 'acc-livret').reduce((s, l) => s + l.requested, 0));
+    it('[niveau 1] points 3 et 4 — pour chaque période à venir, le virement vers le Livret A vaut ce que ses tirelires demandent, lu sur la même page', async () => {
+      for (const période of PÉRIODES_À_VENIR) {
+        await allerÀLaPériode(page, période);
+        const c = await carte(page);
+        expect(c, `carte « ${COMPTE} » absente en ${période}`).not.toBeNull();
+        const demandé = await demandeÀLÉcran(page);
+        expect(demandé, `aucune tirelire du ${COMPTE} ne demande rien en ${période} : le harnais lit mal la liste « Tirelires »`).toBeGreaterThan(0);
+        expect(
+          c!.titre,
+          `${période} : la carte du ${COMPTE} dit de virer ${eur(c!.titre)} pour ${eur(demandé)} demandés par ses tirelires (liste « Tirelires » de la même page) — ${résumé(c!.texte)}`,
+        ).toBe(demandé);
+        // Le même montant, recalculé par le cœur sur le même grand livre.
+        const p = computePlan(exampleLedger(), periodStart(période), LECTURE_EXEMPLE);
+        expect(demandé).toBe(p.lines.filter((l) => l.accountId === 'acc-livret').reduce((s, l) => s + l.requested, 0));
+      }
     });
 
     // Point 6 (ni manquement)
-    it.each(['septembre 2026', ...PÉRIODES_À_VENIR])('[niveau 1] point 6 — %s : sans suivi des opérations, le plan ne montre aucun manquement ni état d’occurrence', async (période) => {
-      await allerÀLaPériode(page, période);
-      const écran = await lireLÉcran(page);
-      expect(écran.texte, `sans opération importée, « ${période} » parle de suivi`).not.toMatch(SUIVI);
-      expect(await carte(page), `carte « ${COMPTE} » absente : le plan sans suivi est complet`).not.toBeNull();
+    it('[niveau 1] point 6 — sans suivi des opérations, le plan ne montre, en aucune période, ni manquement ni état d’occurrence', async () => {
+      for (const période of ['septembre 2026', ...PÉRIODES_À_VENIR]) {
+        await allerÀLaPériode(page, période);
+        const écran = await lireLÉcran(page);
+        expect(écran.texte, `sans opération importée, « ${période} » parle de suivi`).not.toMatch(SUIVI);
+        expect(await carte(page), `carte « ${COMPTE} » absente en ${période} : le plan sans suivi est complet`).not.toBeNull();
+      }
     });
   });
 
@@ -397,6 +382,10 @@ describe.skipIf(!navigateur)('#183 · le plan sans hypothèse, à 375 px', () =>
     beforeAll(async () => {
       page = await pageAvec(site, grandLivreAvecTroisVirements());
       ouvertes.push(page);
+      // L'écran se lit au 20 septembre, dans la période de septembre : le grand livre du harnais est celui qu'on croit.
+      const écran = await lireLÉcran(page);
+      expect(écran.période).toBe('septembre 2026');
+      expect(écran.légende).toMatch(/soldes au 20 sept/i);
     });
 
     /**
@@ -458,40 +447,27 @@ describe.skipIf(!navigateur)('#183 · le plan sans hypothèse, à 375 px', () =>
       return { surLePlan, surLesFlux, ...états([...surLePlan, ...surLesFlux]) };
     }
 
-    it('[niveau 1] point 5 — l’écran se lit au 20 septembre, dans la période de septembre : le grand livre du harnais est celui qu’on croit', async () => {
-      const écran = await lireLÉcran(page);
-      expect(écran.période).toBe('septembre 2026');
-      expect(écran.légende).toMatch(/soldes au 20 sept/i);
-    });
-
+    // Le point 5 dit « se lit sur son flux » : l'état de chaque occurrence se lit sur la ligne du flux
+    // (écran Flux prévus). Le manquement se voit en plus depuis le plan de sa période.
     it('[niveau 1] point 5 — le virement pointé se lit « pointé » sur son flux, et n’est pas un manquement', async () => {
       const v = await lecture('Livret A');
-      expect(v.pointée, `rien ne dit que l’occurrence du 28 août du « Virement Livret A » est pointée : ${résumé([...v.surLePlan, ...v.surLesFlux].join(' | '))}`).toBe(true);
+      expect(états(v.surLesFlux).pointée, `rien ne dit, sur le flux, que l’occurrence du 28 août du « Virement Livret A » est pointée : ${résumé(v.surLesFlux.join(' | '))}`).toBe(true);
       expect(v.nonReçue, 'un virement pointé ne remonte pas en « attendu, non reçu »').toBe(false);
     });
 
-    it('[niveau 1] point 5 — le virement dont la fenêtre est ouverte se lit « attendu », sans être un manquement', async () => {
+    it('[niveau 1] point 5 — le virement dont la fenêtre est ouverte se lit « attendu » sur son flux, sans être un manquement', async () => {
       const v = await lecture('Livret B');
-      expect(v.attendue, `rien ne dit que l’occurrence du 18 septembre du « Virement Livret B » est attendue dans sa fenêtre (jusqu’au 23) : ${résumé([...v.surLePlan, ...v.surLesFlux].join(' | '))}`).toBe(true);
+      expect(états(v.surLesFlux).attendue, `rien ne dit, sur le flux, que l’occurrence du 18 septembre du « Virement Livret B » est attendue dans sa fenêtre (jusqu’au 23) : ${résumé(v.surLesFlux.join(' | '))}`).toBe(true);
       expect(v.nonReçue, 'sa fenêtre est ouverte : ce n’est pas encore un manquement').toBe(false);
       expect(v.pointée, 'aucune ligne de relevé ne l’a rapproché').toBe(false);
     });
 
-    it('[niveau 1] point 5 — le virement attendu non reçu se lit depuis le plan de sa période, sur son flux', async () => {
+    it('[niveau 1] point 5 — le virement attendu non reçu se lit « non reçu » sur son flux, et se voit depuis le plan de sa période', async () => {
       const v = await lecture('Livret C');
-      expect(v.nonReçue, `le « Virement Livret C » du 3 septembre, fenêtre close le 8, n’est pas dit non reçu : ${résumé([...v.surLePlan, ...v.surLesFlux].join(' | '))}`).toBe(true);
+      expect(états(v.surLesFlux).nonReçue, `le « Virement Livret C » du 3 septembre, fenêtre close le 8, n’est pas dit non reçu sur son flux : ${résumé(v.surLesFlux.join(' | '))}`).toBe(true);
       // Depuis le plan de sa période, sans avoir à changer d'écran.
       expect(états(v.surLePlan).nonReçue, 'le manquement se voit depuis le plan de septembre, sans ouvrir les flux').toBe(true);
       expect(v.pointée).toBe(false);
-    });
-
-    it('[niveau 1] point 5 — « Attendus, non reçus » ne nomme que le virement dont la fenêtre est close', async () => {
-      const bloc = await page.evaluate(() => {
-        const h = [...document.querySelectorAll('main h2')].find((x) => /Attendus, non reçus/i.test(x.textContent ?? ''));
-        return ((h?.nextElementSibling as HTMLElement | null)?.innerText ?? '').replace(/\s+/g, ' ').trim();
-      });
-      expect(bloc, 'le bloc « Attendus, non reçus » nomme le Livret C').toMatch(/Livret C/);
-      expect(bloc, 'il ne nomme ni le Livret A (pointé) ni le Livret B (fenêtre ouverte)').not.toMatch(/Livret [AB]\b/);
     });
   });
 

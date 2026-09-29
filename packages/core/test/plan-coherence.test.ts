@@ -84,7 +84,7 @@ describe('[niveau 2] les deux blocs du plan découlent du même calcul (D52)', (
     expect(t.net).toBe(demande(p, 'acc-livret') - t.surplus);
   });
 
-  it('une période à venir ne redemande pas le non affecté : aucune position de compte n’y entre (#183)', () => {
+  it('[niveau 4] une période à venir ne redemande pas le non affecté : aucune position de compte n’y entre (#183, redondant avec le harnais, points 3 et 4)', () => {
     for (const asOf of [OCTOBRE, NOVEMBRE]) {
       const p = plan(asOf);
       const t = p.transfers.find((x) => x.accountId === 'acc-livret')!;
