@@ -447,6 +447,11 @@ qu'elles barrent.
 > Il faut ajouter un rôle : architecte qui analyse un besoin et défini ses spécifications. C'est aujourd'hui réalisé par la première phase de l'auditeur mais je voudrais que l'auditeur soit vraiment réduit à coder le harnais si nécessaire et vérifier le codage. L'analyse du besoin doit être indépendante.
 > Pour le reste je valide les changements décidés maintenant qui vont engendrer un nouveau tour dans cette issue et pr
 
+Modérée par le porteur le 29 septembre 2026, dans #286 : l'auditeur complète dans l'issue ce que
+l'architecte a manqué, sans retirer ni réécrire ce qu'il a écrit.
+
+> amende le role de l'auditeur pour lui permettre d'amender une issue ou une PR afin d'y ajoute des controles, invariants, "fait quand"... que l'architecte aurait manqué en premiere analyse
+
 > Il faudra aussi modifier les instructions dans le projet Claude.la pour se référer aux roles
 
 > En effet, il faut ajouter cette méthode au rôle de l'auditeur. Mais l'auditeur ajoute ses retours pour relancer un tour au codeur dans la PR si besoin.
