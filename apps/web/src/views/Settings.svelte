@@ -4,6 +4,7 @@
   import { exportBundleFor, importBundle, knownPeers, type StateBundle } from '@tirelire/core';
   import { saveFile } from '../lib/platform';
   import { texteSauvegarde, texteSynchronisation } from '../lib/sauvegarde';
+  import { installation } from '../lib/installation.svelte';
 
   let deviceName = $state(readDeviceName());
   let peerFilter = $state('');
@@ -156,7 +157,15 @@
       {app.persistance === 'impossible'
         ? 'Ce navigateur ne permet pas de les mettre à l’abri'
         : 'Votre navigateur n’a pas accepté de les mettre à l’abri'} : s'il manque de place, il peut les effacer sans prévenir.
-      Exportez le fichier régulièrement pour tout retrouver.{app.persistance === 'refusee' ? ' La demande se refait à chaque ouverture ; une application installée depuis le menu du navigateur l’obtient plus souvent.' : ''}</p>
+      Exportez le fichier régulièrement pour tout retrouver.{app.persistance === 'refusee'
+        ? installation.offerte
+          ? ' La demande se refait à chaque ouverture ; une application installée l’obtient plus souvent, et vous pouvez installer Tirelire d’ici.'
+          : ' La demande se refait à chaque ouverture ; une application installée depuis le menu du navigateur l’obtient plus souvent.'
+        : ''}</p>
+    {#if app.persistance === 'refusee' && installation.offerte}
+      <!-- Là où l'installation est conseillée, elle se propose directement (#194, point 4). -->
+      <div class="actions"><button class="btn" onclick={() => installation.installer()}>Installer l'application</button></div>
+    {/if}
   {/if}
   <div class="small">Dernière sauvegarde : {texteSauvegarde(app.sauvegarde)}</div>
   <div class="small">Dernière synchronisation : {texteSynchronisation(app.synchronisation)}</div>
