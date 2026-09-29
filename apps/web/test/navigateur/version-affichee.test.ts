@@ -46,8 +46,9 @@
  * affichée est celle qui tourne, le signal paraît sans recharger d'office (C8, principe 4), refuser
  * laisse travailler, la nouvelle version tourne à l'ouverture suivante. Niveau 2 : les noms des
  * quatre sortes de builds (D83, « Livraison »), pas de faux signal, chaque aperçu servi par lui-même
- * (#233). Niveau 3 : hors ligne après une première visite, les textes vouvoient (D85), le signal ne
- * revient pas une fois la mise à jour faite. Niveau 4 : un diagnostic qui dit où la version se lit.
+ * (#233), hors ligne après une première visite, le signal qui ne revient pas une fois la mise à jour
+ * faite (un faux signal), les textes qui vouvoient (D85, une décision). Niveau 4 : un diagnostic qui
+ * dit où la version se lit.
  */
 // @ts-ignore — module JavaScript sans déclaration de types
 import { CLÉ_ÉTAPE, STATUT, besoins, expression, jobs, scalaire, vrai, évaluer, étapes, commande } from '../../../../packages/gardes/workflow-a-blanc.mjs';
@@ -1189,7 +1190,7 @@ describe.skipIf(!navigateur)('#142 · 2 à 4. une mise à jour prête', () => {
     });
   });
 
-  describe('[niveau 3] la mise à jour faite, le signal ne revient pas', () => {
+  describe('[niveau 2] la mise à jour faite, le signal ne revient pas', () => {
     it('après avoir rechargé, aucun signal ne demande de recharger encore', async () => {
       const o = await jouer('accepter');
       expect(o.après.rechargé, 'accepter le signal ne recharge pas la page').toBe(true);
@@ -1203,7 +1204,7 @@ describe.skipIf(!navigateur)('#142 · 2 à 4. une mise à jour prête', () => {
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 
 describe.skipIf(!navigateur)('#142 · 5. ce qui tenait tient encore', () => {
-  describe('[niveau 3] hors ligne, après une première visite', () => {
+  describe('[niveau 2] hors ligne, après une première visite', () => {
     /** Une première visite, le service worker installé, puis la page rouverte sans réseau. */
     async function rouvrirSansRéseau<T>(suite: (page: Page) => Promise<T>): Promise<T> {
       const { chrome: c } = bacPrêt();
@@ -1330,7 +1331,7 @@ describe.skipIf(!navigateur)('#142 · 5. ce qui tenait tient encore', () => {
 const TUTOIEMENT = /\b(?:tu|toi|ton|ta|tes)\b|\bt['’]|\b(?:recharge|actualise|mets|clique|appuie|relance|redémarre|profite|installe|choisis|attends)\b/i;
 
 describe.skipIf(!navigateur)('#142 · D85', () => {
-  describe('[niveau 3] les textes que la version et la mise à jour ajoutent vouvoient', () => {
+  describe('[niveau 2] D85 · les textes que la version et la mise à jour ajoutent vouvoient', () => {
     it('ni le signal de mise à jour ni la ligne de la version ne tutoient', async () => {
       const o = await jouer('ignorer');
       expect(o.texteDuSignal, 'pas de signal à relire').toBeDefined();
