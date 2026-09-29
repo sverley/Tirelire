@@ -1,9 +1,20 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execFileSync } from 'node:child_process';
+import { versionConstruite } from './src/lib/version';
 
 // `--base` (ou TIRELIRE_BASE) permet de servir le site depuis un sous-dossier d'un hébergement.
 const base = process.env.TIRELIRE_BASE ?? '/';
+
+/** Le commit d'une construction locale, s'il se lit ; rien n'est inventé sinon (#142). */
+function commitLocal(): string | undefined {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Les navigations que le service worker laisse au serveur, au lieu d'y répondre par la page de
@@ -19,10 +30,15 @@ export function navigationsLaisséesAuServeur(racine: string): RegExp[] {
 
 export default defineConfig({
   base,
+  // La version que ce code exécutera, fixée ici : ce que l'application affiche (#142, `version.ts`).
+  define: { __TIRELIRE_VERSION__: JSON.stringify(versionConstruite(process.env, commitLocal)) },
   plugins: [
     svelte(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Une nouvelle version s'installe puis attend : l'application le signale et l'utilisateur
+      // choisit quand recharger ; rien ne se recharge à son insu (#142, principe 4).
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Tirelire',
