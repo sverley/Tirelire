@@ -20,6 +20,7 @@
     "@tirelire/core": "workspace:*",
     "qrcode": "^1.5.4",
     "sql.js": "^1.13.0",
+    "workbox-window": "^7.4.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

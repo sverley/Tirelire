@@ -274,6 +274,11 @@ class AppState {
     this.reload();
   }
 
+  /** Écrit aussitôt ce qui attendait de l'être : avant de recharger la page (#142). */
+  async ecrireMaintenant(): Promise<void> {
+    await this.opened?.flush();
+  }
+
   /** Export du fichier SQLite. */
   async exportBytes(): Promise<Uint8Array> {
     await this.opened?.flush();

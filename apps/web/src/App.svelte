@@ -4,6 +4,7 @@
   import { shortDate } from './lib/format';
   import { isNative, saveFile } from './lib/platform';
   import { BETA, texteSauvegarde, texteSynchronisation } from './lib/sauvegarde';
+  import { miseAJour } from './lib/miseAJour.svelte';
 
   /**
    * Au-delà de cet écart entre la dernière opération connue et la date de lecture, l'application
@@ -59,6 +60,25 @@
 </header>
 
 <main>
+  {#if miseAJour.prete && !miseAJour.masquee}
+    <!-- Une version plus récente attend (#142) : l'utilisateur choisit quand recharger ; rien ne
+         se recharge de soi-même. Le signal ne bloque aucun écran. -->
+    <div class="card accent" role="status" aria-live="polite">
+      <div class="row">
+        <div class="label">
+          <strong>Une nouvelle version de Tirelire est prête</strong>
+          <span class="sub">
+            Rechargez pour l'utiliser : vos données restent sur cet appareil. Sinon, elle s'ouvrira la
+            prochaine fois que vous ouvrirez Tirelire.
+          </span>
+        </div>
+      </div>
+      <div class="actions" style="margin:6px 0 0">
+        <button class="btn small primary" onclick={() => miseAJour.recharger(() => app.ecrireMaintenant())}>Recharger</button>
+        <button class="btn small" onclick={() => (miseAJour.masquee = true)}>Plus tard</button>
+      </div>
+    </div>
+  {/if}
   {#if app.refused}
     <div class="card warn" role="alert">
       <h2 style="margin-top:0">Ces données ne s'ouvrent pas ici</h2>

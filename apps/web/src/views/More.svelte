@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app, type View } from '../lib/state.svelte';
+  import { VERSION, texteVersion } from '../lib/version';
   const items: Array<{ id: View; label: string; desc: string }> = [
     { id: 'accounts', label: 'Comptes', desc: 'Principal, comptes d’accueil, comptes tiers' },
     { id: 'tirelires', label: 'Tirelires', desc: 'Vos réserves et ce qu’elles doivent financer' },
@@ -32,3 +33,6 @@
     </button>
   {/each}
 </div>
+
+<!-- La version que cette page exécute (#142) : à relier à une vérification ou un signalement. -->
+<p class="muted small">{texteVersion(VERSION)}</p>
