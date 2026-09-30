@@ -165,6 +165,8 @@ de son test.
   écran ne l'exige, aucun ne reste vide faute d'en avoir. Sinon, et notamment si elle ne touche que
   des tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi
   l'application n'est pas atteinte.
+- **À bâtir** · (U6) le parcours complet, des dépenses d'un groupe réparties entre ses personnes à ce
+  que chacune doit (#291, D88).
 
 ## I4 · Simple par défaut, souple sur demande
 

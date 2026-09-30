@@ -33,7 +33,8 @@ le compte principal (D04).
 
 Un livre de compte : une somme réservée à un usage précis, avec son propre solde. Elle se répartit
 sur un ou plusieurs comptes réels, chaque part étant une **composante** ; un compte réel héberge les
-composantes de plusieurs tirelires (D19, I2).
+composantes de plusieurs tirelires (D19, I2). Son solde se lit comme celui d'un compte : c'est un
+compte virtuel, et une étiquette exclusive des sous-opérations (D88).
 
 ## Non affecté
 
@@ -43,9 +44,9 @@ pour chaque compte, solde bancaire = composantes hébergées + non affecté (I2)
 ## Provision
 
 Tirelire qui accumule pour payer une charge plurimensuelle ou annuelle — taxe foncière, assurance
-auto, vacances. Elle se vide à l'échéance et repart. Sa dotation n'est pas la charge divisée par
-douze : c'est ce qui reste à réunir, réparti sur les périodes restantes, ce qui rattrape un retard
-et absorbe un changement de montant.
+auto, vacances. Elle se vide à l'échéance et repart. Sa dotation est sa croisière, la charge
+répartie sur sa périodicité ; ce qui ne sera pas réuni à temps s'annonce comme un **manque**, et ne
+se répartit sur les périodes restantes que par un **lissage** décidé par l'utilisateur (D88).
 
 ## Objectif
 
@@ -64,13 +65,58 @@ tirelire : c'est un flux prévu, directement sur un compte.
 
 ## Flux prévu
 
-Toute opération attendue : salaire, loyer perçu, prélèvement, virement interne, échéance de
-provision. Décrit par un montant, une périodicité, une date et une tolérance.
+La représentation abstraite d'opérations attendues : salaire, loyer perçu, prélèvement, virement
+interne, échéance de provision. Décrit par un montant, une périodicité, une date et une tolérance.
+Il produit les **opérations prévues**, sa représentation concrète, calculées à chaque lecture (D88).
 
 ## Opération
 
-Une ligne de relevé bancaire importée, ou saisie à la main. Elle est pointée sur un flux prévu,
-ventilée en catégories et tirelires, reconnue comme virement interne, ou en attente de tri.
+Un montant, une date, un compte. **Bancaire** : une ligne de relevé importée ; **saisie** : une ligne
+entrée à la main, passée ou future ; **prévue** : une ligne produite par un flux, calculée, jamais
+enregistrée. Elle contient des **sous-opérations**, peut en reprendre une autre, et est reconnue
+comme virement interne ou en attente de tri (D88).
+
+## Sous-opération
+
+Une part d'une opération ; les sous-opérations d'une opération s'additionnent jusqu'à son montant,
+sur autant de niveaux qu'on veut. Elles la **ventilent** entre tirelires, catégories ou personnes, la
+divisent dans le temps (**lissage**, **flux**), ou **reprennent** une autre opération qui désigne le
+même mouvement : le rapprochement d'une opération bancaire, la correction d'une opération prévue, son
+masquage (D88).
+
+## Étiquette
+
+Ce qui classe une sous-opération. **Exclusive** — compte réel, tirelire, catégorie, personne : une
+seule valeur ; en porter plusieurs, c'est diviser le montant. **Libre** : autant qu'on veut, sans
+diviser le montant. Une sous-opération à qui il en manque une prend celle de l'opération qui la
+contient (D88).
+
+## Personne
+
+Un membre du foyer ou du groupe, commun à tous ceux qui ont les clés ; pas un utilisateur identifié.
+Une étiquette exclusive : un revenu porte sa personne, une dépense commune se répartit entre les
+personnes concernées, à parts égales par défaut. Un compte peut l'avoir pour titulaire (D88).
+
+## Lissage
+
+La décision de répartir un manque sur des périodes : proposée par l'application, calculée, puis
+acceptée, modifiée ou refusée par l'utilisateur. Acceptée, c'est une opération divisée en
+sous-opérations datées. Rien ne se lisse d'office (D88).
+
+## Solde prévu
+
+Le solde d'un compte ou d'une tirelire à une date : le solde réel, plus les opérations saisies et
+prévues qui comptent jusque-là (D88).
+
+## Manque
+
+Un solde prévu négatif à une date (D88). Une opération « attendue, non reçue » (D12) n'en est pas un :
+elle cesse de compter dans le solde prévu, qui peut alors en montrer un.
+
+## Instance
+
+La copie d'un jeu de données sur un appareil ; les instances qui partagent les mêmes clés se
+synchronisent (I8). Un navigateur doit pouvoir en tenir plusieurs, de jeux différents (D88).
 
 ## Période budgétaire
 

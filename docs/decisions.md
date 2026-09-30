@@ -26,7 +26,8 @@ reconstruits (`balances.ts`).
 Le compte principal porte un `payDay` ; la période va de ce jour au jour précédent du mois suivant, nommée
 d'après le mois qui contient son milieu (28 août → 27 septembre = « septembre »). `payDay = 1`
 redonne le mois calendaire. Conséquence vérifiée par les tests : une échéance du 15 octobre a deux
-virements devant elle (28 août et 28 septembre), donc le rattrapage se lisse sur deux périodes.
+virements devant elle (28 août et 28 septembre) : c'est sur ces deux périodes que se répartit un
+lissage décidé (D88).
 
 Ce que l'hypothèse du mois calendaire cachait : beaucoup de salaires tombent entre le 27 et le
 dernier jour du mois, et les prélèvements du début de mois suivent. Un budget calé sur le mois civil
@@ -63,8 +64,9 @@ physiquement là.
 ### D06 · Ordre de financement quand la marge est négative
 
 Chaque tirelire a une `priority` (petit = financé d'abord ; défauts : provision 10, budget 20,
-objectif 30). Les planchers (rattrapage d'une provision) sont servis avant tout le reste, puis le
-demandé dans l'ordre des priorités. Le plan dit quelles lignes sont réduites ou non financées.
+objectif 30). Les planchers (ce qu'une échéance demande, lissage décidé compris, D88) sont servis
+avant tout le reste, puis le demandé dans l'ordre des priorités. Le plan dit quelles lignes sont
+réduites ou non financées.
 
 Ce que l'hypothèse « il y a toujours assez » cachait : le mois où les revenus ne couvrent pas les
 charges, les provisions, l'épargne et les budgets, quelqu'un doit céder. L'épargne se décale ; une
@@ -191,8 +193,9 @@ passage, malléable), *verrouillée* (plus aucune règle ne l'atteint). Est vér
 synchronisé — ce qui est verrouillé. Toute modification manuelle d'une opération la verrouille :
 c'est la modification qui change l'état, pas l'ouverture de l'éditeur. Seul l'utilisateur
 déverrouille, à l'unité ou par action groupée (D26). Renomme le pointage de D12 en **rapprochement
-de flux**, qui reste la mise en correspondance avec une échéance attendue et ne change aucun état
-à lui seul ; les deux sens du mot ne doivent plus cohabiter dans le code ni dans l'interface.
+de flux**, qui reste la mise en correspondance avec une échéance attendue — une reprise, au sens de
+D88 — et ne change aucun état à lui seul ; les deux sens du mot ne doivent plus cohabiter dans le
+code ni dans l'interface.
 
 Ce que l'hypothèse de la donnée propre cachait : une opération importée, une opération saisie et une
 opération corrigée n'ont pas la même autorité ; sans état, la synchronisation écrase la correction
@@ -248,12 +251,14 @@ inconnu d'avance, donc un flux à montant variable peut engendrer une règle ver
 ventilation qui dépendrait du contexte — solde d'une tirelire, état du plan — sort de ce cadre :
 elle est une aide, et son résultat doit être figé sur l'opération au moment où il est produit.
 Remplace la ventilation de D10, dont « une catégorie et une tirelire par ligne » reste valable.
+Une ligne de ventilation est une sous-opération (D88), qui peut à son tour en contenir.
 
 ### D28 · Tirelire sans type, besoins multiples
 
 Une tirelire est un pot à **solde unique** portant un ou plusieurs **besoins** : récurrent (tant par
-période, avec le report de D05), à échéance (un montant pour une date, rattrapage lissé sur les
-virements restants), ou objectif (un montant sans date). Le besoin de financement de la période est
+période, avec le report de D05), à échéance (un montant pour une date ; ce qui ne sera pas réuni à
+temps s'annonce comme un manque, et ne se lisse que sur décision de l'utilisateur, D88), ou objectif
+(un montant sans date). Le besoin de financement de la période est
 leur somme. Les priorités et planchers de D06 portent désormais sur les besoins, pas sur les
 tirelires : une même tirelire « Charges » sert ainsi le plancher de la taxe foncière avant son
 courant. Remplace la typologie provision / budget / objectif de D06, qui devient une typologie de
@@ -264,7 +269,8 @@ entre ses membres — s'obtient en fusionnant les tirelires plutôt qu'en les co
 ### D29 · Dotation calculée, virements neutres, report par libération
 
 Précise D06, D19 et D20 et remplace la part de D05 sur le « financement virtuel ». Chaque besoin
-(D28) est **doté** au début de chaque période de ce qu'il demande — croisière ou rattrapage —
+(D28) est **doté** au début de chaque période de ce qu'il demande — sa croisière, plus la part d'un
+lissage décidé (D88), ou le rattrapage d'un déficit —
 sous forme de composante calculée sur le compte principal (ou sur le compte de placement s'il n'y a pas de
 principal), jamais stockée. Un virement interne ventilé sur une tirelire **ne change pas son solde** :
 il déplace une composante d'un compte vers un autre ; le solde ne bouge que par les dotations, les
@@ -778,39 +784,37 @@ que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parco
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.
 
-### D52 · Une période à venir dit ce qu'elle demande, sans rien supposer
+### D52 · Une période à venir se lit en solde prévu
 
-Précise D20 et D29. Le plan a maintenant deux dates : `asOf`, la période qu'on regarde, et `today`,
-la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf`, donc tout appelant à
-deux arguments garde le comportement d'avant ; l'interface y passe sa **date de lecture**).
+Précise D20 et D29 ; son calcul est celui de D88. Le plan a deux dates : `asOf`, la période qu'on
+regarde, et `today`, la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf` ;
+l'interface y passe sa **date de lecture**).
 
 Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un virement des mois passés n'a
 pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est la
-raison d'être du « complément exceptionnel » de D21. Au-delà, il n'y a plus de relevé à lire, et le
-plan ne suppose rien à la place (principe 1.3, #183) : il ne montre aucune position de compte, ni
-lue, ni obtenue en supposant exécuté un virement non constaté. Il dit ce que chaque tirelire demande
-pour la période — sa dotation (D29) — et ce qu'il faut virer pour elle : cette dotation, répartie
-comme son placement la veut (`periodDemand`), calculée sur le seul solde de la tirelire, qui ne
-dépend d'aucun virement (D29).
+raison d'être du « complément exceptionnel » de D21. Au-delà, le plan montre le **solde prévu** des
+comptes et des tirelires (D88) : le réel à la date de lecture, plus les opérations saisies et prévues
+qui comptent jusque-là, chacune affichée avec son origine. Il dit aussi ce que chaque tirelire
+demande pour la période — sa dotation (D29) — et ce qu'il faut virer pour elle : cette dotation,
+répartie comme son placement la veut (`periodDemand`), calculée sur le seul solde de la tirelire,
+qui ne dépend d'aucun virement (D29).
 
-Conséquence, et invariant tenu par les tests : pour une période à venir, ce qu'on vire vers un
-compte d'accueil vaut exactement ce que les tirelires placées là demandent pour cette période ; dans
-la période où l'on lit, moins le non affecté qu'on en rapatrie. Sans cela, le bloc « Virements à
-faire » recalculait l'écart depuis la position réelle du jour — dotations des périodes antérieures
-comprises, puisque rien ne les avait virées — pendant que le bloc « Tirelires » simulait période par
-période. Les deux se contredisaient dès la période suivante et l'écart grossissait de période en
-période (sur l'exemple : 700 € demandés contre 1 400 € virés en octobre, 550 € contre 1 950 € en
-novembre, où une tirelire « en avance » ne demandait plus rien mais faisait toujours virer 300 €).
-Jusqu'à #183, la cohérence tenait par une supposition : le plan tenait pour exécutés les virements
-qu'il avait lui-même proposés aux périodes précédentes. #183 l'a retirée ; la cohérence tient sans
-elle, puisque la demande d'une période ne dépend que du solde des tirelires.
+Invariant tenu par les tests : pour une période à venir, ce qu'on vire vers un compte d'accueil vaut
+exactement ce que les tirelires placées là demandent pour cette période ; dans la période où l'on
+lit, moins le non affecté qu'on en rapatrie. Jusqu'à #183, le plan tenait pour exécutés les virements
+qu'il avait lui-même proposés aux périodes précédentes, sans le dire : le bloc « Virements à faire »
+recalculait l'écart depuis la position réelle du jour pendant que le bloc « Tirelires » simulait
+période par période, et les deux se contredisaient dès la période suivante (sur l'exemple : 700 €
+demandés contre 1 400 € virés en octobre). #183 a retiré toute position à venir ; #291 la rétablit,
+mais affichée : un virement permanent enregistré compte à sa date parce que son flux le prévoit, se
+montre comme une opération prévue, et, sur un compte suivi, cesse de compter s'il n'arrive pas dans
+sa fenêtre (D12, D88).
 
-La question « ce virement a-t-il eu lieu ? » ne se pose pas au plan : elle vit sur les flux, sa mise
-en œuvre dans le temps. Chaque occurrence d'un virement permanent enregistré (D60) se lit sur son
-flux au pointage de D12 — pointée, attendue dans sa fenêtre, ou attendue non reçue — et le plan de
-sa période la montre. Sans suivi des opérations (U1), rien ne se pointe : le plan est complet sans
-occurrences, et n'y montre ni supposition ni manquement. Commencer à importer n'ajoute que ces
-lectures du réel ; ni les besoins, ni les virements permanents proposés ne changent.
+La question « ce virement a-t-il eu lieu ? » se lit sur les opérations : une opération prévue est
+reprise par l'opération bancaire qui la réalise, attendue dans sa fenêtre, ou attendue non reçue
+(D12), et le plan de sa période la montre. Sans suivi des opérations (U1), rien ne se confronte : les
+opérations prévues comptent à leur date, et rien n'est dit manquant. Commencer à importer n'ajoute
+que ces lectures du réel ; ni les besoins, ni les virements permanents proposés ne changent.
 
 Côté interface, les deux dates cessent d'être la même variable. `app.asOf` est la date de lecture :
 elle appartient à toute l'application, l'en-tête la montre, et c'est elle qui dit jusqu'où les
@@ -822,11 +826,9 @@ daté de septembre 2026, se lit donc à sa date : ses périodes suivantes resten
 quelle que soit la date du jour.
 
 Ce qui se lit sur le réel — non affecté du compte principal, soldes à régler des comptes tiers,
-surplus des comptes d'accueil — se lit dans la période où l'on lit, à la date de lecture, pas à une
-date inventée ; une période à venir ne le redemande pas. L'alerte « le non affecté est négatif » ne
-se déclenche donc jamais sur une période à venir. Projeter le solde du compte principal demanderait
-de dérouler revenus et charges période après période : ce n'est pas ce que le plan fait, et il ne le
-prétend pas.
+surplus des comptes d'accueil — se lit dans la période où l'on lit, à la date de lecture. Pour une
+période à venir, c'est le solde prévu qui parle : un solde prévu négatif est un **manque** (D88), sur
+un compte comme sur une tirelire.
 
 ### D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
@@ -1398,7 +1400,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   personne le voie ; la première réponse « oui » donne le niveau :
   - **0 · l'irréparable** — après correction du code, les données de l'utilisateur resteraient-elles
     perdues, altérées ou sorties de l'appareil, ou un secret exposé ?
-  - **1 · une promesse tombe** — un usage (U1 à U5), un principe, un invariant ou une contrainte ne
+  - **1 · une promesse tombe** — un usage de la description, un principe, un invariant ou une contrainte ne
     serait-il plus tenu ? L'appui est un identifiant : un test nommé au registre, ou qui vérifie un
     de ces énoncés tel qu'il est écrit.
   - **2 · un cas est faux** — une règle, métier ou de la garde, donnerait-elle un résultat faux ou
@@ -1634,11 +1636,12 @@ fondent, et son analyse — contraintes, hypothèses, cibles, usages — quand e
 tâches, ni ordre, ni état.
 
 Une réflexion d'ensemble sur un domaine se mène dans une **issue de conception**, par un architecte,
-en pensant aux cinq usages ; son produit va dans les décisions et dans l'analyse du domaine. Les
+en pensant à tous les usages ; son produit va dans les décisions et dans l'analyse du domaine. Les
 choix réversibles se reprennent au fil des versions ; les choix structurels, qui engagent tous les
 usages et toutes les cibles, se posent avant, dans le socle (`v0.0`).
 
-Chaque spécification porte une ligne « Usages » : ce que la tâche fait à U1, U2, U3, U4 et U5 —
+Chaque spécification porte une ligne « Usages » : ce que la tâche fait à chaque usage de la
+description, U1 à U6 —
 sert, indifférent, ou à surveiller. C'est ce qui garde les autres usages dans le regard quand une
 version en sert un seul.
 
@@ -1676,3 +1679,83 @@ Le travail est tiré par les versions : une tâche appartient au jalon de la ver
 quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,
 un jalon du même nom que la version regroupe ces tâches ; son architecte les ordonne
 (`docs/roles/architecte.md`, « Suivre une version »).
+
+### D88 · Opérations, sous-opérations, étiquettes : un modèle, un calcul
+
+Conçue avec le porteur le 30 septembre 2026 (#291), sous le principe 13. Précise D57 ; remplace le
+rattrapage lissé d'office (D02, D06, D28, D29) et ce que D52 disait d'une période à venir.
+
+**Le budget et le plan.** Le budget se construit de manière générique, sans date ; le plan lit les
+écarts entre opérations, flux, tirelires et comptes. Un flux est la représentation abstraite
+d'opérations à venir ; ses opérations prévues en sont la représentation concrète, toujours cohérentes
+avec lui.
+
+**L'opération.** Une opération a un montant, une date et un compte. Elle est **bancaire** (importée),
+**saisie** (à la main, passée ou future) ou **prévue** (produite par un flux). Les deux premières
+s'enregistrent, avec ce que l'utilisateur décide sur elles ; une opération prévue se calcule depuis
+son flux à chaque lecture, ne s'enregistre jamais, et se désigne par son flux et sa date. C'est la
+règle de D57 : se fige ce que la banque a fait et ce que l'utilisateur a validé, jamais une photo de
+ce que le budget prévoit. Tous les calculs se font sur la base lue en mémoire : une opération prévue
+s'ajoute aux autres au moment de compter.
+
+**Les sous-opérations.** Une opération contient des sous-opérations, sur autant de niveaux qu'on
+veut ; leurs montants s'additionnent jusqu'au sien. Un seul concept couvre :
+
+- la **ventilation** (D10, D27) : diviser un montant entre tirelires, catégories ou personnes ; la
+  **répartition** entre personnes est une ventilation par la personne ;
+- le **lissage** et le **flux** : diviser un montant dans le temps, en sous-opérations datées —
+  énumérées et enregistrées pour un lissage, produites par une récurrence et calculées pour un flux ;
+- la **reprise** : une opération en reprend une autre qui désigne le même mouvement. L'opération
+  bancaire reprend la saisie qui l'annonçait, ou l'opération prévue qu'elle réalise — le
+  rapprochement de flux de D12 et D22 ; une saisie reprend l'opération prévue qu'elle corrige ; une
+  saisie de zéro, l'opération prévue qui n'aura pas lieu. L'opération reprise ne compte plus : celle
+  qui la reprend compte à sa place, pour son propre montant, et l'écart entre les deux reste visible.
+  La reprise est automatique quand un flux ou un automatisme la permet (D12), validée par
+  l'utilisateur sinon (principe 4.4).
+
+**Les étiquettes.** Une étiquette classe une sous-opération. Le compte réel, la tirelire, la catégorie
+et la personne sont des étiquettes **exclusives** : une seule valeur par sous-opération ; en porter
+plusieurs, c'est diviser le montant, et une somme par valeur ne compte jamais deux fois le même euro.
+Les étiquettes **libres** ne sont pas exclusives : autant qu'on veut, sans diviser le montant ; chacune
+compte le montant entier. Une sous-opération à qui il manque une étiquette sur un axe prend celle de
+l'opération qui la contient, de proche en proche ; une ventilation posée à un niveau vaut, en
+proportion, pour tout ce qu'il contient, sauf là où un niveau plus bas pose la sienne. Dans une
+reprise, l'opération qui reprend garde ce qui a été décidé sur elle (l'état verrouillé de D22) et
+prend, sinon, la ventilation de l'opération reprise ; leurs étiquettes libres s'ajoutent.
+
+**Le compte et la tirelire.** Une tirelire est un compte virtuel, placé sur des comptes réels (D19,
+D38) : son solde se lit comme celui d'un compte, somme de ce qui y est inscrit. « Compte virtuel » dit
+comment son solde se lit, pas comment elle se stocke. Une sous-opération sans tirelire reste sur son
+compte réel : c'est le non affecté (D29). Comptes et tirelires se lisent en solde, qui s'accumule ;
+catégories et personnes, en totaux sur une période.
+
+**La personne.** Une personne du foyer ou du groupe est une donnée partagée par tous ceux qui ont les
+clés, pas un utilisateur identifié. Un revenu porte sa personne ; une dépense commune se répartit par
+défaut à parts égales entre les personnes concernées, et chaque opération se répartit librement. Un
+compte peut avoir une personne pour titulaire : ce qu'il paie, elle l'a payé. Ce qu'une personne a
+payé, moins ce qu'elle supporte, dit ce qu'elle doit ou ce qu'on lui doit ; un remboursement entre
+personnes est un virement entre comptes, pas une dépense.
+
+**Le solde prévu et le manque.** Le solde prévu d'un compte ou d'une tirelire à une date est son solde
+réel, plus les opérations saisies et prévues qui comptent jusqu'à cette date ; les dotations d'une
+tirelire (D29) y comptent comme des opérations prévues sur elle. Sur un compte suivi (il porte des
+opérations importées), une opération prévue dont la fenêtre (D12) est passée sans reprise cesse de
+compter, et se signale « attendue, non reçue ». Sur un compte sans suivi (U1), rien ne se confronte :
+ses opérations prévues comptent à leur date. Un **manque** est un solde prévu négatif à une date : la
+dépense trop proche du principe 1.4 comme l'opération attendue qui n'arrive pas se lisent par ce même
+calcul. Le plan d'une période à venir montre le solde prévu des comptes et des tirelires, avec les
+opérations prévues qui le font (D52).
+
+**Le lissage.** Un lissage est une décision : l'application en propose un, calculé depuis le manque ;
+l'utilisateur l'accepte, le modifie ou le refuse. Accepté, il s'enregistre comme une opération divisée
+en sous-opérations datées, qui comptent comme des dotations. Rien ne se lisse d'office.
+
+**Plusieurs instances.** Des groupes différents — un couple, une colocation, des amis en vacances —
+partagent chacun leurs données par leurs clés. Un même navigateur doit pouvoir tenir plusieurs
+instances, chacune avec ses clés ; l'application n'en tient qu'une aujourd'hui (`DB_NAME`,
+`apps/web/src/lib/db.ts`). Le partage de certaines opérations seulement, pour une gestion
+individuelle, reste pour la suite.
+
+**Ce qui ne change pas.** Ce qui se fige (D57) ; l'ordre permanent, somme des croisières, et ce qui se
+recalcule, qui ne se stocke pas (D60) ; les fenêtres et tolérances de la reprise (D12) ; les états
+d'une opération (D22) ; le rattrapage d'un déficit (D29).
