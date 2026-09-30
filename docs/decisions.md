@@ -795,7 +795,9 @@ Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un vireme
 pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est la
 raison d'être du « complément exceptionnel » de D21. Au-delà, le plan montre le **solde prévu** des
 comptes et des tirelires (D88) : le réel à la date de lecture, plus les opérations saisies à une
-date future et les opérations prévues qui comptent jusque-là, chacune affichée avec son origine. Il dit aussi ce que chaque tirelire
+date future et les opérations prévues qui comptent jusque-là, chacune affichée avec son origine. Il
+ne suppose rien (principe 1.3) : une opération prévue se calcule depuis un flux enregistré et se
+montre comme prévue (D88). Il dit aussi ce que chaque tirelire
 demande pour la période — sa dotation (D29) — et ce qu'il faut virer pour elle : cette dotation,
 répartie comme son placement la veut (`periodDemand`), calculée sur le seul solde de la tirelire,
 qui ne dépend d'aucun virement (D29).
@@ -1694,7 +1696,9 @@ un flux). Un flux n'est pas une opération : sans date ni montant total, c'est l
 des opérations prévues, une par occurrence. Les opérations bancaires et saisies s'enregistrent, avec ce que l'utilisateur décide sur elles ; une opération prévue se calcule depuis
 son flux à chaque lecture, ne s'enregistre jamais, et se désigne par son flux et sa date. C'est la
 règle de D57 : se fige ce que la banque a fait et ce que l'utilisateur a validé, jamais une photo de
-ce que le budget prévoit. Tous les calculs se font sur la base lue en mémoire : une opération prévue
+ce que le budget prévoit. Une opération prévue n'est pas une hypothèse : calculée depuis un flux
+enregistré et affichée comme prévue, elle lit sous sa forme concrète une donnée enregistrée, le flux,
+et le principe 1.3 tient. Tous les calculs se font sur la base lue en mémoire : une opération prévue
 s'ajoute aux autres au moment de compter.
 
 **Les sous-opérations.** Une opération contient des sous-opérations, sur autant de niveaux qu'on

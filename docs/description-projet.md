@@ -824,5 +824,11 @@ Puis :
 
 > Il faut aussi ajouter les usages décrits
 
+Puis, à la question de l'auditeur de #291 sur le principe 1.3 — « 1. Le principe 1.3 est à corriger,
+avec tes mots. 2. Le principe tient tel quel : une opération prévue, calculée depuis un flux
+enregistré et affichée comme prévue, n'est pas une hypothèse — et D88 doit le dire. » :
+
+> On retient 2
+
 Ce qui en est tiré : le principe 13 (#292), les usages U6 à U8, D88, et la reprise de D02, D06, D22, D27,
 D28, D29, D44, D47 et D52.
