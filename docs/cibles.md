@@ -122,3 +122,6 @@ partout (il sert I8).
 | U3 · Budget sans virements validés, puis import | à venir | à venir | sans objet |
 | U4 · Budget reconstruit depuis l'historique | à venir | à venir | sans objet |
 | U5 · Import seul | à venir | à venir | sans objet |
+| U6 · Couple aux revenus inégaux | à venir | à venir | sans objet |
+| U7 · Colocation | à venir | à venir | sans objet |
+| U8 · Vacances entre amis | à venir | à venir | sans objet |

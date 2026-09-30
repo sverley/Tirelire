@@ -29,7 +29,11 @@ se rencontrent.
 
 > Il faut chercher la bonne solution en comparant et en se projetant sur un usage de 2 modification du plan par ans, un import par mois des opérations avec les classifications et un calcul des écarts et virements à réaliser (sans écriture je pense). Et une synchronisation ou 2 par mois entre 2 ou 3 appareils
 
-Un foyer partage les clés ; ses appareils sont égaux, sans droits.
+Un foyer partage les clés ; ses appareils sont égaux, sans droits. Le 30 septembre 2026 (#291), des
+groupes différents — un couple, une colocation, des amis en vacances —, chacun avec ses clés, et un
+navigateur qui en tient plusieurs (D88) :
+
+> 3. C'est le point le plus délicat. Oui, l'idéal serait de pouvoir gérer plusieurs instances par navigateur (pas forcément par utilisateur, cf point 2)
 
 **Cibles.** Les webapps sur Chromium, Android et ordinateur, et le relais PHP livré avec le site.
 Le relais Node et les autres cibles viendront sans changer le fichier.
@@ -37,4 +41,5 @@ Le relais Node et les autres cibles viendront sans changer le fichier.
 **Usages.** Aucun n'exige la synchronisation ; tous la portent, par les mêmes lignes et les mêmes
 règles. U5 importe le même relevé sur deux appareils ; U1 et U2 construisent le budget sur l'un et le
 lisent sur l'autre ; U3 et U4 lient des opérations et des flux venus d'un autre appareil ; tous
-restaurent une sauvegarde, parfois sur un appareil neuf.
+restaurent une sauvegarde, parfois sur un appareil neuf. U6 à U8 partagent chacun un jeu de
+données entre les personnes qui en ont les clés.

@@ -10,7 +10,8 @@ datés ; ce qu'il retire reste visible, barré.
 ## Principes
 
 Validés par le porteur le 23 septembre 2026 (#162), tels quels : « oui » ; 9, 9.1, 9.2 et 11.1 dans
-les formulations qu'il a validées le même jour. Du plus général au plus précis.
+les formulations qu'il a validées le même jour ; 13 le 30 septembre 2026 (#292), dans sa
+formulation. Du plus général au plus précis.
 
 ### Le produit
 
@@ -48,17 +49,22 @@ les formulations qu'il a validées le même jour. Du plus général au plus pré
 11. Celui qui vérifie n'est pas celui qui code ; le porteur valide, et la fusion vaut validation.
     1. L'architecte, le codeur et l'auditeur lisent le besoin chacun de son côté : c'est la confrontation de leurs lectures qui fait avancer, pas le forçage de l'un par l'autre.
 12. La garde reste simple et peu coûteuse ; elle ne décide pas de sa propre évolution, et tout changement de son comportement est validé par le porteur.
+13. Concept KISS (Kepp It Simple, Stupid) Cela doit rester simple : ce qui est proche, ou suit une logique semblable, partage le même concept voire le même code si possible.
 
 ## Usages
 
-Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29) ; seuls
-l'identifiant et le titre sont ajoutés. U1, l'usage prioritaire (principe 2.1), vient en tête.
+Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29), et U6 à U8
+dans celles du 30 septembre 2026 (#291) ; seuls l'identifiant et le titre sont ajoutés. U1, l'usage
+prioritaire (principe 2.1), vient en tête.
 
 1. **U1 · Budget seul.** « L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation. »
 2. **U2 · Budget et virements permanents.** « on doit accompagner un utilisateur à créer un budget facilement à partir de l'assistant puis lui proposer la mise en place de virement permanent qu'il doit faire manuellement (on n'a pas accès au virement). S'il valide ces mises en place, alors ces virements doivent être enregistrés dans l'appli avec leur ventilation sur les tirelires. »
 3. **U3 · Budget sans virements validés, puis import.** « Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue. »
 4. **U4 · Budget reconstruit depuis l'historique.** « Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée. »
 5. **U5 · Import seul.** « Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget. »
+6. **U6 · Couple aux revenus inégaux.** « il manque un but primordial : le budget doit permettre de différencier les revenus du foyer avec un concept de répartition de dépense par personne. L'usage serait un couple avec enfants qui a des revenus avec de gros écarts nécessitant de gérer une répartition égalitaire. »
+7. **U7 · Colocation.** « Il faut s'assurer que tout ce concept tient meme si plusieurs utilisateur partage la meme instance (couple, collocation, vacances entre amis) »
+8. **U8 · Vacances entre amis.** « Il faut s'assurer que tout ce concept tient meme si plusieurs utilisateur partage la meme instance (couple, collocation, vacances entre amis) »
 
 ## 6 septembre 2026 · le besoin d'origine
 
@@ -722,3 +728,129 @@ Puis, à la question de l'architecte (au Ready, la CI rejoue-t-elle toujours le 
 Puis, au codeur de #266 qui attendait la fusion de #264 réduit et le passage de l'auditeur :
 
 > reprends, et code sans harnais
+
+## 30 septembre 2026 · les opérations et leurs sous-opérations
+
+Dans #291, issue de conception ouverte par l'architecte de #184, sur l'échéance trop proche (principe 1.4) :
+
+> 184 pose des questions de fond. Voici une proposition à consolider pour l'appli :
+> En fait, les flux "prévoient" des opérations sans les matérialiser aujourd'hui. L'idée serait de faire apparaître les opérations à venir émanant des flux, des lissages ou meme d'une saisie manuelle dans le future afin d'anticiper un compte. Le plan pourrait alors se construire à partir de l'etat des comptes incluant les opérations prévues pour la période (glissante ?) à venir. L'affichage de ces opérations seraient réglables pour pouvoir les anticipées mais en restant lisibles (si on mets les flux des 12 mois à venir, ça va faire beaucoup). De même, les rapprochements entres les opérations bancaires et celles prévues se feraient par simple analyse des comptes. Il faudrait alors correctement conserver l'origine des opérations dans les comptes. Comme on l'a déjà dit, les opérations rapprochées gardent leurs existences dans la database mais sont masquées par l'opération réelle. Une opération prévue et non rapprochée après sont délais d'incertitude passée est alors traité comme un manque. Les opérations prévues doivent conserver un lien avec leur origine de création pour les changer en cas de modifications des flux ou lissages. En fait, les flux ne sont que l'automatisation de la création d'opérations prévus. Ils doivent être vus comme une aide plutôt que comme une données. C'est bien la database qui détient les informations (on peut meme recréer les flux automatiquement en relisant une database à partir des opérations récurrentes prévues)
+
+Puis, sur la consolidation de l'architecte, qui relevait que la proposition renversait D57, D60 et D29, et D52 :
+
+> D57: En effet, il faut dissocier le budget (construit de manière générique et non daté) et le plan (écarts entre opérations/flux/tirelire/compte). Je dirais donc pour corriger mon propos que le flux et les opérations "à venir" qui lui sont rattachées doivent etre en cohérence. Les  flux sont la représentation abstraite, les "A venir" sont leur représentation concrète.
+> D60/D29 : Le lissage stocke une décision car on peut choisir le lissage proposé (donc calculé) mais l'utilisateur pourra aussi modifier ce lissage.
+> D52 : Je ne suis pas sur de comprendre
+> Tu lèves un point difficile : une opération modifiée à la main doit-elle devenir une opération "saisie manuelle" et alors l'opération automatique est "masquée" quand elle est rapprochée ?
+> Pour la concurence d'instance, il faut en effet que l'on échange les bonnes informations. Mais comme elles doivent être cohérente dans une meme instance, la résolution est la meme. Je pense que le plus simple sera de résoudre le conflit au niveau des flux qui se reprogrammeront. Logique à vérifier quand même.
+> Le rapprochement doit garder une validation manuelle pour ce qui n'est pas automatisé. Pour les flux ou pour les automatismes plus globaux, le rapprochement à déjà été discuté il me semble.
+> Il y a en effet une ambiguité de vocabulaire à lever entre une opération manquante et un montant qui génère un manque dans la prévision de la tirelire. Mais est-ce fondamentalement différent ? Ne peut-on pas trouver une résolution similaire ?
+> C'est d'ailleurs un  principe de ce projet à consigner : Cela doit rester simple (KISS). Si on peut utiliser le meme concept pour des choses qui sont proches ou ont des logiques similaires, il faut essayer d'utiliser le meme code
+> On continue la discution ici, l'issue n'est là que pour consigner
+
+Puis, sur la formulation du principe 13 proposée par l'architecte, et à la question « veux-tu que le plan des périodes à venir montre le solde prévu des comptes et des tirelires, calculé avec les « à venir » affichés ? » :
+
+> Concept KISS (Kepp It Simple, Stupid) Cela doit rester simple : ce qui est proche, ou suit une logique semblable, partage le même concept voire le même code si possible.
+> ok pour ta question
+
+Puis, sur quatre propositions de l'architecte — les « à venir » calculés depuis leur flux, jamais enregistrés ; une seule règle de masquage ; un lissage décidé qui est un flux ; un seul calcul pour les deux manques :
+
+> 1. ok
+> 2. ok mais on peut forcer à la main un masquage d'un opération à venir
+> 3. ok
+> 4. pas sur de comprendre
+>
+> En fait, les a venir seront des opérations calculées non enregistrées mais utilisées pour faire les comptes ? Dans ce cas, comment faire la différence entre une opération enregistrée dans la base et celle des flux ?
+
+Puis :
+
+> 2 choses :
+> - je n'ai pas compris la diff entre les opérations prévues et les opérations au sens de leur lieu d'existance (comment on somme si hors de la db SQL)
+> - faut pas compliqué, si les opérations prévues sont recalculées et stockées séparément, on n'a pas besoin de conserver leur origine.
+> Il faut appliquer la logique, pas accumuler des paroles dans des decisions. Il faut maintenanir la cohérence en extrayant des concepts simples et globaux plutôt que de rajouter des rustines.
+
+Puis, sur un modèle en quatre concepts — opération, flux, rapprochement, solde prévu :
+
+> Non, je pense que 3. Doit être revu. Un rapprochement peut aussi être d'une opération saisie manuellement vers une opération bancaire. Donc le concept de rapprochement doit être le meme pour les opérations prévues par des flux, ou saisies manuellement. Je me demande du coup si le rapprochement ne devrait pas être un concept qui identifie plusieurs opérations (bancaire et saisie et prévue) et qui resout ce conflit avec des donnes propres à la résolution.
+> Il faut essayer de reprendre le doc fondateur pour tenter de poser des concepts globaux au regard de l'ensemble des usages et des buts poursuivis par l'appli. A ce propos, il manque un but primordial : le budget doit permettre de différencier les revenus du foyer avec un concept de répartition de dépense par personne. L'usage serait un couple avec enfants qui a des revenus avec de gros écarts nécessitant de gérer une répartition égalitaire.
+
+Puis, sur un rapprochement proposé comme un groupe d'opérations, et à la question de la répartition égalitaire :
+
+> Tu n'ouvre pas 294. On va tout gérer ici, ce n'est que de la doc.
+> Je pense que le concept du rapprochement n'est en fait que le meme concept de la ventilation d'une opération. En fait, une opération doit porter sa propre résolution de conflit : une ventilation est une forme de résolution d'un conflit de sous opération. Les montant sont cumulatifs et non exclusifs. Je crois que toute opération doit pour porter d'autres opérations
+
+Puis, sur la lecture de l'architecte — une opération porte d'autres opérations, et les montants de ces liens s'additionnent :
+
+> Je ne pensais pas à l'utilisation d'une seule opération pour traiter un paiement en plusieurs fois, on était parti sur des flux pour les lissages (ce qui est pareil). Mais finalement, est-ce qu'un lissage n'est pas une opération divisée en sous opération plutôt qu'en flux ? Est-ce qu'un flux ne serait pas une opération sous diviser ? Est-ce qu'une tirelire n'est pas une opération globale à laquelle on attache des opérations ? Il ne faut pas tout compliquer en cherchant à tout rattacher à un unique concept mais si ce concept tient, il faut l'évaluer
+
+Puis, sur l'évaluation de l'architecte — le lissage et le flux, des opérations divisées ; la tirelire, un compte virtuel plutôt qu'une opération :
+
+> Oui cette simplification des concepts est assez bonne à condition que l'implémentation n'en soit pas trop alourdie
+
+Puis, à la question « par « répartition égalitaire », entends-tu que chacun paie la même part des dépenses communes, ou une part proportionnelle à ses revenus ? » :
+
+> La répartition est au choix. Je pense que par défaut, c'est 50% mais chaque opérations peut être répartie comme on veut
+
+Puis :
+
+> Est-ce que le concept de personne est différent du concept de catégorie ou d'étiquette ? C'est un moyen de filtrer des opérations pour les compter. Mais est-ce que ça tient ?
+
+Puis, sur la réponse de l'architecte — catégorie et personne, deux axes d'un même concept d'étiquette :
+
+> Est-il envisageable qu'une opération aient plusieurs catégories ? J'ai l'impression que non et que à ce titre, personne et catégorie sont des étiquettes exclusives (1 seule par opérations) et donc se rejoignent mais à 2 niveaux différents. Par contre, étiquette est le meme concept mais non exclusifs donc autant d'étiquette que l'on veut. Il faudra quand meme faire attention aussi dans les opérations à correctement résoudre les conflits d'étiquette, personne et catégorie en fonction du type de résolution (ventilation ou exclusivité)
+
+Puis, sur deux façons de résoudre une étiquette, exclusive ou non, dans une opération :
+
+> Attention, il faut que l'on puisse régler la répartition ou la catégorie par sous opération si elles sont ventilées. Si une sous opération ne porte pas de catégorie ou répartition, on applique celles de l'opération supérieur et ainsi de suite (puisque les opérations peuvent détenir des opérations, on peut avoir autant de niveau de souhaité). Je dirais meme que la répartition d'une opération est en fait une ventilation de l'opération (a n'importe quel niveau) entre plusieurs personnes (étiquettes exclusives)
+
+Puis :
+
+> Ça semble cohérent. Il faut s'assurer que tout ce concept tient meme si plusieurs utilisateur partage la meme instance (couple, collocation, vacances entre amis)
+
+Puis, sur trois points — la répartition par défaut, une même personne créée deux fois, plusieurs projets pour un même utilisateur :
+
+> 1. Oui répartition égale
+> 2. Les personnes sont communes (pas d'identification) à tout ceux qui ont les clés. Si on fait une gestion individuelle, il faudrait alors choisir les opérations partagées dans le compte (ce qui est un concept tres intéressant pour la suite)
+> 3. C'est le point le plus délicat. Oui, l'idéal serait de pouvoir gérer plusieurs instances par navigateur (pas forcément par utilisateur, cf point 2)
+
+Puis, à la question d'écrire ces conclusions :
+
+> Oui, soit précis et fidèle. Tu écrits un texte fondamentale du projet
+
+Puis, à la question d'ouvrir dès maintenant de quoi mettre le code en accord avec D88, frappe
+corrigée par le porteur le même jour :
+
+> Il ~~fait~~ faut mettre l'existant en accord
+
+Puis :
+
+> Il faut aussi ajouter les usages décrits
+
+Puis, à la question de l'auditeur de #291 sur le principe 1.3 — « 1. Le principe 1.3 est à corriger,
+avec tes mots. 2. Le principe tient tel quel : une opération prévue, calculée depuis un flux
+enregistré et affichée comme prévue, n'est pas une hypothèse — et D88 doit le dire. » :
+
+> On retient 2
+
+Ce qui en est tiré : le principe 13 (#292), les usages U6 à U8, D88, et la reprise de D02, D06, D22, D27,
+D28, D29, D44, D47 et D52.
+
+## 1er octobre 2026 · le flux, un automatisme
+
+Dans #291, à la question de l'auditeur sur le flux — « 1. Le flux n'est pas une opération : c'est la
+règle qui produit des opérations prévues (D88 telle qu'elle est écrite). 2. Le flux est une opération
+divisée, comme le lissage : D88 est à reprendre, et doit dire sa date et son montant. » —, frappe
+corrigée par le porteur le même jour :
+
+> On reste sur 1. Un flux génère des opérations mais n'en est pas une. C'est un ~~automatime~~ automatisme
+
+Puis :
+
+> Est-ce qu'un flux est un automatisme ? Il génère des opérations systématiques, je ne suis pas sûr
+
+Puis, à la question de l'architecte « veux-tu que la reconnaissance d'un flux devienne son
+automatisme, avec une seule sélection au lieu de deux ? » :
+
+> C'est ça
+
+Ce qui en est tiré : D24 et D88.
