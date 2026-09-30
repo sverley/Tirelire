@@ -376,7 +376,7 @@ Chemins : `apps/web/src/**/*.svelte`, `apps/web/src/**/*.ts`
 
 - **Harnais** · `apps/web/test/c2-parcours-sans-camera.test.ts` — « aucun fichier essentiel ne fait
   appel à la caméra ou au QR code, hors Sync.svelte et webrtc.ts » : la caméra et le QR code ne
-  servent qu'à la mise en relation directe (I8), jamais dans les cinq usages.
+  servent qu'à la mise en relation directe (I8), jamais dans un usage.
   Témoin rouge : « témoin rouge · un écran essentiel qui dépend de BarcodeDetector »
 - **Vérification manuelle** · `VM-C2-equivalent` — Pour chaque capacité propre à une plateforme
   que la PR utilise (caméra, QR code, installation, partage, fichiers) : suivre le même parcours

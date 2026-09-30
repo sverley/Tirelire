@@ -815,5 +815,14 @@ Puis, à la question d'écrire ces conclusions :
 
 > Oui, soit précis et fidèle. Tu écrits un texte fondamentale du projet
 
+Puis, à la question d'ouvrir dès maintenant de quoi mettre le code en accord avec D88, frappe
+corrigée par le porteur le même jour (« il faut », non « il fait ») :
+
+> Il faut mettre l'existant en accord
+
+Puis :
+
+> Il faut aussi ajouter les usages décrits
+
 Ce qui en est tiré : le principe 13 (#292), les usages U6 à U8, D88, et la reprise de D02, D06, D22, D27,
-D28, D29 et D52.
+D28, D29, D44, D47 et D52.

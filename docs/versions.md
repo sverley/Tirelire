@@ -8,7 +8,8 @@ cibles actives, par incréments, chacun placé juste avant la première version 
 (D87). Le premier est `v0.0 · Données sûres`.
 
 Les versions `v0.x` sont des bêtas ; `v1`, la première version publique, pose le verrou du format
-(D87, D30). Le socle est `v0.0`, les versions d'usage `v0.1` à `v0.5`.
+(D87, D30). Le socle est `v0.0`, les versions d'usage `v0.1` à `v0.5` ; U6, U7 et U8 n'ont pas
+encore de version (#300).
 
 Une version se termine quand son critère de fin est atteint et que le porteur a fait ses
 vérifications manuelles ; elle se publie alors par le tag de son nom (D83). Une version livrée ne

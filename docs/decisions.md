@@ -531,7 +531,8 @@ Le vocabulaire suit : `payPeriodContaining` devient `budgetPeriodContaining`, et
 `payDay` devient `startDay` dans tout le cœur. Un compte ne porte aucun jour de paie.
 
 Remplace la partie de D02 qui situait le jour de paie sur le compte ; tout le reste de D02 — la
-période de paie à paie, son nom pris au mois de son milieu, le lissage du rattrapage — est inchangé.
+période de paie à paie, son nom pris au mois de son milieu, les périodes sur lesquelles un lissage
+décidé se répartit — est inchangé.
 
 ### D45 · Le genre d'un compte dit sa nature, pas comment on le remplit
 
@@ -607,8 +608,8 @@ année. `nextOccurrence` traite les deux familles séparément : jours et semain
 jours, puisque leur pas est de longueur fixe ; mois et années par le calendrier, en repartant
 toujours de l'ancrage pour ne pas dériver quand un mois est plus court (31 → 30 → 30…).
 
-Le lissage, lui, a besoin d'un équivalent en mois (`monthsOf`), forcément approché pour les jours
-et les semaines. L'approximation est acceptable là où elle sert — répartir une dotation sur des
+Répartir une dotation sur des périodes, en revanche, a besoin d'un équivalent en mois (`monthsOf`),
+forcément approché pour les jours et les semaines. L'approximation est acceptable là où elle sert — répartir une dotation sur des
 périodes — et n'est jamais employée pour dater une occurrence, qui reste du calendrier exact.
 
 Dans l'interface, revenus et charges portent « tous les [N] [unité] », modifiable sur la ligne comme
@@ -793,22 +794,20 @@ l'interface y passe sa **date de lecture**).
 Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un virement des mois passés n'a
 pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est la
 raison d'être du « complément exceptionnel » de D21. Au-delà, le plan montre le **solde prévu** des
-comptes et des tirelires (D88) : le réel à la date de lecture, plus les opérations saisies et prévues
-qui comptent jusque-là, chacune affichée avec son origine. Il dit aussi ce que chaque tirelire
+comptes et des tirelires (D88) : le réel à la date de lecture, plus les opérations saisies à une
+date future et les opérations prévues qui comptent jusque-là, chacune affichée avec son origine. Il dit aussi ce que chaque tirelire
 demande pour la période — sa dotation (D29) — et ce qu'il faut virer pour elle : cette dotation,
 répartie comme son placement la veut (`periodDemand`), calculée sur le seul solde de la tirelire,
 qui ne dépend d'aucun virement (D29).
 
 Invariant tenu par les tests : pour une période à venir, ce qu'on vire vers un compte d'accueil vaut
 exactement ce que les tirelires placées là demandent pour cette période ; dans la période où l'on
-lit, moins le non affecté qu'on en rapatrie. Jusqu'à #183, le plan tenait pour exécutés les virements
-qu'il avait lui-même proposés aux périodes précédentes, sans le dire : le bloc « Virements à faire »
-recalculait l'écart depuis la position réelle du jour pendant que le bloc « Tirelires » simulait
-période par période, et les deux se contredisaient dès la période suivante (sur l'exemple : 700 €
-demandés contre 1 400 € virés en octobre). #183 a retiré toute position à venir ; #291 la rétablit,
-mais affichée : un virement permanent enregistré compte à sa date parce que son flux le prévoit, se
-montre comme une opération prévue, et, sur un compte suivi, cesse de compter s'il n'arrive pas dans
-sa fenêtre (D12, D88).
+lit, moins le non affecté qu'on en rapatrie. Sans lui, le bloc « Virements à faire » recalculerait
+l'écart depuis la position réelle du jour pendant que le bloc « Tirelires » simulerait période par
+période, et les deux se contrediraient dès la période suivante (sur l'exemple : 700 € demandés contre
+1 400 € virés en octobre). Aucun virement n'est tenu pour exécuté sans le dire : un virement permanent
+enregistré compte à sa date parce que son flux le prévoit, se montre comme une opération prévue, et,
+sur un compte suivi, cesse de compter s'il n'arrive pas dans sa fenêtre (D12, D88).
 
 La question « ce virement a-t-il eu lieu ? » se lit sur les opérations : une opération prévue est
 reprise par l'opération bancaire qui la réalise, attendue dans sa fenêtre, ou attendue non reçue
@@ -1682,8 +1681,7 @@ un jalon du même nom que la version regroupe ces tâches ; son architecte les o
 
 ### D88 · Opérations, sous-opérations, étiquettes : un modèle, un calcul
 
-Conçue avec le porteur le 30 septembre 2026 (#291), sous le principe 13. Précise D57 ; remplace le
-rattrapage lissé d'office (D02, D06, D28, D29) et ce que D52 disait d'une période à venir.
+Précise D57, sous le principe 13 (#291).
 
 **Le budget et le plan.** Le budget se construit de manière générique, sans date ; le plan lit les
 écarts entre opérations, flux, tirelires et comptes. Un flux est la représentation abstraite
@@ -1691,8 +1689,9 @@ d'opérations à venir ; ses opérations prévues en sont la représentation con
 avec lui.
 
 **L'opération.** Une opération a un montant, une date et un compte. Elle est **bancaire** (importée),
-**saisie** (à la main, passée ou future) ou **prévue** (produite par un flux). Les deux premières
-s'enregistrent, avec ce que l'utilisateur décide sur elles ; une opération prévue se calcule depuis
+**saisie** (à la main, passée ou future ; un lissage décidé en est une) ou **prévue** (produite par
+un flux). Un flux n'est pas une opération : sans date ni montant total, c'est la règle qui produit
+des opérations prévues, une par occurrence. Les opérations bancaires et saisies s'enregistrent, avec ce que l'utilisateur décide sur elles ; une opération prévue se calcule depuis
 son flux à chaque lecture, ne s'enregistre jamais, et se désigne par son flux et sa date. C'est la
 règle de D57 : se fige ce que la banque a fait et ce que l'utilisateur a validé, jamais une photo de
 ce que le budget prévoit. Tous les calculs se font sur la base lue en mémoire : une opération prévue
@@ -1703,8 +1702,9 @@ veut ; leurs montants s'additionnent jusqu'au sien. Un seul concept couvre :
 
 - la **ventilation** (D10, D27) : diviser un montant entre tirelires, catégories ou personnes ; la
   **répartition** entre personnes est une ventilation par la personne ;
-- le **lissage** et le **flux** : diviser un montant dans le temps, en sous-opérations datées —
-  énumérées et enregistrées pour un lissage, produites par une récurrence et calculées pour un flux ;
+- le **lissage** : diviser un montant dans le temps, en sous-opérations datées, énumérées et
+  enregistrées ; un flux fait de même sans total ni fin, et ses opérations prévues, produites par sa
+  récurrence, se calculent ;
 - la **reprise** : une opération en reprend une autre qui désigne le même mouvement. L'opération
   bancaire reprend la saisie qui l'annonçait, ou l'opération prévue qu'elle réalise — le
   rapprochement de flux de D12 et D22 ; une saisie reprend l'opération prévue qu'elle corrige ; une
@@ -1737,7 +1737,8 @@ payé, moins ce qu'elle supporte, dit ce qu'elle doit ou ce qu'on lui doit ; un 
 personnes est un virement entre comptes, pas une dépense.
 
 **Le solde prévu et le manque.** Le solde prévu d'un compte ou d'une tirelire à une date est son solde
-réel, plus les opérations saisies et prévues qui comptent jusqu'à cette date ; les dotations d'une
+réel à la date de lecture, plus les opérations saisies à une date future et les opérations prévues
+qui comptent jusqu'à cette date ; les dotations d'une
 tirelire (D29) y comptent comme des opérations prévues sur elle. Sur un compte suivi (il porte des
 opérations importées), une opération prévue dont la fenêtre (D12) est passée sans reprise cesse de
 compter, et se signale « attendue, non reçue ». Sur un compte sans suivi (U1), rien ne se confronte :

@@ -73,14 +73,14 @@ Il produit les **opérations prévues**, sa représentation concrète, calculée
 
 Un montant, une date, un compte. **Bancaire** : une ligne de relevé importée ; **saisie** : une ligne
 entrée à la main, passée ou future ; **prévue** : une ligne produite par un flux, calculée, jamais
-enregistrée. Elle contient des **sous-opérations**, peut en reprendre une autre, et est reconnue
+enregistrée. Un flux n'est pas une opération, mais la règle qui produit des opérations prévues. Elle contient des **sous-opérations**, peut en reprendre une autre, et est reconnue
 comme virement interne ou en attente de tri (D88).
 
 ## Sous-opération
 
 Une part d'une opération ; les sous-opérations d'une opération s'additionnent jusqu'à son montant,
 sur autant de niveaux qu'on veut. Elles la **ventilent** entre tirelires, catégories ou personnes, la
-divisent dans le temps (**lissage**, **flux**), ou **reprennent** une autre opération qui désigne le
+divisent dans le temps (**lissage**), ou **reprennent** une autre opération qui désigne le
 même mouvement : le rapprochement d'une opération bancaire, la correction d'une opération prévue, son
 masquage (D88).
 
@@ -105,8 +105,8 @@ sous-opérations datées. Rien ne se lisse d'office (D88).
 
 ## Solde prévu
 
-Le solde d'un compte ou d'une tirelire à une date : le solde réel, plus les opérations saisies et
-prévues qui comptent jusque-là (D88).
+Le solde d'un compte ou d'une tirelire à une date : le solde réel à la date de lecture, plus les
+opérations saisies à une date future et les opérations prévues qui comptent jusque-là (D88).
 
 ## Manque
 
