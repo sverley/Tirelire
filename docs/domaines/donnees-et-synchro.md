@@ -41,5 +41,5 @@ Le relais Node et les autres cibles viendront sans changer le fichier.
 **Usages.** Aucun n'exige la synchronisation ; tous la portent, par les mêmes lignes et les mêmes
 règles. U5 importe le même relevé sur deux appareils ; U1 et U2 construisent le budget sur l'un et le
 lisent sur l'autre ; U3 et U4 lient des opérations et des flux venus d'un autre appareil ; tous
-restaurent une sauvegarde, parfois sur un appareil neuf. U6 partage un jeu de données entre les
-personnes qui en ont les clés.
+restaurent une sauvegarde, parfois sur un appareil neuf. U6 à U8 partagent chacun un jeu de
+données entre les personnes qui en ont les clés.

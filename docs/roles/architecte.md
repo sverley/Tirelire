@@ -16,7 +16,7 @@ puis le glossaire et les catalogues.
    ni mécanismes (principe 11.1). Une construction choisie par le porteur reste dans l'issue, comme sa
    parole : elle fait partie du besoin. Borne le « Fait quand » aux cibles actives
    (`docs/cibles.md`). Ajoute une ligne « Usages » : ce que la tâche fait à chaque usage de la
-   description, U1 à U6 — sert, indifférent, ou à surveiller (D86) —, et l'étiquette de son ou de ses
+   description, U1 à U8 — sert, indifférent, ou à surveiller (D86) —, et l'étiquette de son ou de ses
    domaines.
 4. Écris dans l'issue la section « Invariants et contraintes » : les entrées du registre touchées,
    et pour chacune la vérification manuelle attendue, sans case (`node packages/gardes/cli.mjs

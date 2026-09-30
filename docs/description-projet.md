@@ -51,8 +51,8 @@ les formulations qu'il a validées le même jour. Du plus général au plus pré
 
 ## Usages
 
-Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29), et U6 dans
-celles du 30 septembre 2026 (#291) ; seuls l'identifiant et le titre sont ajoutés. U1, l'usage
+Les usages du principe 2, dans les paroles du porteur du 11 septembre 2026 (#29), et U6 à U8
+dans celles du 30 septembre 2026 (#291) ; seuls l'identifiant et le titre sont ajoutés. U1, l'usage
 prioritaire (principe 2.1), vient en tête.
 
 1. **U1 · Budget seul.** « L'application doit pouvoir servir a simplement construire un budget et une ventilation mais sans suivi ni importation. »
@@ -60,7 +60,9 @@ prioritaire (principe 2.1), vient en tête.
 3. **U3 · Budget sans virements validés, puis import.** « Le dernier cas est un utilisateur qui a fait un budget mais sans valider les virements et qui importe ses opérations. Là, on peut l'aider à rapprocher le virement et on peut utiliser la ventilation prévue. »
 4. **U4 · Budget reconstruit depuis l'historique.** « Mais l'autre aspect (non traité ici mais qui compte) est que l'appli doit aussi servir à reconstruire un budget à partir de l'historique des opérations ce qui implique un lien entre les opérations et les flux enregistrés s'ils sont validés par l'utilisateur. Dans ce cas il ne peut pas y avoir de ventilation prévue, elle doit être arbitrée. »
 5. **U5 · Import seul.** « Inversement, elle peut servir uniquement à importer des opérations et faire de la classifications et analyses de catégories sans tirelires et budget. »
-6. **U6 · Dépenses partagées entre personnes.** « il manque un but primordial : le budget doit permettre de différencier les revenus du foyer avec un concept de répartition de dépense par personne. L'usage serait un couple avec enfants qui a des revenus avec de gros écarts nécessitant de gérer une répartition égalitaire. » ; « Il faut s'assurer que tout ce concept tient meme si plusieurs utilisateur partage la meme instance (couple, collocation, vacances entre amis) »
+6. **U6 · Couple aux revenus inégaux.** « il manque un but primordial : le budget doit permettre de différencier les revenus du foyer avec un concept de répartition de dépense par personne. L'usage serait un couple avec enfants qui a des revenus avec de gros écarts nécessitant de gérer une répartition égalitaire. »
+7. **U7 · Colocation.** « Il faut s'assurer que tout ce concept tient meme si plusieurs utilisateur partage la meme instance (couple, collocation, vacances entre amis) »
+8. **U8 · Vacances entre amis.** « Il faut s'assurer que tout ce concept tient meme si plusieurs utilisateur partage la meme instance (couple, collocation, vacances entre amis) »
 
 ## 6 septembre 2026 · le besoin d'origine
 
@@ -813,5 +815,5 @@ Puis, à la question d'écrire ces conclusions :
 
 > Oui, soit précis et fidèle. Tu écrits un texte fondamentale du projet
 
-Ce qui en est tiré : le principe 13 (#292), l'usage U6, D88, et la reprise de D02, D06, D22, D27,
+Ce qui en est tiré : le principe 13 (#292), les usages U6 à U8, D88, et la reprise de D02, D06, D22, D27,
 D28, D29 et D52.

@@ -1641,7 +1641,7 @@ choix réversibles se reprennent au fil des versions ; les choix structurels, qu
 usages et toutes les cibles, se posent avant, dans le socle (`v0.0`).
 
 Chaque spécification porte une ligne « Usages » : ce que la tâche fait à chaque usage de la
-description, U1 à U6 —
+description, U1 à U8 —
 sert, indifférent, ou à surveiller. C'est ce qui garde les autres usages dans le regard quand une
 version en sert un seul.
 
@@ -1750,9 +1750,9 @@ opérations prévues qui le font (D52).
 l'utilisateur l'accepte, le modifie ou le refuse. Accepté, il s'enregistre comme une opération divisée
 en sous-opérations datées, qui comptent comme des dotations. Rien ne se lisse d'office.
 
-**Plusieurs instances.** Des groupes différents — un couple, une colocation, des amis en vacances —
-partagent chacun leurs données par leurs clés. Un même navigateur doit pouvoir tenir plusieurs
-instances, chacune avec ses clés ; l'application n'en tient qu'une aujourd'hui (`DB_NAME`,
+**Plusieurs instances.** Des groupes différents — un couple, une colocation, des amis en vacances
+(U6 à U8) — partagent chacun leurs données par leurs clés. Un même navigateur doit pouvoir tenir
+plusieurs instances, chacune avec ses clés ; l'application n'en tient qu'une aujourd'hui (`DB_NAME`,
 `apps/web/src/lib/db.ts`). Le partage de certaines opérations seulement, pour une gestion
 individuelle, reste pour la suite.
 
