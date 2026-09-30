@@ -10,7 +10,8 @@ datés ; ce qu'il retire reste visible, barré.
 ## Principes
 
 Validés par le porteur le 23 septembre 2026 (#162), tels quels : « oui » ; 9, 9.1, 9.2 et 11.1 dans
-les formulations qu'il a validées le même jour. Du plus général au plus précis.
+les formulations qu'il a validées le même jour ; 13 le 30 septembre 2026 (#292), dans sa
+formulation. Du plus général au plus précis.
 
 ### Le produit
 
@@ -48,6 +49,7 @@ les formulations qu'il a validées le même jour. Du plus général au plus pré
 11. Celui qui vérifie n'est pas celui qui code ; le porteur valide, et la fusion vaut validation.
     1. L'architecte, le codeur et l'auditeur lisent le besoin chacun de son côté : c'est la confrontation de leurs lectures qui fait avancer, pas le forçage de l'un par l'autre.
 12. La garde reste simple et peu coûteuse ; elle ne décide pas de sa propre évolution, et tout changement de son comportement est validé par le porteur.
+13. Concept KISS (Kepp It Simple, Stupid) Cela doit rester simple : ce qui est proche, ou suit une logique semblable, partage le même concept voire le même code si possible.
 
 ## Usages
 
