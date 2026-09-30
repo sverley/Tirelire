@@ -217,11 +217,12 @@ les rend rejouables dans l'ordre chronologique sur un historique importé. Cons�
 l'interface : avec *Ne rien faire*, une opération peut porter une classification tout en restant non
 traitée — « rien dessus » et « quelque chose que personne n'a regardé » doivent se distinguer.
 
-### D24 · Un flux peut engendrer une règle
+### D24 · Un flux est un automatisme
 
-Un flux prévu engendre optionnellement une règle déterministe. Modifier le flux **archive** la règle
-en lui posant une fin de validité et en crée une nouvelle : les opérations déjà classées ne sont pas
-réécrites, puisqu'aucune règle nouvelle ne les sélectionne.
+Un flux prévu est un automatisme doté d'une récurrence (D88) : sa sélection, la seule, reconnaît
+l'opération qui réalise chaque occurrence ; ses actions, facultatives, la classent. Modifier le flux
+**archive** son automatisme en lui posant une fin de validité et en crée un nouveau : les opérations
+déjà classées ne sont pas réécrites, puisqu'aucun automatisme nouveau ne les sélectionne.
 
 ### D25 · Abandon de l'année budgétaire
 
@@ -1692,8 +1693,10 @@ avec lui.
 
 **L'opération.** Une opération a un montant, une date et un compte. Elle est **bancaire** (importée),
 **saisie** (à la main, passée ou future ; un lissage décidé en est une) ou **prévue** (produite par
-un flux). Un flux n'est pas une opération : sans date ni montant total, c'est la règle qui produit
-des opérations prévues, une par occurrence. Les opérations bancaires et saisies s'enregistrent, avec ce que l'utilisateur décide sur elles ; une opération prévue se calcule depuis
+un flux). Un flux n'est pas une opération : sans date ni montant total, c'est un automatisme qui en
+génère. Un automatisme est une sélection et des actions (D23, D39) ; celui d'un flux a en plus une
+récurrence, qui produit les opérations prévues, une par occurrence, et sa sélection, la seule,
+reconnaît l'opération bancaire qui réalise chacune (D24). Les opérations bancaires et saisies s'enregistrent, avec ce que l'utilisateur décide sur elles ; une opération prévue se calcule depuis
 son flux à chaque lecture, ne s'enregistre jamais, et se désigne par son flux et sa date. C'est la
 règle de D57 : se fige ce que la banque a fait et ce que l'utilisateur a validé, jamais une photo de
 ce que le budget prévoit. Une opération prévue n'est pas une hypothèse : calculée depuis un flux
@@ -1714,8 +1717,8 @@ veut ; leurs montants s'additionnent jusqu'au sien. Un seul concept couvre :
   rapprochement de flux de D12 et D22 ; une saisie reprend l'opération prévue qu'elle corrige ; une
   saisie de zéro, l'opération prévue qui n'aura pas lieu. L'opération reprise ne compte plus : celle
   qui la reprend compte à sa place, pour son propre montant, et l'écart entre les deux reste visible.
-  La reprise est automatique quand un flux ou un automatisme la permet (D12), validée par
-  l'utilisateur sinon (principe 4.4).
+  La reprise est automatique quand un automatisme la permet, celui d'un flux compris (D12),
+  validée par l'utilisateur sinon (principe 4.4).
 
 **Les étiquettes.** Une étiquette classe une sous-opération. Le compte réel, la tirelire, la catégorie
 et la personne sont des étiquettes **exclusives** : une seule valeur par sous-opération ; en porter

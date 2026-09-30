@@ -63,17 +63,24 @@ du reliquat se règle par tirelire (D05).
 Prélèvement ou virement régulier de montant connu — loyer, crédit, abonnements. Ce n'est pas une
 tirelire : c'est un flux prévu, directement sur un compte.
 
+## Automatisme
+
+Une sélection et des actions, appliquées sans geste aux opérations qu'elle retient : classer,
+ventiler, verrouiller, reprendre (D23, D39). Un flux en est un, doté d'une récurrence qui génère des
+opérations prévues (D24, D88).
+
 ## Flux prévu
 
-La représentation abstraite d'opérations attendues : salaire, loyer perçu, prélèvement, virement
+Un automatisme (D24) : la représentation abstraite d'opérations attendues : salaire, loyer perçu, prélèvement, virement
 interne, échéance de provision. Décrit par un montant, une périodicité, une date et une tolérance.
-Il produit les **opérations prévues**, sa représentation concrète, calculées à chaque lecture (D88).
+Sa récurrence produit les **opérations prévues**, sa représentation concrète, calculées à chaque
+lecture ; sa sélection reconnaît l'opération bancaire qui réalise chacune (D88).
 
 ## Opération
 
 Un montant, une date, un compte. **Bancaire** : une ligne de relevé importée ; **saisie** : une ligne
 entrée à la main, passée ou future ; **prévue** : une ligne produite par un flux, calculée, jamais
-enregistrée. Un flux n'est pas une opération, mais la règle qui produit des opérations prévues. Elle contient des **sous-opérations**, peut en reprendre une autre, et est reconnue
+enregistrée. Un flux n'est pas une opération, mais un automatisme qui en produit. Elle contient des **sous-opérations**, peut en reprendre une autre, et est reconnue
 comme virement interne ou en attente de tri (D88).
 
 ## Sous-opération

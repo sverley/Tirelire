@@ -816,9 +816,9 @@ Puis, à la question d'écrire ces conclusions :
 > Oui, soit précis et fidèle. Tu écrits un texte fondamentale du projet
 
 Puis, à la question d'ouvrir dès maintenant de quoi mettre le code en accord avec D88, frappe
-corrigée par le porteur le même jour (« il faut », non « il fait ») :
+corrigée par le porteur le même jour :
 
-> Il faut mettre l'existant en accord
+> Il ~~fait~~ faut mettre l'existant en accord
 
 Puis :
 
@@ -832,3 +832,23 @@ enregistré et affichée comme prévue, n'est pas une hypothèse — et D88 doit
 
 Ce qui en est tiré : le principe 13 (#292), les usages U6 à U8, D88, et la reprise de D02, D06, D22, D27,
 D28, D29, D44, D47 et D52.
+
+## 1er octobre 2026 · le flux, un automatisme
+
+Dans #291, à la question de l'auditeur sur le flux — « 1. Le flux n'est pas une opération : c'est la
+règle qui produit des opérations prévues (D88 telle qu'elle est écrite). 2. Le flux est une opération
+divisée, comme le lissage : D88 est à reprendre, et doit dire sa date et son montant. » —, frappe
+corrigée par le porteur le même jour :
+
+> On reste sur 1. Un flux génère des opérations mais n'en est pas une. C'est un ~~automatime~~ automatisme
+
+Puis :
+
+> Est-ce qu'un flux est un automatisme ? Il génère des opérations systématiques, je ne suis pas sûr
+
+Puis, à la question de l'architecte « veux-tu que la reconnaissance d'un flux devienne son
+automatisme, avec une seule sélection au lieu de deux ? » :
+
+> C'est ça
+
+Ce qui en est tiré : D24 et D88.

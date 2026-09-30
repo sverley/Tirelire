@@ -166,7 +166,7 @@ de son test.
   des tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi
   l'application n'est pas atteinte.
 - **À bâtir** · (U6) le parcours complet, des revenus et des dépenses d'un couple répartis entre ses
-  personnes à ce que chacune vire vers le compte commun (#291, D88).
+  personnes à ce que chacune doit ou ce qu'on lui doit (#291, D88).
 - **À bâtir** · (U7) le parcours complet, des dépenses communes d'une colocation, payées par chacun, à
   ce que chacun doit aux autres (#291, D88).
 - **À bâtir** · (U8) le parcours complet, des dépenses d'un séjour entre amis, réparties entre les
