@@ -150,7 +150,10 @@ describe.skipIf(!navigateur)('#296 · le solde prévu à l’écran Plan, à 375
 
   it('[niveau 1] déplié, l’écran ne déborde pas à 375 px', async () => {
     expect(await déplier(page, 'Compte courant')).toBe(true);
-    const déborde = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-    expect(déborde).toBe(false);
+    // `clientWidth`, la largeur de mise en page (375) : en émulation mobile, `window.innerWidth` s'élargit
+    // avec le contenu qui déborde, et le test ne pourrait jamais rougir (comme `mise-en-page.test.ts`).
+    const largeurs = await page.evaluate(() => ({ contenu: document.documentElement.scrollWidth, écran: document.documentElement.clientWidth }));
+    expect(largeurs.écran).toBe(375);
+    expect(largeurs.contenu, `défilement horizontal : le contenu fait ${largeurs.contenu} px pour un écran de ${largeurs.écran} px`).toBeLessThanOrEqual(largeurs.écran);
   });
 });
