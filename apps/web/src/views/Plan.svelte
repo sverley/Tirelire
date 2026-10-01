@@ -196,27 +196,16 @@
             {a.name}
             <span class="sub">au {shortDate(f.today)} : <span class="num">{money(a.start)}</span>{a.hosted.length ? ` · non affecté prévu ${money(a.unallocated)}` : ''}</span>
             {#if a.shortfall}<span class="sub neg">Manque : <span class="num">{money(a.shortfall.amount)}</span> le {shortDate(a.shortfall.date)}</span>{/if}
-            {#if a.notReceived.length}<span class="sub neg">{a.notReceived.length === 1 ? '1 opération attendue, non reçue : elle ne compte plus' : `${a.notReceived.length} opérations attendues, non reçues : elles ne comptent plus`}</span>{/if}
           </div>
           <div class="{moneyClass(a.end)}" style="font-size:17px">{money(a.end)}</div>
         </div>
-        {#if a.movements.length || a.notReceived.length || a.hosted.length}
+        {#if a.movements.length || a.hosted.length}
           <div class="actions" style="margin:0 0 6px">
             <button class="btn small" aria-expanded={deplies.includes(cle)} onclick={() => basculerSolde(cle)}>{deplies.includes(cle) ? 'Masquer le détail' : `Détail · ${a.movements.length} opération${a.movements.length > 1 ? 's' : ''}`}</button>
           </div>
         {/if}
         {#if deplies.includes(cle)}
           {@render mouvements(a.movements)}
-          {#if a.notReceived.length}
-            <div class="orders">
-              {#each a.notReceived as n (n.flowId + n.date)}
-                <div class="row">
-                  <div class="label">{n.label}<span class="sub">attendue le {shortDate(n.date)}, non reçue : fenêtre close le {shortDate(n.windowEnd)} ; ne compte plus</span></div>
-                  <div class="num muted">{money(n.amount)}</div>
-                </div>
-              {/each}
-            </div>
-          {/if}
           {#if a.hosted.length}
             <div class="orders">
               {#each a.hosted as h (h.tirelireId)}

@@ -24,7 +24,7 @@ import {
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, addMonths } from './dates.js';
 import { flowOccurrences, tracksOperations, type FlowOccurrence } from './matching.js';
-import { computeForecast, type Forecast } from './forecast.js';
+import { computeForecast, withPlannedOperations, type Forecast } from './forecast.js';
 
 export interface PlanFlowLine {
   flowId: Id;
@@ -203,12 +203,19 @@ const KIND_ORDER: Record<NeedKind, number> = { payout: -1, dueDate: 0, recurring
  * le solde prévu des comptes et des tirelires s'y ajoute (`forecast`, D52, D88).
  */
 export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf): Plan {
-  const idx = indexLedger(ledger);
-  const warnings: PlanWarning[] = [];
-  const principal = idx.principal;
-  const startDay = idx.startDay;
+  const startDay = ledger.settings.periodStartDay;
   const period = budgetPeriodContaining(asOf, startDay);
   const upcoming = period.start > today;
+  /*
+   * Une période à venir se calcule sur le grand livre prévu (D88, #296, point 10) : ce que chaque
+   * tirelire demande et ce que son solde prévu reçoit sont un seul calcul, prélèvements prévus de ses
+   * échéances compris. La période où l'on lit se calcule sur le réel. Ce qui se lit sur le réel
+   * (occurrences d'un ordre, non affecté) se lit toujours sur le grand livre reçu.
+   */
+  const prevu = upcoming ? withPlannedOperations(ledger, today, period.end) : undefined;
+  const idx = indexLedger(prevu?.ledger ?? ledger);
+  const warnings: PlanWarning[] = [];
+  const principal = idx.principal;
   // Au-delà d'aujourd'hui, aucun relevé ne dit ce que les comptes portent : ce qui se lit sur le
   // réel se lit à la dernière date connue, pas à une date inventée.
   const known = upcoming ? today : asOf;
@@ -457,7 +464,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   }
   transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
 
-  const principalUnallocated = principal ? unallocated(principal, ledger, idx, known) : 0;
+  const principalUnallocated = principal ? unallocated(principal, ledger, upcoming ? indexLedger(ledger) : idx, known) : 0;
   if (principal && principalUnallocated < 0 && !upcoming)
     warnings.push({
       code: 'principalOverdrawn',
@@ -485,7 +492,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       principalUnallocated,
     },
     warnings,
-    ...(upcoming ? { forecast: computeForecast(ledger, period, today) } : {}),
+    ...(prevu ? { forecast: computeForecast(ledger, period, today, prevu) } : {}),
   };
 }
 

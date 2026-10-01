@@ -10,21 +10,24 @@
  * (`accountBalance`, `tirelireComponents`). Rien ne s'enregistre (I10) : le grand livre reçu n'est
  * pas modifié, et ce qui est rendu se recalcule à chaque lecture.
  *
- * Ce qui compte, occurrence par occurrence d'un flux enregistré (virements permanents compris) :
- * - une occurrence reprise par une opération (`Operation.plannedFlowId`, D12) ne compte plus :
- *   l'opération qui la reprend compte à sa place ;
- * - sur un compte suivi (il porte une opération importée), une occurrence dont la fenêtre est
- *   passée sans reprise ne compte plus, et se signale « attendue, non reçue » ;
- * - sur un compte sans suivi (U1), rien ne se confronte : chaque occurrence compte à sa date, depuis
- *   l'ouverture du compte.
+ * Ce qui compte, occurrence par occurrence d'un flux enregistré (virements permanents compris), se
+ * décide par `flowOccurrencesThatCount` (`matching.ts`), le calcul même du bloc « Attendus, non
+ * reçus » : une occurrence reprise ne compte plus ; sur un compte suivi, une occurrence dont la
+ * fenêtre est passée sans reprise non plus ; sur un compte sans suivi (U1), chaque occurrence compte
+ * à sa date, depuis l'ouverture du compte. Le détail d'un solde prévu ne liste que ce qui compte ;
+ * l'occurrence non reçue se signale dans ce bloc seulement (D78).
  * Un virement que le plan propose sans qu'il soit enregistré n'a pas de flux : il ne compte pas.
+ *
+ * Pour une période à venir, les lignes du plan se calculent sur ce même grand livre prévu
+ * (`computePlan`) : la dotation qu'une tirelire reçoit dans son solde prévu est celle que sa ligne
+ * demande.
  */
 import type { Account, Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow, Tirelire } from './model.js';
 import { alive } from './model.js';
 import { accountBalance, indexLedger, tirelireComponents, tirelireTimeline, type LedgerIndex } from './balances.js';
 import type { Period } from './periods.js';
 import { addDays } from './dates.js';
-import { distributeTransfer, flowOccurrences, tracksOperations } from './matching.js';
+import { distributeTransfer, flowOccurrencesThatCount, tracksOperations } from './matching.js';
 
 /** D'où vient un mouvement du solde prévu. */
 export type ForecastOrigin = 'flux' | 'dotation' | 'liberation' | 'saisie' | 'releve' | 'ouverture';
@@ -67,7 +70,11 @@ export interface ForecastAccount extends ForecastBalance {
   hosted: Array<{ tirelireId: Id; amount: Cents }>;
   /** Non affecté prévu : `end` moins les composantes hébergées (I2). */
   unallocated: Cents;
-  /** Opérations prévues dont la fenêtre est passée sans reprise : elles ne comptent plus (D12). */
+  /**
+   * Occurrences attendues, non reçues, sur ce compte : elles ne comptent pas, et ne figurent donc pas
+   * dans `movements`. Lues par le même calcul que le bloc « Attendus, non reçus »
+   * (`flowOccurrencesThatCount`), qui est le seul endroit de l'écran où elles se signalent.
+   */
   notReceived: Array<{ flowId: Id; label: string; date: ISODate; windowEnd: ISODate; amount: Cents }>;
 }
 
@@ -92,8 +99,9 @@ export function isPlannedOperation(op: Operation): boolean {
 }
 
 /**
- * Les opérations prévues qui comptent jusqu'à `until`, ajoutées en mémoire au grand livre, et les
- * occurrences attendues non reçues. Le grand livre reçu n'est pas modifié.
+ * Le grand livre prévu : les opérations prévues qui comptent jusqu'à `until`, ajoutées en mémoire au
+ * grand livre, et les occurrences attendues non reçues, qui ne comptent pas. Le grand livre reçu
+ * n'est pas modifié.
  */
 export function withPlannedOperations(
   ledger: Ledger,
@@ -118,12 +126,9 @@ export function withPlannedOperations(
     const account = accounts.get(flow.accountId);
     if (!account) continue;
     // Comme le solde du compte (`accountBalance`), une opération compte après la date d'ouverture.
-    for (const o of flowOccurrences(ledger, flow, addDays(account.openingDate, 1), until, today)) {
-      if (o.status === 'pointee') continue;
-      if (o.status === 'nonRecue' && isTracked(flow.accountId)) {
-        notReceived.push({ flow, date: o.date, windowEnd: o.windowEnd });
-        continue;
-      }
+    const { counted, notReceived: nonRecues } = flowOccurrencesThatCount(ledger, flow, addDays(account.openingDate, 1), until, today, isTracked(flow.accountId));
+    for (const o of nonRecues) notReceived.push({ flow, date: o.date, windowEnd: o.windowEnd });
+    for (const o of counted) {
       if (flow.kind === 'transfer' && flow.counterpartAccountId && accounts.has(flow.counterpartAccountId)) {
         transfers.push({ flow, date: o.date });
         continue;
@@ -200,11 +205,16 @@ function plannedOperation(flow: PlannedFlow, date: ISODate): Operation {
 
 /**
  * Le solde prévu de chaque compte réel et de chaque tirelire à la fin de `period`, lu à la date
- * `today` : ce qui le fait, mouvement par mouvement, et le manque au point le plus bas.
+ * `today` : ce qui le fait, mouvement par mouvement, et le manque au point le plus bas. `prevu` est
+ * le grand livre prévu jusqu'à la fin de la période, quand l'appelant l'a déjà calculé.
  */
-export function computeForecast(ledger: Ledger, period: Period, today: ISODate): Forecast {
+export function computeForecast(
+  ledger: Ledger,
+  period: Period,
+  today: ISODate,
+  { ledger: prevu, notReceived }: ReturnType<typeof withPlannedOperations> = withPlannedOperations(ledger, today, period.end),
+): Forecast {
   const end = period.end;
-  const { ledger: prevu, notReceived } = withPlannedOperations(ledger, today, end);
   const idx = indexLedger(prevu);
   /** Un mouvement compte s'il est daté après la date de lecture, ou s'il est une opération prévue. */
   const compte = (op: Operation) => op.date <= end && (op.date > today || isPlannedOperation(op));

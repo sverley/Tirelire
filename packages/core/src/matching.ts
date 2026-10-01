@@ -329,30 +329,41 @@ export function flowOccurrences(ledger: Ledger, flow: PlannedFlow, from: ISODate
   return out;
 }
 
-/** Occurrences de flux dont la fenêtre est passée sans opération rapprochée. */
+/**
+ * Ce qui compte, parmi les occurrences d'un flux (D12, D88) — un seul calcul, pour le solde prévu
+ * (`withPlannedOperations`) comme pour le bloc « Attendus, non reçus » (`missingFlows`) :
+ * - une occurrence reprise par une opération (`Operation.plannedFlowId`) ne compte plus, l'opération
+ *   compte à sa place ;
+ * - sur un compte suivi (`tracksOperations`), une occurrence dont la fenêtre est passée sans reprise
+ *   est « attendue, non reçue », et ne compte plus ;
+ * - sur un compte sans suivi (U1), rien ne se confronte : toute autre occurrence compte à sa date.
+ */
+export function flowOccurrencesThatCount(
+  ledger: Ledger,
+  flow: PlannedFlow,
+  from: ISODate,
+  to: ISODate,
+  asOf: ISODate,
+  tracked: boolean = tracksOperations(ledger, flow.accountId),
+): { counted: FlowOccurrence[]; notReceived: FlowOccurrence[] } {
+  const counted: FlowOccurrence[] = [];
+  const notReceived: FlowOccurrence[] = [];
+  for (const o of flowOccurrences(ledger, flow, from, to, asOf)) {
+    if (o.status === 'pointee') continue;
+    if (o.status === 'nonRecue' && tracked) notReceived.push(o);
+    else counted.push(o);
+  }
+  return { counted, notReceived };
+}
+
+/** Occurrences de flux attendues, non reçues entre `from` et `asOf` (`flowOccurrencesThatCount`). */
 export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): MissingFlow[] {
   const out: MissingFlow[] = [];
-  const matched = new Set<string>();
-  const flows = alive(ledger.plannedFlows);
-  for (const o of alive(ledger.operations)) {
-    if (!o.plannedFlowId) continue;
-    const f = flows.find((x) => x.id === o.plannedFlowId);
-    if (!f) continue;
-    const occ = occurrencesBetween(f.periodicity, addDays(o.date, -f.dateWindowDays - 1), addDays(o.date, f.dateWindowDays + 1));
-    for (const d of occ) matched.add(`${f.id}|${d}`);
-  }
-  for (const f of flows) {
-    // Un flux ne peut manquer que sur un compte importé.
-    const acc = ledger.accounts.find((a) => a.id === f.accountId);
-    if (!acc || acc.tracksSettlement) continue;
-    for (const d of occurrencesBetween(f.periodicity, from, asOf)) {
-      if (f.activeFrom && d < f.activeFrom) continue;
-      if (f.activeTo && d > f.activeTo) continue;
-      const windowEnd = addDays(d, f.dateWindowDays);
-      if (windowEnd >= asOf) continue;
-      if (matched.has(`${f.id}|${d}`)) continue;
-      out.push({ flowId: f.id, name: f.name, expectedDate: d, amount: f.amount, windowEnd });
-    }
+  const accounts = new Set(alive(ledger.accounts).map((a) => a.id));
+  for (const f of alive(ledger.plannedFlows)) {
+    if (!accounts.has(f.accountId)) continue;
+    for (const o of flowOccurrencesThatCount(ledger, f, from, asOf, asOf).notReceived)
+      out.push({ flowId: f.id, name: f.name, expectedDate: o.date, amount: f.amount, windowEnd: o.windowEnd });
   }
   return out.sort((a, b) => (a.expectedDate < b.expectedDate ? 1 : -1));
 }
