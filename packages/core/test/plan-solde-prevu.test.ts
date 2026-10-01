@@ -1,15 +1,33 @@
 /**
- * Tests du codeur de #296 — le plan d'une période à venir montre le solde prévu des comptes et des
- * tirelires (D52, D88). Tous de niveau 4 (rôle du codeur) : l'auditeur choisit parmi eux.
+ * Harnais d'audit de #296 — le plan d'une période à venir montre le solde prévu des comptes et des
+ * tirelires (D52, D88). Côté cœur ; ce qui se lit à l'écran est dans
+ * `apps/web/test/navigateur/plan-solde-prevu.test.ts`.
  *
- * Chaque `describe` reprend un point du « Fait quand » sous son numéro ; le point 4 se lit aussi à
- * l'écran (`apps/web/test/navigateur/solde-prevu.test.ts`), et le point 8 est de la documentation.
- * Données inventées (D84) : l'exemple, lu à sa date de lecture, et de petits grands livres écrits ici.
+ * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
+ * peut trancher, un test — celui du codeur quand il la tranche (repris de `solde-prevu.test.ts`, qui
+ * n'existe plus), sinon le mien : le point 5 est réécrit contre les fonctions de `balances.ts` (le
+ * test du codeur relisait ce que le calcul venait de poser), la saisie future qui reprend une
+ * occurrence, le creux le plus profond et le point 9 (ajouté par l'auditeur) sont de moi. Données
+ * inventées (D84) : l'exemple, lu à sa date de lecture, et un petit grand livre écrit ici, dont les
+ * montants attendus sont ceux qu'on calcule à la main.
+ *
+ * Chaque `describe` reprend un point du « Fait quand » sous son numéro. Le point 4 se lit aussi à
+ * l'écran ; le point 8 est de la documentation, relue.
+ *
+ * Niveaux (D83), par le besoin que couvre chaque phrase :
+ * - 0 · point 7 : le calcul n'écrit rien (I10). Même niveau que son harnais du registre, « calculer
+ *   le plan n'écrit rien » ; une opération prévue enregistrée resterait en base après la correction.
+ * - 1 · point 3 : le plan « signale un risque à venir » (principe 1.3) ; point 5 : I2 tel qu'il est
+ *   écrit ; point 2, le seul test d'un virement proposé : « seules les données enregistrées servent,
+ *   jamais une hypothèse » (principe 1.3).
+ * - 2 · les autres : une règle de D52 ou de D88 qui donnerait un résultat faux, l'usage restant
+ *   possible.
  */
 import { describe, expect, it } from 'vitest';
 import {
   accountBalance,
   alive,
+  componentsOnAccount,
   computePlan,
   emptyLedger,
   euros,
@@ -17,6 +35,8 @@ import {
   indexLedger,
   periodsAround,
   tirelireBalance,
+  unallocated,
+  withPlannedOperations,
   type Ledger,
   type Operation,
   type PlannedFlow,
@@ -73,7 +93,7 @@ const tirelire = (p: Plan, id: string) => p.forecast!.tirelires.find((t) => t.id
 
 // ---------------------------------------------------------------------------------------------
 
-describe('[niveau 4] point 1 — une période à venir montre le solde prévu de chaque compte et de chaque tirelire à sa fin', () => {
+describe('[niveau 2] point 1 — une période à venir montre le solde prévu de chaque compte et de chaque tirelire à sa fin', () => {
   it('l’exemple : chaque compte réel et chaque tirelire, sur chaque période à venir', () => {
     const l = exampleLedger();
     const périodes = àVenir(l, LECTURE_EXEMPLE);
@@ -113,7 +133,7 @@ describe('[niveau 4] point 1 — une période à venir montre le solde prévu de
   });
 });
 
-describe('[niveau 4] point 2 — ce qui compte, et ce qui ne compte plus', () => {
+describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () => {
   it('sans suivi, chaque occurrence d’un flux compte à sa date : septembre et octobre, pour octobre', () => {
     const c = compte(planDe(petitBudget(), '2026-10-01'), CC);
     expect(c.tracked).toBe(false);
@@ -164,6 +184,15 @@ describe('[niveau 4] point 2 — ce qui compte, et ce qui ne compte plus', () =>
     expect(c2.end).toBe(euros(1000 + 1900 + 2000));
   });
 
+  it('une saisie à venir qui reprend une occurrence compte à sa place, pour son propre montant (D88)', () => {
+    const l = petitBudget();
+    l.operations.push(opération({ id: 'salaire-corrigé', date: '2026-09-25', amount: euros(1900), plannedFlowId: 'f-salaire' }));
+    const c = compte(planDe(l, '2026-10-01'), CC);
+    expect(c.movements.filter((m) => m.flowId === 'f-salaire').map((m) => m.date)).toEqual(['2026-10-25']);
+    expect(c.movements).toContainEqual(expect.objectContaining({ date: '2026-09-25', origin: 'saisie', amount: euros(1900), operationId: 'salaire-corrigé' }));
+    expect(c.end).toBe(euros(1000 + 1900 + 2000));
+  });
+
   it('un virement permanent enregistré compte à sa date, des deux côtés, sans changer le solde des tirelires (D29)', () => {
     const l = petitBudget();
     l.plannedFlows.push(
@@ -182,14 +211,14 @@ describe('[niveau 4] point 2 — ce qui compte, et ce qui ne compte plus', () =>
     expect(compte(avec, LIVRET).hosted.find((h) => h.tirelireId === 'tf')?.amount).toBe(euros(300) + (compte(sans, LIVRET).hosted.find((h) => h.tirelireId === 'tf')?.amount ?? 0));
   });
 
-  it('un virement proposé par le plan mais non enregistré ne compte pas', () => {
+  it('[niveau 1] un virement proposé par le plan mais non enregistré ne compte pas (principe 1.3)', () => {
     const p = planDe(petitBudget(), '2026-10-01');
     expect(p.transfers.find((t) => t.accountId === LIVRET)?.net ?? 0, 'le plan propose bien un virement vers le livret').toBeGreaterThan(0);
     expect(compte(p, LIVRET).movements).toEqual([]);
     expect(compte(p, LIVRET).end).toBe(0);
   });
 
-  it('l’exemple : le virement permanent enregistré vers le Livret A compte, celui vers la Carte enfants, proposé seulement, ne compte pas', () => {
+  it('[niveau 1] l’exemple : le virement permanent enregistré vers le Livret A compte, celui vers la Carte enfants, proposé seulement, ne compte pas', () => {
     const octobre = àVenir(exampleLedger(), LECTURE_EXEMPLE)[0]!;
     expect(compte(octobre, 'acc-livret').movements.every((m) => m.origin === 'flux' && m.flowId === 'flow-vir-livret')).toBe(true);
     expect(compte(octobre, 'acc-livret').movements.length).toBeGreaterThan(0);
@@ -205,7 +234,7 @@ describe('[niveau 4] point 2 — ce qui compte, et ce qui ne compte plus', () =>
   });
 });
 
-describe('[niveau 4] point 3 — un solde prévu négatif est un manque, au point le plus bas', () => {
+describe('[niveau 1] point 3 — un solde prévu négatif est un manque, au point le plus bas (principe 1.3 : le plan signale un risque à venir)', () => {
   it('une échéance plus forte que le compte, puis un revenu : le manque est daté de l’échéance, à son montant le plus bas', () => {
     const l = petitBudget();
     l.accounts[0]!.openingBalance = euros(100);
@@ -216,8 +245,27 @@ describe('[niveau 4] point 3 — un solde prévu négatif est un manque, au poin
     expect(c.end).toBe(euros(100 - 1200 + 2000));
   });
 
-  it('pas de manque quand le solde prévu reste positif', () => {
+  it('deux creux dans la période : le manque est le plus profond, pas le premier', () => {
+    const l = petitBudget();
+    l.accounts[0]!.openingBalance = euros(100);
+    const unique = (id: string, kind: PlannedFlow['kind'], amount: number, jour: string) =>
+      flux({ id, name: id, kind, amount, periodicity: { interval: 12, unit: 'month', anchorDate: jour } });
+    l.plannedFlows.length = 0;
+    l.plannedFlows.push(unique('f-a', 'fixedCharge', -euros(200), '2026-11-10'), unique('f-b', 'fixedCharge', -euros(400), '2026-11-20'), unique('f-c', 'income', euros(1000), '2026-11-25'));
+    const c = compte(planDe(l, '2026-11-01'), CC);
+    expect(c.shortfall).toEqual({ date: '2026-11-20', amount: euros(100 - 200 - 400) });
+    expect(c.end).toBe(euros(100 - 200 - 400 + 1000));
+  });
+
+  it('pas de manque quand le solde prévu reste positif, ni quand il tombe juste à zéro', () => {
     expect(compte(planDe(petitBudget(), '2026-11-01'), CC).shortfall).toBeUndefined();
+    const l = petitBudget();
+    l.accounts[0]!.openingBalance = euros(1200);
+    l.plannedFlows.length = 0;
+    l.plannedFlows.push(flux({ id: 'f-tf', name: 'Taxe foncière (prélèvement)', kind: 'fixedCharge', amount: -euros(1200), periodicity: { interval: 12, unit: 'month', anchorDate: '2026-11-15' } }));
+    const c = compte(planDe(l, '2026-11-01'), CC);
+    expect(c.end).toBe(0);
+    expect(c.shortfall).toBeUndefined();
   });
 
   it('une tirelire que l’échéance vide au-delà de ce qu’elle porte est en manque à la date de l’échéance', () => {
@@ -237,7 +285,7 @@ describe('[niveau 4] point 3 — un solde prévu négatif est un manque, au poin
   });
 });
 
-describe('[niveau 4] point 4 — chaque opération qui fait un solde prévu porte son origine', () => {
+describe('[niveau 2] point 4 — chaque opération qui fait un solde prévu porte son origine', () => {
   it('le flux qui la produit, la dotation de la tirelire, ou « saisie »', () => {
     const l = petitBudget();
     l.operations.push(opération({ id: 'achat-futur', date: '2026-11-03', amount: -euros(40) }));
@@ -252,7 +300,7 @@ describe('[niveau 4] point 4 — chaque opération qui fait un solde prévu port
   });
 });
 
-describe('[niveau 4] point 5 — le solde prévu d’un compte est la somme des tirelires qu’il héberge, plus son non affecté (I2)', () => {
+describe('[niveau 1] point 5 — le solde prévu d’un compte est la somme des tirelires qu’il héberge, plus son non affecté (I2)', () => {
   const cas: Array<[string, () => Ledger, string]> = [
     ['l’exemple', exampleLedger, LECTURE_EXEMPLE],
     ['le petit budget', petitBudget, LECTURE],
@@ -267,19 +315,32 @@ describe('[niveau 4] point 5 — le solde prévu d’un compte est la somme des 
     ],
   ];
   it.each(cas)('%s : au centime près, à la fin de chaque période à venir', (_nom, faire, lecture) => {
-    for (const p of àVenir(faire(), lecture)) {
+    const l = faire();
+    for (const p of àVenir(l, lecture)) {
       const f = p.forecast!;
-      for (const a of f.accounts) expect(a.hosted.reduce((s, h) => s + h.amount, 0) + a.unallocated, `${p.period.label} · ${a.name}`).toBe(a.end);
-      // Le solde prévu d'une tirelire répartie est la somme de ses composantes.
+      // Le grand livre que les fonctions de `balances.ts` lisent : celui du plan, opérations prévues comprises.
+      const prevu = withPlannedOperations(l, lecture, f.period.end).ledger;
+      const idx = indexLedger(prevu);
+      for (const a of f.accounts) {
+        const réel = l.accounts.find((x) => x.id === a.id)!;
+        const où = `${p.period.label} · ${a.name}`;
+        expect(a.end, `${où} : solde prévu`).toBe(accountBalance(réel, prevu, f.period.end));
+        // I2 tel qu'il est écrit : solde bancaire = somme des tirelires hébergées + non affecté.
+        expect(a.hosted.reduce((s, h) => s + h.amount, 0) + a.unallocated, où).toBe(a.end);
+        expect(a.hosted.reduce((s, h) => s + h.amount, 0), `${où} : tirelires hébergées`).toBe(componentsOnAccount(réel, idx, f.period.end));
+        expect(a.unallocated, `${où} : non affecté`).toBe(unallocated(réel, prevu, idx, f.period.end));
+      }
+      // Le solde prévu d'une tirelire répartie est la somme de ses composantes, comptes confondus.
       for (const t of f.tirelires) {
         const composantes = f.accounts.reduce((s, a) => s + (a.hosted.find((h) => h.tirelireId === t.id)?.amount ?? 0), 0);
-        expect(composantes, `${p.period.label} · ${t.name}`).toBe(t.end);
+        expect(composantes, `${p.period.label} · ${t.name} : somme des composantes`).toBe(t.end);
+        expect(t.end, `${p.period.label} · ${t.name} : solde prévu`).toBe(tirelireBalance(l.tirelires.find((x) => x.id === t.id)!, idx, f.period.end));
       }
     }
   });
 });
 
-describe('[niveau 4] point 6 — la période où l’on lit se lit sur le réel ; une période à venir vire ce que les tirelires demandent', () => {
+describe('[niveau 2] point 6 — la période où l’on lit se lit sur le réel ; une période à venir vire ce que les tirelires demandent', () => {
   it('la période où l’on lit n’a pas de solde prévu', () => {
     const courante = plans(exampleLedger(), LECTURE_EXEMPLE).find((p) => p.period.start <= LECTURE_EXEMPLE && p.period.end >= LECTURE_EXEMPLE)!;
     expect(courante.simulated).toBe(false);
@@ -296,7 +357,7 @@ describe('[niveau 4] point 6 — la période où l’on lit se lit sur le réel 
   });
 });
 
-describe('[niveau 4] point 7 — calculer le solde prévu ne modifie rien, et aucune opération prévue ne s’enregistre', () => {
+describe('[niveau 0] point 7 — calculer le solde prévu ne modifie rien, et aucune opération prévue ne s’enregistre (I10)', () => {
   it('le grand livre est le même avant et après, sans opération prévue', () => {
     const l = petitBudget();
     l.plannedFlows.push(flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', origin: 'derived', amount: -euros(150), counterpartAccountId: LIVRET }));
@@ -307,5 +368,17 @@ describe('[niveau 4] point 7 — calculer le solde prévu ne modifie rien, et au
     const avantEx = JSON.stringify(ex);
     àVenir(ex, LECTURE_EXEMPLE);
     expect(JSON.stringify(ex)).toBe(avantEx);
+  });
+});
+
+describe('[niveau 2] point 9 (ajouté par l’auditeur) — une libération de reliquat compte dans le solde prévu d’une tirelire, avec son origine (D29)', () => {
+  it('l’exemple, octobre : « Alimentation », à remise à zéro et sans réserve, rend son solde le dernier jour de sa période, puis reçoit sa dotation', () => {
+    const octobre = àVenir(exampleLedger(), LECTURE_EXEMPLE)[0]!;
+    const t = tirelire(octobre, 'env-alim');
+    expect(t.movements.map((m) => [m.date, m.origin, m.amount])).toEqual([
+      ['2026-09-27', 'liberation', -euros(900)],
+      ['2026-09-28', 'dotation', euros(900)],
+    ]);
+    expect([t.start, t.end]).toEqual([euros(900), euros(900)]);
   });
 });

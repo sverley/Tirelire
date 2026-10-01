@@ -1,12 +1,16 @@
 /**
- * Tests du codeur de #296, côté écran — le plan d'une période à venir montre le solde prévu des
+ * Harnais d'audit de #296, côté écran — le plan d'une période à venir montre le solde prévu des
  * comptes et des tirelires, et les opérations qui le font se lisent sur demande, chacune avec son
  * origine, repliées par défaut (point 4 du « Fait quand »). Le calcul est gardé dans le cœur
- * (`packages/core/test/solde-prevu.test.ts`) ; ici, seulement ce qui se lit à l'écran.
+ * (`packages/core/test/plan-solde-prevu.test.ts`) ; ici, seulement ce qui se lit à l'écran.
+ *
+ * Tests du codeur, repris tels quels (`solde-prevu.test.ts`, qui n'existe plus) ; l'auditeur n'a
+ * changé que leurs marques de niveau (D83) : 1 pour le manque signalé (principe 1.3) et pour l'écran
+ * qui ne déborde pas (C9), 2 pour ce que D52 et D88 font lire.
  *
  * L'exemple chargé par « Charger l'exemple » se lit au 6 septembre 2026 ; octobre 2026 est la
  * première période à venir. Les montants ne sont pas figés : ils sont relus dans le cœur, sur le même
- * grand livre. Tous de niveau 4 (rôle du codeur).
+ * grand livre.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -99,11 +103,11 @@ describe.skipIf(!navigateur)('#296 · le solde prévu à l’écran Plan, à 375
     await site?.fermer();
   });
 
-  it('[niveau 4] la période où l’on lit ne montre pas de solde prévu', async () => {
+  it('[niveau 2] la période où l’on lit ne montre pas de solde prévu', async () => {
     expect(await soldesPrévus(page)).toBeNull();
   });
 
-  it('[niveau 4] point 1 — octobre montre le solde prévu de chaque compte et de chaque tirelire, celui que le cœur calcule', async () => {
+  it('[niveau 2] point 1 — octobre montre le solde prévu de chaque compte et de chaque tirelire, celui que le cœur calcule', async () => {
     expect(await cliquer(page, OCTOBRE)).toBe(true);
     await pause(200);
     const bloc = await soldesPrévus(page);
@@ -113,7 +117,7 @@ describe.skipIf(!navigateur)('#296 · le solde prévu à l’écran Plan, à 375
     expect(bloc!.tirelires.map((t) => [t.nom, t.montant])).toEqual(f.tirelires.map((t) => [t.name, fmt(t.end)]));
   });
 
-  it('[niveau 4] point 3 — un manque se lit avec sa date et son montant', async () => {
+  it('[niveau 1] point 3 — un manque se lit avec sa date et son montant', async () => {
     const bloc = (await soldesPrévus(page))!;
     for (const a of plan.forecast!.accounts.filter((x) => x.shortfall)) {
       const l = bloc.comptes.find((c) => c.nom === a.name)!;
@@ -123,7 +127,7 @@ describe.skipIf(!navigateur)('#296 · le solde prévu à l’écran Plan, à 375
     expect(plan.forecast!.accounts.some((a) => a.shortfall), 'l’exemple n’a aucun manque en octobre : ce test ne vérifie rien').toBe(true);
   });
 
-  it('[niveau 4] point 4 — repliées par défaut, les opérations se lisent sur demande, chacune avec son origine', async () => {
+  it('[niveau 2] point 4 — repliées par défaut, les opérations se lisent sur demande, chacune avec son origine', async () => {
     let bloc = (await soldesPrévus(page))!;
     for (const l of [...bloc.comptes, ...bloc.tirelires]) expect(l.détail, `« ${l.nom} » est déplié par défaut`).toEqual([]);
 
@@ -144,7 +148,7 @@ describe.skipIf(!navigateur)('#296 · le solde prévu à l’écran Plan, à 375
     expect(bloc.comptes.find((c) => c.nom === 'Compte courant')!.détail).toEqual([]);
   });
 
-  it('[niveau 4] déplié, l’écran ne déborde pas à 375 px', async () => {
+  it('[niveau 1] déplié, l’écran ne déborde pas à 375 px', async () => {
     expect(await déplier(page, 'Compte courant')).toBe(true);
     const déborde = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(déborde).toBe(false);
