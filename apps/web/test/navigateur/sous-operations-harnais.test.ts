@@ -275,4 +275,30 @@ describe.skipIf(!navigateur)('#297 · 6 et 11. les écrans', () => {
       await page.close();
     }
   });
+
+  it('[niveau 0] #297 · 11. une opération divisée en plusieurs parts reste telle qu’elle est quand la Saisie en change le montant', async () => {
+    const page = await ouvrirLExemple(site);
+    try {
+      // L'exemple, divisé au premier niveau en deux parts : −100 € « montant fixe », et le reste.
+      await allerÀ(page, 'Opérations');
+      await afficherToutes(page);
+      await ouvrirLaLigne(page, OPÉRATION);
+      await saisir(page, 0, '-100,00');
+      await bouton(page, 'Ajouter une ligne');
+      await bouton(page, 'Enregistrer');
+
+      await saisieModifier(page, OPÉRATION, { montant: '200,00' });
+      await allerÀ(page, 'Opérations');
+      await afficherToutes(page);
+      await ouvrirLaLigne(page, OPÉRATION);
+      // La part fixe reste à −100 € ; seul le reste suit le montant.
+      expect((await choixDeLaLigne(page, 0)).part).toBe('Montant fixe');
+      expect((await ligne(page, 0)).soit).toBe('soit −100,00 €');
+      expect((await choixDeLaLigne(page, 1)).part).toBe('Le reste');
+      expect((await ligne(page, 1)).soit).toBe('soit −100,00 €');
+      expect(await page.evaluate(() => document.querySelectorAll('form.edit .grid').length - 1)).toBe(2);
+    } finally {
+      await page.close();
+    }
+  });
 });
