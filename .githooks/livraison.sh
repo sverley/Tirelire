@@ -24,11 +24,13 @@
 #    empreinte : l'état, dans l'arbre jugé, des chemins qu'il lit (`packages/gardes/attestation.mjs`,
 #    `ENSEMBLES`). Parmi ceux que la nature du besoin retient, il ne se joue pas si elle est déjà
 #    trouvée verte, à un seuil au moins égal — par l'attestation locale ou distante de la branche,
-#    écrite par l'outillage à la livraison ou à la demande, dans cette session ou dans une autre —, ou
-#    si elle est celle de la base commune avec `main` : rien de ce qu'il lit n'a changé. Un ensemble
-#    qui se joue est dit, avec son seuil et son verdict ; un ensemble qui ne se joue pas l'est aussi,
-#    avec sa raison. Ce que la livraison ne joue pas, la CI le joue au Ready s'il n'est pas vert sur
-#    son empreinte.
+#    écrite par l'outillage, dans cette session ou dans une autre —, ou si elle est celle de la base
+#    commune avec `main` : rien de ce qu'il lit n'a changé. Dans un ensemble qui se joue, le lanceur
+#    saute chaque fichier de test vert sur son empreinte — attesté vert par un lancement des tests
+#    (#302) —, d'après ce qui couvre l'arbre jugé (`attestation.mjs couverture`, passé par
+#    `--attestation`). Un ensemble qui se joue est dit, avec son seuil, son verdict et les fichiers
+#    joués et sautés ; un ensemble qui ne se joue pas l'est aussi, avec sa raison. Ce que la livraison
+#    ne joue pas, la CI le joue au Ready s'il n'est pas vert sur son empreinte.
 # 4. Seuil 2 (#232 : les tests de niveau 0 à 2), le moins cher d'abord :
 #    - le typecheck des paquets dont un ensemble se joue ; rouge, rien d'autre ne se joue ;
 #    - puis les tests sans navigateur, et le harnais du besoin qui ne vit pas dans le navigateur ;
@@ -42,10 +44,11 @@
 #    et la documentation (`**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon son verdict
 #    s'affiche. La non-régression bloque toujours.
 # 6. Sous-branche (`<branche>--codeur`, `<branche>--auditeur`) : non-régression seule, sans attestation.
-# 7. Bilan et attestation (#237, #266) : chaque ensemble est dit — joué, à quel seuil, avec quel
-#    verdict, ou pourquoi il ne l'est pas. Les ensembles joués verts s'ajoutent à l'attestation
+# 7. Bilan et attestation (#237, #266, #302) : chaque ensemble est dit — joué, à quel seuil, avec
+#    quel verdict, ou pourquoi il ne l'est pas. Les ensembles joués verts s'ajoutent à l'attestation
 #    locale (`attestation.mjs bilan`) ; un ensemble rouge, ou dont un test s'est sauté faute d'outil,
-#    n'y entre pas. Une livraison verte l'envoie sur `<branche>--attestation` (`attestation.mjs
+#    n'y entre pas, mais ses fichiers joués verts y entrent un à un (`--bilan` du lanceur), comme
+#    ceux de tout lancement des tests hors CI. Une livraison verte l'envoie sur `<branche>--attestation` (`attestation.mjs
 #    envoyer`), même quand rien ne s'est rejoué. La CI la lit pour ne jouer que le manque (D83). Une
 #    branche `…--attestation` n'est jamais jugée.
 # Limite : une résolution de fusion qui ajoute du code (commit de fusion) ne compte pas comme code

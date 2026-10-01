@@ -88,6 +88,13 @@ pnpm crochets   # core.hooksPath = .githooks, merge.ff = false
 Les crochets joués sont alors ceux de la branche extraite, dans chaque worktree. Ce que joue chaque
 niveau :
 
+- **Tout lancement des tests** (`pnpm test N`, `pnpm --dir <paquet> run test N`, les crochets, la
+  CI) saute chaque fichier de test déjà vert sur l'**empreinte** de son ensemble — l'état des chemins
+  que lit chaque ensemble de tests (`packages/gardes/attestation.mjs`) — à un seuil au moins égal,
+  et dit, pour chaque ensemble, les fichiers joués et les fichiers sautés, avec ce qui les couvre.
+  Hors CI, sur une branche, il atteste chaque fichier qu'il joue vert ; l'attestation part avec le
+  push suivant. Un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
+  n'atteste rien (D83, « Les empreintes »).
 - **pré-commit**, moins de 5 s, sur la copie de travail : les tests des paquets que touchent les
   fichiers du commit — cœur ; garde ou règles (décisions, description du projet, invariants,
   contraintes, `CLAUDE.md`) ; relais ; hébergement. Rien pour la seule
@@ -105,10 +112,10 @@ niveau :
     `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
     touchés, tests headless de l'interface ; durée attendue 40 s) ou **organisationnel** (tests de la
     garde ; durée attendue 45 s), ou les deux. Un dépassement de plus de 20 % s'affiche, sans bloquer.
-  - De ce que la nature retient, ne se joue que ce qui n'est pas déjà vert sur son **empreinte** —
-    l'état des chemins que lit chaque ensemble de tests (`packages/gardes/attestation.mjs`) —, dans
-    l'attestation de la branche, d'un push ou d'une session à l'autre, ou parce que `main` a la
-    même ; la livraison dit chaque ensemble, joué ou non, et pourquoi (D83, « Les empreintes »). Les
+  - De ce que la nature retient, ne se joue que ce qui n'est pas déjà vert sur son empreinte, dans
+    l'attestation de la branche, d'un lancement, d'un push ou d'une session à l'autre, ou parce que
+    `main` a la même ; la livraison dit chaque ensemble, joué ou non, et pourquoi, et les fichiers
+    qu'elle joue et qu'elle saute (D83, « Les empreintes »). Les
     tests navigateur (`apps/web/test/navigateur/`) restent au Ready, en CI, sauf demande :
     `pnpm livraison --navigateur` (D83). Le typecheck se joue avant les tests, et les tests
     navigateur ne partent que si le reste est vert.
@@ -119,8 +126,8 @@ niveau :
   - Un push vers une sous-branche (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la
     non-régression, sans rien attester.
 - **CI** : au passage en Ready de chaque PR, jamais en brouillon, typecheck, tests (navigateur compris), build, en mode strict
-  (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job. Un ensemble déjà vert sur son empreinte
-  ne s'y rejoue pas, seuil 1 compris ; au tag, rien ne se saute.
+  (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job. Un fichier de test déjà vert sur son
+  empreinte ne s'y rejoue pas, seuil 1 compris ; au tag, rien ne se saute.
 
 `git commit --no-verify` est un contournement : il fait sauter la non-régression avec le
 reste, et aucune consigne ne le propose. Un harnais rouge ne le justifie pas : il ne bloque pas le

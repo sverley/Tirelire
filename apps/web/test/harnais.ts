@@ -49,16 +49,17 @@ export interface Site {
 
 /**
  * Le site construit une fois pour tout le lancement (#302, point 8) : dans le dossier que la mise en
- * place du lancement prépare (`vitest.site-du-lancement.ts`), le premier fichier qui l'ouvre le construit,
- * les autres attendent qu'il soit prêt, puis le servent. Rend son dossier, ou `null` hors d'un
- * lancement qui le prépare : l'appelant construit alors le sien.
+ * place du lancement prépare (`vitest.site-du-lancement.ts`), le premier fichier qui l'ouvre le
+ * construit, les autres attendent qu'il soit prêt, puis le servent. Rend son dossier, et si cet
+ * appel l'a construit ; `null` hors d'un lancement qui le prépare : l'appelant construit alors le
+ * sien.
  *
  * Vitest joue les fichiers de test en parallèle : la construction se réserve par un dossier créé une
  * seule fois (`mkdir` échoue s'il existe), et se signale prête, ou en échec, par un fichier. Elle se
  * fait dans son propre dossier, jamais dans `dist` : une construction qui vide un dossier commun
  * pendant qu'un autre fichier le sert laisse une application qui ne monte pas (#149).
  */
-async function siteDuLancement(): Promise<string | null> {
+export async function siteDuLancement(): Promise<{ sortie: string; construit: boolean } | null> {
   let dossier: string | undefined;
   try {
     dossier = inject('siteDuLancement');
@@ -79,7 +80,7 @@ async function siteDuLancement(): Promise<string | null> {
     try {
       await build({ root: RACINE, logLevel: 'error', build: { outDir: sortie, emptyOutDir: true } });
       writeFileSync(prêt, '');
-      return sortie;
+      return { sortie, construit: true };
     } catch (err) {
       writeFileSync(échec, err instanceof Error ? (err.stack ?? err.message) : String(err));
       throw err;
@@ -91,7 +92,7 @@ async function siteDuLancement(): Promise<string | null> {
     if (Date.now() > fin) throw new Error('La construction du site, faite pour tout le lancement, ne finit pas.');
     await new Promise((r) => setTimeout(r, 100));
   }
-  return sortie;
+  return { sortie, construit: false };
 }
 
 /**
@@ -105,7 +106,7 @@ async function siteDuLancement(): Promise<string | null> {
  * Hors d'un lancement qui le prépare, l'appel construit le site dans son propre dossier temporaire.
  */
 export async function ouvrirLeSite(): Promise<Site> {
-  const partagé = await siteDuLancement();
+  const partagé = (await siteDuLancement())?.sortie;
   const sortie = partagé ?? mkdtempSync(join(tmpdir(), 'tirelire-site-'));
   const nettoyer = () => {
     if (!partagé) rmSync(sortie, { recursive: true, force: true });

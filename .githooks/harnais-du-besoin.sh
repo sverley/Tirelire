@@ -18,8 +18,9 @@
 # Exécuté (`sh .githooks/harnais-du-besoin.sh --jouer`), il joue le harnais du besoin en entier, au
 # seuil 4, tests navigateur activés, dans le paquet de chaque fichier, et sort en échec si l'un
 # rougit : c'est l'étape de la CI au Ready. Sans harnais du besoin, il le dit et sort en succès.
-# `--jouer --attestation <fichier>` passe le fichier à `pnpm test` (#237) : ce que la livraison a
-# joué sur cet arbre, harnais vert, n'est pas rejoué, et le lanceur le dit.
+# `--jouer --attestation <fichier>` passe le fichier à `pnpm test` (#237, #302) : un fichier du
+# harnais vert sur son empreinte, au seuil 4, avec tout le harnais ou attesté lui-même, n'est pas
+# rejoué, et le lanceur le dit.
 
 # Nom de la branche : celle qui est extraite, sinon celle de la PR en CI.
 branche_du_besoin() {

@@ -1,5 +1,5 @@
 /**
- * Empreintes et attestation des tests (#237, #266, D83).
+ * Empreintes et attestation des tests (#237, #266, #302, D83).
  *
  * Chaque ensemble de tests — garde, cœur, relais, hébergement, interface sans navigateur, interface
  * dans le navigateur, harnais du besoin — a une empreinte : l'état, dans l'arbre jugé, des chemins
@@ -11,17 +11,21 @@
  * tête de la branche dont toute la CI a fini verte au Ready, ou parce que `main` a la même (la branche
  * ne change rien de ce qu'il lit). Aucun moment ne fait exception (porteur, 28/09 : « si l'empreinte
  * est verte, on ne joue pas les tests, c'est universel ») : le seuil 1 du Ready non plus. L'attestation
- * porte les empreintes trouvées vertes par l'outillage : seul l'outillage l'écrit
- * (`.githooks/attestation.mjs`), elle voyage sur `<branche>--attestation` et s'enrichit d'un push et
- * d'une session à l'autre. Le risque visé est l'erreur, pas la fraude (porteur, 27/09).
+ * porte les empreintes trouvées vertes par l'outillage : seul l'outillage l'écrit (le lanceur,
+ * `.githooks/attestation.mjs`), elle voyage sur `<branche>--attestation` et s'enrichit d'un push et
+ * d'une session à l'autre. Le risque visé est l'erreur, pas la fraude (porteur, 27/09). Ce qui se
+ * saute se décide fichier de test par fichier de test (#302) : un fichier se saute s'il est vert sur
+ * l'empreinte de son ensemble, attesté lui-même par un lancement des tests, ou avec tout l'ensemble.
  *
  * Ce module ne fait que lire et décider, sans git ni réseau :
  * - `ENSEMBLES`, `lit`, `empreinteDe`, `empreintes` : ce que chaque ensemble lit, et son empreinte ;
  * - `texteDeLAttestation`, `lireLAttestation`, `fusionner` : l'attestation, un message de commit ;
  * - `planifier`, `verdictDuLancement` : ce qu'un crochet joue ou saute, et pourquoi ; ce qu'un
  *   lancement a donné ;
- * - `couvertureAuReady`, `couvertureApresFusion`, `couvre` : ce que la CI saute, par le fichier
- *   qu'elle passe à `pnpm test --attestation`, et la décision du lanceur (`lanceur.mjs`).
+ * - `couvertureAuReady`, `couvertureApresFusion`, `couvertureLocale`, `couvre` : ce qui couvre un
+ *   lancement — en CI, à la livraison, à la main —, et s'il est couvert en entier ;
+ * - `fichiersCouverts`, `fichiersDuLancement` : la décision du lanceur (`lanceur.mjs`), fichier par
+ *   fichier, et ce que chaque fichier a donné.
  */
 import { createHash } from 'node:crypto';
 import { niveauDesTitres } from './niveaux.mjs';

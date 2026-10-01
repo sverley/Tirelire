@@ -235,7 +235,8 @@ describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests n
   test('points 7 et 8 · la demande passe par une commande et ses arguments, écrite dans les rôles', () => {
     assert.equal(JSON.parse(lireFichier('package.json')).scripts.livraison, 'sh .githooks/livraison.sh demande');
     for (const rôle of ['codeur', 'auditeur']) assert.match(lireFichier(`docs/roles/${rôle}.md`), /`pnpm livraison --navigateur`/, rôle);
-    assert.match(lireFichier('docs/roles/auditeur.md'), /`pnpm test 2` : rien n'en est sauté/);
+    // #302 : la vérification de l'auditeur saute, elle aussi, ce qui est vert sur son empreinte.
+    assert.match(lireFichier('docs/roles/auditeur.md'), /`pnpm test 2` : ce qui est\s+déjà vert sur son empreinte s'y saute/);
   });
 });
 

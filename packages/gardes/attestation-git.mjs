@@ -10,7 +10,7 @@
  * hors sous-branche (D83).
  */
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fusionner, lireLAttestation, lireLesEntrees, texteDeLAttestation } from './attestation.mjs';
@@ -89,15 +89,14 @@ export function ajouterALAttestation({ branche, nouveaux, anciens = [], cwd }) {
 /**
  * L'arbre du contenu joué (#302) : la copie de travail telle qu'elle est, fichiers suivis et fichiers
  * non suivis que `.gitignore` n'écarte pas, modifications et suppressions comprises. Il s'écrit par un
- * index à part, copié de celui du clone pour aller vite ; ni l'index ni la branche ne changent. Rend
- * `{ arbre, entrees }`, ou `null` s'il ne se lit pas.
+ * index à part, neuf : chaque fichier y est relu, sans se fier à ce que l'index du clone sait de ses
+ * dates et de sa taille ; ni l'index ni la branche ne changent. Rend `{ arbre, entrees }`, ou `null`
+ * s'il ne se lit pas.
  */
 export function arbreDeLaCopie(racine) {
   const dossier = mkdtempSync(join(tmpdir(), 'tirelire-copie-'));
   try {
     const index = join(dossier, 'index');
-    const indexDuClone = essaie(() => git(['rev-parse', '--path-format=absolute', '--git-path', 'index'], { cwd: racine }));
-    if (indexDuClone && existsSync(indexDuClone)) copyFileSync(indexDuClone, index);
     const env = { ...process.env, GIT_INDEX_FILE: index };
     git(['add', '-A', '--', ':/'], { cwd: racine, env });
     const arbre = git(['write-tree'], { cwd: racine, env });

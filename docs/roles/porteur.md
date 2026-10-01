@@ -9,9 +9,10 @@ le reste est vert ; le seuil 2 hors navigateur a été joué avant, par la livra
 dont la vérification dit s'il a demandé les tests navigateur, et pourquoi (D83). Une branche qui ne
 contient pas le dernier `main` y est dite à mettre à jour, et rien d'autre ne se joue. Chaque
 ensemble de tests a son empreinte, l'état des chemins qu'il lit : la CI saute, seuil 1 compris, un
-ensemble déjà trouvé vert sur son empreinte — par l'outillage de la branche, qui l'atteste d'un push
-et d'une session à l'autre, par la CI sur une tête précédente verte au Ready, ou parce que la PR ne
-change rien de ce qu'il lit —, et dit, pour chaque ensemble, ce qu'elle saute et pourquoi ; après la
+fichier de test déjà trouvé vert sur l'empreinte de son ensemble — par l'outillage de la branche,
+qui l'atteste à chaque lancement des tests, d'un push et d'une session à l'autre, par la CI sur une
+tête précédente verte au Ready, ou parce que la PR ne change rien de ce que lit son ensemble —, et
+dit, pour chaque ensemble, ce qu'elle saute et pourquoi ; après la
 fusion, un ensemble vert au Ready sur la même empreinte, ou inchangé depuis le premier parent, ne
 rejoue pas ses tests (D83, « Les empreintes »). La version de dev
 s'assemble depuis le dernier commit de la branche. À la fermeture de la PR, fusionnée ou non, ses
