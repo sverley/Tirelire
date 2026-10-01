@@ -100,7 +100,7 @@ describe('[niveau 2] #307, point 2 · les tests navigateur de l’issue : ce que
     assert.ok(!commandes(SUR_MAIN).some((x) => /tests-de-l-issue/.test(x)), 'sur main, aucune issue');
   });
 
-  test('la liste du Ready : fichiers navigateur ajoutés ou modifiés depuis main, sans le harnais du besoin ni les autres tests', () => {
+  test('la liste du Ready : fichiers navigateur ajoutés ou modifiés depuis main, sans le harnais du besoin ni les autres tests, jouée en entier', () => {
     const f = dépôtGit('liste');
     for (const n of ['a', 'b', 'c']) f.écrire(`apps/web/test/navigateur/${n}.test.ts`, `// ${n}\n`);
     f.écrire('apps/web/test/w.test.ts', '// w\n');
@@ -118,6 +118,17 @@ describe('[niveau 2] #307, point 2 · les tests navigateur de l’issue : ce que
     const r = spawnSync('sh', ['-c', `. .githooks/tests-de-l-issue.sh && tests_de_l_issue '${liste}'`, '.githooks/tests-de-l-issue.sh'], { cwd: f.dépôt, env: f.env, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(readFileSync(liste, 'utf8').split('\n').filter(Boolean), ['apps/web/test/navigateur/a.test.ts', 'apps/web/test/navigateur/d.test.ts']);
+
+    // Joués par l'étape du Ready : en entier (seuil 4), navigateur activé, avec l'attestation, et l'étape rougit si un fichier rougit.
+    const bin = join(f.dépôt, '..', 'bin');
+    const appels = join(f.dépôt, '..', 'appels-pnpm');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'pnpm'), `#!/bin/sh\necho "$*" >> '${appels}'\nexit "$PNPM_CODE"\n`, { mode: 0o755 });
+    const attestation = join(f.dépôt, '..', 'attestation.json');
+    const ready = (code) => spawnSync('sh', ['.githooks/tests-de-l-issue.sh', '--jouer', '--attestation', attestation], { cwd: f.dépôt, env: { ...f.env, PATH: `${bin}:${process.env.PATH}`, PNPM_CODE: code }, encoding: 'utf8' });
+    assert.equal(ready('0').status, 0);
+    assert.equal(readFileSync(appels, 'utf8').trim(), `--dir apps/web run test 4 --navigateur --attestation ${attestation} test/navigateur/a.test.ts test/navigateur/d.test.ts`);
+    assert.equal(ready('1').status, 1, 'un fichier rouge fait échouer l’étape du Ready');
   });
 
   test('le bilan atteste les fichiers de l’issue un à un, jamais toute l’interface dans le navigateur', () => {
