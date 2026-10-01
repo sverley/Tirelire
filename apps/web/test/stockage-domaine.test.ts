@@ -81,7 +81,7 @@ import {
 import { relaySync } from '../src/lib/relay';
 
 const SQL = await initSqlJs();
-const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
+const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'automations', 'importProfiles', 'devices'] as const;
 type Cle = (typeof CLES)[number];
 type Ligne = Record<string, unknown> & { id: string };
 const DECISIONS = new URL('../../../docs/decisions.md', import.meta.url);
@@ -146,8 +146,8 @@ function importer(store: LedgerStore): void {
   if (!dates.length) return;
   runPipeline(store.load(), dates[0]!, addDays(dates[dates.length - 1]!, 1), (patch) => {
     for (const o of patch.operations) store.upsert('operations', o);
-    for (const a of patch.allocations) store.upsert('allocations', a);
-    for (const id of patch.removedAllocations ?? []) store.remove('allocations', id);
+    for (const a of patch.subOperations) store.upsert('subOperations', a);
+    for (const id of patch.removedSubOperations ?? []) store.remove('subOperations', id);
     return store.load();
   });
 }
@@ -540,7 +540,7 @@ describe('#197 · 3. la clé est courte et stable', () => {
 function casIncoherents(s: LedgerStore): Array<{ cle: Cle; ligne: Ligne; champ: string; valeur: unknown; pourquoi: string }> {
   const compte = lignes(s, 'accounts').find((c) => c.id === 'acc-principal')!;
   const op = importees(s)[0]!;
-  const ventilation = lignes(s, 'allocations').find((a) => !a['deletedAt'])!;
+  const ventilation = lignes(s, 'subOperations').find((a) => !a['deletedAt'])!;
   const besoin = lignes(s, 'needs')[0]!;
   const flux = lignes(s, 'plannedFlows')[0]!;
   const categorie = lignes(s, 'categories').find((c) => c['nature'])!;
@@ -549,7 +549,7 @@ function casIncoherents(s: LedgerStore): Array<{ cle: Cle; ligne: Ligne; champ: 
     { cle: 'accounts', ligne: compte, champ: 'kind', valeur: undefined, pourquoi: 'un compte sans genre' },
     { cle: 'operations', ligne: op, champ: 'date', valeur: undefined, pourquoi: 'une opération sans date' },
     { cle: 'operations', ligne: op, champ: 'amount', valeur: undefined, pourquoi: 'une opération sans montant' },
-    { cle: 'allocations', ligne: ventilation, champ: 'operationId', valeur: undefined, pourquoi: 'une ventilation sans opération' },
+    { cle: 'subOperations', ligne: ventilation, champ: 'operationId', valeur: undefined, pourquoi: 'une ventilation sans opération' },
     { cle: 'accounts', ligne: compte, champ: 'kind', valeur: 'pivot', pourquoi: 'un genre de compte inconnu' },
     { cle: 'operations', ligne: op, champ: 'state', valeur: 'bidon', pourquoi: 'un état d’opération inconnu' },
     { cle: 'needs', ligne: besoin, champ: 'kind', valeur: 'bidon', pourquoi: 'un genre de besoin inconnu' },
@@ -749,7 +749,7 @@ function releve(store: LedgerStore): unknown {
   const cle = (o: Ligne) => [o['accountId'], o['date'], o['label'], o['amount']].join('|');
   const tries = [...ops].sort((a, b) => (cle(a) < cle(b) ? -1 : cle(a) > cle(b) ? 1 : 0));
   const rang = new Map(tries.map((o, i) => [o.id, i]));
-  const ventilations = lignes(store, 'allocations').filter((a) => !a['deletedAt']);
+  const ventilations = lignes(store, 'subOperations').filter((a) => !a['deletedAt']);
   const ou_ = (v: unknown) => v ?? null;
   return tries.map((o) => ({
     accountId: o['accountId'],

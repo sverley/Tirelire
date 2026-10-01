@@ -52,7 +52,7 @@ function latin1(s: string): Uint8Array {
 function ledgerWithBank(): { ledger: Ledger; profile: ReturnType<typeof bankMultiAccountProfile> } {
   const ledger = exampleLedger();
   ledger.operations = [];
-  ledger.allocations = [];
+  ledger.subOperations = [];
   const profile = bankMultiAccountProfile('prof-bank');
   profile.accountMap = { '00011111111': 'acc-principal' };
   return { ledger, profile };
@@ -183,7 +183,7 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
       const op = l2.operations.find((o) => o.id === m.operationId)!;
       expect(op.state).toBe('reconciled');
       expect(op.plannedFlowId).toBe('flow-credit');
-      expect(l2.allocations.find((a) => a.operationId === op.id)?.categoryId).toBe('cat-logement');
+      expect(l2.subOperations.find((a) => a.operationId === op.id)?.categoryId).toBe('cat-logement');
       // La même occurrence n'est plus proposée.
       expect(proposeMatches(l2, '2026-08-01', '2026-09-30').some((p) => p.flowId === 'flow-credit')).toBe(false);
     });
@@ -193,7 +193,7 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
       l.automations.push({ id: 'r1', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' }, rank: 'm' });
       const patch = applyAutomations(l);
       expect(patch.operations.length).toBe(2);
-      expect(patch.allocations[0]!.tirelireId).toBe('env-alim');
+      expect(patch.subOperations[0]!.tirelireId).toBe('env-alim');
       const l2 = applyPatchToLedger(l, patch);
       const idx = indexLedger(l2);
       expect(tirelireBalance(idx.tireliresById.get('env-alim')!, idx, '2026-09-06')).toBe(euros(900 - 170.8));
@@ -295,7 +295,7 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
     const patch = matchTirelireTransfers(l);
     // Version cassée : le libellé est bien reconnu, mais le virement n'est pas réparti par l'ordre
     // de financement (D21) — tout tombe dans la première tirelire venue.
-    const cassé: Patch = { ...patch, allocations: patch.allocations.map((a) => ({ ...a, tirelireId: 'env-vac' })) };
+    const cassé: Patch = { ...patch, subOperations: patch.subOperations.map((a) => ({ ...a, tirelireId: 'env-vac' })) };
     const idx = indexLedger(applyPatchToLedger(l, cassé));
 
     const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, '2026-09-06');

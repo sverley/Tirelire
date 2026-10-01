@@ -38,7 +38,7 @@ function ventilation(l: Ledger, flow: PlannedFlow, montant: number): Map<string,
     auto: true,
     reasons: [],
   });
-  return new Map(patch.allocations.map((a) => [a.tirelireId!, a.share.kind === 'fixed' ? a.share.amount : 0]));
+  return new Map(patch.subOperations.map((a) => [a.tirelireId!, a.share.kind === 'fixed' ? a.share.amount : 0]));
 }
 
 /**

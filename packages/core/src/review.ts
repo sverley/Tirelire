@@ -4,7 +4,7 @@
  */
 import type { Cents, Tirelire, Id, ISODate, Ledger, Need } from './model.js';
 import { alive, needActive, needName } from './model.js';
-import { allocationAmount, tirelireBalance, indexLedger, needCruise } from './balances.js';
+import { tirelireBalance, indexLedger, needCruise } from './balances.js';
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, diffDays } from './dates.js';
 
@@ -126,22 +126,22 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
     const p = periodOf(op.date);
     if (!p) continue;
     const pi = periods.indexOf(p);
-    for (const al of idx.allocationsByOperation.get(op.id) ?? []) {
+    for (const line of idx.linesByOperation.get(op.id) ?? []) {
       // Un renflouement (D49) fausserait les moyennes : un cadeau gonflerait le revenu moyen, un
       // virement interne compterait deux fois. Il est compté ailleurs, par `reviewReplenishments`.
-      if (al.replenishment) continue;
+      if (line.replenishment) continue;
       const targets: CategoryReview[] = [];
-      if (al.categoryId) {
-        const c = categories.find((x) => x.id === al.categoryId);
+      if (line.categoryId) {
+        const c = categories.find((x) => x.id === line.categoryId);
         if (c) targets.push(ensure(`cat:${c.id}`, () => ({ categoryId: c.id, name: c.name, nature: c.nature })));
       }
-      if (al.tirelireId && budgetOf.has(al.tirelireId)) {
-        const e = tirelires.find((x) => x.id === al.tirelireId)!;
+      if (line.tirelireId && budgetOf.has(line.tirelireId)) {
+        const e = tirelires.find((x) => x.id === line.tirelireId)!;
         targets.push(ensure(`env:${e.id}`, () => ({ tirelireId: e.id, name: `Budget « ${e.name} »`, nature: 'expense', target: budgetOf.get(e.id)! })));
       }
       for (const t of targets) {
         const ps = t.periods[pi]!;
-        const amount = allocationAmount(al, idx);
+        const amount = line.amount;
         const spent = t.nature === 'income' ? amount : -amount;
         ps.spent += spent;
         ps.count++;
@@ -242,11 +242,11 @@ export function reviewReplenishments(ledger: Ledger, periods: Period[]): Repleni
 
   for (const op of idx.operationsById.values()) {
     if (op.date < debut || op.date > fin) continue;
-    for (const al of idx.allocationsByOperation.get(op.id) ?? []) {
-      if (!al.replenishment || !al.tirelireId) continue;
-      const e = idx.tireliresById.get(al.tirelireId);
+    for (const line of idx.linesByOperation.get(op.id) ?? []) {
+      if (!line.replenishment || !line.tirelireId) continue;
+      const e = idx.tireliresById.get(line.tirelireId);
       if (!e) continue;
-      const montant = allocationAmount(al, idx);
+      const montant = line.amount;
       if (montant <= 0) continue; // seul ce qui entre dans la tirelire renfloue
       let r = parTirelire.get(e.id);
       if (!r) {
@@ -256,7 +256,7 @@ export function reviewReplenishments(ledger: Ledger, periods: Period[]): Repleni
       }
       r.count++;
       r.total += montant;
-      if (al.replenishment === 'external') r.fromOutside += montant;
+      if (line.replenishment === 'external') r.fromOutside += montant;
       else r.fromInside += montant;
     }
   }

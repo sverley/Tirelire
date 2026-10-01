@@ -86,8 +86,8 @@ function ligneBancaire(l: Ledger, montant: number, date = JOUR_VIREMENT, id = 'o
 function appliquer(l: Ledger, p: Patch): Ledger {
   const ops = new Map(l.operations.map((o) => [o.id, o]));
   for (const o of p.operations) ops.set(o.id, o);
-  const retirées = new Set(p.removedAllocations ?? []);
-  return { ...l, operations: [...ops.values()], allocations: [...l.allocations.filter((a) => !retirées.has(a.id)), ...p.allocations] };
+  const retirées = new Set(p.removedSubOperations ?? []);
+  return { ...l, operations: [...ops.values()], subOperations: [...l.subOperations.filter((a) => !retirées.has(a.id)), ...p.subOperations] };
 }
 
 /** L'import tel que l'écran Opérations le fait : proposition, puis application. */
@@ -107,7 +107,7 @@ function addJours(d: string, n: number): string {
 /** Ventilation d'un patch, tirelire → montant positif. */
 function ventilation(p: Patch | undefined): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const a of p?.allocations ?? []) if (a.tirelireId && a.share.kind === 'fixed') out[a.tirelireId] = (out[a.tirelireId] ?? 0) - a.share.amount;
+  for (const a of p?.subOperations ?? []) if (a.tirelireId && a.share.kind === 'fixed') out[a.tirelireId] = (out[a.tirelireId] ?? 0) - a.share.amount;
   return out;
 }
 

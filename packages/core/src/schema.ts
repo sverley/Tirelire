@@ -180,9 +180,9 @@ export const TABLES: Record<string, TableDef> = {
       DELETED_AT,
     ],
   },
-  allocations: {
-    name: 'allocations',
-    columns: [ID, req('operationId'), c('categoryId'), c('tirelireId'), req('share', 'json'), oneOf('replenishment', REPLENISHMENT_KINDS), DELETED_AT],
+  subOperations: {
+    name: 'sub_operations',
+    columns: [ID, req('operationId'), c('parentId'), c('categoryId'), c('tirelireId'), req('share', 'json'), oneOf('replenishment', REPLENISHMENT_KINDS), DELETED_AT],
   },
   automations: {
     name: 'automations',
@@ -212,7 +212,7 @@ export const TABLES: Record<string, TableDef> = {
 };
 
 /** Clé de `Ledger` correspondant à chaque table. */
-export const LEDGER_KEYS = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
+export const LEDGER_KEYS = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'automations', 'importProfiles', 'devices'] as const;
 export type LedgerKey = (typeof LEDGER_KEYS)[number];
 
 /** Colonne de chaque table, réglages compris : l'horloge logique de la dernière écriture (D58). */
@@ -268,12 +268,11 @@ export function rowProblem(t: TableDef, id: unknown, v: Record<string, string | 
 export const FILE_FORMAT = 'tirelire';
 /**
  * Version du format du fichier et des paquets de synchronisation. Un fichier ou un paquet d'une
- * autre version est refusé en le disant, sans rien écrire (D30, D58). La version 3 lie le compte
- * principal à son identifiant, présent dans toute base (contrainte `accounts.principal`, #209) ;
- * la version 2 parlait le domaine et contraignait ses colonnes ; ni elle ni la version 1 ne sont
- * plus lues.
+ * autre version est refusé en le disant, sans rien écrire (D30, D58). La version 4 range les
+ * sous-opérations à tous les niveaux dans `sub_operations` (D88, #297) ; aucune version antérieure
+ * n'est plus lue.
  */
-export const FORMAT_VERSION = 3;
+export const FORMAT_VERSION = 4;
 
 export const SYSTEM_SQL = [
   // Réglages : une ligne par clé, valeur JSON, horloge de la dernière écriture ; synchronisés.

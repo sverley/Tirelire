@@ -22,7 +22,7 @@
  * (`computePlan`) : la dotation qu'une tirelire reçoit dans son solde prévu est celle que sa ligne
  * demande.
  */
-import type { Account, Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow, Tirelire } from './model.js';
+import type { Account, SubOperation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow, Tirelire } from './model.js';
 import { alive } from './model.js';
 import { accountBalance, indexLedger, tirelireComponents, tirelireTimeline, type LedgerIndex } from './balances.js';
 import type { Period } from './periods.js';
@@ -108,7 +108,7 @@ export function withPlannedOperations(ledger: Ledger, today: ISODate, until: ISO
   };
 
   const operations: Operation[] = [];
-  const allocations: Allocation[] = [];
+  const subOperations: SubOperation[] = [];
   const transfers: Array<{ flow: PlannedFlow; date: ISODate }> = [];
 
   for (const flow of alive(ledger.plannedFlows)) {
@@ -123,7 +123,7 @@ export function withPlannedOperations(ledger: Ledger, today: ISODate, until: ISO
       const op = plannedOperation(flow, o.date);
       operations.push(op);
       if (flow.kind === 'dueDate' && flow.tirelireId && tirelires.has(flow.tirelireId))
-        allocations.push({
+        subOperations.push({
           id: `${op.id}:tirelire`,
           operationId: op.id,
           tirelireId: flow.tirelireId,
@@ -133,7 +133,7 @@ export function withPlannedOperations(ledger: Ledger, today: ISODate, until: ISO
     }
   }
 
-  let out: Ledger = { ...ledger, operations: [...ledger.operations, ...operations], allocations: [...ledger.allocations, ...allocations] };
+  let out: Ledger = { ...ledger, operations: [...ledger.operations, ...operations], subOperations: [...ledger.subOperations, ...subOperations] };
 
   /*
    * Un virement prévu sort d'un compte et entre sur l'autre : deux opérations appariées, comme
@@ -161,8 +161,8 @@ export function withPlannedOperations(ledger: Ledger, today: ISODate, until: ISO
     out = {
       ...out,
       operations: [...out.operations, sortie, entree],
-      allocations: [
-        ...out.allocations,
+      subOperations: [
+        ...out.subOperations,
         ...parts.map((p, i) => ({
           id: `${sortie.id}:part-${i}`,
           operationId: sortie.id,

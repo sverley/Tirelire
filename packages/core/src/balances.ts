@@ -3,7 +3,7 @@
  *
  * Une tirelire a une position par compte (D19) : ses **composantes**. Elles viennent
  *  - du solde initial, réputé sur le compte de placement à la date d'ouverture ;
- *  - des lignes de ventilation : une dépense ou un revenu pèse sur le compte de l'opération,
+ *  - des sous-opérations qui ne se divisent plus (`countedLines`, D88) : une dépense ou un revenu pèse sur le compte de l'opération,
  *    un virement interne déplace une composante d'un compte vers l'autre sans changer le solde ;
  *  - des **dotations** calculées (D29) : au début de chaque période, chaque besoin reçoit ce
  *    qu'il demande, sur le compte principal (ou sur le compte de placement sans principal) ;
@@ -13,12 +13,13 @@
  * Deux invariants : la somme des composantes d'une tirelire fait son solde ; pour un compte,
  * la somme des composantes qu'il porte plus son non affecté fait son solde bancaire.
  */
-import type { Account, Allocation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation, ValidityState } from './model.js';
+import type { Account, SubOperation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation, ValidityState } from './model.js';
 import {
   monthsOf, alive, needActive, validityState } from './model.js';
 import { nextOccurrence, budgetPeriodContaining, periodsUntil, nextPeriod, type Period } from './periods.js';
 import { divideCents } from './money.js';
 import { addDays } from './dates.js';
+import { countedLines, liveSubOperations, type CountedLine } from './suboperations.js';
 
 /** Position d'une tirelire : compte → composante (centimes signés). */
 export type Components = Map<Id, Cents>;
@@ -30,7 +31,8 @@ export interface ComponentEffect {
 
 export interface TirelireEntry {
   operation: Operation;
-  allocation: Allocation;
+  /** La ligne comptée (`countedLines`) qui porte cette tirelire. */
+  line: CountedLine;
   /** Effets par compte (un pour une dépense, deux pour un virement dont l'autre côté n'est pas importé). */
   effects: ComponentEffect[];
   /** Effet net sur le solde de la tirelire. */
@@ -70,15 +72,16 @@ export interface LedgerIndex {
   tireliresById: Map<Id, Tirelire>;
   needsByTirelire: Map<Id, Need[]>;
   operationsById: Map<Id, Operation>;
-  allocationsByOperation: Map<Id, Allocation[]>;
+  /** Sous-opérations vivantes par opération, tous niveaux (`liveSubOperations`). */
+  subOperationsByOperation: Map<Id, SubOperation[]>;
+  /** Lignes comptées par opération (`countedLines`), une pour une opération sans sous-opération. */
+  linesByOperation: Map<Id, CountedLine[]>;
   /** Écritures vivantes par tirelire, effets déjà calculés, triées par date. */
   entriesByTirelire: Map<Id, TirelireEntry[]>;
   principal: Account | undefined;
   startDay: number;
   /** Mémo des chronologies par tirelire (dotations et libérations), étendues à la demande. */
   timelines: Map<Id, PeriodSnapshot[]>;
-  /** Montant résolu de chaque ligne de ventilation (D27), part variable comprise. */
-  amountsByAllocation: Map<Id, Cents>;
 }
 
 export function indexLedger(ledger: Ledger): LedgerIndex {
@@ -93,37 +96,34 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
   }
   for (const arr of needsByTirelire.values()) arr.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
   const operationsById = new Map(alive(ledger.operations).map((o) => [o.id, o]));
-  const allocationsByOperation = new Map<Id, Allocation[]>();
-  for (const al of alive(ledger.allocations)) {
-    if (!operationsById.has(al.operationId)) continue;
-    const arr = allocationsByOperation.get(al.operationId);
-    if (arr) arr.push(al);
-    else allocationsByOperation.set(al.operationId, [al]);
+  const subOperationsByOperation = new Map<Id, SubOperation[]>();
+  for (const sub of liveSubOperations(ledger.subOperations, new Set(operationsById.keys()))) {
+    const arr = subOperationsByOperation.get(sub.operationId);
+    if (arr) arr.push(sub);
+    else subOperationsByOperation.set(sub.operationId, [sub]);
   }
+  const linesByOperation = new Map<Id, CountedLine[]>();
+  for (const op of operationsById.values()) linesByOperation.set(op.id, countedLines(op, subOperationsByOperation.get(op.id) ?? []));
   const principal = [...accountsById.values()].find((a) => a.kind === 'principal');
   const idx: LedgerIndex = {
     accountsById,
     tireliresById,
     needsByTirelire,
     operationsById,
-    allocationsByOperation,
+    subOperationsByOperation,
+    linesByOperation,
     entriesByTirelire: new Map(),
     principal,
     startDay: ledger.settings.periodStartDay,
     timelines: new Map(),
-    amountsByAllocation: new Map(),
   };
-  for (const [opId, allocs] of allocationsByOperation) {
+  for (const [opId, lines] of linesByOperation) {
     const op = operationsById.get(opId)!;
-    for (const [id, amount] of resolveShares(op, allocs)) idx.amountsByAllocation.set(id, amount);
-  }
-  for (const [opId, allocs] of allocationsByOperation) {
-    const op = operationsById.get(opId)!;
-    for (const al of allocs) {
-      const env = al.tirelireId ? tireliresById.get(al.tirelireId) : undefined;
+    for (const line of lines) {
+      const env = line.tirelireId ? tireliresById.get(line.tirelireId) : undefined;
       if (!env) continue;
-      const effects = allocationEffects(op, al, idx);
-      const entry: TirelireEntry = { operation: op, allocation: al, effects, effect: effects.reduce((s, x) => s + x.amount, 0) };
+      const effects = lineEffects(op, line, idx);
+      const entry: TirelireEntry = { operation: op, line, effects, effect: effects.reduce((s, x) => s + x.amount, 0) };
       const arr = idx.entriesByTirelire.get(env.id);
       if (arr) arr.push(entry);
       else idx.entriesByTirelire.set(env.id, [entry]);
@@ -134,76 +134,26 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
 }
 
 /**
- * Montants résolus des lignes d'une opération (D27) : une part fixe vaut son montant, une part
- * en pourcentage se calcule sur le montant de l'opération, et la part variable prend le reste,
- * bornée à zéro — jamais de signe opposé à l'opération. Les lignes sont résolues dans l'ordre
- * reçu, ce qui rend le calcul déterministe et rejouable à montant inconnu d'avance.
- */
-export function resolveShares(op: Operation, allocations: Allocation[]): Map<Id, Cents> {
-  const out = new Map<Id, Cents>();
-  const sign = op.amount < 0 ? -1 : 1;
-  let used = 0;
-  let variable: Allocation | undefined;
-  for (const al of allocations) {
-    if (al.share.kind === 'variable') {
-      // Une seule ligne variable (D27) : les suivantes ne prennent rien.
-      if (variable) out.set(al.id, 0);
-      else variable = al;
-      continue;
-    }
-    const amount = al.share.kind === 'fixed' ? al.share.amount : Math.round((op.amount * al.share.pct) / 100);
-    out.set(al.id, amount);
-    used += amount;
-  }
-  if (variable) {
-    const rest = op.amount - used;
-    out.set(variable.id, sign * rest > 0 ? rest : 0);
-  }
-  return out;
-}
-
-/** Reste non couvert par les lignes fixes et en pourcentage, borné à zéro (part variable, D27). */
-export function variableRest(op: Operation, allocations: Allocation[]): Cents {
-  const sign = op.amount < 0 ? -1 : 1;
-  const used = allocations.reduce((s, al) => {
-    if (al.share.kind === 'fixed') return s + al.share.amount;
-    if (al.share.kind === 'percent') return s + Math.round((op.amount * al.share.pct) / 100);
-    return s;
-  }, 0);
-  const rest = op.amount - used;
-  return sign * rest > 0 ? rest : 0;
-}
-
-/** Montant résolu d'une ligne de ventilation, dans le signe de l'opération (D27). */
-export function allocationAmount(al: Allocation, idx?: LedgerIndex): Cents {
-  const memo = idx?.amountsByAllocation.get(al.id);
-  if (memo !== undefined) return memo;
-  if (al.share.kind === 'fixed') return al.share.amount;
-  return 0;
-}
-
-/**
- * Effets par compte d'une ligne de ventilation (D19).
+ * Effets par compte d'une ligne comptée (D19).
  *  - dépense ou revenu : `amount` sur le compte de l'opération ;
  *  - virement interne : `amount` sur le compte de départ et `−amount` sur le compte d'arrivée,
- *    sauf si l'autre côté du virement est importé et ventilé sur la même tirelire (il porte
- *    alors lui-même sa composante).
+ *    sauf si l'autre côté du virement est importé et compte une ligne sur la même tirelire (il
+ *    porte alors lui-même sa composante).
  */
-export function allocationEffects(op: Operation, al: Allocation, idx: LedgerIndex): ComponentEffect[] {
-  const amount = allocationAmount(al, idx);
-  const own: ComponentEffect = { accountId: op.accountId, amount };
+export function lineEffects(op: Operation, line: CountedLine, idx: LedgerIndex): ComponentEffect[] {
+  const own: ComponentEffect = { accountId: op.accountId, amount: line.amount };
   if (!op.transferAccountId) return [own];
   if (op.transferOperationId) {
     const twin = idx.operationsById.get(op.transferOperationId);
-    const twinAllocs = twin ? (idx.allocationsByOperation.get(twin.id) ?? []) : [];
-    if (twin && twinAllocs.some((a) => a.tirelireId === al.tirelireId)) return [own];
+    const twinLines = twin ? (idx.linesByOperation.get(twin.id) ?? []) : [];
+    if (twin && twinLines.some((l) => l.tirelireId && l.tirelireId === line.tirelireId)) return [own];
   }
-  return [own, { accountId: op.transferAccountId, amount: -amount }];
+  return [own, { accountId: op.transferAccountId, amount: -line.amount }];
 }
 
-/** Effet net d'une ligne sur le solde de son tirelire (0 pour un virement interne). */
-export function allocationEffect(op: Operation, al: Allocation, idx: LedgerIndex): Cents {
-  return allocationEffects(op, al, idx).reduce((s, x) => s + x.amount, 0);
+/** Effet net d'une ligne comptée sur le solde de sa tirelire (0 pour un virement interne). */
+export function lineEffect(op: Operation, line: CountedLine, idx: LedgerIndex): Cents {
+  return lineEffects(op, line, idx).reduce((s, x) => s + x.amount, 0);
 }
 
 function entriesUpTo(e: Tirelire, idx: LedgerIndex, asOf: ISODate): TirelireEntry[] {
@@ -538,10 +488,12 @@ export function unallocated(a: Account, ledger: Ledger, idx: LedgerIndex, asOf: 
   return accountBalance(a, ledger, asOf) - componentsOnAccount(a, idx, asOf);
 }
 
-/** Part d'une opération non couverte par ses lignes de ventilation (dans le signe de l'opération). */
+/**
+ * Part d'une opération sans tirelire, à tous les niveaux (dans le signe de l'opération) : ce qui
+ * reste sur son compte réel, le non affecté (D29, D88).
+ */
 export function unallocatedAmount(op: Operation, idx: LedgerIndex): Cents {
-  const allocs = idx.allocationsByOperation.get(op.id) ?? [];
-  return op.amount - allocs.reduce((s, a) => s + allocationAmount(a, idx), 0);
+  return (idx.linesByOperation.get(op.id) ?? []).reduce((s, l) => (l.tirelireId && idx.tireliresById.has(l.tirelireId) ? s : s + l.amount), 0);
 }
 
 /**
@@ -564,9 +516,9 @@ export function settlementBalance(third: Account, ledger: Ledger, idx: LedgerInd
     const isTransferToThird = op.transferAccountId === third.id;
     if (!isOnThird && !isTransferToThird) continue;
     if (isOnThird && op.transferAccountId) continue;
-    const placedHere = (idx.allocationsByOperation.get(op.id) ?? []).reduce((s, al) => {
-      const env = al.tirelireId ? idx.tireliresById.get(al.tirelireId) : undefined;
-      return env && homeAccount(env) === third.id ? s + allocationAmount(al, idx) : s;
+    const placedHere = (idx.linesByOperation.get(op.id) ?? []).reduce((s, line) => {
+      const env = line.tirelireId ? idx.tireliresById.get(line.tirelireId) : undefined;
+      return env && homeAccount(env) === third.id ? s + line.amount : s;
     }, 0);
     const outside = op.amount - placedHere;
     owes += isOnThird ? -outside : outside;

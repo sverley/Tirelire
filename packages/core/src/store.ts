@@ -448,6 +448,7 @@ export class LedgerStore {
             result.stale++;
           }
         }
+        if (result.applied > 0) this.removeOrphanSubOperations();
         if (opts.learn) {
           for (const h of Object.values(opts.learn)) this.hlc.receive(h);
           for (const row of rows) this.learnOne(row.hlc);
@@ -462,6 +463,26 @@ export class LedgerStore {
     }
     this.notify();
     return result;
+  }
+
+  /**
+   * Une sous-opération ne reste pas sans le niveau qui la contient (D88, #297) : quand une
+   * instance retire un niveau pendant qu'une autre y ajoutait une sous-opération, la fusion laisse
+   * celle-ci sous un niveau retiré. Elle est retirée à son tour, datée de la suppression de ce
+   * niveau : toute instance qui fait la même fusion écrit la même ligne, sans conflit (D58).
+   */
+  private removeOrphanSubOperations(): void {
+    const t = TABLES.subOperations!;
+    for (;;) {
+      const orphans = this.db.exec(
+        `SELECT c.id, p.deleted_at FROM ${t.name} c JOIN ${t.name} p ON c.parent_id = p.id WHERE c.deleted_at IS NULL AND p.deleted_at IS NOT NULL`,
+      )[0]?.values;
+      if (!orphans?.length) return;
+      for (const [id, deletedAt] of orphans) {
+        const row = this.readRowState(t.name, id as string)!;
+        this.writeRow({ ...row, hlc: this.tick(), v: { ...row.v, deleted_at: deletedAt as SqlValue } });
+      }
+    }
   }
 
   /** Mémorise ce qu'un pair sait, pour ne lui envoyer ensuite que ce qui lui manque. */

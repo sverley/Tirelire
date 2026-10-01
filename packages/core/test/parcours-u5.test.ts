@@ -58,7 +58,7 @@ function leBilanParCatégorieSeLit(ledger: Ledger): void {
   expect(alive(ledger.needs)).toEqual([]);
   expect(alive(ledger.plannedFlows)).toEqual([]);
 
-  const lignes = alive(ledger.allocations);
+  const lignes = alive(ledger.subOperations);
   expect(lignes.length, 'aucune opération classée').toBeGreaterThan(0);
   for (const a of lignes) {
     expect(a.categoryId, 'une ligne de ventilation sans catégorie').toBeDefined();
@@ -136,7 +136,7 @@ describe('[niveau 1] harnais du registre · I3 (U5)', () => {
 
       // Version volontairement cassée : le classement n'est retenu que s'il désigne une tirelire —
       // l'usage devient le mode dégradé du budget, ce que I3 refuse.
-      leBilanParCatégorieSeLit({ ...ledger, allocations: ledger.allocations.filter((a) => a.tirelireId) });
+      leBilanParCatégorieSeLit({ ...ledger, subOperations: ledger.subOperations.filter((a) => a.tirelireId) });
     });
   });
 });

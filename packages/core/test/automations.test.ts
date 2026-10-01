@@ -110,14 +110,14 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
       l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
       l = applyPatchToLedger(l, applyAutomations(l));
       expect(l.operations.find((o) => o.id === 'o1')!.state).toBe('reconciled');
-      expect(l.allocations.filter((a) => a.operationId === 'o1').length).toBe(1);
+      expect(l.subOperations.filter((a) => a.operationId === 'o1').length).toBe(1);
       // Deuxième passage : rien ne bouge.
       expect(applyAutomations(l).operations.length).toBe(0);
       // Règle retirée : l'opération revient à rien.
       l.automations = [];
       l = applyPatchToLedger(l, applyAutomations(l));
       expect(l.operations.find((o) => o.id === 'o1')!.state).toBe('untreated');
-      expect(l.allocations.filter((a) => a.operationId === 'o1').length).toBe(0);
+      expect(l.subOperations.filter((a) => a.operationId === 'o1').length).toBe(0);
     });
 
     describe('[niveau 0] D22 · la vérité est ce qui est verrouillé', () => {
@@ -132,12 +132,12 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
     describe('[niveau 0] D33 · ce que l’import a établi ne se perd pas', () => {
       it('ce que l’import a établi survit au passage des règles (D33)', () => {
         const l = withOps(op('o1', 'VIR LIVRET', euros(-100), { transferAccountId: 'acc-livret' }));
-        l.allocations.push({ id: 'al1', operationId: 'o1', tirelireId: 'env-vacances', share: { kind: 'variable' } });
+        l.subOperations.push({ id: 'al1', operationId: 'o1', tirelireId: 'env-vacances', share: { kind: 'variable' } });
         const patch = applyAutomations(l);
         // La ventilation posée par l'appariement survit ; seul l'état suit (le virement est rapproché).
-        expect(patch.removedAllocations).toEqual([]);
+        expect(patch.removedSubOperations).toEqual([]);
         // La ligne est réécrite à l'identique (même identifiant), pas remplacée.
-        expect(patch.allocations.map((a) => [a.id, a.tirelireId])).toEqual([['al1', 'env-vacances']]);
+        expect(patch.subOperations.map((a) => [a.id, a.tirelireId])).toEqual([['al1', 'env-vacances']]);
         expect(patch.operations[0]!.state).toBe('reconciled');
       });
     });
@@ -157,7 +157,7 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
       const l = withOps(op('o1', 'SUPERMARCHE', euros(-40)));
       l.automations.push(rule({ id: 'r', rank: 'm', selection: { labelPattern: 'SUPERMARCHE' }, action: { categoryId: 'cat-alim', state: 'reconcile' } }));
       const patch = applyAutomations(l);
-      expect(patch.allocations[0]!.tirelireId).toBe('env-alim');
+      expect(patch.subOperations[0]!.tirelireId).toBe('env-alim');
     });
   });
 
@@ -216,7 +216,7 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
 
         // Une opération d'avant la bascule reste sélectionnée par l'ancienne règle, pas par la nouvelle.
         const ancienne = op('o-ancien', 'CREDIT MAISON', euros(-950), { date: '2026-08-05' });
-        l = applyPatchToLedger(l, { operations: [ancienne], allocations: [] });
+        l = applyPatchToLedger(l, { operations: [ancienne], subOperations: [] });
         expect(selects(created.selection, ancienne) && !created.validFrom).toBe(false);
       });
     });

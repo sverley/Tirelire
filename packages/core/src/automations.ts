@@ -10,7 +10,8 @@
  * chaque champ renseigné écrasant ce qu'une règle moins prioritaire avait posé, les champs vides
  * laissant en place. Il n'y a pas de détection de conflit ; le rang tranche.
  */
-import type { Allocation, Category, Id, Ledger, Operation, OperationState, PlannedFlow, Automation, AutomationAction, AutomationSelection, AutomationStateAction, Share } from './model.js';
+import { liveSubOperations } from './suboperations.js';
+import type { SubOperation, Category, Id, Ledger, Operation, OperationState, PlannedFlow, Automation, AutomationAction, AutomationSelection, AutomationStateAction, Share } from './model.js';
 import { alive, isLocked } from './model.js';
 import { emptyPatch, type Patch } from './matching.js';
 import { uuidv7 } from './ids.js';
@@ -105,8 +106,16 @@ export interface Outcome {
   operationId: Id;
   state: OperationState;
   oneOff: boolean;
-  /** Ventilation résultante, sans identifiants : ils sont attribués à l'écriture. */
+  /**
+   * Ventilation résultante, une seule division sans identifiants : ils sont attribués à
+   * l'écriture, et elle remplace la ventilation à tous ses niveaux.
+   */
   allocation: Array<{ categoryId?: Id; tirelireId?: Id; share: Share }>;
+  /**
+   * Aucune règle n'a écrit la ventilation d'une opération que l'import a établie (D33) : elle
+   * reste telle qu'elle est, à tous ses niveaux.
+   */
+  keepsVentilation: boolean;
   /** Règles ayant écrit quelque chose, du rang le plus élevé au rang 1. */
   by: Id[];
 }
@@ -145,7 +154,7 @@ function singleLine(action: AutomationAction, categories: Map<Id, Category>): Ou
  * d'un flux ou appariée en virement interne garde cet acquis, les autres partent vierges. Sans
  * cela, le moteur effacerait le travail que le pipeline vient de faire.
  */
-export function outcomeFor(op: Operation, automations: Automation[], categories: Map<Id, Category>, base: Allocation[] = []): Outcome {
+export function outcomeFor(op: Operation, automations: Automation[], categories: Map<Id, Category>, base: SubOperation[] = []): Outcome {
   const fromImport = !!op.plannedFlowId || !!op.transferAccountId;
   const out: Outcome = {
     operationId: op.id,
@@ -154,6 +163,7 @@ export function outcomeFor(op: Operation, automations: Automation[], categories:
     allocation: fromImport
       ? base.map((a) => ({ ...(a.categoryId ? { categoryId: a.categoryId } : {}), ...(a.tirelireId ? { tirelireId: a.tirelireId } : {}), share: a.share }))
       : [],
+    keepsVentilation: fromImport,
     by: [],
   };
   for (const rule of [...automations].reverse()) {
@@ -162,9 +172,11 @@ export function outcomeFor(op: Operation, automations: Automation[], categories:
     let wrote = false;
     if (a.allocation) {
       out.allocation = a.allocation.map((l) => ({ ...l }));
+      out.keepsVentilation = false;
       wrote = true;
     } else if (a.categoryId || a.tirelireId) {
       out.allocation = singleLine(a, categories);
+      out.keepsVentilation = false;
       wrote = true;
     }
     if (a.oneOff !== undefined) {
@@ -183,17 +195,53 @@ export function outcomeFor(op: Operation, automations: Automation[], categories:
 /** Différence lisible entre ce qu'une opération porte et ce qu'elle porterait (aperçu, D23). */
 export interface AutomationDiff {
   operation: Operation;
-  before: { state: OperationState; oneOff: boolean; allocation: Allocation[] };
+  /** `allocation` : la division de l'opération elle-même ; `subOperations` : tous ses niveaux. */
+  before: { state: OperationState; oneOff: boolean; allocation: SubOperation[]; subOperations: SubOperation[] };
   after: Outcome;
   changed: boolean;
 }
 
-function sameAllocation(before: Allocation[], after: Outcome['allocation']): boolean {
+function sameAllocation(before: SubOperation[], after: Outcome['allocation']): boolean {
   if (before.length !== after.length) return false;
   return before.every((b, i) => {
     const a = after[i]!;
     return (b.categoryId ?? undefined) === a.categoryId && (b.tirelireId ?? undefined) === a.tirelireId && JSON.stringify(b.share) === JSON.stringify(a.share);
   });
+}
+
+/** Sous-opérations vivantes par opération, tous niveaux. */
+function subOperationsByOperation(ledger: Ledger): Map<Id, SubOperation[]> {
+  const out = new Map<Id, SubOperation[]>();
+  for (const sub of liveSubOperations(ledger.subOperations)) {
+    const arr = out.get(sub.operationId);
+    if (arr) arr.push(sub);
+    else out.set(sub.operationId, [sub]);
+  }
+  return out;
+}
+
+/**
+ * Remplace la ventilation d'une opération, à tous ses niveaux, par une seule division (D23,
+ * #297) : les identifiants de la division de l'opération sont réutilisés dans l'ordre, pour ne
+ * réécrire que ce qui bouge quand seule la catégorie change ; tout le reste est retiré, ce que
+ * contiennent les sous-opérations réutilisées compris.
+ */
+function replaceVentilation(patch: Patch, operationId: Id, existing: SubOperation[], lines: Outcome['allocation']): void {
+  const reuse = existing.filter((s) => !s.parentId);
+  const kept = new Set<Id>();
+  for (const line of lines) {
+    const old = reuse.shift();
+    const id = old?.id ?? uuidv7();
+    kept.add(id);
+    patch.subOperations.push({
+      id,
+      operationId,
+      share: line.share,
+      ...(line.categoryId ? { categoryId: line.categoryId } : {}),
+      ...(line.tirelireId ? { tirelireId: line.tirelireId } : {}),
+    });
+  }
+  patch.removedSubOperations!.push(...existing.filter((s) => !kept.has(s.id)).map((s) => s.id));
 }
 
 /**
@@ -204,18 +252,15 @@ function sameAllocation(before: Allocation[], after: Outcome['allocation']): boo
 export function previewAutomations(ledger: Ledger, extra?: Automation): AutomationDiff[] {
   const rules = extra ? [...automationsByRank(ledger), extra].sort((a, b) => (a.rank < b.rank ? 1 : a.rank > b.rank ? -1 : b.id.localeCompare(a.id))) : automationsByRank(ledger);
   const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
-  const allocsByOp = new Map<Id, Allocation[]>();
-  for (const al of alive(ledger.allocations)) {
-    const arr = allocsByOp.get(al.operationId);
-    if (arr) arr.push(al);
-    else allocsByOp.set(al.operationId, [al]);
-  }
+  const subsByOp = subOperationsByOperation(ledger);
   const out: AutomationDiff[] = [];
   for (const op of alive(ledger.operations)) {
     if (isLocked(op)) continue;
-    const before = { state: op.state, oneOff: !!op.oneOff, allocation: allocsByOp.get(op.id) ?? [] };
+    const subs = subsByOp.get(op.id) ?? [];
+    const before = { state: op.state, oneOff: !!op.oneOff, allocation: subs.filter((s) => !s.parentId), subOperations: subs };
     const after = outcomeFor(op, rules, categories, before.allocation);
-    const changed = before.state !== after.state || before.oneOff !== after.oneOff || !sameAllocation(before.allocation, after.allocation);
+    const ventilationChanged = !after.keepsVentilation && (subs.length !== before.allocation.length || !sameAllocation(before.allocation, after.allocation));
+    const changed = before.state !== after.state || before.oneOff !== after.oneOff || ventilationChanged;
     out.push({ operation: op, before, after, changed });
   }
   return out;
@@ -234,18 +279,9 @@ export function applyAutomations(ledger: Ledger): Patch {
     if (d.after.oneOff) next.oneOff = true;
     else delete next.oneOff;
     patch.operations.push(next);
-    const reuse = [...d.before.allocation];
-    for (const line of d.after.allocation) {
-      const old = reuse.shift();
-      patch.allocations.push({
-        id: old?.id ?? uuidv7(),
-        operationId: d.operation.id,
-        share: line.share,
-        ...(line.categoryId ? { categoryId: line.categoryId } : {}),
-        ...(line.tirelireId ? { tirelireId: line.tirelireId } : {}),
-      });
-    }
-    patch.removedAllocations!.push(...reuse.map((a) => a.id));
+    // Gardée, la division de l'opération se réécrit à l'identique, et ce qu'elle contient reste.
+    if (d.after.keepsVentilation) patch.subOperations.push(...d.before.allocation);
+    else replaceVentilation(patch, d.operation.id, d.before.subOperations, d.after.allocation);
   }
   return patch;
 }
@@ -263,13 +299,7 @@ export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: Auto
   const patch = emptyPatch();
   const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
   const wanted = new Set(operationIds);
-  const allocsByOp = new Map<Id, Allocation[]>();
-  for (const al of alive(ledger.allocations)) {
-    if (!wanted.has(al.operationId)) continue;
-    const arr = allocsByOp.get(al.operationId);
-    if (arr) arr.push(al);
-    else allocsByOp.set(al.operationId, [al]);
-  }
+  const subsByOp = subOperationsByOperation(ledger);
   for (const op of alive(ledger.operations)) {
     if (!wanted.has(op.id)) continue;
     const next: Operation = { ...op, state: stateAfter(op.state, action.state ?? 'lock') };
@@ -280,18 +310,7 @@ export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: Auto
     patch.operations.push(next);
     const lines = action.allocation ?? (action.categoryId || action.tirelireId ? singleLine(action, categories) : undefined);
     if (!lines) continue;
-    const reuse = [...(allocsByOp.get(op.id) ?? [])];
-    for (const line of lines) {
-      const old = reuse.shift();
-      patch.allocations.push({
-        id: old?.id ?? uuidv7(),
-        operationId: op.id,
-        share: line.share,
-        ...(line.categoryId ? { categoryId: line.categoryId } : {}),
-        ...(line.tirelireId ? { tirelireId: line.tirelireId } : {}),
-      });
-    }
-    patch.removedAllocations!.push(...reuse.map((a) => a.id));
+    replaceVentilation(patch, op.id, subsByOp.get(op.id) ?? [], lines);
   }
   return patch;
 }

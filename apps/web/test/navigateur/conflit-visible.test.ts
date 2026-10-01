@@ -206,7 +206,7 @@ describe('[niveau 0] I8 · harnais du registre', () => {
       // A : le cœur, l'exemple déposé sur le relais.
       const a = await LedgerStore.create({ sqlJs: SQL });
       const l = exampleLedger();
-      for (const cle of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations'] as const)
+      for (const cle of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations'] as const)
         for (const r of l[cle]) a.upsert(cle, r as never);
       await relaySync(a, RELAIS);
 

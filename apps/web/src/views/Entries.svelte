@@ -2,7 +2,7 @@
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
   import { money, shortDate, centsToInput, inputToCents, openAccounts } from '../lib/format';
-  import { alive, normalizeLabel, findCategoryByName, type Allocation, type Category, type Operation } from '@tirelire/core';
+  import { alive, liveSubOperations, normalizeLabel, findCategoryByName, type SubOperation, type Category, type Operation } from '@tirelire/core';
 
   type Nature = 'expense' | 'income' | 'transfer';
 
@@ -31,7 +31,25 @@
       .filter((o) => o.origin === 'manual')
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
   );
-  const allocByOp = $derived(new Map(alive(app.ledger.allocations).map((a) => [a.operationId, a])));
+  /** Sous-opérations vivantes par opération, à tous les niveaux (D88). */
+  const subsByOp = $derived.by(() => {
+    const m = new Map<string, SubOperation[]>();
+    for (const a of liveSubOperations(app.ledger.subOperations)) {
+      const arr = m.get(a.operationId);
+      if (arr) arr.push(a);
+      else m.set(a.operationId, [a]);
+    }
+    return m;
+  });
+  /** La division de l'opération elle-même. */
+  const topOf = (id: string | undefined) => (id ? (subsByOp.get(id) ?? []).filter((a) => !a.parentId) : []);
+  /**
+   * La saisie règle une catégorie et une tirelire, celles de la seule part de l'opération ; une
+   * opération divisée en plusieurs parts se ventile dans l'écran Opérations, et la saisie garde
+   * ses parts telles quelles (#297).
+   */
+  const lineOf = (id: string | undefined) => (topOf(id).length === 1 ? topOf(id)[0] : undefined);
+  const divided = $derived(topOf(editingId).length > 1);
   const accountName = (id: string | undefined) => accounts.find((a) => a.id === id)?.name ?? '?';
   /** Une saisie neuve ne vise pas un compte clos (D56) ; celui déjà choisi reste offert. */
   const comptesSaisie = $derived(openAccounts(accounts, app.asOf, form.accountId));
@@ -49,7 +67,7 @@
   }
 
   function startEdit(op: Operation) {
-    const al = allocByOp.get(op.id);
+    const al = lineOf(op.id);
     form = {
       accountId: op.accountId,
       date: op.date,
@@ -108,31 +126,34 @@
       ...(form.nature === 'transfer' ? { transferAccountId: form.transferAccountId } : {}),
     };
     app.upsert('operations', op);
-    const existing = allocByOp.get(id);
-    const al: Allocation = {
-      id: existing?.id ?? app.newId(),
-      operationId: id,
-      // Une ligne unique variable prend l'intégralité du montant (D27).
-      share: { kind: 'variable' },
-      ...(categoryId ? { categoryId } : {}),
-      ...(form.tirelireId ? { tirelireId: form.tirelireId } : {}),
-    };
-    app.upsert('allocations', al);
+    if (topOf(id).length <= 1) {
+      // La seule part garde son identifiant, donc ce qu'elle contient ; une saisie neuve a une
+      // part unique variable, qui prend l'intégralité du montant (D27).
+      const existing = lineOf(id);
+      const al: SubOperation = {
+        id: existing?.id ?? app.newId(),
+        operationId: id,
+        share: existing?.share ?? { kind: 'variable' },
+        ...(categoryId ? { categoryId } : {}),
+        ...(form.tirelireId ? { tirelireId: form.tirelireId } : {}),
+        ...(existing?.replenishment ? { replenishment: existing.replenishment } : {}),
+      };
+      app.upsert('subOperations', al);
+    }
     showForm = false;
     editingId = undefined;
   }
 
   function remove(op: Operation) {
     if (!confirm(`Supprimer « ${op.label} » ?`)) return;
-    const al = allocByOp.get(op.id);
-    if (al) app.remove('allocations', al.id);
+    for (const a of subsByOp.get(op.id) ?? []) app.remove('subOperations', a.id);
     app.remove('operations', op.id);
   }
 </script>
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Saisie</h1>
-<p class="muted small">Dépenses et revenus non importables (comptes tiers, espèces), et virements internes faits depuis le compte principal. Une catégorie et une tirelire par opération ; la ventilation en plusieurs lignes arrivera avec l'import.</p>
+<p class="muted small">Dépenses et revenus non importables (comptes tiers, espèces), et virements internes faits depuis le compte principal. Une catégorie et une tirelire par opération ; pour la diviser en plusieurs parts, à tout niveau, ouvrez-la dans l'écran Opérations.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Saisir une opération</button>
@@ -165,6 +186,9 @@
           </select>
         </label>
       {/if}
+      {#if divided}
+        <p class="small muted">Cette opération est divisée en {topOf(editingId).length} parts : sa ventilation se règle dans l'écran Opérations, et cette saisie la garde.</p>
+      {:else}
       <label class="f">Catégorie
         <select bind:value={form.categoryId} onchange={onCategoryPick}>
           <option value="">—</option>
@@ -178,6 +202,7 @@
           {#each tirelires as e}<option value={e.id}>{e.name}</option>{/each}
         </select>
       </label>
+      {/if}
     </div>
     {#if error}<div class="err">{error}</div>{/if}
     <div class="actions" style="margin:0">
@@ -194,13 +219,15 @@
 
 <div class="card">
   {#each operations as op (op.id)}
-    {@const al = allocByOp.get(op.id)}
+    {@const al = lineOf(op.id)}
     <div class="row" class:editing={showForm && editingId === op.id}>
       <div class="label">
         <strong>{op.label}</strong>
         <span class="sub">
           {shortDate(op.date)} · {accountName(op.accountId)}{op.transferAccountId ? ` → ${accountName(op.transferAccountId)}` : ''}
-          {#if al?.categoryId || al?.tirelireId}
+          {#if topOf(op.id).length > 1}
+            · divisée en {topOf(op.id).length} parts
+          {:else if al?.categoryId || al?.tirelireId}
             · {[categoryName(al.categoryId), tirelireName(al.tirelireId) ? `tirelire ${tirelireName(al.tirelireId)}` : undefined].filter(Boolean).join(' · ')}
           {/if}
         </span>

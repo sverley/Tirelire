@@ -47,7 +47,7 @@ import { relaySync } from '../src/lib/relay';
 
 const SQL = await initSqlJs();
 const AUJOURD_HUI = '2026-09-06';
-const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
+const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'automations', 'importProfiles', 'devices'] as const;
 type Cle = (typeof CLES)[number];
 type Ligne = Record<string, unknown> & { id: string };
 
@@ -254,13 +254,13 @@ function source(store: LedgerStore, cle: Cle): Ligne {
 
 function copie(store: LedgerStore, cle: Cle, suffixe: string): Ligne {
   const r: Ligne = { ...source(store, cle), id: `${source(store, cle).id}-${suffixe}` };
-  if (cle === 'allocations') r['operationId'] = `${source(store, 'operations').id}-${suffixe}`;
+  if (cle === 'subOperations') r['operationId'] = `${source(store, 'operations').id}-${suffixe}`;
   return r;
 }
 
 function modifie(store: LedgerStore, cle: Cle): Ligne {
   const r: Ligne = { ...source(store, cle) };
-  if (cle === 'allocations') r['categoryId'] = lignes(store, 'categories').find((c) => c.id !== r['categoryId'])!.id;
+  if (cle === 'subOperations') r['categoryId'] = lignes(store, 'categories').find((c) => c.id !== r['categoryId'])!.id;
   else if (cle === 'operations') r['details'] = 'modifié par B';
   else r['name'] = `${String(r['name'] ?? cle)} (B)`;
   return r;

@@ -4,6 +4,7 @@ export * from './periods.js';
 export * from './money.js';
 export * from './ids.js';
 export * from './balances.js';
+export * from './suboperations.js';
 export * from './plan.js';
 export * from './forecast.js';
 export * from './hlc.js';

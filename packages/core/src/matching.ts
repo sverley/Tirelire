@@ -5,7 +5,7 @@
  * Toutes les fonctions sont pures : elles reçoivent le grand livre et rendent
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
  */
-import type { Allocation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
+import type { SubOperation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
 import { alive, isDerivedFlow, isLocked } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
@@ -13,20 +13,21 @@ import { fundByPriority, transferLabel } from './plan.js';
 import { tirelireComponents, indexLedger, periodSnapshot } from './balances.js';
 import { uuidv7, normalizeLabel } from './ids.js';
 import { applyAutomations } from './automations.js';
+import { liveSubOperations } from './suboperations.js';
 
 export interface Patch {
   operations: Operation[];
-  allocations: Allocation[];
-  /** Lignes de ventilation à supprimer (une édition manuelle peut en retirer, D27). */
-  removedAllocations?: Id[];
+  subOperations: SubOperation[];
+  /** Sous-opérations à retirer, à tous les niveaux (une édition manuelle ou une règle en retire, D27). */
+  removedSubOperations?: Id[];
 }
 
 export function emptyPatch(): Patch {
-  return { operations: [], allocations: [], removedAllocations: [] };
+  return { operations: [], subOperations: [], removedSubOperations: [] };
 }
 
-function allocationsOf(ledger: Ledger, opId: Id): Allocation[] {
-  return alive(ledger.allocations).filter((a) => a.operationId === opId);
+function subOperationsOf(ledger: Ledger, opId: Id): SubOperation[] {
+  return liveSubOperations(ledger.subOperations).filter((a) => a.operationId === opId);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +115,7 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
     if (isLocked(op)) continue;
-    if (op.transferAccountId && allocationsOf(ledger, op.id).length > 0) continue;
+    if (op.transferAccountId && subOperationsOf(ledger, op.id).length > 0) continue;
     if (!/TIRELIRE/.test(op.normalizedLabel)) continue;
     const hit = accounts
       .filter(({ a, label }) => a.id !== op.accountId && label.length > 0 && op.normalizedLabel.includes(label))
@@ -124,7 +125,7 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
     patch.operations.push({ ...op, state: 'reconciled', transferAccountId: target });
     if (op.amount >= 0) continue;
     for (const part of distributeTransfer(ledger, target, op.amount, op.date)) {
-      patch.allocations.push({
+      patch.subOperations.push({
         id: uuidv7(),
         operationId: op.id,
         tirelireId: part.tirelireId,
@@ -232,7 +233,7 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   const next: Operation = { ...op, state: isLocked(op) ? 'locked' : 'reconciled', plannedFlowId: f.id };
   if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
   patch.operations.push(next);
-  const existing = allocationsOf(ledger, op.id);
+  const existing = subOperationsOf(ledger, op.id);
   /*
    * Virement permanent **dérivé** (D21, D57) : sa ventilation ne se lit pas dans le flux, elle se
    * **rejoue** par l'ordre de financement (D06) sur le montant réellement viré, au jour de
@@ -248,7 +249,7 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   const parts = f.kind === 'transfer' && isDerivedFlow(f) && existing.length === 0 && target ? distributeTransfer(ledger, target, op.amount, op.date) : [];
   if (parts.length > 0) {
     for (const part of parts) {
-      patch.allocations.push({
+      patch.subOperations.push({
         id: uuidv7(),
         operationId: op.id,
         tirelireId: part.tirelireId,
@@ -259,7 +260,7 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
     return patch;
   }
   if (existing.length === 0 && (f.categoryId || f.tirelireId)) {
-    patch.allocations.push({
+    patch.subOperations.push({
       id: uuidv7(),
       operationId: op.id,
       // Part variable : la ventilation d'un flux à montant variable reste rejouable (D27).
@@ -412,8 +413,8 @@ export function runPipeline(ledger: Ledger, from: ISODate, to: ISODate, apply: (
 export function applyPatchToLedger(ledger: Ledger, patch: Patch): Ledger {
   const ops = new Map(ledger.operations.map((o) => [o.id, o]));
   for (const o of patch.operations) ops.set(o.id, o);
-  const allocs = new Map(ledger.allocations.map((a) => [a.id, a]));
-  for (const a of patch.allocations) allocs.set(a.id, a);
-  for (const id of patch.removedAllocations ?? []) allocs.delete(id);
-  return { ...ledger, operations: [...ops.values()], allocations: [...allocs.values()] };
+  const subs = new Map(ledger.subOperations.map((a) => [a.id, a]));
+  for (const a of patch.subOperations) subs.set(a.id, a);
+  for (const id of patch.removedSubOperations ?? []) subs.delete(id);
+  return { ...ledger, operations: [...ops.values()], subOperations: [...subs.values()] };
 }

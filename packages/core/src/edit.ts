@@ -1,27 +1,29 @@
 /**
- * Édition manuelle d'une opération (D22, D27).
+ * Édition manuelle d'une opération (D22, D27, D88).
  *
  * C'est la modification qui change l'état, pas l'ouverture de l'éditeur : toute écriture passe
  * par ici et verrouille l'opération, ce qui la met hors d'atteinte des règles. Le déverrouillage
  * est le seul geste qui la leur rend, et il n'appartient qu'à l'utilisateur.
  *
- * La ventilation est à parts : une seule ligne variable, qui prend le reste. Les lignes sont
- * validées ici plutôt que dans l'interface, pour que l'invariant tienne aussi quand une règle ou
- * une action groupée écrit une ventilation.
+ * Une opération se divise en sous-opérations, et chaque sous-opération peut se diviser à son tour.
+ * Une division est à parts : une seule part variable, qui prend le reste. Les parts sont validées
+ * ici plutôt que dans l'interface, pour que l'invariant tienne aussi quand une règle ou une action
+ * groupée écrit une ventilation.
  */
-import type { Allocation, Id, Operation, ReplenishmentKind, Share } from './model.js';
+import type { Cents, SubOperation, Id, Operation, ReplenishmentKind, Share } from './model.js';
 import { alive } from './model.js';
 import type { Ledger } from './model.js';
 import { emptyPatch, type Patch } from './matching.js';
 import { uuidv7 } from './ids.js';
+import { descendantsOf, divisionOf, liveSubOperations, subOperationAmount } from './suboperations.js';
 
-/** Ligne de ventilation demandée : sans identifiant, elle est créée. */
-export interface AllocationDraft {
+/** Sous-opération demandée dans une division : sans identifiant, elle est créée. */
+export interface SubOperationDraft {
   id?: Id;
   categoryId?: Id;
   tirelireId?: Id;
   share: Share;
-  /** Cette ligne renfloue la tirelire (D49). */
+  /** Cette sous-opération renfloue la tirelire (D49). */
   replenishment?: ReplenishmentKind;
 }
 
@@ -43,58 +45,84 @@ export function unlock(op: Operation): Operation {
 }
 
 /**
- * Valide une ventilation à parts (D27) : au plus une ligne variable, pourcentages entre 0 et 100,
- * et somme des parts fixes et pourcentages qui ne dépasse pas le montant de l'opération quand il
- * n'y a pas de ligne variable pour absorber le reste.
+ * Valide une division à parts (D27) d'un niveau de montant `amount` : au plus une part variable,
+ * pourcentages entre 0 et 100, parts fixes dans le sens de l'opération, et somme des parts fixes
+ * et pourcentages qui ne dépasse pas le montant du niveau.
  */
-export function validateShares(op: Operation, drafts: AllocationDraft[]): void {
+export function validateShares(amount: Cents, drafts: SubOperationDraft[]): void {
   if (drafts.filter((d) => d.share.kind === 'variable').length > 1)
-    throw new EditError('Une seule ligne variable par ventilation.');
+    throw new EditError('Une seule part variable par division.');
   for (const d of drafts) {
     if (d.share.kind === 'percent' && (d.share.pct < 0 || d.share.pct > 100))
       throw new EditError('Un pourcentage se situe entre 0 et 100.');
   }
-  const sign = op.amount < 0 ? -1 : 1;
+  const sign = amount < 0 ? -1 : 1;
   const used = drafts.reduce((s, d) => {
     if (d.share.kind === 'fixed') return s + d.share.amount;
-    if (d.share.kind === 'percent') return s + Math.round((op.amount * d.share.pct) / 100);
+    if (d.share.kind === 'percent') return s + Math.round((amount * d.share.pct) / 100);
     return s;
   }, 0);
   if (drafts.some((d) => d.share.kind === 'fixed' && sign * d.share.amount < 0))
     throw new EditError("Une part fixe va dans le sens de l'opération.");
-  if (sign * used > sign * op.amount) throw new EditError('Les parts dépassent le montant de l’opération.');
+  if (sign * used > sign * amount) throw new EditError('Les parts dépassent le montant qu’elles divisent.');
+}
+
+function sameSubOperation(a: SubOperation, b: SubOperation): boolean {
+  return (
+    (a.parentId ?? undefined) === (b.parentId ?? undefined) &&
+    (a.categoryId ?? undefined) === (b.categoryId ?? undefined) &&
+    (a.tirelireId ?? undefined) === (b.tirelireId ?? undefined) &&
+    (a.replenishment ?? undefined) === (b.replenishment ?? undefined) &&
+    JSON.stringify(a.share) === JSON.stringify(b.share)
+  );
 }
 
 /**
- * Remplace la ventilation d'une opération et la verrouille. Les lignes absentes du brouillon
- * sont supprimées. Une opération sans ligne vaut une ligne variable non classée (D27) : c'est
- * donc une ventilation valide, et tout son montant pèse sur le non affecté du compte.
+ * Remplace une division d'une opération — celle de l'opération elle-même, ou celle de la
+ * sous-opération `parentId`, à tout niveau — et verrouille l'opération. Les sous-opérations absentes
+ * du brouillon sont retirées, avec tout ce qu'elles contiennent ; celles qui restent gardent ce
+ * qu'elles contiennent, et seules les sous-opérations qui changent s'écrivent, si bien que deux
+ * instances qui modifient deux niveaux différents d'une même opération n'écrivent pas les mêmes
+ * lignes (D58). Une division vide vaut une part variable non classée (D27) : le niveau garde tout
+ * son montant, et ce qui vaut pour lui.
  */
-export function editAllocations(
+export function editDivision(
   ledger: Ledger,
   operationId: Id,
-  drafts: AllocationDraft[],
+  drafts: SubOperationDraft[],
   changes: Partial<Omit<Operation, 'id' | 'state'>> = {},
+  parentId?: Id,
 ): Patch {
   const op = alive(ledger.operations).find((o) => o.id === operationId);
   if (!op) throw new EditError('Opération introuvable.');
-  validateShares(op, drafts);
+  const subs = liveSubOperations(ledger.subOperations).filter((s) => s.operationId === operationId);
+  const amount = parentId === undefined ? op.amount : subOperationAmount(op, subs, parentId);
+  if (amount === undefined) throw new EditError('Sous-opération introuvable.');
+  validateShares(amount, drafts);
+  const existing = divisionOf(subs, operationId, parentId);
+  const byId = new Map(existing.map((s) => [s.id, s]));
+  const elsewhere = new Set(ledger.subOperations.filter((s) => !byId.has(s.id)).map((s) => s.id));
+  for (const d of drafts) {
+    if (d.id && elsewhere.has(d.id)) throw new EditError('Cette sous-opération n’appartient pas à la division modifiée.');
+  }
   const patch = emptyPatch();
   patch.operations.push(manualEdit(op, changes));
-  const existing = alive(ledger.allocations).filter((a) => a.operationId === operationId);
   const keep = new Set<Id>();
   for (const d of drafts) {
-    const al: Allocation = {
+    const sub: SubOperation = {
       id: d.id ?? uuidv7(),
       operationId,
+      ...(parentId ? { parentId } : {}),
       share: d.share,
       ...(d.categoryId ? { categoryId: d.categoryId } : {}),
       ...(d.tirelireId ? { tirelireId: d.tirelireId } : {}),
       ...(d.replenishment ? { replenishment: d.replenishment } : {}),
     };
-    keep.add(al.id);
-    patch.allocations.push(al);
+    keep.add(sub.id);
+    const before = byId.get(sub.id);
+    if (!before || !sameSubOperation(before, sub)) patch.subOperations.push(sub);
   }
-  patch.removedAllocations = existing.filter((a) => !keep.has(a.id)).map((a) => a.id);
+  const removed = existing.filter((s) => !keep.has(s.id));
+  patch.removedSubOperations = [...removed, ...removed.flatMap((s) => descendantsOf(subs, s.id))].map((s) => s.id);
   return patch;
 }
