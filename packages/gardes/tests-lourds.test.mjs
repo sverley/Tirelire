@@ -222,6 +222,8 @@ describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests n
   });
 
   test('[niveau 3] point 5 · en CI, les tests navigateur suivent le typecheck, le seuil 1 et le harnais, et ne partent pas après un rouge', () => {
+    // Au Ready, les tests navigateur sont ceux de l'issue (#307).
+    const NAVIGATEUR_CI = /tests-de-l-issue\.sh --jouer/;
     const c = étapesDuTest(AU_READY);
     const i = (motif) => c.findIndex((x) => motif.test(x));
     const nav = i(NAVIGATEUR_CI);
