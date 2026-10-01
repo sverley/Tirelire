@@ -23,9 +23,9 @@
  * - Tout lancement saute chaque fichier de test vert sur la même empreinte à un seuil au moins égal
  *   — attesté vert lui-même, ou couvert avec tout son ensemble —, et dit, pour chaque ensemble, les
  *   fichiers joués et les fichiers sautés, avec ce qui les couvre : par qui, sur quel arbre ou quel
- *   commit, à quel seuil. L'empreinte d'un fichier attesté est celle de ce qu'il lit — son
- *   ensemble sans les autres fichiers de test, plus lui-même (#304, `empreintesDesFichiers`) —,
- *   calculée sur le contenu joué, copie de travail comprise (`attestation-git.mjs`, `arbreDeLaCopie`).
+ *   commit, à quel seuil. L'empreinte d'un fichier attesté est celle de ce qu'il lit (D83, #304,
+ *   `empreintesDesFichiers`), calculée sur le contenu joué, copie de travail comprise
+ *   (`attestation-git.mjs`, `arbreDeLaCopie`).
  * - `--attestation <fichier>`, que passent la CI et la livraison : ce qui couvre ce lancement, écrit
  *   par `.githooks/attestation.mjs` ; `--bilan <fichier>`, que passe la livraison : ce que chaque
  *   fichier joué a donné, pour qu'elle atteste un à un les fichiers verts d'un ensemble qui ne l'est
