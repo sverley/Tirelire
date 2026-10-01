@@ -1,19 +1,22 @@
 /**
  * Harnais d'audit de #297, côté écran — ce que les écrans Opérations et Saisie font des
- * sous-opérations (point 6 du « Fait quand ») : on divise une part à tout niveau et on la lit avec son
- * montant et ce qui vaut pour elle ; modifier l'opération, un niveau ou sa saisie garde ce que
- * contiennent les autres niveaux. Le calcul, la conservation et la synchronisation sont gardés dans
- * le cœur (`packages/core/test/sous-operations-harnais.test.ts`) ; ici, seulement ce qui se voit et
- * ce que l'écran ne perd pas.
+ * sous-opérations (points 6 et 11 du « Fait quand ») : on divise une part à tout niveau et on la lit
+ * avec son montant et ce qui vaut pour elle ; modifier l'opération, un niveau ou sa saisie garde ce
+ * que contiennent les autres niveaux ; changer le montant d'une opération à une seule part, dans la
+ * Saisie, remet cette part à « le reste », sans toucher à ce qu'elle contient. Le calcul, la
+ * conservation et la synchronisation sont gardés dans le cœur
+ * (`packages/core/test/sous-operations-harnais.test.ts`) ; ici, seulement ce qui se voit et ce que
+ * l'écran ne perd pas.
  *
- * Écrits par l'auditeur : le codeur n'avait aucun test d'écran pour ce point. Les deux parcours
- * partent de l'exemple chargé (« Fournitures scolaires », −146 €, une ligne : catégorie « Enfants »,
- * tirelire « Enfants et loisirs »), divisé à la main en deux moitiés de −73 € : l'une classée
- * « Alimentation », l'autre sans catégorie ni tirelire, qui prend celles du niveau au-dessus.
+ * Écrits par l'auditeur : le codeur n'avait aucun test d'écran pour ces points. Les parcours partent
+ * de l'exemple chargé (« Fournitures scolaires », −146 €, une seule part « montant fixe » : catégorie
+ * « Enfants », tirelire « Enfants et loisirs »), parfois divisé à la main en deux moitiés de −73 € :
+ * l'une classée « Alimentation », l'autre sans catégorie ni tirelire, qui prend celles du niveau
+ * au-dessus.
  *
  * Niveaux (D83) : 0 pour ce qu'une modification de l'écran ne doit pas perdre (des données saisies,
- * irréparables une fois perdues) ; 2 pour ce que l'écran donne à lire (un cas faux, l'usage restant
- * possible).
+ * irréparables une fois perdues) ; 2 pour ce que l'écran donne à lire et pour le montant que la Saisie
+ * écrit (un cas faux, l'usage restant possible).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -122,8 +125,46 @@ async function saisir(page: Page, i: number, valeur: string) {
   await pause(150);
 }
 
+/** Ce que la ligne `i` du panneau a de choisi : sa part, sa catégorie, sa tirelire. */
+const choixDeLaLigne = (page: Page, i: number) =>
+  page.evaluate((i: number) => {
+    const t = (e?: Element | null) => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const g = [...document.querySelectorAll('form.edit .grid')][i];
+    const choisi = (début: string) =>
+      t(([...(g?.querySelectorAll('label') ?? [])].find((x) => t(x).startsWith(début))?.querySelector('select') as HTMLSelectElement | null)?.selectedOptions[0]);
+    return { part: choisi('Part'), catégorie: choisi('Catégorie'), tirelire: choisi('Tirelire') };
+  }, i);
+
+/** Modifie dans la Saisie l'opération `libellé`, son montant ou son libellé, et enregistre. */
+async function saisieModifier(page: Page, libellé: string, changements: { montant?: string; libellé?: string }) {
+  await allerÀ(page, 'Plus');
+  await cliquer(page, 'Saisie manuelle');
+  await pause(300);
+  const ouverte = await page.evaluate((ancien: string) => {
+    const r = [...document.querySelectorAll('main .card .row')].find((x) => (x.querySelector('.label strong')?.textContent ?? '').trim() === ancien);
+    const modifier = [...(r?.querySelectorAll('button') ?? [])].find((b) => (b.textContent ?? '').trim() === 'Modifier') as HTMLButtonElement | undefined;
+    return !!modifier && (modifier.click(), true);
+  }, libellé);
+  if (!ouverte) throw new Error(`la saisie de « ${libellé} » ne s’ouvre pas`);
+  await pause(300);
+  await page.evaluate((c: { montant?: string; libellé?: string }) => {
+    const f = document.querySelector('form.edit');
+    const champ = (début: string) =>
+      [...(f?.querySelectorAll('label') ?? [])].find((x) => (x.textContent ?? '').trim().startsWith(début))?.querySelector('input') as HTMLInputElement | null;
+    for (const [début, valeur] of [['Libellé', c.libellé], ['Montant', c.montant]] as const) {
+      if (valeur === undefined) continue;
+      const i = champ(début);
+      if (!i) throw new Error(`champ « ${début} » introuvable dans la saisie`);
+      i.value = valeur;
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    ([...(f?.querySelectorAll('button') ?? [])].find((b) => (b.textContent ?? '').trim() === 'Enregistrer') as HTMLButtonElement).click();
+  }, changements);
+  await pause(400);
+}
+
 /**
- * Le point de départ des deux parcours : la part de l'exemple divisée à la main en 50 % « Alimentation »
+ * Le point de départ des parcours : la part de l'exemple divisée à la main en 50 % « Alimentation »
  * et le reste, enregistrée. Rend ce que disait le panneau du niveau à son ouverture, avant qu'on y écrive.
  */
 async function diviserEnDeux(page: Page): Promise<string> {
@@ -140,7 +181,7 @@ async function diviserEnDeux(page: Page): Promise<string> {
   return ouverture;
 }
 
-describe.skipIf(!navigateur)('#297 · 6. les écrans', () => {
+describe.skipIf(!navigateur)('#297 · 6 et 11. les écrans', () => {
   let site: Site;
 
   beforeAll(async () => {
@@ -170,8 +211,7 @@ describe.skipIf(!navigateur)('#297 · 6. les écrans', () => {
       // Et on la divise encore, un niveau plus bas, sans limite : le niveau dit tout ce qui le contient.
       await bouton(page, 'Diviser', 1);
       const troisième = await panneau(page);
-      // Les espaces autour de « › » ne sont pas ce que ce test garde.
-      expect(troisième).toMatch(/Opération › −146,00 € · Enfants · Enfants et loisirs\s*›\s*−73,00 €/);
+      expect(troisième).toContain('Opération › −146,00 € · Enfants · Enfants et loisirs › −73,00 €');
       expect(troisième).toContain('Vous divisez cette part de −73,00 €');
     } finally {
       await page.close();
@@ -193,34 +233,44 @@ describe.skipIf(!navigateur)('#297 · 6. les écrans', () => {
       expect(aprèsNiveau).toContain('Santé / Enfants et loisirs / −73,00 €');
 
       // La saisie ne règle qu'une catégorie et une tirelire : elle garde la division, à tous ses niveaux.
-      await allerÀ(page, 'Plus');
-      await cliquer(page, 'Saisie manuelle');
-      await pause(300);
-      const renommée = await page.evaluate(
-        ({ ancien, nouveau }: { ancien: string; nouveau: string }) => {
-          const r = [...document.querySelectorAll('main .card .row')].find((x) => (x.querySelector('.label strong')?.textContent ?? '').trim() === ancien);
-          const modifier = [...(r?.querySelectorAll('button') ?? [])].find((b) => (b.textContent ?? '').trim() === 'Modifier') as HTMLButtonElement | undefined;
-          return !!modifier && (modifier.click(), true);
-        },
-        { ancien: OPÉRATION, nouveau: `${OPÉRATION} (rentrée)` },
-      );
-      expect(renommée, 'la saisie de l’opération s’ouvre').toBe(true);
-      await pause(300);
-      await page.evaluate((nouveau: string) => {
-        const f = document.querySelector('form.edit');
-        const champ = [...(f?.querySelectorAll('label') ?? [])].find((x) => (x.textContent ?? '').trim().startsWith('Libellé'))?.querySelector('input') as HTMLInputElement | null;
-        if (!champ) throw new Error('champ « Libellé » introuvable dans la saisie');
-        champ.value = nouveau;
-        champ.dispatchEvent(new Event('input', { bubbles: true }));
-        ([...(f?.querySelectorAll('button') ?? [])].find((b) => (b.textContent ?? '').trim() === 'Enregistrer') as HTMLButtonElement).click();
-      }, `${OPÉRATION} (rentrée)`);
-      await pause(400);
+      await saisieModifier(page, OPÉRATION, { libellé: `${OPÉRATION} (rentrée)` });
 
       await allerÀ(page, 'Opérations');
       await afficherToutes(page);
       const aprèsSaisie = await résumé(page, `${OPÉRATION} (rentrée)`);
       expect(aprèsSaisie).toMatch(/Alimentation[^+]*−73,00 €/);
       expect(aprèsSaisie).toContain('Santé / Enfants et loisirs / −73,00 €');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('[niveau 2] #297 · 11. changer dans la Saisie le montant d’une opération qui n’a qu’une part remet cette part à « le reste »', async () => {
+    const page = await ouvrirLExemple(site);
+    try {
+      // L'exemple : une seule part « montant fixe » de −146 €. Portée à 200 €, elle vaut 200 €, et rien ne tombe dans le non affecté.
+      await saisieModifier(page, OPÉRATION, { montant: '200,00' });
+      await allerÀ(page, 'Opérations');
+      await afficherToutes(page);
+      await ouvrirLaLigne(page, OPÉRATION);
+      expect(await choixDeLaLigne(page, 0)).toEqual({ part: 'Le reste', catégorie: 'Enfants', tirelire: 'Enfants et loisirs' });
+      expect((await ligne(page, 0)).soit).toBe('soit −200,00 €');
+      expect(await panneau(page)).not.toMatch(/non affecté\s*:/);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('[niveau 2] #297 · 11. … sans toucher à ce que contient cette part : ses moitiés suivent le nouveau montant', async () => {
+    const page = await ouvrirLExemple(site);
+    try {
+      await diviserEnDeux(page);
+      await saisieModifier(page, OPÉRATION, { montant: '200,00' });
+      await allerÀ(page, 'Opérations');
+      await afficherToutes(page);
+      const lignes = await résumé(page, OPÉRATION);
+      expect(lignes).toMatch(/Alimentation[^+]*−100,00 €/);
+      expect(lignes).toContain('Enfants / Enfants et loisirs / −100,00 €');
     } finally {
       await page.close();
     }
