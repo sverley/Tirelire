@@ -1,6 +1,21 @@
 /**
- * Tests du codeur de #302 (niveau 4) : tout lancement de l'outil de test atteste ce qu'il a joué vert,
- * fichier par fichier, et saute ce qui est vert sur son empreinte.
+ * Harnais d'audit de #302, composé parmi les tests du codeur (D83) : chaque test porte sa marque ;
+ * le second fichier du harnais est `apps/web/test/site-une-fois.test.ts` (point 8).
+ *
+ * Tout lancement de l'outil de test atteste ce qu'il a joué vert, fichier par fichier, et saute ce
+ * qui est vert sur son empreinte.
+ *
+ * **Qu'aucun rouge ne fusionne** (niveau 1) — principe 10.1 et D83 (« aucun job sauté ne peut laisser
+ * fusionner ce qu'un job joué aurait rougi ») : un fichier ne se saute que vert sur la même empreinte,
+ * à un seuil au moins égal (point 4) ; n'est pas attesté, ou pas au-delà du seuil joué, un fichier
+ * rouge, sauté faute d'outil, écarté en partie par le seuil, ou joué pendant qu'un fichier lu changeait
+ * (points 1 et 2) ; un appel nommé se joue toujours (point 2) ; le harnais du besoin pas joué en entier
+ * se rejoue (point 5) ; sur `main`, une sous-branche ou une tête détachée — le tag —, rien ne se saute
+ * (point 4).
+ *
+ * **Le dégradé** (niveau 3) : si ces tests tombent, le résultat reste juste, obtenu plus lentement ou
+ * moins lisiblement — ce qui a tourné vert ne se rejoue pas, et chaque lancement dit ce qu'il joue et
+ * ce qu'il saute (points 1, 3 à 6).
  *
  * - La décision, sans git : ce qui couvre un fichier (`fichiersCouverts`), ce que chaque fichier a
  *   donné (`fichiersDuLancement`), ce que l'attestation garde (`fusionner`, `dejaVert`).
@@ -41,7 +56,7 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
   const N = 'apps/web/test/navigateur/n.test.ts';
   const H = 'apps/web/test/h.test.ts';
 
-  test('points 1 et 4 · un fichier attesté vert sur l’empreinte de son ensemble se saute, à un seuil au moins égal ; pas un autre', () => {
+  test('[niveau 1] points 1 et 4 · un fichier attesté vert sur l’empreinte de son ensemble se saute, à un seuil au moins égal ; pas un autre', () => {
     const c = couvertureLocale({ arbre: 'a', empreintes: e, verts: [vert('interface', e.interface, 2, { fichier: W })] });
     const d = (f, s) => fichiersCouverts(c, demande('apps/web', { seuil: s }), [f], e)[0];
     assert.equal(d(W, 2).couvert, true);
@@ -52,13 +67,13 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
     assert.equal(fichiersCouverts(ailleurs, demande('apps/web'), [W], E('y'))[0].couvert, false, 'sur une autre empreinte, il se joue');
   });
 
-  test('point 2 · un appel nommé se joue toujours ; un contenu joué d’une autre empreinte que la couverture aussi', () => {
+  test('[niveau 1] point 2 · un appel nommé se joue toujours ; un contenu joué d’une autre empreinte que la couverture aussi', () => {
     const c = couvertureLocale({ arbre: 'a', empreintes: e, verts: [vert('interface', e.interface, 4, { fichier: W })] });
     assert.equal(fichiersCouverts(c, demande('apps/web', { nomme: true }), [W], e)[0].couvert, false);
     assert.equal(fichiersCouverts(c, demande('apps/web'), [W], { ...e, interface: E('z').interface })[0].couvert, false);
   });
 
-  test('point 6 · ce qui couvre tout un ensemble — base commune avec main, tête verte au Ready — couvre chacun de ses fichiers', () => {
+  test('[niveau 1] point 6 · ce qui couvre tout un ensemble — base commune avec main, tête verte au Ready — couvre chacun de ses fichiers', () => {
     const main = couvertureLocale({ arbre: 'a', empreintes: e, main: { commit: 'm'.repeat(40), empreintes: e } });
     for (const f of [W, N]) assert.equal(fichiersCouverts(main, demande('apps/web', { navigateur: true }), [f], e)[0].couvert, true, f);
     assert.equal(fichiersCouverts(main, demande('apps/web', { seuil: 3 }), [W], e)[0].couvert, false, 'main ne couvre que jusqu’au seuil 2');
@@ -66,7 +81,7 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
     assert.equal(fichiersCouverts(ready, demande('apps/web', { seuil: 1 }), [W], e)[0].couvert, true);
   });
 
-  test('dans un lancement du harnais du besoin, seul ce qui couvre le harnais, ou le fichier lui-même, le couvre', () => {
+  test('[niveau 1] point 5 · dans un lancement du harnais du besoin, seul ce qui couvre le harnais, ou le fichier lui-même, le couvre', () => {
     const harnais = [H];
     const eh = { ...e, harnais: 'h'.repeat(64) };
     const ensembleVert = couvertureLocale({ arbre: 'a', empreintes: eh, verts: [vert('interface', eh.interface, 4)], harnais });
@@ -78,7 +93,7 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
     assert.equal(fichiersCouverts(auSeuil2, lancement, [H], eh)[0].couvert, false, 'joué au seuil 2 seulement, il se rejoue en entier');
   });
 
-  test('une empreinte verte d’un fichier ne vaut jamais pour tout son ensemble ; l’attestation les garde toutes deux', () => {
+  test('[niveau 1] point 4 · une empreinte verte d’un fichier ne vaut jamais pour tout son ensemble ; l’attestation les garde toutes deux', () => {
     const verts = [vert('coeur', e.coeur, 4, { fichier: 'packages/core/test/a.test.ts' })];
     assert.equal(dejaVert({ id: 'coeur', empreinte: e.coeur, seuil: 1, verts }), null);
     const gardes = fusionner(verts, [vert('coeur', e.coeur, 2)], [vert('coeur', e.coeur, 2, { fichier: 'packages/core/test/a.test.ts', date: '2026-09-01T00:00:00Z' })]);
@@ -89,7 +104,7 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
     assert.deepEqual(étranger.verts, [], 'un fichier n’est attesté que dans l’ensemble de son paquet');
   });
 
-  test('points 1 et 2 · ce que chaque fichier a donné, sous vitest : rouge, sauté faute d’outil, joué en entier ou non', () => {
+  test('[niveau 1] points 1 et 2 · ce que chaque fichier a donné, sous vitest : rouge, sauté faute d’outil, joué en entier ou non', () => {
     const f = (name, tests, status = 'passed') => ({ name, status, assertionResults: tests.map(([t, s]) => ({ ancestorTitles: [], title: t, status: s })) });
     const r = fichiersDuLancement({
       code: 1,
@@ -116,7 +131,7 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
     assert.equal(fichiersDuLancement({ code: 0, sorte: 'vitest', seuil: 2, rapport: null }), null);
   });
 
-  test('points 1 et 2 · ce que chaque fichier a donné, sous node --test', () => {
+  test('[niveau 1] points 1 et 2 · ce que chaque fichier a donné, sous node --test', () => {
     const lignes = [
       { type: 'lance', fichier: '/n/a' },
       { type: 'lance', fichier: '/n/b' },
@@ -215,7 +230,7 @@ function dépôtInventé(nom) {
 }
 
 describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute ce qui l’est', { concurrency: true }, () => {
-  test('points 1 et 4 · un lancement atteste chaque fichier joué vert ; le suivant le saute et dit pourquoi ; un changement de ce que lit l’ensemble fait tout rejouer', async () => {
+  test('[niveau 3] points 1 et 4 · un lancement atteste chaque fichier joué vert ; le suivant le saute et dit pourquoi ; un changement de ce que lit l’ensemble fait tout rejouer', async () => {
     const f = dépôtInventé('saut');
     f.git('checkout', '-q', '-b', 'codage/997-saut');
     // Sans changement, la base commune avec main couvrirait tout (point 6).
@@ -235,17 +250,29 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     assert.deepEqual(après.joués, ['a', 'b'], `un fichier que lit l'ensemble a changé, copie de travail comprise : tout se rejoue\n${après.sortie}`);
   });
 
-  test('points 1 et 2 · un fichier écarté en partie par le seuil est attesté à ce seuil ; un fichier rouge, ou un appel nommé, n’atteste rien', async () => {
+  test('[niveau 1] points 1 et 2 · un fichier écarté en partie par le seuil est attesté à ce seuil, sous node comme sous vitest ; un fichier rouge, sauté faute d’outil, ou un appel nommé, n’atteste rien', async () => {
     const f = dépôtInventé('rouge');
     f.git('checkout', '-q', '-b', 'codage/996-rouge');
     f.écrire('packages/core/lib.mjs', 'export const un = 4;\n');
     f.écrire('packages/core/r.test.mjs', "import { test } from 'node:test';\ntest('r [niveau 1]', () => { throw new Error('rouge'); });\n");
+    f.écrire('packages/core/s.test.mjs', "import { test } from 'node:test';\ntest('s [niveau 1]', { skip: 'faute d’outil' }, () => {});\n");
     const r = await f.tester('packages/core', '1');
     assert.notEqual(r.code, 0, r.sortie);
     assert.match(r.sortie, /attestation : r\.test\.mjs : non attesté — rouge\./, r.sortie);
+    assert.match(r.sortie, /attestation : s\.test\.mjs : non attesté — un test s'est sauté/, r.sortie);
     const a = f.attestation('codage/996-rouge');
     assert.deepEqual(a.verts.map((v) => `${v.fichier}:${v.seuil}`).sort(), ['packages/core/a.test.mjs:4', 'packages/core/b.test.mjs:1'], `b, de niveau 2, écarté au seuil 1 : attesté au seuil 1\n${r.sortie}`);
+    // Sous vitest (ajouté par l'auditeur) : un fichier dont un test est écarté par le seuil n'est attesté qu'à ce seuil.
+    f.écrire('apps/web/test/x.test.mjs', "import { test } from 'vitest';\ntest('x1 [niveau 1]', () => {});\ntest('x3 [niveau 3]', () => {});\n");
+    const v = await f.tester('apps/web', '2');
+    assert.equal(v.code, 0, v.sortie);
+    assert.deepEqual(
+      f.attestation('codage/996-rouge').verts.filter((x) => x.fichier?.startsWith('apps/web/')).map((x) => `${x.fichier}:${x.seuil}`).sort(),
+      ['apps/web/test/w.test.mjs:4', 'apps/web/test/x.test.mjs:2'],
+      `x, dont un test de niveau 3 est écarté au seuil 2 : attesté au seuil 2\n${v.sortie}`,
+    );
     rmSync(join(f.dépôt, 'packages/core/r.test.mjs'));
+    rmSync(join(f.dépôt, 'packages/core/s.test.mjs'));
     f.git('update-ref', '-d', 'refs/attestations/codage/996-rouge');
     const nommé = await f.tester('packages/core', '2', '--test-name-pattern=a');
     assert.equal(nommé.code, 0, nommé.sortie);
@@ -256,7 +283,7 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     assert.ok(nomméEncore.joués.includes('a'), `un appel nommé se joue, même attesté vert\n${nomméEncore.sortie}`);
   });
 
-  test('point 2 · un fichier que lit l’ensemble change pendant le lancement : rien de l’ensemble n’est attesté', async () => {
+  test('[niveau 1] point 2 · un fichier que lit l’ensemble change pendant le lancement : rien de l’ensemble n’est attesté', async () => {
     const f = dépôtInventé('change');
     f.git('checkout', '-q', '-b', 'codage/995-change');
     f.écrire('packages/core/lib.mjs', 'export const un = 4;\n');
@@ -267,7 +294,7 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     assert.equal(f.attestation('codage/995-change'), null);
   });
 
-  test('sur main et sur une sous-branche, rien ne se saute ni ne s’atteste', async () => {
+  test('[niveau 1] point 4 · sur main, sur une sous-branche et sur une tête détachée (le tag), rien ne se saute ni ne s’atteste', async () => {
     const f = dépôtInventé('main');
     for (const branche of ['main', 'codage/994-x--codeur']) {
       if (branche !== 'main') f.git('checkout', '-q', '-b', branche);
@@ -277,9 +304,19 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
       assert.match(r.sortie, /rien ne se saute ni ne s'atteste/, r.sortie);
       assert.equal(f.attestation(branche), null, branche);
     }
+    // Une tête détachée, comme au tag (ajouté par l'auditeur) : l'attestation de la branche de ce commit ne la couvre pas.
+    f.git('checkout', '-q', '-b', 'codage/992-tag');
+    f.écrire('packages/core/lib.mjs', 'export const un = 5;\n');
+    f.git('commit', '-q', '--no-verify', '-am', 'besoin #992');
+    await f.tester('packages/core', '2');
+    assert.equal(f.attestation('codage/992-tag').verts.length, 2, 'la branche a attesté ses deux fichiers');
+    f.git('checkout', '-q', '--detach');
+    const tag = await f.tester('packages/core', '3');
+    assert.deepEqual(tag.joués, ['a', 'b'], `tête détachée : tout se joue\n${tag.sortie}`);
+    assert.match(tag.sortie, /aucune branche extraite : rien ne se saute ni ne s'atteste/, tag.sortie);
   });
 
-  test('point 5 · le push qui suit un « pnpm test 2 » vert ne rejoue rien, hors le harnais du besoin qu’il n’a pas joué en entier ; la CI au Ready qui suit des tests navigateur verts ne les rejoue pas', async () => {
+  test('[niveau 3] points 3 et 5 · le push qui suit un « pnpm test 2 » vert ne rejoue rien, hors le harnais du besoin qu’il n’a pas joué en entier ; la CI au Ready qui suit des tests navigateur verts ne les rejoue pas', async () => {
     const f = dépôtInventé('push');
     const B = 'codage/993-push';
     f.git('checkout', '-q', '-b', B);

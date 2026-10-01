@@ -1,7 +1,10 @@
 /**
- * Test du codeur de #302, point 8 (niveau 4) : un lancement des tests de l'interface ne construit le
- * site qu'une fois, quel que soit le nombre de fichiers qui l'ouvrent ; le dossier du site disparaît
- * à la fin du lancement.
+ * Harnais d'audit de #302, second fichier, composé parmi les tests du codeur (le premier :
+ * `packages/gardes/attestation-par-fichier.test.mjs`). Point 8, niveau 3 (le dégradé : sans lui, le site se construit à
+ * chaque fichier, plus lentement) : un lancement des tests de l'interface ne construit le site qu'une
+ * fois, quel que soit le nombre de fichiers qui l'ouvrent ; le dossier du site disparaît à la fin du
+ * lancement. Que chaque fichier garde son serveur (`port: 0`) et son navigateur se vérifie en relisant
+ * `ouvrirLeSite` (`harnais.ts`).
  *
  * Un lancement de vitest est joué dans le paquet, sur trois fichiers inventés qui demandent chacun le
  * site du lancement (`siteDuLancement`, `harnais.ts`) en même temps et notent ce qu'ils reçoivent.
@@ -33,7 +36,7 @@ function lancer(): Promise<{ code: number | null; sortie: string }> {
   });
 }
 
-describe('[niveau 4] #302, point 8 · le site des tests navigateur se construit une fois par lancement', () => {
+describe('[niveau 3] #302, point 8 · le site des tests navigateur se construit une fois par lancement', () => {
   test('trois fichiers le demandent en même temps : un seul le construit, tous reçoivent le même ; il disparaît à la fin', async () => {
     mkdirSync(join(dossier, 'test'), { recursive: true });
     writeFileSync(témoin, '');
