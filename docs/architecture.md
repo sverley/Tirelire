@@ -82,11 +82,13 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
    fenêtre (D12) est passée sans reprise non plus ; sur un compte sans suivi, chaque occurrence
    compte à sa date. Le même calcul fait le bloc « Attendus, non reçus » (`missingFlows`), seul
    endroit où une occurrence non reçue se signale. Un virement proposé mais non enregistré n'a pas
-   de flux et ne compte pas. Les lignes d'une période à venir (étapes 2 à 5) se calculent sur ce
-   même grand livre prévu : la dotation qu'une tirelire reçoit dans son solde prévu est celle que sa
-   ligne demande. Chaque mouvement porte son origine (flux, dotation, libération, saisie…) ; un solde
-   prévu négatif est un **manque**, daté et chiffré au point le plus bas de la période. Rien ne
-   s'enregistre (I10). La période où l'on lit se lit sur le réel.
+   de flux et ne compte pas. Les lignes d'une période à venir et leurs écarts de placement (étapes
+   2 à 4) se calculent sur ce même grand livre prévu : la dotation qu'une tirelire reçoit dans son
+   solde prévu est celle que sa ligne demande. Les occurrences de l'ordre permanent (étape 5) et le
+   non affecté du compte principal se lisent sur le grand livre reçu. Chaque mouvement porte son
+   origine (flux, dotation, libération, saisie…) ; un solde prévu négatif est un **manque**, daté
+   et chiffré au point le plus bas de la période. Rien ne s'enregistre (I10). La période où l'on
+   lit se lit sur le réel.
 1. Période contenant `asOf` ; revenus et charges fixes = occurrences des flux dans la période.
 2. Par besoin (D28) : part du solde de la tirelire qui lui revient (ordre des priorités), croisière,
    rattrapage, dotation = max, plancher = rattrapage d'une échéance.

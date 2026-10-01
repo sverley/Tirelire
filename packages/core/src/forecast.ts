@@ -70,12 +70,6 @@ export interface ForecastAccount extends ForecastBalance {
   hosted: Array<{ tirelireId: Id; amount: Cents }>;
   /** Non affecté prévu : `end` moins les composantes hébergées (I2). */
   unallocated: Cents;
-  /**
-   * Occurrences attendues, non reçues, sur ce compte : elles ne comptent pas, et ne figurent donc pas
-   * dans `movements`. Lues par le même calcul que le bloc « Attendus, non reçus »
-   * (`flowOccurrencesThatCount`), qui est le seul endroit de l'écran où elles se signalent.
-   */
-  notReceived: Array<{ flowId: Id; label: string; date: ISODate; windowEnd: ISODate; amount: Cents }>;
 }
 
 export interface Forecast {
@@ -100,14 +94,10 @@ export function isPlannedOperation(op: Operation): boolean {
 
 /**
  * Le grand livre prévu : les opérations prévues qui comptent jusqu'à `until`, ajoutées en mémoire au
- * grand livre, et les occurrences attendues non reçues, qui ne comptent pas. Le grand livre reçu
- * n'est pas modifié.
+ * grand livre. Une occurrence attendue, non reçue ne compte pas, et ne se signale que dans le bloc
+ * « Attendus, non reçus » (`missingFlows`, même calcul). Le grand livre reçu n'est pas modifié.
  */
-export function withPlannedOperations(
-  ledger: Ledger,
-  today: ISODate,
-  until: ISODate,
-): { ledger: Ledger; notReceived: Array<{ flow: PlannedFlow; date: ISODate; windowEnd: ISODate }> } {
+export function withPlannedOperations(ledger: Ledger, today: ISODate, until: ISODate): { ledger: Ledger } {
   const accounts = new Map(alive(ledger.accounts).map((a) => [a.id, a]));
   const tirelires = new Set(alive(ledger.tirelires).map((e) => e.id));
   const tracked = new Map<Id, boolean>();
@@ -120,15 +110,12 @@ export function withPlannedOperations(
   const operations: Operation[] = [];
   const allocations: Allocation[] = [];
   const transfers: Array<{ flow: PlannedFlow; date: ISODate }> = [];
-  const notReceived: Array<{ flow: PlannedFlow; date: ISODate; windowEnd: ISODate }> = [];
 
   for (const flow of alive(ledger.plannedFlows)) {
     const account = accounts.get(flow.accountId);
     if (!account) continue;
     // Comme le solde du compte (`accountBalance`), une opération compte après la date d'ouverture.
-    const { counted, notReceived: nonRecues } = flowOccurrencesThatCount(ledger, flow, addDays(account.openingDate, 1), until, today, isTracked(flow.accountId));
-    for (const o of nonRecues) notReceived.push({ flow, date: o.date, windowEnd: o.windowEnd });
-    for (const o of counted) {
+    for (const o of flowOccurrencesThatCount(ledger, flow, addDays(account.openingDate, 1), until, today, isTracked(flow.accountId)).counted) {
       if (flow.kind === 'transfer' && flow.counterpartAccountId && accounts.has(flow.counterpartAccountId)) {
         transfers.push({ flow, date: o.date });
         continue;
@@ -186,7 +173,7 @@ export function withPlannedOperations(
       ],
     };
   }
-  return { ledger: out, notReceived };
+  return { ledger: out };
 }
 
 function plannedOperation(flow: PlannedFlow, date: ISODate): Operation {
@@ -212,7 +199,7 @@ export function computeForecast(
   ledger: Ledger,
   period: Period,
   today: ISODate,
-  { ledger: prevu, notReceived }: ReturnType<typeof withPlannedOperations> = withPlannedOperations(ledger, today, period.end),
+  { ledger: prevu }: { ledger: Ledger } = withPlannedOperations(ledger, today, period.end),
 ): Forecast {
   const end = period.end;
   const idx = indexLedger(prevu);
@@ -252,9 +239,6 @@ export function computeForecast(
       tracked: tracksOperations(ledger, a.id),
       hosted,
       unallocated: total - sumHosted,
-      notReceived: notReceived
-        .filter((n) => n.flow.accountId === a.id)
-        .map((n) => ({ flowId: n.flow.id, label: n.flow.name, date: n.date, windowEnd: n.windowEnd, amount: n.flow.amount })),
     });
   }
   return { period, today, accounts, tirelires };
