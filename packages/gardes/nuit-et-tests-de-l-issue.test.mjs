@@ -332,7 +332,7 @@ describe('[niveau 2] #307, point 3 · chaque nuit, vers 3 h à Paris, les tests 
 
 // ─── Point 4 : une nuit rouge se signale ─────────────────────────────────────────────────────────
 
-describe('[niveau 2] #307, point 4 · une nuit rouge ouvre ou complète une issue ; la nuit verte qui suit le dit ; aucune nuit ne bloque une fusion', () => {
+describe('[niveau 2] #307, point 4 · une nuit rouge — même sans avoir pu jouer — ouvre ou complète une issue ; la nuit verte qui suit le dit ; aucune nuit ne bloque une fusion', () => {
   test('ce que la nuit demande à GitHub : une issue, un commentaire, ou rien', () => {
     const dossier = temporaire('signal');
     const faux = join(dossier, 'fetch.mjs');
@@ -378,6 +378,17 @@ describe('[niveau 2] #307, point 4 · une nuit rouge ouvre ou complète une issu
 
     assert.deepEqual(nuit('vert', ouverte([ROUGE, VERTE])), [], 'une nuit verte après une nuit verte ne dit rien : c’est le dernier commentaire qui compte');
     assert.deepEqual(nuit('vert', {}), [], 'sans issue ouverte, une nuit verte ne dit rien');
+  });
+
+  test('une nuit qui devait jouer se signale rouge, même si elle échoue avant de savoir ce qu’elle joue ; une nuit qui n’a rien à jouer ne dit rien', () => {
+    const nuit = (plan, échoue) => {
+      const ctx = { github: { event: {}, event_name: 'schedule' }, vars: {}, secrets: {}, inputs: {}, needs: { heure: { outputs: { jouer: 'oui' } } }, steps: { plan, tests: { outcome: 'skipped', outputs: {} } } };
+      const jouées = jouer(lireFichier('.github/workflows/nuit.yml'), ctx, (é) => échoue && /^\s+(?:- )?id: plan\b/m.test(é.texte)).flatMap((j) => j.joués);
+      return jouées.some((é) => /nuit\.mjs signaler/.test(é.texte));
+    };
+    assert.equal(nuit({ outcome: 'success', outputs: { jouer: 'oui', commit: 'c' } }, false), true, 'le plan dit de jouer : le signal se joue, quelle que soit la suite');
+    assert.equal(nuit({ outcome: 'success', outputs: { jouer: 'non', commit: 'c' } }, false), false, 'le plan dit que rien ne se joue : rien à signaler');
+    assert.equal(nuit({ outcome: 'failure', outputs: {} }, true), true, 'le plan lui-même échoue (outil, extraction) : la nuit est rouge, et se signale');
   });
 
   test('la nuit ne se lance que seule et n’écrit que des branches et des issues : elle ne peut bloquer aucune fusion', () => {
