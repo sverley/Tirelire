@@ -8,7 +8,9 @@
  * au second tour, de `solde-prevu-un-calcul.test.ts`, qui n'existent plus), sinon le mien : le point 5
  * est réécrit contre les fonctions de `balances.ts` (le test du codeur relisait ce que le calcul
  * venait de poser), la saisie future qui reprend une occurrence, le creux le plus profond, le bord de
- * la fenêtre d'une occurrence et le point 9 (ajouté par l'auditeur) sont de moi. Données inventées
+ * la fenêtre d'une occurrence, ce qui existe à la fin de la période (flux supprimé, terminé ou à
+ * venir ; compte et tirelire créés plus tard ; saisie d'une période suivante) et le point 9 (ajouté par
+ * l'auditeur) sont de moi. Données inventées
  * (D84) : l'exemple, lu à sa date de lecture, et un petit grand livre écrit ici, dont les montants
  * attendus sont ceux qu'on calcule à la main.
  *
@@ -127,13 +129,30 @@ describe('[niveau 2] point 1 — une période à venir montre le solde prévu de
     }
   });
 
-  it('une opération saisie à une date future compte jusqu’à la fin de la période qui la contient', () => {
+  it('une opération saisie à une date future compte jusqu’à la fin de la période qui la contient, et pas avant ni après', () => {
     const l = petitBudget();
     l.operations.push(opération({ id: 'achat-futur', date: '2026-10-08', amount: -euros(250) }));
+    l.operations.push(opération({ id: 'achat-novembre', date: '2026-11-03', amount: -euros(75) }));
     const sans = compte(planDe(petitBudget(), '2026-10-01'), CC).end;
     const octobre = compte(planDe(l, '2026-10-01'), CC);
     expect(octobre.end).toBe(sans - euros(250));
     expect(octobre.movements).toContainEqual(expect.objectContaining({ date: '2026-10-08', origin: 'saisie', amount: -euros(250), operationId: 'achat-futur' }));
+    // Celle de novembre ne compte pas en octobre, et le départ reste le réel à la date de lecture.
+    expect(octobre.movements.map((m) => m.operationId)).not.toContain('achat-novembre');
+    expect(octobre.start).toBe(euros(1000));
+    expect(compte(planDe(l, '2026-11-01'), CC).movements.map((m) => m.operationId)).toContain('achat-novembre');
+  });
+
+  it('un compte et une tirelire qui n’existent pas encore à la fin de la période n’y figurent pas', () => {
+    const l = petitBudget();
+    l.accounts.push({ id: 'futur', name: 'Compte futur', kind: 'courant', openingBalance: 0, openingDate: '2026-12-01', activeFrom: '2026-12-01' });
+    l.tirelires.push({ id: 'futur', name: 'Tirelire future', placement: [{ accountId: CC, share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-12-01' });
+    const octobre = planDe(l, '2026-10-01').forecast!;
+    expect(octobre.accounts.map((a) => a.id)).toEqual([CC, LIVRET]);
+    expect(octobre.tirelires.map((t) => t.id)).toEqual(['tf']);
+    const décembre = planDe(l, '2026-12-01').forecast!;
+    expect(décembre.accounts.map((a) => a.id)).toContain('futur');
+    expect(décembre.tirelires.map((t) => t.id)).toContain('futur');
   });
 });
 
@@ -144,6 +163,24 @@ describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () =>
     expect(c.start).toBe(euros(1000));
     expect(c.movements.filter((m) => m.origin === 'flux' && m.flowId === 'f-salaire').map((m) => m.date)).toEqual(['2026-09-25', '2026-10-25']);
     expect(c.end).toBe(euros(5000));
+  });
+
+  it('un flux supprimé, un flux terminé et un flux pas encore commencé ne produisent pas d’opération prévue', () => {
+    const l = petitBudget();
+    const mensuel = (id: string, plus: Partial<PlannedFlow>) =>
+      flux({ id, name: id, kind: 'fixedCharge', amount: -euros(10), periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-12' }, ...plus });
+    l.plannedFlows.push(
+      mensuel('f-vivant', {}),
+      mensuel('f-supprimé', { deletedAt: '2026-09-01T00:00:00Z' }),
+      mensuel('f-terminé', { activeTo: '2026-10-05' }),
+      mensuel('f-futur', { activeFrom: '2026-11-01' }),
+    );
+    const dates = (p: Plan, id: string) => compte(p, CC).movements.filter((m) => m.flowId === id).map((m) => m.date);
+    const novembre = planDe(l, '2026-11-01');
+    expect(dates(novembre, 'f-vivant')).toEqual(['2026-09-12', '2026-10-12', '2026-11-12']);
+    expect(dates(novembre, 'f-supprimé')).toEqual([]);
+    expect(dates(novembre, 'f-terminé')).toEqual(['2026-09-12']);
+    expect(dates(novembre, 'f-futur')).toEqual(['2026-11-12']);
   });
 
   it('sans suivi, une occurrence passée compte aussi : rien ne se confronte, rien n’est dit manquant (U1)', () => {
