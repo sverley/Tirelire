@@ -353,7 +353,9 @@ export function dejaVert({ id, empreinte, seuil, verts = [], references = [] }) 
   // Une empreinte verte d'un fichier ne vaut que pour lui (#302) : jamais pour tout l'ensemble.
   const v = verts.filter((x) => x.fichier === undefined && x.ensemble === id && x.empreinte === empreinte && x.seuil >= seuil).sort((a, b) => b.seuil - a.seuil)[0];
   if (v) return raisonDuVert(v);
-  if (id !== HARNAIS.id) {
+  // Ni le harnais du besoin, ni les tests navigateur de non-régression, que rien ne joue avant la
+  // fusion (#307) : l'empreinte de `main`, ou du premier parent, ne les dit pas verts.
+  if (id !== HARNAIS.id && id !== 'navigateur') {
     const r = references.find((x) => x.empreintes?.[id] === empreinte && x.seuil >= seuil);
     if (r) return r.raison;
   }
@@ -362,8 +364,12 @@ export function dejaVert({ id, empreinte, seuil, verts = [], references = [] }) 
 
 // ─── Ce que joue un crochet ─────────────────────────────────────────────────────────────────────
 
-/** Pourquoi les tests navigateur de non-régression ne se jouent pas à la livraison sans demande (#264). */
-export const SANS_DEMANDE = 'tests navigateur de non-régression laissés au Ready faute de demande (pnpm livraison --navigateur)';
+/**
+ * Pourquoi les tests navigateur de non-régression ne se jouent pas à la livraison sans demande (#264,
+ * #307) : ils se jouent la nuit, sur `main` (`nuit.yml`) ; ceux de l'issue se jouent à part.
+ */
+export const JOUES_LA_NUIT = 'les tests navigateur de non-régression se jouent la nuit, sur main (nuit.yml)';
+export const SANS_DEMANDE ='tests navigateur de non-régression joués la nuit sur main, sauf demande (pnpm livraison --navigateur)';
 
 /**
  * Ce qu'un crochet joue ou saute. `seuil` : celui du moment (0 au pré-commit, 2 à la livraison) ;
@@ -409,14 +415,25 @@ export function verdictDuLancement({ code, sorte, journal = '', rapport = null, 
 
 // ─── Ce que saute la CI ─────────────────────────────────────────────────────────────────────────
 
-/** Les seuils que la CI joue au Ready, donc ceux qu'une tête verte au Ready couvre (D83). */
-export const SEUILS_DU_READY = Object.freeze({ garde: 1, coeur: 1, relais: 1, hebergement: 1, interface: 1, navigateur: 2, harnais: 4 });
+/**
+ * Les seuils que la CI joue au Ready, donc ceux qu'une tête verte au Ready couvre (D83). Les tests
+ * navigateur de non-régression n'y sont pas : ils se jouent la nuit, sur `main` (#307) ; une tête
+ * verte au Ready ne les dit donc pas verts.
+ */
+export const SEUILS_DU_READY = Object.freeze({ garde: 1, coeur: 1, relais: 1, hebergement: 1, interface: 1, harnais: 4 });
 /**
  * Le seuil jusqu'auquel l'empreinte de `main`, ou du premier parent sur `main`, compte comme verte :
- * 2, celui où tout ce qui y est arrivé a été vérifié avant la fusion — la livraison, l'auditeur, les
- * tests navigateur au Ready (D83). Au tag, le seuil 3 n'est donc jamais couvert par `main`.
+ * 2, celui où tout ce qui y est arrivé a été vérifié avant la fusion — la livraison, l'auditeur (D83).
+ * Au tag, le seuil 3 n'est donc jamais couvert par `main`. Les tests navigateur de non-régression,
+ * joués la nuit et non avant la fusion (#307), n'en profitent pas (`dejaVert`).
  */
 export const SEUIL_DE_MAIN = 2;
+/**
+ * Le seuil de la nuit (#307) : chaque nuit, une CI joue les tests navigateur de non-régression sur le
+ * dernier commit de `main`, au seuil 2, sauf ce qu'une nuit précédente a trouvé vert sur la même
+ * empreinte (`nuit.yml`).
+ */
+export const SEUIL_DE_LA_NUIT = 2;
 
 /**
  * Les empreintes vertes qu'apporte une tête dont toute la CI a fini verte au Ready : chaque ensemble
@@ -424,7 +441,7 @@ export const SEUIL_DE_MAIN = 2;
  */
 export function vertsDuReady(tete) {
   if (tete?.statut !== 'success' || !tete.empreintes) return [];
-  return TOUS.filter((id) => tete.empreintes[id]).map((id) => ({
+  return TOUS.filter((id) => tete.empreintes[id] && SEUILS_DU_READY[id] !== undefined).map((id) => ({
     ensemble: id,
     empreinte: tete.empreintes[id],
     seuil: SEUILS_DU_READY[id],
@@ -661,7 +678,11 @@ export function resume(couverture) {
     const seuils = [...new Set(attestes.map(([, x]) => x.seuil))].sort();
     const fichiers = attestes.length ? ` ; ${attestes.length} fichier(s) attesté(s) vert(s) sur son empreinte, au seuil ${seuils.join(' ou ')}, que le lanceur saute en les nommant` : '';
     if (id === HARNAIS.id && !couverture.harnais?.length) lignes.push(`- ${nomDe(id)} : aucun.`);
-    else if (c) lignes.push(`- ${nomDe(id)} : sauté jusqu'au seuil ${c.seuil} — ${c.raison}${fichiers}.`);
+    // La CI au Ready et sur `main` ne joue pas la non-régression dans le navigateur (#307).
+    else if (id === 'navigateur' && couverture.origine === 'main') lignes.push(`- ${nomDe(id)} : non joué — ${JOUES_LA_NUIT}.`);
+    else if (id === 'navigateur' && couverture.origine === 'ready') {
+      lignes.push(`- ${nomDe(id)} : non-régression non jouée — ${JOUES_LA_NUIT} ; les tests navigateur de l'issue se jouent en entier${fichiers}.`);
+    } else if (c)lignes.push(`- ${nomDe(id)} : sauté jusqu'au seuil ${c.seuil} — ${c.raison}${fichiers}.`);
     else lignes.push(`- ${nomDe(id)} : se joue — aucune empreinte verte${attestes.length ? " pour tout l'ensemble" : ''}${fichiers}.`);
   }
   return lignes;

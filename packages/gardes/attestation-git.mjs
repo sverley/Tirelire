@@ -18,6 +18,13 @@ import { fusionner, lireLAttestation, lireLesEntrees, texteDeLAttestation } from
 export const REF = (branche) => `refs/attestations/${branche}`;
 export const DISTANTE = (branche) => `refs/attestations-distantes/${branche}`;
 export const BRANCHE_D_ATTESTATION = (branche) => `${branche}--attestation`;
+/**
+ * L'attestation de la nuit (#307) : ce que les nuits ont trouvé vert sur `main`, sous la référence
+ * locale `REF(NUIT)`, et sur `origin` sur sa propre branche. Son nom ne finit pas par `--attestation` :
+ * aucune PR n'en a la tête, et `branches.yml` la supprimerait comme une branche qui traîne.
+ */
+export const NUIT = 'nuit';
+export const BRANCHE_DE_LA_NUIT = 'attestation-de-la-nuit';
 /** L'outillage signe : l'attestation n'est l'œuvre de personne. */
 const IDENTITE = { GIT_AUTHOR_NAME: 'Livraison Tirelire', GIT_AUTHOR_EMAIL: 'livraison@tirelire.invalid' };
 
