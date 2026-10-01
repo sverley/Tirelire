@@ -180,12 +180,13 @@ elif [ -z "$hbase" ]; then
 elif [ -z "$sous" ]; then
   git -c core.quotePath=false diff --name-only --no-renames --diff-filter=AM "$hbase" "$arbre" -- |
     grep -E '\.test\.[^/]+$' >"$travail/candidats"
-  # shellcheck source=harnais-du-besoin.sh
-  . "$crochets/harnais-du-besoin.sh"
+  # Le harnais du besoin et les tests navigateur de l'issue, par leur définition commune avec la CI.
+  # shellcheck source=tests-de-l-issue.sh
+  . "$crochets/tests-de-l-issue.sh"
   [ -n "$branche" ] || branche=$(branche_du_besoin)
   harnais_retenus "$travail/candidats" "$journaux/harnais.txt" "$arbre:" "$branche" || exit 1
   # Les tests navigateur de l'issue, hors harnais du besoin, qui se joue à part.
-  grep '^apps/web/test/navigateur/' "$travail/candidats" | grep -vxF -f "$journaux/harnais.txt" >"$journaux/issue.txt"
+  tests_de_l_issue_parmi "$travail/candidats" "$journaux/harnais.txt" "$journaux/issue.txt"
 fi
 git ls-tree -r --name-only "$arbre" >"$travail/fichiers" || exit 1
 git cat-file -p "$arbre:packages/gardes/chemins-ignores" >"$travail/chemins-ignores" 2>/dev/null || : >"$travail/chemins-ignores"
@@ -347,12 +348,12 @@ autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | tr '\n' ' 
 
 debut=$(date +%s)
 # Durée attendue de ce qui se joue, mesurée de nouveau le 01/10 sur 2 cœurs comme la CI (#307) : 30 s
-# pour les paquets fonctionnels et l'interface sans navigateur, 40 s pour la garde ; 630 s pour toute
+# pour les paquets fonctionnels et l'interface sans navigateur, 50 s pour la garde (mesure de l'auditeur) ; 630 s pour toute
 # la non-régression dans le navigateur demandée, et, pour les tests navigateur de l'issue, 80 s pour
 # construire le site et lancer le navigateur, plus 25 s par fichier (la moyenne des fichiers ; le plus
 # lourd en prend 175). Un dépassement de plus de 20 % se dit, sans bloquer ; le harnais du besoin est
 # hors durée attendue.
-DUREE_FONCTIONNEL=30 DUREE_GARDE=40
+DUREE_FONCTIONNEL=30 DUREE_GARDE=50
 attendue=0
 { joue coeur || joue relais || joue hebergement || joue interface; } && attendue=$((attendue + DUREE_FONCTIONNEL))
 joue navigateur && attendue=$((attendue + 630))

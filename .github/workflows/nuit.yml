@@ -14,7 +14,9 @@ name: Tests navigateur de la nuit
 #
 # Une nuit rouge se signale sans qu'on la cherche (`packages/gardes/nuit.mjs`) : une issue s'ouvre, ou
 # se complète si celle d'une nuit précédente est encore ouverte ; elle nomme les fichiers rouges et le
-# commit de `main` jugé. La nuit verte qui suit le dit dans cette issue.
+# commit de `main` jugé. La nuit verte qui suit le dit dans cette issue. Une nuit qui devait jouer
+# et qui échoue avant de savoir ce qu'elle joue — extraction, outil de la nuit — est une nuit rouge :
+# elle se signale de même, sans fichier rouge à nommer ; sans le dépôt extrait, par `gh`.
 #
 # L'heure : la planification de GitHub est en UTC. Deux déclenchements, à 1 h 07 et 2 h 07 UTC ; seul
 # joue celui qui tombe à 3 h à Paris — le premier à l'heure d'été (UTC+2), le second à l'heure
@@ -118,15 +120,35 @@ jobs:
             node .githooks/attestation.mjs envoyer origin nuit attestation-de-la-nuit | sed 's/^/- /'
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Une nuit rouge se signale
-        if: always() && steps.plan.outputs.jouer == 'oui'
+        # Sauf quand le plan dit que rien ne se joue : un plan qui a échoué ne dit rien, et la nuit est
+        # alors rouge (#307, point 8).
+        if: always() && steps.plan.outputs.jouer != 'non'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          COMMIT: ${{ steps.plan.outputs.commit }}
+          # Sans plan, le commit que le déclenchement visait.
+          COMMIT: ${{ steps.plan.outputs.commit || github.sha }}
           RESULTAT: ${{ steps.tests.outcome }}
           EXECUTION: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # Une nuit qui n'a pas pu jouer (installation rouge, par exemple) est une nuit rouge.
+          # Une nuit qui n'a pas pu jouer (installation rouge, plan rouge, par exemple) est une nuit rouge.
           verdict=rouge
           [ "$RESULTAT" = success ] && verdict=vert
-          node packages/gardes/nuit.mjs signaler "$verdict" "$COMMIT" "$NUIT/journaux/navigateur.rapport" "$EXECUTION"
+          if [ -f packages/gardes/nuit.mjs ] && command -v node > /dev/null; then
+            node packages/gardes/nuit.mjs signaler "$verdict" "$COMMIT" "${NUIT:-$RUNNER_TEMP/nuit}/journaux/navigateur.rapport" "$EXECUTION"
+            exit
+          fi
+          # Sans le dépôt extrait, ni l'outil de la nuit : la même issue, par `gh` — même titre, même
+          # marque que `packages/gardes/nuit.mjs`.
+          titre='Tests navigateur rouges la nuit, sur main'
+          texte="<!-- nuit : rouge -->
+          Nuit rouge : la nuit n'a pas pu jouer les tests navigateur sur le commit \`$COMMIT\` de \`main\` — elle a échoué avant de savoir ce qu'elle joue (extraction, outil de la nuit). Aucun fichier rouge à nommer : voir le journal de l'exécution.
+
+          Exécution : $EXECUTION"
+          numero=$(gh issue list --state open --limit 100 --json number,title,body --jq "[.[] | select(.title == \"$titre\" and (.body | contains(\"<!-- nuit : tests navigateur -->\")))] | sort_by(.number) | .[0].number // empty")
+          if [ -n "$numero" ]; then
+            gh issue comment "$numero" --body "$texte"
+          else
+            gh issue create --title "$titre" --body "<!-- nuit : tests navigateur -->
+          $texte"
+          fi

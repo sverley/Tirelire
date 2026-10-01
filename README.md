@@ -111,7 +111,7 @@ niveau :
   - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
     `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
     touchés, tests headless de l'interface ; durée attendue 30 s) ou **organisationnel** (tests de la
-    garde ; durée attendue 40 s), ou les deux. Un dépassement de plus de 20 % s'affiche, sans bloquer.
+    garde ; durée attendue 50 s), ou les deux. Un dépassement de plus de 20 % s'affiche, sans bloquer.
   - De ce que la nature retient, ne se joue que ce qui n'est pas déjà vert sur son empreinte, dans
     l'attestation de la branche, d'un lancement, d'un push ou d'une session à l'autre, ou parce que
     `main` a la même ; la livraison dit chaque ensemble, joué ou non, et pourquoi, et les fichiers

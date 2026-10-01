@@ -1581,7 +1581,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
   l'interface sans navigateur, 30 s ; 630 s de plus avec les tests navigateur demandés, et 80 s plus
-  25 s par fichier pour ceux de l'issue) ou organisationnel (garde, 40 s) —, mesurés sur 2 cœurs comme
+  25 s par fichier pour ceux de l'issue) ou organisationnel (garde, 50 s) —, mesurés sur 2 cœurs comme
   la CI (#307), et de ce qu'elle retient ne se joue que ce qui n'est pas vert sur
   son empreinte (voir « Les empreintes ») ; ce qu'elle ne retient pas, la CI le joue au Ready s'il
   n'est pas vert sur son empreinte. Les tests navigateur de non-régression
