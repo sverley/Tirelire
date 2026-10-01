@@ -446,12 +446,12 @@ describe('[niveau 2] D83 · les seuils, l’appel nommé et les crochets (#232)'
       assert.deepEqual(r.codeur, attendus(2), 'livraison : un autre fichier de test que la branche ajoute n’est pas le harnais du besoin ; il se joue à son niveau, au seuil 2 (#232, point 9)');
     });
 
-    test('la livraison d’un besoin fonctionnel vérifie l’interface au seuil 2, et laisse les tests navigateur au Ready faute de demande', async () => {
+    test('la livraison d’un besoin fonctionnel vérifie l’interface au seuil 2, et laisse les tests navigateur à la nuit, faute de demande', async () => {
       const { fonctionnel: r } = await crochets();
       assert.equal(r.code, 0, `livraison (pré-push) d'un besoin fonctionnel refusée\n${r.sortie.slice(-2000)}`);
       assert.deepEqual(r.web, attendus(2), 'livraison : les tests headless de l’interface se jouent au seuil 2 (#232, point 6)');
       assert.deepEqual(r.nav, [], 'livraison : sans demande, les tests navigateur ne se jouent pas, navigateur présent ou non (#264, point 6)');
-      assert.ok(r.sortie.split('\n').some((l) => /navigateur/i.test(l) && /Ready faute de demande/.test(l)), `livraison : elle le dit et laisse les tests navigateur au Ready (#264, point 9)\n${r.sortie.slice(-1500)}`);
+      assert.ok(r.sortie.split('\n').some((l) => /navigateur/i.test(l) && /la nuit sur main, sauf demande/.test(l)), `livraison : elle le dit et laisse les tests navigateur à la nuit (#264, point 9 ; #307)\n${r.sortie.slice(-1500)}`);
     });
   });
 });

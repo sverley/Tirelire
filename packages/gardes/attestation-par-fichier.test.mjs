@@ -76,7 +76,9 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
 
   test('[niveau 1] point 6 · ce qui couvre tout un ensemble — base commune avec main, tête verte au Ready — couvre chacun de ses fichiers', () => {
     const main = couvertureLocale({ arbre: 'a', empreintes: e, main: { commit: 'm'.repeat(40), empreintes: e } });
-    for (const f of [W, N]) assert.equal(fichiersCouverts(main, demande('apps/web', { navigateur: true }), [f], e)[0].couvert, true, f);
+    assert.equal(fichiersCouverts(main, demande('apps/web', { navigateur: true }), [W], e)[0].couvert, true, W);
+    // Les tests navigateur de non-régression ne se jouent plus avant la fusion, mais la nuit (#307) : main ne les couvre pas.
+    assert.equal(fichiersCouverts(main, demande('apps/web', { navigateur: true }), [N], e)[0].couvert, false, N);
     assert.equal(fichiersCouverts(main, demande('apps/web', { seuil: 3 }), [W], e)[0].couvert, false, 'main ne couvre que jusqu’au seuil 2');
     const ready = couvertureAuReady({ arbre: 'a', empreintes: e, tetes: [{ sha: 't'.repeat(40), statut: 'success', empreintes: e }] });
     assert.equal(fichiersCouverts(ready, demande('apps/web', { seuil: 1 }), [W], e)[0].couvert, true);

@@ -35,7 +35,7 @@ const lireFichier = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').repla
 const CI = '.github/workflows/ci.yml';
 const WORKFLOW_BRANCHES = '.github/workflows/branches.yml';
 const ATTESTATION_MJS = join(RACINE, '.githooks/attestation.mjs');
-const FAUTE_DE_DEMANDE = /interface dans le navigateur : non joué — tests navigateur de non-régression laissés au Ready faute de demande/;
+const FAUTE_DE_DEMANDE = /interface dans le navigateur : non joué — tests navigateur de non-régression joués la nuit sur main, sauf demande/;
 const PALIER_ROUGE = /tests navigateur non joués : un test sans navigateur, palier moins cher, a rougi/;
 
 let dossierTemporaire;
@@ -311,7 +311,7 @@ describe('[niveau 4] #264, points 10 et 11 · les branches, à la fermeture d’
 // ─── Ce que chaque moment dit ──────────────────────────────────────────────────────────────────
 
 describe('[niveau 4] #264, point 9 · chaque moment qui ne joue pas les tests navigateur dit pourquoi', () => {
-  test('la livraison sans demande les dit laissés au Ready faute de demande', async () => {
+  test('la livraison sans demande les dit joués la nuit, sur main, sauf demande', async () => {
     assert.match((await livraisonVerte()).push.sortie, FAUTE_DE_DEMANDE);
   });
 
