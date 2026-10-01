@@ -92,8 +92,9 @@ describe('[niveau 4] #304 · l’empreinte d’un fichier de test : ce qu’il l
     const demande = { dossier: 'apps/web', seuil: 2, navigateur: true, cibles: ['test/navigateur'], nomme: false };
     const c = couvertureLocale({ arbre: 'b', empreintes: empreintes(après), fichiers: fAprès, verts: [vert] });
     assert.equal(fichiersCouverts(c, demande, [N1], empreintes(après), fAprès)[0].couvert, true, 'w1 modifié : n1 reste couvert');
-    const ensemble = couvertureLocale({ arbre: 'a', empreintes: e, fichiers: fAvant, main: { commit: 'm'.repeat(40), empreintes: e } });
-    assert.equal(fichiersCouverts(ensemble, demande, [N1], e, fAvant)[0].couvert, true, 'la base commune avec main couvre n1');
+    // Tout l'ensemble vert sur son empreinte — trouvé vert par la nuit, par exemple —, et non plus la base commune avec main, qui ne joue pas les tests navigateur (#307).
+    const ensemble = couvertureLocale({ arbre: 'a', empreintes: e, fichiers: fAvant, verts: [{ ensemble: 'navigateur', empreinte: e.navigateur, seuil: 2, par: 'la nuit', commit: 'm'.repeat(40), date: '2026-10-01T00:00:00Z' }] });
+    assert.equal(fichiersCouverts(ensemble, demande, [N1], e, fAvant)[0].couvert, true, 'l’ensemble vert sur son empreinte couvre n1');
     const changé = entrees({ [N1]: 1 });
     const cN = couvertureLocale({ arbre: 'c', empreintes: empreintes(changé), fichiers: empreintesDesFichiers(TESTS, changé), verts: [vert] });
     assert.equal(fichiersCouverts(cN, demande, [N1], empreintes(changé), empreintesDesFichiers(TESTS, changé))[0].couvert, false, 'n1 modifié : il se rejoue');

@@ -9,7 +9,8 @@
 #   livraison.sh demande [--navigateur]
 #       la demande du codeur ou de l'auditeur (`pnpm livraison --navigateur`, #264) : juge le dernier
 #       commit de la branche comme un premier push et, avec `--navigateur`, y joue aussi les tests
-#       navigateur de non-régression ; l'attestation part sur `origin`.
+#       navigateur de non-régression, qui sinon se jouent la nuit, sur `main` (#307) ; l'attestation
+#       part sur `origin`.
 #
 # 1. Arbre jugé. L'index (fusion) ou le commit (push, demande), jamais la copie de travail : les tests
 #    tournent sur place si la copie est identique à cet arbre, sinon dans une extraction à part
@@ -34,10 +35,14 @@
 # 4. Seuil 2 (#232 : les tests de niveau 0 à 2), le moins cher d'abord :
 #    - le typecheck des paquets dont un ensemble se joue ; rouge, rien d'autre ne se joue ;
 #    - puis les tests sans navigateur, et le harnais du besoin qui ne vit pas dans le navigateur ;
-#    - puis, seulement si tout cela est vert, les tests navigateur : le harnais du besoin qui vit dans
-#      le navigateur (`apps/web/test/navigateur/`) et, sur demande seulement, la non-régression dans
-#      le navigateur ; sans demande, elle est laissée au Ready, et la livraison le dit. Un harnais du
-#      besoin rouge qui ne bloque pas ne les retient pas.
+#    - puis, seulement si tout cela est vert, les tests navigateur : ceux de l'issue (#307) — le
+#      harnais du besoin qui vit dans le navigateur (`apps/web/test/navigateur/`), et les autres
+#      fichiers de tests navigateur que la branche ajoute ou modifie depuis sa base commune avec
+#      `main`, joués en entier (seuil 4), sauf chaque fichier vert sur son empreinte — et, sur
+#      demande seulement, la non-régression dans le navigateur, sans eux ; sans demande, elle se joue
+#      la nuit, sur `main`, et la livraison le dit. Un harnais du besoin rouge qui ne bloque pas ne les
+#      retient pas. Les tests navigateur de l'issue qui ne sont pas du harnais sont de la
+#      non-régression : rouges, ils bloquent ; ils ne s'attestent que fichier par fichier.
 # 5. Harnais du besoin (`harnais-du-besoin.sh` : le fichier de l'auditeur, qui porte le numéro de
 #    l'issue). Joué à part, en entier (seuil 4), quelle que soit sa finalité. Il bloque si ce qui
 #    arrive (commits absents de `main` et de la branche d'arrivée) touche autre chose que le harnais
@@ -163,8 +168,9 @@ esac
 # Le code qui arrive : un fichier hors du harnais et de la documentation.
 code=$(grep -Ev '(^|/)test/|\.test\.[^/]+$|^docs/|\.md$|^$' "$travail/entrants" | sort -u | head -n 3 | tr '\n' ' ')
 
-# Harnais du besoin.
+# Harnais du besoin, et tests navigateur de l'issue (#307).
 : >"$journaux/harnais.txt"
+: >"$journaux/issue.txt"
 if [ -n "$surmain" ]; then
   dit "sur main, tout test est non-régression (aucun harnais du besoin)"
 elif [ -z "$main" ]; then
@@ -174,10 +180,13 @@ elif [ -z "$hbase" ]; then
 elif [ -z "$sous" ]; then
   git -c core.quotePath=false diff --name-only --no-renames --diff-filter=AM "$hbase" "$arbre" -- |
     grep -E '\.test\.[^/]+$' >"$travail/candidats"
-  # shellcheck source=harnais-du-besoin.sh
-  . "$crochets/harnais-du-besoin.sh"
+  # Le harnais du besoin et les tests navigateur de l'issue, par leur définition commune avec la CI.
+  # shellcheck source=tests-de-l-issue.sh
+  . "$crochets/tests-de-l-issue.sh"
   [ -n "$branche" ] || branche=$(branche_du_besoin)
   harnais_retenus "$travail/candidats" "$journaux/harnais.txt" "$arbre:" "$branche" || exit 1
+  # Les tests navigateur de l'issue, hors harnais du besoin, qui se joue à part.
+  tests_de_l_issue_parmi "$travail/candidats" "$journaux/harnais.txt" "$journaux/issue.txt"
 fi
 git ls-tree -r --name-only "$arbre" >"$travail/fichiers" || exit 1
 git cat-file -p "$arbre:packages/gardes/chemins-ignores" >"$travail/chemins-ignores" 2>/dev/null || : >"$travail/chemins-ignores"
@@ -282,6 +291,8 @@ non_regression() { # ensemble dossier
     [ "$dossier" = packages/core ] && set -- "$@" --no-isolate
     [ "$id" = navigateur ] && set -- "$@" --navigateur test/navigateur
     for f in $(dans "$dossier"); do set -- "$@" --exclude "$f"; done
+    # Les tests navigateur de l'issue se jouent à part, en entier (#307).
+    [ "$id" = navigateur ] && for f in $(sed 's#^apps/web/##' "$journaux/issue.txt"); do set -- "$@" --exclude "$f"; done
     lance "$id" "$dossier" pnpm run test "$@"
     ajoute "$id" "$id" "$dossier" vitest
   elif [ -n "$(dans "$dossier")" ]; then
@@ -314,6 +325,15 @@ harnais() { # dossier sans|nav
   fi
 }
 
+# Les tests navigateur de l'issue, en entier (seuil 4), hors harnais du besoin (#307) : de la
+# non-régression, qui ne s'atteste que fichier par fichier.
+issue_nav() {
+  [ -s "$journaux/issue.txt" ] && [ -f "$juge/apps/web/package.json" ] || return 0
+  # shellcheck disable=SC2046
+  lance issue-navigateur apps/web pnpm run test 4 $(couvert issue-navigateur) --navigateur $(rapports_vitest issue-navigateur) $(sed 's#^apps/web/##' "$journaux/issue.txt")
+  ajoute issue issue-navigateur apps/web vitest
+}
+
 bloque=affiche
 if [ -n "$sous" ]; then
   :
@@ -327,13 +347,19 @@ autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | tr '\n' ' 
 [ -z "$autres" ] || dit "harnais du besoin hors de tout paquet, non joué : $autres"
 
 debut=$(date +%s)
-# Durée attendue de ce qui se joue (mesurée le 25/09) : 40 s pour les paquets fonctionnels et
-# l'interface sans navigateur, 270 s de plus pour les tests navigateur demandés, 45 s pour la garde.
-# Un dépassement de plus de 20 % se dit, sans bloquer ; le harnais du besoin est hors durée attendue.
+# Durée attendue de ce qui se joue, mesurée de nouveau le 01/10 sur 2 cœurs comme la CI (#307) : 30 s
+# pour les paquets fonctionnels et l'interface sans navigateur, 50 s pour la garde (mesure de l'auditeur) ; 630 s pour toute
+# la non-régression dans le navigateur demandée, et, pour les tests navigateur de l'issue, 80 s pour
+# construire le site et lancer le navigateur, plus 25 s par fichier (la moyenne des fichiers ; le plus
+# lourd en prend 175). Un dépassement de plus de 20 % se dit, sans bloquer ; le harnais du besoin est
+# hors durée attendue.
+DUREE_FONCTIONNEL=30 DUREE_GARDE=50
 attendue=0
-{ joue coeur || joue relais || joue hebergement || joue interface; } && attendue=$((attendue + 40))
-joue navigateur && attendue=$((attendue + 270))
-joue garde && attendue=$((attendue + 45))
+{ joue coeur || joue relais || joue hebergement || joue interface; } && attendue=$((attendue + DUREE_FONCTIONNEL))
+joue navigateur && attendue=$((attendue + 630))
+issues=$(grep -c . "$journaux/issue.txt")
+[ "$issues" -gt 0 ] && attendue=$((attendue + 80 + 25 * issues))
+joue garde && attendue=$((attendue + DUREE_GARDE))
 # Palier 1 : le typecheck des paquets touchés (fonctionnels) dont un ensemble se joue ; la garde n'en
 # a pas à la livraison (#121). La CI le rejoue toujours.
 for p in $DOSSIERS; do [ "${p%%:*}" != garde ] && joue "${p%%:*}" && grep -qxF "${p#*:}" "$travail/touches" && echo "${p#*:}"; done | sort -u >"$travail/paquets"
@@ -367,13 +393,20 @@ if [ -z "$retenu" ]; then
   elif [ "$bloque" = bloque ] && [ -n "$ha" ] && rouge $ha; then
     retenu="le harnais du besoin, qui bloque, a rougi sans navigateur"
   fi
-  # Palier 3 : les tests navigateur, seulement si tout le reste est vert.
+  # Palier 3 : les tests navigateur, seulement si tout le reste est vert : ceux de l'issue, et la
+  # non-régression demandée.
   if [ -z "$retenu" ]; then
     joue navigateur && non_regression navigateur apps/web
+    issue_nav
     joue harnais && harnais_nav && harnais apps/web nav
     wait
   else
     joue navigateur && echo "$retenu" >"$journaux/navigateur.retenu"
+    if [ -s "$journaux/issue.txt" ]; then
+      printf 'issue\t%s\tvitest\n' issue-navigateur >>"$journaux/lances"
+      echo retenu >"$journaux/issue-navigateur.code"
+      echo "$retenu" >"$journaux/issue-navigateur.retenu"
+    fi
     if joue harnais && harnais_nav; then
       printf 'harnais\t%s\tvitest\n' harnais-web-navigateur >>"$journaux/lances"
       echo retenu >"$journaux/harnais-web-navigateur.code"
@@ -382,8 +415,13 @@ if [ -z "$retenu" ]; then
   fi
 else
   for id in garde coeur relais hebergement interface navigateur harnais; do joue "$id" && echo "$retenu" >"$journaux/$id.retenu"; done
+  if [ -s "$journaux/issue.txt" ]; then
+    printf 'issue\t%s\tvitest\n' issue-navigateur >>"$journaux/lances"
+    echo retenu >"$journaux/issue-navigateur.code"
+    echo "$retenu" >"$journaux/issue-navigateur.retenu"
+  fi
 fi
-if [ -n "$retenu" ] && { joue navigateur || { joue harnais && harnais_nav; }; }; then
+if [ -n "$retenu" ] && { joue navigateur || [ -s "$journaux/issue.txt" ] || { joue harnais && harnais_nav; }; }; then
   dit "tests navigateur non joués : $retenu"
 fi
 

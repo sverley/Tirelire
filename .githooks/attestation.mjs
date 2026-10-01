@@ -22,8 +22,8 @@
  *       ensemble rouge, ou dont un test s'est sauté faute d'outil, n'y entre pas, mais ses fichiers
  *       joués verts y entrent un à un (`<journaux>/<nom>.bilan`, écrit par le lanceur, #302). Seul
  *       l'outillage l'appelle ; aucune session ne l'écrit.
- *   node attestation.mjs envoyer <dépôt distant> <branche>
- *       Envoie l'attestation locale sur `<branche>--attestation`. Un échec se dit sans bloquer : la CI
+ *   node attestation.mjs envoyer <dépôt distant> <branche> [<branche distante>]
+ *       Envoie l'attestation locale sur `<branche>--attestation`, ou sur `<branche distante>`. Un échec se dit sans bloquer : la CI
  *       jouera alors ce que la table de D83 prévoit.
  *   node attestation.mjs ready <tête> <branche> <main> <sortie> [<résumé>] [--depot <propriétaire/dépôt>]
  *       La CI au Ready : si la tête ne contient pas `<main>`, la branche est à mettre à jour, et la
@@ -33,12 +33,20 @@
  *   node attestation.mjs apres-fusion <commit> <dépôt GitHub> <sortie> [<résumé>]
  *       La CI sur `main` : un ensemble se saute si son empreinte est celle d'une tête de PR verte au
  *       Ready, ou celle du premier parent.
+ *   node attestation.mjs nuit <dossier> [<résumé>]
+ *       La nuit (#307), sur le commit extrait de `main` : lit l'attestation de la nuit
+ *       (`attestation-de-la-nuit` sur `origin`) et écrit dans `<dossier>` `verts.json`, `plan` (la
+ *       ligne de l'interface dans le navigateur, au seuil 2, que lit `bilan`), `jouer` (`oui` ou `non` :
+ *       non, son empreinte est déjà trouvée verte, rien de ce qu'ils lisent n'a changé) et
+ *       `couverture.json`, que la nuit passe au lanceur (`--attestation`). Dit ce qui se joue.
+ *       `bilan … nuit <verts> --enregistrer`, puis `envoyer origin nuit attestation-de-la-nuit`,
+ *       gardent ce qu'elle trouve vert pour les nuits suivantes.
  *
  * `<sortie>` est le fichier que la CI passe à `pnpm test --attestation`. `<résumé>` reçoit, en plus
  * de la sortie standard, ce que la CI saute.
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   couvertureApresFusion,
@@ -54,12 +62,15 @@ import {
   planifier,
   resume,
   SEUIL_DE_MAIN,
+  SEUIL_DE_LA_NUIT,
   verdictDuLancement,
 } from '../packages/gardes/attestation.mjs';
-import { ajouterALAttestation, BRANCHE_D_ATTESTATION, DISTANTE, essaie, harnaisDuBesoin as harnaisDe, REF, vertsDu as vertsDuCommit } from '../packages/gardes/attestation-git.mjs';
+import { ajouterALAttestation, BRANCHE_D_ATTESTATION, BRANCHE_DE_LA_NUIT, DISTANTE, NUIT, essaie, harnaisDuBesoin as harnaisDe, REF, vertsDu as vertsDuCommit } from '../packages/gardes/attestation-git.mjs';
 
 const git = (args, options = {}) => execFileSync('git', args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024, ...options }).trim();
 const lire = (f) => essaie(() => readFileSync(f, 'utf8')) ?? '';
+/** Les lancements des tests navigateur de l'issue, dans `<journaux>/lances` (#307). */
+const ISSUE = 'issue';
 const derniereLigne = (e) => String(e?.stderr || e?.message || e).trim().split('\n').at(-1);
 
 /** Les empreintes d'un arbre ou d'un commit, harnais du besoin compris. */
@@ -140,6 +151,21 @@ if (commande === 'verts') {
   const lances = lire(join(journaux, 'lances')).split('\n').filter(Boolean).map((l) => l.split('\t'));
   const nouveaux = [];
   const date = new Date().toISOString();
+  /** Les fichiers joués verts de ces lancements, d'après le bilan du lanceur (`<nom>.bilan`, #302). */
+  const fichiersVerts = (siens) => {
+    const ef = essaie(() => fichiersDe(arbre)) ?? {};
+    const r = [];
+    for (const [, nom] of siens) {
+      const b = essaie(() => JSON.parse(lire(join(journaux, `${nom}.bilan`))));
+      if (!b?.lisible) continue;
+      for (const f of b.fichiers ?? []) {
+        const empreinte = ef[f.fichier];
+        if (f.etat !== 'vert' || !empreinte) continue;
+        r.push({ ensemble: f.ensemble, fichier: f.fichier, empreinte, seuil: f.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
+      }
+    }
+    return r;
+  };
   for (const p of plan) {
     if (!p.jouer) continue;
     const siens = lances.filter(([id]) => id === p.id);
@@ -162,20 +188,25 @@ if (commande === 'verts') {
     console.log(`${moment} : ${nomDe(p.id)} : ${texte}.`);
     for (const l of dits) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
     if (vert && p.empreinte !== '-') nouveaux.push({ ensemble: p.id, empreinte: p.empreinte, seuil: p.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
-    else if (verdicts.length) {
-      // L'ensemble n'est pas vert : ses fichiers joués verts s'attestent un à un, chacun sur
-      // l'empreinte de ce qu'il lit dans l'arbre jugé (#304).
-      const ef = essaie(() => fichiersDe(arbre)) ?? {};
-      for (const [, nom] of siens) {
-        const b = essaie(() => JSON.parse(lire(join(journaux, `${nom}.bilan`))));
-        if (!b?.lisible) continue;
-        for (const f of b.fichiers ?? []) {
-          const empreinte = ef[f.fichier];
-          if (f.etat !== 'vert' || !empreinte) continue;
-          nouveaux.push({ ensemble: f.ensemble, fichier: f.fichier, empreinte, seuil: f.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
-        }
-      }
-    }
+    // L'ensemble n'est pas vert : ses fichiers joués verts s'attestent un à un, chacun sur
+    // l'empreinte de ce qu'il lit dans l'arbre jugé (#304).
+    else if (verdicts.length) nouveaux.push(...fichiersVerts(siens));
+  }
+  // Les tests navigateur de l'issue (#307) : joués à part, en entier (seuil 4), ils ne disent rien de
+  // toute la non-régression dans le navigateur ; leurs fichiers joués verts s'attestent un à un.
+  const issue = lances.filter(([id]) => id === ISSUE);
+  if (issue.length) {
+    const verdicts = issue.map(([, nom, sorte]) => verdictDans(journaux, nom, sorte, 4)).filter(Boolean);
+    const dits = issue.flatMap(([, nom]) => lire(join(journaux, `${nom}.log`)).split('\n').filter((l) => l.startsWith('attestation : ')));
+    let texte;
+    if (!verdicts.length) texte = 'non joués — aucun test à lancer';
+    else if (verdicts.some((v) => v.etat === 'retenu')) texte = `non joués — ${verdicts.find((v) => v.etat === 'retenu').retenu}`;
+    else if (verdicts.some((v) => v.etat === 'rouge')) texte = 'joués en entier : rouge';
+    else if (verdicts.some((v) => v.etat === 'sauté')) texte = "joués en entier : des tests se sont sautés faute d'outil, leurs fichiers ne sont pas attestés";
+    else texte = 'joués en entier, sauf fichier vert sur son empreinte : vert';
+    console.log(`${moment} : tests navigateur de l'issue : ${texte}.`);
+    for (const l of dits) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
+    if (verdicts.length) nouveaux.push(...fichiersVerts(issue));
   }
   if (option === '--enregistrer' && nouveaux.length) {
     const anciens = essaie(() => JSON.parse(lire(fichierVerts))) ?? [];
@@ -186,13 +217,13 @@ if (commande === 'verts') {
     console.log(`${moment} : attestation locale de ${branche} : ${dit.join(', ')} vert(s) sur leur empreinte.`);
   }
 } else if (commande === 'envoyer') {
-  const [distant, branche] = args;
+  const [distant, branche, destination = BRANCHE_D_ATTESTATION(branche)] = args;
   if (!essaie(() => git(['rev-parse', '-q', '--verify', REF(branche)]))) {
     console.log(`aucune attestation locale de ${branche} : rien à envoyer.`);
   } else {
     try {
-      git(['push', '-q', distant, `+${REF(branche)}:refs/heads/${BRANCHE_D_ATTESTATION(branche)}`]);
-      console.log(`attestation de ${branche} envoyée (${BRANCHE_D_ATTESTATION(branche)}).`);
+      git(['push', '-q', distant, `+${REF(branche)}:refs/heads/${destination}`]);
+      console.log(`attestation de ${branche} envoyée (${destination}).`);
     } catch (e) {
       console.log(`attestation de ${branche} non envoyée, la CI jouera ce que D83 prévoit : ${derniereLigne(e)}`);
     }
@@ -253,7 +284,40 @@ if (commande === 'verts') {
   console.log(`Arbre ${arbre.slice(0, 10)} : têtes de PR ${tetes.map((t) => `${t.sha.slice(0, 7)} ${t.statut ?? 'sans statut'}`).join(', ') || 'aucune'}.`);
   const couverture = couvertureApresFusion({ arbre, empreintes: empreintesDe(commit), tetes, parent: premier ? { commit: premier, empreintes: empreintesDe(premier) } : null });
   conclure(couverture, sortie, fichierResume, 'Empreintes vertes après la fusion');
+} else if (commande === 'nuit') {
+  // La nuit (#307) : la non-régression dans le navigateur, sur le commit extrait de `main`, au seuil 2,
+  // sauf ce que les nuits précédentes ont trouvé vert sur la même empreinte, ensemble ou fichier.
+  const [dossier, fichierResume] = args;
+  mkdirSync(dossier, { recursive: true });
+  const commit = git(['rev-parse', 'HEAD']);
+  const arbre = git(['rev-parse', 'HEAD^{tree}']);
+  let verts = [];
+  let lu;
+  try {
+    git(['fetch', '-q', '--no-tags', 'origin', `+refs/heads/${BRANCHE_DE_LA_NUIT}:${DISTANTE(NUIT)}`]);
+    verts = vertsDu(git(['rev-parse', DISTANTE(NUIT)]));
+    lu = `attestation de la nuit lue sur ${BRANCHE_DE_LA_NUIT} : ${verts.length} empreinte(s) verte(s)`;
+  } catch (err) {
+    lu = `aucune attestation de la nuit lue sur ${BRANCHE_DE_LA_NUIT} (${derniereLigne(err)}) : tout se joue`;
+  }
+  writeFileSync(join(dossier, 'verts.json'), `${JSON.stringify(verts)}\n`);
+  const e = empreintesDe(commit);
+  const [p] = planifier({ empreintes: e, seuil: SEUIL_DE_LA_NUIT, verts, navigateur: true }).filter((x) => x.id === 'navigateur');
+  writeFileSync(join(dossier, 'plan'), `${[p.id, p.jouer ? 1 : 0, p.seuil, p.empreinte ?? '-', p.raison].join('\t')}\n`);
+  writeFileSync(join(dossier, 'jouer'), p.jouer ? 'oui\n' : 'non\n');
+  const couverture = couvertureLocale({ origine: 'nuit', arbre, empreintes: e, fichiers: fichiersDe(commit), verts });
+  writeFileSync(join(dossier, 'couverture.json'), `${JSON.stringify(couverture, null, 2)}\n`);
+  const attestes = Object.values(couverture.fichiers).filter((f) => f.ensemble === 'navigateur' && f.seuil >= SEUIL_DE_LA_NUIT).length;
+  const lignes = [
+    `- Commit de main jugé : ${commit.slice(0, 10)}.`,
+    `- ${lu.charAt(0).toUpperCase()}${lu.slice(1)}.`,
+    p.jouer
+      ? `- ${nomDe(p.id)}, seuil ${p.seuil} : se joue${attestes ? ` ; ${attestes} fichier(s) attesté(s) vert(s) sur leur empreinte, que le lanceur saute en les nommant` : ''}.`
+      : `- ${nomDe(p.id)}, seuil ${p.seuil} : rien ne se joue cette nuit — ${p.raison} ; rien de ce qu'ils lisent n'a changé.`,
+  ];
+  for (const l of lignes) console.log(l);
+  if (fichierResume) appendFileSync(fichierResume, `### Tests navigateur de la nuit\n\n${lignes.join('\n')}\n`);
 } else {
-  console.error('usage : attestation.mjs verts | plan | bilan | envoyer | ready | apres-fusion …');
+  console.error('usage : attestation.mjs verts | plan | couverture | bilan | envoyer | ready | apres-fusion | nuit …');
   process.exit(2);
 }
