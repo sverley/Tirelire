@@ -24,6 +24,7 @@ import {
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, addMonths } from './dates.js';
 import { flowOccurrences, tracksOperations, type FlowOccurrence } from './matching.js';
+import { computeForecast, type Forecast } from './forecast.js';
 
 export interface PlanFlowLine {
   flowId: Id;
@@ -157,9 +158,9 @@ export interface Plan {
   today: ISODate;
   /**
    * Vrai quand la période affichée commence après `today` : une période à venir (D52, #183). Le plan
-   * y dit ce que chaque tirelire demande et ce qu'il faut virer pour elle, sans aucune position de
-   * compte — ni lue, ni supposée : rien n'y est plus simulé. Le nom reste, parce que des instantanés
-   * du plan (#197, #209) le fixent.
+   * y dit ce que chaque tirelire demande et ce qu'il faut virer pour elle, calculé sur le seul solde
+   * des tirelires, et montre le solde prévu des comptes et des tirelires (`forecast`, D88) : rien n'y
+   * est supposé. Le nom reste, parce que des instantanés du plan (#197, #209) le fixent.
    */
   simulated: boolean;
   incomes: PlanFlowLine[];
@@ -182,6 +183,12 @@ export interface Plan {
     principalUnallocated: Cents;
   };
   warnings: PlanWarning[];
+  /**
+   * Pour une période à venir : le solde prévu de chaque compte réel et de chaque tirelire à la fin
+   * de la période, avec les opérations qui le font et le manque au point le plus bas (D52, D88).
+   * Absent de la période où l'on lit, qui se lit sur le réel.
+   */
+  forecast?: Forecast;
 }
 
 const KIND_ORDER: Record<NeedKind, number> = { payout: -1, dueDate: 0, recurring: 1, goal: 2 };
@@ -191,9 +198,9 @@ const KIND_ORDER: Record<NeedKind, number> = { payout: -1, dueDate: 0, recurring
  *
  * `today` est la date jusqu'à laquelle les soldes bancaires sont connus (D52) ; par défaut `asOf`,
  * c'est-à-dire « tout est connu jusqu'à la date de calcul ». Jusqu'à la période qui la contient, les
- * virements se lisent sur les positions réelles. Au-delà, le plan ne lit ni ne suppose aucune
- * position de compte : ce qu'il faut virer vers un compte est ce que les tirelires placées là
- * demandent pour la période (`periodDemand`), et rien d'autre (#183).
+ * virements se lisent sur les positions réelles. Au-delà, ce qu'il faut virer vers un compte est ce
+ * que les tirelires placées là demandent pour la période (`periodDemand`), et rien d'autre (#183) ;
+ * le solde prévu des comptes et des tirelires s'y ajoute (`forecast`, D52, D88).
  */
 export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf): Plan {
   const idx = indexLedger(ledger);
@@ -478,6 +485,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       principalUnallocated,
     },
     warnings,
+    ...(upcoming ? { forecast: computeForecast(ledger, period, today) } : {}),
   };
 }
 
