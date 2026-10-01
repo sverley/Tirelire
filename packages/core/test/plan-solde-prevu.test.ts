@@ -4,12 +4,13 @@
  * `apps/web/test/navigateur/plan-solde-prevu.test.ts`.
  *
  * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
- * peut trancher, un test — celui du codeur quand il la tranche (repris de `solde-prevu.test.ts`, qui
- * n'existe plus), sinon le mien : le point 5 est réécrit contre les fonctions de `balances.ts` (le
- * test du codeur relisait ce que le calcul venait de poser), la saisie future qui reprend une
- * occurrence, le creux le plus profond et le point 9 (ajouté par l'auditeur) sont de moi. Données
- * inventées (D84) : l'exemple, lu à sa date de lecture, et un petit grand livre écrit ici, dont les
- * montants attendus sont ceux qu'on calcule à la main.
+ * peut trancher, un test — celui du codeur quand il la tranche (repris de `solde-prevu.test.ts` et,
+ * au second tour, de `solde-prevu-un-calcul.test.ts`, qui n'existent plus), sinon le mien : le point 5
+ * est réécrit contre les fonctions de `balances.ts` (le test du codeur relisait ce que le calcul
+ * venait de poser), la saisie future qui reprend une occurrence, le creux le plus profond, le bord de
+ * la fenêtre d'une occurrence et le point 9 (ajouté par l'auditeur) sont de moi. Données inventées
+ * (D84) : l'exemple, lu à sa date de lecture, et un petit grand livre écrit ici, dont les montants
+ * attendus sont ceux qu'on calcule à la main.
  *
  * Chaque `describe` reprend un point du « Fait quand » sous son numéro. Le point 4 se lit aussi à
  * l'écran ; le point 8 est de la documentation, relue.
@@ -20,8 +21,8 @@
  * - 1 · point 3 : le plan « signale un risque à venir » (principe 1.3) ; point 5 : I2 tel qu'il est
  *   écrit ; point 2, le seul test d'un virement proposé : « seules les données enregistrées servent,
  *   jamais une hypothèse » (principe 1.3).
- * - 2 · les autres : une règle de D52 ou de D88 qui donnerait un résultat faux, l'usage restant
- *   possible.
+ * - 2 · les autres, points 10 et 11 compris : une règle de D52, de D12 ou de D88 qui donnerait un
+ *   résultat faux, l'usage restant possible.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -33,6 +34,7 @@ import {
   euros,
   exampleLedger,
   indexLedger,
+  missingFlows,
   periodsAround,
   tirelireBalance,
   unallocated,
@@ -59,6 +61,8 @@ const àVenir = (l: Ledger, lecture: string) => plans(l, lecture).filter((p) => 
 const LECTURE = '2026-09-10';
 const CC = 'cc';
 const LIVRET = 'livret';
+/** Le début de la fenêtre où l'on cherche les occurrences « attendues, non reçues ». */
+const DEPUIS = '2026-07-01';
 
 function flux(f: Partial<PlannedFlow> & Pick<PlannedFlow, 'id' | 'name' | 'kind' | 'amount'>): PlannedFlow {
   return { accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-25' }, dateWindowDays: 3, ...f };
@@ -140,25 +144,24 @@ describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () =>
     expect(c.start).toBe(euros(1000));
     expect(c.movements.filter((m) => m.origin === 'flux' && m.flowId === 'f-salaire').map((m) => m.date)).toEqual(['2026-09-25', '2026-10-25']);
     expect(c.end).toBe(euros(5000));
-    expect(c.notReceived).toEqual([]);
   });
 
-  it('sans suivi, une occurrence passée compte aussi : rien ne se confronte (U1)', () => {
+  it('sans suivi, une occurrence passée compte aussi : rien ne se confronte, rien n’est dit manquant (U1)', () => {
     const l = petitBudget();
     l.plannedFlows.push(flux({ id: 'f-loyer', name: 'Loyer', kind: 'fixedCharge', amount: -euros(700), periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-02' } }));
     const c = compte(planDe(l, '2026-10-01'), CC);
     expect(c.movements.filter((m) => m.flowId === 'f-loyer').map((m) => m.date)).toEqual(['2026-09-02', '2026-10-02']);
-    expect(c.notReceived).toEqual([]);
+    expect(missingFlows(l, DEPUIS, LECTURE)).toEqual([]);
   });
 
-  it('avec suivi, une occurrence dont la fenêtre est passée sans reprise ne compte plus et se signale « attendue, non reçue »', () => {
+  it('avec suivi, une occurrence dont la fenêtre est passée sans reprise ne compte plus : le bloc « Attendus, non reçus » la dit', () => {
     const l = petitBudget();
     l.plannedFlows.push(flux({ id: 'f-loyer', name: 'Loyer', kind: 'fixedCharge', amount: -euros(700), periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-02' } }));
     l.operations.push(opération({ id: 'cb', origin: 'imported', date: '2026-09-03', amount: -euros(20), state: 'untreated' }));
     const c = compte(planDe(l, '2026-10-01'), CC);
     expect(c.tracked).toBe(true);
     expect(c.movements.filter((m) => m.flowId === 'f-loyer').map((m) => m.date)).toEqual(['2026-10-02']);
-    expect(c.notReceived).toEqual([{ flowId: 'f-loyer', label: 'Loyer', date: '2026-09-02', windowEnd: '2026-09-05', amount: -euros(700) }]);
+    expect(missingFlows(l, DEPUIS, LECTURE)).toEqual([{ flowId: 'f-loyer', name: 'Loyer', expectedDate: '2026-09-02', amount: -euros(700), windowEnd: '2026-09-05' }]);
   });
 
   it('avec suivi, une occurrence encore dans sa fenêtre compte', () => {
@@ -167,7 +170,7 @@ describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () =>
     l.operations.push(opération({ id: 'cb', origin: 'imported', date: '2026-09-03', amount: -euros(20), state: 'untreated' }));
     const c = compte(planDe(l, '2026-10-01'), CC);
     expect(c.movements.filter((m) => m.flowId === 'f-loyer').map((m) => m.date)).toEqual(['2026-09-08', '2026-10-08']);
-    expect(c.notReceived).toEqual([]);
+    expect(missingFlows(l, DEPUIS, LECTURE)).toEqual([]);
   });
 
   it('une occurrence reprise ne compte plus : l’opération qui la reprend compte à sa place, pour son propre montant', () => {
@@ -380,5 +383,76 @@ describe('[niveau 2] point 9 (ajouté par l’auditeur) — une libération de r
       ['2026-09-28', 'dotation', euros(900)],
     ]);
     expect([t.start, t.end]).toEqual([euros(900), euros(900)]);
+  });
+});
+
+describe('[niveau 2] point 10 — la dotation du solde prévu d’une tirelire est celle que sa ligne du plan demande : un seul calcul (D88, D29)', () => {
+  /** Ce que les lignes d'une tirelire demandent, et ce que son solde prévu reçoit au début de la période. */
+  function deuxLectures(p: Plan, tirelireId: string) {
+    const ligne = p.lines.filter((l) => l.tirelireId === tirelireId).reduce((s, l) => s + l.requested, 0);
+    const dotation = tirelire(p, tirelireId).movements.filter((m) => m.origin === 'dotation' && m.date === p.period.start).reduce((s, m) => s + m.amount, 0);
+    return { ligne, dotation };
+  }
+
+  it('l’exemple : chaque tirelire, sur chaque période à venir', () => {
+    const périodes = àVenir(exampleLedger(), LECTURE_EXEMPLE);
+    expect(périodes.length).toBeGreaterThanOrEqual(4);
+    for (const p of périodes) {
+      for (const t of p.forecast!.tirelires) {
+        const { ligne, dotation } = deuxLectures(p, t.id);
+        expect({ période: p.period.label, tirelire: t.name, dotation }).toEqual({ période: p.period.label, tirelire: t.name, dotation: ligne });
+      }
+    }
+  });
+
+  it('l’exemple : de novembre à janvier, la taxe foncière, vidée le 15 octobre, redemande sa croisière', () => {
+    const périodes = àVenir(exampleLedger(), LECTURE_EXEMPLE).filter((p) => ['novembre 2026', 'décembre 2026', 'janvier 2027'].includes(p.period.label));
+    expect(périodes.length).toBe(3);
+    for (const p of périodes) {
+      expect({ période: p.period.label, ...deuxLectures(p, 'env-tf') }).toEqual({ période: p.period.label, ligne: euros(100), dotation: euros(100) });
+    }
+  });
+
+  it('la période où l’on lit se calcule sur le réel : une occurrence encore dans sa fenêtre, que rien n’a reprise, ne change pas ses lignes', () => {
+    const l = petitBudget();
+    // L'échéance de 1 200 € est prévue le 8 septembre, dans la période où l'on lit (le 10), fenêtre de 3 jours : encore attendue.
+    l.needs[0] = { ...l.needs[0]!, periodicity: { interval: 12, unit: 'month', anchorDate: '2026-09-08' } };
+    l.plannedFlows[1] = { ...l.plannedFlows[1]!, periodicity: { interval: 12, unit: 'month', anchorDate: '2026-09-08' } };
+    const avec = planDe(l, LECTURE);
+    const sans = planDe({ ...l, plannedFlows: l.plannedFlows.filter((f) => f.id !== 'f-tf') }, LECTURE);
+    expect(avec.simulated).toBe(false);
+    expect(avec.lines.length).toBeGreaterThan(0);
+    // Ce que le plan lit sur le réel : ses lignes, ce qu'il vire, ses totaux (dont le non affecté du compte principal), ses écarts de placement.
+    const lu = (p: Plan) => ({ lignes: p.lines.map((x) => [x.needId, x.balance, x.requested]), virements: p.transfers, totaux: p.totals, écarts: p.gaps, alertes: p.warnings });
+    expect(lu(avec)).toEqual(lu(sans));
+  });
+});
+
+describe('[niveau 2] point 11 — « attendue, non reçue » : le bloc « Attendus, non reçus » et le solde prévu reconnaissent la même occurrence (D12, D88)', () => {
+  /** Le petit budget, avec un loyer de 700 € le 2 de chaque mois (fenêtre de 3 jours) et un relevé importé le 3 septembre : le compte courant est suivi. */
+  function suivi(): Ledger {
+    const l = petitBudget();
+    l.plannedFlows.push(flux({ id: 'f-loyer', name: 'Loyer', kind: 'fixedCharge', amount: -euros(700), periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-02' } }));
+    l.operations.push(opération({ id: 'cb', origin: 'imported', date: '2026-09-03', amount: -euros(20), state: 'untreated' }));
+    return l;
+  }
+  /** Les dates où le solde prévu d'octobre compte le loyer, lu à `lecture`. */
+  const loyers = (l: Ledger, lecture: string) => compte(planDe(l, '2026-10-01', lecture), CC).movements.filter((m) => m.flowId === 'f-loyer').map((m) => m.date);
+
+  it('jusqu’au bord de la fenêtre : la dernière journée l’occurrence compte et n’est pas dite manquante, le lendemain l’inverse', () => {
+    const l = suivi();
+    // La fenêtre du 2 septembre finit le 5 : le 5, l'occurrence est encore attendue.
+    expect(missingFlows(l, DEPUIS, '2026-09-05')).toEqual([]);
+    expect(loyers(l, '2026-09-05')).toEqual(['2026-09-02', '2026-10-02']);
+    // Le 6, la fenêtre est passée sans reprise : le bloc la dit manquante, le solde prévu ne la compte plus.
+    expect(missingFlows(l, DEPUIS, '2026-09-06').map((m) => [m.flowId, m.expectedDate])).toEqual([['f-loyer', '2026-09-02']]);
+    expect(loyers(l, '2026-09-06')).toEqual(['2026-10-02']);
+  });
+
+  it('une occurrence reprise n’est pas dite manquante, et n’est pas comptée deux fois', () => {
+    const l = suivi();
+    l.operations.push(opération({ id: 'loyer-sept', origin: 'imported', date: '2026-09-03', amount: -euros(700), plannedFlowId: 'f-loyer', state: 'reconciled' }));
+    expect(missingFlows(l, DEPUIS, LECTURE)).toEqual([]);
+    expect(loyers(l, LECTURE)).toEqual(['2026-10-02']);
   });
 });

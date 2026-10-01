@@ -55,8 +55,8 @@ async function soldesPrévus(page: Page): Promise<{ titre: string; comptes: Lign
           const dernier = out[out.length - 1];
           if (dernier) dernier.bouton = texte(enfant.querySelector('button'));
         } else if (enfant.classList.contains('orders')) {
-          // Le premier bloc déplié sous une ligne est celui des opérations ; les suivants (opérations
-          // non reçues, parts des tirelires hébergées) n'en sont pas.
+          // Le premier bloc déplié sous une ligne est celui des opérations ; le suivant (parts des
+          // tirelires hébergées) n'en est pas.
           const dernier = out[out.length - 1];
           if (!dernier || enfant.previousElementSibling?.classList.contains('orders')) continue;
           for (const r of enfant.querySelectorAll('.row'))
