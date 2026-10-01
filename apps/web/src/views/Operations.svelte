@@ -591,7 +591,7 @@
             {@const herite = inherited(op)}
             <p class="small">
               Opération ›
-              {#each levelChain(op) as s, k (s.id)}{#if k > 0} › {/if}<strong>{describe(s, op)}</strong>{/each}
+              {#each levelChain(op) as s, k (s.id)}{#if k > 0}{' › '}{/if}<strong>{describe(s, op)}</strong>{/each}
             </p>
             <p class="small muted">
               Vous divisez cette part de {money(levelAmount(op))}.

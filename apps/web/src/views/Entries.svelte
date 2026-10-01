@@ -127,13 +127,13 @@
     };
     app.upsert('operations', op);
     if (topOf(id).length <= 1) {
-      // La seule part garde son identifiant, donc ce qu'elle contient ; une saisie neuve a une
-      // part unique variable, qui prend l'intégralité du montant (D27).
+      // La seule part garde son identifiant, donc ce qu'elle contient, et redevient « le reste » :
+      // une part unique variable prend l'intégralité du montant saisi (D27, #297 point 11).
       const existing = lineOf(id);
       const al: SubOperation = {
         id: existing?.id ?? app.newId(),
         operationId: id,
-        share: existing?.share ?? { kind: 'variable' },
+        share: { kind: 'variable' },
         ...(categoryId ? { categoryId } : {}),
         ...(form.tirelireId ? { tirelireId: form.tirelireId } : {}),
         ...(existing?.replenishment ? { replenishment: existing.replenishment } : {}),
