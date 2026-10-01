@@ -57,23 +57,26 @@ describe('[niveau 2] les deux blocs du plan découlent du même calcul (D52)', (
     expect(o.exceptional).toBe(euros(50));
   });
 
-  it('novembre 2026 : une tirelire en avance ne demande rien, donc ne fait plus virer', () => {
+  it('novembre 2026 : l’échéance prélevée le 15 octobre, la taxe foncière reprend sa croisière, et le virement la suit', () => {
+    // Le plan d'une période à venir compte le prélèvement prévu de la taxe foncière (#296, point
+    // 10) : la tirelire, vidée le 15 octobre, redemande sa croisière, et le virement la porte.
     const p = plan(NOVEMBRE);
     expect(p.period.label).toBe('novembre 2026');
     const tf = p.lines.find((l) => l.needId === 'need-tf')!;
-    expect(tf.status).toBe('ahead');
-    expect(tf.requested).toBe(0);
-    // Avant correction : le plan disait « rien à mettre de côté » et « vire 300 € » en même temps.
-    expect(ordre(p, 'acc-livret', 'env-tf')).toBeUndefined();
-    expect(demande(p, 'acc-livret')).toBe(euros(550));
-    expect(vire(p, 'acc-livret')).toBe(euros(550));
+    expect(tf.status).toBe('ok');
+    expect(tf.requested).toBe(euros(100));
+    expect(ordre(p, 'acc-livret', 'env-tf')!.amount).toBe(euros(100));
+    // Les deux blocs disent la même chose : 550 € pour les autres tirelires du livret, plus 100 €.
+    expect(demande(p, 'acc-livret')).toBe(euros(650));
+    expect(vire(p, 'acc-livret')).toBe(euros(650));
   });
 
   it('« retenu » est le solde simulé au début de la période affichée, pas le solde du jour', () => {
-    // Taxe foncière : 900 € au livret, puis les dotations de 150 € de septembre et d'octobre.
+    // Taxe foncière : 900 € au livret, puis les dotations de 150 € de septembre et d'octobre, puis le
+    // prélèvement prévu de 1 200 € le 15 octobre (#296, point 10).
     expect(plan(SEPTEMBRE).lines.find((l) => l.needId === 'need-tf')!.held).toBe(euros(900));
     expect(plan(OCTOBRE).lines.find((l) => l.needId === 'need-tf')!.held).toBe(euros(1050));
-    expect(plan(NOVEMBRE).lines.find((l) => l.needId === 'need-tf')!.held).toBe(euros(1200));
+    expect(plan(NOVEMBRE).lines.find((l) => l.needId === 'need-tf')!.held).toBe(0);
   });
 
   it('le total net à sortir suit : demandé moins ce qu’on rapatrie du non affecté, dans la période où l’on lit', () => {

@@ -5,6 +5,7 @@ export * from './money.js';
 export * from './ids.js';
 export * from './balances.js';
 export * from './plan.js';
+export * from './forecast.js';
 export * from './hlc.js';
 export * from './schema.js';
 export * from './store.js';
