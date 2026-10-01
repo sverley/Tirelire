@@ -17,7 +17,8 @@ Tirelire/
 │   ├── src/importer.ts     profils d'import, lecture des lignes, clés, doublons
 │   ├── src/matching.ts     virements internes, virements par compte, rapprochement de flux, pipeline
 │   ├── src/automations.ts  moteur d'automatismes, aperçu, actions groupées, automatismes issus des flux
-│   ├── src/edit.ts         édition manuelle : verrouillage, ventilation à parts
+│   ├── src/suboperations.ts  sous-opérations à tous les niveaux : parts par division, lignes comptées avec ce qui vaut pour elles, sous-opérations vivantes
+│   ├── src/edit.ts         édition manuelle : verrouillage, division à parts d'un niveau, à tout niveau
 │   ├── src/review.ts       bilan par catégorie, calibrage, provisions prévu vs payé
 │   ├── src/hlc.ts          horloge logique hybride
 │   ├── src/schema.ts       définition des tables aux noms du domaine, colonnes obligatoires et énumérées (une source pour SQL, lecture, écriture, échange), format du fichier
@@ -47,7 +48,7 @@ Tirelire/
 | `Category` | classement des dépenses / revenus ; peut consommer un budget | UUID v7 |
 | `PlannedFlow` | revenu, charge fixe, échéance payée par une tirelire, virement attendu ; périodicité, fenêtre, tolérance, motif | UUID v7 |
 | `Operation` | ligne de relevé (`imported`) ou saisie (`manual`) ; état (non traitée / rapprochée / verrouillée) ; transfert ; flux rapproché | clé déterministe ou UUID v7 |
-| `Allocation` | ligne de ventilation : catégorie + tirelire + part (fixe, pourcentage, variable) | UUID v7 |
+| `SubOperation` | sous-opération (D88) : part (fixe, pourcentage, variable) du niveau qui la contient — l'opération, ou une sous-opération (`parentId`) —, catégorie, tirelire, renflouement ; se divise à son tour, sans limite de niveaux | UUID v7 |
 | `Automation` | sélection + action à champs facultatifs + rang (clé triable) + validité | UUID v7 |
 | `ImportProfile` | colonnes, formats, correspondance des comptes | UUID v7 |
 | `Device` (branche sync) | appareil et personne | siteId |
@@ -61,11 +62,18 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
 ## Conventions de signe
 
 - `operation.amount` : signe bancaire du compte porteur.
-- `allocation` : une part de l'opération (fixe, pourcentage, ou variable = le reste), résolue par
-  `resolveShares`, dans le signe de l'opération.
-- Effet sur la tirelire (`allocationEffects`, D19) : le montant sur le compte de l'opération ; pour
-  un virement interne, aussi son opposé sur le compte de contrepartie — la composante se déplace,
-  le solde ne bouge pas.
+- Sous-opération : une part du niveau qui la contient (fixe, pourcentage du montant de ce niveau, ou
+  variable = le reste, une par division), résolue par `resolveShares`, dans le signe de
+  l'opération. Ce qu'elle ne porte pas (catégorie, tirelire, renflouement), elle le prend du niveau
+  qui la contient, de proche en proche.
+- Tout ce qui lit la ventilation lit les **lignes comptées** (`countedLines`, `linesByOperation`) :
+  les sous-opérations qui ne se divisent plus, et le reste d'une division que ses parts ne couvrent
+  pas, qui garde ce qui vaut pour le niveau divisé ; leur somme est le montant de l'opération, si
+  bien qu'aucun euro ne compte deux fois. Une ligne sans tirelire reste sur le compte réel : c'est
+  le non affecté (D29).
+- Effet sur la tirelire (`lineEffects`, D19) : le montant d'une ligne comptée sur le compte de
+  l'opération ; pour un virement interne, aussi son opposé sur le compte de contrepartie — la
+  composante se déplace, le solde ne bouge pas.
 - Solde à régler d'un compte tiers (`settlementBalance`) : positif = le compte principal lui doit.
 
 ## Calcul du plan (`computePlan`)
@@ -114,7 +122,19 @@ verrouille (`edit.ts`) ; seul l'utilisateur déverrouille, à l'unité ou par ac
 Les règles se rejouent du rang le plus élevé au rang 1 sur les opérations non verrouillées : chaque
 champ renseigné écrase, les champs vides laissent en place, le rang tranche. Le calcul repart de ce
 que l'import a établi (D33), jamais de rien. `previewRules` donne l'avant/après sans écrire ;
-`applyBulkAction` fait la même chose sur une sélection, avec en plus le déverrouillage (D26).
+`applyBulkAction` fait la même chose sur une sélection, avec en plus le déverrouillage (D26). Une
+règle ou une action groupée qui écrit la ventilation la remplace à tous ses niveaux par une seule
+division ; une ventilation que l'import a établie et qu'aucune règle n'écrit reste entière.
+
+## Sous-opérations (D88)
+
+Une opération se divise en sous-opérations (`SubOperation`, table `sub_operations`), chacune
+pouvant se diviser à son tour, sur autant de niveaux qu'on veut. Une sous-opération est vivante si
+elle n'est pas supprimée et que chaque niveau qui la contient l'est aussi (`liveSubOperations`).
+`editDivision` remplace une division, celle de l'opération ou d'une sous-opération, verrouille
+l'opération (D22), n'écrit que les sous-opérations qui changent et retire, avec une sous-opération,
+tout ce qu'elle contient. À la réception (`LedgerStore.receive`), une sous-opération restée sous un
+niveau retiré par une autre instance est retirée à son tour, datée de la suppression de ce niveau.
 
 ## Pipeline d'import (`runPipeline`)
 
@@ -136,7 +156,7 @@ relais Node (`apps/relay`) et relais PHP servi avec la PWA (`apps/hebergement`).
 
 - `pnpm test` : les tests vitest du cœur (périodes, plan, positions et invariants, besoins,
   report, états et filtre, dépôt, fusion, import, rapprochement, règles, ventilation à parts,
-  bilan, sync), plus les gardes de navigateur de `apps/web/test/navigateur/`, sur le harnais commun
+  bilan, sync, sous-opérations), plus les gardes de navigateur de `apps/web/test/navigateur/`, sur le harnais commun
   `apps/web/test/harnais.ts`.
 - `pnpm typecheck`, `pnpm build`.
 - Scénarios navigateur joués avec Playwright pendant le développement (exemple → import CSV → tri → bilan ; synchronisation WebRTC et relais entre deux contextes).
