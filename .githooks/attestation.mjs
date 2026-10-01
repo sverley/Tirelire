@@ -45,6 +45,8 @@ import {
   couvertureAuReady,
   couvertureLocale,
   empreintes,
+  empreintesDesFichiers,
+  estUnFichierDeTest,
   etatDuStatut,
   fusionner,
   lireLesEntrees,
@@ -61,7 +63,13 @@ const lire = (f) => essaie(() => readFileSync(f, 'utf8')) ?? '';
 const derniereLigne = (e) => String(e?.stderr || e?.message || e).trim().split('\n').at(-1);
 
 /** Les empreintes d'un arbre ou d'un commit, harnais du besoin compris. */
-const empreintesDe = (objet, harnais = []) => empreintes(lireLesEntrees(git(['ls-tree', '-r', '-z', '--full-tree', objet])), harnais);
+const entreesDe = (objet) => lireLesEntrees(git(['ls-tree', '-r', '-z', '--full-tree', objet]));
+const empreintesDe = (objet, harnais = []) => empreintes(entreesDe(objet), harnais);
+/** Les empreintes des fichiers de test d'un arbre ou d'un commit, chacun sur ce qu'il lit (#304). */
+const fichiersDe = (objet) => {
+  const entrees = entreesDe(objet);
+  return empreintesDesFichiers(entrees.map((x) => x.chemin).filter(estUnFichierDeTest), entrees);
+};
 
 /** Les empreintes vertes portées par un commit d'attestation, ou `[]`. */
 const vertsDu = (commit) => vertsDuCommit(commit, process.cwd());
@@ -120,7 +128,7 @@ if (commande === 'verts') {
   const harnais = lire(fichierHarnais).split('\n').filter(Boolean);
   const verts = essaie(() => JSON.parse(lire(fichierVerts))) ?? [];
   const reference = main && main !== '-' ? { commit: git(['rev-parse', main]), empreintes: empreintesDe(main) } : null;
-  const couverture = couvertureLocale({ origine: 'livraison', arbre, empreintes: empreintesDe(arbre, harnais), verts, main: reference, harnais });
+  const couverture = couvertureLocale({ origine: 'livraison', arbre, empreintes: empreintesDe(arbre, harnais), fichiers: fichiersDe(arbre), verts, main: reference, harnais });
   writeFileSync(sortie, `${JSON.stringify(couverture, null, 2)}\n`);
 } else if (commande === 'bilan') {
   const [fichierPlan, journaux, moment, arbre, commit, branche, fichierVerts, option] = args;
@@ -132,7 +140,6 @@ if (commande === 'verts') {
   const lances = lire(join(journaux, 'lances')).split('\n').filter(Boolean).map((l) => l.split('\t'));
   const nouveaux = [];
   const date = new Date().toISOString();
-  const empreinteDe = (id) => plan.find((p) => p.id === id)?.empreinte;
   for (const p of plan) {
     if (!p.jouer) continue;
     const siens = lances.filter(([id]) => id === p.id);
@@ -156,13 +163,15 @@ if (commande === 'verts') {
     for (const l of dits) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
     if (vert && p.empreinte !== '-') nouveaux.push({ ensemble: p.id, empreinte: p.empreinte, seuil: p.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
     else if (verdicts.length) {
-      // L'ensemble n'est pas vert : ses fichiers joués verts s'attestent un à un, sur l'empreinte de leur ensemble.
+      // L'ensemble n'est pas vert : ses fichiers joués verts s'attestent un à un, chacun sur
+      // l'empreinte de ce qu'il lit dans l'arbre jugé (#304).
+      const ef = essaie(() => fichiersDe(arbre)) ?? {};
       for (const [, nom] of siens) {
         const b = essaie(() => JSON.parse(lire(join(journaux, `${nom}.bilan`))));
         if (!b?.lisible) continue;
         for (const f of b.fichiers ?? []) {
-          const empreinte = f.ensemble ? empreinteDe(f.ensemble) : null;
-          if (f.etat !== 'vert' || !empreinte || empreinte === '-') continue;
+          const empreinte = ef[f.fichier];
+          if (f.etat !== 'vert' || !empreinte) continue;
           nouveaux.push({ ensemble: f.ensemble, fichier: f.fichier, empreinte, seuil: f.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
         }
       }
@@ -226,7 +235,7 @@ if (commande === 'verts') {
       }
       console.log(`Têtes de la branche vertes au Ready : ${tetes.map((t) => t.sha.slice(0, 7)).join(', ') || 'aucune'}.`);
     }
-    const couverture = couvertureAuReady({ arbre, empreintes: empreintesDe(tete, harnais), verts, tetes, main: { commit: git(['rev-parse', main]), empreintes: empreintesDe(main) }, harnais });
+    const couverture = couvertureAuReady({ arbre, empreintes: empreintesDe(tete, harnais), fichiers: fichiersDe(tete), verts, tetes, main: { commit: git(['rev-parse', main]), empreintes: empreintesDe(main) }, harnais });
     conclure(couverture, sortie, fichierResume, titre);
   }
 } else if (commande === 'apres-fusion') {

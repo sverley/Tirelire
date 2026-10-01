@@ -34,17 +34,10 @@ name: CI et livraison
 #   (#264) : typecheck, seuil 1, harnais du besoin, puis les tests navigateur de non-régression, qui
 #   ne partent que si tout le reste est vert. Il ne joue que le manque (#237, #266) : au Ready, une
 #   branche qui ne contient pas le dernier `main` est à mettre à jour et rien d'autre ne se joue ;
-#   sinon un fichier de test se saute, seuil 1 compris, si l'empreinte de son ensemble — l'état des
-#   chemins qu'il lit (`packages/gardes/attestation.mjs`) — est déjà trouvée verte à un seuil au
-#   moins égal : pour ce fichier, attesté vert par un lancement des tests sur la branche (#302), ou
-#   pour tout son ensemble, par l'attestation de la branche (les tests navigateur demandés et joués
-#   verts en local compris), par la CI sur une tête de la branche verte au Ready, ou parce que `main`
-#   a la même. Sur `main`, un ensemble se saute si son empreinte est celle d'une tête de PR verte au
-#   Ready, ou celle du premier parent. La décision passe par `pnpm test --attestation <fichier>`, et
-#   le lanceur dit les fichiers qu'il joue et ceux qu'il saute. Au tag et pour une version forcée,
-#   rien ne se saute : le lanceur n'y lit aucune attestation — ni sur une tête détachée, ni sur
-#   `main` — et la CI ne lui passe pas `--attestation`. Il lit l'API (statuts, PR d'un commit) en
-#   lecture seule.
+#   sinon, ce qui se saute suit D83 (« Les empreintes », « L'attestation »), seuil 1 compris : la
+#   décision passe par `pnpm test --attestation <fichier>`, que prépare `.githooks/attestation.mjs`,
+#   et le lanceur dit les fichiers qu'il joue et ceux qu'il saute. Il lit l'API (statuts, PR d'un
+#   commit) en lecture seule.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
 #   `main` et à la main (la racine de la recette, `/`), à un tag `v*` (la production,
 #   `vars.TIRELIRE_BASE`) ; jamais sur une PR, où `assemblage-apercu` l'assemble (#153).

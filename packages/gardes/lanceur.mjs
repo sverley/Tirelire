@@ -23,8 +23,9 @@
  * - Tout lancement saute chaque fichier de test vert sur la même empreinte à un seuil au moins égal
  *   — attesté vert lui-même, ou couvert avec tout son ensemble —, et dit, pour chaque ensemble, les
  *   fichiers joués et les fichiers sautés, avec ce qui les couvre : par qui, sur quel arbre ou quel
- *   commit, à quel seuil. L'empreinte est celle de l'ensemble du fichier, calculée sur le contenu
- *   joué, copie de travail comprise (`attestation-git.mjs`, `arbreDeLaCopie`).
+ *   commit, à quel seuil. L'empreinte d'un fichier attesté est celle de ce qu'il lit (D83, #304,
+ *   `empreintesDesFichiers`), calculée sur le contenu joué, copie de travail comprise
+ *   (`attestation-git.mjs`, `arbreDeLaCopie`).
  * - `--attestation <fichier>`, que passent la CI et la livraison : ce qui couvre ce lancement, écrit
  *   par `.githooks/attestation.mjs` ; `--bilan <fichier>`, que passe la livraison : ce que chaque
  *   fichier joué a donné, pour qu'elle atteste un à un les fichiers verts d'un ensemble qui ne l'est
@@ -53,7 +54,7 @@ import { existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, readdirSync
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ciblesDesArguments, couvertureLocale, separerLesCibles, empreintes, ensembleDuFichier, fichiersCouverts, fichiersDuLancement, nomDe } from './attestation.mjs';
+import { ciblesDesArguments, couvertureLocale, separerLesCibles, empreintes, empreintesDesFichiers, estUnFichierDeTest, ensembleDuFichier, fichiersCouverts, fichiersDuLancement, nomDe } from './attestation.mjs';
 import { ajouterALAttestation, arbreDeLaCopie, baseAvecMain, brancheAttestable, entreesDe, essaie, harnaisDuBesoin, racineGit, vertsConnus } from './attestation-git.mjs';
 import { appelsDeTests } from './gardes.mjs';
 import { NIVEAU_MAX, ligneEcartes, lireSeuil, motifDuSeuil } from './niveaux.mjs';
@@ -106,6 +107,9 @@ const demande = { dossier, seuil, navigateur, cibles: ciblesDesArguments(reste),
 let couverture = null;
 /** Les empreintes du contenu joué, `null` s'il ne se lit pas. */
 let jouees = null;
+/** Les empreintes des fichiers de test du contenu joué, chacun sur ce qu'il lit (#304), `null` sans. */
+let fichiersJoues = null;
+const empreintesDesTests = (entrees) => empreintesDesFichiers(entrees.map((x) => x.chemin).filter(estUnFichierDeTest), entrees);
 /** L'arbre joué et ses chemins, pour attester. */
 let copie = null;
 /** Hors CI et hors livraison, sur une branche : ce qu'il faut pour attester. */
@@ -117,7 +121,10 @@ if (fichierAttestation !== null) {
   if (!couverture) annonces.push('aucune empreinte verte pour cet arbre : tout se joue');
   else if (depotGit) {
     copie = arbreDeLaCopie(depotGit);
-    if (copie) jouees = empreintes(copie.entrees, couverture.harnais ?? []);
+    if (copie) {
+      jouees = empreintes(copie.entrees, couverture.harnais ?? []);
+      fichiersJoues = empreintesDesTests(copie.entrees);
+    }
     else {
       couverture = null;
       annonces.push('le contenu joué ne se lit pas : tout se joue');
@@ -134,9 +141,10 @@ if (fichierAttestation !== null) {
   else {
     const harnais = harnaisDuBesoin(b.branche, depotGit);
     jouees = empreintes(copie.entrees, harnais);
+    fichiersJoues = empreintesDesTests(copie.entrees);
     const base = baseAvecMain(depotGit);
     const main = base ? essaie(() => ({ commit: base, empreintes: empreintes(entreesDe(base, depotGit)) })) : null;
-    couverture = couvertureLocale({ arbre: copie.arbre, empreintes: jouees, verts: vertsConnus(b.branche, depotGit), main, harnais });
+    couverture = couvertureLocale({ arbre: copie.arbre, empreintes: jouees, fichiers: fichiersJoues, verts: vertsConnus(b.branche, depotGit), main, harnais });
     attester = { branche: b.branche, harnais };
   }
 } else if (!depotGit) annonces.push("hors de tout dépôt git : rien ne se saute ni ne s'atteste");
@@ -225,7 +233,7 @@ if (couverture && !nomme && racine) {
     const chemins = new Set(copie?.entrees.map((x) => x.chemin));
     // Un fichier que l'arbre joué ne porte pas (ignoré, hors du dépôt) se joue, et ne s'atteste pas.
     const lisibles = dedans.filter((f) => !copie || chemins.has(relatif(racine, f)));
-    decisions = fichiersCouverts(couverture, demande, lisibles.map((f) => relatif(racine, f)), jouees);
+    decisions = fichiersCouverts(couverture, demande, lisibles.map((f) => relatif(racine, f)), jouees, fichiersJoues);
   }
 }
 
@@ -364,7 +372,7 @@ function attesterLeLancement(code, ecartesParFichier) {
     return;
   }
   const apres = arbreDeLaCopie(depotGit);
-  const empreintesApres = apres ? empreintes(apres.entrees, attester.harnais) : null;
+  const fichiersApres = apres ? empreintesDesTests(apres.entrees) : null;
   const chemins = new Set(copie.entrees.map((x) => x.chemin));
   const nouveaux = [];
   const refuses = new Map();
@@ -375,7 +383,8 @@ function attesterLeLancement(code, ecartesParFichier) {
     const fichier = relatif(racine, absolu);
     const ensemble = ensembleDuFichier(fichier);
     if (!ensemble || !chemins.has(fichier)) continue;
-    if (!empreintesApres || empreintesApres[ensemble] !== jouees[ensemble]) {
+    // Ce qu'il lit a changé pendant le lancement : il n'est pas attesté (#302, point 2 ; #304).
+    if (!fichiersJoues?.[fichier] || !fichiersApres || fichiersApres[fichier] !== fichiersJoues[fichier]) {
       changes.add(nomDe(ensemble));
       continue;
     }
@@ -383,7 +392,7 @@ function attesterLeLancement(code, ecartesParFichier) {
       refuses.set(fichier, r.etat === 'rouge' ? 'rouge' : "un test s'est sauté, faute d'outil par exemple");
       continue;
     }
-    nouveaux.push({ ensemble, fichier, empreinte: jouees[ensemble], seuil: r.seuil, par, arbre: copie.arbre, date });
+    nouveaux.push({ ensemble, fichier, empreinte: fichiersJoues[fichier], seuil: r.seuil, par, arbre: copie.arbre, date });
   }
   if (changes.size) dire(`${[...changes].join(', ')} : un fichier qu'il lit a changé pendant le lancement, rien n'en est attesté.`);
   for (const [f, pourquoi] of refuses) dire(`${court(f)} : non attesté — ${pourquoi}.`);

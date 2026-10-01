@@ -23,10 +23,12 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
    chaque ensemble — joué, à quel seuil, avec quel verdict, ou pourquoi non —, ajoute à
    l'attestation les empreintes jouées vertes et l'envoie avec le push, sur `<branche>--attestation`,
    où elle se garde d'un push à l'autre ; seul l'outillage la produit, tu ne l'écris ni ne la pousses
-   jamais toi-même (D83). Les tests navigateur se jouent au Ready, en CI ; plus tôt seulement si
-   c'est justifié, à ta demande, sur ton dernier commit : `pnpm livraison --navigateur` ; verts, ils
-   sont attestés sur leur empreinte et la CI ne les rejoue pas tant que ce qu'ils lisent n'a pas
-   changé. En brouillon, le verdict est local : `pnpm typecheck`, tes propres tests, joués à la main
+   jamais toi-même (D83). Les tests navigateur se jouent au Ready, en CI. Pour les jouer plus tôt —
+   demande justifiée ou mesure —, commets d'abord, puis demande-les sur ce commit,
+   `pnpm livraison --navigateur` : verts, ils sont attestés, l'attestation part sur `origin`, et la
+   CI ne les rejoue pas tant que ce qu'ils lisent n'a pas changé. Joués autrement — sur une tête
+   détachée, dans un autre clone, par l'exécuteur lancé sans l'outil de test —, rien n'en est
+   attesté, et ils se rejoueront au Ready (#304). En brouillon, le verdict est local : `pnpm typecheck`, tes propres tests, joués à la main
    (`pnpm --dir <paquet> run test 4 <fichiers>`), le harnais du besoin s'il existe et, si tu modifies
    une fonction de la garde, ses tests de développement (D81) : `pnpm --dir packages/gardes run test
    4 'dev/*.dev.mjs'` ; rien d'autre (D83).

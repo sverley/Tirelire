@@ -89,8 +89,8 @@ Les crochets joués sont alors ceux de la branche extraite, dans chaque worktree
 niveau :
 
 - **Tout lancement des tests** (`pnpm test N`, `pnpm --dir <paquet> run test N`, les crochets, la
-  CI) saute chaque fichier de test déjà vert sur l'**empreinte** de son ensemble — l'état des chemins
-  que lit chaque ensemble de tests (`packages/gardes/attestation.mjs`) — à un seuil au moins égal,
+  CI) saute chaque fichier de test déjà vert sur son **empreinte** — l'état de ce qu'il lit (D83,
+  `packages/gardes/attestation.mjs`) — ou sur celle de son ensemble, à un seuil au moins égal,
   et dit, pour chaque ensemble, les fichiers joués et les fichiers sautés, avec ce qui les couvre.
   Hors CI, sur une branche, il atteste chaque fichier qu'il joue vert ; l'attestation part avec le
   push suivant. Un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
