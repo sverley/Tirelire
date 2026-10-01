@@ -12,6 +12,7 @@ Tirelire/
 │   ├── src/ids.ts          uuidv7, normalizeLabel, operationKey (`op_` + 16 hexadécimaux)
 │   ├── src/balances.ts     positions reconstruites (composantes par compte, besoins, dotations, demande d'une période répartie par placement, non affecté, solde à régler, état d'une tirelire)
 │   ├── src/plan.ts         plan de période : croisière / rattrapage, priorités, virements
+│   ├── src/forecast.ts     solde prévu d'une période à venir : opérations prévues en mémoire, mouvements et origines, manque
 │   ├── src/csv.ts          décodage et parseur CSV
 │   ├── src/importer.ts     profils d'import, lecture des lignes, clés, doublons
 │   ├── src/matching.ts     virements internes, virements par compte, rapprochement de flux, pipeline
@@ -70,7 +71,24 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
 ## Calcul du plan (`computePlan`)
 
 0. Deux dates (D52) : `asOf`, la période regardée, et `today`, jusqu'où les soldes sont connus.
-   Au-delà de `today`, le plan ne lit ni ne suppose aucune position de compte (#183).
+   Pour une période à venir, le plan montre le **solde prévu** (`computeForecast`, `forecast.ts`,
+   D88) de chaque compte réel et de chaque tirelire à la fin de la période : le solde réel à
+   `today`, plus les opérations saisies à une date future et les opérations prévues qui comptent
+   jusque-là. Les opérations prévues des flux (virements permanents enregistrés compris) s'ajoutent
+   en mémoire au grand livre (`withPlannedOperations`), et les soldes se lisent avec les fonctions
+   de `balances.ts` ; les dotations d'une tirelire (D29) y comptent comme des opérations prévues sur
+   elle. Ce qui compte se décide par `flowOccurrencesThatCount` (`matching.ts`) : une occurrence
+   reprise (`Operation.plannedFlowId`) ne compte plus ; sur un compte suivi, une occurrence dont la
+   fenêtre (D12) est passée sans reprise non plus ; sur un compte sans suivi, chaque occurrence
+   compte à sa date. Le même calcul fait le bloc « Attendus, non reçus » (`missingFlows`), seul
+   endroit où une occurrence non reçue se signale. Un virement proposé mais non enregistré n'a pas
+   de flux et ne compte pas. Les lignes d'une période à venir et leurs écarts de placement (étapes
+   2 à 4) se calculent sur ce même grand livre prévu : la dotation qu'une tirelire reçoit dans son
+   solde prévu est celle que sa ligne demande. Les occurrences de l'ordre permanent (étape 5) et le
+   non affecté du compte principal se lisent sur le grand livre reçu. Chaque mouvement porte son
+   origine (flux, dotation, libération, saisie…) ; un solde prévu négatif est un **manque**, daté
+   et chiffré au point le plus bas de la période. Rien ne s'enregistre (I10). La période où l'on
+   lit se lit sur le réel.
 1. Période contenant `asOf` ; revenus et charges fixes = occurrences des flux dans la période.
 2. Par besoin (D28) : part du solde de la tirelire qui lui revient (ordre des priorités), croisière,
    rattrapage, dotation = max, plancher = rattrapage d'une échéance.

@@ -3,7 +3,7 @@
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
   import { revealed } from '../lib/actions';
   import { centsToInput, inputToCents } from '../lib/format';
-  import { alive, computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, type Period, type PlanTransfer } from '@tirelire/core';
+  import { alive, computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, type ForecastMovement, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -108,6 +108,24 @@
     app.upsert('plannedFlows', flow);
     ordreEdite = undefined;
   }
+  /*
+   * Le solde prévu d'une période à venir (D52, D88) : un chiffre par compte et par tirelire, et,
+   * sur demande seulement, les opérations qui le font — repliées par défaut, sans quoi quatre mois
+   * de flux noieraient le chiffre qu'on vient chercher.
+   */
+  let deplies = $state<string[]>([]);
+  function basculerSolde(cle: string) {
+    deplies = deplies.includes(cle) ? deplies.filter((x) => x !== cle) : [...deplies, cle];
+  }
+  const ORIGINES: Record<ForecastMovement['origin'], string> = {
+    flux: 'opération prévue par ce flux',
+    dotation: 'dotation de la tirelire',
+    liberation: 'reliquat rendu au non affecté',
+    saisie: 'saisie',
+    releve: 'relevé',
+    ouverture: 'solde initial',
+  };
+  const tirelireNom = $derived(new Map(app.ledger.tirelires.map((t) => [t.id, t.name])));
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
 
@@ -129,7 +147,7 @@
   </div>
   <p class="muted small">
     Période du {shortDate(plan.period.start)} au {shortDate(plan.period.end)}, {plan.simulated
-      ? 'période à venir : ce que chaque tirelire demande et ce qu’il faut virer pour elle, sans rien supposer des virements à venir ni des soldes des comptes'
+      ? 'période à venir : ce que chaque tirelire demande, ce qu’il faut virer pour elle, et le solde prévu des comptes et des tirelires à la fin de la période'
       : `soldes au ${shortDate(plan.asOf)}`}.
   </p>
 
@@ -147,6 +165,76 @@
     <div class="warnings">
       {#each plan.warnings as w}
         <div>{w.message}</div>
+      {/each}
+    </div>
+  {/if}
+
+  {#if plan.forecast}
+    {@const f = plan.forecast}
+    <h2>Soldes prévus au {shortDate(f.period.end)}</h2>
+    <p class="muted small">
+      Le solde au {shortDate(f.today)}, plus les opérations saisies et les opérations prévues par les flux enregistrés, jusqu’à la fin de la période. Un virement proposé ici mais pas enregistré ne compte pas.
+    </p>
+    {#snippet mouvements(liste: ForecastMovement[])}
+      <div class="orders">
+        {#each liste as m, i (i)}
+          <div class="row">
+            <div class="label">{m.label}<span class="sub">{shortDate(m.date)} · {ORIGINES[m.origin]}</span></div>
+            <div class="{moneyClass(m.amount)}">{money(m.amount)}</div>
+          </div>
+        {:else}
+          <div class="muted small">Aucune opération d’ici la fin de la période.</div>
+        {/each}
+      </div>
+    {/snippet}
+    <h3>Comptes</h3>
+    <div class="card">
+      {#each f.accounts as a (a.id)}
+        {@const cle = `compte:${a.id}`}
+        <div class="row">
+          <div class="label">
+            {a.name}
+            <span class="sub">au {shortDate(f.today)} : <span class="num">{money(a.start)}</span>{a.hosted.length ? ` · non affecté prévu ${money(a.unallocated)}` : ''}</span>
+            {#if a.shortfall}<span class="sub neg">Manque : <span class="num">{money(a.shortfall.amount)}</span> le {shortDate(a.shortfall.date)}</span>{/if}
+          </div>
+          <div class="{moneyClass(a.end)}" style="font-size:17px">{money(a.end)}</div>
+        </div>
+        {#if a.movements.length || a.hosted.length}
+          <div class="actions" style="margin:0 0 6px">
+            <button class="btn small" aria-expanded={deplies.includes(cle)} onclick={() => basculerSolde(cle)}>{deplies.includes(cle) ? 'Masquer le détail' : `Détail · ${a.movements.length} opération${a.movements.length > 1 ? 's' : ''}`}</button>
+          </div>
+        {/if}
+        {#if deplies.includes(cle)}
+          {@render mouvements(a.movements)}
+          {#if a.hosted.length}
+            <div class="orders">
+              {#each a.hosted as h (h.tirelireId)}
+                <div class="row"><div class="label">{tirelireNom.get(h.tirelireId) ?? '?'}<span class="sub">part de la tirelire sur ce compte, prévue</span></div><div class="num">{money(h.amount)}</div></div>
+              {/each}
+              <div class="row"><div class="label">Non affecté prévu</div><div class="num">{money(a.unallocated)}</div></div>
+            </div>
+          {/if}
+        {/if}
+      {/each}
+    </div>
+    <h3>Tirelires</h3>
+    <div class="card">
+      {#each f.tirelires as t (t.id)}
+        {@const cle = `tirelire:${t.id}`}
+        <div class="row">
+          <div class="label">
+            {t.name}
+            <span class="sub">au {shortDate(f.today)} : <span class="num">{money(t.start)}</span></span>
+            {#if t.shortfall}<span class="sub neg">Manque : <span class="num">{money(t.shortfall.amount)}</span> le {shortDate(t.shortfall.date)}</span>{/if}
+          </div>
+          <div class="{moneyClass(t.end)}" style="font-size:17px">{money(t.end)}</div>
+        </div>
+        {#if t.movements.length}
+          <div class="actions" style="margin:0 0 6px">
+            <button class="btn small" aria-expanded={deplies.includes(cle)} onclick={() => basculerSolde(cle)}>{deplies.includes(cle) ? 'Masquer le détail' : `Détail · ${t.movements.length} opération${t.movements.length > 1 ? 's' : ''}`}</button>
+          </div>
+        {/if}
+        {#if deplies.includes(cle)}{@render mouvements(t.movements)}{/if}
       {/each}
     </div>
   {/if}
