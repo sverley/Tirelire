@@ -56,14 +56,15 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
   const N = 'apps/web/test/navigateur/n.test.ts';
   const H = 'apps/web/test/h.test.ts';
 
-  test('[niveau 1] points 1 et 4 · un fichier attesté vert sur l’empreinte de son ensemble se saute, à un seuil au moins égal ; pas un autre', () => {
-    const c = couvertureLocale({ arbre: 'a', empreintes: e, verts: [vert('interface', e.interface, 2, { fichier: W })] });
+  test('[niveau 1] points 1 et 4 · un fichier attesté vert sur son empreinte se saute, à un seuil au moins égal ; pas un autre', () => {
+    // #304 : un fichier attesté vaut sur sa propre empreinte, celle que l'arbre jugé lui donne (`fichiers`).
+    const c = couvertureLocale({ arbre: 'a', empreintes: e, fichiers: { [W]: e.interface }, verts: [vert('interface', e.interface, 2, { fichier: W })] });
     const d = (f, s) => fichiersCouverts(c, demande('apps/web', { seuil: s }), [f], e)[0];
     assert.equal(d(W, 2).couvert, true);
     assert.match(d(W, 2).raison, /fichier attesté vert par un lancement, sur l'arbre a{10}, au seuil 2/);
     assert.equal(d(W, 3).couvert, false, 'un seuil plus haut se joue');
     assert.equal(d('apps/web/test/autre.test.ts', 2).couvert, false, 'un autre fichier du même ensemble se joue');
-    const ailleurs = couvertureLocale({ arbre: 'a', empreintes: E('y'), verts: [vert('interface', e.interface, 2, { fichier: W })] });
+    const ailleurs = couvertureLocale({ arbre: 'a', empreintes: E('y'), fichiers: { [W]: E('y').interface }, verts: [vert('interface', e.interface, 2, { fichier: W })] });
     assert.equal(fichiersCouverts(ailleurs, demande('apps/web'), [W], E('y'))[0].couvert, false, 'sur une autre empreinte, il se joue');
   });
 
@@ -87,9 +88,9 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
     const ensembleVert = couvertureLocale({ arbre: 'a', empreintes: eh, verts: [vert('interface', eh.interface, 4)], harnais });
     const lancement = demande('apps/web', { seuil: 4, cibles: ['test/h.test.ts'] });
     assert.equal(fichiersCouverts(ensembleVert, lancement, [H], eh)[0].couvert, false, 'l’interface verte ne couvre pas le harnais');
-    const fichierVert = couvertureLocale({ arbre: 'a', empreintes: eh, verts: [vert('interface', eh.interface, 4, { fichier: H })], harnais });
+    const fichierVert = couvertureLocale({ arbre: 'a', empreintes: eh, fichiers: { [H]: eh.interface }, verts: [vert('interface', eh.interface, 4, { fichier: H })], harnais });
     assert.equal(fichiersCouverts(fichierVert, lancement, [H], eh)[0].couvert, true, 'le fichier du harnais joué en entier le couvre');
-    const auSeuil2 = couvertureLocale({ arbre: 'a', empreintes: eh, verts: [vert('interface', eh.interface, 2, { fichier: H })], harnais });
+    const auSeuil2 = couvertureLocale({ arbre: 'a', empreintes: eh, fichiers: { [H]: eh.interface }, verts: [vert('interface', eh.interface, 2, { fichier: H })], harnais });
     assert.equal(fichiersCouverts(auSeuil2, lancement, [H], eh)[0].couvert, false, 'joué au seuil 2 seulement, il se rejoue en entier');
   });
 

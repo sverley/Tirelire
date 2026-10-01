@@ -1478,11 +1478,16 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   même lanceur, et la garde, qui lit tout, se rejouent quand elle change. Le harnais du besoin a
   pour empreinte ses fichiers et ce que lisent les ensembles de leurs paquets.
 
-  Ce qui se saute se décide fichier de test par fichier de test (#302) ; l'empreinte reste celle de
-  l'ensemble du fichier, et modifier un fichier que lit l'ensemble, fichier de test compris, fait
-  rejouer tous ses fichiers. Un fichier ne se rejoue pas sur l'empreinte de son ensemble déjà
-  trouvée verte, à un seuil au moins égal : pour lui seul, par tout lancement de l'outil de test
-  hors CI sur la branche (voir « L'attestation ») ; ou pour tout son ensemble, par l'outillage sur
+  Ce qui se saute se décide fichier de test par fichier de test (#302). Un fichier de test a son
+  empreinte, celle de ce qu'il lit (#304) : ce que lit son ensemble, sans les fichiers de test autres
+  que lui, plus lui-même. Un fichier de test ne lit pas les autres — aucun n'en importe un autre, ce
+  que vérifie un test de la garde —, et un fichier de test modifié se rejoue lui-même. Dans la garde
+  et l'hébergement, dont les tests lisent les autres fichiers de test, c'est l'empreinte de
+  l'ensemble. Modifier un fichier de test ne fait donc rejouer que lui, et modifier un autre fichier
+  que lit l'ensemble fait rejouer tous ses fichiers. Un fichier ne se rejoue pas sur une empreinte
+  déjà trouvée verte, à un seuil au moins égal : pour lui seul, sur la sienne, par tout lancement de
+  l'outil de test hors CI sur la branche (voir « L'attestation ») ; ou, sur celle de son ensemble,
+  pour tout son ensemble, par l'outillage sur
   la branche — à la livraison ou à la demande du codeur ou de l'auditeur, dans cette session ou dans
   une autre (chaque session a son clone, voir « Crochets ») —, ou par la CI sur une tête de la
   branche dont toute la CI a fini verte au Ready. L'empreinte qu'a l'ensemble sur la base commune de
@@ -1512,8 +1517,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   la livraison (pré-fusion, pré-push), à la demande —, sur une branche qui n'est ni `main` ni une
   sous-branche, par l'outillage (le lanceur, `.githooks/attestation.mjs`) : aucune session ne
   l'écrit. Y entre chaque fichier de test dont tous les tests de niveau N ou moins ont tourné et fini
-  verts : le fichier, son ensemble, le seuil N — 4 si aucun de ses tests n'a été écarté —, et
-  l'empreinte de l'ensemble calculée sur le contenu joué, copie de travail comprise. N'y entrent ni
+  verts : le fichier, son ensemble, le seuil N — 4 si aucun de ses tests n'a été écarté —, et son
+  empreinte (voir « Les empreintes ») calculée sur le contenu joué, copie de travail comprise. N'y entrent ni
   un fichier dont un test a rougi, ou s'est sauté faute d'outil, ni rien d'un ensemble dont un
   fichier lu a changé pendant le lancement ; un lancement par nom de test n'atteste rien. La
   livraison et la demande y ajoutent chaque ensemble joué vert. Une empreinte calculée sur la copie
