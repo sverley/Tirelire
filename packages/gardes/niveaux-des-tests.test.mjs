@@ -230,6 +230,9 @@ const crochets = mémo(async () => {
   const préCommit = await lancer('sh', ['.githooks/pre-commit'], { cwd: dépôt, env: environnement({ NIVEAUX_TEMOIN: témoinCommit }) });
   git('commit', '-q', '--no-verify', '-m', 'besoin #999');
   const sha = git('rev-parse', 'HEAD');
+  // Le pré-commit atteste ce qu'il a joué vert (#302) ; la livraison se juge ici sans cette
+  // attestation, pour voir ce qu'elle joue d'elle-même.
+  git('update-ref', '-d', `refs/attestations/${BRANCHE}`);
 
   const témoinPush = join(temporaire(), 'pre-push.temoin');
   writeFileSync(témoinPush, '');

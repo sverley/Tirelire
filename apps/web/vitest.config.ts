@@ -10,5 +10,7 @@ export default defineConfig({
     hookTimeout: 120_000,
     // Garde de #113 : un harnais joué en local ne sort pas de la machine.
     setupFiles: ['../../packages/gardes/sans-sortie-vitest.mjs'],
+    // Le site des tests navigateur se construit une fois par lancement (#302, point 8).
+    globalSetup: ['vitest.site-du-lancement.ts'],
   },
 });
