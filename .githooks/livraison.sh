@@ -188,6 +188,9 @@ if [ -z "$sous" ] && [ -z "$surmain" ] && [ -n "$branche" ]; then
   dit "$(node "$crochets/attestation.mjs" verts "$branche" "$travail/verts" $depot 2>&1)"
 fi
 node "$crochets/attestation.mjs" plan "$arbre" 2 "$travail/verts" "$journaux/harnais.txt" "${hbase:--}" "$demande_nav" "$travail/plan" "$niveau" || exit 1
+# Ce qui couvre chaque lancement, fichier par fichier (#302) : le lanceur y saute ce qui est vert sur
+# son empreinte, et dit ce qu'il joue et ce qu'il saute.
+node "$crochets/attestation.mjs" couverture "$arbre" "$travail/verts" "$journaux/harnais.txt" "${hbase:--}" "$travail/couverture" || exit 1
 joue() { awk -F '\t' -v id="$1" '$1 == id && $2 == 1 { ok = 1 } END { exit !ok }' "$travail/plan"; }
 
 # Arbre jugé : sur place, ou extrait à part.
@@ -253,6 +256,8 @@ lance() { # nom dossier commande…
 }
 rapports_node() { echo "--test-reporter=tap" "--test-reporter-destination=stdout" "--test-reporter=$crochets/rapport-node.mjs" "--test-reporter-destination=$journaux/$1.rapport"; }
 rapports_vitest() { echo "--reporter=default" "--reporter=json" "--outputFile.json=$journaux/$1.rapport"; }
+# Ce qui couvre le lancement, et le bilan de ses fichiers, que lit `attestation.mjs bilan` (#302).
+couvert() { echo "--attestation" "$travail/couverture" "--bilan" "$journaux/$1.bilan"; }
 lances=''
 ajoute() { # ensemble nom dossier lanceur : pour le verdict, et pour le bilan de l'ensemble
   lances="$lances $2:$3:$4"
@@ -270,7 +275,7 @@ non_regression() { # ensemble dossier
   [ -f "$juge/$dossier/package.json" ] || { echo "$dossier n'a pas de paquet dans cet arbre" >"$journaux/$id.retenu"; return 0; }
   if vitest_de "$dossier"; then
     # shellcheck disable=SC2046
-    set -- 2 --passWithNoTests $(rapports_vitest "$id")
+    set -- 2 $(couvert "$id") --passWithNoTests $(rapports_vitest "$id")
     [ "$dossier" = packages/core ] && set -- "$@" --no-isolate
     [ "$id" = navigateur ] && set -- "$@" --navigateur test/navigateur
     for f in $(dans "$dossier"); do set -- "$@" --exclude "$f"; done
@@ -280,11 +285,11 @@ non_regression() { # ensemble dossier
     liste=$(grep -E "^$dossier/[^/]*\\.test\\.[cm]?js$" "$travail/fichiers" | grep -vxF -f "$journaux/harnais.txt" | sed "s#^$dossier/##")
     [ -n "$liste" ] || { echo "aucun test hors du harnais du besoin" >"$journaux/$id.retenu"; return 0; }
     # shellcheck disable=SC2046,SC2086
-    lance "$id" "$dossier" pnpm run test 2 $(rapports_node "$id") $liste
+    lance "$id" "$dossier" pnpm run test 2 $(couvert "$id") $(rapports_node "$id") $liste
     ajoute "$id" "$id" "$dossier" node
   else
     # shellcheck disable=SC2046
-    lance "$id" "$dossier" pnpm run test 2 $(rapports_node "$id")
+    lance "$id" "$dossier" pnpm run test 2 $(couvert "$id") $(rapports_node "$id")
     ajoute "$id" "$id" "$dossier" node
   fi
 }
@@ -297,11 +302,11 @@ harnais() { # dossier sans|nav
   [ -n "$liste" ] && [ -f "$juge/$d/package.json" ] || return 0
   if vitest_de "$d"; then
     # shellcheck disable=SC2046,SC2086
-    lance "$n" "$d" pnpm run test 4 $([ "$2" = nav ] && echo --navigateur) $(rapports_vitest "$n") $liste
+    lance "$n" "$d" pnpm run test 4 $(couvert "$n") $([ "$2" = nav ] && echo --navigateur) $(rapports_vitest "$n") $liste
     ajoute harnais "$n" "$d" vitest
   else
     # shellcheck disable=SC2046,SC2086
-    lance "$n" "$d" pnpm run test 4 $(rapports_node "$n") $liste
+    lance "$n" "$d" pnpm run test 4 $(couvert "$n") $(rapports_node "$n") $liste
     ajoute harnais "$n" "$d" node
   fi
 }

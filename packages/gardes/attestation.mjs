@@ -26,7 +26,14 @@
 import { createHash } from 'node:crypto';
 import { niveauDesTitres } from './niveaux.mjs';
 
-export const VERSION = 2;
+/**
+ * Version 3 (#302) : une empreinte verte peut porter un `fichier` — le fichier de test, depuis la
+ * racine, que tout lancement de l'outil de test atteste quand tous ses tests de niveau au plus le
+ * seuil ont tourné et fini verts ; sans `fichier`, elle vaut pour tout l'ensemble. Une attestation de
+ * version 2 se lit encore : elle ne porte que des ensembles.
+ */
+export const VERSION = 3;
+const VERSIONS_LUES = [2, VERSION];
 export const TITRE = 'Attestation de livraison de la branche';
 /** Le statut que `apercu.yml` termine au Ready, sur la tête de la PR (#168). */
 export const STATUT_DU_READY = 'Toute la CI sur ce commit';
@@ -229,29 +236,53 @@ export function lireLAttestation(message) {
   } catch {
     return { raison: "l'attestation ne se lit pas (JSON)" };
   }
-  if (a?.version !== VERSION) return { raison: `version d'attestation inconnue (${a?.version})` };
+  if (!VERSIONS_LUES.includes(a?.version)) return { raison: `version d'attestation inconnue (${a?.version})` };
   if (!Array.isArray(a.verts)) return { raison: "l'attestation ne liste pas ses empreintes vertes" };
-  const verts = a.verts.filter((v) => TOUS.includes(v?.ensemble) && /^[0-9a-f]{64}$/.test(v?.empreinte ?? '') && Number.isInteger(v?.seuil));
+  const verts = a.verts.filter(
+    (v) =>
+      TOUS.includes(v?.ensemble) &&
+      /^[0-9a-f]{64}$/.test(v?.empreinte ?? '') &&
+      Number.isInteger(v?.seuil) &&
+      // Un fichier n'est attesté que dans l'ensemble de son paquet, jamais dans le harnais du besoin.
+      (v.fichier === undefined || (typeof v.fichier === 'string' && ensembleDuFichier(v.fichier) === v.ensemble)),
+  );
   return { attestation: { ...a, verts } };
 }
 
+/** Combien d'empreintes vertes l'attestation garde par fichier de test : les plus récentes. */
+export const GARDEES_PAR_FICHIER = 3;
+/** Combien d'empreintes vertes de fichiers l'attestation garde par ensemble, au plus. */
+export const FICHIERS_GARDES = 600;
+
 /**
- * Réunit des listes d'empreintes vertes : une par ensemble et empreinte, au plus haut seuil trouvé,
- * les `GARDEES` plus récentes de chaque ensemble. Rien ne se perd d'un push ou d'une session à
- * l'autre, sinon les plus anciennes.
+ * Réunit des listes d'empreintes vertes : une par ensemble, fichier (s'il y en a un) et empreinte, au
+ * plus haut seuil trouvé ; les `GARDEES` plus récentes de chaque ensemble, et, pour les fichiers, les
+ * `GARDEES_PAR_FICHIER` plus récentes de chacun, `FICHIERS_GARDES` au plus par ensemble. Rien ne se
+ * perd d'un push ou d'une session à l'autre, sinon les plus anciennes.
  */
 export function fusionner(...listes) {
   const parCle = new Map();
   for (const v of listes.flat()) {
     if (!v) continue;
-    const cle = `${v.ensemble} ${v.empreinte}`;
+    const cle = `${v.ensemble} ${v.fichier ?? ''} ${v.empreinte}`;
     const deja = parCle.get(cle);
     if (!deja || v.seuil > deja.seuil || (v.seuil === deja.seuil && String(v.date ?? '') > String(deja.date ?? ''))) parCle.set(cle, v);
   }
+  const recents = (a, b) => String(b.date ?? '').localeCompare(String(a.date ?? ''));
   const garde = [];
   for (const id of TOUS) {
-    const siens = [...parCle.values()].filter((v) => v.ensemble === id).sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
-    garde.push(...siens.slice(0, GARDEES));
+    const siens = [...parCle.values()].filter((v) => v.ensemble === id).sort(recents);
+    garde.push(...siens.filter((v) => v.fichier === undefined).slice(0, GARDEES));
+    const parFichier = new Map();
+    const fichiers = [];
+    for (const v of siens) {
+      if (v.fichier === undefined) continue;
+      const n = parFichier.get(v.fichier) ?? 0;
+      if (n >= GARDEES_PAR_FICHIER) continue;
+      parFichier.set(v.fichier, n + 1);
+      fichiers.push(v);
+    }
+    garde.push(...fichiers.slice(0, FICHIERS_GARDES));
   }
   return garde;
 }
@@ -261,6 +292,7 @@ const court = (sha) => String(sha ?? '').slice(0, 10);
 /** Qui a trouvé cette empreinte verte, sur quoi, à quel seuil. */
 export function raisonDuVert(v) {
   const sur = v.commit ? `le commit ${court(v.commit)}` : `l'arbre ${court(v.arbre)}`;
+  if (v.fichier !== undefined) return `fichier attesté vert par ${v.par ?? "l'outillage"}, sur ${sur}, au seuil ${v.seuil}`;
   return `empreinte trouvée verte par ${v.par ?? "l'outillage"}, sur ${sur}, au seuil ${v.seuil}`;
 }
 
@@ -272,7 +304,8 @@ export function raisonDuVert(v) {
  */
 export function dejaVert({ id, empreinte, seuil, verts = [], references = [] }) {
   if (!empreinte) return null;
-  const v = verts.filter((x) => x.ensemble === id && x.empreinte === empreinte && x.seuil >= seuil).sort((a, b) => b.seuil - a.seuil)[0];
+  // Une empreinte verte d'un fichier ne vaut que pour lui (#302) : jamais pour tout l'ensemble.
+  const v = verts.filter((x) => x.fichier === undefined && x.ensemble === id && x.empreinte === empreinte && x.seuil >= seuil).sort((a, b) => b.seuil - a.seuil)[0];
   if (v) return raisonDuVert(v);
   if (id !== HARNAIS.id) {
     const r = references.find((x) => x.empreintes?.[id] === empreinte && x.seuil >= seuil);
@@ -354,7 +387,7 @@ export function vertsDuReady(tete) {
   }));
 }
 
-/** Pour chaque ensemble couvert, le plus haut seuil couvert et sa raison. */
+/** Pour chaque ensemble couvert, le plus haut seuil couvert et sa raison ; pour chaque fichier attesté vert sur l'empreinte de son ensemble, de même (#302). */
 function couvertureDe({ origine, arbre, empreintes: e, verts, references, harnais, ids }) {
   const ensembles = {};
   for (const id of ids) {
@@ -366,7 +399,15 @@ function couvertureDe({ origine, arbre, empreintes: e, verts, references, harnai
       }
     }
   }
-  return { version: VERSION, origine, arbre, harnais: [...(harnais ?? [])].sort(), ensembles };
+  const fichiers = {};
+  for (const v of verts ?? []) {
+    if (v.fichier === undefined || !ids.includes(v.ensemble) || !e[v.ensemble] || v.empreinte !== e[v.ensemble]) continue;
+    if (fichiers[v.fichier]?.seuil >= v.seuil) continue;
+    fichiers[v.fichier] = { ensemble: v.ensemble, seuil: v.seuil, raison: raisonDuVert(v) };
+  }
+  const empreintesLues = {};
+  for (const id of ids) if (e[id]) empreintesLues[id] = e[id];
+  return { version: VERSION, origine, arbre, harnais: [...(harnais ?? [])].sort(), empreintes: empreintesLues, ensembles, fichiers };
 }
 
 const referenceDe = (quoi, commit, e) => ({ empreintes: e, seuil: SEUIL_DE_MAIN, raison: `rien de ce qu'il lit n'a changé depuis ${quoi} (${court(commit)})` });
@@ -399,18 +440,28 @@ export function etatDuStatut(statuts) {
 /** Options du lanceur qui prennent une valeur dans l'argument suivant. */
 const AVEC_VALEUR = new Set(['--dir', '-t', '--testNamePattern', '--test-name-pattern', '--exclude', '--reporter', '--outputFile', '--config', '-c', '--root', '-r', '--project', '--test-reporter', '--test-reporter-destination', '--import']);
 
-/** Les cibles d'un lancement : ses arguments qui ne sont ni des options, ni leurs valeurs. */
-export function ciblesDesArguments(args) {
+/**
+ * Sépare les arguments d'un lancement : `options`, les options et leurs valeurs, dans l'ordre ;
+ * `cibles`, les autres, telles qu'écrites.
+ */
+export function separerLesCibles(args) {
+  const options = [];
   const cibles = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a.startsWith('-')) {
-      if (AVEC_VALEUR.has(a)) i++;
+      options.push(a);
+      if (AVEC_VALEUR.has(a) && i + 1 < args.length) options.push(args[++i]);
       continue;
     }
-    cibles.push(a.replace(/^\.\//, '').replace(/\/+$/, ''));
+    cibles.push(a);
   }
-  return cibles;
+  return { options, cibles };
+}
+
+/** Les cibles d'un lancement : ses arguments qui ne sont ni des options, ni leurs valeurs. */
+export function ciblesDesArguments(args) {
+  return separerLesCibles(args).cibles.map((a) => a.replace(/^\.\//, '').replace(/\/+$/, ''));
 }
 
 const sousNavigateur = (c) => c === 'test/navigateur' || c.startsWith('test/navigateur/');
@@ -449,6 +500,98 @@ export function couvre(couverture, demande) {
   return { couvert: true, raison: ids.map((id) => `${nomDe(id)} : ${couverture.ensembles[id].raison}`).join(' ; ') };
 }
 
+/**
+ * Ce qu'un lancement de l'outil de test hors CI saute (#302) : ce que l'attestation de la branche
+ * (locale, et distante telle que le dernier crochet l'a lue) ou `main` — la base commune de la
+ * branche avec `main` — couvre. `origine` : `local` pour un lancement à la main, `livraison` pour la
+ * livraison, qui passe le fichier au lanceur. Mêmes entrées que `couvertureAuReady`, sans têtes.
+ */
+export function couvertureLocale({ origine = 'local', arbre, empreintes: e, verts = [], main = null, harnais = [] }) {
+  const references = main ? [referenceDe('main', main.commit, main.empreintes)] : [];
+  return couvertureDe({ origine, arbre, empreintes: e, verts, references, harnais, ids: TOUS });
+}
+
+/**
+ * Ce qu'un lancement saute, fichier par fichier (#302, points 4 et 6). `couverture` : celle de la
+ * CI, de la livraison ou du lancement local (`null` sans) ; `demande` : `{ dossier, seuil,
+ * navigateur, cibles, nomme }` ; `fichiers` : les fichiers de test que le lancement jouerait, depuis
+ * la racine ; `jouees` : les empreintes du contenu joué, ou `null` quand il ne se lit pas (la
+ * livraison joue alors l'extraction de l'arbre qu'elle juge, et sa couverture vaut pour lui).
+ *
+ * Un fichier se saute s'il est vert sur la même empreinte à un seuil au moins égal : attesté vert
+ * lui-même, ou couvert avec tout son ensemble (ce que D83 saute par ensemble vaut pour tous ses
+ * fichiers). Dans un lancement du harnais du besoin, seul ce qui couvre le harnais, ou le fichier
+ * lui-même, le couvre. Un appel nommé ne saute rien. Rend `[{ fichier, ensemble, couvert, raison }]`.
+ */
+export function fichiersCouverts(couverture, demande, fichiers, jouees = null) {
+  const harnais = couverture?.harnais ?? [];
+  const lancementDuHarnais = ensemblesDeLaDemande(demande, harnais)?.[0] === HARNAIS.id;
+  return fichiers.map((fichier) => {
+    const ensemble = ensembleDuFichier(fichier);
+    const joue = (raison) => ({ fichier, ensemble, couvert: false, raison });
+    const saute = (raison) => ({ fichier, ensemble, couvert: true, raison });
+    if (demande.nomme) return joue('appel nommé : il se joue');
+    if (!couverture || couverture.version !== VERSION) return joue('aucune empreinte verte');
+    if (!ensemble) return joue("hors de tout ensemble : il se joue");
+    if (jouees && couverture.empreintes?.[ensemble] !== jouees[ensemble]) return joue(`le contenu joué n'a pas l'empreinte des empreintes vertes (${nomDe(ensemble)})`);
+    if (lancementDuHarnais) {
+      const h = couverture.ensembles?.[HARNAIS.id];
+      const memeHarnais = !jouees || couverture.empreintes?.[HARNAIS.id] === jouees[HARNAIS.id];
+      if (h?.seuil >= demande.seuil && harnais.includes(fichier) && memeHarnais) return saute(`harnais du besoin : ${h.raison}`);
+    } else {
+      const c = couverture.ensembles?.[ensemble];
+      if (c?.seuil >= demande.seuil) return saute(c.raison);
+    }
+    const f = couverture.fichiers?.[fichier];
+    if (f && f.ensemble === ensemble && f.seuil >= demande.seuil) return saute(f.raison);
+    return joue(`aucune empreinte verte au seuil ${demande.seuil}`);
+  });
+}
+
+/**
+ * Ce que chaque fichier a donné dans un lancement (#302, points 1 et 2) : `Map(fichier → { etat,
+ * seuil })`, `etat` valant `vert`, `rouge` ou `sauté` (un test de niveau au plus le seuil s'est
+ * sauté, faute d'outil par exemple : pas vert sur son empreinte) ; `seuil` : 4 si aucun de ses tests
+ * n'a été écarté par le seuil (joué en entier, niveau 4 compris), sinon celui du lancement. Rend
+ * `null` si le lancement ne se lit pas : rouge sans qu'aucun fichier le soit, ou rapport absent.
+ *
+ * - vitest : `rapport`, son rapport JSON ; un test `todo` ne compte pas, comme dans
+ *   `verdictDuLancement`.
+ * - node : `lignes`, celles du rapporteur `rapport-fichiers.mjs`, qui nomme chaque fichier lancé ;
+ *   `ecartes`, `Map(fichier → nombre)` des tests que le seuil n'a pas inscrits.
+ */
+export function fichiersDuLancement({ code, sorte, rapport = null, lignes = [], ecartes = new Map(), seuil }) {
+  const r = new Map();
+  if (sorte === 'vitest') {
+    if (!Array.isArray(rapport?.testResults)) return null;
+    for (const f of rapport.testResults) {
+      let etat = f.status === 'failed' ? 'rouge' : 'vert';
+      let ecarte = 0;
+      for (const a of f.assertionResults ?? []) {
+        const niveau = niveauDesTitres([...(a.ancestorTitles ?? []), a.title]);
+        if (a.status === 'failed') etat = 'rouge';
+        else if (a.status === 'skipped' || a.status === 'pending') {
+          if (niveau > seuil) ecarte++;
+          else if (etat !== 'rouge') etat = 'sauté';
+        }
+      }
+      r.set(f.name, { etat, seuil: ecarte ? seuil : 4 });
+    }
+  } else {
+    for (const l of lignes) {
+      if (l.type === 'lance' && !r.has(l.fichier)) r.set(l.fichier, { etat: 'vert', seuil: ecartes.get(l.fichier) ? seuil : 4 });
+    }
+    for (const l of lignes) {
+      const x = r.get(l.fichier);
+      if (!x) continue;
+      if (l.type === 'echec') x.etat = 'rouge';
+      else if (l.type === 'saute' && x.etat !== 'rouge') x.etat = 'sauté';
+    }
+  }
+  if (String(code).trim() !== '0' && ![...r.values()].some((x) => x.etat === 'rouge')) return null;
+  return r;
+}
+
 /** Les lignes qui disent, dans la CI, ce que la couverture permet de sauter, ensemble par ensemble. */
 export function resume(couverture) {
   if (!couverture) return ['Aucune empreinte verte pour cet arbre : la CI joue tout ce que D83 prévoit.'];
@@ -456,9 +599,13 @@ export function resume(couverture) {
   const ids = couverture.origine === 'main' ? ENSEMBLES.map((e) => e.id) : TOUS;
   for (const id of ids) {
     const c = couverture.ensembles?.[id];
+    // Les fichiers attestés verts un à un (#302) : le lanceur les saute, et dit lesquels.
+    const attestes = Object.entries(couverture.fichiers ?? {}).filter(([f, x]) => x.ensemble === id || (id === HARNAIS.id && couverture.harnais?.includes(f)));
+    const seuils = [...new Set(attestes.map(([, x]) => x.seuil))].sort();
+    const fichiers = attestes.length ? ` ; ${attestes.length} fichier(s) attesté(s) vert(s) sur son empreinte, au seuil ${seuils.join(' ou ')}, que le lanceur saute en les nommant` : '';
     if (id === HARNAIS.id && !couverture.harnais?.length) lignes.push(`- ${nomDe(id)} : aucun.`);
-    else if (c) lignes.push(`- ${nomDe(id)} : sauté jusqu'au seuil ${c.seuil} — ${c.raison}.`);
-    else lignes.push(`- ${nomDe(id)} : se joue — aucune empreinte verte.`);
+    else if (c) lignes.push(`- ${nomDe(id)} : sauté jusqu'au seuil ${c.seuil} — ${c.raison}${fichiers}.`);
+    else lignes.push(`- ${nomDe(id)} : se joue — aucune empreinte verte${attestes.length ? " pour tout l'ensemble" : ''}${fichiers}.`);
   }
   return lignes;
 }

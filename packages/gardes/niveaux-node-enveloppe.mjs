@@ -86,10 +86,12 @@ for (const [cle, valeur] of Object.entries(reel)) {
   else defaut[cle] = valeur;
 }
 
+// Le compte du fichier, à côté de son nom (#302) : un fichier dont aucun test n'est écarté a été joué
+// en entier, niveau 4 compris.
 process.on('exit', () => {
   if (!ecartes || !process.env.TIRELIRE_ECARTES) return;
   try {
-    appendFileSync(process.env.TIRELIRE_ECARTES, `${ecartes}\n`);
+    appendFileSync(process.env.TIRELIRE_ECARTES, `${ecartes}\t${process.argv[1] ?? ''}\n`);
   } catch {
     // le compte n'est qu'affiché
   }

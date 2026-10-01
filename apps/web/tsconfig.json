@@ -26,6 +26,7 @@
     "src/**/*.svelte",
     "test/**/*.ts",
     "vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "vitest.site-du-lancement.ts"
   ]
 }
