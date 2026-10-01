@@ -14,8 +14,10 @@
  * porte les empreintes trouvées vertes par l'outillage : seul l'outillage l'écrit (le lanceur,
  * `.githooks/attestation.mjs`), elle voyage sur `<branche>--attestation` et s'enrichit d'un push et
  * d'une session à l'autre. Le risque visé est l'erreur, pas la fraude (porteur, 27/09). Ce qui se
- * saute se décide fichier de test par fichier de test (#302) : un fichier se saute s'il est vert sur
- * l'empreinte de son ensemble, attesté lui-même par un lancement des tests, ou avec tout l'ensemble.
+ * saute se décide fichier de test par fichier de test (#302) : un fichier se saute s'il est attesté
+ * vert lui-même, par un lancement des tests, sur son empreinte — ce qu'il lit : son ensemble sans les
+ * autres fichiers de test, plus lui-même (#304) —, ou vert avec tout son ensemble, sur l'empreinte de
+ * l'ensemble.
  *
  * Ce module ne fait que lire et décider, sans git ni réseau :
  * - `ENSEMBLES`, `lit`, `empreinteDe`, `empreintes` : ce que chaque ensemble lit, et son empreinte ;
@@ -431,7 +433,10 @@ export function vertsDuReady(tete) {
   }));
 }
 
-/** Pour chaque ensemble couvert, le plus haut seuil couvert et sa raison ; pour chaque fichier attesté vert sur l'empreinte de son ensemble, de même (#302). */
+/**
+ * Pour chaque ensemble couvert, sur son empreinte, le plus haut seuil couvert et sa raison ; pour
+ * chaque fichier attesté vert sur son empreinte à lui (`ef`, #304), de même, avec cette empreinte.
+ */
 function couvertureDe({ origine, arbre, empreintes: e, fichiers: ef = {}, verts, references, harnais, ids }) {
   const ensembles = {};
   for (const id of ids) {

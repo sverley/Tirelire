@@ -18,9 +18,9 @@
 # L'interface, sans ou dans le navigateur, ne s'y joue jamais.
 # Un ensemble dont l'empreinte, dans l'index, est déjà trouvée verte — par l'attestation de la branche
 # connue de ce clone, ou parce que c'est celle de la base commune avec `main` — ne se rejoue pas (#266,
-# `attestation.mjs plan`). Dans ce qui se joue, le lanceur saute chaque fichier de test vert sur
-# l'empreinte de son ensemble, et atteste ceux qu'il joue verts, empreinte calculée sur la copie de
-# travail (#302). Il dit, pour chaque ensemble, s'il l'a joué, à quel seuil, avec quel verdict, ou
+# `attestation.mjs plan`). Dans ce qui se joue, le lanceur saute chaque fichier de test vert sur son
+# empreinte — ce qu'il lit : son ensemble sans les autres fichiers de test, plus lui-même (#304) —, et
+# atteste ceux qu'il joue verts, empreinte calculée sur la copie de travail (#302). Il dit, pour chaque ensemble, s'il l'a joué, à quel seuil, avec quel verdict, ou
 # pourquoi il ne l'a pas joué, et les fichiers joués et sautés (`attestation.mjs bilan`).
 # `verdict.mjs` trie les échecs par fichier :
 #   - un échec de la non-régression refuse le commit ;

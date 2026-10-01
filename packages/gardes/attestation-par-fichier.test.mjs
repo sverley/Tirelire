@@ -56,7 +56,7 @@ describe('[niveau 4] #302 · la décision, fichier par fichier', () => {
   const N = 'apps/web/test/navigateur/n.test.ts';
   const H = 'apps/web/test/h.test.ts';
 
-  test('[niveau 1] points 1 et 4 · un fichier attesté vert sur l’empreinte de son ensemble se saute, à un seuil au moins égal ; pas un autre', () => {
+  test('[niveau 1] points 1 et 4 · un fichier attesté vert sur son empreinte se saute, à un seuil au moins égal ; pas un autre', () => {
     // #304 : un fichier attesté vaut sur sa propre empreinte, celle que l'arbre jugé lui donne (`fichiers`).
     const c = couvertureLocale({ arbre: 'a', empreintes: e, fichiers: { [W]: e.interface }, verts: [vert('interface', e.interface, 2, { fichier: W })] });
     const d = (f, s) => fichiersCouverts(c, demande('apps/web', { seuil: s }), [f], e)[0];
