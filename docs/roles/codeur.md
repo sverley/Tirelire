@@ -14,8 +14,11 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
    compose le harnais après ton premier compte rendu ; aux tours suivants, ses verdicts te
    suffisent.
 2. Code sur la branche, commets, pousse : chaque ensemble de tests a son empreinte, l'état des
-   chemins qu'il lit, et ne se rejoue pas sur une empreinte déjà trouvée verte, ni aux crochets
-   suivants, dans cette session ou une autre, ni en CI (D83, « Les empreintes »). La livraison
+   chemins qu'il lit, et chaque fichier de test ne se rejoue pas sur une empreinte déjà trouvée
+   verte, ni à tes lancements suivants, ni aux crochets, dans cette session ou une autre, ni en CI
+   (D83, « Les empreintes »). Tout lancement de l'outil de test, les tiens compris, atteste les
+   fichiers qu'il joue verts, et dit ce qu'il joue et ce qu'il saute ; un lancement par nom de test
+   (`-t`, `--test-name-pattern`) se joue toujours, et n'atteste rien. La livraison
    (pré-push) joue le typecheck avant les tests, sans les tests navigateur de non-régression, dit
    chaque ensemble — joué, à quel seuil, avec quel verdict, ou pourquoi non —, ajoute à
    l'attestation les empreintes jouées vertes et l'envoie avec le push, sur `<branche>--attestation`,

@@ -1432,9 +1432,11 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   jouent que si l'option `--navigateur` les active, après le seuil (`pnpm test 2 --navigateur`) ;
   sans elle, ils sont écartés, et comptés tels qu'ils sont écrits dans leurs fichiers, sans être
   exécutés : un test écrit dans une boucle compte pour un, et la sortie dit ce qu'elle compte, pour
-  que ce nombre ne passe pas pour celui des tests exécutés. L'option `--attestation <fichier>`, que
-  seule la CI passe, saute ce qui est vert sur son empreinte dans l'arbre extrait (voir « Les
-  empreintes »), et le dit.
+  que ce nombre ne passe pas pour celui des tests exécutés. Tout lancement saute chaque fichier de
+  test vert sur son empreinte, et le dit (voir « Les empreintes ») ; l'option
+  `--attestation <fichier>`, que seules la CI et la livraison passent, lui donne ce qui couvre le
+  lancement, et sans elle il le lit lui-même : l'attestation de la branche extraite et sa base
+  commune avec `main`.
   Aucune variable d'environnement ne change ce qui se
   joue : tout passe par les arguments. Un test appelé nommément (`-t` de vitest,
   `--test-name-pattern` de `node --test`) se joue quel que soit son niveau. Le script `test` de
@@ -1445,11 +1447,11 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur ; sauf ce qui est vert sur son empreinte |
   | Livraison (pré-fusion, pré-push) | 2, sans les tests navigateur de non-régression ; sauf ce qui est vert sur son empreinte |
   | Demande des tests navigateur (`pnpm livraison --navigateur`) | 2, tests navigateur compris ; sauf ce qui est vert sur son empreinte |
-  | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; rien ne se saute |
+  | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; sauf ce qui est vert sur son empreinte |
   | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
   | CI après la fusion, sur `main` | comme au Ready, hors harnais ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
   | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
-  | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
+  | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option ; sauf ce qui est vert sur son empreinte |
 
   Les tests de développement de fonctions de la garde (D81) ne se jouent à aucun de ces moments :
   hors de `pnpm test`, ils se jouent à la main. Aucun autre ensemble n'a de tests joués à la main.
@@ -1476,26 +1478,48 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   même lanceur, et la garde, qui lit tout, se rejouent quand elle change. Le harnais du besoin a
   pour empreinte ses fichiers et ce que lisent les ensembles de leurs paquets.
 
-  Un ensemble ne se rejoue pas sur une empreinte déjà trouvée verte, à un seuil au moins égal : par
-  l'outillage sur la branche — à la livraison ou à la demande du codeur ou de l'auditeur, dans cette
-  session ou dans une autre (chaque session a son clone, voir « Crochets ») —, ou par la CI sur une
-  tête de la branche dont toute la CI a fini verte au Ready. L'empreinte qu'il a sur la base commune
-  de la branche avec `main` compte aussi comme verte, jusqu'au seuil 2 : la branche ne change rien de
-  ce qu'il lit. Aucun moment ne fait exception (porteur, 28/09 : « si l'empreinte est verte, on ne
-  joue pas les tests, c'est universel ») : au Ready, le seuil 1 non plus. Sur `main`, un ensemble ne
+  Ce qui se saute se décide fichier de test par fichier de test (#302) ; l'empreinte reste celle de
+  l'ensemble du fichier, et modifier un fichier que lit l'ensemble, fichier de test compris, fait
+  rejouer tous ses fichiers. Un fichier ne se rejoue pas sur l'empreinte de son ensemble déjà
+  trouvée verte, à un seuil au moins égal : pour lui seul, par tout lancement de l'outil de test
+  hors CI sur la branche (voir « L'attestation ») ; ou pour tout son ensemble, par l'outillage sur
+  la branche — à la livraison ou à la demande du codeur ou de l'auditeur, dans cette session ou dans
+  une autre (chaque session a son clone, voir « Crochets ») —, ou par la CI sur une tête de la
+  branche dont toute la CI a fini verte au Ready. L'empreinte qu'a l'ensemble sur la base commune de
+  la branche avec `main` compte aussi comme verte, pour tous ses fichiers, jusqu'au seuil 2 : la
+  branche ne change rien de ce qu'il lit. Dans un lancement du harnais du besoin, seul ce qui couvre
+  le harnais, ou le fichier lui-même, couvre un de ses fichiers. Aucun moment ne fait exception
+  (porteur, 28/09 : « si l'empreinte est verte, on ne joue pas les tests, c'est universel ») : au
+  Ready, le seuil 1 non plus ; la vérification de l'auditeur non plus (porteur, 01/10, #302). Un
+  lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours : c'est la voie pour
+  rejouer exprès. Sur `main`, un ensemble ne
   se rejoue pas si son empreinte est celle qu'il a sur la tête d'une PR dont toute la CI a fini verte
   au Ready, ou sur le premier parent du commit arrivé. N'est pas vert sur son empreinte un ensemble
   dont un test a rougi, ou s'est sauté faute d'outil : il se rejoue au moment suivant qui le prévoit.
-  Aucun moment ne trouve d'empreinte verte au seuil 3 : au tag, rien ne se saute. Chaque moment —
+  Au tag et pour une version forcée, rien ne se saute : le lanceur n'y lit aucune attestation — ni
+  sur une tête détachée, ni sur `main` — et la CI ne lui passe pas `--attestation`. Un fichier joué
+  en entier est pourtant attesté au seuil 4, et un lancement à la main au seuil 3 ou 4 le saute.
+  Chaque moment —
   pré-commit, pré-fusion, pré-push, demande, CI au Ready, CI sur `main`, tag — dit, pour chaque
   ensemble, s'il l'a joué, à quel seuil et avec quel verdict, ou pourquoi il ne l'a pas joué :
   empreinte trouvée verte (par qui, sur quel commit ou arbre, à quel seuil), ou rien de ce qu'il lit
-  n'a changé depuis `main` ou depuis le premier parent ; au tag, que rien ne se saute.
-- **L'attestation** (#237, #266) porte les empreintes trouvées vertes par l'outillage. Elle ne se
-  produit qu'à la livraison (pré-fusion, pré-push) et à la demande, hors sous-branche, par
-  l'outillage (`.githooks/attestation.mjs`) : aucune session ne l'écrit. Le pré-commit, qui joue sur
-  la copie de travail, n'atteste rien. Elle se garde d'un push et d'une session à l'autre : un push
-  ne retire pas les empreintes vertes d'un push précédent. Le pré-push et la demande l'envoient sur
+  n'a changé depuis `main` ou depuis le premier parent ; au tag, que rien ne se saute. Chaque
+  lancement de l'outil de test dit en plus, pour chaque ensemble, les fichiers qu'il joue et ceux
+  qu'il saute, avec ce qui les couvre : par qui, sur quel arbre ou quel commit, à quel seuil.
+- **L'attestation** (#237, #266, #302) porte les empreintes trouvées vertes par l'outillage. Elle se
+  produit à tout lancement de l'outil de test hors CI — à la main (`pnpm test N`,
+  `pnpm --dir <paquet> run test N [fichiers]`), vérification de l'auditeur comprise, au pré-commit, à
+  la livraison (pré-fusion, pré-push), à la demande —, sur une branche qui n'est ni `main` ni une
+  sous-branche, par l'outillage (le lanceur, `.githooks/attestation.mjs`) : aucune session ne
+  l'écrit. Y entre chaque fichier de test dont tous les tests de niveau N ou moins ont tourné et fini
+  verts : le fichier, son ensemble, le seuil N — 4 si aucun de ses tests n'a été écarté —, et
+  l'empreinte de l'ensemble calculée sur le contenu joué, copie de travail comprise. N'y entrent ni
+  un fichier dont un test a rougi, ou s'est sauté faute d'outil, ni rien d'un ensemble dont un
+  fichier lu a changé pendant le lancement ; un lancement par nom de test n'atteste rien. La
+  livraison et la demande y ajoutent chaque ensemble joué vert. Une empreinte calculée sur la copie
+  de travail n'est retrouvée, à la livraison ou en CI, que si le contenu poussé est le même ; sinon
+  tout se rejoue : une erreur fait rejouer plus, jamais moins. Elle se garde d'un push et d'une
+  session à l'autre : un push ne retire pas les empreintes vertes d'un push précédent. Le pré-push et la demande l'envoient sur
   la branche `<branche>--attestation`, qui n'est jamais jugée et disparaît à la fermeture de la PR.
   Le risque visé est l'erreur, pas la fraude. Au Ready, la CI lit l'attestation, les têtes de la
   branche vertes au Ready et l'empreinte de `main`, et saute ce qui est vert sur son empreinte ; sans
@@ -1510,7 +1534,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   qui juge le dernier commit de la branche comme un premier push, tests navigateur compris ; verts,
   ils sont attestés sur leur empreinte, l'attestation part sur `origin`, et la CI ne les rejoue pas
   tant que ce qu'ils lisent n'a pas changé. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
-  demandés, et pourquoi. À chaque moment qui joue le typecheck, il se joue avant les tests ; les
+  demandés, et pourquoi. Un lancement des tests navigateur ne construit le site qu'une fois, quel
+  que soit le nombre de fichiers qui l'ouvrent (#302) ; chaque fichier garde son serveur, donc son
+  origine, et son navigateur. À chaque moment qui joue le typecheck, il se joue avant les tests ; les
   tests navigateur — de non-régression, ou du harnais du besoin qui vit dans le navigateur — ne
   partent que si le typecheck et les tests sans navigateur de ce moment ont fini verts ; un harnais
   du besoin rouge qui ne bloque pas ne les retient pas. Chaque moment qui ne joue pas les tests
@@ -1557,9 +1583,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   supprimées par leur nom exact, jamais par préfixe, chacune nommée avec son dernier commit ; la
   tête n'est pas touchée ; à son arrivée sur `main` et à la main, celles qui traînent sans PR ouverte
   de leur tête).
-- **Aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait rougi.** Un ensemble ne se
-  saute que vert sur la même empreinte, jamais s'il a rougi ou s'est sauté faute d'outil, et un
-  chemin oublié de sa liste fait jouer plus. Un rouge découvert
+- **Aucun job sauté ne peut laisser fusionner ce qu'un job joué aurait rougi.** Un fichier de test,
+  ou un ensemble, ne se saute que vert sur la même empreinte, jamais s'il a rougi ou s'est sauté
+  faute d'outil, et un chemin oublié de sa liste fait jouer plus. Un rouge découvert
   après la fusion (#149) relance tout un tour de relecture et de code ; un job sauté qui ne décide pas
   de la fusion, et dont le rouge éventuel reste visible ailleurs, ne coûte rien et reste permis (les
   exécutions d'`apercu.yml` et de `depot-apercu.yml` en montrent). Ne rien sauter de ce qui décide de

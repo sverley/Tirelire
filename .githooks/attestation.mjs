@@ -11,11 +11,17 @@
  *       Ce qu'un crochet joue ou saute : les empreintes de l'arbre, comparées aux vertes et à celles
  *       de `<main>` (la base commune avec `main`). Écrit une ligne par ensemble dans `<sortie>` :
  *       `id<TAB>1|0<TAB>seuil<TAB>empreinte<TAB>raison`, et dit ce qui ne se joue pas, et pourquoi.
+ *   node attestation.mjs couverture <arbre> <verts> <harnais> <main|-> <sortie>
+ *       Ce qui couvre les lancements de la livraison (#302) : le fichier qu'elle passe au lanceur
+ *       (`--attestation`), qui y saute, fichier par fichier, ce qui est vert sur son empreinte — attesté
+ *       vert lui-même, ou avec tout son ensemble, ou inchangé depuis `<main>`.
  *   node attestation.mjs bilan <plan> <journaux> <moment> <arbre> <commit|-> <branche> <verts> [--enregistrer]
  *       Après les lancements (`<journaux>/lances` : `id<TAB>nom<TAB>vitest|node`) : dit, pour chaque
- *       ensemble joué, son seuil et son verdict. Avec `--enregistrer`, ajoute à l'attestation locale
- *       les empreintes jouées vertes ; un ensemble rouge, ou dont un test s'est sauté faute d'outil,
- *       n'y entre pas. Seul l'outillage l'appelle ; aucune session ne l'écrit.
+ *       ensemble joué, son seuil et son verdict, et redit ce que le lanceur a dit de ses fichiers, joués
+ *       ou sautés. Avec `--enregistrer`, ajoute à l'attestation locale les empreintes jouées vertes ; un
+ *       ensemble rouge, ou dont un test s'est sauté faute d'outil, n'y entre pas, mais ses fichiers
+ *       joués verts y entrent un à un (`<journaux>/<nom>.bilan`, écrit par le lanceur, #302). Seul
+ *       l'outillage l'appelle ; aucune session ne l'écrit.
  *   node attestation.mjs envoyer <dépôt distant> <branche>
  *       Envoie l'attestation locale sur `<branche>--attestation`. Un échec se dit sans bloquer : la CI
  *       jouera alors ce que la table de D83 prévoit.
@@ -32,65 +38,36 @@
  * de la sortie standard, ce que la CI saute.
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   couvertureApresFusion,
   couvertureAuReady,
+  couvertureLocale,
   empreintes,
   etatDuStatut,
   fusionner,
-  lireLAttestation,
   lireLesEntrees,
   nomDe,
   planifier,
   resume,
   SEUIL_DE_MAIN,
-  texteDeLAttestation,
   verdictDuLancement,
 } from '../packages/gardes/attestation.mjs';
+import { ajouterALAttestation, BRANCHE_D_ATTESTATION, DISTANTE, essaie, harnaisDuBesoin as harnaisDe, REF, vertsDu as vertsDuCommit } from '../packages/gardes/attestation-git.mjs';
 
 const git = (args, options = {}) => execFileSync('git', args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024, ...options }).trim();
-const essaie = (f) => {
-  try {
-    return f();
-  } catch {
-    return null;
-  }
-};
 const lire = (f) => essaie(() => readFileSync(f, 'utf8')) ?? '';
-const REF = (branche) => `refs/attestations/${branche}`;
-const DISTANTE = (branche) => `refs/attestations-distantes/${branche}`;
-const BRANCHE_D_ATTESTATION = (branche) => `${branche}--attestation`;
 const derniereLigne = (e) => String(e?.stderr || e?.message || e).trim().split('\n').at(-1);
 
 /** Les empreintes d'un arbre ou d'un commit, harnais du besoin compris. */
 const empreintesDe = (objet, harnais = []) => empreintes(lireLesEntrees(git(['ls-tree', '-r', '-z', '--full-tree', objet])), harnais);
 
 /** Les empreintes vertes portées par un commit d'attestation, ou `[]`. */
-function vertsDu(commit) {
-  if (!commit) return [];
-  return lireLAttestation(essaie(() => git(['log', '-1', '--format=%B', commit]))).attestation?.verts ?? [];
-}
+const vertsDu = (commit) => vertsDuCommit(commit, process.cwd());
 
 /** Les fichiers du harnais du besoin, par sa définition commune (`harnais-du-besoin.sh`). */
-function harnaisDuBesoin(branche) {
-  const dossier = mkdtempSync(join(tmpdir(), 'harnais-266-'));
-  const liste = join(dossier, 'liste');
-  try {
-    const script = join(git(['rev-parse', '--show-toplevel']), '.githooks/harnais-du-besoin.sh');
-    execFileSync('sh', ['-c', '. "$1" && harnais_du_besoin "$2" >/dev/null', 'harnais', script, liste], {
-      env: { ...process.env, GITHUB_HEAD_REF: branche },
-      stdio: ['ignore', 'ignore', 'ignore'],
-    });
-    return lire(liste).split('\n').filter(Boolean);
-  } catch {
-    return [];
-  } finally {
-    rmSync(dossier, { recursive: true, force: true });
-  }
-}
+const harnaisDuBesoin = (branche) => essaie(() => harnaisDe(branche, git(['rev-parse', '--show-toplevel']))) ?? [];
 
 /** Écrit la couverture pour la CI, et dit ce qu'elle permet de sauter. */
 function conclure(couverture, sortie, fichierResume, titre) {
@@ -138,6 +115,13 @@ if (commande === 'verts') {
   const plan = planifier({ empreintes: e, seuil: Number(seuil), verts, references, navigateur: nav === 'oui', harnais });
   writeFileSync(sortie, `${plan.map((p) => [p.id, p.jouer ? 1 : 0, p.seuil, p.empreinte ?? '-', p.raison].join('\t')).join('\n')}\n`);
   for (const p of plan) if (!p.jouer) console.log(`${moment} : ${p.nom} : non joué — ${p.raison}.`);
+} else if (commande === 'couverture') {
+  const [arbre, fichierVerts, fichierHarnais, main, sortie] = args;
+  const harnais = lire(fichierHarnais).split('\n').filter(Boolean);
+  const verts = essaie(() => JSON.parse(lire(fichierVerts))) ?? [];
+  const reference = main && main !== '-' ? { commit: git(['rev-parse', main]), empreintes: empreintesDe(main) } : null;
+  const couverture = couvertureLocale({ origine: 'livraison', arbre, empreintes: empreintesDe(arbre, harnais), verts, main: reference, harnais });
+  writeFileSync(sortie, `${JSON.stringify(couverture, null, 2)}\n`);
 } else if (commande === 'bilan') {
   const [fichierPlan, journaux, moment, arbre, commit, branche, fichierVerts, option] = args;
   const plan = lire(fichierPlan).split('\n').filter(Boolean).map((l) => {
@@ -148,10 +132,15 @@ if (commande === 'verts') {
   const lances = lire(join(journaux, 'lances')).split('\n').filter(Boolean).map((l) => l.split('\t'));
   const nouveaux = [];
   const date = new Date().toISOString();
+  const empreinteDe = (id) => plan.find((p) => p.id === id)?.empreinte;
   for (const p of plan) {
     if (!p.jouer) continue;
-    const verdicts = lances.filter(([id]) => id === p.id).map(([, nom, sorte]) => verdictDans(journaux, nom, sorte, p.seuil)).filter(Boolean);
+    const siens = lances.filter(([id]) => id === p.id);
+    const verdicts = siens.map(([, nom, sorte]) => verdictDans(journaux, nom, sorte, p.seuil)).filter(Boolean);
     const retenu = lire(join(journaux, `${p.id}.retenu`)).trim();
+    // Ce que le lanceur a dit de ses fichiers : joués, sautés, et pourquoi (#302, point 4).
+    const dits = siens.flatMap(([, nom]) => lire(join(journaux, `${nom}.log`)).split('\n').filter((l) => l.startsWith('attestation : ')));
+    const toutSaute = siens.length > 0 && siens.every(([, nom]) => /^attestation : sauté, seuil/m.test(lire(join(journaux, `${nom}.log`))));
     let texte;
     let vert = false;
     if (!verdicts.length) texte = `non joué — ${retenu || 'aucun test à lancer'}`;
@@ -160,21 +149,32 @@ if (commande === 'verts') {
     else if (verdicts.some((v) => v.etat === 'sauté')) texte = `joué au seuil ${p.seuil} : ${verdicts.reduce((s, v) => s + (v.sautes ?? 0), 0)} test(s) sauté(s) faute d'outil, donc pas vert sur son empreinte`;
     else if (verdicts.some((v) => v.etat === 'illisible')) texte = `joué au seuil ${p.seuil} : vert, mais son rapport ne se lit pas, donc pas compté vert sur son empreinte`;
     else {
-      texte = `joué au seuil ${p.seuil} : vert`;
+      texte = toutSaute ? `non rejoué au seuil ${p.seuil} — chaque fichier est vert sur son empreinte : vert` : `joué au seuil ${p.seuil} : vert`;
       vert = true;
     }
     console.log(`${moment} : ${nomDe(p.id)} : ${texte}.`);
+    for (const l of dits) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
     if (vert && p.empreinte !== '-') nouveaux.push({ ensemble: p.id, empreinte: p.empreinte, seuil: p.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
+    else if (verdicts.length) {
+      // L'ensemble n'est pas vert : ses fichiers joués verts s'attestent un à un, sur l'empreinte de leur ensemble.
+      for (const [, nom] of siens) {
+        const b = essaie(() => JSON.parse(lire(join(journaux, `${nom}.bilan`))));
+        if (!b?.lisible) continue;
+        for (const f of b.fichiers ?? []) {
+          const empreinte = f.ensemble ? empreinteDe(f.ensemble) : null;
+          if (f.etat !== 'vert' || !empreinte || empreinte === '-') continue;
+          nouveaux.push({ ensemble: f.ensemble, fichier: f.fichier, empreinte, seuil: f.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
+        }
+      }
+    }
   }
   if (option === '--enregistrer' && nouveaux.length) {
     const anciens = essaie(() => JSON.parse(lire(fichierVerts))) ?? [];
-    const message = texteDeLAttestation({ branche, verts: [...nouveaux, ...anciens] });
-    // L'outillage signe : l'attestation n'est l'œuvre de personne.
-    const identite = { GIT_AUTHOR_NAME: 'Livraison Tirelire', GIT_AUTHOR_EMAIL: 'livraison@tirelire.invalid' };
-    const env = { ...process.env, ...identite, GIT_COMMITTER_NAME: identite.GIT_AUTHOR_NAME, GIT_COMMITTER_EMAIL: identite.GIT_AUTHOR_EMAIL };
-    const vide = git(['hash-object', '-t', 'tree', '-w', '--stdin'], { input: '' });
-    git(['update-ref', REF(branche), git(['commit-tree', vide, '-F', '-'], { input: message, env })]);
-    console.log(`${moment} : attestation locale de ${branche} : ${nouveaux.map((v) => `${nomDe(v.ensemble)} (seuil ${v.seuil})`).join(', ')} vert(s) sur leur empreinte.`);
+    ajouterALAttestation({ branche, nouveaux, anciens, cwd: process.cwd() });
+    const ensembles = nouveaux.filter((v) => v.fichier === undefined);
+    const fichiers = nouveaux.filter((v) => v.fichier !== undefined);
+    const dit = [...ensembles.map((v) => `${nomDe(v.ensemble)} (seuil ${v.seuil})`), ...(fichiers.length ? [`${fichiers.length} fichier(s) d'un ensemble qui n'est pas vert`] : [])];
+    console.log(`${moment} : attestation locale de ${branche} : ${dit.join(', ')} vert(s) sur leur empreinte.`);
   }
 } else if (commande === 'envoyer') {
   const [distant, branche] = args;

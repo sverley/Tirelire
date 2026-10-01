@@ -24,11 +24,13 @@
 #    empreinte : l'état, dans l'arbre jugé, des chemins qu'il lit (`packages/gardes/attestation.mjs`,
 #    `ENSEMBLES`). Parmi ceux que la nature du besoin retient, il ne se joue pas si elle est déjà
 #    trouvée verte, à un seuil au moins égal — par l'attestation locale ou distante de la branche,
-#    écrite par l'outillage à la livraison ou à la demande, dans cette session ou dans une autre —, ou
-#    si elle est celle de la base commune avec `main` : rien de ce qu'il lit n'a changé. Un ensemble
-#    qui se joue est dit, avec son seuil et son verdict ; un ensemble qui ne se joue pas l'est aussi,
-#    avec sa raison. Ce que la livraison ne joue pas, la CI le joue au Ready s'il n'est pas vert sur
-#    son empreinte.
+#    écrite par l'outillage, dans cette session ou dans une autre —, ou si elle est celle de la base
+#    commune avec `main` : rien de ce qu'il lit n'a changé. Dans un ensemble qui se joue, le lanceur
+#    saute chaque fichier de test vert sur son empreinte — attesté vert par un lancement des tests
+#    (#302) —, d'après ce qui couvre l'arbre jugé (`attestation.mjs couverture`, passé par
+#    `--attestation`). Un ensemble qui se joue est dit, avec son seuil, son verdict et les fichiers
+#    joués et sautés ; un ensemble qui ne se joue pas l'est aussi, avec sa raison. Ce que la livraison
+#    ne joue pas, la CI le joue au Ready s'il n'est pas vert sur son empreinte.
 # 4. Seuil 2 (#232 : les tests de niveau 0 à 2), le moins cher d'abord :
 #    - le typecheck des paquets dont un ensemble se joue ; rouge, rien d'autre ne se joue ;
 #    - puis les tests sans navigateur, et le harnais du besoin qui ne vit pas dans le navigateur ;
@@ -42,10 +44,11 @@
 #    et la documentation (`**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon son verdict
 #    s'affiche. La non-régression bloque toujours.
 # 6. Sous-branche (`<branche>--codeur`, `<branche>--auditeur`) : non-régression seule, sans attestation.
-# 7. Bilan et attestation (#237, #266) : chaque ensemble est dit — joué, à quel seuil, avec quel
-#    verdict, ou pourquoi il ne l'est pas. Les ensembles joués verts s'ajoutent à l'attestation
+# 7. Bilan et attestation (#237, #266, #302) : chaque ensemble est dit — joué, à quel seuil, avec
+#    quel verdict, ou pourquoi il ne l'est pas. Les ensembles joués verts s'ajoutent à l'attestation
 #    locale (`attestation.mjs bilan`) ; un ensemble rouge, ou dont un test s'est sauté faute d'outil,
-#    n'y entre pas. Une livraison verte l'envoie sur `<branche>--attestation` (`attestation.mjs
+#    n'y entre pas, mais ses fichiers joués verts y entrent un à un (`--bilan` du lanceur), comme
+#    ceux de tout lancement des tests hors CI. Une livraison verte l'envoie sur `<branche>--attestation` (`attestation.mjs
 #    envoyer`), même quand rien ne s'est rejoué. La CI la lit pour ne jouer que le manque (D83). Une
 #    branche `…--attestation` n'est jamais jugée.
 # Limite : une résolution de fusion qui ajoute du code (commit de fusion) ne compte pas comme code
@@ -188,6 +191,9 @@ if [ -z "$sous" ] && [ -z "$surmain" ] && [ -n "$branche" ]; then
   dit "$(node "$crochets/attestation.mjs" verts "$branche" "$travail/verts" $depot 2>&1)"
 fi
 node "$crochets/attestation.mjs" plan "$arbre" 2 "$travail/verts" "$journaux/harnais.txt" "${hbase:--}" "$demande_nav" "$travail/plan" "$niveau" || exit 1
+# Ce qui couvre chaque lancement, fichier par fichier (#302) : le lanceur y saute ce qui est vert sur
+# son empreinte, et dit ce qu'il joue et ce qu'il saute.
+node "$crochets/attestation.mjs" couverture "$arbre" "$travail/verts" "$journaux/harnais.txt" "${hbase:--}" "$travail/couverture" || exit 1
 joue() { awk -F '\t' -v id="$1" '$1 == id && $2 == 1 { ok = 1 } END { exit !ok }' "$travail/plan"; }
 
 # Arbre jugé : sur place, ou extrait à part.
@@ -253,6 +259,8 @@ lance() { # nom dossier commande…
 }
 rapports_node() { echo "--test-reporter=tap" "--test-reporter-destination=stdout" "--test-reporter=$crochets/rapport-node.mjs" "--test-reporter-destination=$journaux/$1.rapport"; }
 rapports_vitest() { echo "--reporter=default" "--reporter=json" "--outputFile.json=$journaux/$1.rapport"; }
+# Ce qui couvre le lancement, et le bilan de ses fichiers, que lit `attestation.mjs bilan` (#302).
+couvert() { echo "--attestation" "$travail/couverture" "--bilan" "$journaux/$1.bilan"; }
 lances=''
 ajoute() { # ensemble nom dossier lanceur : pour le verdict, et pour le bilan de l'ensemble
   lances="$lances $2:$3:$4"
@@ -270,7 +278,7 @@ non_regression() { # ensemble dossier
   [ -f "$juge/$dossier/package.json" ] || { echo "$dossier n'a pas de paquet dans cet arbre" >"$journaux/$id.retenu"; return 0; }
   if vitest_de "$dossier"; then
     # shellcheck disable=SC2046
-    set -- 2 --passWithNoTests $(rapports_vitest "$id")
+    set -- 2 $(couvert "$id") --passWithNoTests $(rapports_vitest "$id")
     [ "$dossier" = packages/core ] && set -- "$@" --no-isolate
     [ "$id" = navigateur ] && set -- "$@" --navigateur test/navigateur
     for f in $(dans "$dossier"); do set -- "$@" --exclude "$f"; done
@@ -280,11 +288,11 @@ non_regression() { # ensemble dossier
     liste=$(grep -E "^$dossier/[^/]*\\.test\\.[cm]?js$" "$travail/fichiers" | grep -vxF -f "$journaux/harnais.txt" | sed "s#^$dossier/##")
     [ -n "$liste" ] || { echo "aucun test hors du harnais du besoin" >"$journaux/$id.retenu"; return 0; }
     # shellcheck disable=SC2046,SC2086
-    lance "$id" "$dossier" pnpm run test 2 $(rapports_node "$id") $liste
+    lance "$id" "$dossier" pnpm run test 2 $(couvert "$id") $(rapports_node "$id") $liste
     ajoute "$id" "$id" "$dossier" node
   else
     # shellcheck disable=SC2046
-    lance "$id" "$dossier" pnpm run test 2 $(rapports_node "$id")
+    lance "$id" "$dossier" pnpm run test 2 $(couvert "$id") $(rapports_node "$id")
     ajoute "$id" "$id" "$dossier" node
   fi
 }
@@ -297,11 +305,11 @@ harnais() { # dossier sans|nav
   [ -n "$liste" ] && [ -f "$juge/$d/package.json" ] || return 0
   if vitest_de "$d"; then
     # shellcheck disable=SC2046,SC2086
-    lance "$n" "$d" pnpm run test 4 $([ "$2" = nav ] && echo --navigateur) $(rapports_vitest "$n") $liste
+    lance "$n" "$d" pnpm run test 4 $(couvert "$n") $([ "$2" = nav ] && echo --navigateur) $(rapports_vitest "$n") $liste
     ajoute harnais "$n" "$d" vitest
   else
     # shellcheck disable=SC2046,SC2086
-    lance "$n" "$d" pnpm run test 4 $(rapports_node "$n") $liste
+    lance "$n" "$d" pnpm run test 4 $(couvert "$n") $(rapports_node "$n") $liste
     ajoute harnais "$n" "$d" node
   fi
 }

@@ -6,3 +6,7 @@ dist/
 coverage/
 *.csv
 *.sqlite
+# Dossiers jetables de tests (#232, #302), créés dans un paquet pour que vitest s'y résolve : hors du
+# contenu joué, ils ne changent aucune empreinte pendant un lancement (#302).
+.niveaux-232-*/
+.site-302-*/
