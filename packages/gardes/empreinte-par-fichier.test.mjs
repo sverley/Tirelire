@@ -1,5 +1,15 @@
 /**
- * Tests du codeur de #304 (niveau 4) : un fichier de test ne se rejoue que si ce qu'il lit a changé.
+ * Harnais d'audit de #304, composé parmi les tests du codeur (D83) : chaque test porte sa marque.
+ * Un fichier de test ne se rejoue que si ce qu'il lit a changé.
+ *
+ * **Qu'aucun rouge ne fusionne** (niveau 1) — principe 10.1 et D83 (« aucun job sauté ne peut laisser
+ * fusionner ce qu'un job joué aurait rougi ») : l'empreinte d'un fichier de test change avec tout ce
+ * que lit son ensemble hors des autres fichiers de test, et avec lui-même ; dans la garde et
+ * l'hébergement, elle reste celle de l'ensemble ; un fichier attesté ne vaut que sur sa propre
+ * empreinte (point 1) ; aucun fichier de test d'un autre ensemble n'en importe un autre (point 3).
+ *
+ * **Le dégradé** (niveau 3) : si ces tests tombent, le résultat reste juste, obtenu plus lentement —
+ * modifier un fichier de test ne fait rejouer que lui, et aucun test navigateur (point 2).
  *
  * - L'empreinte d'un fichier de test (`empreintesDesFichiers`) : ce que lit son ensemble, sans les
  *   autres fichiers de test, plus lui-même ; dans la garde et l'hébergement, celle de l'ensemble.
@@ -48,11 +58,11 @@ const changés = (chemin) => {
 const changésAilleurs = (chemin) => changés(chemin).filter((f) => !LISENT_LES_TESTS.includes(ensembleDuFichier(f)));
 
 describe('[niveau 4] #304 · l’empreinte d’un fichier de test : ce qu’il lit', () => {
-  test('point 1 · modifier un fichier de test du cœur ou de l’interface ne change que sa propre empreinte', () => {
+  test('[niveau 1] point 1 · modifier un fichier de test du cœur ou de l’interface ne change que sa propre empreinte', () => {
     for (const f of ['packages/core/test/a.test.ts', 'apps/web/test/w1.test.ts', 'apps/web/test/navigateur/n2.test.ts']) assert.deepEqual(changésAilleurs(f), [f], f);
   });
 
-  test('point 1 · modifier ce que lit l’ensemble, hors fichiers de test, change l’empreinte de tous ses fichiers', () => {
+  test('[niveau 1] point 1 · modifier ce que lit l’ensemble, hors fichiers de test, change l’empreinte de tous ses fichiers', () => {
     for (const f of ['packages/core/test/a.test.ts', 'packages/core/test/b.test.ts', 'apps/web/test/w1.test.ts', 'apps/web/test/navigateur/n1.test.ts']) {
       assert.ok(changés('packages/core/src/plan.ts').includes(f), `${f} lit le cœur`);
     }
@@ -61,7 +71,7 @@ describe('[niveau 4] #304 · l’empreinte d’un fichier de test : ce qu’il l
     assert.ok(!changés('apps/web/src/App.svelte').includes('packages/core/test/a.test.ts'), 'le cœur ne lit pas l’interface');
   });
 
-  test('point 1 · dans la garde et l’hébergement, dont les tests lisent les autres, l’empreinte reste celle de l’ensemble', () => {
+  test('[niveau 1] point 1 · dans la garde et l’hébergement, dont les tests lisent les autres, l’empreinte reste celle de l’ensemble', () => {
     assert.deepEqual([...LISENT_LES_TESTS].sort(), ['garde', 'hebergement']);
     const e = empreintes(entrees());
     const f = empreintesDesFichiers(TESTS, entrees());
@@ -71,7 +81,7 @@ describe('[niveau 4] #304 · l’empreinte d’un fichier de test : ce qu’il l
     assert.deepEqual(changésAilleurs('packages/gardes/g1.test.mjs'), [], 'un fichier de test de la garde ne change l’empreinte d’aucun fichier d’un autre ensemble');
   });
 
-  test('point 1 · ce qui couvre tout un ensemble couvre toujours chacun de ses fichiers ; un fichier attesté ne vaut que sur sa propre empreinte', () => {
+  test('[niveau 1] point 1 · ce qui couvre tout un ensemble couvre toujours chacun de ses fichiers ; un fichier attesté ne vaut que sur sa propre empreinte', () => {
     const avant = entrees();
     const après = entrees({ 'apps/web/test/w1.test.ts': 1 });
     const e = empreintes(avant);
@@ -125,13 +135,13 @@ function importsEntreTests(lire, chemins) {
 }
 
 describe('[niveau 4] #304, point 3 · aucun fichier de test d’un autre ensemble que la garde et l’hébergement n’en importe un autre', () => {
-  test('le dépôt : aucun import d’un fichier de test par un autre', () => {
+  test('[niveau 1] le dépôt : aucun import d’un fichier de test par un autre', () => {
     const suivis = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: RACINE, encoding: 'utf8' }).split('\0').filter(Boolean);
     const fautes = importsEntreTests((f) => readFileSync(join(RACINE, f), 'utf8'), suivis);
     assert.deepEqual(fautes, [], 'un fichier de test qui en importe un autre le lit : son empreinte ne l’écarte plus (#304, point 1)');
   });
 
-  test('témoin rouge · un import, statique, dynamique ou par require, d’un autre fichier de test se voit ; un module d’aide non', () => {
+  test('[niveau 1] témoin rouge · un import, statique, dynamique ou par require, d’un autre fichier de test se voit ; un module d’aide non', () => {
     const chemins = ['apps/web/test/a.test.ts', 'apps/web/test/b.test.ts', 'apps/web/test/harnais.ts', 'packages/core/test/c.test.ts', 'packages/gardes/g.test.mjs', 'packages/gardes/h.test.mjs'];
     const sources = {
       'apps/web/test/a.test.ts': "import { x } from './b.test';\nimport { ouvrirLeSite } from './harnais';\n",
@@ -225,7 +235,7 @@ function dépôtInventé(nom) {
 }
 
 describe('[niveau 4] #304, point 2 · un fichier de test ne se rejoue que si ce qu’il lit a changé', { concurrency: true }, () => {
-  test('interface : après un lot attesté vert, un fichier de test sans navigateur modifié ne fait rejouer que lui, et aucun test navigateur — à la main comme à la demande', async () => {
+  test('[niveau 3] interface : après un lot attesté vert, un fichier de test sans navigateur modifié ne fait rejouer que lui, et aucun test navigateur — à la main comme à la demande', async () => {
     const f = dépôtInventé('interface');
     f.git('checkout', '-q', '-b', 'codage/992-interface');
     f.écrire('apps/web/lib.mjs', 'export const deux = 2;\n');
@@ -253,7 +263,7 @@ describe('[niveau 4] #304, point 2 · un fichier de test ne se rejoue que si ce 
     assert.deepEqual(nav.joués, ['n2'], `un fichier de test navigateur modifié ne fait rejouer que lui\n${nav.sortie}`);
   });
 
-  test('cœur : modifier un fichier de test ne fait rejouer que lui ; modifier le code les fait tous rejouer', async () => {
+  test('[niveau 3] cœur : modifier un fichier de test ne fait rejouer que lui ; modifier le code les fait tous rejouer', async () => {
     const f = dépôtInventé('coeur');
     f.git('checkout', '-q', '-b', 'codage/991-coeur');
     f.écrire('packages/core/lib.mjs', 'export const un = 2;\n');
