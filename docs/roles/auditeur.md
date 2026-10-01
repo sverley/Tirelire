@@ -37,10 +37,12 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
 3. Vérifie le travail en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
    un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready, garde comprise
-   (`node packages/gardes/cli.mjs pr --issue <n>`). Les tests navigateur se jouent au Ready, en CI ;
-   si tu les juges utiles plus tôt, demande-les sur le dernier commit de la branche
-   (`pnpm livraison --navigateur`) : verts, ils sont attestés sur leur empreinte et la CI ne les
-   rejoue pas tant que ce qu'ils lisent n'a pas changé. Dis dans ta vérification si tu les as demandés, et pourquoi. Le travail doit être conforme à
+   (`node packages/gardes/cli.mjs pr --issue <n>`). Les tests navigateur se jouent au Ready, en CI.
+   Pour les jouer plus tôt — demande justifiée ou mesure —, commets d'abord, puis demande-les sur ce
+   commit, `pnpm livraison --navigateur` : verts, ils sont attestés, l'attestation part sur
+   `origin`, et la CI ne les rejoue pas tant que ce qu'ils lisent n'a pas changé. Joués autrement —
+   sur une tête détachée, dans un autre clone, par l'exécuteur lancé sans l'outil de test —, rien
+   n'en est attesté, et ils se rejoueront au Ready (#304). Dis dans ta vérification si tu les as demandés, et pourquoi. Le travail doit être conforme à
    l'issue, sans contredire les autres entrées de son catalogue ni les fondamentaux (D82). Si le
    codage modifie une fonction de la garde, joue aussi ses tests de développement, à la main
    (`pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'`, D81), et dis-le. Vérifie que les

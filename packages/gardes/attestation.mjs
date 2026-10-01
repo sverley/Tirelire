@@ -219,6 +219,46 @@ export function empreintes(entrees, harnais = []) {
   return r;
 }
 
+/** Un fichier de test : un fichier `*.test.*`, que joue un lanceur. */
+export const estUnFichierDeTest = (chemin) => /\.test\.[cm]?[jt]sx?$/.test(chemin);
+
+/**
+ * Les ensembles dont les tests lisent les autres fichiers de test comme des données — marques des
+ * niveaux, harnais du registre, fichiers suivis parcourus (#141) : un fichier de test y garde
+ * l'empreinte de son ensemble (#304, point 1).
+ */
+export const LISENT_LES_TESTS = Object.freeze(['garde', 'hebergement']);
+
+/**
+ * L'empreinte de chaque fichier de test (#304) : ce que lit son ensemble, sans les fichiers de test
+ * autres que lui, plus lui-même. Un fichier de test ne lit pas les autres (aucun n'en importe un
+ * autre, ce que vérifie un test de la garde), et un fichier de test modifié se rejoue lui-même. Dans
+ * la garde et l'hébergement, c'est l'empreinte de l'ensemble. `fichiers` : chemins depuis la racine ;
+ * rend `{ fichier: empreinte }`, sans les fichiers hors de tout ensemble.
+ */
+export function empreintesDesFichiers(fichiers, entrees) {
+  const r = {};
+  const bases = new Map();
+  const parChemin = new Map(entrees.map((x) => [x.chemin, x]));
+  for (const fichier of new Set(fichiers)) {
+    const id = ensembleDuFichier(fichier);
+    if (!id) continue;
+    if (LISENT_LES_TESTS.includes(id)) {
+      if (!bases.has(id)) bases.set(id, empreinteDe(id, entrees));
+      r[fichier] = bases.get(id);
+      continue;
+    }
+    const cle = `${id} sans tests`;
+    if (!bases.has(cle)) {
+      const e = ensemble(id);
+      bases.set(cle, hache(entrees.filter((x) => lit(e, x.chemin) && !estUnFichierDeTest(x.chemin)).map(ligneDEntree).sort().join('\n')));
+    }
+    const lui = parChemin.get(fichier);
+    r[fichier] = hache(`${id}\nfichier ${fichier}\n${lui ? ligneDEntree(lui) : 'absent'}\n${bases.get(cle)}\n`);
+  }
+  return r;
+}
+
 // ─── L'attestation ──────────────────────────────────────────────────────────────────────────────
 
 /** Combien d'empreintes vertes l'attestation garde par ensemble : les plus récentes. */
@@ -392,7 +432,7 @@ export function vertsDuReady(tete) {
 }
 
 /** Pour chaque ensemble couvert, le plus haut seuil couvert et sa raison ; pour chaque fichier attesté vert sur l'empreinte de son ensemble, de même (#302). */
-function couvertureDe({ origine, arbre, empreintes: e, verts, references, harnais, ids }) {
+function couvertureDe({ origine, arbre, empreintes: e, fichiers: ef = {}, verts, references, harnais, ids }) {
   const ensembles = {};
   for (const id of ids) {
     for (const s of [4, 3, 2, 1, 0]) {
@@ -403,11 +443,12 @@ function couvertureDe({ origine, arbre, empreintes: e, verts, references, harnai
       }
     }
   }
+  // Un fichier attesté vert l'est sur son empreinte à lui (#304) : `ef`, celles de l'arbre jugé.
   const fichiers = {};
   for (const v of verts ?? []) {
-    if (v.fichier === undefined || !ids.includes(v.ensemble) || !e[v.ensemble] || v.empreinte !== e[v.ensemble]) continue;
+    if (v.fichier === undefined || !ids.includes(v.ensemble) || !ef[v.fichier] || v.empreinte !== ef[v.fichier]) continue;
     if (fichiers[v.fichier]?.seuil >= v.seuil) continue;
-    fichiers[v.fichier] = { ensemble: v.ensemble, seuil: v.seuil, raison: raisonDuVert(v) };
+    fichiers[v.fichier] = { ensemble: v.ensemble, seuil: v.seuil, empreinte: v.empreinte, raison: raisonDuVert(v) };
   }
   const empreintesLues = {};
   for (const id of ids) if (e[id]) empreintesLues[id] = e[id];
@@ -419,11 +460,12 @@ const referenceDe = (quoi, commit, e) => ({ empreintes: e, seuil: SEUIL_DE_MAIN,
 /**
  * Ce que la CI peut sauter au Ready (#266, point 4), seuil 1 compris : ce que l'attestation, une tête
  * de la branche verte au Ready ou `main` couvre. `tetes` : `[{ sha, statut, empreintes }]` ; `main` :
- * `{ commit, empreintes }` ; `harnais` : ses fichiers.
+ * `{ commit, empreintes }` ; `harnais` : ses fichiers ; `fichiers` : les empreintes des fichiers de
+ * test de la tête (`empreintesDesFichiers`), sur lesquelles valent les fichiers attestés (#304).
  */
-export function couvertureAuReady({ arbre, empreintes: e, verts = [], tetes = [], main = null, harnais = [] }) {
+export function couvertureAuReady({ arbre, empreintes: e, fichiers = {}, verts = [], tetes = [], main = null, harnais = [] }) {
   const references = main ? [referenceDe('main', main.commit, main.empreintes)] : [];
-  return couvertureDe({ origine: 'ready', arbre, empreintes: e, verts: [...verts, ...tetes.flatMap(vertsDuReady)], references, harnais, ids: TOUS });
+  return couvertureDe({ origine: 'ready', arbre, empreintes: e, fichiers, verts: [...verts, ...tetes.flatMap(vertsDuReady)], references, harnais, ids: TOUS });
 }
 
 /**
@@ -508,26 +550,28 @@ export function couvre(couverture, demande) {
  * Ce qu'un lancement de l'outil de test hors CI saute (#302) : ce que l'attestation de la branche
  * (locale, et distante telle que le dernier crochet l'a lue) ou `main` — la base commune de la
  * branche avec `main` — couvre. `origine` : `local` pour un lancement à la main, `livraison` pour la
- * livraison, qui passe le fichier au lanceur. Mêmes entrées que `couvertureAuReady`, sans têtes.
+ * livraison, qui passe le fichier au lanceur. Mêmes entrées que `couvertureAuReady`, sans têtes ;
+ * `fichiers` : les empreintes des fichiers de test de l'arbre (`empreintesDesFichiers`).
  */
-export function couvertureLocale({ origine = 'local', arbre, empreintes: e, verts = [], main = null, harnais = [] }) {
+export function couvertureLocale({ origine = 'local', arbre, empreintes: e, fichiers = {}, verts = [], main = null, harnais = [] }) {
   const references = main ? [referenceDe('main', main.commit, main.empreintes)] : [];
-  return couvertureDe({ origine, arbre, empreintes: e, verts, references, harnais, ids: TOUS });
+  return couvertureDe({ origine, arbre, empreintes: e, fichiers, verts, references, harnais, ids: TOUS });
 }
 
 /**
  * Ce qu'un lancement saute, fichier par fichier (#302, points 4 et 6). `couverture` : celle de la
  * CI, de la livraison ou du lancement local (`null` sans) ; `demande` : `{ dossier, seuil,
  * navigateur, cibles, nomme }` ; `fichiers` : les fichiers de test que le lancement jouerait, depuis
- * la racine ; `jouees` : les empreintes du contenu joué, ou `null` quand il ne se lit pas (la
- * livraison joue alors l'extraction de l'arbre qu'elle juge, et sa couverture vaut pour lui).
+ * la racine ; `jouees` et `fichiersJoues` : les empreintes du contenu joué, des ensembles et des
+ * fichiers (`empreintesDesFichiers`), ou `null` quand il ne se lit pas (la livraison joue alors
+ * l'extraction de l'arbre qu'elle juge, et sa couverture vaut pour lui).
  *
  * Un fichier se saute s'il est vert sur la même empreinte à un seuil au moins égal : attesté vert
- * lui-même, ou couvert avec tout son ensemble (ce que D83 saute par ensemble vaut pour tous ses
- * fichiers). Dans un lancement du harnais du besoin, seul ce qui couvre le harnais, ou le fichier
+ * lui-même, sur l'empreinte de ce qu'il lit (#304), ou couvert avec tout son ensemble, sur celle de
+ * l'ensemble (ce que D83 saute par ensemble vaut pour tous ses fichiers). Dans un lancement du harnais du besoin, seul ce qui couvre le harnais, ou le fichier
  * lui-même, le couvre. Un appel nommé ne saute rien. Rend `[{ fichier, ensemble, couvert, raison }]`.
  */
-export function fichiersCouverts(couverture, demande, fichiers, jouees = null) {
+export function fichiersCouverts(couverture, demande, fichiers, jouees = null, fichiersJoues = null) {
   const harnais = couverture?.harnais ?? [];
   const lancementDuHarnais = ensemblesDeLaDemande(demande, harnais)?.[0] === HARNAIS.id;
   return fichiers.map((fichier) => {
@@ -537,17 +581,21 @@ export function fichiersCouverts(couverture, demande, fichiers, jouees = null) {
     if (demande.nomme) return joue('appel nommé : il se joue');
     if (!couverture || couverture.version !== VERSION) return joue('aucune empreinte verte');
     if (!ensemble) return joue("hors de tout ensemble : il se joue");
-    if (jouees && couverture.empreintes?.[ensemble] !== jouees[ensemble]) return joue(`le contenu joué n'a pas l'empreinte des empreintes vertes (${nomDe(ensemble)})`);
-    if (lancementDuHarnais) {
+    // Ce qui couvre tout l'ensemble vaut sur l'empreinte de l'ensemble ; ce qui couvre le fichier
+    // lui-même, sur la sienne (#304).
+    const memeEnsemble = !jouees || couverture.empreintes?.[ensemble] === jouees[ensemble];
+    if (memeEnsemble && lancementDuHarnais) {
       const h = couverture.ensembles?.[HARNAIS.id];
       const memeHarnais = !jouees || couverture.empreintes?.[HARNAIS.id] === jouees[HARNAIS.id];
       if (h?.seuil >= demande.seuil && harnais.includes(fichier) && memeHarnais) return saute(`harnais du besoin : ${h.raison}`);
-    } else {
+    } else if (memeEnsemble) {
       const c = couverture.ensembles?.[ensemble];
       if (c?.seuil >= demande.seuil) return saute(c.raison);
     }
     const f = couverture.fichiers?.[fichier];
-    if (f && f.ensemble === ensemble && f.seuil >= demande.seuil) return saute(f.raison);
+    const memeFichier = !fichiersJoues || (f && fichiersJoues[fichier] === f.empreinte);
+    if (f && memeFichier && f.ensemble === ensemble && f.seuil >= demande.seuil) return saute(f.raison);
+    if (!memeEnsemble && !memeFichier) return joue(`le contenu joué n'a pas l'empreinte des empreintes vertes (${nomDe(ensemble)})`);
     return joue(`aucune empreinte verte au seuil ${demande.seuil}`);
   });
 }
