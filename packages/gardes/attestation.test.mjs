@@ -125,12 +125,16 @@ const LUS_PAR_LE_NAVIGATEUR = ['apps/web/src/App.svelte', 'apps/web/test/navigat
 const NON_LUS = ['docs/decisions.md', '.github/workflows/ci.yml', '.githooks/livraison.sh', 'packages/gardes/lanceur.mjs', 'apps/hebergement/apercu.sh', 'apps/relay/relais.php', 'README.md', 'apps/web/README.md', '.gitignore'];
 /** Les empreintes de tous les ensembles d'un arbre de ces chemins ; `change` : un chemin changé. */
 const arbreDe = (chemins, change) => chemins.map((chemin) => ({ mode: '100644', objet: chemin === change ? 'changé' : 'base', chemin }));
-/** Au Ready sans attestation : les tests navigateur se sautent-ils quand seul `fichier` change depuis main ? */
+/**
+ * Les tests navigateur se sautent-ils quand seul `fichier` change depuis un `main` que la nuit a trouvé
+ * vert ? (#307 : `main` ne les couvre plus de lui-même, la nuit si.)
+ */
 function navigateurSautéSiSeul(fichier) {
   const chemins = [...new Set([...LUS_PAR_LE_NAVIGATEUR, ...NON_LUS, fichier])];
   const main = { navigateur: empreinteDe('navigateur', arbreDe(chemins)) };
   const tête = { navigateur: empreinteDe('navigateur', arbreDe(chemins, fichier)) };
-  return couvre(couvertureAuReady({ arbre: A, empreintes: tête, main: { commit: B, empreintes: main } }), NAVIGATEUR).couvert;
+  const nuit = { ensemble: 'navigateur', empreinte: main.navigateur, seuil: 2, par: 'la nuit', commit: B };
+  return couvre(couvertureAuReady({ arbre: A, empreintes: tête, verts: [nuit], main: { commit: B, empreintes: main } }), NAVIGATEUR).couvert;
 }
 
 // La CI jouée à blanc.
@@ -280,9 +284,8 @@ describe('[niveau 4] #237 · la livraison atteste, la CI saute ce qui est couver
     for (const f of NON_LUS) assert.equal(navigateurSautéSiSeul(f), true, `${f} : les tests navigateur se sautent`);
     const r = readySur('docs-seuls', 'docs/decisions.md');
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    const d = couvre(r.couverture, { ...NAVIGATEUR, arbre: r.arbre });
-    assert.equal(d.couvert, true, `docs seuls : la CI au Ready saute les tests navigateur\n${r.stdout}`);
-    assert.match(r.stdout, /interface dans le navigateur : sauté/, 'et le dit');
+    // #307 : au Ready, la non-régression dans le navigateur ne se joue plus, elle se joue la nuit.
+    assert.match(r.stdout, /interface dans le navigateur : non-régression non jouée — les tests navigateur de non-régression se jouent la nuit/, `docs seuls : la CI au Ready le dit\n${r.stdout}`);
   });
 
   test('les cibles d’un lancement : ses arguments, hors options et valeurs d’options', () => {

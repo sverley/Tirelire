@@ -1348,7 +1348,9 @@ Les tests de la garde sont ceux qui vérifient la garde elle-même : ses trois v
 règle des harnais ; ils vivent dans `packages/gardes/gardes.test.mjs`. Eux et les harnais du registre
 servent le même but — que les principes et les règles ne soient pas enfreints — et se traitent de la
 même manière : tout leur test est de niveau 0 ou 1 (D83), témoins compris, donc joué à chaque fusion,
-sauf sur une empreinte déjà trouvée verte à un seuil au moins égal (D83, « Les empreintes »).
+sauf sur une empreinte déjà trouvée verte à un seuil au moins égal (D83, « Les empreintes ») ; un
+harnais du registre qui vit dans le navigateur (`apps/web/test/navigateur/`) est joué chaque nuit, sur
+`main`, et non à chaque fusion, comme toute la non-régression dans le navigateur (D83, porteur, #307).
 Quand une ligne `Harnais` nomme un test, la règle vaut pour ce test, sa suite et son témoin ; quand
 elle cite un fichier, pour tout le fichier. Les tests de la garde et les harnais du registre
 n'accueillent donc jamais de test de niveau 4. La règle est un test de la garde, pas une logique de
@@ -1445,11 +1447,12 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Moment | Seuil |
   |---|---|
   | Pré-commit | 0 sur les paquets touchés, plus le harnais du besoin en entier ; sans tests navigateur ; sauf ce qui est vert sur son empreinte |
-  | Livraison (pré-fusion, pré-push) | 2, sans les tests navigateur de non-régression ; sauf ce qui est vert sur son empreinte |
-  | Demande des tests navigateur (`pnpm livraison --navigateur`) | 2, tests navigateur compris ; sauf ce qui est vert sur son empreinte |
+  | Livraison (pré-fusion, pré-push) | 2, sans les tests navigateur de non-régression, plus les tests navigateur de l'issue en entier ; sauf ce qui est vert sur son empreinte |
+  | Demande des tests navigateur (`pnpm livraison --navigateur`) | 2, tests navigateur compris, et ceux de l'issue en entier ; sauf ce qui est vert sur son empreinte |
   | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; sauf ce qui est vert sur son empreinte |
-  | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
-  | CI après la fusion, sur `main` | comme au Ready, hors harnais ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
+  | CI au Ready | 1, plus le harnais du besoin et les tests navigateur de l'issue, en entier ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
+  | CI après la fusion, sur `main` | 1, sans tests navigateur ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
+  | Nuit, sur le dernier commit de `main` (vers 3 h, heure de Paris) | 2, les tests navigateur seuls ; sauf ce qu'une nuit a trouvé vert sur son empreinte |
   | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option ; sauf ce qui est vert sur son empreinte |
 
@@ -1492,7 +1495,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   une autre (chaque session a son clone, voir « Crochets ») —, ou par la CI sur une tête de la
   branche dont toute la CI a fini verte au Ready. L'empreinte qu'a l'ensemble sur la base commune de
   la branche avec `main` compte aussi comme verte, pour tous ses fichiers, jusqu'au seuil 2 : la
-  branche ne change rien de ce qu'il lit. Dans un lancement du harnais du besoin, seul ce qui couvre
+  branche ne change rien de ce qu'il lit ; sauf pour l'interface dans le navigateur, que rien ne joue
+  avant la fusion (#307) : ni `main`, ni le premier parent, ni une tête verte au Ready ne la disent
+  verte. Dans un lancement du harnais du besoin, seul ce qui couvre
   le harnais, ou le fichier lui-même, couvre un de ses fichiers. Aucun moment ne fait exception
   (porteur, 28/09 : « si l'empreinte est verte, on ne joue pas les tests, c'est universel ») : au
   Ready, le seuil 1 non plus ; la vérification de l'auditeur non plus (porteur, 01/10, #302). Un
@@ -1530,22 +1535,35 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   branche vertes au Ready et l'empreinte de `main`, et saute ce qui est vert sur son empreinte ; sans
   attestation — une PR rouverte, dont l'attestation a disparu, par exemple —, ce que la table prévoit,
   hors ce qui est inchangé depuis `main` ou vert au Ready sur une tête précédente.
-- **Les tests navigateur au Ready, le moins cher d'abord** (#264). Les tests navigateur de
-  non-régression ne se jouent pas à chaque push : ni la livraison ni la vérification de l'auditeur
-  ne les jouent d'elles-mêmes, navigateur présent ou non. Ils se jouent une fois, au Ready, en CI,
-  sur l'état final, sauf sur une empreinte déjà verte. Plus tôt, en local, seulement quand c'est
-  justifié : le harnais du besoin qui vit dans le navigateur se joue à la livraison ; le codeur ou
-  l'auditeur peut demander la non-régression dans le navigateur par `pnpm livraison --navigateur`,
-  qui juge le dernier commit de la branche comme un premier push, tests navigateur compris ; verts,
-  ils sont attestés sur leur empreinte, l'attestation part sur `origin`, et la CI ne les rejoue pas
-  tant que ce qu'ils lisent n'a pas changé. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
+- **Les tests navigateur la nuit ; ceux de l'issue, pendant toute la PR** (#264, #307). Les tests
+  navigateur de non-régression — tout fichier de `apps/web/test/navigateur/` qui n'est pas un test de
+  l'issue, harnais du registre compris — ne se jouent ni avant la fusion ni à la CI d'une fusion sur
+  `main` : ni à la livraison, ni au Ready, ni après la fusion ; ils ne décident d'aucune fusion
+  (porteur, #307 : « main ne part pas en prod, mais en preview »). Chaque nuit, vers 3 h, heure de
+  Paris, `nuit.yml` les joue sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur
+  son empreinte : une nuit où rien de ce qu'ils lisent n'a changé ne joue rien, et le dit ; ce qu'une
+  nuit trouve vert vaut pour les nuits suivantes, tant que ce qu'il lit ne change pas (l'attestation
+  de la nuit, sur la branche `attestation-de-la-nuit`, écrite par l'outillage). Une nuit rouge se
+  signale sans qu'on la cherche : une issue s'ouvre, ou se complète si celle d'une nuit précédente
+  est encore ouverte ; elle nomme les fichiers rouges et le commit de `main` jugé ; la nuit verte qui
+  suit le dit dans cette issue. Une nuit rouge ne bloque aucune fusion ; une régression peut rester
+  sur la recette jusqu'à la nuit et sa correction, et la production reste gardée par le tag, qui
+  rejoue tout. Les tests navigateur de l'issue — les fichiers de tests navigateur que sa PR ajoute
+  ou modifie, et le harnais du besoin quand il vit dans le navigateur — se jouent pendant toute la
+  PR : à chaque livraison (pré-push, pré-fusion) et au Ready, en entier, niveau 4 compris, sauf
+  chaque fichier vert sur son empreinte (définition commune : `.githooks/tests-de-l-issue.sh`, et
+  `harnais-du-besoin.sh` pour le harnais) ; hors harnais, ils sont de la non-régression, qui bloque,
+  et ne s'attestent que fichier par fichier. Le codeur ou l'auditeur peut demander toute la
+  non-régression dans le navigateur par `pnpm livraison --navigateur`, qui juge le dernier commit de
+  la branche comme un premier push, tests navigateur compris ; verts, ils sont attestés sur leur
+  empreinte et l'attestation part sur `origin`. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
   demandés, et pourquoi. Un lancement des tests navigateur ne construit le site qu'une fois, quel
   que soit le nombre de fichiers qui l'ouvrent (#302) ; chaque fichier garde son serveur, donc son
   origine, et son navigateur. À chaque moment qui joue le typecheck, il se joue avant les tests ; les
-  tests navigateur — de non-régression, ou du harnais du besoin qui vit dans le navigateur — ne
+  tests navigateur — de non-régression demandée, ou de l'issue — ne
   partent que si le typecheck et les tests sans navigateur de ce moment ont fini verts ; un harnais
   du besoin rouge qui ne bloque pas ne les retient pas. Chaque moment qui ne joue pas les tests
-  navigateur dit pourquoi : laissés au Ready faute de demande, palier moins cher rouge, empreinte
+  navigateur dit pourquoi : joués la nuit faute de demande, palier moins cher rouge, empreinte
   trouvée verte, ou rien de ce qu'ils lisent n'a changé ; au tag, il dit que rien ne se saute.
 - **Crochets.** Une session commence, dans son propre clone, par `pnpm install && pnpm crochets`.
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
@@ -1562,22 +1580,25 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   bloque. `--no-verify` est un contournement, qu'aucune consigne ne propose. À la
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
-  l'interface sans navigateur, 40 s ; 270 s de plus avec les tests navigateur demandés) ou
-  organisationnel (garde, 45 s) —, et de ce qu'elle retient ne se joue que ce qui n'est pas vert sur
+  l'interface sans navigateur, 30 s ; 630 s de plus avec les tests navigateur demandés, et 80 s plus
+  25 s par fichier pour ceux de l'issue) ou organisationnel (garde, 50 s) —, mesurés sur 2 cœurs comme
+  la CI (#307), et de ce qu'elle retient ne se joue que ce qui n'est pas vert sur
   son empreinte (voir « Les empreintes ») ; ce qu'elle ne retient pas, la CI le joue au Ready s'il
   n'est pas vert sur son empreinte. Les tests navigateur de non-régression
-  (`apps/web/test/navigateur/`) sont laissés au Ready sauf demande, et la livraison le dit, et le
-  harnais du besoin est joué à part, en entier, et bloque quand du code arrive.
+  (`apps/web/test/navigateur/`) se jouent la nuit sauf demande, et la livraison le dit ; ceux de
+  l'issue se jouent en entier ; le harnais du besoin est joué à part, en entier, et bloque quand du
+  code arrive.
 - **La CI** ne joue qu'au passage en Ready d'une PR, une fois par passage, en mode strict, les
   harnais et la garde : typecheck, `pnpm test 1`, le harnais du besoin en entier, tests navigateur
-  activés, puis les tests navigateur au seuil 2 (`--navigateur`), qui ne partent que si le reste est
-  vert, build, version de dev ; un outil manquant y fait échouer le job.
+  activés, puis les tests navigateur de l'issue en entier, qui ne partent que si le reste est vert,
+  build, version de dev ; un outil manquant y fait échouer le job.
   Elle vérifie d'abord que la tête de la PR contient le dernier `main` : sinon la branche est à
   mettre à jour, le job échoue et rien d'autre ne se joue. Elle ne joue que le manque : ce qui est
   vert sur son empreinte se saute, seuil 1 compris, et elle dit ce qu'elle saute et pourquoi. Avant
-  toute fusion, les niveaux 0 à 2 ont donc été joués, par la livraison et par l'auditeur — les tests
-  navigateur, par la CI au Ready ou à la demande, en local —, et chaque ensemble a été trouvé vert au
-  seuil 1 au moins sur son empreinte finale. Dix workflows : `ci.yml` (tests, version de dev, livraison), `version-forcee.yml` (la version forcée, que le porteur déclenche à la main ; elle appelle `ci.yml`), `validation.yml` (la
+  toute fusion, les niveaux 0 à 2 ont donc été joués, par la livraison et par l'auditeur — hors tests
+  navigateur de non-régression, joués la nuit, sauf demande —, et chaque ensemble sans navigateur a été
+  trouvé vert au seuil 1 au moins sur son empreinte finale. Onze workflows : `nuit.yml` (les tests
+  navigateur de non-régression, chaque nuit, sur `main`, et l'issue d'une nuit rouge), `ci.yml` (tests, version de dev, livraison), `version-forcee.yml` (la version forcée, que le porteur déclenche à la main ; elle appelle `ci.yml`), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
   d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un
@@ -1594,7 +1615,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   après la fusion (#149) relance tout un tour de relecture et de code ; un job sauté qui ne décide pas
   de la fusion, et dont le rouge éventuel reste visible ailleurs, ne coûte rien et reste permis (les
   exécutions d'`apercu.yml` et de `depot-apercu.yml` en montrent). Ne rien sauter de ce qui décide de
-  la fusion, ne pas alourdir ce qui n'en décide pas (principe 10.1).
+  la fusion, ne pas alourdir ce qui n'en décide pas (principe 10.1). Les tests navigateur de
+  non-régression ne décident plus de la fusion (porteur, #307) : la règle ne vaut plus pour eux ; un
+  rouge que la nuit découvre relance un tour de code, comme un rouge découvert après la fusion.
 - **Workflows.** Un agent ne crée ni ne modifie aucun workflow (`.github/workflows/`,
   `.github/actions/`), sauf quand l'issue le demande. Un workflow déclenché par
   `pull_request_target` tourne avec les droits du dépôt et ses secrets : il n'exécute rien de la PR ;

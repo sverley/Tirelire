@@ -110,24 +110,30 @@ niveau :
   livraison, jugée sur l'état commis — l'index ou le commit poussé, jamais la copie de travail.
   - La nature du besoin se lit aux fichiers modifiés des deux côtés, comparés à
     `packages/gardes/chemins-ignores` : **fonctionnel** (typecheck et tests headless des paquets
-    touchés, tests headless de l'interface ; durée attendue 40 s) ou **organisationnel** (tests de la
-    garde ; durée attendue 45 s), ou les deux. Un dépassement de plus de 20 % s'affiche, sans bloquer.
+    touchés, tests headless de l'interface ; durée attendue 30 s) ou **organisationnel** (tests de la
+    garde ; durée attendue 50 s), ou les deux. Un dépassement de plus de 20 % s'affiche, sans bloquer.
   - De ce que la nature retient, ne se joue que ce qui n'est pas déjà vert sur son empreinte, dans
     l'attestation de la branche, d'un lancement, d'un push ou d'une session à l'autre, ou parce que
     `main` a la même ; la livraison dit chaque ensemble, joué ou non, et pourquoi, et les fichiers
     qu'elle joue et qu'elle saute (D83, « Les empreintes »). Les
-    tests navigateur (`apps/web/test/navigateur/`) restent au Ready, en CI, sauf demande :
-    `pnpm livraison --navigateur` (D83). Le typecheck se joue avant les tests, et les tests
-    navigateur ne partent que si le reste est vert.
+    tests navigateur de non-régression (`apps/web/test/navigateur/`) se jouent la nuit, sur `main`,
+    sauf demande : `pnpm livraison --navigateur` ; ceux de l'issue — les fichiers que la branche
+    ajoute ou modifie — se jouent en entier (D83, #307). Le typecheck se joue avant les tests, et les
+    tests navigateur ne partent que si le reste est vert.
   - Le harnais du besoin est toujours joué, à part et hors durée attendue, sauf vert sur son
     empreinte. Il **bloque** quand ce qui arrive
     apporte du code (un fichier hors de `**/test/**`, `**/*.test.*`, `docs/**`, `**/*.md`) ; sinon
     son verdict s'affiche. La non-régression bloque toujours.
   - Un push vers une sous-branche (`<branche>--codeur`, `<branche>--auditeur`) ne joue que la
     non-régression, sans rien attester.
-- **CI** : au passage en Ready de chaque PR, jamais en brouillon, typecheck, tests (navigateur compris), build, en mode strict
+- **CI** : au passage en Ready de chaque PR, jamais en brouillon, typecheck, tests (dans le
+  navigateur, ceux de l'issue seuls), build, en mode strict
   (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job. Un fichier de test déjà vert sur son
   empreinte ne s'y rejoue pas, seuil 1 compris ; au tag, rien ne se saute.
+- **Nuit** (`nuit.yml`) : chaque nuit, vers 3 h, heure de Paris, les tests navigateur de
+  non-régression sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur son
+  empreinte ; une nuit rouge ouvre une issue, ou complète celle d'une nuit précédente, sans bloquer
+  aucune fusion (#307).
 
 `git commit --no-verify` est un contournement : il fait sauter la non-régression avec le
 reste, et aucune consigne ne le propose. Un harnais rouge ne le justifie pas : il ne bloque pas le

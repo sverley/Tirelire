@@ -526,12 +526,12 @@ describe('[niveau 4] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue p
   test('[niveau 3] point 4 · au Ready, une tête de la branche verte au Ready, ou main, couvre ce qu’elle a joué ; sur main, une tête verte ou le premier parent', () => {
     const e = E('v');
     const c = couvertureAuReady({ arbre: A, empreintes: e, tetes: [{ sha: 't'.repeat(40), statut: 'success', empreintes: { ...E('w'), navigateur: e.navigateur, coeur: e.coeur } }], main: { commit: 'm'.repeat(40), empreintes: { ...E('w'), relais: e.relais } } });
-    assert.equal(couvre(c, NAVIGATEUR).couvert, true, 'tests navigateur verts au Ready sur une tête précédente');
+    assert.equal(couvre(c, NAVIGATEUR).couvert, false, 'la CI au Ready ne joue plus les tests navigateur de non-régression (#307) : une tête verte au Ready ne les couvre pas');
     assert.equal(couvre(c, demande('packages/core')).couvert, true, 'cœur vert au seuil 1 sur une tête précédente');
     assert.equal(couvre(c, demande('apps/relay', { seuil: 2 })).couvert, true, 'relais inchangé depuis main');
     const après = couvertureApresFusion({ arbre: A, empreintes: e, tetes: [{ sha: 't'.repeat(40), statut: 'success', empreintes: { ...E('x'), coeur: e.coeur } }], parent: { commit: 'p'.repeat(40), empreintes: { ...E('x'), navigateur: e.navigateur } } });
     assert.equal(couvre(après, demande('packages/core')).couvert, true, 'sur main, cœur sur l’empreinte d’une tête verte au Ready');
-    assert.equal(couvre(après, NAVIGATEUR).couvert, true, 'sur main, navigateur inchangé depuis le premier parent');
+    assert.equal(couvre(après, NAVIGATEUR).couvert, false, 'sur main, le premier parent ne couvre pas les tests navigateur, que rien ne joue avant la fusion (#307)');
   });
 
   test('[niveau 3] point 4 · en CI, au Ready et sur main, chaque lancement des tests lit les empreintes vertes, seuil 1 compris', () => {
@@ -576,7 +576,7 @@ describe('[niveau 4] #266, point 7 · chaque moment dit, pour chaque ensemble, c
     const e = E('c');
     const lignes = resume(couvertureAuReady({ arbre: A, empreintes: e, verts: [vert('navigateur', e.navigateur, 2, { par: 'demande' })], main: { commit: 'd'.repeat(40), empreintes: { ...E('z'), relais: e.relais } }, harnais: [] }));
     for (const id of TOUS) assert.ok(lignes.some((l) => l.startsWith(`- ${nomDe(id)} :`)), `${id} : la CI n'en dit rien\n${lignes.join('\n')}`);
-    assert.ok(lignes.some((l) => /interface dans le navigateur : sauté jusqu'au seuil 2 — empreinte trouvée verte par demande, sur le commit c{10}, au seuil 2/.test(l)), lignes.join('\n'));
+    assert.ok(lignes.some((l) => /interface dans le navigateur : non-régression non jouée — les tests navigateur de non-régression se jouent la nuit, sur main \(nuit\.yml\) ; les tests navigateur de l'issue se jouent en entier/.test(l)), lignes.join('\n'));
     assert.ok(lignes.some((l) => /relais : sauté jusqu'au seuil 2 — rien de ce qu'il lit n'a changé depuis main \(d{10}\)/.test(l)), lignes.join('\n'));
     assert.ok(lignes.some((l) => /cœur : se joue — aucune empreinte verte/.test(l)), lignes.join('\n'));
     const main = resume(couvertureApresFusion({ arbre: A, empreintes: e, parent: { commit: 'p'.repeat(40), empreintes: e } }));
@@ -587,7 +587,7 @@ describe('[niveau 4] #266, point 7 · chaque moment dit, pour chaque ensemble, c
     const étape = lireFichier(CI).split('\n      - ').find((é) => é.startsWith('name: Ce que ce passage a joué'));
     assert.ok(étape, 'aucune étape ne dit ce que le passage a joué');
     assert.match(étape, /if: always\(\)/, 'elle se joue même après un rouge');
-    for (const quoi of ['typecheck', 'garde, cœur, relais, hébergement, interface sans navigateur', 'harnais du besoin', 'interface dans le navigateur', 'empreinte verte', 'au tag, rien ne se saute']) {
+    for (const quoi of ['typecheck', 'garde, cœur, relais, hébergement, interface sans navigateur', 'harnais du besoin', "tests navigateur de l'issue", 'tests navigateur de non-régression', 'la nuit', 'empreinte verte', 'au tag, rien ne se saute']) {
       assert.ok(étape.includes(quoi), `l'étape ne dit rien de « ${quoi} »`);
     }
   });

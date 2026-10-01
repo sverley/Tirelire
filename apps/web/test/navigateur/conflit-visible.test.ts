@@ -1,7 +1,8 @@
 /**
  * Harnais de #196, point 5 à l'écran — « Un conflit se voit ». Second fichier du harnais de #196,
- * à côté de `../fichier-etat.test.ts` : les tests navigateur vivent dans ce dossier, joués par la
- * CI et non par les crochets (#121, D83).
+ * à côté de `../fichier-etat.test.ts` : les tests navigateur vivent dans ce dossier, joués chaque
+ * nuit sur `main`, et, pendant une PR qui les ajoute ou les modifie, à chaque livraison et au Ready
+ * (#307, D83).
  *
  * L'issue : « Une même ligne modifiée des deux côtés depuis la dernière synchronisation des deux
  * instances : les deux retiennent la même version, et l'utilisateur voit la ligne, ce qui est

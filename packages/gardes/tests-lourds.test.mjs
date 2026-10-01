@@ -35,7 +35,7 @@ const lireFichier = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').repla
 const CI = '.github/workflows/ci.yml';
 const WORKFLOW_BRANCHES = '.github/workflows/branches.yml';
 const ATTESTATION_MJS = join(RACINE, '.githooks/attestation.mjs');
-const FAUTE_DE_DEMANDE = /interface dans le navigateur : non joué — tests navigateur de non-régression laissés au Ready faute de demande/;
+const FAUTE_DE_DEMANDE = /interface dans le navigateur : non joué — tests navigateur de non-régression joués la nuit sur main, sauf demande/;
 const PALIER_ROUGE = /tests navigateur non joués : un test sans navigateur, palier moins cher, a rougi/;
 
 let dossierTemporaire;
@@ -222,6 +222,8 @@ describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests n
   });
 
   test('[niveau 3] point 5 · en CI, les tests navigateur suivent le typecheck, le seuil 1 et le harnais, et ne partent pas après un rouge', () => {
+    // Au Ready, les tests navigateur sont ceux de l'issue (#307).
+    const NAVIGATEUR_CI = /tests-de-l-issue\.sh --jouer/;
     const c = étapesDuTest(AU_READY);
     const i = (motif) => c.findIndex((x) => motif.test(x));
     const nav = i(NAVIGATEUR_CI);
@@ -311,7 +313,7 @@ describe('[niveau 4] #264, points 10 et 11 · les branches, à la fermeture d’
 // ─── Ce que chaque moment dit ──────────────────────────────────────────────────────────────────
 
 describe('[niveau 4] #264, point 9 · chaque moment qui ne joue pas les tests navigateur dit pourquoi', () => {
-  test('la livraison sans demande les dit laissés au Ready faute de demande', async () => {
+  test('la livraison sans demande les dit joués la nuit, sur main, sauf demande', async () => {
     assert.match((await livraisonVerte()).push.sortie, FAUTE_DE_DEMANDE);
   });
 
@@ -327,7 +329,7 @@ describe('[niveau 4] #264, point 9 · chaque moment qui ne joue pas les tests na
     const étape = lireFichier(CI).split('\n      - ').find((é) => é.startsWith('name: Ce que ce passage a joué'));
     assert.ok(étape, 'aucune étape ne dit ce que le passage a joué');
     assert.match(étape, /if: always\(\)/, 'elle se joue même après un rouge');
-    for (const quoi of ['typecheck', 'harnais du besoin', 'interface dans le navigateur', 'palier moins cher', 'couvre', "rien de ce qu'elle lit n'a changé", 'au tag, rien ne se saute']) {
+    for (const quoi of ['typecheck', 'harnais du besoin', "tests navigateur de l'issue", 'tests navigateur de non-régression', 'la nuit', 'palier moins cher', 'empreinte verte', 'au tag, rien ne se saute']) {
       assert.ok(étape.includes(quoi), `l'étape ne dit rien de « ${quoi} »`);
     }
   });

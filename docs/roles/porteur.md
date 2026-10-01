@@ -4,16 +4,19 @@ Le porteur du projet. Ses paroles font foi (principe 7) ; il valide, et la fusio
 (principe 11, D82).
 
 Il lit le compte rendu du codeur et la vérification de l'auditeur, et passe la PR en Ready. La CI y
-joue le seuil 1, puis le harnais du besoin et les tests navigateur de niveau 2, qui ne partent que si
-le reste est vert ; le seuil 2 hors navigateur a été joué avant, par la livraison et par l'auditeur,
-dont la vérification dit s'il a demandé les tests navigateur, et pourquoi (D83). Une branche qui ne
+joue le seuil 1, puis le harnais du besoin et les tests navigateur de l'issue, en entier, qui ne
+partent que si le reste est vert ; le seuil 2 hors navigateur a été joué avant, par la livraison et
+par l'auditeur, dont la vérification dit s'il a demandé les tests navigateur, et pourquoi (D83). Les
+tests navigateur de non-régression ne se jouent ni avant la fusion ni après : chaque nuit, vers 3 h,
+sur `main` ; une nuit rouge ouvre une issue, ou complète celle d'une nuit précédente encore ouverte,
+sans bloquer aucune fusion (#307). Une branche qui ne
 contient pas le dernier `main` y est dite à mettre à jour, et rien d'autre ne se joue. Chaque
 ensemble de tests a son empreinte, l'état des chemins qu'il lit, et chaque fichier de test la
 sienne, l'état de ce qu'il lit (D83). La CI
 saute, seuil 1 compris, un fichier de test déjà trouvé vert sur son empreinte — par l'outillage de
 la branche, qui l'atteste à chaque lancement des tests, d'un push et d'une session à l'autre —, ou
 sur celle de son ensemble — par la CI sur une tête précédente verte au Ready, ou parce que la PR ne
-change rien de ce que lit son ensemble —, et
+change rien de ce que lit son ensemble, hors tests navigateur —, et
 dit, pour chaque ensemble, ce qu'elle saute et pourquoi ; après la
 fusion, un ensemble vert au Ready sur la même empreinte, ou inchangé depuis le premier parent, ne
 rejoue pas ses tests (D83, « Les empreintes »). La version de dev
