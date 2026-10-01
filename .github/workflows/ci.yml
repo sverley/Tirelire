@@ -41,8 +41,9 @@ name: CI et livraison
 #   verts en local compris), par la CI sur une tête de la branche verte au Ready, ou parce que `main`
 #   a la même. Sur `main`, un ensemble se saute si son empreinte est celle d'une tête de PR verte au
 #   Ready, ou celle du premier parent. La décision passe par `pnpm test --attestation <fichier>`, et
-#   le lanceur dit les fichiers qu'il joue et ceux qu'il saute. Au tag, rien ne se saute :
-#   aucun moment ne trouve une empreinte verte au seuil 3. Il lit l'API (statuts, PR d'un commit) en
+#   le lanceur dit les fichiers qu'il joue et ceux qu'il saute. Au tag et pour une version forcée,
+#   rien ne se saute : le lanceur n'y lit aucune attestation — ni sur une tête détachée, ni sur
+#   `main` — et la CI ne lui passe pas `--attestation`. Il lit l'API (statuts, PR d'un commit) en
 #   lecture seule.
 # - `hebergement` est hors harnais : il assemble le site pour la racine, sans rien vérifier, sur
 #   `main` et à la main (la racine de la recette, `/`), à un tag `v*` (la production,
@@ -193,8 +194,9 @@ jobs:
           TIRELIRE_STRICT: '1'
       # Avant de publier une version, poussée à la main ou forcée (#274) : les tests jusqu'au niveau 3,
       # le dégradé compris, tests navigateur activés (D87), le moins cher d'abord : les tests
-      # navigateur ne partent que si le reste est vert (#264). Sans fichier d'empreintes : aucun moment
-      # ne trouve une empreinte verte au seuil 3, rien ne se saute (#266, point 4).
+      # navigateur ne partent que si le reste est vert (#264). Rien ne se saute (#266, point 4 ; #302) :
+      # sans fichier d'empreintes, sur une tête détachée ou sur `main`, le lanceur ne lit aucune
+      # attestation.
       - name: Tests au seuil 3, avant de publier
         id: seuil3
         if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
@@ -235,7 +237,7 @@ jobs:
             echo
             echo "- typecheck : $(dit "$TYPECHECK")"
             if [ "$TAG" = true ]; then
-              echo "- au tag, rien ne se saute (aucun moment ne trouve une empreinte verte au seuil 3) : seuil 3 en entier, sur chaque ensemble : $(dit "$SEUIL3") ; tests navigateur au seuil 3 : $(dit "$NAVIGATEUR3")"
+              echo "- au tag, rien ne se saute (aucune empreinte verte n'y est lue) : seuil 3 en entier, sur chaque ensemble : $(dit "$SEUIL3") ; tests navigateur au seuil 3 : $(dit "$NAVIGATEUR3")"
             else
               echo "- seuil 1 — garde, cœur, relais, hébergement, interface sans navigateur : $(dit "$SEUIL1" ", chaque ensemble joué ou sauté sur une empreinte verte (voir plus haut)")"
               [ "$GITHUB_EVENT_NAME" = pull_request ] && echo "- harnais du besoin, en entier : $(dit "$HARNAIS" ", joué ou sauté sur une empreinte verte (voir plus haut)")"

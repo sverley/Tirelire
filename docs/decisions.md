@@ -1451,7 +1451,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | CI au Ready | 1, plus les tests navigateur de niveau 2 et le harnais du besoin ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
   | CI après la fusion, sur `main` | comme au Ready, hors harnais ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
   | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
-  | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option |
+  | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option ; sauf ce qui est vert sur son empreinte |
 
   Les tests de développement de fonctions de la garde (D81) ne se jouent à aucun de ces moments :
   hors de `pnpm test`, ils se jouent à la main. Aucun autre ensemble n'a de tests joués à la main.
@@ -1496,7 +1496,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   se rejoue pas si son empreinte est celle qu'il a sur la tête d'une PR dont toute la CI a fini verte
   au Ready, ou sur le premier parent du commit arrivé. N'est pas vert sur son empreinte un ensemble
   dont un test a rougi, ou s'est sauté faute d'outil : il se rejoue au moment suivant qui le prévoit.
-  Aucun moment ne trouve d'empreinte verte au seuil 3 : au tag, rien ne se saute. Chaque moment —
+  Au tag et pour une version forcée, rien ne se saute : le lanceur n'y lit aucune attestation — ni
+  sur une tête détachée, ni sur `main` — et la CI ne lui passe pas `--attestation`. Un fichier joué
+  en entier est pourtant attesté au seuil 4, et un lancement à la main au seuil 3 ou 4 le saute.
+  Chaque moment —
   pré-commit, pré-fusion, pré-push, demande, CI au Ready, CI sur `main`, tag — dit, pour chaque
   ensemble, s'il l'a joué, à quel seuil et avec quel verdict, ou pourquoi il ne l'a pas joué :
   empreinte trouvée verte (par qui, sur quel commit ou arbre, à quel seuil), ou rien de ce qu'il lit
