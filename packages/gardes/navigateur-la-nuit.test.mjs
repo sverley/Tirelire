@@ -4,9 +4,7 @@
  * harnais, `nuit-et-tests-de-l-issue.test.mjs`, en les complétant ; ceux-ci restent, au niveau 4.
  */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import {
@@ -108,48 +106,4 @@ test('[niveau 4] #307 · la couverture de la nuit ne doit rien à main', () => {
   const c = couvertureLocale({ origine: 'nuit', arbre: A, empreintes: e, verts: [] });
   assert.equal(c.origine, 'nuit');
   assert.equal(c.ensembles.navigateur, undefined);
-});
-
-// ─── Point 8 : une nuit qui échoue avant son plan, sans le dépôt extrait ───────────────────────────
-
-describe('[niveau 4] #307, point 8 · sans le dépôt extrait, la nuit rouge se signale par gh, sous la même issue', () => {
-  /** Le script de l'étape du signal, tel que le workflow l'écrit. */
-  const script = () => {
-    const lignes = lireFichier('.github/workflows/nuit.yml').split('\n');
-    const début = lignes.findIndex((l) => l.includes('- name: Une nuit rouge se signale'));
-    const run = lignes.findIndex((l, i) => i > début && /^ {8}run: \|$/.test(l));
-    const corps = [];
-    for (const l of lignes.slice(run + 1)) {
-      if (l.trim() && !l.startsWith(' '.repeat(10))) break;
-      corps.push(l.slice(10));
-    }
-    return corps.join('\n');
-  };
-  /** Joue l'étape dans un dossier vide (rien d'extrait), avec un `gh` de poche qui note ses appels. */
-  const signal = (ouverte) => {
-    const d = mkdtempSync(join(tmpdir(), 'tirelire-307-signal-'));
-    try {
-      const gh = join(d, 'gh');
-      writeFileSync(gh, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${d}/appels"\n[ "$1 $2" = "issue list" ] && printf '%s\\n' '${ouverte}'\nexit 0\n`);
-      chmodSync(gh, 0o755);
-      const r = spawnSync('bash', ['-e', '-c', script()], { cwd: d, encoding: 'utf8', env: { PATH: `${d}:${process.env.PATH}`, RESULTAT: 'skipped', COMMIT: 'c'.repeat(40), EXECUTION: 'https://exemple.invalid/run/1', RUNNER_TEMP: d } });
-      return { code: r.status, sortie: r.stdout + r.stderr, appels: readFileSync(join(d, 'appels'), 'utf8') };
-    } finally {
-      rmSync(d, { recursive: true, force: true });
-    }
-  };
-
-  test('sans issue ouverte, une issue, avec le titre et la marque de nuit.mjs, qui nomme le commit', () => {
-    const r = signal('');
-    assert.equal(r.code, 0, r.sortie);
-    assert.ok(r.appels.includes(`issue create --title ${TITRE} --body ${MARQUE}`), r.appels);
-    assert.ok(r.appels.includes(ROUGE) && r.appels.includes('c'.repeat(40)), r.appels);
-  });
-
-  test('avec l’issue de la nuit ouverte, elle se complète', () => {
-    const r = signal('12');
-    assert.equal(r.code, 0, r.sortie);
-    assert.match(r.appels, /^issue comment 12 --body <!-- nuit : rouge -->/m, r.appels);
-    assert.doesNotMatch(r.appels, /issue create/);
-  });
 });

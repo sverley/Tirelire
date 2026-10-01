@@ -11,14 +11,14 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { after, describe, test } from 'node:test';
 import { RACINE } from './gardes.mjs';
 import { MARQUE, ROUGE, TITRE, VERTE } from './nuit.mjs';
-import { commande, jouer } from './workflow-a-blanc.mjs';
+import { commande, interpoler, jouer } from './workflow-a-blanc.mjs';
 
 const lireFichier = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').replace(/\r\n?/g, '\n');
 const h = (c) => c.repeat(64);
@@ -249,7 +249,7 @@ describe('[niveau 2] #307, point 2 · les tests navigateur de l’issue : ce que
 
 // ─── Point 3 : la nuit ───────────────────────────────────────────────────────────────────────────
 
-describe('[niveau 2] #307, point 3 · chaque nuit, vers 3 h à Paris, les tests navigateur sur main, sauf fichier vert sur son empreinte', () => {
+describe('[niveau 1] #307, point 3 · chaque nuit, vers 3 h à Paris, les tests navigateur sur main, sauf fichier vert sur son empreinte', () => {
   test('le workflow de la nuit : sur main, au seuil 2, avec l’attestation de la nuit', () => {
     const w = lireFichier('.github/workflows/nuit.yml');
     assert.match(w, /ref: main/);
@@ -343,7 +343,7 @@ describe('[niveau 2] #307, point 3 · chaque nuit, vers 3 h à Paris, les tests 
 
 // ─── Point 4 : une nuit rouge se signale ─────────────────────────────────────────────────────────
 
-describe('[niveau 2] #307, point 4 · une nuit rouge — même sans avoir pu jouer — ouvre ou complète une issue ; la nuit verte qui suit le dit ; aucune nuit ne bloque une fusion', () => {
+describe('[niveau 1] #307, point 4 · une nuit rouge — même sans avoir pu jouer — ouvre ou complète une issue ; la nuit verte qui suit le dit ; aucune nuit ne bloque une fusion', () => {
   test('ce que la nuit demande à GitHub : une issue, un commentaire, ou rien', () => {
     const dossier = temporaire('signal');
     const faux = join(dossier, 'fetch.mjs');
@@ -391,15 +391,80 @@ describe('[niveau 2] #307, point 4 · une nuit rouge — même sans avoir pu jou
     assert.deepEqual(nuit('vert', {}), [], 'sans issue ouverte, une nuit verte ne dit rien');
   });
 
-  test('une nuit qui devait jouer se signale rouge, même si elle échoue avant de savoir ce qu’elle joue ; une nuit qui n’a rien à jouer ne dit rien', () => {
+  test('une nuit qui devait jouer se signale rouge, même si elle échoue avant de savoir ce qu’elle joue, et nomme alors le commit du déclenchement ; une nuit qui n’a rien à jouer ne dit rien', () => {
+    const SHA = 's'.repeat(40);
     const nuit = (plan, échoue) => {
-      const ctx = { github: { event: {}, event_name: 'schedule' }, vars: {}, secrets: {}, inputs: {}, needs: { heure: { outputs: { jouer: 'oui' } } }, steps: { plan, tests: { outcome: 'skipped', outputs: {} } } };
+      const ctx = { github: { event: {}, event_name: 'schedule', sha: SHA }, vars: {}, secrets: {}, inputs: {}, needs: { heure: { outputs: { jouer: 'oui' } } }, steps: { plan, tests: { outcome: 'skipped', outputs: {} } } };
       const jouées = jouer(lireFichier('.github/workflows/nuit.yml'), ctx, (é) => échoue && /^\s+(?:- )?id: plan\b/m.test(é.texte)).flatMap((j) => j.joués);
-      return jouées.some((é) => /nuit\.mjs signaler/.test(é.texte));
+      const signal = jouées.find((é) => /nuit\.mjs signaler/.test(é.texte));
+      return signal ? { commit: interpoler(/^\s+COMMIT: (.*)$/m.exec(signal.texte)[1], ctx) } : null;
     };
-    assert.equal(nuit({ outcome: 'success', outputs: { jouer: 'oui', commit: 'c' } }, false), true, 'le plan dit de jouer : le signal se joue, quelle que soit la suite');
-    assert.equal(nuit({ outcome: 'success', outputs: { jouer: 'non', commit: 'c' } }, false), false, 'le plan dit que rien ne se joue : rien à signaler');
-    assert.equal(nuit({ outcome: 'failure', outputs: {} }, true), true, 'le plan lui-même échoue (outil, extraction) : la nuit est rouge, et se signale');
+    assert.deepEqual(nuit({ outcome: 'success', outputs: { jouer: 'oui', commit: 'c' } }, false), { commit: 'c' }, 'le plan dit de jouer : le signal se joue, avec le commit du plan');
+    assert.equal(nuit({ outcome: 'success', outputs: { jouer: 'non', commit: 'c' } }, false), null, 'le plan dit que rien ne se joue : rien à signaler');
+    assert.deepEqual(nuit({ outcome: 'failure', outputs: {} }, true), { commit: SHA }, 'le plan lui-même échoue (outil, extraction) : la nuit est rouge, se signale, et nomme le commit du déclenchement');
+  });
+
+  /** Le script de l'étape du signal, tel que `nuit.yml` l'écrit : le corps de `run`, sans son retrait. */
+  const scriptDuSignal = () => {
+    const lignes = lireFichier('.github/workflows/nuit.yml').split('\n');
+    const début = lignes.findIndex((l) => l.includes('- name: Une nuit rouge se signale'));
+    const run = lignes.findIndex((l, i) => i > début && /^ {8}run: \|$/.test(l));
+    const corps = [];
+    for (const l of lignes.slice(run + 1)) {
+      if (l.trim() && !l.startsWith(' '.repeat(10))) break;
+      corps.push(l.slice(10));
+    }
+    return corps.join('\n');
+  };
+  const COMMIT = 'c'.repeat(40);
+  const EXECUTION = 'https://exemple.invalid/run/1';
+
+  test('avec le dépôt extrait, l’étape du signal donne à nuit.mjs le verdict, le commit, le rapport de la nuit et l’exécution, sans appeler gh', () => {
+    const d = temporaire('signal-depot');
+    mkdirSync(join(d, 'packages/gardes'), { recursive: true });
+    mkdirSync(join(d, 'bin'));
+    writeFileSync(join(d, 'packages/gardes/nuit.mjs'), "import { appendFileSync } from 'node:fs';\nappendFileSync(process.env.APPELS, JSON.stringify(process.argv.slice(2)) + '\\n');\n");
+    writeFileSync(join(d, 'bin/gh'), `#!/bin/sh\necho gh >> "${d}/appels-gh"\n`, { mode: 0o755 });
+    const jouée = (résultat, nuit) => {
+      rmSync(join(d, 'appels'), { force: true });
+      const env = { ...process.env, PATH: `${join(d, 'bin')}:${process.env.PATH}`, APPELS: join(d, 'appels'), RESULTAT: résultat, COMMIT, EXECUTION, RUNNER_TEMP: d };
+      delete env.NUIT;
+      if (nuit) env.NUIT = nuit;
+      const r = spawnSync('bash', ['-e', '-c', scriptDuSignal()], { cwd: d, encoding: 'utf8', env });
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      return JSON.parse(readFileSync(join(d, 'appels'), 'utf8').trim());
+    };
+    assert.deepEqual(jouée('failure', '/n'), ['signaler', 'rouge', COMMIT, '/n/journaux/navigateur.rapport', EXECUTION]);
+    assert.deepEqual(jouée('success', '/n'), ['signaler', 'vert', COMMIT, '/n/journaux/navigateur.rapport', EXECUTION], 'tests verts : la nuit est verte');
+    assert.deepEqual(jouée('skipped', null), ['signaler', 'rouge', COMMIT, `${d}/nuit/journaux/navigateur.rapport`, EXECUTION], 'tests sautés : rouge ; sans le dossier de la nuit, celui que le plan lui aurait donné');
+    assert.equal(existsSync(join(d, 'appels-gh')), false, 'gh ne sert que sans le dépôt');
+  });
+
+  const JQ = spawnSync('jq', ['--version']).status === 0;
+  test('sans le dépôt extrait, la nuit rouge se signale par gh : l’issue de la nuit se complète, sinon il s’en ouvre une', { skip: !JQ && !process.env.TIRELIRE_STRICT && 'jq absent' }, () => {
+    const nuit = (ouvertes) => {
+      const d = temporaire('signal-gh');
+      mkdirSync(join(d, 'bin'));
+      writeFileSync(join(d, 'issues.json'), JSON.stringify(ouvertes));
+      // Un `gh` de poche : il note ses appels, et applique à `issues.json` le filtre `--jq` qu'on lui donne, avec le vrai jq.
+      writeFileSync(join(d, 'bin/gh'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${d}/appels"\nif [ "$1 $2" = "issue list" ]; then\n  while [ $# -gt 0 ]; do\n    if [ "$1" = --jq ]; then shift; jq -r "$1" "${d}/issues.json"; exit $?; fi\n    shift\n  done\nfi\nexit 0\n`, { mode: 0o755 });
+      const r = spawnSync('bash', ['-e', '-c', scriptDuSignal()], { cwd: d, encoding: 'utf8', env: { ...process.env, PATH: `${join(d, 'bin')}:${process.env.PATH}`, RESULTAT: 'skipped', COMMIT, EXECUTION, RUNNER_TEMP: d } });
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      return readFileSync(join(d, 'appels'), 'utf8');
+    };
+    const issue = (number, title, body) => ({ number, title, body });
+
+    const créée = nuit([]);
+    assert.ok(créée.includes(`issue create --title ${TITRE} --body ${MARQUE}`), créée);
+    assert.ok(créée.includes(ROUGE) && créée.includes(COMMIT), 'la marque de la nuit rouge, et le commit jugé');
+    assert.doesNotMatch(créée, /issue comment/);
+
+    const complétée = nuit([issue(5, TITRE, 'sans marque'), issue(9, TITRE, `${MARQUE}\nplus récente`), issue(7, TITRE, `${MARQUE}\nla plus ancienne`), issue(3, 'une autre issue', MARQUE)]);
+    assert.match(complétée, /^issue comment 7 --body <!-- nuit : rouge -->/m, 'la plus ancienne issue de la nuit, par son titre et sa marque');
+    assert.doesNotMatch(complétée, /issue create/);
+
+    const autre = nuit([issue(5, TITRE, 'sans marque')]);
+    assert.ok(autre.includes('issue create'), 'une issue au même titre, sans la marque de la nuit, n’est pas celle de la nuit');
   });
 
   test('la nuit ne se lance que seule et n’écrit que des branches et des issues : elle ne peut bloquer aucune fusion', () => {
