@@ -81,7 +81,7 @@ harnais), constaté et validé comme le reste.
 
 ## I2 · Une tirelire est un livre de compte
 
-Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`
+Chemins : `packages/core/src/balances.ts`, `packages/core/src/model.ts`, `packages/core/src/forecast.ts`
 
 - **Harnais** · `packages/core/test/plan.test.ts` — « positions et soldes (D19, D29) » : une
   tirelire répartie sur plusieurs comptes, son solde égal à la somme de ses composantes, le solde
@@ -312,7 +312,7 @@ Chemins : `.github/workflows/ci.yml`, `package.json`, `pnpm-lock.yaml`, `apps/we
 
 ## I10 · Proposer, et ne jamais faire de manière cachée
 
-Chemins : `packages/core/src/plan.ts`
+Chemins : `packages/core/src/plan.ts`, `packages/core/src/forecast.ts`
 
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — « I10 · calculer le plan ne modifie ni le budget, ni les flux, ni la base » :
   le plan de trois périodes calculé sur le budget de l'assistant, le registre lu et la base

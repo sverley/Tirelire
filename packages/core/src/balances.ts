@@ -475,8 +475,9 @@ function resolvePlacement(e: Tirelire, real: Components): Components {
 
 /**
  * Écarts de placement (D20, D38), lus sur le réel : par compte, ce qui s'y trouve de trop (positif)
- * ou y manque (négatif) au regard du placement voulu, à `asOf`. Ne sert qu'à une période où les
- * soldes sont connus : au-delà, le plan ne lit ni ne suppose aucune position de compte (D52, #183).
+ * ou y manque (négatif) au regard du placement voulu, à `asOf`. Ne sert qu'à la période où l'on lit :
+ * pour une période à venir, ce qu'il faut virer est ce que les tirelires demandent (`periodDemand`),
+ * et les positions des comptes se lisent en solde prévu (`computeForecast`, D52, D88).
  */
 export function placementGaps(e: Tirelire, idx: LedgerIndex, asOf: ISODate): ComponentEffect[] {
   const real = tirelireComponents(e, idx, asOf);
