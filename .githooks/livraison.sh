@@ -346,17 +346,18 @@ autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | tr '\n' ' 
 [ -z "$autres" ] || dit "harnais du besoin hors de tout paquet, non joué : $autres"
 
 debut=$(date +%s)
-# Durée attendue de ce qui se joue (#307), sur 2 cœurs comme la CI : les paquets fonctionnels et
-# l'interface sans navigateur, et la garde, mesurés de nouveau le 01/10 ; les tests navigateur, d'après
-# la mesure du 01/10 (#307) — 650 s pour toute la non-régression demandée, et, pour ceux de l'issue,
-# 80 s pour construire le site et ouvrir le navigateur, plus 30 s par fichier. Un dépassement de plus
-# de 20 % se dit, sans bloquer ; le harnais du besoin est hors durée attendue.
+# Durée attendue de ce qui se joue, mesurée de nouveau le 01/10 sur 2 cœurs comme la CI (#307) : 30 s
+# pour les paquets fonctionnels et l'interface sans navigateur, 40 s pour la garde ; 630 s pour toute
+# la non-régression dans le navigateur demandée, et, pour les tests navigateur de l'issue, 80 s pour
+# construire le site et lancer le navigateur, plus 25 s par fichier (la moyenne des fichiers ; le plus
+# lourd en prend 175). Un dépassement de plus de 20 % se dit, sans bloquer ; le harnais du besoin est
+# hors durée attendue.
 DUREE_FONCTIONNEL=30 DUREE_GARDE=40
 attendue=0
 { joue coeur || joue relais || joue hebergement || joue interface; } && attendue=$((attendue + DUREE_FONCTIONNEL))
-joue navigateur && attendue=$((attendue + 650))
+joue navigateur && attendue=$((attendue + 630))
 issues=$(grep -c . "$journaux/issue.txt")
-[ "$issues" -gt 0 ] && attendue=$((attendue + 80 + 30 * issues))
+[ "$issues" -gt 0 ] && attendue=$((attendue + 80 + 25 * issues))
 joue garde && attendue=$((attendue + DUREE_GARDE))
 # Palier 1 : le typecheck des paquets touchés (fonctionnels) dont un ensemble se joue ; la garde n'en
 # a pas à la livraison (#121). La CI le rejoue toujours.

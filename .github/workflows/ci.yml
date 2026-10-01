@@ -29,10 +29,12 @@ name: CI et livraison
 # Place de chaque job sur le second axe des harnais, ce qu'ils lisent (#113) :
 # - `test` lit des fichiers suivis : il rejoue ici typecheck, `pnpm test` et build, tels qu'en local ;
 #   l'archive du site qu'il dépose ensuite ne juge rien. Ses seuils (#232, D83) : au Ready et sur
-#   `main`, seuil 1, plus les tests navigateur au seuil 2, et le harnais du besoin en entier sur une
-#   PR ; au tag `v*` et pour une version forcée, seuil 3, tests navigateur activés, avant de publier. Le moins cher d'abord
-#   (#264) : typecheck, seuil 1, harnais du besoin, puis les tests navigateur de non-régression, qui
-#   ne partent que si tout le reste est vert. Il ne joue que le manque (#237, #266) : au Ready, une
+#   `main`, seuil 1, et, sur une PR, le harnais du besoin et les tests navigateur de l'issue en entier
+#   (`tests-de-l-issue.sh`, #307) ; au tag `v*` et pour une version forcée, seuil 3, tests navigateur
+#   activés, avant de publier. Les tests navigateur de non-régression ne s'y jouent ni au Ready ni
+#   après la fusion : chaque nuit, sur `main` (`nuit.yml`, #307). Le moins cher d'abord (#264) :
+#   typecheck, seuil 1, harnais du besoin, puis les tests navigateur de l'issue, qui ne partent que si
+#   tout le reste est vert. Il ne joue que le manque (#237, #266) : au Ready, une
 #   branche qui ne contient pas le dernier `main` est à mettre à jour et rien d'autre ne se joue ;
 #   sinon, ce qui se saute suit D83 (« Les empreintes », « L'attestation »), seuil 1 compris : la
 #   décision passe par `pnpm test --attestation <fichier>`, que prépare `.githooks/attestation.mjs`,
@@ -159,8 +161,9 @@ jobs:
           python3 -c 'import pyftpdlib; print("pyftpdlib présent")'
       # Seuils (#232, D83) : au Ready et sur `main`, les tests de niveau 0 et 1 — l'auditeur a
       # vérifié au seuil 2 avant le Ready, la livraison aussi, hors tests navigateur sauf demande —,
-      # hors tests navigateur, que seule l'option `--navigateur` active ; puis le harnais du besoin,
-      # puis les tests navigateur au seuil 2, qui ne partent que si tout le reste est vert (#264).
+      # hors tests navigateur, que seule l'option `--navigateur` active ; puis, sur une PR, le harnais
+      # du besoin, puis les tests navigateur de l'issue, qui ne partent que si tout le reste est vert
+      # (#264). La non-régression dans le navigateur se joue la nuit, sur `main` (#307).
       # `--attestation` (#237, #266, #302) : le lanceur saute, fichier par fichier, ce dont l'empreinte
       # est déjà trouvée verte à un seuil au moins égal, et dit ce qu'il joue et ce qu'il saute ; sans
       # fichier, tout se joue. Aucun moment ne fait exception, le seuil 1 du Ready non plus (#266,
@@ -179,10 +182,13 @@ jobs:
         run: sh .githooks/harnais-du-besoin.sh --jouer --attestation "$RUNNER_TEMP/attestation.json"
         env:
           TIRELIRE_STRICT: '1'
-      - name: Tests navigateur au seuil 2
+      # Les tests navigateur de l'issue (#307) : les fichiers de tests navigateur que la PR ajoute ou
+      # modifie, hors harnais du besoin, en entier (seuil 4), sauf chaque fichier vert sur son
+      # empreinte, par leur définition commune avec la livraison.
+      - name: Tests navigateur de l'issue, en entier
         id: navigateur
-        if: "!startsWith(github.ref, 'refs/tags/v') && !inputs.version_forcee"
-        run: pnpm --dir apps/web run test 2 --navigateur --attestation "$RUNNER_TEMP/attestation.json" test/navigateur
+        if: github.event_name == 'pull_request'
+        run: sh .githooks/tests-de-l-issue.sh --jouer --attestation "$RUNNER_TEMP/attestation.json"
         env:
           TIRELIRE_STRICT: '1'
       # Avant de publier une version, poussée à la main ou forcée (#274) : les tests jusqu'au niveau 3,
@@ -234,7 +240,8 @@ jobs:
             else
               echo "- seuil 1 — garde, cœur, relais, hébergement, interface sans navigateur : $(dit "$SEUIL1" ", chaque ensemble joué ou sauté sur une empreinte verte (voir plus haut)")"
               [ "$GITHUB_EVENT_NAME" = pull_request ] && echo "- harnais du besoin, en entier : $(dit "$HARNAIS" ", joué ou sauté sur une empreinte verte (voir plus haut)")"
-              echo "- interface dans le navigateur, seuil 2 : $(dit "$NAVIGATEUR" ", jouée ou sautée sur une empreinte verte — la couvre ce que l'outillage de la branche ou une tête verte au Ready a trouvé vert, ou rien de ce qu'elle lit n'a changé (voir plus haut)")"
+              [ "$GITHUB_EVENT_NAME" = pull_request ] && echo "- tests navigateur de l'issue, en entier : $(dit "$NAVIGATEUR" ", chaque fichier joué ou sauté sur une empreinte verte (voir le journal de l'étape)")"
+              echo "- tests navigateur de non-régression : non joués ici — ils se jouent la nuit, sur main (nuit.yml)"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
       - run: pnpm build

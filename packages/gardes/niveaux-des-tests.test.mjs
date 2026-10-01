@@ -12,7 +12,8 @@
  * **Au niveau 1** — ce qui, tombé sans qu'on le voie, laisserait découvrir un rouge après la fusion
  * (principe 10.1) : dans chaque ensemble, au seuil 1, les tests de niveau 0 et 1 se jouent, et eux
  * seuls ; l'interface, avec et sans l'option navigateur ; `ci.yml`, joué à blanc, vérifie au seuil 1,
- * active les tests navigateur au seuil 2, joue le harnais du besoin dans une étape bloquante, et ne
+ * joue les tests navigateur de l'issue et le harnais du besoin dans des étapes bloquantes — la
+ * non-régression dans le navigateur se joue la nuit (#307) —, et ne
  * publie qu'après le seuil 3 au tag `v*`.
  *
  * **Au niveau 2** — des cas de D83, l'usage restant possible s'ils tombaient : le seuil par défaut,
@@ -359,13 +360,16 @@ describe('[niveau 1] D83, principe 10.1 · au Ready, la CI joue tout ce qui gard
 
   // La CI, jouée à blanc.
 
-  test('au Ready, la CI vérifie au seuil 1, et active les tests navigateur au seuil 2', () => {
+  test('au Ready, la CI vérifie au seuil 1, et joue les tests navigateur de l’issue, non la non-régression dans le navigateur (#307)', () => {
     const tests = étapesDeTests(lire(CI), auReady);
     const suite = tests.filter((t) => !t.navigateur);
     assert.ok(suite.length, `${CI} : aucune étape ne joue les tests au passage en Ready`);
     for (const t of suite) assert.equal(t.seuil, 1, `${CI} : au Ready, « ${t.job.nom} » joue les tests au seuil ${t.seuil}, attendu 1 (#232, point 7)`);
-    const navigateur = tests.filter((t) => t.navigateur && t.seuil === 2 && !laisseÉchouer(t.job, t.é));
-    assert.ok(navigateur.length, `${CI} : au Ready, aucune étape bloquante n'active les tests navigateur (\`--navigateur\`) au seuil 2 (#232, point 7)`);
+    const navigateur = tests.filter((t) => t.navigateur && t.seuil === 2);
+    assert.deepEqual(navigateur.map((t) => t.job.nom), [], `${CI} : au Ready, la non-régression dans le navigateur ne se joue plus : elle se joue la nuit (#307, point 1)`);
+    const joués = jouer(lire(CI), auReady).flatMap((job) => job.joués.map((é) => ({ job, é })));
+    const issue = joués.filter(({ é }) => /tests-de-l-issue\.sh --jouer/.test(déplier(commande(é))));
+    assert.ok(issue.length && issue.every(({ job, é }) => !laisseÉchouer(job, é)), `${CI} : au Ready, aucune étape bloquante ne joue les tests navigateur de l'issue (\`.githooks/tests-de-l-issue.sh\`) (#307, point 2)`);
   });
 
   test('au Ready, une étape bloquante joue le harnais du besoin, par sa définition commune', () => {

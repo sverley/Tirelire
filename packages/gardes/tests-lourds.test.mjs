@@ -327,7 +327,7 @@ describe('[niveau 4] #264, point 9 · chaque moment qui ne joue pas les tests na
     const étape = lireFichier(CI).split('\n      - ').find((é) => é.startsWith('name: Ce que ce passage a joué'));
     assert.ok(étape, 'aucune étape ne dit ce que le passage a joué');
     assert.match(étape, /if: always\(\)/, 'elle se joue même après un rouge');
-    for (const quoi of ['typecheck', 'harnais du besoin', 'interface dans le navigateur', 'palier moins cher', 'couvre', "rien de ce qu'elle lit n'a changé", 'au tag, rien ne se saute']) {
+    for (const quoi of ['typecheck', 'harnais du besoin', "tests navigateur de l'issue", 'tests navigateur de non-régression', 'la nuit', 'palier moins cher', 'empreinte verte', 'au tag, rien ne se saute']) {
       assert.ok(étape.includes(quoi), `l'étape ne dit rien de « ${quoi} »`);
     }
   });
