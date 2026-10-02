@@ -1,7 +1,8 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
-  import { money, shortDate } from '../lib/format';
-  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, budgetPeriodContaining, minDate, needActive, needCruise, nextPeriod, automationsByRank, automationLabel, type CategoryReview, type Automation, type Need } from '@tirelire/core';
+  import { money, moneyClass, shortDate } from '../lib/format';
+  import Manque from '../lib/Manque.svelte';
+  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, budgetPeriodContaining, minDate, needActive, needCruise, nextPeriod, automationsByRank, automationLabel, readBudgetAhead, type CategoryReview, type Automation, type Need, type BudgetNeedReading } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -15,6 +16,20 @@
   const categories = $derived(alive(app.ledger.categories));
   const tirelires = $derived(alive(app.ledger.tirelires));
   const hasOps = $derived(app.ledger.operations.some((o) => !o.deletedAt));
+
+  /*
+   * La lecture du budget (#320, D57 : le budget d'abord) : la période en cours et les suivantes,
+   * autant que le choix du nombre de périodes en demande, chacune telle que le Plan la dit (D06, D29,
+   * D52). Sans moyenne : les montants du budget, période par période. Absente sans besoin (U5).
+   */
+  const budget = $derived(readBudgetAhead(app.ledger, app.asOf, horizon));
+  let periodesDepliees = $state<string[]>([]);
+  function basculerPeriode(cle: string) {
+    periodesDepliees = periodesDepliees.includes(cle) ? periodesDepliees.filter((x) => x !== cle) : [...periodesDepliees, cle];
+  }
+  /** Ce que le Plan dit d'un besoin que les revenus ne couvrent pas entièrement. */
+  const nonCouvert = (n: BudgetNeedReading) =>
+    n.status === 'unfunded' ? `« ${n.name} » n’est pas couverte par les revenus` : `« ${n.name} » n’est couverte qu’en partie par les revenus`;
 
   const keyOf = (r: CategoryReview) => `${r.categoryId ?? ''}|${r.tirelireId ?? ''}`;
 
@@ -73,18 +88,89 @@
 </script>
 
 <h1>Bilan</h1>
-<p class="muted small">Dépensé par période de paie et par catégorie, hors virements internes ; les dépenses ponctuelles sont exclues des moyennes. Une période « partielle » commence avant la première opération connue : la comparer aux autres serait trompeur.</p>
 
-<div class="actions" style="margin-top:0">
-  {#each [3, 6, 12] as n}
-    <button class="btn small" class:primary={horizon === n} onclick={() => (horizon = n)}>{n} périodes</button>
-  {/each}
-  <label class="btn small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" bind:checked={showIncome} /> revenus</label>
-</div>
-
-{#if !hasOps}
-  <div class="empty">Importe des relevés ou saisis des opérations pour voir le bilan.</div>
+{#if !budget && !hasOps}
+  <div class="card accent">
+    <p style="margin-top:0">Le Bilan lira votre budget, période par période, dès qu’il y en aura un ; et ce que vous avez dépensé dès qu’il y aura des opérations, importées ou saisies.</p>
+    <div class="actions" style="margin-bottom:0">
+      <button class="btn primary" onclick={() => app.go('wizard')}>Construire mon budget</button>
+    </div>
+  </div>
 {:else}
+  <div class="actions" style="margin-top:0">
+    {#each [3, 6, 12] as n}
+      <button class="btn small" class:primary={horizon === n} onclick={() => (horizon = n)}>{n} périodes</button>
+    {/each}
+  </div>
+
+  {#if budget}
+    <h2>Le budget, période par période</h2>
+    <p class="muted small">La période en cours et les suivantes : ce que le budget demande, ce que les revenus prévus en couvrent et la marge, comme le Plan le dit pour chacune. Des montants du budget, pas des moyennes.</p>
+    {#each budget.periods as p, i (p.period.key)}
+      {@const cle = p.period.key}
+      <div class="card" class:warn={p.uncovered.length > 0} data-periode={cle}>
+        <div class="row">
+          <div class="label">
+            <strong>Du {shortDate(p.period.start)} au {shortDate(p.period.end)}</strong>{#if i === 0}<span class="sub"> · période en cours</span>{/if}
+          </div>
+          <div style="text-align:right">
+            <div class="{moneyClass(p.totals.margin)}" style="font-size:17px">{money(p.totals.margin)}</div>
+            <div class="sub">marge</div>
+          </div>
+        </div>
+        <div class="small">
+          {#each [['Revenus prévus', p.totals.incomes], ['Charges fixes', p.totals.fixedCharges], ['Demandé', p.totals.requested], ['Couvert par les revenus', p.totals.funded]] as [k, v] (k)}
+            <div style="display:flex;justify-content:space-between;gap:8px"><span class="muted">{k}</span><span class="num">{money(v as number)}</span></div>
+          {/each}
+        </div>
+        {#each p.uncovered as n (n.needId)}
+          <div class="row">
+            <div class="label neg">{nonCouvert(n)}</div>
+            <div class="num neg">{money(n.uncovered)}<span class="sub"> non couverts</span></div>
+          </div>
+        {/each}
+        {#if p.needs.length}
+          <div class="actions" style="margin:6px 0 0">
+            <button class="btn small" aria-expanded={periodesDepliees.includes(cle)} onclick={() => basculerPeriode(cle)}>{periodesDepliees.includes(cle) ? 'Masquer le détail' : `Détail · ${p.needs.length} besoin${p.needs.length > 1 ? 's' : ''}`}</button>
+          </div>
+        {/if}
+        {#if periodesDepliees.includes(cle)}
+          <div class="orders">
+            {#each p.needs as n (n.needId)}
+              <div class="row">
+                <div class="label">
+                  {n.name}{#if n.name !== n.tirelireName}<span class="sub"> dans {n.tirelireName}</span>{/if}
+                  <span class="sub">{n.kind === 'payout' ? `verse au budget ${money(-n.requested)}` : `demandé ${money(n.requested)} · couvert ${money(n.funded)}`}</span>
+                </div>
+                {#if n.uncovered > 0}<div class="num neg">{money(n.uncovered)}<span class="sub"> non couverts</span></div>{:else if n.kind !== 'payout'}<div class="sub">couvert</div>{/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/each}
+
+    {#if budget.shortfalls.length}
+      <h2>Échéances en manque</h2>
+      <p class="muted small">Ce que les virements permanents ne réuniront pas à temps, sur ces périodes. Vous y répondez dans le Plan : lisser ou refuser.</p>
+      <div class="card warn">
+        {#each budget.shortfalls as m (m.needId + m.dueDate)}
+          <Manque manque={m} repondre={false} />
+        {/each}
+        <div class="actions" style="margin:6px 0 0">
+          <button class="btn small" onclick={() => app.go('plan')}>Répondre dans le Plan</button>
+        </div>
+      </div>
+    {/if}
+  {/if}
+
+  {#if hasOps}
+    {#if budget}<h2>Ce qui a été dépensé</h2>{/if}
+    <p class="muted small">Dépensé par période de paie et par catégorie, hors virements internes ; les dépenses ponctuelles sont exclues des moyennes. Une période « partielle » commence avant la première opération connue : la comparer aux autres serait trompeur.</p>
+    <div class="actions" style="margin-top:0">
+      <label class="btn small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" bind:checked={showIncome} /> revenus</label>
+    </div>
+
   <div class="card" style="padding:0">
     {#each rows as r (keyOf(r))}
       {@const g = gap(r)}
@@ -166,6 +252,10 @@
         </div>
       {/each}
     </div>
+  {/if}
+  {:else}
+    <h2>Ce qui a été dépensé</h2>
+    <div class="empty">Avec des opérations, importées ou saisies, le Bilan ajoutera ici ce qui a été dépensé, face à ce budget.</div>
   {/if}
 {/if}
 

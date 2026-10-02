@@ -5,7 +5,7 @@
   import { centsToInput, inputToCents } from '../lib/format';
   import Manque from '../lib/Manque.svelte';
   import { supprimerOperations } from '../lib/suppression';
-  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Operation, type Period, type PlanTransfer } from '@tirelire/core';
+  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Operation, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -32,8 +32,8 @@
   const periode = $derived(
     (choisie && periods.find((p) => p.key === choisie!.key)) ?? periods.find((p) => p.start <= app.asOf && p.end >= app.asOf) ?? periods[0]!,
   );
-  // Dans la période où l'on lit, on lit à la date de lecture ; ailleurs, au premier jour.
-  const periodeAsOf = $derived(periode.start <= app.asOf && periode.end >= app.asOf ? app.asOf : periode.start);
+  // Dans la période où l'on lit, on lit à la date de lecture ; ailleurs, au premier jour (D52).
+  const periodeAsOf = $derived(periodReadingDate(periode, app.asOf));
   const plan = $derived(computePlan(app.ledger, periodeAsOf, app.asOf));
 
   function goTo(p: Period) {
