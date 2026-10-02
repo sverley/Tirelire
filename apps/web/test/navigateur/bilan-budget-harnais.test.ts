@@ -209,12 +209,12 @@ describe.skipIf(!navigateur)('#320 · le Bilan à l’écran', () => {
         if (i === 1) expect(await periodeSuivanteDuPlan(page), 'le Plan n’a pas de période suivante').toBe(true);
         await pause();
         const plan = await tuilesDuPlan(page);
-        for (const k of ['Revenus prévus', 'Charges fixes', 'Réservé et viré', 'Marge']) expect(plan[k], `le Plan ne montre pas « ${k} »`).toBeTruthy();
+        for (const k of ['Revenus prévus', 'Charges fixes', 'Couvert par les revenus', 'Marge']) expect(plan[k], `le Plan ne montre pas « ${k} »`).toBeTruthy();
         const carte = b.periodes[i]!.texte;
-        // « Réservé et viré » du Plan est la part des dotations que les revenus couvrent.
+        // « Couvert par les revenus » du Plan est la part des dotations que les revenus couvrent.
         expect(carte, `période ${i + 1} : revenus prévus`).toContain(plan['Revenus prévus']);
         expect(carte, `période ${i + 1} : charges fixes`).toContain(plan['Charges fixes']);
-        expect(carte, `période ${i + 1} : part couverte par les revenus`).toMatch(new RegExp(`Couvert par les revenus\\s*${plan['Réservé et viré']!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+        expect(carte, `période ${i + 1} : part couverte par les revenus`).toMatch(new RegExp(`Couvert par les revenus\\s*${plan['Couvert par les revenus']!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
         expect(carte, `période ${i + 1} : marge`).toContain(plan['Marge']);
       }
     });

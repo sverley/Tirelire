@@ -171,7 +171,7 @@ async function traverser(page: Page): Promise<Parcours> {
 
   const plan = await page.evaluate(() => {
     const texte = (document.querySelector('main')?.textContent ?? '').replace(/\s+/g, ' ');
-    const réservé = texte.match(/([\d  \u202f.,]+€)\s*Réservé et viré/);
+    const réservé = texte.match(/([\d  \u202f.,]+€)\s*Couvert par les revenus/);
     return { texte, réservé: réservé?.[1]?.trim() ?? '', dotées: (texte.match(/croisière/g) ?? []).length };
   });
 
