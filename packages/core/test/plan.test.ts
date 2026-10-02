@@ -144,6 +144,9 @@ describe('[niveau 2] plan de période, sur l’exemple de l’analyse (D02, D28,
   it('échéance entièrement provisionnée : dotation nulle', () => {
     const l = exampleLedger();
     l.tirelires.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
+    // Sans lissage décidé (#184) : celui de l'exemple n'a plus de raison d'être.
+    l.shortfallAnswers = [];
+    l.operations = l.operations.filter((o) => o.id !== 'op-lissage-tf');
     expect(line(computePlan(l, asOf), 'need-tf').requested).toBe(0);
   });
 

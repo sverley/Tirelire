@@ -103,9 +103,10 @@ describe('[niveau 1] harnais du registre · I3 (U1)', () => {
 
     it('laisse un reste à vivre cohérent avec ce qui a été déclaré', () => {
       const plan = computePlan(budgetDeLAssistant(), asOf);
-      // 2 400 − 750 de loyer − (500 de courses + 240 d'assurance) = 910 €.
-      expect(plan.totals.requested).toBe(euros(740));
-      expect(plan.totals.margin).toBe(euros(910));
+      // 2 400 − 750 de loyer − (500 de courses + 100 de croisière d'assurance) = 1 050 € : rien ne
+      // se lisse d'office (#184), le manque de l'assurance s'annonce à part.
+      expect(plan.totals.requested).toBe(euros(600));
+      expect(plan.totals.margin).toBe(euros(1050));
     });
 
     it("n'annonce pas de découvert quand le solde du compte a été renseigné", () => {
