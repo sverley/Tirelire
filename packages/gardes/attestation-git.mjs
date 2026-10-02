@@ -45,14 +45,16 @@ export const racineGit = (cwd) => essaie(() => git(['rev-parse', '--show-topleve
 
 /**
  * La branche dont un lancement dans `cwd` peut lire et écrire l'attestation : `{ branche }`, ou
- * `{ raison }` — aucune branche extraite, `main`, ou une sous-branche (`--codeur`, `--auditeur`, qui
- * n'attestent rien, D83).
+ * `{ raison, sorte }` — aucune branche extraite (`sorte` : `detachee`), `main` (`main`), ou une
+ * sous-branche (`--codeur`, `--auditeur`, qui n'attestent rien, D83 ; `sous-branche`, avec son nom
+ * dans `extraite`). Sur une tête détachée ou une sous-branche, un lancement saute pourtant ce que
+ * couvre la base commune avec `main` (#314) ; sur `main`, rien.
  */
 export function brancheAttestable(cwd) {
   const branche = essaie(() => git(['symbolic-ref', '--short', '-q', 'HEAD'], { cwd }));
-  if (!branche) return { raison: 'aucune branche extraite' };
-  if (branche === 'main') return { raison: 'sur main' };
-  if (/--(?:codeur|auditeur|attestation)$/.test(branche)) return { raison: `sous-branche ${branche}` };
+  if (!branche) return { raison: 'aucune branche extraite', sorte: 'detachee' };
+  if (branche === 'main') return { raison: 'sur main', sorte: 'main' };
+  if (/--(?:codeur|auditeur|attestation)$/.test(branche)) return { raison: `sous-branche ${branche}`, sorte: 'sous-branche', extraite: branche };
   return { branche };
 }
 
