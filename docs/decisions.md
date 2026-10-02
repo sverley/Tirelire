@@ -1097,7 +1097,24 @@ opération importée (D09) est `op_` + 16 hexadécimaux. L'écriture par ligne e
 `CHECK` nommé `table.colonne`, et le cœur vérifie la même chose avant d'écrire, localement comme à la
 réception, si bien qu'une ligne incohérente est refusée sans rien écrire, en nommant la table et la
 colonne. Les références et les autres invariants sont vérifiés par une fonction du cœur, qui sert
-aussi à l'ouverture d'un fichier étranger. Le format est documenté dans
+aussi à l'ouverture d'un fichier étranger. Un fichier que l'utilisateur ouvre — une restauration, un
+fichier fabriqué hors de l'application — passe par cette vérification entière ; celui que
+l'application tient déjà, rouvert au démarrage, ne passe que par le contrôle du format, chaque
+écriture l'ayant vérifié ligne par ligne. S'y complète ce que l'application pose d'elle-même pour
+ses propres lignes : une table absente vaut une table vide, une colonne facultative absente vaut
+vide, un réglage absent prend sa valeur par défaut, le compte principal absent naît (D40), une ligne
+sans horloge reçoit une horloge de l'instance qui ouvre. Tout le reste le fait refuser, sans rien
+ouvrir, écrire ni effacer (D30) : une table ou une colonne hors du format ; une valeur qui ne tient
+pas dans sa colonne — obligatoire, énumération, booléen, entier, date, horodatage, JSON et sa forme,
+dont une seule part variable par ventilation et par placement (D27, D38) ; un identifiant répété ;
+une colonne, ou un identifiant dans une colonne JSON — le placement d'une tirelire, la sélection et
+l'action d'un automatisme, la table des comptes d'un profil d'import —, qui désigne une ligne absente
+du fichier ; une horloge qui ne se lit pas ; un second compte
+principal ; un réglage hors du format ou qui décrit une instance. Rien n'avertit seulement : un
+fichier s'ouvre ou il est refusé, car l'ouvrir en écartant des lignes cacherait ce qui manque
+(principe 4). Le refus nomme le premier problème — la table, la ligne, la colonne — et dit combien
+d'autres il y a ; la commande `verifier-fichier` du cœur rend le même verdict hors de l'interface,
+sur la machine, chaque problème nommé. Le format est documenté dans
 `docs/format-depot-sqlite.md` pour pouvoir être fabriqué depuis l'extérieur.
 
 Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'y stocke qui se
