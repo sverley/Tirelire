@@ -1478,7 +1478,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   l'empreinte. La garde et l'hébergement lisent tout le dépôt. Une PR qui ne change que
   des fichiers de `docs/` ne rejoue donc que la garde et l'hébergement, à tout lancement à
   la main, sur la branche comme sur une tête détachée, à la livraison et au Ready, `docs/decisions.md`
-  compris : ce qui confronte une décision au code est un test de la garde ; le lancement dit, pour chaque autre ensemble, qu'il le saute et pourquoi (#314). Pour les tests navigateur, la liste
+  compris : ce qui confronte une décision au code se joue dans l'ensemble de la garde, qui lit tout le dépôt ; le lancement dit, pour chaque autre ensemble, qu'il le saute et pourquoi (#314). Pour les tests navigateur, la liste
   est celle du point 9 de #237 : `docs/`, `.github/`, `.githooks/`, `packages/gardes/`,
   `apps/hebergement/`, `apps/relay/`, les fichiers `*.md` et `.gitignore`. La garde y figure : les
   tests navigateur la lisent par leur lanceur, mais l'interface sans navigateur, qui la lit par le
