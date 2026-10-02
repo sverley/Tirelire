@@ -342,8 +342,8 @@ describe('[niveau 4] #237 · la livraison atteste, la CI saute ce qui est couver
     assert.ok(a, "l'attestation envoyée se lit");
     assert.deepEqual(
       a.verts.map((v) => `${v.ensemble}:${v.seuil}`).sort(),
-      ['garde:2', 'harnais:4'],
-      `la garde, que retient un besoin organisationnel, jouée au seuil 2, et le harnais du besoin vert, en entier (point 1)\n${l.stdout}`,
+      ['garde:2', 'harnais:4', 'hebergement:2'],
+      `la garde et l'hébergement, que retient un besoin organisationnel (#314), joués au seuil 2, et le harnais du besoin vert, en entier (point 1)\n${l.stdout}`,
     );
 
     // La branche arrive sur le distant ; la CI la lit, au Ready, sur l'arbre de la tête.

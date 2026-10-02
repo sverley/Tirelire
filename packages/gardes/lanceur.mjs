@@ -31,8 +31,9 @@
  *   fichier joué a donné, pour qu'elle atteste un à un les fichiers verts d'un ensemble qui ne l'est
  *   pas. Un fichier absent vaut « aucune empreinte verte ». Sans elle, le
  *   lanceur lit lui-même ce que ce clone connaît : l'attestation de la branche extraite, locale et
- *   distante, et la base commune avec `main`, verte jusqu'au seuil 2 (D83). Sur `main`, sans branche
- *   ou sur une sous-branche, rien ne se saute.
+ *   distante, et la base commune avec `main`, verte jusqu'au seuil 2 (D83). Sur une tête détachée ou
+ *   une sous-branche, seule cette base commune couvre, et aucune attestation ne se lit (#314) ; sur
+ *   `main`, rien ne se saute.
  * - Hors CI et hors livraison, c'est-à-dire sans `--attestation`, sur une branche qui n'est ni `main`
  *   ni une sous-branche, le lanceur atteste chaque fichier dont tous les tests de niveau au plus le
  *   seuil ont tourné et fini verts : le fichier, son ensemble, son seuil — 4 si aucun de ses tests
@@ -135,17 +136,29 @@ if (fichierAttestation !== null) {
   }
 } else if (depotGit && !nomme) {
   const b = brancheAttestable(depotGit);
-  copie = b.branche ? arbreDeLaCopie(depotGit) : null;
-  if (!b.branche) annonces.push(`${b.raison} : rien ne se saute ni ne s'atteste`);
+  // Sur une tête détachée ou une sous-branche (#314) : seule la base commune avec `main` couvre ; on
+  // n'y lit l'attestation d'aucune branche, et on n'y atteste rien. Sur `main`, rien ne se saute.
+  const baseSeule = !b.branche && b.sorte !== 'main';
+  copie = b.branche || baseSeule ? arbreDeLaCopie(depotGit) : null;
+  if (!b.branche && !baseSeule) annonces.push(`${b.raison} : rien ne se saute ni ne s'atteste`);
   else if (!copie) annonces.push("le contenu joué ne se lit pas : rien ne se saute ni ne s'atteste");
   else {
-    const harnais = harnaisDuBesoin(b.branche, depotGit);
+    // Le harnais du besoin, jamais couvert par `main` : sur une tête détachée, tout fichier qui se dit
+    // harnais d'audit, faute de numéro de branche (`.githooks/harnais-du-besoin.sh`).
+    const harnais = harnaisDuBesoin(b.branche ?? b.extraite ?? '', depotGit);
     jouees = empreintes(copie.entrees, harnais);
     fichiersJoues = empreintesDesTests(copie.entrees);
     const base = baseAvecMain(depotGit);
     const main = base ? essaie(() => ({ commit: base, empreintes: empreintes(entreesDe(base, depotGit)) })) : null;
-    couverture = couvertureLocale({ arbre: copie.arbre, empreintes: jouees, fichiers: fichiersJoues, verts: vertsConnus(b.branche, depotGit), main, harnais });
-    attester = { branche: b.branche, harnais };
+    const verts = baseSeule ? [] : vertsConnus(b.branche, depotGit);
+    couverture = couvertureLocale({ arbre: copie.arbre, empreintes: jouees, fichiers: fichiersJoues, verts, main, harnais });
+    if (baseSeule) {
+      annonces.push(
+        main
+          ? `${b.raison} : seul se saute ce que couvre la base commune avec main (${base.slice(0, 10)}), jusqu'au seuil 2 ; aucune attestation n'est lue, rien ne s'atteste`
+          : `${b.raison}, sans base commune avec origin/main : rien ne se saute ni ne s'atteste`,
+      );
+    } else attester = { branche: b.branche, harnais };
   }
 } else if (!depotGit) annonces.push("hors de tout dépôt git : rien ne se saute ni ne s'atteste");
 if (nomme) annonces.push("appel nommé : il se joue en entier, quel que soit l'attestation, et n'atteste rien");

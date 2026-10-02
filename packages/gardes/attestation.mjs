@@ -106,7 +106,7 @@ export const ENSEMBLES = Object.freeze([
     dossier: 'apps/web',
     navigateur: false,
     ecartes: [
-      { motifs: ['docs/', '*.md', '.gitignore', '!docs/decisions.md'], raison: 'la documentation, hors `docs/decisions.md`, que lit `stockage-domaine.test.ts`' },
+      DOCUMENTATION,
       OUTILLAGE_CI,
       { motifs: ['apps/relay/', 'apps/hebergement/'], raison: "l'interface ne les importe pas ; ses tests tiennent le relais en mémoire" },
       { motifs: ['apps/web/test/navigateur/'], raison: 'les tests navigateur : sans navigateur, le lanceur les écarte' },

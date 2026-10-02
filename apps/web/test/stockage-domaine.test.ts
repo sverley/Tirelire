@@ -30,8 +30,9 @@
  *    table et la colonne telles que le fichier les nomme. Par le fichier lui-même (D58 : `NOT NULL`,
  *    `CHECK`) : la même écriture en SQL échoue. Un test par besoin, pour que chacun ait son niveau.
  * 5. Une colonne d'`operations` qui vaut partout le libellé normalisé est dérivée : si elle est
- *    gardée, `docs/decisions.md` la nomme. Que la raison tienne, et le classement des autres
- *    colonnes (saisie, importée, dérivée), se relit.
+ *    gardée, `docs/decisions.md` la nomme. Ce test et son témoin vivent dans la garde
+ *    (`packages/gardes/colonnes-derivees.test.mjs`, #314) : l'interface ne lit plus `docs/`. Que la
+ *    raison tienne, et le classement des autres colonnes (saisie, importée, dérivée), se relit.
  * 6. Un fichier et un paquet de `main` avant #197 (966ebc3), données inventées, compressés en base64
  *    en fin de fichier.
  * 7. Le plan de l'exemple à trois dates, et l'import d'un relevé inventé (opérations, rapprochements
@@ -43,7 +44,7 @@
  * Niveaux (#232, D83), marqués dans chaque titre ; un témoin a le niveau de ce qu'il garde :
  * - 0 : point 3, les deux tests sans doublon ; point 4, une ligne refusée, écrite ou reçue, n'écrit
  *   rien ; point 6, les quatre tests ; point 7, l'export qui se rouvre à l'identique.
- * - 2 : points 1, 2 et 5 ; point 3, la forme de la clé ; point 4, chaque colonne refusée et le refus
+ * - 2 : points 1 et 2 (le point 5 est dans la garde) ; point 3, la forme de la clé ; point 4, chaque colonne refusée et le refus
  *   par le fichier lui-même ; point 7, le plan et l'import.
  * - 3 : point 4, les deux refus qui nomment la table et la colonne.
  *
@@ -54,7 +55,6 @@
  * contenu de chaque table du fichier, horloges des lignes et table `meta` comprises, que
  * « #196 · 8 » ne lit que par `load()`.
  */
-import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -69,7 +69,6 @@ import {
   exportBundle,
   importBundle,
   memoryTransportPair,
-  normalizeLabel,
   parseCsv,
   parseRows,
   prepareImport,
@@ -84,7 +83,6 @@ const SQL = await initSqlJs();
 const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'automations', 'importProfiles', 'devices'] as const;
 type Cle = (typeof CLES)[number];
 type Ligne = Record<string, unknown> & { id: string };
-const DECISIONS = new URL('../../../docs/decisions.md', import.meta.url);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // Outils
@@ -417,11 +415,6 @@ function verifierRefusFichier(bytes: Uint8Array, table: string, colonne: string,
   expect(refuse, `le fichier accepte ${table}.${colonne} = ${JSON.stringify(valeur)}`).toBe(true);
 }
 
-function verifierRaisonEcrite(derivees: string[], decisions: string): void {
-  const camel = (s: string) => s.replace(/_([a-z])/g, (_m, l: string) => l.toUpperCase());
-  expect(derivees.filter((c) => !decisions.includes('`' + c + '`') && !decisions.includes('`' + camel(c) + '`')), 'des colonnes dérivées gardées sans raison écrite').toEqual([]);
-}
-
 function verifierRefus(r: { etat: string; dit: string }): void {
   expect(r.etat, 'le format précédent n’est pas refusé').toBe('refusé');
   expect(r.dit.trim(), 'le refus ne dit rien').not.toBe('');
@@ -632,27 +625,6 @@ describe('#197 · 4. le fichier refuse l’incohérent', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// 5. Rien de dérivé sans raison
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-
-describe('#197 · 5. rien de dérivé sans raison', () => {
-  it('une colonne d’operations qui se déduit du libellé n’est gardée qu’avec sa raison écrite dans les décisions [niveau 2]', async () => {
-    const s = await semee();
-    const bytes = s.export();
-    const ops = importees(s);
-    expect(ops.some((o) => normalizeLabel(String(o['label'])) !== o['label']), 'aucun libellé ne se normalise').toBe(true);
-    const { table } = ou(bytes, ops[0]!.id, ops[0]!['date']);
-    const db = new SQL.Database(bytes);
-    const r = db.exec(`SELECT * FROM "${table}" WHERE id IN (${ops.map(() => '?').join(', ')})`, ops.map((o) => o.id))[0]!;
-    db.close();
-    const libelle = new Map(ops.map((o) => [o.id, String(o['label'])]));
-    const idx = r.columns.indexOf('id');
-    const derivees = r.columns.filter((_c, k) => r.values.every((v) => v[k] === normalizeLabel(libelle.get(String(v[idx]))!)));
-    verifierRaisonEcrite(derivees, readFileSync(DECISIONS, 'utf8'));
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
 // 6. Le format précédent est refusé comme #196 le prévoit
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -830,10 +802,6 @@ it.fails('témoin rouge · un refus qui ne nomme pas la colonne [niveau 3]', () 
 it.fails('témoin rouge · un fichier qui accepte un genre de compte inconnu [niveau 2]', () => {
   // Version cassée : le fichier de main avant #197, sans contrainte.
   verifierRefusFichier(fichierAvant(), 'accounts', 'kind', 'cpt-avant-197', 'pivot');
-});
-
-it.fails('témoin rouge · une colonne dérivée gardée sans raison écrite [niveau 2]', () => {
-  verifierRaisonEcrite(['normalized_label'], '');
 });
 
 it.fails('témoin rouge · un fichier du format précédent ouvert sans lire son format [niveau 0]', async () => {
