@@ -219,16 +219,16 @@ class AppState {
   /** Écrit un patch (opérations + ventilations) d'un seul coup. */
   applyPatch(patch: Patch): void {
     for (const o of patch.operations) this.store.upsert('operations', o);
-    for (const a of patch.allocations) this.store.upsert('allocations', a);
-    for (const id of patch.removedAllocations ?? []) this.store.remove('allocations', id);
-    if (patch.operations.length || patch.allocations.length || patch.removedAllocations?.length) this.reload();
+    for (const a of patch.subOperations) this.store.upsert('subOperations', a);
+    for (const id of patch.removedSubOperations ?? []) this.store.remove('subOperations', id);
+    if (patch.operations.length || patch.subOperations.length || patch.removedSubOperations?.length) this.reload();
   }
 
   /** Applique un patch sans recharger (pour enchaîner), puis rend le grand livre relu. */
   applyPatchQuiet(patch: Patch): Ledger {
     for (const o of patch.operations) this.store.upsert('operations', o);
-    for (const a of patch.allocations) this.store.upsert('allocations', a);
-    for (const id of patch.removedAllocations ?? []) this.store.remove('allocations', id);
+    for (const a of patch.subOperations) this.store.upsert('subOperations', a);
+    for (const id of patch.removedSubOperations ?? []) this.store.remove('subOperations', id);
     this.ledger = this.store.load();
     return this.ledger;
   }

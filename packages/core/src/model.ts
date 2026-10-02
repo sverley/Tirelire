@@ -428,8 +428,8 @@ export const OPERATION_STATES = ['untreated', 'reconciled', 'locked'] as const;
 export type OperationState = (typeof OPERATION_STATES)[number];
 
 /**
- * Une opération est ventilée en une ou plusieurs lignes (`Allocation`) à parts (D27), chacune
- * portant une catégorie et une tirelire. Sans aucune ligne, elle vaut une ligne variable sans
+ * Une opération se divise en sous-opérations (`SubOperation`, D88), sur autant de niveaux qu'on
+ * veut, à parts (D27). Sans aucune sous-opération, elle vaut une sous-opération variable sans
  * classement : tout son montant pèse sur le « non affecté » du compte.
  */
 export interface Operation {
@@ -468,23 +468,15 @@ export function isLocked(op: Operation): boolean {
 }
 
 /**
- * Part d'une ligne de ventilation (D27) : un montant fixe, un pourcentage du montant de
- * l'opération, ou la part variable — le reste, bornée à zéro, jamais négative. Une seule ligne
- * variable par ventilation ; une opération sans ligne vaut une ligne variable non classée.
+ * Part d'une sous-opération dans le niveau qui la contient (D27) : un montant fixe, un pourcentage
+ * du montant de ce niveau, ou la part variable — le reste, bornée à zéro, jamais négative. Une
+ * seule part variable par division.
  */
 export type Share =
   | { kind: 'fixed'; amount: Cents }
   | { kind: 'percent'; pct: number }
   | { kind: 'variable' };
 
-/**
- * Ligne de ventilation. Son montant résolu est une part du montant de l'opération, dans le même
- * signe (une dépense de 85 € ventilée en −60 alimentation et le reste en vêtements).
- *
- * Effet sur la tirelire (D19) : le montant sur le compte de l'opération ; pour un virement
- * interne, aussi son opposé sur le compte de contrepartie, ce qui déplace une composante sans
- * changer le solde.
- */
 /**
  * Origine d'un renflouement (D49). Un renflouement est par définition ce que le plan sert à éviter :
  * si tout est correctement provisionné, l'argent n'a pas besoin d'être ramené. Le distinguer sert
@@ -498,14 +490,28 @@ export type Share =
 export const REPLENISHMENT_KINDS = ['internal', 'external'] as const;
 export type ReplenishmentKind = (typeof REPLENISHMENT_KINDS)[number];
 
-export interface Allocation {
+/**
+ * Sous-opération (D88) : une part du niveau qui la contient — l'opération, ou une autre
+ * sous-opération (`parentId`) —, dans le signe de l'opération, qui peut à son tour se diviser.
+ * Une ligne de ventilation de D10 et D27 en est une. Ce qu'elle ne porte pas (catégorie, tirelire,
+ * renflouement), elle le prend du niveau qui la contient, de proche en proche ; ne comptent que
+ * les sous-opérations qui ne se divisent plus (`countedLines`).
+ *
+ * Effet sur la tirelire (D19) : le montant sur le compte de l'opération ; pour un virement
+ * interne, aussi son opposé sur le compte de contrepartie, ce qui déplace une composante sans
+ * changer le solde.
+ */
+export interface SubOperation {
   id: Id;
+  /** L'opération dont elle fait partie, à tout niveau. */
   operationId: Id;
+  /** La sous-opération qui la contient ; absente, c'est l'opération elle-même. */
+  parentId?: Id;
   categoryId?: Id;
   tirelireId?: Id;
   share: Share;
   /**
-   * Cette ligne renfloue la tirelire au lieu de la faire vivre normalement (D49). Exclue des
+   * Cette sous-opération renfloue la tirelire au lieu de la faire vivre normalement (D49). Exclue des
    * moyennes du bilan, et comptée à part pour proposer un réajustement de la dotation.
    */
   replenishment?: ReplenishmentKind;
@@ -548,7 +554,8 @@ export type AutomationStateAction = 'lock' | 'reconcile' | 'none' | 'unlock';
 
 /**
  * Action d'une règle : chaque champ est facultatif, et seuls les champs renseignés écrasent ce
- * qu'une règle moins prioritaire a posé. `allocation` remplace la ventilation entière ; une part
+ * qu'une règle moins prioritaire a posé. `allocation` remplace la ventilation entière, à tous ses
+ * niveaux, par une seule division ; une part
  * variable la rend rejouable à montant inconnu d'avance (D27).
  */
 export interface AutomationAction {
@@ -636,7 +643,7 @@ export interface Ledger {
   categories: Category[];
   plannedFlows: PlannedFlow[];
   operations: Operation[];
-  allocations: Allocation[];
+  subOperations: SubOperation[];
   automations: Automation[];
   importProfiles: ImportProfile[];
   devices: Device[];
@@ -651,7 +658,7 @@ export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
     categories: [],
     plannedFlows: [],
     operations: [],
-    allocations: [],
+    subOperations: [],
     automations: [],
     importProfiles: [],
     devices: [],

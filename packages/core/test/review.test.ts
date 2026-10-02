@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { euros, exampleLedger, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, type Ledger, type Operation, type Allocation } from '../src/index.js';
+import { euros, exampleLedger, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, type Ledger, type Operation, type SubOperation } from '../src/index.js';
 
 function withHistory(): Ledger {
   const l = exampleLedger();
@@ -8,18 +8,18 @@ function withHistory(): Ledger {
   const amounts = [820, 910, 870, 950, 890, 930];
   months.forEach((d, i) => {
     const op: Operation = { id: `op-alim-${i}`, accountId: 'acc-principal', origin: 'imported', date: d, label: 'SUPERMARCHE', normalizedLabel: 'SUPERMARCHE', amount: euros(-amounts[i]!), state: 'reconciled' };
-    const al: Allocation = { id: `al-alim-${i}`, operationId: op.id, categoryId: 'cat-alim', tirelireId: 'env-alim', share: { kind: 'fixed', amount: op.amount } };
+    const al: SubOperation = { id: `al-alim-${i}`, operationId: op.id, categoryId: 'cat-alim', tirelireId: 'env-alim', share: { kind: 'fixed', amount: op.amount } };
     l.operations.push(op);
-    l.allocations.push(al);
+    l.subOperations.push(al);
   });
   l.operations.push({ id: 'op-frigo', accountId: 'acc-principal', origin: 'imported', date: '2026-06-10', label: 'FRIGO', normalizedLabel: 'FRIGO', amount: euros(-600), state: 'reconciled', oneOff: true });
-  l.allocations.push({ id: 'al-frigo', operationId: 'op-frigo', categoryId: 'cat-alim', tirelireId: 'env-alim', share: { kind: 'fixed', amount: euros(-600) } });
+  l.subOperations.push({ id: 'al-frigo', operationId: 'op-frigo', categoryId: 'cat-alim', tirelireId: 'env-alim', share: { kind: 'fixed', amount: euros(-600) } });
   // Taxe foncière 2025 : provision à 1 200, payée 1 260 le 15 octobre 2025.
   l.tirelires.find((e) => e.id === 'env-tf')!.openingDate = '2025-01-01';
   l.tirelires.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
   l.needs.find((n) => n.id === 'need-tf')!.periodicity = { interval: 12, unit: 'month' as const, anchorDate: '2025-10-15' };
   l.operations.push({ id: 'op-tf-2025', accountId: 'acc-principal', origin: 'imported', date: '2025-10-16', label: 'DGFIP TAXE FONCIERE', normalizedLabel: 'DGFIP TAXE FONCIERE', amount: euros(-1260), state: 'reconciled', plannedFlowId: 'flow-tf' });
-  l.allocations.push({ id: 'al-tf-2025', operationId: 'op-tf-2025', categoryId: 'cat-logement', tirelireId: 'env-tf', share: { kind: 'fixed', amount: euros(-1260) } });
+  l.subOperations.push({ id: 'al-tf-2025', operationId: 'op-tf-2025', categoryId: 'cat-logement', tirelireId: 'env-tf', share: { kind: 'fixed', amount: euros(-1260) } });
   return l;
 }
 
@@ -71,12 +71,12 @@ describe('[niveau 1] harnais du registre · I3 (U4)', () => {
         id: 'op-cadeau', accountId: 'acc-principal', origin: 'manual', date: '2026-07-20',
         label: 'VIREMENT MAMIE', normalizedLabel: 'VIREMENT MAMIE', amount: euros(300), state: 'reconciled',
       };
-      const al: Allocation = {
+      const al: SubOperation = {
         id: 'al-cadeau', operationId: cadeau.id, tirelireId: 'env-alim',
         share: { kind: 'fixed', amount: euros(300) }, replenishment: 'external',
       };
       l.operations.push(cadeau);
-      l.allocations.push(al);
+      l.subOperations.push(al);
       return l;
     }
 

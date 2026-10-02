@@ -329,7 +329,7 @@ describe('[niveau 2] point 4 — chaque opération qui fait un solde prévu port
   it('le flux qui la produit, la dotation de la tirelire, ou « saisie »', () => {
     const l = petitBudget();
     l.operations.push(opération({ id: 'achat-futur', date: '2026-11-03', amount: -euros(40) }));
-    l.allocations.push({ id: 'al-achat', operationId: 'achat-futur', tirelireId: 'tf', share: { kind: 'fixed', amount: -euros(40) } });
+    l.subOperations.push({ id: 'al-achat', operationId: 'achat-futur', tirelireId: 'tf', share: { kind: 'fixed', amount: -euros(40) } });
     const p = planDe(l, '2026-11-01');
     const t = tirelire(p, 'tf');
     expect(t.movements).toContainEqual(expect.objectContaining({ origin: 'flux', flowId: 'f-tf', date: '2026-11-15', amount: -euros(1200) }));

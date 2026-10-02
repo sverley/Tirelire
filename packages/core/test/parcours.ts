@@ -39,8 +39,8 @@ export async function relire(store: LedgerStore, site: string): Promise<Ledger> 
 /** Écrit un patch d'un seul coup, comme l'écran des opérations (`state.svelte.ts`). */
 export function ecrire(store: LedgerStore, patch: Patch): void {
   for (const o of patch.operations) store.upsert('operations', o);
-  for (const a of patch.allocations) store.upsert('allocations', a);
-  for (const id of patch.removedAllocations ?? []) store.remove('allocations', id);
+  for (const a of patch.subOperations) store.upsert('subOperations', a);
+  for (const id of patch.removedSubOperations ?? []) store.remove('subOperations', id);
 }
 
 const mensuel = (anchorDate: string) => ({ interval: 1, unit: 'month' as const, anchorDate });

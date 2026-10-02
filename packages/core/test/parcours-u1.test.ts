@@ -88,7 +88,7 @@ describe('[niveau 1] harnais du registre · I3 (U1)', () => {
 
       // Rien n'a été importé ni saisi : c'est la condition de l'usage, pas un détail du cas.
       expect(ledger.operations).toEqual([]);
-      expect(ledger.allocations).toEqual([]);
+      expect(ledger.subOperations).toEqual([]);
       expect(ledger.settings.periodStartDay).toBe(PAIE);
       expect(ledger.tirelires).toHaveLength(3);
 

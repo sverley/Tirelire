@@ -16,7 +16,7 @@
     categories: 'Catégorie',
     planned_flows: 'Flux prévu',
     operations: 'Opération',
-    allocations: 'Ventilation',
+    sub_operations: 'Sous-opération',
     automations: 'Automatisme',
     devices: 'Appareil',
     import_profiles: 'Profil d’import',
@@ -40,6 +40,7 @@
     active_to: 'Valable jusqu’au',
     state: 'État',
     share: 'Part',
+    parent_id: 'Contenue dans',
     value: 'Valeur',
     user: 'Utilisé par',
   };

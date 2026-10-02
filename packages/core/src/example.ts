@@ -332,7 +332,7 @@ export function exampleLedger(): Ledger {
       state: 'locked',
     },
   );
-  l.allocations.push(
+  l.subOperations.push(
     { id: 'al-salaire-08', operationId: 'op-salaire-08', categoryId: 'cat-salaire', share: { kind: 'fixed', amount: euros(3400) } },
     { id: 'al-dentiste', operationId: 'op-dentiste', categoryId: 'cat-sante', tirelireId: 'env-sante', share: { kind: 'fixed', amount: euros(-80) } },
     { id: 'al-caf-marie', operationId: 'op-caf-marie', categoryId: 'cat-alloc', share: { kind: 'fixed', amount: euros(100) } },

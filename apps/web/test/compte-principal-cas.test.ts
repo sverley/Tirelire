@@ -35,7 +35,7 @@ import {
 } from '@tirelire/core';
 
 const SQL = await initSqlJs();
-const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'allocations', 'automations', 'importProfiles', 'devices'] as const;
+const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'automations', 'importProfiles', 'devices'] as const;
 type Cle = (typeof CLES)[number];
 type Ligne = Record<string, unknown> & { id: string };
 const DATES = ['2026-09-06', '2026-10-20', '2027-01-10'];
@@ -101,8 +101,8 @@ function importer(store: LedgerStore): void {
   if (!dates.length) return;
   runPipeline(store.load(), dates[0]!, addDays(dates[dates.length - 1]!, 1), (patch) => {
     for (const o of patch.operations) store.upsert('operations', o);
-    for (const a of patch.allocations) store.upsert('allocations', a);
-    for (const id of patch.removedAllocations ?? []) store.remove('allocations', id);
+    for (const a of patch.subOperations) store.upsert('subOperations', a);
+    for (const id of patch.removedSubOperations ?? []) store.remove('subOperations', id);
     return store.load();
   });
 }
@@ -113,7 +113,7 @@ function releve(store: LedgerStore): unknown {
   const cle = (o: Ligne) => [o['accountId'], o['date'], o['label'], o['amount']].join('|');
   const tries = [...ops].sort((a, b) => (cle(a) < cle(b) ? -1 : cle(a) > cle(b) ? 1 : 0));
   const rang = new Map(tries.map((o, i) => [o.id, i]));
-  const ventilations = lignes(store, 'allocations').filter((a) => !a['deletedAt']);
+  const ventilations = lignes(store, 'subOperations').filter((a) => !a['deletedAt']);
   const ou_ = (v: unknown) => v ?? null;
   return tries.map((o) => ({
     accountId: o['accountId'],

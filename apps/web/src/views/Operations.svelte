@@ -8,11 +8,14 @@
     proposeMatches,
     budgetPeriodContaining,
     addDays,
-    type Allocation,
+    type SubOperation,
     type Category,
     applyAutomations,
     applyBulkAction,
-    editAllocations,
+    editDivision,
+    countedLines,
+    liveSubOperations,
+    subOperationAmount,
     selects,
     type AutomationSelection,
     inferSelection,
@@ -21,7 +24,7 @@
     topRank,
     unlock,
     variableRest,
-    type AllocationDraft,
+    type SubOperationDraft,
     type MatchProposal,
     type Operation,
     type OperationState,
@@ -40,7 +43,11 @@
   let searchOpen = $state(true);
   let editingId = $state<string | undefined>(undefined);
 
-  // Formulaire de ventilation : chaque ligne porte une part (D27).
+  /**
+   * Formulaire de ventilation : une division à la fois, celle de l'opération ou d'une de ses
+   * sous-opérations (`level`), à tout niveau (D88) ; chaque ligne porte une part (D27).
+   */
+  let level = $state<string | undefined>(undefined);
   type LineForm = { id?: string; categoryId: string; tirelireId: string; kind: 'fixed' | 'percent' | 'variable'; value: string; replenishment: '' | 'internal' | 'external' };
   let lines = $state<LineForm[]>([]);
   let newCategory = $state('');
@@ -64,9 +71,10 @@
   const categories = $derived(alive(app.ledger.categories).sort((a, b) => a.name.localeCompare(b.name, 'fr')));
   const flows = $derived(alive(app.ledger.plannedFlows));
   const period = $derived(budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay));
+  /** Sous-opérations vivantes par opération, à tous les niveaux. */
   const allocByOp = $derived.by(() => {
-    const m = new Map<string, Allocation[]>();
-    for (const a of alive(app.ledger.allocations)) {
+    const m = new Map<string, SubOperation[]>();
+    for (const a of liveSubOperations(app.ledger.subOperations)) {
       const arr = m.get(a.operationId);
       if (arr) arr.push(a);
       else m.set(a.operationId, [a]);
@@ -134,7 +142,17 @@
 
   function startEdit(op: Operation) {
     editingId = op.id;
-    const existing = allocByOp.get(op.id) ?? [];
+    openLevel(op, undefined);
+    newCategory = '';
+    oneOff = !!op.oneOff;
+    makeRule = false;
+    rulePattern = suggestPattern(op);
+  }
+
+  /** Ouvre la division d'un niveau : celle de l'opération (`undefined`) ou d'une sous-opération. */
+  function openLevel(op: Operation, parentId: string | undefined) {
+    level = parentId;
+    const existing = division(op, parentId);
     lines = existing.length
       ? existing.map((a) => ({
           id: a.id,
@@ -144,13 +162,79 @@
           value: a.share.kind === 'fixed' ? centsToInput(a.share.amount) : a.share.kind === 'percent' ? String(a.share.pct) : '',
           replenishment: a.replenishment ?? '',
         }))
-      // Toute opération a par défaut une ligne unique variable, qui prend l'intégralité du montant.
+      // Toute division a par défaut une ligne unique variable, qui prend l'intégralité du montant.
       : [{ categoryId: '', tirelireId: '', kind: 'variable' as const, value: '', replenishment: '' as const }];
-    newCategory = '';
-    oneOff = !!op.oneOff;
-    makeRule = false;
-    rulePattern = suggestPattern(op);
     error = '';
+  }
+
+  /** Les sous-opérations que contient un niveau. */
+  function division(op: Operation, parentId: string | undefined): SubOperation[] {
+    return (allocByOp.get(op.id) ?? []).filter((a) => (a.parentId ?? undefined) === parentId);
+  }
+
+  /** Les niveaux qui mènent au niveau ouvert, du premier sous l'opération jusqu'à lui. */
+  function levelChain(op: Operation): SubOperation[] {
+    const subs = allocByOp.get(op.id) ?? [];
+    const chain: SubOperation[] = [];
+    for (let s = subs.find((x) => x.id === level); s; s = subs.find((x) => x.id === s!.parentId)) chain.unshift(s);
+    return chain;
+  }
+
+  /** Montant du niveau ouvert : celui de l'opération, ou de la sous-opération qu'on divise. */
+  function levelAmount(op: Operation): number {
+    return level === undefined ? op.amount : (subOperationAmount(op, allocByOp.get(op.id) ?? [], level) ?? 0);
+  }
+
+  /** Ce qui vaut pour le niveau ouvert, pris du niveau qui le contient, de proche en proche. */
+  function inherited(op: Operation): { categoryId?: string; tirelireId?: string } {
+    const out: { categoryId?: string; tirelireId?: string } = {};
+    for (const s of levelChain(op)) {
+      if (s.categoryId) out.categoryId = s.categoryId;
+      if (s.tirelireId) out.tirelireId = s.tirelireId;
+    }
+    return out;
+  }
+
+  /** Décrit un niveau : son montant et ce qui vaut pour lui. */
+  function describe(s: SubOperation, op: Operation): string {
+    const amount = subOperationAmount(op, allocByOp.get(op.id) ?? [], s.id) ?? 0;
+    return [money(amount), categoryName(s.categoryId), tirelireName(s.tirelireId)].filter(Boolean).join(' · ');
+  }
+
+  /** La division saisie diffère-t-elle de celle qui est enregistrée ? */
+  function dirty(op: Operation): boolean {
+    const stored = division(op, level);
+    const typed = drafts();
+    if (stored.length === 0) return !(typed.length === 1 && typed[0]!.share.kind === 'variable' && !typed[0]!.categoryId && !typed[0]!.tirelireId);
+    if (stored.length !== typed.length) return true;
+    return typed.some((d, i) => {
+      const a = stored[i]!;
+      return d.id !== a.id || (d.categoryId ?? '') !== (a.categoryId ?? '') || (d.tirelireId ?? '') !== (a.tirelireId ?? '') || (d.replenishment ?? '') !== (a.replenishment ?? '') || JSON.stringify(d.share) !== JSON.stringify(a.share);
+    });
+  }
+
+  /** Diviser une sous-opération enregistrée : on ouvre son niveau, sans rien écrire. */
+  function divide(op: Operation, id: string) {
+    if (dirty(op)) {
+      error = 'Enregistrez d’abord cette division, puis divisez la part.';
+      return;
+    }
+    openLevel(op, id);
+  }
+
+  /** Revenir au niveau qui contient celui qu'on divise. */
+  function up(op: Operation) {
+    if (dirty(op)) {
+      error = 'Enregistrez d’abord cette division avant de remonter.';
+      return;
+    }
+    const parent = (allocByOp.get(op.id) ?? []).find((x) => x.id === level)?.parentId;
+    openLevel(op, parent);
+  }
+
+  /** Lignes comptées d'une opération : ce qui ne se divise plus, avec ce qui vaut pour lui. */
+  function counted(op: Operation) {
+    return countedLines(op, allocByOp.get(op.id) ?? []).filter((l) => l.categoryId || l.tirelireId);
   }
 
   function addLine(op: Operation) {
@@ -164,7 +248,7 @@
   }
 
   /** Parts saisies, converties pour le cœur. */
-  function drafts(): AllocationDraft[] {
+  function drafts(): SubOperationDraft[] {
     return lines.map((l) => ({
       ...(l.id ? { id: l.id } : {}),
       ...(l.categoryId ? { categoryId: l.categoryId } : {}),
@@ -181,13 +265,12 @@
 
   /** Ce que prendrait la part variable en l'état de la saisie (D27). */
   function rest(op: Operation): number {
-    const allocs = drafts().map((d, i) => ({ id: String(i), operationId: op.id, share: d.share }));
-    return variableRest(op, allocs);
+    return variableRest(levelAmount(op), drafts());
   }
 
   function lineAmount(op: Operation, l: LineForm): number {
     if (l.kind === 'fixed') return inputToCents(l.value) ?? 0;
-    if (l.kind === 'percent') return Math.round((op.amount * (Number(l.value.replace(',', '.')) || 0)) / 100);
+    if (l.kind === 'percent') return Math.round((levelAmount(op) * (Number(l.value.replace(',', '.')) || 0)) / 100);
     return rest(op);
   }
 
@@ -210,12 +293,13 @@
     const drafted = drafts().map((d) => (createdCategory && !d.categoryId ? { ...d, categoryId: createdCategory!.id } : d));
     try {
       // Le cœur valide les parts et verrouille l'opération : c'est la modification qui change l'état.
-      app.applyPatch(editAllocations(app.ledger, op.id, drafted, { oneOff }));
+      app.applyPatch(editDivision(app.ledger, op.id, drafted, { oneOff }, level));
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
       return;
     }
-    if (makeRule && rulePattern.trim()) {
+    // Un automatisme ne pose qu'une division, celle de l'opération (D23) : il naît du premier niveau.
+    if (level === undefined && makeRule && rulePattern.trim()) {
       const first = drafted[0];
       const rule: Automation = {
         id: app.newId(),
@@ -230,7 +314,8 @@
       app.store.upsert('automations', rule);
     }
     app.reload();
-    editingId = undefined;
+    if (level === undefined) editingId = undefined;
+    else openLevel(op, level);
   }
 
   function toggle(id: string) {
@@ -345,14 +430,14 @@
     delete next.plannedFlowId;
     delete next.transferAccountId;
     delete next.transferOperationId;
-    for (const a of allocByOp.get(op.id) ?? []) app.store.remove('allocations', a.id);
+    for (const a of allocByOp.get(op.id) ?? []) app.store.remove('subOperations', a.id);
     app.upsert('operations', next);
     editingId = undefined;
   }
 
   function remove(op: Operation) {
     if (!confirm(`Supprimer « ${op.label} » ? (un réimport la fera revenir)`)) return;
-    for (const a of allocByOp.get(op.id) ?? []) app.store.remove('allocations', a.id);
+    for (const a of allocByOp.get(op.id) ?? []) app.store.remove('subOperations', a.id);
     app.remove('operations', op.id);
     editingId = undefined;
   }
@@ -484,7 +569,7 @@
           {#if op.oneOff} · ponctuelle{/if}
           {#if op.plannedFlowId} · {flowName(op.plannedFlowId)}{/if}
           {#if op.transferAccountId} · → {accountName(op.transferAccountId)}{/if}
-          {#if allocs.length} · {allocs.map((a) => [categoryName(a.categoryId), tirelireName(a.tirelireId)].filter(Boolean).join(' / ')).join(' + ')}{/if}
+          {#if counted(op).length} · {counted(op).map((l) => [categoryName(l.categoryId), tirelireName(l.tirelireId), counted(op).length > 1 ? money(l.amount) : ''].filter(Boolean).join(' / ')).join(' + ')}{/if}
           {#if op.suggestedCategory && !allocs.length} · banque : {op.suggestedCategory}{/if}
         </span>
         {#if prop && op.state !== 'locked'}
@@ -502,17 +587,31 @@
             </div>
           {/if}
           <h3>Ventilation</h3>
+          {#if level !== undefined}
+            {@const herite = inherited(op)}
+            <p class="small">
+              Opération ›
+              {#each levelChain(op) as s, k (s.id)}{#if k > 0}{' › '}{/if}<strong>{describe(s, op)}</strong>{/each}
+            </p>
+            <p class="small muted">
+              Vous divisez cette part de {money(levelAmount(op))}.
+              {#if herite.categoryId || herite.tirelireId}Une ligne sans catégorie ou sans tirelire prend {[categoryName(herite.categoryId), tirelireName(herite.tirelireId)].filter(Boolean).join(' et ')}.{/if}
+            </p>
+            <div class="actions" style="margin:0"><button class="btn small" type="button" onclick={() => up(op)}>Remonter d’un niveau</button></div>
+          {/if}
           {#each lines as l, i (i)}
+            {@const herite = inherited(op)}
+            {@const contenu = l.id ? division(op, l.id).length : 0}
             <div class="grid">
               <label class="f">Catégorie
                 <select bind:value={l.categoryId} onchange={() => onCategory(i)}>
-                  <option value="">—</option>
+                  <option value="">{herite.categoryId ? `— (${categoryName(herite.categoryId)})` : '—'}</option>
                   {#each categories as c}<option value={c.id}>{c.name}</option>{/each}
                 </select>
               </label>
               <label class="f">Tirelire
                 <select bind:value={l.tirelireId}>
-                  <option value="">— (non affecté)</option>
+                  <option value="">{herite.tirelireId ? `— (${tirelireName(herite.tirelireId)})` : '— (non affecté)'}</option>
                   {#each tirelires as e}<option value={e.id}>{e.name}</option>{/each}
                 </select>
               </label>
@@ -535,22 +634,23 @@
               {#if l.kind !== 'variable'}
                 <label class="f">{l.kind === 'percent' ? '%' : 'Montant'} <input bind:value={l.value} inputmode="decimal" /></label>
               {/if}
-              <div class="f"><span class="sub">soit {money(lineAmount(op, l))}</span></div>
-              {#if lines.length > 1}<button class="btn small danger" type="button" style="align-self:end" onclick={() => lines.splice(i, 1)}>Retirer</button>{/if}
+              <div class="f"><span class="sub">soit {money(lineAmount(op, l))}{#if contenu} · divisée en {contenu}{/if}</span></div>
+              {#if l.id}<button class="btn small" type="button" style="align-self:end" onclick={() => divide(op, l.id!)}>{contenu ? 'Voir sa division' : 'Diviser'}</button>{/if}
+              {#if lines.length > 1}<button class="btn small danger" type="button" style="align-self:end" onclick={() => lines.splice(i, 1)}>{contenu ? 'Retirer, avec sa division' : 'Retirer'}</button>{/if}
             </div>
           {/each}
           <div class="actions" style="margin:0">
             <button class="btn small" type="button" onclick={() => addLine(op)}>Ajouter une ligne</button>
             {#if !lines.some((l) => l.kind === 'variable') && rest(op) !== 0}
-              <span class="small neg">non affecté : {money(op.amount - lines.reduce((s, l) => s + lineAmount(op, l), 0))}</span>
+              <span class="small neg">{level === undefined ? 'non affecté' : 'reste de la part'} : {money(levelAmount(op) - lines.reduce((s, l) => s + lineAmount(op, l), 0))}</span>
             {/if}
           </div>
           <div class="grid">
             <label class="f">Nouvelle catégorie (si absente) <input bind:value={newCategory} /></label>
             <label class="f check"><input type="checkbox" bind:checked={oneOff} /> Dépense ponctuelle (hors moyennes de budget)</label>
           </div>
-          <label class="f check"><input type="checkbox" bind:checked={makeRule} /> Créer un automatisme pour les prochaines opérations semblables</label>
-          {#if makeRule}<label class="f">Motif (regex, insensible à la casse) <input bind:value={rulePattern} /></label>{/if}
+          {#if level === undefined}<label class="f check"><input type="checkbox" bind:checked={makeRule} /> Créer un automatisme pour les prochaines opérations semblables</label>{/if}
+          {#if level === undefined && makeRule}<label class="f">Motif (regex, insensible à la casse) <input bind:value={rulePattern} /></label>{/if}
           {#if error}<div class="err">{error}</div>{/if}
           <div class="actions" style="margin:0">
             <button class="btn primary" type="submit">Enregistrer</button>
