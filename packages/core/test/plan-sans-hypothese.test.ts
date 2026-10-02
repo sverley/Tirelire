@@ -228,8 +228,8 @@ describe('[niveau 1] points 3 et 4 — pour une période à venir, ce qu’il fa
  * jours, sur le compte principal ; il n'importe aucun relevé. Dans la période « septembre 2026 »
  * (28/08 → 27/09), l'occurrence du 28 août est close ; celle du 28 septembre ouvre « octobre 2026 ».
  */
-function ligneDeRelevé(id: string, date: string, montant: number, plannedFlowId?: string): Operation {
-  return { id, accountId: PRINCIPAL, origin: 'imported', date, label: LIBELLÉ_VIREMENT, normalizedLabel: normalizeLabel(LIBELLÉ_VIREMENT), amount: montant, state: 'untreated', ...(plannedFlowId ? { plannedFlowId } : {}) };
+function ligneDeRelevé(id: string, date: string, montant: number, reprise?: { plannedFlowId: string; plannedDate: string }): Operation {
+  return { id, accountId: PRINCIPAL, origin: 'imported', date, label: LIBELLÉ_VIREMENT, normalizedLabel: normalizeLabel(LIBELLÉ_VIREMENT), amount: montant, state: 'untreated', ...reprise };
 }
 
 const avecLignes = (...ops: Operation[]): Ledger => {
@@ -241,7 +241,7 @@ const virementLivret = (l: Ledger, asOf: string) => computePlan(l, asOf, LECTURE
 
 describe('[niveau 1] point 5 — le virement permanent se lit sur son flux, le plan de sa période le montre (D12)', () => {
   it('pointée : une opération rapprochée de l’ordre, dans sa fenêtre', () => {
-    const l = avecLignes(ligneDeRelevé('o1', '2026-08-29', -euros(600), 'flow-vir-livret'));
+    const l = avecLignes(ligneDeRelevé('o1', '2026-08-29', -euros(600), { plannedFlowId: 'flow-vir-livret', plannedDate: '2026-08-28' }));
     expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'pointee', operationId: 'o1' }]);
   });
 

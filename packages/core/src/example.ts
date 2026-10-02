@@ -279,7 +279,9 @@ export function exampleLedger(): Ledger {
       normalizedLabel: 'VIR SALAIRE AOUT',
       amount: euros(3400),
       state: 'reconciled',
+      // Il reprend l'opération prévue du salaire au 28 août, désignée par son flux et sa date (D88).
       plannedFlowId: 'flow-salaire',
+      plannedDate: '2026-08-28',
     },
     {
       id: 'op-dentiste',

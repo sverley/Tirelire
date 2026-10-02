@@ -16,7 +16,7 @@
  * et seulement ce que l'appelant enregistre.
  */
 import type { Cents, Id, ISODate, Ledger, Need, Operation, ShortfallAnswer, SubOperation } from './model.js';
-import { alive, dueDateFlowForNeed, needName, shortfallAnswerId } from './model.js';
+import { alive, dueDateFlowForNeed, needName, realizedOccurrence, shortfallAnswerId } from './model.js';
 import { dotationAccount, indexLedger, needCruise, tirelireBalance } from './balances.js';
 import { budgetPeriodContaining, nextOccurrence, nextPeriod, type Period } from './periods.js';
 import { addDays, maxDate } from './dates.js';
@@ -79,7 +79,11 @@ export function dueDateShortfalls(ledger: Ledger, today: ISODate): DueDateShortf
 
   // Un seul grand livre prévu, jusqu'au plus lointain prélèvement possible d'une échéance (D88).
   const until = addDays(echeances.reduce((m, x) => maxDate(m, x.dueDate), today), FENETRE_PAIEMENT);
-  const idx = indexLedger(withPlannedOperations(ledger, today, until).ledger);
+  const prevu = withPlannedOperations(ledger, today, until).ledger;
+  const idx = indexLedger(prevu);
+  // L'occurrence que réalise chaque opération, en suivant ses reprises (D88) : une opération
+  // bancaire qui reprend la saisie corrigeant le prélèvement le paie aussi.
+  const vivantes = new Map(alive(prevu.operations).map((o) => [o.id, o]));
   const answers = new Map(alive(ledger.shortfallAnswers ?? []).map((a) => [a.id, a]));
 
   const out: DueDateShortfall[] = [];
@@ -87,14 +91,14 @@ export function dueDateShortfalls(ledger: Ledger, today: ISODate): DueDateShortf
     const e = idx.tireliresById.get(need.tirelireId)!;
     const target = need.amount ?? 0;
     // Le solde prévu se lit après le prélèvement du besoin — son opération prévue, ou l'opération
-    // rapprochée de son flux —, s'il en a un ; sans prélèvement, l'échéance se paie à sa date pour
+    // qui la reprend (D88) —, s'il en a un ; sans prélèvement, l'échéance se paie à sa date pour
     // son montant, et toute autre dépense de la tirelire s'y ajoute (#184, point 11).
     const prelevement = dueDateFlowForNeed(need, ledger.plannedFlows, dueDate);
     const paiements = prelevement
       ? (idx.entriesByTirelire.get(e.id) ?? []).filter(
           (x) =>
             x.effect < 0 &&
-            x.operation.plannedFlowId === prelevement.id &&
+            realizedOccurrence(x.operation, vivantes)?.flowId === prelevement.id &&
             x.date >= addDays(dueDate, -FENETRE_PAIEMENT) &&
             x.date <= addDays(dueDate, FENETRE_PAIEMENT),
         )

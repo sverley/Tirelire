@@ -212,12 +212,12 @@ describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () =>
 
   it('une occurrence reprise ne compte plus : l’opération qui la reprend compte à sa place, pour son propre montant', () => {
     const l = petitBudget();
-    l.operations.push(opération({ id: 'salaire-sept', origin: 'imported', date: '2026-09-09', amount: euros(1900), plannedFlowId: 'f-salaire', state: 'reconciled' }));
+    l.operations.push(opération({ id: 'salaire-sept', origin: 'imported', date: '2026-09-09', amount: euros(1900), state: 'reconciled' }));
     const c = compte(planDe(l, '2026-10-01', '2026-09-10'), CC);
-    // Reprise dans la fenêtre du 25 septembre ? Non : le 9 est hors fenêtre (±3 jours) ; elle ne reprend rien.
+    // Une opération qui ne désigne aucune occurrence, par son flux et sa date, ne reprend rien (D88).
     expect(c.movements.filter((m) => m.flowId === 'f-salaire').map((m) => m.date)).toEqual(['2026-09-25', '2026-10-25']);
     const l2 = petitBudget();
-    l2.operations.push(opération({ id: 'salaire-sept', origin: 'imported', date: '2026-09-24', amount: euros(1900), plannedFlowId: 'f-salaire', state: 'reconciled' }));
+    l2.operations.push(opération({ id: 'salaire-sept', origin: 'imported', date: '2026-09-24', amount: euros(1900), plannedFlowId: 'f-salaire', plannedDate: '2026-09-25', state: 'reconciled' }));
     const c2 = compte(planDe(l2, '2026-10-01', '2026-09-26'), CC);
     expect(c2.movements.filter((m) => m.flowId === 'f-salaire').map((m) => m.date)).toEqual(['2026-10-25']);
     expect(c2.start).toBe(euros(1000 + 1900));
@@ -226,7 +226,7 @@ describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () =>
 
   it('une saisie à venir qui reprend une occurrence compte à sa place, pour son propre montant (D88)', () => {
     const l = petitBudget();
-    l.operations.push(opération({ id: 'salaire-corrigé', date: '2026-09-25', amount: euros(1900), plannedFlowId: 'f-salaire' }));
+    l.operations.push(opération({ id: 'salaire-corrigé', date: '2026-09-25', amount: euros(1900), plannedFlowId: 'f-salaire', plannedDate: '2026-09-25' }));
     const c = compte(planDe(l, '2026-10-01'), CC);
     expect(c.movements.filter((m) => m.flowId === 'f-salaire').map((m) => m.date)).toEqual(['2026-10-25']);
     expect(c.movements).toContainEqual(expect.objectContaining({ date: '2026-09-25', origin: 'saisie', amount: euros(1900), operationId: 'salaire-corrigé' }));
@@ -488,7 +488,7 @@ describe('[niveau 2] point 11 — « attendue, non reçue » : le bloc « Attend
 
   it('une occurrence reprise n’est pas dite manquante, et n’est pas comptée deux fois', () => {
     const l = suivi();
-    l.operations.push(opération({ id: 'loyer-sept', origin: 'imported', date: '2026-09-03', amount: -euros(700), plannedFlowId: 'f-loyer', state: 'reconciled' }));
+    l.operations.push(opération({ id: 'loyer-sept', origin: 'imported', date: '2026-09-03', amount: -euros(700), plannedFlowId: 'f-loyer', plannedDate: '2026-09-02', state: 'reconciled' }));
     expect(missingFlows(l, DEPUIS, LECTURE)).toEqual([]);
     expect(loyers(l, LECTURE)).toEqual(['2026-10-02']);
   });

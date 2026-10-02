@@ -130,7 +130,7 @@ function tablesDe(l: Ledger, o: { sansPrincipal?: boolean; reglages?: boolean } 
   return tables;
 }
 
-/** L'exemple, plus un automatisme rattaché à un flux et un profil d'import rattaché à un compte, qu'il n'a pas, avec chacun leurs identifiants dans leurs colonnes JSON. */
+/** L’exemple, plus un automatisme et un profil d’import rattaché à un compte, qu’il n’a pas, avec chacun leurs identifiants dans leurs colonnes JSON. */
 function exempleCompletDeToutesLesTables(): Ledger {
   const l = exampleLedger();
   l.automations.push({
@@ -146,7 +146,6 @@ function exempleCompletDeToutesLesTables(): Ledger {
       state: 'none',
     },
     rank: 'a',
-    flowId: l.plannedFlows[0]!.id,
   });
   l.importProfiles.push({
     id: 'profil-198',
