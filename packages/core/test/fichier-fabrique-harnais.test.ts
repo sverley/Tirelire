@@ -16,6 +16,11 @@
  * et sa version (D88, point 4 : « tout le reste refuse ») — qu'aucun test ne gardait ; la commande
  * jouée sans aucune connexion hors de la machine (I7), par le script du `package.json`.
  *
+ * Tour 2 : les tests du codeur sur les identifiants des colonnes JSON (points 2 et 10 amendés, porteur,
+ * 02/10) et sur le chemin relatif de la commande sont repris ici, tous ; son fichier
+ * `fichier-fabrique-json.test.ts` n'a plus lieu d'être. Est de moi : la sauvegarde de l'application,
+ * `C5`, porte aussi ces identifiants, dont certains désignent des lignes supprimées.
+ *
  * Chaque `describe` reprend un point du « Fait quand », sous son numéro ; le dernier, `C5`, garde ce
  * que la vérification ne doit jamais refuser. Le point 11, la documentation, est relu. Le point 8 est joué selon le texte que le codeur propose au porteur dans
  * l'issue — celui de l'issue ne peut pas tenir, l'exemple portant des réglages et un compte
@@ -45,6 +50,7 @@ import {
   exampleLedger,
   exportBundle,
   FichierRefuse,
+  feuillesDe,
   FILE_FORMAT,
   FORMAT_VERSION,
   FormatRefused,
@@ -124,10 +130,24 @@ function tablesDe(l: Ledger, o: { sansPrincipal?: boolean; reglages?: boolean } 
   return tables;
 }
 
-/** L'exemple, plus un automatisme rattaché à un flux et un profil d'import rattaché à un compte, qu'il n'a pas. */
+/** L'exemple, plus un automatisme rattaché à un flux et un profil d'import rattaché à un compte, qu'il n'a pas, avec chacun leurs identifiants dans leurs colonnes JSON. */
 function exempleCompletDeToutesLesTables(): Ledger {
   const l = exampleLedger();
-  l.automations.push({ id: 'auto-198', selection: { labelPattern: 'SALAIRE' }, action: { state: 'none' }, rank: 'a', flowId: l.plannedFlows[0]!.id });
+  l.automations.push({
+    id: 'auto-198',
+    selection: { labelPattern: 'SALAIRE', accountId: MAIN_ACCOUNT_ID },
+    action: {
+      categoryId: 'cat-loyer',
+      tirelireId: 'env-vac',
+      allocation: [
+        { categoryId: 'cat-loyer', tirelireId: 'env-vac', share: { kind: 'fixed', amount: 1000 } },
+        { categoryId: 'cat-salaire', share: { kind: 'variable' } },
+      ],
+      state: 'none',
+    },
+    rank: 'a',
+    flowId: l.plannedFlows[0]!.id,
+  });
   l.importProfiles.push({
     id: 'profil-198',
     name: 'Banque',
@@ -137,7 +157,7 @@ function exempleCompletDeToutesLesTables(): Ledger {
     headerRow: 0,
     columns: { date: 'Date', label: 'Libellé', amount: 'Montant' },
     dateFormat: 'DMY',
-    accountMap: {},
+    accountMap: { 'FR76 0001': MAIN_ACCOUNT_ID },
     accountId: MAIN_ACCOUNT_ID,
   });
   return l;
@@ -181,7 +201,21 @@ interface Violation {
   id?: string;
   colonne?: string;
   lie?: true;
+  /** Pour un identifiant dans une colonne JSON : son chemin, tel que `feuillesDe` le dit (point 10). */
+  chemin?: string;
 }
+const AUTO = (selection: string, action: string): Ligne => ({ id: 'a-1', selection, action, rank: 'a' });
+const PROFIL = (accountMap: string): Ligne => ({
+  id: 'p-1',
+  name: 'Banque',
+  source: 'bank',
+  encoding: 'auto',
+  delimiter: 'auto',
+  header_row: 0,
+  columns: '{"date":"Date","label":"Libellé"}',
+  date_format: 'DMY',
+  account_map: accountMap,
+});
 const VIOLATIONS: Violation[] = [
   { cas: 'une table qui n’est pas du format', tables: { budgets: [{ id: 'b' }] }, table: 'budgets' },
   { cas: 'une colonne qui n’est pas du format', tables: { operations: [op({ montant_euros: 3.5 })] }, table: 'operations', colonne: 'montant_euros' },
@@ -209,6 +243,18 @@ const VIOLATIONS: Violation[] = [
   { cas: 'des sous-opérations qui se contiennent l’une l’autre (D88)', tables: { operations: [OP], sub_operations: [part('s-1', FIXE, { parent_id: 's-2' }), part('s-2', FIXE, { parent_id: 's-1' })] }, table: 'sub_operations', id: 's-1', colonne: 'parent_id', lie: true },
   { cas: 'une catégorie qui est son propre parent', tables: { categories: [{ id: 'c-1', name: 'Courses', nature: 'expense', parent_id: 'c-1' }] }, table: 'categories', id: 'c-1', colonne: 'parent_id', lie: true },
   { cas: 'une clé de meta autre que le format et sa version', tables: { meta: [{ key: 'auteur', value: 'script' }] }, table: 'meta', id: 'auteur', lie: true },
+  // Un identifiant dans une colonne JSON désigne une ligne absente (points 2 et 10, porteur 02/10) : chacun refuse, comme une colonne.
+  ...(
+    [
+      ['tirelires.placement[].accountId', 'tirelires', 't-1', 'placement', { id: 't-1', name: 'Vacances', placement: '[{"accountId":"acc-absent","share":{"kind":"variable"}}]', opening_balance: 0, opening_date: '2026-09-01' }],
+      ['automations.selection.accountId', 'automations', 'a-1', 'selection', AUTO('{"accountId":"acc-absent"}', '{}')],
+      ['automations.action.categoryId', 'automations', 'a-1', 'action', AUTO('{}', '{"categoryId":"cat-absente"}')],
+      ['automations.action.tirelireId', 'automations', 'a-1', 'action', AUTO('{}', '{"tirelireId":"env-absente"}')],
+      ['automations.action.allocation[].categoryId', 'automations', 'a-1', 'action', AUTO('{}', '{"allocation":[{"categoryId":"cat-absente","share":{"kind":"variable"}}]}')],
+      ['automations.action.allocation[].tirelireId', 'automations', 'a-1', 'action', AUTO('{}', '{"allocation":[{"tirelireId":"env-absente","share":{"kind":"variable"}}]}')],
+      ['import_profiles.account_map{}', 'import_profiles', 'p-1', 'account_map', PROFIL('{"FR76 0001":"acc-absent"}')],
+    ] as const
+  ).map(([chemin, table, id, colonne, ligne]): Violation => ({ cas: `${chemin} vers une ligne absente`, tables: { [table]: [ligne] }, table, id, colonne, lie: true, chemin })),
   { cas: 'une horloge présente qui ne se lit pas', tables: { operations: [op({ hlc: 'hier' })] }, table: 'operations', id: 'op-1', colonne: 'hlc' },
   {
     cas: 'un second compte principal (D40)',
@@ -248,6 +294,10 @@ describe('[niveau 2] #198 · 2. est refusé, sans rien ouvrir, un fichier où…
       }
     });
   }
+  it('un identifiant dans une colonne JSON qui désigne une ligne supprimée, mais présente dans le fichier, ne refuse pas', async () => {
+    const octets = fabriquer({ categories: [{ id: 'c-retiree', name: 'Retirée', nature: 'expense', deleted_at: '2026-09-01T10:00:00.000Z' }], automations: [AUTO('{}', '{"categoryId":"c-retiree"}')] });
+    expect((await verifierFichier(octets, { sqlJs: SQL })).ouvre).toBe(true);
+  });
 });
 
 describe('[niveau 2] #198 · 3. le refus nomme le premier problème et dit combien d’autres il y a', () => {
@@ -282,6 +332,14 @@ describe('[niveau 2] #198 · 5. la même vérification se lance hors de l’inte
     expect(r.stdout).toContain('table operations, ligne « op-1 », colonne amount');
     expect(r.stdout).toContain('table operations, ligne « op-2 », colonne date');
     expect((await refus(octets)).problemes).toHaveLength(2); // même verdict qu'à l'ouverture
+  }, 30_000);
+
+  it('un chemin relatif se lit depuis le dossier de l’appel, pas depuis celui du cœur où pnpm lance la commande', () => {
+    const dossier = mkdtempSync(join(tmpdir(), 'tirelire-198-'));
+    writeFileSync(join(dossier, 'fabrique.sqlite'), fabriquer({ operations: [OP] }));
+    const r = spawnSync('pnpm', ['--dir', coeur, 'run', '--silent', 'verifier-fichier', 'fabrique.sqlite'], { cwd: dossier, encoding: 'utf8' });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.stdout).toContain('s’ouvre');
   }, 30_000);
 
   it('[niveau 0] un fichier qui s’ouvre : la commande réussit, dit ce qui se complète, et ne tente aucune connexion hors de la machine (I7)', () => {
@@ -417,10 +475,22 @@ describe('[niveau 2] #198 · 10. toute colonne qui désigne une ligne d’une au
     }
     expect(manques).toEqual([]);
   });
+
+  const feuilles = tables.flatMap((t) => t.columns.filter((c) => c.shape).flatMap((c) => feuillesDe(`${t.name}.${c.col}`, c.shape!)));
+
+  it('chaque valeur d’une forme JSON nommée en « Id », et chaque valeur de la table des comptes d’un profil, déclare la table qu’elle désigne', () => {
+    const identifiants = feuilles.filter((f) => /Id$/.test(f.chemin) || f.chemin.endsWith('{}'));
+    expect(identifiants.filter((f) => !f.feuille.ref).map((f) => f.chemin)).toEqual([]);
+    for (const f of identifiants) expect(tables.map((t) => t.name)).toContain(f.feuille.ref);
+  });
+
+  it('chaque identifiant déclaré d’une forme JSON est un de ceux que le point 2 casse un à un : un identifiant ajouté à une forme rougit ce test ou le précédent', () => {
+    expect(new Set(feuilles.filter((f) => f.feuille.ref).map((f) => f.chemin))).toEqual(new Set(VIOLATIONS.flatMap((v) => (v.chemin ? [v.chemin] : []))));
+  });
 });
 
 describe('[niveau 0] #198 · C5. une sauvegarde de l’application se rouvre sous la vérification entière', () => {
-  it('toutes les tables, des lignes supprimées, des sous-opérations sur trois niveaux, un appareil, des réglages : rien n’est refusé, rien n’est complété, tout revient', async () => {
+  it('toutes les tables, des identifiants dans les colonnes JSON, des lignes supprimées dont certaines qu’ils désignent, des sous-opérations sur trois niveaux, un appareil, des réglages : rien n’est refusé, rien n’est complété, tout revient', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 'a' });
     const l = exempleCompletDeToutesLesTables();
     for (const cle of Object.keys(TABLES) as LedgerKey[]) for (const r of l[cle] as unknown as Array<Record<string, unknown>>) s.upsert(cle, r as never);
@@ -432,7 +502,8 @@ describe('[niveau 0] #198 · C5. une sauvegarde de l’application se rouvre sou
     s.upsert('devices', { id: 'telephone', name: 'Téléphone', user: 'Marie', lastSeen: '2026-09-06T08:00:00.000Z' } as never);
     s.setSetting('periodStartDay', 5);
     s.remove('operations', l.operations[0]!.id);
-    s.remove('categories', l.categories[0]!.id);
+    s.remove('categories', 'cat-loyer'); // les identifiants de l'automatisme, de ses allocations et du profil désignent encore des lignes : supprimées, mais présentes
+    s.remove('tirelires', 'env-vac');
     s.remove('subOperations', 's-petit-fils');
     s.remove('devices', 'telephone');
     const r = await LedgerStore.create({ sqlJs: SQL, bytes: s.export(), verifier: true, siteId: 'b' });
