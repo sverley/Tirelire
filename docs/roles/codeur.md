@@ -13,26 +13,32 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
 1. **Ne lis pas le harnais.** Code depuis ta propre lecture du besoin (principe 11.1). L'auditeur
    compose le harnais après ton premier compte rendu ; aux tours suivants, ses verdicts te
    suffisent.
-2. Code sur la branche, commets, pousse : chaque ensemble de tests a son empreinte, l'état des
-   chemins qu'il lit, et chaque fichier de test ne se rejoue pas sur une empreinte déjà trouvée
-   verte, ni à tes lancements suivants, ni aux crochets, dans cette session ou une autre, ni en CI
-   (D83, « Les empreintes »). Tout lancement de l'outil de test, les tiens compris, atteste les
-   fichiers qu'il joue verts, et dit ce qu'il joue et ce qu'il saute ; un lancement par nom de test
-   (`-t`, `--test-name-pattern`) se joue toujours, et n'atteste rien. La livraison
-   (pré-push) joue le typecheck avant les tests, sans les tests navigateur de non-régression mais avec
-   ceux de l'issue — les fichiers de tests navigateur que ta branche ajoute ou modifie —, en entier, dit
-   chaque ensemble — joué, à quel seuil, avec quel verdict, ou pourquoi non —, ajoute à
-   l'attestation les empreintes jouées vertes et l'envoie avec le push, sur `<branche>--attestation`,
-   où elle se garde d'un push à l'autre ; seul l'outillage la produit, tu ne l'écris ni ne la pousses
-   jamais toi-même (D83). Les tests navigateur de non-régression se jouent la nuit, sur `main`, et ne
-   décident pas de la fusion ; une nuit rouge ouvre une issue (#307). Pour les jouer sur ta branche —
-   demande justifiée ou mesure —, commets d'abord, puis demande-les sur ce commit,
-   `pnpm livraison --navigateur` : verts, ils sont attestés, et l'attestation part sur `origin`. Joués autrement — sur une tête
-   détachée, dans un autre clone, par l'exécuteur lancé sans l'outil de test —, rien n'en est
-   attesté, et ils se rejoueront : ceux de l'issue au Ready, les autres la nuit (#304, #307). En brouillon, le verdict est local : `pnpm typecheck`, tes propres tests, joués à la main
-   (`pnpm --dir <paquet> run test 4 <fichiers>`), le harnais du besoin s'il existe et, si tu modifies
-   une fonction de la garde, ses tests de développement (D81) : `pnpm --dir packages/gardes run test
-   4 'dev/*.dev.mjs'` ; rien d'autre (D83).
+2. Code sur la branche, commets, pousse. **Ne lance pas la suite des tests** (`pnpm test N`, la
+   non-régression navigateur) : l'auditeur va déplacer et modifier tes tests en composant le harnais,
+   et ce que tu aurais joué de plus serait à rejouer (porteur, 02/10). En brouillon, ton verdict est
+   local : `pnpm typecheck`, tes propres tests, joués à la main (`pnpm --dir <paquet> run test 4
+   <fichiers>`), le harnais du besoin s'il existe, au plus la garde (`pnpm --dir packages/gardes run
+   test`) et, si tu modifies une fonction de la garde, ses tests de développement (D81) : `pnpm --dir
+   packages/gardes run test 4 'dev/*.dev.mjs'` ; rien d'autre (D83). La livraison du push joue
+   d'elle-même ce que D83 prévoit.
+
+   Chaque ensemble de tests a son empreinte, l'état des chemins qu'il lit, et chaque fichier de test
+   ne se rejoue pas sur une empreinte déjà trouvée verte, ni à tes lancements suivants, ni aux
+   crochets, dans cette session ou une autre, ni en CI (D83, « Les empreintes »). Tout lancement de
+   l'outil de test, les tiens compris, atteste les fichiers qu'il joue verts, et dit ce qu'il joue et
+   ce qu'il saute ; un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
+   n'atteste rien. La livraison (pré-push) joue le typecheck avant les tests, sans les tests
+   navigateur de non-régression mais avec ceux de l'issue — les fichiers de tests navigateur que ta
+   branche ajoute ou modifie —, en entier, dit chaque ensemble — joué, à quel seuil, avec quel
+   verdict, ou pourquoi non —, ajoute à l'attestation les empreintes jouées vertes et l'envoie avec
+   le push, sur `<branche>--attestation`, où elle se garde d'un push à l'autre ; seul l'outillage la
+   produit, tu ne l'écris ni ne la pousses jamais toi-même (D83). Les tests navigateur de
+   non-régression se jouent la nuit, sur `main`, et ne décident pas de la fusion ; une nuit rouge
+   ouvre une issue (#307). Ne les demande sur ta branche que si l'issue le requiert — une mesure, par
+   exemple : commets d'abord, puis demande-les sur ce commit, `pnpm livraison --navigateur` ; verts,
+   ils sont attestés, et l'attestation part sur `origin`. Joués autrement — sur une tête détachée,
+   dans un autre clone, par l'exécuteur lancé sans l'outil de test —, rien n'en est attesté, et ils
+   se rejoueront : ceux de l'issue au Ready, les autres la nuit (#304, #307).
 3. Écris les tests dont tu as besoin, tous : ceux qui vérifient le besoin, parmi lesquels
    l'auditeur choisira le harnais, et ceux qui ne servent qu'à toi — un diagnostic, une analyse.
    Écris-les dans tes propres fichiers, jamais dans celui du harnais, et marque-les tous de niveau 4
