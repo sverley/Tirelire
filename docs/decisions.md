@@ -1438,7 +1438,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   test vert sur son empreinte, et le dit (voir « Les empreintes ») ; l'option
   `--attestation <fichier>`, que seules la CI et la livraison passent, lui donne ce qui couvre le
   lancement, et sans elle il le lit lui-même : l'attestation de la branche extraite et sa base
-  commune avec `main`.
+  commune avec `main` ; sur une tête détachée ou une sous-branche, cette base commune seule ; sur
+  `main`, rien (#314).
   Aucune variable d'environnement ne change ce qui se
   joue : tout passe par les arguments. Un test appelé nommément (`-t` de vitest,
   `--test-name-pattern` de `node --test`) se joue quel que soit son niveau. Le script `test` de
@@ -1474,7 +1475,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   l'ensemble écarte (`ENSEMBLES`, `packages/gardes/attestation.mjs`), chacun avec sa raison :
   l'ensemble ne le lit pas, ou ce qu'il en lit est vérifié par ce qui se joue quand il change. Un
   chemin oublié de la liste fait jouer plus, jamais moins : tout fichier qu'elle n'écarte pas change
-  l'empreinte. La garde et l'hébergement lisent tout le dépôt. Pour les tests navigateur, la liste
+  l'empreinte. La garde et l'hébergement lisent tout le dépôt. Une PR qui ne change que
+  des fichiers de `docs/` ne rejoue donc que la garde et l'hébergement, à tout lancement à
+  la main, sur la branche comme sur une tête détachée, à la livraison et au Ready, `docs/decisions.md`
+  compris : ce qui confronte une décision au code se joue dans l'ensemble de la garde, qui lit tout le dépôt ; le lancement dit, pour chaque autre ensemble, qu'il le saute et pourquoi (#314). Pour les tests navigateur, la liste
   est celle du point 9 de #237 : `docs/`, `.github/`, `.githooks/`, `packages/gardes/`,
   `apps/hebergement/`, `apps/relay/`, les fichiers `*.md` et `.gitignore`. La garde y figure : les
   tests navigateur la lisent par leur lanceur, mais l'interface sans navigateur, qui la lit par le
@@ -1497,7 +1501,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   la branche avec `main` compte aussi comme verte, pour tous ses fichiers, jusqu'au seuil 2 : la
   branche ne change rien de ce qu'il lit ; sauf pour l'interface dans le navigateur, que rien ne joue
   avant la fusion (#307) : ni `main`, ni le premier parent, ni une tête verte au Ready ne la disent
-  verte. Dans un lancement du harnais du besoin, seul ce qui couvre
+  verte. Cette base se calcule depuis la tête extraite, branche ou non : sur une tête détachée, comme
+  sur une sous-branche, un lancement de l'outil de test sans `--attestation` saute ce qu'elle couvre,
+  sans y lire l'attestation d'aucune branche ni y rien attester ; sur `main`, rien ne se saute
+  (#314). Dans un lancement du harnais du besoin, seul ce qui couvre
   le harnais, ou le fichier lui-même, couvre un de ses fichiers. Aucun moment ne fait exception
   (porteur, 28/09 : « si l'empreinte est verte, on ne joue pas les tests, c'est universel ») : au
   Ready, le seuil 1 non plus ; la vérification de l'auditeur non plus (porteur, 01/10, #302). Un
@@ -1506,8 +1513,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   se rejoue pas si son empreinte est celle qu'il a sur la tête d'une PR dont toute la CI a fini verte
   au Ready, ou sur le premier parent du commit arrivé. N'est pas vert sur son empreinte un ensemble
   dont un test a rougi, ou s'est sauté faute d'outil : il se rejoue au moment suivant qui le prévoit.
-  Au tag et pour une version forcée, rien ne se saute : le lanceur n'y lit aucune attestation — ni
-  sur une tête détachée, ni sur `main` — et la CI ne lui passe pas `--attestation`. Un fichier joué
+  Au tag et pour une version forcée, rien ne se saute : ils se jouent au seuil 3, que la base
+  commune avec `main` ne couvre pas, et le lanceur n'y lit aucune attestation — la CI ne lui passe
+  pas `--attestation`. Un fichier joué
   en entier est pourtant attesté au seuil 4, et un lancement à la main au seuil 3 ou 4 le saute.
   Chaque moment —
   pré-commit, pré-fusion, pré-push, demande, CI au Ready, CI sur `main`, tag — dit, pour chaque
@@ -1583,7 +1591,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
   l'interface sans navigateur, 30 s ; 630 s de plus avec les tests navigateur demandés, et 80 s plus
-  25 s par fichier pour ceux de l'issue) ou organisationnel (garde, 50 s) —, mesurés sur 2 cœurs comme
+  25 s par fichier pour ceux de l'issue) ou organisationnel (garde, 50 s, et hébergement, 5 s, qui
+  lisent tout le dépôt, #314) —, mesurés sur 2 cœurs comme
   la CI (#307), et de ce qu'elle retient ne se joue que ce qui n'est pas vert sur
   son empreinte (voir « Les empreintes ») ; ce qu'elle ne retient pas, la CI le joue au Ready s'il
   n'est pas vert sur son empreinte. Les tests navigateur de non-régression

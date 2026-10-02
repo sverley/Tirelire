@@ -37,7 +37,10 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
 3. Vérifie le travail en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
    un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready, garde comprise
-   (`node packages/gardes/cli.mjs pr --issue <n>`). Les tests navigateur de l'issue — les fichiers
+   (`node packages/gardes/cli.mjs pr --issue <n>`). Une tête détachée reste permise quand tu en as
+   besoin : elle saute ce que couvre la base commune avec `main`, mais n'atteste rien (D83, « Les
+   empreintes »). Avant de relancer, lis ce que le lanceur dit jouer et sauter, et pourquoi (D83).
+   Les tests navigateur de l'issue — les fichiers
    de tests navigateur que la PR ajoute ou modifie — se jouent à chaque livraison et au Ready, en
    entier ; la non-régression dans le navigateur se joue la nuit, sur `main`, et ne décide pas de la
    fusion (#307). Pour la jouer sur la branche — demande justifiée ou mesure —, commets d'abord, puis
