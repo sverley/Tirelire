@@ -13,8 +13,6 @@
     needForDueDateFlow,
     nextOccurrence,
     stateShown,
-    syncFlowAutomations,
-    todayISO,
     validityState,
     DEFAULT_VISIBILITY,
     type PlannedFlow,
@@ -42,7 +40,7 @@
     tolerancePct: '',
     labelPattern: '',
     variable: false,
-    makesAutomation: false,
+    locks: false,
     activeFrom: '',
     activeTo: '',
   });
@@ -82,7 +80,7 @@
   function startNew() {
     const principal = accounts.find((a) => a.kind === 'principal');
     editing = { id: app.newId(), name: '', kind: 'income', amount: 0, accountId: principal?.id ?? '', periodicity: { interval: 1, unit: 'month' as const, anchorDate: app.asOf }, dateWindowDays: 3 };
-    form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', interval: '1', unit: 'month' as PeriodUnit, anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, makesAutomation: false, activeFrom: '', activeTo: '' };
+    form = { ...form, name: '', kind: 'income', amount: '', accountId: principal?.id ?? '', tirelireId: '', categoryId: '', counterpartAccountId: '', interval: '1', unit: 'month' as PeriodUnit, anchorDate: app.asOf, dateWindowDays: '3', toleranceAbs: '', tolerancePct: '', labelPattern: '', variable: false, locks: false, activeFrom: '', activeTo: '' };
     titre = 'Ajouter un flux';
     error = '';
   }
@@ -105,7 +103,7 @@
       tolerancePct: f.amountTolerance?.pct !== undefined ? String(f.amountTolerance.pct) : '',
       labelPattern: f.labelPattern ?? '',
       variable: !!f.variable,
-      makesAutomation: !!f.makesAutomation,
+      locks: !!f.locks,
       activeFrom: f.activeFrom ?? '',
       activeTo: f.activeTo ?? '',
     };
@@ -147,14 +145,12 @@
         : {}),
       ...(form.labelPattern.trim() ? { labelPattern: form.labelPattern.trim() } : {}),
       ...(form.variable ? { variable: true } : {}),
-      ...(form.makesAutomation ? { makesAutomation: true } : {}),
+      ...(form.locks ? { locks: true } : {}),
       ...(form.activeFrom ? { activeFrom: form.activeFrom } : {}),
       ...(form.activeTo ? { activeTo: form.activeTo } : {}),
     };
+    // D24 : modifier un flux ne réécrit aucune opération déjà reprise ; il vaut pour celles qu'il reprendra.
     app.upsert('plannedFlows', row);
-    // D24 : modifier un flux archive son automatisme et en crée une nouvelle, sans réécrire le passé.
-    for (const rule of syncFlowAutomations(app.ledger, todayISO()).automations) app.store.upsert('automations', rule);
-    app.reload();
     editing = undefined;
   }
 
@@ -167,7 +163,7 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Flux prévus</h1>
-<p class="muted small">Revenus, charges fixes, échéances payées par une tirelire. Le montant se saisit en positif ; la fenêtre de dates, la tolérance et le motif serviront au rapprochement de flux. Les virements permanents, eux, sont <strong>dérivés du budget</strong> (D57) : ils se confirment depuis le Plan et ne se modifient pas ici.</p>
+<p class="muted small">Revenus, charges fixes, échéances payées par une tirelire. Le montant se saisit en positif. Le compte, le motif de libellé, la tolérance de montant et la fenêtre de dates sont les critères du flux : eux seuls reconnaissent l’opération du relevé qui réalise chaque échéance, qu’elle reprend et classe. Les virements permanents, eux, sont <strong>dérivés du budget</strong> (D57) : ils se confirment depuis le Plan et ne se modifient pas ici.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
@@ -220,14 +216,14 @@
         </select>
       </label>
       <label class="f">Première date <input type="date" bind:value={form.anchorDate} /></label>
-      <label class="f">Fenêtre de rapprochement (± jours) <input type="number" min="0" bind:value={form.dateWindowDays} /></label>
+      <label class="f">Fenêtre des échéances (± jours) <input type="number" min="0" bind:value={form.dateWindowDays} /></label>
       <label class="f">Tolérance de montant (€) <input bind:value={form.toleranceAbs} inputmode="decimal" /></label>
       <label class="f">Tolérance de montant (%) <input type="number" min="0" bind:value={form.tolerancePct} /></label>
       <label class="f">Motif de libellé (regex) <input bind:value={form.labelPattern} placeholder="ECHEANCE PRET" /></label>
       <label class="f">Actif à partir du <input type="date" bind:value={form.activeFrom} /></label>
       <label class="f">Actif jusqu'au <input type="date" bind:value={form.activeTo} /></label>
-      <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (rapprochement à confirmer)</label>
-      <label class="f check"><input type="checkbox" bind:checked={form.makesAutomation} /> Classer automatiquement les opérations de ce flux (crée un automatisme qui verrouille)</label>
+      <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (reprise à confirmer)</label>
+      <label class="f check"><input type="checkbox" bind:checked={form.locks} /> Verrouiller les opérations que ce flux reprend</label>
     </div>
     {#if error}<div class="err">{error}</div>{/if}
     <div class="actions" style="margin:0">
@@ -251,7 +247,7 @@
       {@const provision = provisionText(f)}
       <div class="row {badge ? 'dormant' : ''}" class:editing={editing?.id === f.id}>
         <div class="label">
-          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.makesAutomation ? ' · automatisme' : ''}
+          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.locks ? ' · verrouille' : ''}
           {#if badge}<span class="pill dim">{badge}</span>{/if}
           {#if isDerivedFlow(f)}<span class="pill dim">dérivé du budget</span>{/if}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}{validite ? ` · ${validite}` : ''}</span>
@@ -263,7 +259,7 @@
             {@const occurrences = flowOccurrences(app.ledger, f, addMonths(app.asOf, -3), app.asOf, app.asOf).slice(-3)}
             {#if occurrences.length}
               <span class="sub">{occurrences
-                .map((o) => `${shortDate(o.date)} : ${o.status === 'pointee' ? 'pointé' : o.status === 'attendue' ? 'attendu' : 'attendu, non reçu'}`)
+                .map((o) => `${shortDate(o.date)} : ${o.status === 'pointee' ? 'repris' : o.status === 'attendue' ? 'attendu' : 'attendu, non reçu'}`)
                 .join(' · ')}</span>
             {/if}
           {/if}

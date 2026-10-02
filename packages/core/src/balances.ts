@@ -17,7 +17,7 @@
  */
 import type { Account, SubOperation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation, ValidityState } from './model.js';
 import {
-  monthsOf, alive, needActive, validityState } from './model.js';
+  monthsOf, alive, countedOperations, needActive, validityState } from './model.js';
 import { nextOccurrence, budgetPeriodContaining, nextPeriod, type Period } from './periods.js';
 import { divideCents } from './money.js';
 import { addDays } from './dates.js';
@@ -88,6 +88,7 @@ export interface LedgerIndex {
   accountsById: Map<Id, Account>;
   tireliresById: Map<Id, Tirelire>;
   needsByTirelire: Map<Id, Need[]>;
+  /** Les opérations qui comptent (`countedOperations`) : vivantes, et non reprises (D88). */
   operationsById: Map<Id, Operation>;
   /** Sous-opérations vivantes par opération, tous niveaux (`liveSubOperations`). */
   subOperationsByOperation: Map<Id, SubOperation[]>;
@@ -119,7 +120,8 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
     else needsByTirelire.set(n.tirelireId, [n]);
   }
   for (const arr of needsByTirelire.values()) arr.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
-  const operationsById = new Map(alive(ledger.operations).map((o) => [o.id, o]));
+  // Ce qui compte : une opération reprise ne compte plus, celle qui la reprend compte à sa place (D88).
+  const operationsById = new Map(countedOperations(ledger.operations).map((o) => [o.id, o]));
   const subOperationsByOperation = new Map<Id, SubOperation[]>();
   for (const sub of liveSubOperations(ledger.subOperations, new Set(operationsById.keys()))) {
     const arr = subOperationsByOperation.get(sub.operationId);
@@ -523,9 +525,9 @@ export function spentInPeriod(e: Tirelire, idx: LedgerIndex, period: Period): Ce
   }, 0);
 }
 
-/** Solde bancaire reconstruit d'un compte réel (principal, accueil). */
+/** Solde bancaire reconstruit d'un compte réel (principal, accueil) : les opérations qui comptent (D88). */
 export function accountBalance(a: Account, ledger: Ledger, asOf: ISODate): Cents {
-  return alive(ledger.operations)
+  return countedOperations(ledger.operations)
     .filter((o) => o.accountId === a.id && o.date > a.openingDate && o.date <= asOf)
     .reduce((s, o) => s + o.amount, a.openingBalance);
 }

@@ -187,7 +187,7 @@ export const TABLES: Record<string, TableDef> = {
       c('variable', 'boolean'),
       date('activeFrom'),
       date('activeTo'),
-      c('makesAutomation', 'boolean'), // D24, D39
+      c('locks', 'boolean'), // D22, D24 : verrouiller ce que le flux reprend
       oneOf('origin', FLOW_ORIGINS), // D57 : flux déclaré ou dérivé du budget ; absent vaut déclaré
       DELETED_AT,
     ],
@@ -207,10 +207,29 @@ export const TABLES: Record<string, TableDef> = {
       oneOf('state', OPERATION_STATES, true),
       c('oneOff', 'boolean'),
       c('suggestedCategory'),
-      ref('plannedFlowId', 'planned_flows'),
+      ref('plannedFlowId', 'planned_flows'), // D88 : l'opération prévue reprise, désignée par son flux…
+      date('plannedDate'), // … et sa date
+      ref('resumedOperationId', 'operations'), // D88 : la saisie reprise
       ref('transferAccountId', 'accounts'),
       ref('transferOperationId', 'operations'),
       DELETED_AT,
+    ],
+    constraints: [
+      {
+        // Une opération en reprend au plus une autre (D88) : une opération prévue, désignée par son
+        // flux et sa date, qui vont ensemble, ou une autre opération qu'elle-même.
+        name: 'operations.reprise',
+        sql: '(planned_flow_id IS NULL) = (planned_date IS NULL) AND (resumed_operation_id IS NULL OR (planned_flow_id IS NULL AND resumed_operation_id <> id))',
+        problem: (id, v) => {
+          const flux = v['planned_flow_id'] != null;
+          if (flux !== (v['planned_date'] != null))
+            return `operations.planned_date ${flux ? 'manque' : 'est posé sans flux'} pour « ${id} » : une opération prévue reprise se désigne par son flux et sa date.`;
+          if (v['resumed_operation_id'] == null) return undefined;
+          if (flux) return `operations.resumed_operation_id est posé pour « ${id} », qui reprend déjà une opération prévue : une opération en reprend au plus une autre.`;
+          if (v['resumed_operation_id'] === id) return `operations.resumed_operation_id désigne « ${id} » elle-même.`;
+          return undefined;
+        },
+      },
     ],
   },
   subOperations: {
@@ -247,7 +266,7 @@ export const TABLES: Record<string, TableDef> = {
   },
   automations: {
     name: 'automations',
-    columns: [ID, c('name'), json('selection', SELECTION, true), json('action', ACTION, true), req('rank'), date('validFrom'), date('validTo'), ref('flowId', 'planned_flows'), DELETED_AT],
+    columns: [ID, c('name'), json('selection', SELECTION, true), json('action', ACTION, true), req('rank'), date('validFrom'), date('validTo'), DELETED_AT],
   },
   devices: {
     name: 'devices',
@@ -353,10 +372,12 @@ export const FILE_FORMAT = 'tirelire';
  * Version du format du fichier et des paquets de synchronisation. Un fichier ou un paquet d'une
  * autre version est refusé en le disant, sans rien écrire (D30, D58). La version 4 range les
  * sous-opérations à tous les niveaux dans `sub_operations` (D88, #297) ; la version 5 leur donne une
- * date propre et range les réponses aux manques dans `shortfall_answers` (#184). Aucune version
- * antérieure n'est plus lue.
+ * date propre et range les réponses aux manques dans `shortfall_answers` (#184) ; la version 6 désigne
+ * l'opération prévue reprise par son flux et sa date, ajoute la reprise d'une saisie, et donne au flux
+ * sa seule sélection, sans automatisme engendré à part (#306). Aucune version antérieure n'est plus
+ * lue.
  */
-export const FORMAT_VERSION = 5;
+export const FORMAT_VERSION = 6;
 
 export const SYSTEM_SQL = [
   // Réglages : une ligne par clé, valeur JSON, horloge de la dernière écriture ; synchronisés.

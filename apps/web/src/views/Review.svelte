@@ -176,7 +176,7 @@
     <div class="row">
       <div class="label">
         <span class="num">{automationLabel(rule)}</span>
-        <span class="sub">→ {ruleEffect(rule)}{rule.flowId ? ' · issu d’un flux' : ''}{rule.validTo ? ` · archivée le ${rule.validTo}` : ''}</span>
+        <span class="sub">→ {ruleEffect(rule)}{rule.validTo ? ` · archivée le ${rule.validTo}` : ''}</span>
       </div>
       <button class="btn small danger" onclick={() => removeRule(rule)}>×</button>
     </div>

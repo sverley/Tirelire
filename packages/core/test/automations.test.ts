@@ -9,10 +9,10 @@ import {
   outcomeFor,
   previewAutomations,
   rankBetween,
-  automationFromFlow,
+  applyMatch,
   automationsByRank,
+  proposeMatches,
   selects,
-  syncFlowAutomations,
   topRank,
   type Ledger,
   type Operation,
@@ -188,56 +188,49 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
     });
   });
 
-  describe('règles engendrées par les flux (D24)', () => {
-    it('un flux qui engendre une règle la fait verrouiller : elle porte toute la classification', () => {
-      const l = withOps();
-      const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
-      flow.makesAutomation = true;
-      const patch = syncFlowAutomations(l, '2026-09-07');
-      expect(patch.automations.length).toBe(1);
-      expect(patch.automations[0]!.action.state).toBe('lock');
-      expect(patch.automations[0]!.flowId).toBe('flow-credit');
+  describe('le flux reprend ce que sa sélection reconnaît, sans automatisme à part (D24, #306)', () => {
+    /** L'échéance du crédit du 5 septembre, au relevé. */
+    const échéance = (extra: Partial<Operation> = {}) => op('o-credit', 'ECHEANCE PRET IMMO', euros(-950), { date: '2026-09-05', ...extra });
+
+    it('un flux qui verrouille fait verrouiller ce qu’il reprend : il porte toute la classification', () => {
+      const l = withOps(échéance());
+      l.plannedFlows.find((f) => f.id === 'flow-credit')!.locks = true;
+      const m = proposeMatches(l, '2026-09-01', '2026-09-30').find((p) => p.operationId === 'o-credit')!;
+      expect(m.flowId).toBe('flow-credit');
+      const après = applyPatchToLedger(l, applyMatch(l, m)).operations.find((o) => o.id === 'o-credit')!;
+      expect(après.state).toBe('locked');
     });
 
     describe('[niveau 0] D24 · le passé déjà classé n’est pas réécrit', () => {
-      it('modifier le flux archive la règle et en crée une nouvelle, sans réécrire le passé', () => {
-        let l = withOps();
-        const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
-        flow.makesAutomation = true;
-        l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
-        const first = l.automations[l.automations.length - 1]!;
+      it('modifier le flux ne réécrit aucune opération déjà reprise', () => {
+        let l = withOps(échéance());
+        const m = proposeMatches(l, '2026-09-01', '2026-09-30').find((p) => p.operationId === 'o-credit')!;
+        l = applyPatchToLedger(l, applyMatch(l, m));
+        const avant = { op: l.operations.find((o) => o.id === 'o-credit')!, subs: l.subOperations.filter((s) => s.operationId === 'o-credit') };
+        expect(avant.subs.map((s) => s.categoryId)).toEqual(['cat-logement']);
 
-        flow.amount = euros(-1000);
-        const patch = syncFlowAutomations(l, '2026-10-07');
-        const archived = patch.automations.find((r) => r.id === first.id)!;
-        const created = patch.automations.find((r) => r.id !== first.id)!;
-        expect(archived.validTo).toBe('2026-10-07');
-        expect(created.validFrom).toBe('2026-10-07');
-
-        // Une opération d'avant la bascule reste sélectionnée par l'ancienne règle, pas par la nouvelle.
-        const ancienne = op('o-ancien', 'CREDIT MAISON', euros(-950), { date: '2026-08-05' });
-        l = applyPatchToLedger(l, { operations: [ancienne], subOperations: [] });
-        expect(selects(created.selection, ancienne) && !created.validFrom).toBe(false);
+        // Le flux change de montant et de catégorie : ce qu'il a repris garde ce qu'il a pris.
+        l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'flow-credit' ? { ...f, amount: euros(-1000), categoryId: 'cat-alim' } : f));
+        l = applyPatchToLedger(l, applyAutomations(l));
+        expect(l.operations.find((o) => o.id === 'o-credit')).toEqual(avant.op);
+        expect(l.subOperations.filter((s) => s.operationId === 'o-credit')).toEqual(avant.subs);
       });
     });
 
-    it('un flux à montant variable ne contraint pas le montant', () => {
-      const l = withOps();
-      const flow = { ...l.plannedFlows[0]!, variable: true, labelPattern: 'SALAIRE' };
-      const r = automationFromFlow(flow, 'm');
-      expect(r.selection.amountMin).toBeUndefined();
-      expect(r.selection.labelPattern).toBe('SALAIRE');
+    it('un flux à montant variable ne contraint pas le montant, et ne reprend jamais sans confirmation', () => {
+      const l = withOps(op('o-sal', 'VIR SALAIRE SEPT', euros(3600), { date: '2026-09-28' }));
+      const m = proposeMatches(l, '2026-09-01', '2026-09-30').find((p) => p.operationId === 'o-sal');
+      expect(m?.flowId).toBe('flow-salaire');
+      expect(m?.auto).toBe(false);
     });
 
-    it('décocher « engendre une règle » archive la règle plutôt que de la supprimer', () => {
-      const l = withOps();
-      const flow = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
-      flow.makesAutomation = true;
-      l.automations.push(...syncFlowAutomations(l, '2026-09-07').automations);
-      flow.makesAutomation = false;
-      const patch = syncFlowAutomations(l, '2026-10-07');
-      expect(patch.automations[0]!.validTo).toBe('2026-10-07');
-      expect(patch.automations[0]!.deletedAt).toBeUndefined();
+    it('retirer le verrouillage du flux ne déverrouille pas ce qu’il a déjà repris', () => {
+      let l = withOps(échéance());
+      l.plannedFlows.find((f) => f.id === 'flow-credit')!.locks = true;
+      l = applyPatchToLedger(l, applyMatch(l, proposeMatches(l, '2026-09-01', '2026-09-30').find((p) => p.operationId === 'o-credit')!));
+      l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'flow-credit' ? { ...f, locks: false } : f));
+      l = applyPatchToLedger(l, applyAutomations(l));
+      expect(l.operations.find((o) => o.id === 'o-credit')!.state).toBe('locked');
     });
   });
 

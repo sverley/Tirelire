@@ -430,7 +430,8 @@ describe.skipIf(!navigateur)('#183 · le plan sans hypothèse, à 375 px', () =>
     function états(textes: string[]) {
       const tout = textes.join(' | ');
       return {
-        pointée: /(?:point|rapproch)[ée]e?s?(?![a-zé])/i.test(tout),
+        // « repris » : depuis #306, l'occurrence que réalise une opération est reprise par elle (D88).
+        pointée: /(?:(?:point|rapproch)[ée]|repris)e?s?(?![a-zé])/i.test(tout),
         attendue: /attendu(?:e|s|es)?(?![a-zé])/i.test(tout.replace(/attendus?,?\s+non\s+re[çc]us?/gi, '')),
         nonReçue: /non\s+re[çc]u(?:e|s|es)?(?![a-zé])/i.test(tout),
       };

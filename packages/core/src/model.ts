@@ -387,17 +387,25 @@ export interface PlannedFlow {
   counterpartAccountId?: Id;
   categoryId?: Id;
   periodicity: Periodicity;
-  /** Fenêtre de rapprochement de flux en jours autour de la date attendue. */
+  /*
+   * La sélection du flux, la seule (D24) : son compte (`accountId`), son motif de libellé, sa
+   * tolérance de montant et la fenêtre de ses occurrences. Elle seule reconnaît l'opération bancaire
+   * qui réalise une occurrence, automatiquement selon D12, en proposition sinon (`proposeMatches`).
+   */
+  /** Fenêtre de ses occurrences, en jours autour de la date attendue (D12). */
   dateWindowDays: number;
   amountTolerance?: AmountTolerance;
-  /** Motif de libellé (expression régulière, insensible à la casse) pour le rapprochement de flux. */
+  /** Motif de libellé (expression régulière, insensible à la casse) : sans lui, aucun libellé n'est reconnu. */
   labelPattern?: string;
-  /** Revenu variable : tolérance large, jamais rapproché d'un flux automatiquement sans confirmation. */
+  /** Montant variable : tolérance large, jamais repris automatiquement sans confirmation (D12). */
   variable?: boolean;
   activeFrom?: ISODate;
   activeTo?: ISODate;
-  /** Le flux engendre-t-il un automatisme (D24, D39) ? */
-  makesAutomation?: boolean;
+  /**
+   * Action du flux sur ce qu'il reprend (D22, D24) : le verrouiller. Sans elle, l'opération reprise
+   * est rapprochée ; avec ou sans, elle prend la ventilation du flux si elle n'en a pas.
+   */
+  locks?: boolean;
   /** D57 : absent vaut `declared`, si bien qu'aucun flux déjà écrit n'est à réécrire. */
   origin?: FlowOrigin;
   deletedAt?: string;
@@ -455,8 +463,20 @@ export interface Operation {
   oneOff?: boolean;
   /** Catégorie proposée par la source (banque, Linxo), à confirmer. */
   suggestedCategory?: string;
-  /** Flux prévu rapproché (rapprochement de flux, D22) : ne change aucun état à lui seul. */
+  /**
+   * La reprise (D88) : l'opération en reprend au plus une autre, qui désigne le même mouvement et ne
+   * compte plus — celle-ci compte à sa place, pour son propre montant (`countedOperations`).
+   *
+   * - Une opération prévue, désignée par son flux et sa date (`plannedFlowId`, `plannedDate`) : le
+   *   rapprochement de flux de D12 et D22, ou la saisie qui la corrige ou la masque. Les deux vont
+   *   ensemble.
+   * - Une saisie (`resumedOperationId`) : l'opération bancaire qui réalise ce qu'elle annonçait.
+   *
+   * La reprise ne change aucun état à elle seule (D22).
+   */
   plannedFlowId?: Id;
+  plannedDate?: ISODate;
+  resumedOperationId?: Id;
   /** Transfert interne : compte de contrepartie. */
   transferAccountId?: Id;
   /** Opération de contrepartie appariée (si les deux relevés sont importés). */
@@ -467,6 +487,36 @@ export interface Operation {
 /** Une opération verrouillée est de la vérité : aucune règle ne la réécrit (D22). */
 export function isLocked(op: Operation): boolean {
   return op.state === 'locked';
+}
+
+/** Les opérations reprises par une opération vivante (D88) : elles ne comptent plus. */
+export function resumedOperationIds(operations: Operation[]): Set<Id> {
+  const out = new Set<Id>();
+  for (const o of operations) if (!o.deletedAt && o.resumedOperationId) out.add(o.resumedOperationId);
+  return out;
+}
+
+/**
+ * Les opérations qui comptent (D88) : les vivantes, sauf celles qu'une autre reprend — l'opération
+ * qui reprend compte à sa place, pour son propre montant. Un seul filtre pour les soldes, réels et
+ * prévus, et les totaux.
+ */
+export function countedOperations(operations: Operation[]): Operation[] {
+  const resumed = resumedOperationIds(operations);
+  return operations.filter((o) => !o.deletedAt && !resumed.has(o.id));
+}
+
+/**
+ * L'occurrence d'un flux qu'une opération réalise, en suivant ses reprises (D88) : la sienne, ou celle
+ * de la saisie qu'elle reprend, de proche en proche. `byId` porte les opérations vivantes.
+ */
+export function realizedOccurrence(op: Operation, byId: Map<Id, Operation>): { flowId: Id; date: ISODate } | undefined {
+  const vues = new Set<Id>();
+  for (let o: Operation | undefined = op; o && !vues.has(o.id); o = o.resumedOperationId ? byId.get(o.resumedOperationId) : undefined) {
+    vues.add(o.id);
+    if (o.plannedFlowId && o.plannedDate) return { flowId: o.plannedFlowId, date: o.plannedDate };
+  }
+  return undefined;
 }
 
 /**
@@ -629,8 +679,6 @@ export interface Automation {
   /** Validité : bornes sur la date de l'opération, pas sur l'horloge. */
   validFrom?: ISODate;
   validTo?: ISODate;
-  /** Règle engendrée par un flux prévu (D24) : archivée et remplacée quand le flux change. */
-  flowId?: Id;
   deletedAt?: string;
 }
 

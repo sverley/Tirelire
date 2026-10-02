@@ -6,7 +6,7 @@
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
  */
 import type { SubOperation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
-import { alive, isDerivedFlow, isLocked } from './model.js';
+import { alive, isDerivedFlow, isLocked, resumedOperationIds } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
 import { fundByPriority, transferLabel } from './plan.js';
@@ -138,49 +138,81 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
 }
 
 // ---------------------------------------------------------------------------
-// Rapprochement de flux prévus
+// La reprise (D88) : rapprochement de flux (D12, D22, D24) et reprise d'une saisie
 // ---------------------------------------------------------------------------
+
+/** Clé d'une occurrence d'un flux : une opération prévue se désigne par son flux et sa date (D88). */
+export function occurrenceKey(flowId: Id, date: ISODate): string {
+  return `${flowId}|${date}`;
+}
+
+/** L'opération reprend-elle une autre opération, prévue ou saisie (D88) ? */
+export function resumesSomething(op: Operation): boolean {
+  return !!op.plannedFlowId || !!op.resumedOperationId;
+}
+
+/** Pour chaque occurrence reprise, l'opération vivante qui la reprend : une occurrence n'est reprise qu'une fois (D12). */
+function occurrenceTakers(ledger: Ledger): Map<string, Operation> {
+  const out = new Map<string, Operation>();
+  for (const o of alive(ledger.operations)) if (o.plannedFlowId && o.plannedDate) out.set(occurrenceKey(o.plannedFlowId, o.plannedDate), o);
+  return out;
+}
 
 export interface MatchProposal {
   operationId: Id;
   flowId: Id;
+  /** Date de l'occurrence reconnue : avec le flux, elle désigne l'opération prévue reprise (D88). */
   expectedDate: ISODate;
   expectedAmount: Cents;
+  /**
+   * La saisie qui corrige ou masque déjà cette occurrence : c'est elle que l'opération reprend, et non
+   * l'occurrence (D88).
+   */
+  resumedOperationId?: Id;
   /** 0-1 */
   score: number;
-  /** Assez sûr pour être appliqué sans confirmation. */
+  /** Assez sûr pour être appliqué sans confirmation (D12). */
   auto: boolean;
   reasons: string[];
 }
 
-function amountWithinTolerance(flow: PlannedFlow, amount: Cents): { ok: boolean; ratio: number } {
+function amountWithinTolerance(flow: PlannedFlow, amount: Cents): { ok: boolean; ratio: number; exact: boolean } {
   const expected = flow.amount;
-  if (Math.sign(expected) !== Math.sign(amount)) return { ok: false, ratio: 0 };
+  if (Math.sign(expected) !== Math.sign(amount)) return { ok: false, ratio: 0, exact: false };
   const diff = Math.abs(Math.abs(amount) - Math.abs(expected));
   const tolAbs = flow.amountTolerance?.abs ?? 0;
   const tolPct = flow.amountTolerance?.pct ?? (flow.variable ? 30 : 0);
   const allowed = Math.max(tolAbs, (Math.abs(expected) * tolPct) / 100);
   const ratio = expected === 0 ? 0 : 1 - Math.min(1, diff / Math.max(1, Math.abs(expected)));
-  return { ok: diff <= allowed + 0.5, ratio };
+  return { ok: diff <= allowed + 0.5, ratio, exact: diff === 0 };
+}
+
+/** Le motif de libellé du flux reconnaît-il l'opération ? Un motif illisible ne reconnaît rien. */
+function labelRecognized(pattern: string, op: Operation): boolean {
+  try {
+    const re = new RegExp(pattern, 'i');
+    return re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '');
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Propose un flux prévu pour chaque opération en attente. Une occurrence d'un
- * flux n'est proposée qu'à une seule opération (la mieux notée).
+ * La sélection des flux, la seule (D24), sur les opérations bancaires sans reprise, non verrouillées,
+ * datées entre `from` et `to` : le compte du flux, son motif de libellé s'il en a un, sa tolérance de
+ * montant et la fenêtre de ses occurrences (D12). Ce qu'elle ne reconnaît pas, le flux ne le reprend
+ * ni ne le classe.
+ *
+ * Automatique selon D12 — montant exact, ou dans la tolérance avec le libellé reconnu, flux non
+ * variable —, proposée sinon. Une occurrence n'est reprise qu'une fois, et une opération en reprend
+ * au plus une : la mieux notée. Une occurrence qu'une saisie corrige ou masque déjà se reprend par
+ * cette saisie (D88).
  */
 export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): MatchProposal[] {
   const flows = alive(ledger.plannedFlows);
-  const ops = alive(ledger.operations).filter((o) => !isLocked(o) && !o.plannedFlowId && o.date >= from && o.date <= to);
-  const taken = new Set<string>(); // flowId|date déjà rapprochés
-  for (const o of alive(ledger.operations)) {
-    if (o.plannedFlowId) {
-      const f = flows.find((x) => x.id === o.plannedFlowId);
-      if (!f) continue;
-      const occ = occurrencesBetween(f.periodicity, addDays(o.date, -f.dateWindowDays - 1), addDays(o.date, f.dateWindowDays + 1));
-      const nearest = occ.sort((a, b) => Math.abs(diffDays(a, o.date)) - Math.abs(diffDays(b, o.date)))[0];
-      if (nearest) taken.add(`${f.id}|${nearest}`);
-    }
-  }
+  const resumed = resumedOperationIds(ledger.operations);
+  const takers = occurrenceTakers(ledger);
+  const ops = alive(ledger.operations).filter((o) => o.origin === 'imported' && !isLocked(o) && !resumesSomething(o) && !resumed.has(o.id) && o.date >= from && o.date <= to);
   const candidates: MatchProposal[] = [];
   for (const op of ops) {
     for (const f of flows) {
@@ -189,32 +221,41 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       if (f.activeTo && op.date > f.activeTo) continue;
       const amt = amountWithinTolerance(f, op.amount);
       if (!amt.ok) continue;
+      const label = f.labelPattern ? labelRecognized(f.labelPattern, op) : undefined;
+      if (label === false) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
-      if (taken.has(`${f.id}|${expectedDate}`)) continue;
+      const taker = takers.get(occurrenceKey(f.id, expectedDate));
+      // Reprise par une opération bancaire, ou par une saisie déjà reprise : l'occurrence est servie.
+      if (taker && (taker.origin !== 'manual' || resumed.has(taker.id))) continue;
       const reasons: string[] = [];
       const dateScore = 1 - Math.abs(diffDays(expectedDate, op.date)) / (f.dateWindowDays + 1);
       reasons.push(`date à ${Math.abs(diffDays(expectedDate, op.date))} j`);
-      let labelScore = 0.5;
-      if (f.labelPattern) {
-        const re = new RegExp(f.labelPattern, 'i');
-        labelScore = re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '') ? 1 : 0;
-        reasons.push(labelScore ? 'libellé reconnu' : 'libellé différent');
-      }
-      if (amt.ratio === 1) reasons.push('montant exact');
-      else reasons.push('montant dans la tolérance');
-      const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * labelScore;
-      const auto = !f.variable && (f.labelPattern ? labelScore === 1 && amt.ratio >= 0.98 : amt.ratio === 1 && dateScore >= 0.5);
-      candidates.push({ operationId: op.id, flowId: f.id, expectedDate, expectedAmount: f.amount, score, auto, reasons });
+      if (label) reasons.push('libellé reconnu');
+      reasons.push(amt.exact ? 'montant exact' : 'montant dans la tolérance');
+      if (taker) reasons.push('déjà corrigée par une saisie');
+      const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
+      const auto = !f.variable && (amt.exact || label === true);
+      candidates.push({
+        operationId: op.id,
+        flowId: f.id,
+        expectedDate,
+        expectedAmount: f.amount,
+        ...(taker ? { resumedOperationId: taker.id } : {}),
+        score,
+        auto,
+        reasons,
+      });
     }
   }
   // Attribution gloutonne : meilleure note d'abord, une opération et une occurrence à la fois.
   candidates.sort((a, b) => b.score - a.score);
   const usedOps = new Set<Id>();
+  const taken = new Set<string>();
   const out: MatchProposal[] = [];
   for (const c of candidates) {
-    const key = `${c.flowId}|${c.expectedDate}`;
+    const key = occurrenceKey(c.flowId, c.expectedDate);
     if (usedOps.has(c.operationId) || taken.has(key)) continue;
     usedOps.add(c.operationId);
     taken.add(key);
@@ -223,17 +264,12 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
   return out;
 }
 
-/** Applique une proposition : statut, flux, et ventilation d'après le flux. */
-export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
-  const patch = emptyPatch();
-  const op = alive(ledger.operations).find((o) => o.id === m.operationId);
-  const f = alive(ledger.plannedFlows).find((x) => x.id === m.flowId);
-  if (!op || !f) return patch;
-  // Le rapprochement de flux ne verrouille pas à lui seul (D22) : il rend l'opération rapprochée.
-  const next: Operation = { ...op, state: isLocked(op) ? 'locked' : 'reconciled', plannedFlowId: f.id };
-  if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
-  patch.operations.push(next);
-  const existing = subOperationsOf(ledger, op.id);
+/**
+ * La ventilation d'un flux pour l'opération qui reprend une de ses occurrences (D88) : celle d'un
+ * virement permanent **dérivé** se rejoue par l'ordre de financement (D06, D21, D60) sur le montant
+ * réel, au jour de l'opération ; sinon, la catégorie et la tirelire du flux, en part variable.
+ */
+function flowVentilation(ledger: Ledger, f: PlannedFlow, operationId: Id, amount: Cents, date: ISODate, target: Id | undefined): SubOperation[] {
   /*
    * Virement permanent **dérivé** (D21, D57) : sa ventilation ne se lit pas dans le flux, elle se
    * **rejoue** par l'ordre de financement (D06) sur le montant réellement viré, au jour de
@@ -245,30 +281,228 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
    * lui a données, avec la part variable qui suit le montant du jour. Le rejouer reviendrait à
    * réécrire un fait de l'utilisateur, ce que D57 interdit.
    */
-  const target = f.counterpartAccountId ?? op.transferAccountId;
-  const parts = f.kind === 'transfer' && isDerivedFlow(f) && existing.length === 0 && target ? distributeTransfer(ledger, target, op.amount, op.date) : [];
-  if (parts.length > 0) {
-    for (const part of parts) {
-      patch.subOperations.push({
-        id: uuidv7(),
-        operationId: op.id,
-        tirelireId: part.tirelireId,
-        share: { kind: 'fixed', amount: op.amount < 0 ? -part.amount : part.amount },
-        ...(f.categoryId ? { categoryId: f.categoryId } : {}),
-      });
-    }
-    return patch;
-  }
-  if (existing.length === 0 && (f.categoryId || f.tirelireId)) {
-    patch.subOperations.push({
+  const parts = f.kind === 'transfer' && isDerivedFlow(f) && target ? distributeTransfer(ledger, target, amount, date) : [];
+  if (parts.length > 0)
+    return parts.map((part) => ({
       id: uuidv7(),
-      operationId: op.id,
+      operationId,
+      tirelireId: part.tirelireId,
+      share: { kind: 'fixed' as const, amount: amount < 0 ? -part.amount : part.amount },
+      ...(f.categoryId ? { categoryId: f.categoryId } : {}),
+    }));
+  if (!f.categoryId && !f.tirelireId) return [];
+  return [
+    {
+      id: uuidv7(),
+      operationId,
       // Part variable : la ventilation d'un flux à montant variable reste rejouable (D27).
       share: { kind: 'variable' },
       ...(f.categoryId ? { categoryId: f.categoryId } : {}),
       ...(f.tirelireId ? { tirelireId: f.tirelireId } : {}),
+    },
+  ];
+}
+
+/** Ce qu'un flux reprend devient rapproché (D22), verrouillé s'il le demande ; verrouillé, il le reste. */
+function stateOnResumption(op: Operation, f: PlannedFlow | undefined): Operation['state'] {
+  return isLocked(op) || f?.locks ? 'locked' : 'reconciled';
+}
+
+/**
+ * Applique une proposition : l'opération reprend l'occurrence, désignée par son flux et sa date, ou la
+ * saisie qui la corrige ou la masque déjà (D88). Elle devient rapprochée, verrouillée si le flux le
+ * demande (D22, D24), et garde ce qui a été décidé sur elle : sa ventilation, si elle en a une ;
+ * sinon, elle prend celle de ce qu'elle reprend.
+ */
+export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
+  const patch = emptyPatch();
+  const op = alive(ledger.operations).find((o) => o.id === m.operationId);
+  const f = alive(ledger.plannedFlows).find((x) => x.id === m.flowId);
+  if (!op || !f) return patch;
+  if (m.resumedOperationId) return resumeEntryWith(ledger, op, m.resumedOperationId, f);
+  const next: Operation = { ...op, state: stateOnResumption(op, f), plannedFlowId: f.id, plannedDate: m.expectedDate };
+  delete next.resumedOperationId;
+  if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
+  patch.operations.push(next);
+  if (subOperationsOf(ledger, op.id).length === 0)
+    patch.subOperations.push(...flowVentilation(ledger, f, op.id, op.amount, op.date, f.counterpartAccountId ?? op.transferAccountId));
+  return patch;
+}
+
+/**
+ * Les saisies qu'une opération bancaire peut reprendre (D88, principe 4.4) : non reprises, du même
+ * compte et du même sens, les plus proches en date, puis en montant. Une saisie de zéro n'a pas de
+ * sens : elle ne se reprend que par l'occurrence qu'elle masque (`proposeMatches`) ; un lissage
+ * décidé n'annonce aucun mouvement de la banque.
+ */
+export function entryCandidates(ledger: Ledger, operationId: Id): Operation[] {
+  const op = alive(ledger.operations).find((o) => o.id === operationId);
+  if (!op || op.origin !== 'imported' || resumesSomething(op) || op.amount === 0) return [];
+  const resumed = resumedOperationIds(ledger.operations);
+  const smoothing = new Set(alive(ledger.shortfallAnswers ?? []).flatMap((a) => (a.operationId ? [a.operationId] : [])));
+  const distance = (e: Operation) => [Math.abs(diffDays(e.date, op.date)), Math.abs(e.amount - op.amount)] as const;
+  return alive(ledger.operations)
+    .filter(
+      (e) =>
+        e.origin === 'manual' &&
+        e.id !== op.id &&
+        e.accountId === op.accountId &&
+        e.amount !== 0 &&
+        Math.sign(e.amount) === Math.sign(op.amount) &&
+        !e.resumedOperationId &&
+        !resumed.has(e.id) &&
+        !smoothing.has(e.id),
+    )
+    .sort((a, b) => {
+      const [da, ma] = distance(a);
+      const [db, mb] = distance(b);
+      return da - db || ma - mb || a.id.localeCompare(b.id);
     });
+}
+
+/**
+ * L'opération bancaire reprend la saisie qui annonçait le même mouvement, sur validation de
+ * l'utilisateur (D88, principe 4.4). Elle devient rapprochée, garde ce qui a été décidé sur elle, et
+ * prend sinon la ventilation de la saisie.
+ */
+export function resumeEntry(ledger: Ledger, operationId: Id, entryId: Id): Patch {
+  const op = alive(ledger.operations).find((o) => o.id === operationId);
+  if (!op || !entryCandidates(ledger, operationId).some((e) => e.id === entryId)) return emptyPatch();
+  return resumeEntryWith(ledger, op, entryId, undefined);
+}
+
+function resumeEntryWith(ledger: Ledger, op: Operation, entryId: Id, flow: PlannedFlow | undefined): Patch {
+  const patch = emptyPatch();
+  const entry = alive(ledger.operations).find((o) => o.id === entryId);
+  if (!entry) return patch;
+  const next: Operation = { ...op, state: stateOnResumption(op, flow), resumedOperationId: entry.id };
+  delete next.plannedFlowId;
+  delete next.plannedDate;
+  const target = flow?.counterpartAccountId ?? entry.transferAccountId;
+  if (target && !next.transferAccountId) next.transferAccountId = target;
+  patch.operations.push(next);
+  if (subOperationsOf(ledger, op.id).length > 0) return patch;
+  // La saisie corrige un virement permanent dérivé : la ventilation se rejoue sur le montant réel (D21, D60).
+  const entryFlow = entry.plannedFlowId ? alive(ledger.plannedFlows).find((f) => f.id === entry.plannedFlowId) : undefined;
+  if (entryFlow && entryFlow.kind === 'transfer' && isDerivedFlow(entryFlow)) {
+    patch.subOperations.push(...flowVentilation(ledger, entryFlow, op.id, op.amount, op.date, entryFlow.counterpartAccountId ?? next.transferAccountId));
+    return patch;
   }
+  // Sinon, la ventilation de la saisie, à tous ses niveaux, recopiée sur l'opération qui la reprend.
+  const subs = subOperationsOf(ledger, entry.id);
+  const ids = new Map(subs.map((s) => [s.id, uuidv7()]));
+  for (const s of subs) {
+    const copy: SubOperation = { ...s, id: ids.get(s.id)!, operationId: op.id };
+    if (s.parentId) copy.parentId = ids.get(s.parentId)!;
+    patch.subOperations.push(copy);
+  }
+  return patch;
+}
+
+/**
+ * Défaire une reprise (D88) : l'opération ne reprend plus rien, et ce qu'elle reprenait compte de
+ * nouveau. Verrouillée, elle garde ce qui a été décidé sur elle (D22) ; sinon, elle repart de ce que
+ * l'import a établi et les automatismes la reprennent (D33).
+ */
+export function undoResumption(ledger: Ledger, operationId: Id): Patch {
+  const patch = emptyPatch();
+  const op = alive(ledger.operations).find((o) => o.id === operationId);
+  if (!op || !resumesSomething(op)) return patch;
+  const next: Operation = { ...op };
+  delete next.plannedFlowId;
+  delete next.plannedDate;
+  delete next.resumedOperationId;
+  patch.operations.push(next);
+  if (isLocked(op)) return patch;
+  const after = applyPatchToLedger(ledger, patch);
+  const automated = applyAutomations(after);
+  const mine = automated.operations.find((o) => o.id === op.id);
+  if (mine) patch.operations[0] = mine;
+  patch.subOperations.push(...automated.subOperations.filter((s) => s.operationId === op.id));
+  const own = new Set(subOperationsOf(ledger, op.id).map((s) => s.id));
+  patch.removedSubOperations!.push(...(automated.removedSubOperations ?? []).filter((id) => own.has(id)));
+  return patch;
+}
+
+/** Ce qu'une opération reprend (D88) : une occurrence d'un flux, ou une saisie, avec son montant et l'écart. */
+export interface Resumption {
+  /** L'occurrence reprise : son flux et sa date. */
+  flow?: PlannedFlow;
+  date: ISODate;
+  /** La saisie reprise. */
+  operation?: Operation;
+  /** Montant de ce qui est repris : celui du flux pour une occurrence, celui de la saisie sinon. */
+  amount: Cents;
+  /** Écart : le montant de l'opération qui reprend, moins celui de ce qu'elle reprend. */
+  gap: Cents;
+}
+
+export function resumptionOf(ledger: Ledger, op: Operation): Resumption | undefined {
+  if (op.plannedFlowId && op.plannedDate) {
+    const flow = ledger.plannedFlows.find((f) => f.id === op.plannedFlowId);
+    const amount = flow?.amount ?? 0;
+    return { ...(flow ? { flow } : {}), date: op.plannedDate, amount, gap: op.amount - amount };
+  }
+  if (op.resumedOperationId) {
+    const operation = ledger.operations.find((o) => o.id === op.resumedOperationId);
+    const amount = operation?.amount ?? 0;
+    return { ...(operation ? { operation } : {}), date: operation?.date ?? op.date, amount, gap: op.amount - amount };
+  }
+  return undefined;
+}
+
+/** L'opération vivante qui reprend celle-ci, s'il y en a une (D88). */
+export function resumerOf(ledger: Ledger, operationId: Id): Operation | undefined {
+  return alive(ledger.operations).find((o) => o.resumedOperationId === operationId);
+}
+
+/**
+ * Ce qui empêche de supprimer ces opérations (#306, point 9) : les opérations vivantes qui en
+ * reprennent une. Tant que la reprise tient, la saisie reprise ne se supprime pas — sinon
+ * l'occurrence qu'elle corrigeait redeviendrait libre, et le mouvement compterait deux fois.
+ * Défaire d'abord la reprise (`undoResumption`) la rend supprimable.
+ */
+export function removalBlockers(ledger: Ledger, operationIds: Id[]): Operation[] {
+  const ids = new Set(operationIds);
+  return alive(ledger.operations).filter((o) => !!o.resumedOperationId && ids.has(o.resumedOperationId) && !ids.has(o.id));
+}
+
+/**
+ * Corriger une opération prévue, ou la masquer (D88, porteur, 30/09) : une saisie qui la reprend —
+ * elle vaudra `amount`, à `date` ; zéro, elle n'aura pas lieu. La saisie est un fait de l'utilisateur,
+ * verrouillée (D22), et prend la ventilation du flux, rejouée sur son montant pour un virement
+ * permanent dérivé. Un virement corrigé garde ses deux côtés, comme l'opération prévue qu'il
+ * remplace (`withPlannedOperations`) ; masqué, il n'en a pas. La retirer fait compter de nouveau
+ * l'opération prévue.
+ */
+export function correctPlannedOperation(ledger: Ledger, flowId: Id, occurrenceDate: ISODate, amount: Cents, date: ISODate): Patch {
+  const patch = emptyPatch();
+  const f = alive(ledger.plannedFlows).find((x) => x.id === flowId);
+  if (!f || occurrenceTakers(ledger).has(occurrenceKey(f.id, occurrenceDate))) return patch;
+  const op: Operation = {
+    id: uuidv7(),
+    accountId: f.accountId,
+    origin: 'manual',
+    date,
+    label: f.name,
+    normalizedLabel: normalizeLabel(f.name),
+    amount,
+    state: 'locked',
+    plannedFlowId: f.id,
+    plannedDate: occurrenceDate,
+  };
+  const counterpart = f.kind === 'transfer' ? f.counterpartAccountId : undefined;
+  if (counterpart) op.transferAccountId = counterpart;
+  patch.operations.push(op);
+  if (amount === 0) return patch;
+  if (counterpart) {
+    const twin: Operation = { ...op, id: uuidv7(), accountId: counterpart, amount: -amount, transferAccountId: f.accountId, transferOperationId: op.id };
+    delete twin.plannedFlowId;
+    delete twin.plannedDate;
+    op.transferOperationId = twin.id;
+    patch.operations.push(twin);
+  }
+  patch.subOperations.push(...flowVentilation(ledger, f, op.id, amount, date, counterpart));
   return patch;
 }
 
@@ -294,11 +528,11 @@ export interface FlowOccurrence {
   /** Fin de sa fenêtre de rapprochement. */
   windowEnd: ISODate;
   /**
-   * `pointee` : une opération lui a été rapprochée ; `attendue` : sa fenêtre court encore à `asOf` ;
-   * `nonRecue` : la fenêtre est passée sans opération (D12).
+   * `pointee` : une opération la reprend (D88) ; `attendue` : sa fenêtre court encore à `asOf` ;
+   * `nonRecue` : la fenêtre est passée sans reprise (D12).
    */
   status: OccurrenceStatus;
-  /** L'opération pointée, s'il y en a une. */
+  /** L'opération qui la reprend, s'il y en a une. */
   operationId?: Id;
 }
 
@@ -313,17 +547,19 @@ export function tracksOperations(ledger: Ledger, accountId: Id): boolean {
 
 /**
  * Les occurrences d'un flux entre `from` et `to`, chacune avec ce qu'elle est devenue à `asOf`
- * (D12) : pointée, attendue dans sa fenêtre, ou attendue non reçue. Même rapprochement que
- * `missingFlows` : une opération rapprochée du flux pointe l'occurrence dont la fenêtre la contient.
+ * (D12) : reprise, attendue dans sa fenêtre, ou attendue non reçue. Une opération reprend
+ * l'occurrence que désignent son flux et sa date (D88) : saisie qui la corrige ou la masque, ou
+ * opération bancaire qui la réalise.
  */
 export function flowOccurrences(ledger: Ledger, flow: PlannedFlow, from: ISODate, to: ISODate, asOf: ISODate): FlowOccurrence[] {
-  const pointees = alive(ledger.operations).filter((o) => o.plannedFlowId === flow.id);
+  const takers = new Map<ISODate, Operation>();
+  for (const o of alive(ledger.operations)) if (o.plannedFlowId === flow.id && o.plannedDate) takers.set(o.plannedDate, o);
   const out: FlowOccurrence[] = [];
   for (const d of occurrencesBetween(flow.periodicity, from, to)) {
     if (flow.activeFrom && d < flow.activeFrom) continue;
     if (flow.activeTo && d > flow.activeTo) continue;
     const windowEnd = addDays(d, flow.dateWindowDays);
-    const op = pointees.find((o) => o.date >= addDays(d, -flow.dateWindowDays - 1) && o.date <= addDays(d, flow.dateWindowDays + 1));
+    const op = takers.get(d);
     if (op) out.push({ date: d, windowEnd, status: 'pointee', operationId: op.id });
     else out.push({ date: d, windowEnd, status: windowEnd >= asOf ? 'attendue' : 'nonRecue' });
   }
@@ -333,8 +569,8 @@ export function flowOccurrences(ledger: Ledger, flow: PlannedFlow, from: ISODate
 /**
  * Ce qui compte, parmi les occurrences d'un flux (D12, D88) — un seul calcul, pour le solde prévu
  * (`withPlannedOperations`) comme pour le bloc « Attendus, non reçus » (`missingFlows`) :
- * - une occurrence reprise par une opération (`Operation.plannedFlowId`) ne compte plus, l'opération
- *   compte à sa place ;
+ * - une occurrence reprise par une opération (son flux et sa date, `Operation.plannedFlowId` et
+ *   `plannedDate`) ne compte plus, l'opération compte à sa place ;
  * - sur un compte suivi (`tracksOperations`), une occurrence dont la fenêtre est passée sans reprise
  *   est « attendue, non reçue », et ne compte plus ;
  * - sur un compte sans suivi (U1), rien ne se confronte : toute autre occurrence compte à sa date.

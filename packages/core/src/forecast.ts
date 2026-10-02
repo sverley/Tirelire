@@ -187,6 +187,7 @@ function plannedOperation(flow: PlannedFlow, date: ISODate): Operation {
     amount: flow.amount,
     state: 'reconciled',
     plannedFlowId: flow.id,
+    plannedDate: date,
   };
 }
 

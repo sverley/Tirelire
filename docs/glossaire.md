@@ -74,13 +74,15 @@ opérations prévues (D24, D88).
 Un automatisme (D24) : la représentation abstraite d'opérations attendues : salaire, loyer perçu, prélèvement, virement
 interne, échéance de provision. Décrit par un montant, une périodicité, une date et une tolérance.
 Sa récurrence produit les **opérations prévues**, sa représentation concrète, calculées à chaque
-lecture ; sa sélection reconnaît l'opération bancaire qui réalise chacune (D88).
+lecture ; sa sélection, la seule — son compte, son motif de libellé, sa tolérance de montant et la
+fenêtre de ses occurrences —, reconnaît l'opération bancaire qui réalise chacune, qui la **reprend**
+(D12, D24, D88).
 
 ## Opération
 
 Un montant, une date, un compte. **Bancaire** : une ligne de relevé importée ; **saisie** : une ligne
 entrée à la main, passée ou future ; **prévue** : une ligne produite par un flux, calculée, jamais
-enregistrée. Un flux n'est pas une opération, mais un automatisme qui en produit. Elle contient des **sous-opérations**, peut en reprendre une autre, et est reconnue
+enregistrée, désignée par son flux et sa date. Un flux n'est pas une opération, mais un automatisme qui en produit. Elle contient des **sous-opérations**, peut en reprendre une autre, et est reconnue
 comme virement interne ou en attente de tri (D88).
 
 ## Sous-opération
@@ -90,6 +92,15 @@ sur autant de niveaux qu'on veut. Elles la **ventilent** entre tirelires, catég
 divisent dans le temps (**lissage**), ou **reprennent** une autre opération qui désigne le
 même mouvement : le rapprochement d'une opération bancaire, la correction d'une opération prévue, son
 masquage (D88).
+
+## Reprise
+
+Une opération en reprend au plus une autre, qui désigne le même mouvement : l'opération bancaire
+reprend l'opération prévue qu'elle réalise, désignée par son flux et sa date, ou une saisie : celle
+qui annonçait le même mouvement, ou celle qui corrige ou masque cette opération prévue ; une saisie
+reprend l'opération prévue qu'elle corrige, ou, de zéro, qu'elle masque. Une opération n'est reprise qu'une fois. L'opération reprise ne compte
+plus : celle qui la reprend compte à sa place, pour son propre montant, et l'écart entre les deux
+reste visible (D12, D88). Le rapprochement de flux de D22 en est une.
 
 ## Étiquette
 

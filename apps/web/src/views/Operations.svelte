@@ -1,11 +1,16 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
+  import { supprimerOperations } from '../lib/suppression';
   import {
     alive,
     applyMatch,
+    entryCandidates,
     findCategoryByName,
     proposeMatches,
+    resumeEntry,
+    resumptionOf,
+    undoResumption,
     budgetPeriodContaining,
     addDays,
     type SubOperation,
@@ -82,6 +87,12 @@
     }
     return m;
   });
+  /** L'opération qui reprend chacune, quand une autre la reprend (D88) : elle ne compte plus. */
+  const resumers = $derived.by(() => {
+    const m = new Map<string, Operation>();
+    for (const o of alive(app.ledger.operations)) if (o.resumedOperationId) m.set(o.resumedOperationId, o);
+    return m;
+  });
   const proposals = $derived.by(() => {
     const m = new Map<string, MatchProposal>();
     for (const p of proposeMatches(app.ledger, addDays(period.start, -400), addDays(period.end, 40))) m.set(p.operationId, p);
@@ -135,6 +146,20 @@
   const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
   const categoryName = (id: string | undefined) => categories.find((c) => c.id === id)?.name;
   const flowName = (id: string | undefined) => flows.find((f) => f.id === id)?.name;
+
+  /** Ce qu'une opération reprend (D88), et l'écart de montant entre les deux. */
+  function repriseText(op: Operation): string {
+    const r = resumptionOf(app.ledger, op);
+    if (!r) return '';
+    const quoi = r.operation ? `la saisie « ${r.operation.label} » du ${shortDate(r.date)}` : `l’opération prévue « ${r.flow?.name ?? '?'} » du ${shortDate(r.date)}`;
+    return `reprend ${quoi} · écart ${r.gap === 0 ? 'nul' : money(r.gap)}`;
+  }
+
+  /** Ce que propose un flux : l'occurrence qu'il reconnaît, ou la saisie qui la corrige déjà. */
+  function propositionText(p: MatchProposal): string {
+    const quoi = `l’opération prévue « ${flowName(p.flowId)} » du ${shortDate(p.expectedDate)}`;
+    return p.resumedOperationId ? `${quoi}, par la saisie qui la corrige` : quoi;
+  }
 
   /** D22 : l'état dit qui a le droit d'écrire, pas ce que l'opération est. */
   function stateLabel(s: OperationState): string {
@@ -427,10 +452,24 @@
     app.upsert('operations', unlock(op));
   }
 
-  /** Repartir de zéro : plus de flux, plus de virement, plus de ventilation. */
+  /** L'opération bancaire reprend la saisie qui annonçait le même mouvement : l'utilisateur valide (D88, principe 4.4). */
+  function acceptEntry(op: Operation, entry: Operation) {
+    app.applyPatch(resumeEntry(app.ledger, op.id, entry.id));
+    editingId = undefined;
+  }
+
+  /** Défaire la reprise : ce que l'opération reprenait compte de nouveau (D88). */
+  function undoReprise(op: Operation) {
+    app.applyPatch(undoResumption(app.ledger, op.id));
+    editingId = undefined;
+  }
+
+  /** Repartir de zéro : plus de reprise, plus de virement, plus de ventilation. */
   function unlink(op: Operation) {
     const next: Operation = { ...op, state: 'untreated' };
     delete next.plannedFlowId;
+    delete next.plannedDate;
+    delete next.resumedOperationId;
     delete next.transferAccountId;
     delete next.transferOperationId;
     for (const a of allocByOp.get(op.id) ?? []) app.store.remove('subOperations', a.id);
@@ -438,11 +477,10 @@
     editingId = undefined;
   }
 
+  /** Une saisie reprise ne se supprime pas tant que la reprise tient (#306, point 9). */
   function remove(op: Operation) {
-    if (!confirm(`Supprimer « ${op.label} » ? (un réimport la fera revenir)`)) return;
-    for (const a of allocByOp.get(op.id) ?? []) app.store.remove('subOperations', a.id);
-    app.remove('operations', op.id);
-    editingId = undefined;
+    const question = op.origin === 'imported' ? `Supprimer « ${op.label} » ? (un réimport la fera revenir)` : `Supprimer « ${op.label} » ?`;
+    if (supprimerOperations([op.id], question)) editingId = undefined;
   }
 </script>
 
@@ -570,13 +608,14 @@
         <span class="sub">
           {shortDate(op.date)} · {accountName(op.accountId)} · <span class="pill {op.state === 'untreated' ? 'catchUp' : 'ok'}">{stateLabel(op.state)}</span>
           {#if op.oneOff} · ponctuelle{/if}
-          {#if op.plannedFlowId} · {flowName(op.plannedFlowId)}{/if}
+          {#if repriseText(op)} · {repriseText(op)}{/if}
+          {#if resumers.get(op.id)} · reprise par « {resumers.get(op.id)!.label} » du {shortDate(resumers.get(op.id)!.date)}, ne compte plus{/if}
           {#if op.transferAccountId} · → {accountName(op.transferAccountId)}{/if}
           {#if counted(op).length} · {counted(op).map((l) => [categoryName(l.categoryId), tirelireName(l.tirelireId), counted(op).length > 1 ? money(l.amount) : ''].filter(Boolean).join(' / ')).join(' + ')}{/if}
           {#if op.suggestedCategory && !allocs.length} · banque : {op.suggestedCategory}{/if}
         </span>
         {#if prop && op.state !== 'locked'}
-          <span class="sub" style="color:var(--accent)">Proposition : rapprocher du flux « {flowName(prop.flowId)} » ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
+          <span class="sub" style="color:var(--accent)">Proposition : reprendre {propositionText(prop)} ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
         {/if}
       </button>
       <div class="num {op.amount > 0 ? 'pos' : ''}">{money(op.amount)}</div>
@@ -586,8 +625,25 @@
           {#if op.details}<p class="small muted">{op.details}</p>{/if}
           {#if prop && op.state !== 'locked'}
             <div class="actions" style="margin:0">
-              <button class="btn primary" type="button" onclick={() => acceptMatch(op)}>Rapprocher du flux « {flowName(prop.flowId)} »</button>
+              <button class="btn primary" type="button" onclick={() => acceptMatch(op)}>Reprendre {propositionText(prop)}</button>
             </div>
+          {/if}
+          {#if repriseText(op)}
+            <h3>Reprise</h3>
+            <p class="small">Cette opération {repriseText(op)} : elle compte à sa place, pour son propre montant.</p>
+            <div class="actions" style="margin:0"><button class="btn" type="button" onclick={() => undoReprise(op)}>Défaire la reprise</button></div>
+          {:else if op.origin === 'imported'}
+            {@const saisies = entryCandidates(app.ledger, op.id).slice(0, 3)}
+            {#if saisies.length}
+              <h3>Reprendre une saisie</h3>
+              <p class="small muted">Une saisie qui annonçait ce mouvement : l’opération du relevé la reprend et compte à sa place.</p>
+              {#each saisies as e (e.id)}
+                <div class="row">
+                  <div class="label">{e.label}<span class="sub">{shortDate(e.date)} · {money(e.amount)} · écart {e.amount === op.amount ? 'nul' : money(op.amount - e.amount)}</span></div>
+                  <button class="btn small" type="button" onclick={() => acceptEntry(op, e)}>Reprendre</button>
+                </div>
+              {/each}
+            {/if}
           {/if}
           <h3>Ventilation</h3>
           {#if level !== undefined}

@@ -4,7 +4,8 @@
   import { revealed } from '../lib/actions';
   import { centsToInput, inputToCents } from '../lib/format';
   import Manque from '../lib/Manque.svelte';
-  import { alive, computePlan, dueDateShortfalls, periodsAround, missingFlows, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Period, type PlanTransfer } from '@tirelire/core';
+  import { supprimerOperations } from '../lib/suppression';
+  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Operation, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -135,6 +136,56 @@
     ouverture: 'solde initial',
   };
   const tirelireNom = $derived(new Map(app.ledger.tirelires.map((t) => [t.id, t.name])));
+
+  /*
+   * Corriger ou masquer une opération prévue (D88, porteur, 30/09) : une saisie qui la reprend — elle
+   * vaudra tel montant, à telle date ; zéro, elle n'aura pas lieu. La retirer fait compter de nouveau
+   * l'opération prévue. Rien de cela ne demande d'import.
+   */
+  let correction = $state<{ cle: string; flowId: string; date: string; montant: string; jour: string; signe: number } | undefined>(undefined);
+  let titreCorrection = $state('');
+  let erreurCorrection = $state('');
+  const operationsParId = $derived(new Map(alive(app.ledger.operations).map((o) => [o.id, o])));
+
+  function ouvrirCorrection(cle: string, m: ForecastMovement) {
+    const flux = app.ledger.plannedFlows.find((f) => f.id === m.flowId);
+    if (!flux) return;
+    correction = { cle, flowId: flux.id, date: m.date, montant: centsToInput(Math.abs(flux.amount)), jour: m.date, signe: flux.amount < 0 ? -1 : 1 };
+    titreCorrection = `Corriger l’opération prévue — ${flux.name}, ${shortDate(m.date)}`;
+    erreurCorrection = '';
+  }
+
+  function enregistrerCorrection(e: Event) {
+    e.preventDefault();
+    if (!correction) return;
+    const montant = inputToCents(correction.montant);
+    if (montant === undefined || montant < 0) return void (erreurCorrection = 'Montant invalide (en positif ; zéro la masque).');
+    if (!correction.jour) return void (erreurCorrection = 'La date est obligatoire.');
+    app.applyPatch(correctPlannedOperation(app.ledger, correction.flowId, correction.date, correction.signe * montant, correction.jour));
+    correction = undefined;
+  }
+
+  function masquer(m: ForecastMovement) {
+    if (!m.flowId) return;
+    app.applyPatch(correctPlannedOperation(app.ledger, m.flowId, m.date, 0, m.date));
+  }
+
+  /** La saisie qui corrige ou masque une opération prévue, s'il s'agit d'elle. */
+  function correctionDe(m: ForecastMovement): Operation | undefined {
+    const op = m.origin === 'saisie' && m.operationId ? operationsParId.get(m.operationId) : undefined;
+    return op?.plannedFlowId && op.plannedDate ? op : undefined;
+  }
+
+  /**
+   * Retirer la correction : la saisie, et l'autre côté d'un virement corrigé ; l'opération prévue
+   * compte de nouveau. Reprise par une opération du relevé, elle ne se retire qu'une fois la reprise
+   * défaite (#306, point 9).
+   */
+  function retirerCorrection(op: Operation) {
+    const jumelle = op.transferOperationId ? operationsParId.get(op.transferOperationId) : undefined;
+    const ids = [op.id, ...(jumelle && jumelle.origin === 'manual' && jumelle.transferOperationId === op.id ? [jumelle.id] : [])];
+    supprimerOperations(ids);
+  }
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
 
@@ -192,15 +243,44 @@
     {@const f = plan.forecast}
     <h2>Soldes prévus au {shortDate(f.period.end)}</h2>
     <p class="muted small">
-      Le solde au {shortDate(f.today)}, plus les opérations saisies et les opérations prévues par les flux enregistrés, jusqu’à la fin de la période. Un virement proposé ici mais pas enregistré ne compte pas.
+      Le solde au {shortDate(f.today)}, plus les opérations saisies et les opérations prévues par les flux enregistrés, jusqu’à la fin de la période. Un virement proposé ici mais pas enregistré ne compte pas. Une opération prévue se corrige ou se masque depuis le détail.
     </p>
-    {#snippet mouvements(liste: ForecastMovement[])}
+    {#snippet mouvements(liste: ForecastMovement[], contexte: string)}
       <div class="orders">
         {#each liste as m, i (i)}
+          {@const corrigee = correctionDe(m)}
+          {@const cle = `${contexte}|${m.flowId}|${m.date}`}
           <div class="row">
-            <div class="label">{m.label}<span class="sub">{shortDate(m.date)} · {ORIGINES[m.origin]}</span></div>
+            <div class="label">
+              {m.label}<span class="sub">{shortDate(m.date)} · {ORIGINES[m.origin]}</span>
+              {#if corrigee}<span class="sub">{corrigee.amount === 0 ? 'masque' : 'corrige'} l’opération prévue du {shortDate(corrigee.plannedDate!)}</span>{/if}
+            </div>
             <div class="{moneyClass(m.amount)}">{money(m.amount)}</div>
           </div>
+          {#if m.origin === 'flux' && m.flowId}
+            <div class="actions" style="margin:0 0 6px">
+              <button class="btn small" onclick={() => ouvrirCorrection(cle, m)}>Corriger</button>
+              <button class="btn small" onclick={() => masquer(m)}>Masquer</button>
+            </div>
+          {:else if corrigee}
+            <div class="actions" style="margin:0 0 6px">
+              <button class="btn small" onclick={() => retirerCorrection(corrigee)}>{corrigee.amount === 0 ? 'Rétablir l’opération prévue' : 'Retirer la correction'}</button>
+            </div>
+          {/if}
+          {#if correction?.cle === cle}
+            <form class="edit attached" use:revealed onsubmit={enregistrerCorrection}>
+              <p class="titre-panneau">{titreCorrection}</p>
+              <div class="grid">
+                <label class="f">Montant <input bind:value={correction.montant} inputmode="decimal" /></label>
+                <label class="f">Date <input type="date" bind:value={correction.jour} /></label>
+              </div>
+              {#if erreurCorrection}<div class="err">{erreurCorrection}</div>{/if}
+              <div class="actions" style="margin:0">
+                <button class="btn primary" type="submit">Enregistrer</button>
+                <button class="btn" type="button" onclick={() => (correction = undefined)}>Annuler</button>
+              </div>
+            </form>
+          {/if}
         {:else}
           <div class="muted small">Aucune opération d’ici la fin de la période.</div>
         {/each}
@@ -224,7 +304,7 @@
           </div>
         {/if}
         {#if deplies.includes(cle)}
-          {@render mouvements(a.movements)}
+          {@render mouvements(a.movements, cle)}
           {#if a.hosted.length}
             <div class="orders">
               {#each a.hosted as h (h.tirelireId)}
@@ -253,7 +333,7 @@
             <button class="btn small" aria-expanded={deplies.includes(cle)} onclick={() => basculerSolde(cle)}>{deplies.includes(cle) ? 'Masquer le détail' : `Détail · ${t.movements.length} opération${t.movements.length > 1 ? 's' : ''}`}</button>
           </div>
         {/if}
-        {#if deplies.includes(cle)}{@render mouvements(t.movements)}{/if}
+        {#if deplies.includes(cle)}{@render mouvements(t.movements, cle)}{/if}
       {/each}
     </div>
   {/if}

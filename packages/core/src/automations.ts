@@ -1,5 +1,6 @@
 /**
- * Moteur de règles (D23), règles engendrées par les flux (D24), actions groupées (D26).
+ * Moteur de règles (D23), actions groupées (D26). Un flux n'engendre pas d'automatisme à part : sa
+ * sélection, la seule, reprend l'opération qui réalise une occurrence (D24, `proposeMatches`).
  *
  * Une règle est un automatisme, pas de la vérité : le moteur repart chaque fois des opérations
  * non verrouillées et recalcule ce qu'elles portent, plutôt que d'accumuler des effets. Deux
@@ -11,7 +12,7 @@
  * laissant en place. Il n'y a pas de détection de conflit ; le rang tranche.
  */
 import { liveSubOperations } from './suboperations.js';
-import type { SubOperation, Category, Id, Ledger, Operation, OperationState, PlannedFlow, Automation, AutomationAction, AutomationSelection, AutomationStateAction, Share } from './model.js';
+import type { SubOperation, Category, Id, Ledger, Operation, OperationState, Automation, AutomationAction, AutomationSelection, AutomationStateAction, Share } from './model.js';
 import { alive, isLocked } from './model.js';
 import { emptyPatch, type Patch } from './matching.js';
 import { uuidv7 } from './ids.js';
@@ -150,12 +151,12 @@ function singleLine(action: AutomationAction, categories: Map<Id, Category>): Ou
  * Applique les règles à une opération, du rang le plus élevé au rang 1. Chaque champ renseigné
  * écrase, les champs vides laissent en place.
  *
- * Le calcul repart à chaque passage de ce que l'import a établi (D33) : une opération rapprochée
- * d'un flux ou appariée en virement interne garde cet acquis, les autres partent vierges. Sans
+ * Le calcul repart à chaque passage de ce que l'import a établi (D33) : une opération qui en reprend
+ * une autre (D88) ou appariée en virement interne garde cet acquis, les autres partent vierges. Sans
  * cela, le moteur effacerait le travail que le pipeline vient de faire.
  */
 export function outcomeFor(op: Operation, automations: Automation[], categories: Map<Id, Category>, base: SubOperation[] = []): Outcome {
-  const fromImport = !!op.plannedFlowId || !!op.transferAccountId;
+  const fromImport = !!op.plannedFlowId || !!op.resumedOperationId || !!op.transferAccountId;
   const out: Outcome = {
     operationId: op.id,
     state: fromImport ? 'reconciled' : 'untreated',
@@ -365,79 +366,4 @@ export function suggestPattern(op: Operation): string {
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// ---------------------------------------------------------------------------
-// Règles engendrées par les flux (D24)
-// ---------------------------------------------------------------------------
-
-/** Règle déterministe correspondant à un flux : elle porte toute la classification, donc verrouille. */
-export function automationFromFlow(flow: PlannedFlow, rank: string, id: Id = uuidv7()): Automation {
-  const selection: AutomationSelection = { accountId: flow.accountId };
-  if (flow.labelPattern) selection.labelPattern = flow.labelPattern;
-  if (!flow.variable) {
-    const tol = Math.max(flow.amountTolerance?.abs ?? 0, Math.round((Math.abs(flow.amount) * (flow.amountTolerance?.pct ?? 0)) / 100));
-    selection.amountMin = Math.min(flow.amount - tol, flow.amount + tol);
-    selection.amountMax = Math.max(flow.amount - tol, flow.amount + tol);
-  }
-  const action: AutomationAction = { state: 'lock' };
-  if (flow.categoryId) action.categoryId = flow.categoryId;
-  if (flow.tirelireId) action.tirelireId = flow.tirelireId;
-  return {
-    id,
-    name: flow.name,
-    selection,
-    action,
-    rank,
-    flowId: flow.id,
-    ...(flow.activeFrom ? { validFrom: flow.activeFrom } : {}),
-    ...(flow.activeTo ? { validTo: flow.activeTo } : {}),
-  };
-}
-
-export interface FlowAutomationsPatch {
-  automations: Automation[];
-}
-
-/**
- * Synchronise les règles engendrées par les flux (D24). Modifier un flux **archive** sa règle en
- * lui posant une fin de validité et en crée une nouvelle : les opérations déjà classées ne sont
- * pas réécrites, puisqu'aucune règle nouvelle ne les sélectionne. C'est ce qui rend l'historique
- * rejouable dans l'ordre chronologique plutôt que réinterprété à l'aune du budget d'aujourd'hui.
- */
-export function syncFlowAutomations(ledger: Ledger, asOf: string): FlowAutomationsPatch {
-  const out: FlowAutomationsPatch = { automations: [] };
-  const existing = new Map<Id, Automation>();
-  const flowsById = new Map(alive(ledger.plannedFlows).map((f) => [f.id, f]));
-  for (const r of alive(ledger.automations)) {
-    if (!r.flowId) continue;
-    // Une règle est « en cours » tant que sa fin de validité n'est que celle du flux lui-même : un
-    // flux daté (`activeTo`) en pose une dès la création. Une règle **archivée**, elle, porte une
-    // fin posée à la date d'archivage, qui n'est pas celle du flux. Sans cette distinction, un flux
-    // daté n'avait jamais de règle en cours : chaque passage en créait une de plus au lieu de
-    // remplacer la précédente.
-    if (r.validTo && r.validTo !== flowsById.get(r.flowId)?.activeTo) continue;
-    existing.set(r.flowId, r);
-  }
-  let rank = topRank(ledger);
-  for (const flow of alive(ledger.plannedFlows)) {
-    const current = existing.get(flow.id);
-    if (!flow.makesAutomation) {
-      if (current) out.automations.push({ ...current, validTo: asOf });
-      continue;
-    }
-    const wanted = automationFromFlow(flow, current?.rank ?? rank);
-    if (!current) {
-      out.automations.push(wanted);
-      rank = rankBetween(rank, undefined);
-      continue;
-    }
-    const same = JSON.stringify({ ...wanted, id: '', rank: '' }) === JSON.stringify({ ...current, id: '', rank: '' });
-    if (same) continue;
-    // Le flux a changé : on archive la règle en cours et on en crée une qui vaut à partir d'ici.
-    out.automations.push({ ...current, validTo: asOf });
-    out.automations.push({ ...automationFromFlow(flow, rank), validFrom: flow.activeFrom && flow.activeFrom > asOf ? flow.activeFrom : asOf });
-    rank = rankBetween(rank, undefined);
-  }
-  return out;
 }
