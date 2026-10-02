@@ -16,7 +16,7 @@
  * qu'au fichier entier, et se vérifie ici.
  */
 import type { Database } from 'sql.js';
-import { settingProblem } from './formes.js';
+import { referencesDe, settingProblem, type Description } from './formes.js';
 import { parseTimestamp } from './hlc.js';
 import { DEFAULT_MAIN_ACCOUNT, MAIN_ACCOUNT_ID } from './model.js';
 import { HLC_COLUMN, rowProblem, TABLES, type TableDef } from './schema.js';
@@ -206,6 +206,7 @@ function liens(lignes: Map<string, LigneLue[]>, problemes: Probleme[]): void {
 
   for (const t of Object.values(TABLES)) {
     for (const c of t.columns) {
+      if (c.shape) referencesJson(t.name, c.col, c.shape, lignes.get(t.name)!, ids, problemes);
       if (!c.ref) continue;
       const cible = ids.get(c.ref)!;
       for (const l of lignes.get(t.name)!) {
@@ -248,6 +249,26 @@ function liens(lignes: Map<string, LigneLue[]>, problemes: Probleme[]): void {
   }
   cycles('sub_operations', subs, problemes);
   cycles('categories', lignes.get('categories')!, problemes);
+}
+
+/**
+ * Les identifiants d'une colonne JSON (le placement d'une tirelire, la sélection et l'action d'un
+ * automatisme, la table des comptes d'un profil d'import) : chacun désigne une ligne présente du
+ * fichier, comme une colonne (#198, points 2 et 10).
+ */
+function referencesJson(table: string, col: string, shape: Description, lues: LigneLue[], ids: Map<string, Set<string>>, problemes: Probleme[]): void {
+  for (const l of lues) {
+    const brut = l.v[col];
+    if (typeof brut !== 'string') continue;
+    let valeur: unknown;
+    try {
+      valeur = JSON.parse(brut);
+    } catch {
+      continue; // déjà dit ligne par ligne
+    }
+    for (const r of referencesDe(`${table}.${col}`, valeur, shape))
+      if (!ids.get(r.table)?.has(r.id)) problemes.push({ table, id: l.id, colonne: col, message: `${r.chemin} désigne « ${r.id} », absent de la table ${r.table}.` });
+  }
 }
 
 /** Une ligne qui se contient elle-même, de parent en parent. */

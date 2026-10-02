@@ -5,10 +5,14 @@
  *
  *   pnpm --dir packages/core run verifier-fichier <fichier.sqlite>
  *
+ * Un chemin relatif se lit depuis le dossier d'où la commande est appelée (`INIT_CWD`, que pnpm
+ * pose), pas depuis `packages/core` où pnpm la lance.
+ *
  * Sortie 0 : le fichier s'ouvre (ce qui s'y complète est dit) ; 1 : il est refusé ; 2 : la commande
  * est mal appelée, ou le fichier ne se lit pas sur le disque.
  */
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { decrireProbleme, verifierFichier } from '../src/index.js';
 
 const chemin = process.argv[2];
@@ -19,7 +23,7 @@ if (!chemin || process.argv.length > 3) {
 
 let octets: Uint8Array;
 try {
-  octets = new Uint8Array(await readFile(chemin));
+  octets = new Uint8Array(await readFile(resolve(process.env['INIT_CWD'] ?? process.cwd(), chemin)));
 } catch (err) {
   console.error(`Lecture impossible de ${chemin} : ${err instanceof Error ? err.message : String(err)}`);
   process.exit(2);

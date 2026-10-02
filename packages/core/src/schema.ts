@@ -24,18 +24,19 @@ import {
 } from './model.js';
 import { IMPORT_DATE_FORMATS, IMPORT_DELIMITERS, IMPORT_ENCODINGS, IMPORT_SOURCES } from './importer.js';
 import {
+  ACTION,
+  COLONNES_IMPORT,
   estDate,
   estHorodatage,
-  formeAction,
-  formeColonnesImport,
-  formePart,
-  formePlacement,
-  formeReport,
-  formeRythme,
-  formeSelection,
-  formeTableComptes,
-  formeTolerance,
-  type Forme,
+  PART,
+  PLACEMENT,
+  problemeDeForme,
+  REPORT,
+  RYTHME,
+  SELECTION,
+  TABLE_COMPTES,
+  TOLERANCE,
+  type Description,
 } from './formes.js';
 
 export type ColumnType = 'text' | 'integer' | 'real' | 'json' | 'boolean';
@@ -54,8 +55,8 @@ export interface ColumnDef {
   form?: 'date' | 'instant';
   /** Une colonne qui désigne une ligne d'une autre table : le nom SQL de cette table (#198). */
   ref?: string;
-  /** La forme d'une colonne JSON, une fois lue. */
-  shape?: Forme;
+  /** La forme d'une colonne JSON, une fois lue ; ses identifiants y portent la table qu'ils désignent. */
+  shape?: Description;
 }
 
 /** Une règle qui lie plusieurs colonnes d'une ligne : son `CHECK` dans le fichier, et le même refus dit en français. */
@@ -79,7 +80,7 @@ interface Options {
   values?: readonly string[];
   form?: 'date' | 'instant';
   ref?: string;
-  shape?: Forme;
+  shape?: Description;
 }
 
 const c = (prop: string, type: ColumnType = 'text', opts: Options = {}): ColumnDef => ({
@@ -102,7 +103,7 @@ const ref = (prop: string, table: string, required = false): ColumnDef => c(prop
 const date = (prop: string, required = false): ColumnDef => c(prop, 'text', { form: 'date', ...(required ? { required } : {}) });
 
 /** Colonne JSON d'une forme donnée, obligatoire ou non. */
-const json = (prop: string, shape: Forme, required = false): ColumnDef => c(prop, 'json', { shape, ...(required ? { required } : {}) });
+const json = (prop: string, shape: Description, required = false): ColumnDef => c(prop, 'json', { shape, ...(required ? { required } : {}) });
 
 const ID = req('id');
 const DELETED_AT = c('deletedAt', 'text', { form: 'instant' });
@@ -146,7 +147,7 @@ export const TABLES: Record<string, TableDef> = {
   },
   tirelires: {
     name: 'tirelires',
-    columns: [ID, req('name'), json('placement', formePlacement, true), req('openingBalance', 'integer'), date('openingDate', true), json('rollover', formeReport), DELETED_AT],
+    columns: [ID, req('name'), json('placement', PLACEMENT, true), req('openingBalance', 'integer'), date('openingDate', true), json('rollover', REPORT), DELETED_AT],
   },
   needs: {
     name: 'needs',
@@ -156,7 +157,7 @@ export const TABLES: Record<string, TableDef> = {
       oneOf('kind', NEED_KINDS, true),
       c('name'),
       c('amount', 'integer'),
-      json('periodicity', formeRythme),
+      json('periodicity', RYTHME),
       c('monthlyAmount', 'integer'),
       req('priority', 'integer'),
       date('activeFrom'), // D50
@@ -179,9 +180,9 @@ export const TABLES: Record<string, TableDef> = {
       ref('tirelireId', 'tirelires'),
       ref('counterpartAccountId', 'accounts'),
       ref('categoryId', 'categories'),
-      json('periodicity', formeRythme, true),
+      json('periodicity', RYTHME, true),
       req('dateWindowDays', 'integer'),
-      json('amountTolerance', formeTolerance),
+      json('amountTolerance', TOLERANCE),
       c('labelPattern'),
       c('variable', 'boolean'),
       date('activeFrom'),
@@ -220,14 +221,14 @@ export const TABLES: Record<string, TableDef> = {
       ref('parentId', 'sub_operations'),
       ref('categoryId', 'categories'),
       ref('tirelireId', 'tirelires'),
-      json('share', formePart, true),
+      json('share', PART, true),
       oneOf('replenishment', REPLENISHMENT_KINDS),
       DELETED_AT,
     ],
   },
   automations: {
     name: 'automations',
-    columns: [ID, c('name'), json('selection', formeSelection, true), json('action', formeAction, true), req('rank'), date('validFrom'), date('validTo'), ref('flowId', 'planned_flows'), DELETED_AT],
+    columns: [ID, c('name'), json('selection', SELECTION, true), json('action', ACTION, true), req('rank'), date('validFrom'), date('validTo'), ref('flowId', 'planned_flows'), DELETED_AT],
   },
   devices: {
     name: 'devices',
@@ -242,10 +243,10 @@ export const TABLES: Record<string, TableDef> = {
       oneOf('encoding', IMPORT_ENCODINGS, true),
       oneOf('delimiter', IMPORT_DELIMITERS, true),
       req('headerRow', 'integer'),
-      json('columns', formeColonnesImport, true),
+      json('columns', COLONNES_IMPORT, true),
       oneOf('dateFormat', IMPORT_DATE_FORMATS, true),
       c('debitPositive', 'boolean'),
-      json('accountMap', formeTableComptes, true),
+      json('accountMap', TABLE_COMPTES, true),
       ref('accountId', 'accounts'),
       DELETED_AT,
     ],
@@ -322,7 +323,7 @@ export function valueProblem(t: TableDef, col: ColumnDef, val: unknown): string 
     } catch {
       return `${nom} vaut « ${val} », qui ne se lit pas en JSON.`;
     }
-    return col.shape?.(nom, parsed);
+    return col.shape ? problemeDeForme(nom, parsed, col.shape) : undefined;
   }
   return undefined;
 }
