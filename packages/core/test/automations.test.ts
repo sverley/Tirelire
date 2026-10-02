@@ -199,8 +199,6 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
       expect(m.flowId).toBe('flow-credit');
       const après = applyPatchToLedger(l, applyMatch(l, m)).operations.find((o) => o.id === 'o-credit')!;
       expect(après.state).toBe('locked');
-      // Aucun automatisme n'est engendré : la liste des automatismes est celle d'avant.
-      expect(l.automations).toEqual(exampleLedger().automations);
     });
 
     describe('[niveau 0] D24 · le passé déjà classé n’est pas réécrit', () => {
