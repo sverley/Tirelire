@@ -9,8 +9,9 @@
  * période en période qu'on les voit prendre effet.
  */
 import type { Ledger } from './model.js';
-import { emptyLedger } from './model.js';
+import { emptyLedger, shortfallAnswerId } from './model.js';
 import { euros } from './money.js';
+import { normalizeLabel } from './ids.js';
 
 export function exampleLedger(): Ledger {
   const l = emptyLedger({ principalCushion: euros(600), periodStartDay: 28 });
@@ -340,6 +341,32 @@ export function exampleLedger(): Ledger {
     { id: 'al-enfants-1', operationId: 'op-enfants-1', categoryId: 'cat-enfants', tirelireId: 'env-enfants', share: { kind: 'fixed', amount: euros(-146) } },
     { id: 'al-enfants-2', operationId: 'op-enfants-2', categoryId: 'cat-enfants', tirelireId: 'env-enfants', share: { kind: 'fixed', amount: euros(-90) } },
   );
+
+  /*
+   * Le lissage décidé de la taxe foncière (principe 1.4, D88, #184). 900 € sont retenus pour 1 200 €
+   * au 15 octobre, et la croisière de 100 € n'en réunit que 200 sur les deux périodes restantes : il
+   * manquerait 100 €. Rien ne se lisse d'office ; l'exemple porte donc la réponse de l'utilisateur,
+   * le lissage proposé et accepté tel quel — 50 € au 28 août, 50 € au 28 septembre —, qui donne ce
+   * que donnait le rattrapage d'avant : 150 € demandés dans chacune des deux périodes, si bien que le
+   * plan du 6 septembre reste celui de l'analyse. La saisie ne change pas le compte : elle fait passer
+   * chaque part du non affecté à la tirelire, à sa date (I2).
+   */
+  const lissage = 'Lissage — Taxe foncière';
+  l.operations.push({
+    id: 'op-lissage-tf',
+    accountId: 'acc-principal',
+    origin: 'manual',
+    date: '2026-08-28',
+    label: lissage,
+    normalizedLabel: normalizeLabel(lissage),
+    amount: 0,
+    state: 'locked',
+  });
+  l.subOperations.push(
+    { id: 'al-lissage-tf-1', operationId: 'op-lissage-tf', tirelireId: 'env-tf', share: { kind: 'fixed', amount: euros(50) }, date: '2026-08-28' },
+    { id: 'al-lissage-tf-2', operationId: 'op-lissage-tf', tirelireId: 'env-tf', share: { kind: 'fixed', amount: euros(50) }, date: '2026-09-28' },
+  );
+  l.shortfallAnswers.push({ id: shortfallAnswerId('need-tf', '2026-10-15'), needId: 'need-tf', dueDate: '2026-10-15', operationId: 'op-lissage-tf' });
 
   return l;
 }

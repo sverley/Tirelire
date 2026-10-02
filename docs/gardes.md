@@ -103,8 +103,8 @@ de son test.
   Témoin rouge : « témoin rouge · un budget ouvert aujourd’hui et ancré sur une occurrence à venir »
 - **Harnais** · `packages/core/test/parcours-u1.test.ts` — « parcours U1 · de la base vide au plan, sans une seule opération » :
   d'une base vide, le budget écrit comme l'application l'écrit puis relu après redémarrage ; le plan
-  de la période en cours se lit en entier — dotations, lissage de l'échéance, marge, virement à
-  faire — et le bilan ne fabrique aucun observé, sans une seule opération.
+  de la période en cours se lit en entier — dotations, croisière de l'échéance et manque annoncé,
+  marge, virement à faire — et le bilan ne fabrique aucun observé, sans une seule opération.
   Témoin rouge : « témoin rouge · un plan dont les dotations viennent de ce que les opérations montrent »
 - **Vérification manuelle** · `VM-I3-u1-parcours` — Si la PR touche l'application, ou à la fin d'une
   version (`docs/versions.md`) : (U1) Sur une base vide, construire un budget avec l'assistant

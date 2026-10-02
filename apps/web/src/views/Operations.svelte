@@ -48,7 +48,8 @@
    * sous-opérations (`level`), à tout niveau (D88) ; chaque ligne porte une part (D27).
    */
   let level = $state<string | undefined>(undefined);
-  type LineForm = { id?: string; categoryId: string; tirelireId: string; kind: 'fixed' | 'percent' | 'variable'; value: string; replenishment: '' | 'internal' | 'external' };
+  /** `date` : la date propre d'une part (#184), que seul un lissage écrit ; vide pour les autres. */
+  type LineForm = { id?: string; categoryId: string; tirelireId: string; kind: 'fixed' | 'percent' | 'variable'; value: string; replenishment: '' | 'internal' | 'external'; date: string };
   let lines = $state<LineForm[]>([]);
   let newCategory = $state('');
   let oneOff = $state(false);
@@ -161,9 +162,10 @@
           kind: a.share.kind,
           value: a.share.kind === 'fixed' ? centsToInput(a.share.amount) : a.share.kind === 'percent' ? String(a.share.pct) : '',
           replenishment: a.replenishment ?? '',
+          date: a.date ?? '',
         }))
       // Toute division a par défaut une ligne unique variable, qui prend l'intégralité du montant.
-      : [{ categoryId: '', tirelireId: '', kind: 'variable' as const, value: '', replenishment: '' as const }];
+      : [{ categoryId: '', tirelireId: '', kind: 'variable' as const, value: '', replenishment: '' as const, date: '' }];
     error = '';
   }
 
@@ -242,8 +244,8 @@
     const hasVariable = lines.some((l) => l.kind === 'variable');
     lines.push(
       hasVariable
-        ? { categoryId: '', tirelireId: '', kind: 'fixed', value: centsToInput(rest(op)), replenishment: '' }
-        : { categoryId: '', tirelireId: '', kind: 'variable', value: '', replenishment: '' },
+        ? { categoryId: '', tirelireId: '', kind: 'fixed', value: centsToInput(rest(op)), replenishment: '', date: '' }
+        : { categoryId: '', tirelireId: '', kind: 'variable', value: '', replenishment: '', date: '' },
     );
   }
 
@@ -254,6 +256,7 @@
       ...(l.categoryId ? { categoryId: l.categoryId } : {}),
       ...(l.tirelireId ? { tirelireId: l.tirelireId } : {}),
       ...(l.replenishment ? { replenishment: l.replenishment } : {}),
+      ...(l.date ? { date: l.date } : {}),
       share:
         l.kind === 'fixed'
           ? ({ kind: 'fixed', amount: inputToCents(l.value) ?? 0 } as const)
@@ -633,6 +636,11 @@
               </label>
               {#if l.kind !== 'variable'}
                 <label class="f">{l.kind === 'percent' ? '%' : 'Montant'} <input bind:value={l.value} inputmode="decimal" /></label>
+              {/if}
+              {#if l.date}
+                <!-- Une part qui a sa propre date — une part de lissage (#184) — compte à cette date
+                     dans sa tirelire ; le compte bouge à la date de l'opération. -->
+                <label class="f">Compte dans la tirelire le <input type="date" bind:value={l.date} required /></label>
               {/if}
               <div class="f"><span class="sub">soit {money(lineAmount(op, l))}{#if contenu} · divisée en {contenu}{/if}</span></div>
               {#if l.id}<button class="btn small" type="button" style="align-self:end" onclick={() => divide(op, l.id!)}>{contenu ? 'Voir sa division' : 'Diviser'}</button>{/if}

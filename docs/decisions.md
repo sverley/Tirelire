@@ -1230,8 +1230,8 @@ lendemain de chaque virement. Quatre cas s'en déduisent, et sont tenus par le h
 atteint sort de la somme (il ne demande plus rien, D06) ; une échéance déjà provisionnée y reste
 (elle sera dépensée, l'épargne reprend juste après) ; un besoin versant (D48) n'y entre pas, il rend
 de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D19) au lieu de
-l'exiger deux fois. Le rattrapage n'en fait jamais partie : un ordre permanent ne se règle pas sur
-l'exceptionnel. L'écran l'affiche comme une somme, dépliable par « Détail » — c'est là que viendra
+l'exiger deux fois. Un lissage décidé n'en fait jamais partie (D88) : un ordre permanent ne se règle
+pas sur l'exceptionnel. L'écran l'affiche comme une somme, dépliable par « Détail » — c'est là que viendra
 la division d'un virement en plusieurs ordres (issue #25).
 
 Un ordre déjà enregistré garde son ancrage quand on corrige son montant : le déplacer ferait perdre
@@ -1838,7 +1838,14 @@ opérations prévues qui le font (D52).
 
 **Le lissage.** Un lissage est une décision : l'application en propose un, calculé depuis le manque ;
 l'utilisateur l'accepte, le modifie ou le refuse. Accepté, il s'enregistre comme une opération divisée
-en sous-opérations datées, qui comptent comme des dotations. Rien ne se lisse d'office.
+en sous-opérations datées, qui comptent comme des dotations. Rien ne se lisse d'office. Le refus
+s'enregistre aussi : la réponse, lissage retenu ou refus, est une par échéance, désignée par le besoin
+et la date de l'échéance ; tant qu'elle existe, la proposition ne revient pas, et le manque qui
+resterait se signale toujours. Un refus n'est pas une opération : il ne paraît ni dans les opérations,
+ni dans le bilan, ni dans un solde. Une sous-opération datée compte à sa date dans la tirelire et la
+catégorie qui valent pour elle ; le compte réel bouge à la date de l'opération. Une part de lissage
+passe ainsi, à sa date, du non affecté du compte à la tirelire, sans changer le solde du compte (I2) ;
+elle n'est ni une dépense ni un revenu (#184).
 
 **Plusieurs instances.** Des groupes différents — un couple, une colocation, des amis en vacances
 (U6 à U8) — partagent chacun leurs données par leurs clés. Un même navigateur doit pouvoir tenir

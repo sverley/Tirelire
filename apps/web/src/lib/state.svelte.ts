@@ -9,7 +9,10 @@ import {
   exampleLedger,
   LEDGER_KEYS,
   marqueDesDonnees,
+  refusalAnswer,
   sauvegardeARappeler,
+  smoothingAnswer,
+  withdrawnAnswer,
   todayISO,
   uuidv7,
   type Ledger,
@@ -19,6 +22,7 @@ import {
   type Conflict,
   type Settings,
   type DerniereSauvegarde,
+  type SmoothingPart,
 } from '@tirelire/core';
 import type { LedgerKey } from '@tirelire/core';
 import { lireSauvegarde, lireSynchronisation, noterSauvegarde, noterSynchronisation, type DerniereSynchronisation, type Moyen } from './sauvegarde';
@@ -231,6 +235,38 @@ class AppState {
     for (const id of patch.removedSubOperations ?? []) this.store.remove('subOperations', id);
     this.ledger = this.store.load();
     return this.ledger;
+  }
+
+  /**
+   * Accepte, tel quel ou modifié, le lissage d'un manque (#184) : la saisie divisée en parts datées,
+   * puis la réponse qui la désigne. Rend le message d'une saisie refusée, sinon rien.
+   */
+  acceptSmoothing(needId: string, dueDate: string, parts: SmoothingPart[]): string | undefined {
+    let w: ReturnType<typeof smoothingAnswer>;
+    try {
+      w = smoothingAnswer(this.ledger, needId, dueDate, parts);
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+    for (const o of w.patch.operations) this.store.upsert('operations', o);
+    for (const a of w.patch.subOperations) this.store.upsert('subOperations', a);
+    this.store.upsert('shortfallAnswers', w.answer);
+    this.reload();
+    return undefined;
+  }
+
+  /** Refuse de lisser le manque d'une échéance (#184) : la réponse s'enregistre, sans opération. */
+  refuseSmoothing(needId: string, dueDate: string): void {
+    this.upsert('shortfallAnswers', refusalAnswer(needId, dueDate));
+  }
+
+  /** Retire le lissage décidé, ou revient sur le refus (#184) : la proposition revient. */
+  withdrawAnswer(answerId: string): void {
+    const w = withdrawnAnswer(this.ledger, answerId);
+    for (const id of w.subOperationIds) this.store.remove('subOperations', id);
+    if (w.operationId) this.store.remove('operations', w.operationId);
+    this.store.remove('shortfallAnswers', w.answerId);
+    this.reload();
   }
 
   /** Charge le jeu d'exemple de l'analyse (remplace les données courantes). */

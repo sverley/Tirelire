@@ -51,8 +51,10 @@ function latin1(s: string): Uint8Array {
 
 function ledgerWithBank(): { ledger: Ledger; profile: ReturnType<typeof bankMultiAccountProfile> } {
   const ledger = exampleLedger();
-  ledger.operations = [];
-  ledger.subOperations = [];
+  // Aucune opération : le relevé les apporte. Seul reste le lissage décidé de la taxe foncière
+  // (#184), une décision de l'utilisateur qu'aucun relevé ne porte.
+  ledger.operations = ledger.operations.filter((o) => o.id === 'op-lissage-tf');
+  ledger.subOperations = ledger.subOperations.filter((x) => x.operationId === 'op-lissage-tf');
   const profile = bankMultiAccountProfile('prof-bank');
   profile.accountMap = { '00011111111': 'acc-principal' };
   return { ledger, profile };
@@ -138,7 +140,10 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
       const { ledger, profile } = ledgerWithBank();
       const rows = parseRows(parseCsv(decodeBytes(latin1(CSV))), profile).rows;
       const prep = prepareImport(ledger, rows, profile);
-      return { ...ledger, operations: prep.candidates.filter((c) => !c.exact).map((c) => c.operation) };
+      // Le lissage décidé de la taxe foncière (#184) est une décision de l'utilisateur, pas une ligne
+      // de relevé : il reste à côté des opérations importées.
+      const lissage = ledger.operations.filter((o) => o.id === 'op-lissage-tf');
+      return { ...ledger, operations: [...lissage, ...prep.candidates.filter((c) => !c.exact).map((c) => c.operation)] };
     }
 
     it('virements « TIRELIRE <COMPTE> » reconnus par compte et répartis par l’ordre de financement (D21)', () => {

@@ -3,7 +3,8 @@
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
   import { revealed } from '../lib/actions';
   import { centsToInput, inputToCents } from '../lib/format';
-  import { alive, computePlan, periodsAround, missingFlows, addDays, roundOrderUp, standingTransferFlow, type ForecastMovement, type Period, type PlanTransfer } from '@tirelire/core';
+  import Manque from '../lib/Manque.svelte';
+  import { alive, computePlan, dueDateShortfalls, periodsAround, missingFlows, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -37,6 +38,14 @@
   function goTo(p: Period) {
     choisie = p;
   }
+
+  /*
+   * Les échéances en manque, ou qui ont reçu leur réponse (#184) : le plan de la période en cours et
+   * de chaque période jusqu'à leur date les signale, avec la proposition de lisser tant qu'elles
+   * n'ont pas de réponse. Elles se lisent à la date de lecture, quelle que soit la période regardée.
+   */
+  const echeances = $derived(dueDateShortfalls(app.ledger, app.asOf));
+  const manques = $derived(shortfallsForPeriod(echeances, plan.period, app.asOf));
 
   const virtualLines = $derived(plan.lines.filter((l) => l.virtual));
   const transferLines = $derived(plan.lines.filter((l) => !l.virtual));
@@ -165,6 +174,16 @@
     <div class="warnings">
       {#each plan.warnings as w}
         <div>{w.message}</div>
+      {/each}
+    </div>
+  {/if}
+
+  {#if manques.length}
+    <h2>Échéances en manque</h2>
+    <p class="muted small">Ce qui ne sera pas réuni à temps par les virements permanents. Rien ne se lisse sans vous : acceptez, modifiez ou refusez la proposition.</p>
+    <div class="card warn">
+      {#each manques as m (m.needId + m.dueDate)}
+        <Manque manque={m} />
       {/each}
     </div>
   {/if}
@@ -381,7 +400,7 @@
             {NEED_KINDS_SHORT[l.kind]} · {accountsById.get(l.accountId)?.name ?? '?'}{l.virtual ? ' (réservé sur place)' : ''}{l.dueDate ? ` · échéance ${shortDate(l.dueDate)}` : ''}{l.target !== undefined && l.kind !== 'recurring' ? ` · cible ${money(l.target)}` : ''}
           </span>
           <span class="sub num">
-            retenu <span class={l.held < 0 ? 'neg' : ''}>{money(l.held)}</span> · croisière {money(l.cruise)}{l.requested !== l.cruise ? ` · demandé ${money(l.requested)}` : ''}
+            retenu <span class={l.held < 0 ? 'neg' : ''}>{money(l.held)}</span> · croisière {money(l.cruise)}{l.requested !== l.cruise ? ` · demandé ${money(l.requested)}` : ''}{l.smoothing ? ` · dont lissage décidé ${money(l.smoothing)}` : ''}
           </span>
         </div>
         <div class="num" style="font-size:17px">{money(l.funded)}</div>

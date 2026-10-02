@@ -2,6 +2,7 @@
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
   import FiltreEtat from '../lib/FiltreEtat.svelte';
+  import Manque from '../lib/Manque.svelte';
   import { money, shortDate, centsToInput, inputToCents, openAccounts, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS, periodicityLabel, validityLabel, validityBadge } from '../lib/format';
   import {
     alive,
@@ -15,6 +16,7 @@
     stateShown,
     indexLedger,
     dueDateFlowForNeed,
+    dueDateShortfalls,
     needCruise,
     nextOccurrence,
     validityState,
@@ -274,7 +276,19 @@
     }
     app.upsert('needs', row);
     editingNeed = undefined;
+    // Une échéance enregistrée trop près de sa date se dit aussitôt (principe 1.4, #184).
+    annonce = row.kind === 'dueDate' ? row.id : undefined;
   }
+
+  /*
+   * L'échéance qu'on vient d'enregistrer, nouvelle ou qui en remplace une autre (D50) : si elle est
+   * en manque, l'application dit aussitôt le montant qui manquera et sa date, à côté de ce que
+   * l'ordre permanent demande par période, avec la proposition de lisser (#184, point 3).
+   */
+  let annonce = $state<string | undefined>(undefined);
+  const annonceManque = $derived(
+    annonce ? dueDateShortfalls(app.ledger, app.asOf).find((s) => s.needId === annonce && (s.amount > 0 || s.answer)) : undefined,
+  );
 
   function removeNeed(n: Need) {
     if (confirm('Supprimer ce besoin ?')) app.remove('needs', n.id);
@@ -475,6 +489,12 @@
       </div>
       {#if editingNeed?.isNew && editingNeed.need.tirelireId === e.id}
         {@render editeurBesoin()}
+      {/if}
+      {#if annonceManque && annonceManque.tirelireId === e.id}
+        <div class="card warn" style="margin:8px 0 0" role="status">
+          <Manque manque={annonceManque} />
+          <div class="actions" style="margin:0"><button class="btn small" onclick={() => (annonce = undefined)}>Fermer</button></div>
+        </div>
       {/if}
     </div>
     {#if editing?.id === e.id}

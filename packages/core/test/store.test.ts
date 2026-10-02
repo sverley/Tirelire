@@ -18,6 +18,7 @@ async function seeded(site: string) {
   for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
   for (const o of l.operations) s.upsert('operations', o);
   for (const a of l.subOperations) s.upsert('subOperations', a);
+  for (const r of l.shortfallAnswers) s.upsert('shortfallAnswers', r);
   s.setSetting('principalCushion', l.settings.principalCushion);
   return s;
 }

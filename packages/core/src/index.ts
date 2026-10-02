@@ -7,6 +7,7 @@ export * from './balances.js';
 export * from './suboperations.js';
 export * from './plan.js';
 export * from './forecast.js';
+export * from './shortfall.js';
 export * from './hlc.js';
 export * from './schema.js';
 export * from './store.js';

@@ -9,7 +9,7 @@
  * qui vaut pour elle, pris d'elle ou du niveau qui la contient, de proche en proche. Elles
  * couvrent le montant de l'opération une fois et une seule : aucun euro ne compte deux fois.
  */
-import type { Cents, Id, Operation, ReplenishmentKind, Share, SubOperation } from './model.js';
+import type { Cents, Id, ISODate, Operation, ReplenishmentKind, Share, SubOperation } from './model.js';
 
 /**
  * Ligne comptée : une sous-opération qui ne se divise plus, ou le reste d'une division. Le reste
@@ -23,6 +23,12 @@ export interface CountedLine {
   subOperationId?: Id;
   /** Montant résolu, dans le signe de l'opération. */
   amount: Cents;
+  /**
+   * Date à laquelle la ligne compte dans sa tirelire et sa catégorie (#184) : celle de la
+   * sous-opération, sinon celle du niveau qui la contient, de proche en proche, jusqu'à celle de
+   * l'opération. Le compte réel, lui, bouge toujours à la date de l'opération.
+   */
+  date: ISODate;
   categoryId?: Id;
   tirelireId?: Id;
   replenishment?: ReplenishmentKind;
@@ -115,6 +121,7 @@ export function variableRest(amount: Cents, shares: Array<{ share: Share }>): Ce
 
 /** Ce qui vaut pour un niveau : ce qu'il porte, sinon ce qui vaut pour le niveau qui le contient. */
 interface Labels {
+  date: ISODate;
   categoryId?: Id;
   tirelireId?: Id;
   replenishment?: ReplenishmentKind;
@@ -125,6 +132,7 @@ function labelsOf(s: SubOperation, above: Labels): Labels {
   const tirelireId = s.tirelireId ?? above.tirelireId;
   const replenishment = s.replenishment ?? above.replenishment;
   return {
+    date: s.date ?? above.date,
     ...(categoryId ? { categoryId } : {}),
     ...(tirelireId ? { tirelireId } : {}),
     ...(replenishment ? { replenishment } : {}),
@@ -160,7 +168,7 @@ export function countedLines(op: Operation, subs: SubOperation[]): CountedLine[]
     }
     if (amount - used !== 0) out.push({ id: `${levelId}${REMAINDER_SUFFIX}`, operationId: op.id, amount: amount - used, ...labels });
   };
-  visit(op.id, undefined, op.amount, {});
+  visit(op.id, undefined, op.amount, { date: op.date });
   return out;
 }
 

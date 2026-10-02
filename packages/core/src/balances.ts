@@ -7,6 +7,8 @@
  *    un virement interne déplace une composante d'un compte vers l'autre sans changer le solde ;
  *  - des **dotations** calculées (D29) : au début de chaque période, chaque besoin reçoit ce
  *    qu'il demande, sur le compte principal (ou sur le compte de placement sans principal) ;
+ *  - des parts d'un **lissage décidé** (D88, #184) : des sous-opérations datées d'une saisie, qui
+ *    comptent comme des dotations, chacune à sa date ;
  *  - des **libérations** calculées (D05, D29) : en fin de période, l'excédent au-delà de la
  *    réserve des besoins non récurrents retourne au non affecté du compte de placement.
  *
@@ -16,7 +18,7 @@
 import type { Account, SubOperation, Cents, Tirelire, Id, ISODate, Ledger, Need, Operation, ValidityState } from './model.js';
 import {
   monthsOf, alive, needActive, validityState } from './model.js';
-import { nextOccurrence, budgetPeriodContaining, periodsUntil, nextPeriod, type Period } from './periods.js';
+import { nextOccurrence, budgetPeriodContaining, nextPeriod, type Period } from './periods.js';
 import { divideCents } from './money.js';
 import { addDays } from './dates.js';
 import { countedLines, liveSubOperations, type CountedLine } from './suboperations.js';
@@ -33,6 +35,8 @@ export interface TirelireEntry {
   operation: Operation;
   /** La ligne comptée (`countedLines`) qui porte cette tirelire. */
   line: CountedLine;
+  /** Date à laquelle elle compte dans la tirelire : celle de la ligne (#184). */
+  date: ISODate;
   /** Effets par compte (un pour une dépense, deux pour un virement dont l'autre côté n'est pas importé). */
   effects: ComponentEffect[];
   /** Effet net sur le solde de la tirelire. */
@@ -46,12 +50,20 @@ export interface NeedSnapshot {
   held: Cents;
   /** Mensualité de croisière. */
   cruise: Cents;
-  /** Mensualité de rattrapage (échéance ou déficit). */
+  /**
+   * Ce que le besoin demande au-delà du régime : le rattrapage d'un déficit (D29) ; pour une
+   * échéance, ce qu'elle demande, lissage décidé compris — rien ne se lisse d'office (D88, #184).
+   */
   catchUp: Cents;
-  /** Dotation de la période : max(croisière, rattrapage), 0 si l'objectif est atteint. */
+  /**
+   * Dotation de la période : pour une échéance, sa croisière plus la part d'un lissage décidé (D88) ;
+   * pour un autre besoin, max(croisière, rattrapage d'un déficit), 0 si l'objectif est atteint.
+   */
   requested: Cents;
-  /** Plancher en cas de marge négative : le rattrapage d'une échéance ne se discute pas. */
+  /** Plancher en cas de marge négative (D06) : ce qu'une échéance demande, lissage décidé compris. */
   floor: Cents;
+  /** Part d'un lissage décidé datée dans la période (D88, #184) ; comprise dans `requested`. */
+  smoothing: Cents;
   dueDate?: ISODate;
   target?: Cents;
 }
@@ -61,8 +73,13 @@ export interface PeriodSnapshot {
   /** Solde de la tirelire au début de la période, avant dotation. */
   balanceBefore: Cents;
   needs: NeedSnapshot[];
-  /** Somme des dotations de la période. */
+  /**
+   * Somme des dotations calculées de la période, hors lissage décidé : celui-ci est une saisie, qui
+   * compte par ses sous-opérations datées (`smoothing`).
+   */
   dotation: Cents;
+  /** Parts d'un lissage décidé datées dans la période (D88, #184). */
+  smoothing: Cents;
   /** Libération en fin de période (positif = rendu au non affecté ; négatif = remise à zéro d'un déficit). */
   release: Cents;
 }
@@ -82,6 +99,13 @@ export interface LedgerIndex {
   startDay: number;
   /** Mémo des chronologies par tirelire (dotations et libérations), étendues à la demande. */
   timelines: Map<Id, PeriodSnapshot[]>;
+  /**
+   * Parts des lissages décidés, par besoin (D88, #184) : les lignes datées de la saisie que désigne
+   * une réponse vivante, sur la tirelire du besoin.
+   */
+  smoothingByNeed: Map<Id, Array<{ date: ISODate; amount: Cents }>>;
+  /** Les saisies de lissage que désigne une réponse vivante. */
+  smoothingOperations: Set<Id>;
 }
 
 export function indexLedger(ledger: Ledger): LedgerIndex {
@@ -116,20 +140,32 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
     principal,
     startDay: ledger.settings.periodStartDay,
     timelines: new Map(),
+    smoothingByNeed: new Map(),
+    smoothingOperations: new Set(),
   };
+  const needsById = new Map(alive(ledger.needs).map((n) => [n.id, n]));
+  for (const answer of alive(ledger.shortfallAnswers ?? [])) {
+    const op = answer.operationId ? operationsById.get(answer.operationId) : undefined;
+    const need = needsById.get(answer.needId);
+    if (!op || !need) continue;
+    idx.smoothingOperations.add(op.id);
+    const parts = idx.smoothingByNeed.get(need.id) ?? [];
+    for (const line of linesByOperation.get(op.id) ?? []) if (line.tirelireId === need.tirelireId) parts.push({ date: line.date, amount: line.amount });
+    idx.smoothingByNeed.set(need.id, parts);
+  }
   for (const [opId, lines] of linesByOperation) {
     const op = operationsById.get(opId)!;
     for (const line of lines) {
       const env = line.tirelireId ? tireliresById.get(line.tirelireId) : undefined;
       if (!env) continue;
       const effects = lineEffects(op, line, idx);
-      const entry: TirelireEntry = { operation: op, line, effects, effect: effects.reduce((s, x) => s + x.amount, 0) };
+      const entry: TirelireEntry = { operation: op, line, date: line.date, effects, effect: effects.reduce((s, x) => s + x.amount, 0) };
       const arr = idx.entriesByTirelire.get(env.id);
       if (arr) arr.push(entry);
       else idx.entriesByTirelire.set(env.id, [entry]);
     }
   }
-  for (const arr of idx.entriesByTirelire.values()) arr.sort((a, b) => (a.operation.date < b.operation.date ? -1 : a.operation.date > b.operation.date ? 1 : 0));
+  for (const arr of idx.entriesByTirelire.values()) arr.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return idx;
 }
 
@@ -157,14 +193,16 @@ export function lineEffect(op: Operation, line: CountedLine, idx: LedgerIndex): 
 }
 
 function entriesUpTo(e: Tirelire, idx: LedgerIndex, asOf: ISODate): TirelireEntry[] {
-  return (idx.entriesByTirelire.get(e.id) ?? []).filter(({ operation }) => operation.date <= asOf && operation.date >= e.openingDate);
+  return (idx.entriesByTirelire.get(e.id) ?? []).filter(({ date }) => date <= asOf && date >= e.openingDate);
 }
 
 function entriesEffect(e: Tirelire, idx: LedgerIndex, from: ISODate, to: ISODate): Cents {
-  return (idx.entriesByTirelire.get(e.id) ?? []).reduce(
-    (s, x) => (x.operation.date >= from && x.operation.date <= to && x.operation.date >= e.openingDate ? s + x.effect : s),
-    0,
-  );
+  return (idx.entriesByTirelire.get(e.id) ?? []).reduce((s, x) => (x.date >= from && x.date <= to && x.date >= e.openingDate ? s + x.effect : s), 0);
+}
+
+/** Parts d'un lissage décidé du besoin datées dans la période `p` (D88, #184). */
+export function smoothingIn(idx: LedgerIndex, needId: Id, p: Period): Cents {
+  return (idx.smoothingByNeed.get(needId) ?? []).reduce((s, x) => (x.date >= p.start && x.date <= p.end ? s + x.amount : s), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,8 +243,20 @@ function reserveOf(needs: Need[]): Cents {
  * Attribue le solde aux besoins dans l'ordre des priorités et calcule ce que chacun demande
  * pour la période `p`. Un déficit pèse sur le premier besoin récurrent si la tirelire reporte,
  * sinon sur le premier besoin.
+ *
+ * Une échéance demande sa croisière, plus la part d'un lissage décidé datée dans la période
+ * (`smoothingOf`), et rien d'autre : ce qui ne sera pas réuni à temps est un manque, qui s'annonce
+ * et ne se lisse que sur décision de l'utilisateur (principe 1.4, D88, #184). Entièrement
+ * provisionnée, elle ne demande plus que la part d'un lissage décidé.
  */
-export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Period, startDay: number): NeedSnapshot[] {
+export function needSnapshots(
+  e: Tirelire,
+  needs: Need[],
+  balance: Cents,
+  p: Period,
+  startDay: number,
+  smoothingOf: (needId: Id) => Cents = () => 0,
+): NeedSnapshot[] {
   let remaining = balance;
   const out: NeedSnapshot[] = [];
   for (const n of needs) {
@@ -218,11 +268,10 @@ export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Per
         const dueDate = nextOccurrence(per, p.start);
         const held = Math.min(Math.max(remaining, 0), target);
         remaining -= held;
-        const k = Math.max(1, periodsUntil(p, dueDate, startDay));
-        const catchUp = Math.max(0, Math.ceil(Math.max(0, target - held) / k));
-        // Entièrement provisionné : rien à ajouter avant l'échéance.
-        const requested = held >= target ? 0 : Math.max(cruise, catchUp);
-        out.push({ needId: n.id, held, cruise, catchUp, requested, floor: catchUp, dueDate, target });
+        const smoothing = smoothingOf(n.id);
+        // Entièrement provisionnée : plus de croisière avant l'échéance ; un lissage décidé reste dû.
+        const requested = (held >= target ? 0 : cruise) + smoothing;
+        out.push({ needId: n.id, held, cruise, catchUp: requested, requested, floor: requested, smoothing, dueDate, target });
         break;
       }
       case 'goal': {
@@ -231,7 +280,7 @@ export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Per
         remaining -= held;
         const reached = target !== undefined && held >= target;
         const requested = reached ? 0 : target !== undefined ? Math.min(cruise, target - held) : cruise;
-        out.push({ needId: n.id, held, cruise, catchUp: requested, requested, floor: 0, ...(target !== undefined ? { target } : {}) });
+        out.push({ needId: n.id, held, cruise, catchUp: requested, requested, floor: 0, smoothing: 0, ...(target !== undefined ? { target } : {}) });
         break;
       }
       case 'payout': {
@@ -239,13 +288,13 @@ export function needSnapshots(e: Tirelire, needs: Need[], balance: Cents, p: Per
         const held = Math.max(remaining, 0);
         remaining -= held;
         const verse = Math.min(cruise, held);
-        out.push({ needId: n.id, held, cruise, catchUp: 0, requested: -verse || 0, floor: 0, target: n.amount ?? 0 });
+        out.push({ needId: n.id, held, cruise, catchUp: 0, requested: -verse || 0, floor: 0, smoothing: 0, target: n.amount ?? 0 });
         break;
       }
       case 'recurring': {
         const held = Math.max(remaining, 0);
         remaining -= held;
-        out.push({ needId: n.id, held, cruise, catchUp: cruise, requested: cruise, floor: 0, target: n.amount ?? 0 });
+        out.push({ needId: n.id, held, cruise, catchUp: cruise, requested: cruise, floor: 0, smoothing: 0, target: n.amount ?? 0 });
         break;
       }
     }
@@ -299,10 +348,13 @@ export function tirelireTimeline(e: Tirelire, idx: LedgerIndex, until: ISODate):
     // Seuls les besoins en vigueur le premier jour de la période sont dotés (D50) : un budget
     // clos en juin ne réclame plus rien en juillet, et un budget ouvert en juin ne rétroagit pas.
     const actifs = needs.filter((n) => needActive(n, p.start));
-    const snaps = needSnapshots(e, actifs, balanceBefore, p, idx.startDay);
-    const dotation = snaps.reduce((s, x) => s + x.requested, 0);
+    const snaps = needSnapshots(e, actifs, balanceBefore, p, idx.startDay, (needId) => smoothingIn(idx, needId, p));
+    // Le lissage décidé compte par les sous-opérations de sa saisie (`entriesEffect`) : la dotation
+    // calculée ne le compte pas une seconde fois.
+    const smoothing = snaps.reduce((s, x) => s + x.smoothing, 0);
+    const dotation = snaps.reduce((s, x) => s + x.requested, 0) - smoothing;
     const balanceEnd = balanceBefore + dotation + entriesEffect(e, idx, p.start, p.end);
-    tl.push({ period: p, balanceBefore, needs: snaps, dotation, release: releaseOf(e, actifs, balanceEnd) });
+    tl.push({ period: p, balanceBefore, needs: snaps, dotation, smoothing, release: releaseOf(e, actifs, balanceEnd) });
     p = nextPeriod(p, idx.startDay);
   }
   return tl;
@@ -450,10 +502,12 @@ export function placementGaps(e: Tirelire, idx: LedgerIndex, asOf: ISODate): Com
 export function periodDemand(e: Tirelire, idx: LedgerIndex, asOf: ISODate): Components {
   const snap = periodSnapshot(e, idx, asOf);
   const out: Components = new Map();
-  if (!snap || snap.dotation === 0) return out;
+  // Ce que la tirelire demande : sa dotation, et la part d'un lissage décidé de la période (D88).
+  const demande = snap ? snap.dotation + snap.smoothing : 0;
+  if (!snap || demande === 0) return out;
   const source = dotationAccount(e, idx);
   const avant = resolvePlacement(e, new Map([[source, snap.balanceBefore]]));
-  const apres = resolvePlacement(e, new Map([[source, snap.balanceBefore + snap.dotation]]));
+  const apres = resolvePlacement(e, new Map([[source, snap.balanceBefore + demande]]));
   for (const accountId of new Set([...avant.keys(), ...apres.keys()])) {
     const part = (apres.get(accountId) ?? 0) - (avant.get(accountId) ?? 0);
     if (part !== 0) out.set(accountId, part);
@@ -463,8 +517,8 @@ export function periodDemand(e: Tirelire, idx: LedgerIndex, asOf: ISODate): Comp
 
 /** Dépensé sur une tirelire pendant une période (effets négatifs, en positif). */
 export function spentInPeriod(e: Tirelire, idx: LedgerIndex, period: Period): Cents {
-  return entriesUpTo(e, idx, period.end).reduce((s, { operation, effect }) => {
-    if (operation.date < period.start || operation.date > period.end) return s;
+  return entriesUpTo(e, idx, period.end).reduce((s, { date, effect }) => {
+    if (date < period.start || date > period.end) return s;
     return effect < 0 ? s - effect : s;
   }, 0);
 }

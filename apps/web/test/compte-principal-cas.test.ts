@@ -10,7 +10,9 @@
  *    remplacé par « principal » des deux côtés avant comparaison, et les identifiants des
  *    opérations importées ne sont pas comparés (ils portent le compte, D09).
  *
- * Ce que `main` donnait avant #209 est dans `compte-principal-209.avant.json` : les plans au
+ * Ce que `main` donnait avant #209 est dans `compte-principal-209.avant.json`, adapté par #184 (la
+ * part d'un lissage décidé, `smoothing`, et ce qu'une échéance demande, rattrapage et plancher, sans
+ * rien lisser d'office ; les montants demandés, financés et virés sont ceux d'avant) : les plans au
  * 6 septembre 2026, au 20 octobre 2026 et au 10 janvier 2027, et l'import du relevé ci-dessous.
  *
  * Niveaux (D83) : 2 — un résultat faux, l'usage restant possible.
@@ -35,7 +37,7 @@ import {
 } from '@tirelire/core';
 
 const SQL = await initSqlJs();
-const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'automations', 'importProfiles', 'devices'] as const;
+const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'shortfallAnswers', 'automations', 'importProfiles', 'devices'] as const;
 type Cle = (typeof CLES)[number];
 type Ligne = Record<string, unknown> & { id: string };
 const DATES = ['2026-09-06', '2026-10-20', '2027-01-10'];

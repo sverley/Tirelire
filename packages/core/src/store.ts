@@ -498,6 +498,7 @@ export class LedgerStore {
           }
         }
         if (result.applied > 0) this.removeOrphanSubOperations();
+        this.retireDiscardedSmoothings(result.conflicts);
         if (opts.learn) {
           for (const h of Object.values(opts.learn)) this.hlc.receive(h);
           for (const row of rows) this.learnOne(row.hlc);
@@ -530,6 +531,29 @@ export class LedgerStore {
       for (const [id, deletedAt] of orphans) {
         const row = this.readRowState(t.name, id as string)!;
         this.writeRow({ ...row, hlc: this.tick(), v: { ...row.v, deleted_at: deletedAt as SqlValue } });
+      }
+    }
+  }
+
+  /**
+   * Deux instances qui répondent au manque d'une même échéance écrivent la même réponse (#184) : la
+   * synchronisation garde la plus récente et montre l'autre comme un conflit. Le lissage de la
+   * réponse écartée ne répond plus à rien : sa saisie et ses sous-opérations sont retirées, datées de
+   * la réponse retenue, si bien que les deux instances qui voient le conflit écrivent les mêmes lignes
+   * (D58) et qu'aucune part ne compte deux fois.
+   */
+  private retireDiscardedSmoothings(conflicts: Conflict[]): void {
+    const answers = TABLES.shortfallAnswers!.name;
+    for (const c of conflicts) {
+      if (c.table !== answers) continue;
+      const discarded = c.discarded.v['operation_id'];
+      if (typeof discarded !== 'string' || discarded === c.kept.v['operation_id']) continue;
+      const deletedAt = new Date(parseTimestamp(c.kept.hlc).wall).toISOString();
+      const subs = this.db.exec(`SELECT id FROM ${TABLES.subOperations!.name} WHERE operation_id = ? AND deleted_at IS NULL`, [discarded])[0]?.values ?? [];
+      for (const [table, id] of [...subs.map(([id]) => [TABLES.subOperations!.name, id as string] as const), [TABLES.operations!.name, discarded] as const]) {
+        const row = this.readRowState(table, id);
+        if (!row || row.v['deleted_at'] != null) continue;
+        this.writeRow({ ...row, hlc: this.tick(), v: { ...row.v, deleted_at: deletedAt } });
       }
     }
   }
