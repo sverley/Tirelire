@@ -16,7 +16,7 @@
  * et seulement ce que l'appelant enregistre.
  */
 import type { Cents, Id, ISODate, Ledger, Need, Operation, ShortfallAnswer, SubOperation } from './model.js';
-import { alive, needName, shortfallAnswerId } from './model.js';
+import { alive, dueDateFlowForNeed, needName, shortfallAnswerId } from './model.js';
 import { dotationAccount, indexLedger, needCruise, tirelireBalance } from './balances.js';
 import { budgetPeriodContaining, nextOccurrence, nextPeriod, type Period } from './periods.js';
 import { addDays, maxDate } from './dates.js';
@@ -55,7 +55,7 @@ export interface DueDateShortfall {
   proposal?: SmoothingPart[];
 }
 
-/** Écart, en jours, entre une échéance et le prélèvement qui la paie (comme `reviewProvisions`). */
+/** Écart, en jours, entre une échéance et le prélèvement de son besoin qui la paie (comme `reviewProvisions`). */
 const FENETRE_PAIEMENT = 15;
 
 /**
@@ -86,11 +86,19 @@ export function dueDateShortfalls(ledger: Ledger, today: ISODate): DueDateShortf
   for (const { need, dueDate } of echeances) {
     const e = idx.tireliresById.get(need.tirelireId)!;
     const target = need.amount ?? 0;
-    // Le solde prévu se lit après le prélèvement de l'échéance, s'il est prévu ou passé ; sans
-    // prélèvement, l'échéance se paie à sa date pour son montant.
-    const paiements = (idx.entriesByTirelire.get(e.id) ?? []).filter(
-      (x) => x.effect < 0 && x.date >= addDays(dueDate, -FENETRE_PAIEMENT) && x.date <= addDays(dueDate, FENETRE_PAIEMENT),
-    );
+    // Le solde prévu se lit après le prélèvement du besoin — son opération prévue, ou l'opération
+    // rapprochée de son flux —, s'il en a un ; sans prélèvement, l'échéance se paie à sa date pour
+    // son montant, et toute autre dépense de la tirelire s'y ajoute (#184, point 11).
+    const prelevement = dueDateFlowForNeed(need, ledger.plannedFlows, dueDate);
+    const paiements = prelevement
+      ? (idx.entriesByTirelire.get(e.id) ?? []).filter(
+          (x) =>
+            x.effect < 0 &&
+            x.operation.plannedFlowId === prelevement.id &&
+            x.date >= addDays(dueDate, -FENETRE_PAIEMENT) &&
+            x.date <= addDays(dueDate, FENETRE_PAIEMENT),
+        )
+      : [];
     const at = paiements.reduce((m, x) => maxDate(m, x.date), dueDate);
     const solde = tirelireBalance(e, idx, at) - (paiements.length ? 0 : target);
     const amount = Math.max(0, -solde);
@@ -105,7 +113,7 @@ export function dueDateShortfalls(ledger: Ledger, today: ISODate): DueDateShortf
       amount,
       cruise: needCruise(need),
       ...(answer ? { answer } : {}),
-      ...(amount > 0 && !answer ? { proposal: proposeSmoothing(amount, current, dueDate, startDay) } : {}),
+      ...(amount > 0 && !answer ? { proposal: proposeSmoothing(amount, current, dueDate, startDay, e.openingDate) } : {}),
     });
   }
   return out.sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : a.name.localeCompare(b.name, 'fr')));
@@ -136,12 +144,17 @@ function answerState(
  * `dueDate`, de `from` comprise (D02), datée du premier jour de la période, à parts égales au
  * centime, la dernière prenant le reste.
  */
-export function proposeSmoothing(amount: Cents, from: Period, dueDate: ISODate, startDay: number): SmoothingPart[] {
-  const periods: Period[] = [];
-  for (let p = from; p.start <= dueDate; p = nextPeriod(p, startDay)) periods.push(p);
-  if (periods.length === 0) periods.push(from);
-  const part = Math.floor(amount / periods.length);
-  return periods.map((p, i) => ({ date: p.start, amount: i === periods.length - 1 ? amount - part * (periods.length - 1) : part }));
+export function proposeSmoothing(amount: Cents, from: Period, dueDate: ISODate, startDay: number, opening?: ISODate): SmoothingPart[] {
+  // Aucune part avant l'ouverture de la tirelire, où elle ne compterait pas : la période qui la
+  // contient prend le jour d'ouverture, celles qui la précèdent n'en ont pas (#184, point 10).
+  const dates: ISODate[] = [];
+  for (let p = from; p.start <= dueDate; p = nextPeriod(p, startDay)) {
+    if (opening && p.end < opening) continue;
+    dates.push(opening ? maxDate(p.start, opening) : p.start);
+  }
+  if (dates.length === 0) dates.push(opening ? maxDate(from.start, opening) : from.start);
+  const part = Math.floor(amount / dates.length);
+  return dates.map((date, i) => ({ date, amount: i === dates.length - 1 ? amount - part * (dates.length - 1) : part }));
 }
 
 /** Ce qu'une réponse écrit : les opérations et sous-opérations d'un patch, et la réponse elle-même. */
@@ -167,6 +180,7 @@ export function smoothingAnswer(ledger: Ledger, needId: Id, dueDate: ISODate, pa
     if (!Number.isInteger(p.amount) || p.amount <= 0) throw new EditError('Chaque part d’un lissage est un montant positif.');
     if (!estDate(p.date)) throw new EditError('Chaque part d’un lissage porte une date.');
     if (p.date > dueDate) throw new EditError('Une part d’un lissage tombe au plus tard à la date de l’échéance.');
+    if (p.date < e.openingDate) throw new EditError(`Une part d’un lissage tombe au plus tôt à l’ouverture de la tirelire, le ${e.openingDate}.`);
   }
   const sorted = [...parts].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const label = `Lissage — ${needName(need, e)}`;

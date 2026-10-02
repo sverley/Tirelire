@@ -63,7 +63,10 @@ export interface PlanLine {
    * échéance, ce qu'elle demande, lissage décidé compris (D88, #184).
    */
   catchUp: Cents;
-  /** Dotation de la période : max(croisière, rattrapage), 0 si l'objectif est atteint. */
+  /**
+   * Dotation de la période : pour une échéance, sa croisière plus la part d'un lissage décidé (D88) ;
+   * pour un autre besoin, max(croisière, rattrapage d'un déficit), 0 si l'objectif est atteint.
+   */
   requested: Cents;
   /** Plancher en cas de marge négative (D06) : ce qu'une échéance demande, lissage décidé compris. */
   floor: Cents;
