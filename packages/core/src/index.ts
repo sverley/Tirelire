@@ -21,5 +21,6 @@ export * from './csv.js';
 export * from './importer.js';
 export * from './matching.js';
 export * from './review.js';
+export * from './lecture-budget.js';
 export * from './sync.js';
 export * from './sauvegarde.js';

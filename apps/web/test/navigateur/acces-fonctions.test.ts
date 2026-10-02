@@ -47,7 +47,7 @@ const INVENTAIRE: Fonction[] = [
   { vue: 'plan', nom: 'Plan', par: 'onglet', point: 'Plan', marque: 'Bienvenue dans Tirelire', amorce: 'Construire mon budget' },
   { vue: 'operations', nom: 'Opérations', par: 'onglet', point: 'Opérations', marque: 'Opérations', amorce: 'importe un relevé' },
   { vue: 'import', nom: 'Import', par: 'onglet', point: 'Import', marque: "Import d'un relevé", amorce: 'compte principal' },
-  { vue: 'review', nom: 'Bilan', par: 'onglet', point: 'Bilan', marque: 'Bilan', amorce: 'Importe des relevés ou saisis des opérations' },
+  { vue: 'review', nom: 'Bilan', par: 'onglet', point: 'Bilan', marque: 'Bilan', amorce: 'Construire mon budget' },
   { vue: 'more', nom: 'Configuration', par: 'onglet', point: 'Plus', marque: 'Configuration', amorce: 'Construire mon budget' },
   { vue: 'wizard', nom: 'Construire mon budget', par: 'Configuration', point: 'Lancer', marque: 'Le problème que Tirelire résout', amorce: 'Commencer' },
   { vue: 'accounts', nom: 'Comptes', par: 'Configuration', point: 'Comptes', marque: 'Comptes', amorce: 'Ajouter un compte' },
