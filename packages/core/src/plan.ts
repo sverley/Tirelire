@@ -621,6 +621,15 @@ export function standingTransferFlow(plan: Plan, transfer: PlanTransfer, princip
   };
 }
 
+/**
+ * La date à laquelle se lit le plan d'une période (D52) : la date de lecture `today` dans la période
+ * qui la contient, le premier jour de la période ailleurs. Une seule règle pour tous les écrans qui
+ * lisent une période — le Plan, le Bilan (#320) —, pour qu'ils disent la même chose au centime.
+ */
+export function periodReadingDate(period: Period, today: ISODate): ISODate {
+  return period.start <= today && today <= period.end ? today : period.start;
+}
+
 /** Fenêtre de périodes autour de `asOf`, utile pour naviguer dans l'interface. */
 export function periodsAround(ledger: Ledger, asOf: ISODate, before: number, after: number): Period[] {
   const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');

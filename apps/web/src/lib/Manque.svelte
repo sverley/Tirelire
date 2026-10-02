@@ -5,13 +5,16 @@
    * propose de le lisser ; l'utilisateur accepte, modifie — montants et dates des parts — ou refuse,
    * sur place. Rien ne se lisse d'office. Une fois répondu, la proposition se tait ; le manque qui
    * resterait se dit toujours, et la réponse se retire d'un geste.
+   *
+   * `repondre` faux : la même annonce, sans la proposition ni les gestes de la réponse — le Bilan
+   * l'affiche ainsi et mène au Plan pour y répondre (#320, point 3).
    */
   import { app } from './state.svelte';
   import { revealed } from './actions';
   import { money, shortDate, centsToInput, inputToCents } from './format';
   import type { DueDateShortfall, SmoothingPart } from '@tirelire/core';
 
-  let { manque }: { manque: DueDateShortfall } = $props();
+  let { manque, repondre = true }: { manque: DueDateShortfall; repondre?: boolean } = $props();
 
   type PartForm = { date: string; amount: string };
   let modifie = $state(false);
@@ -59,12 +62,15 @@
       <span class="sub">Lissage décidé : {manque.answer.parts.map((p) => `${money(p.amount)} le ${shortDate(p.date)}`).join(', ')}</span>
     {:else if manque.answer?.kind === 'refusal'}
       <span class="sub">Lissage refusé.</span>
+    {:else if !repondre}
+      <span class="sub">Aucune réponse pour l’instant.</span>
     {:else if manque.proposal}
       <span class="sub">Proposé : lisser {money(total(manque.proposal))} sur {manque.proposal.length === 1 ? 'la période en cours' : `${manque.proposal.length} périodes`} — {manque.proposal.map((p) => `${money(p.amount)} le ${shortDate(p.date)}`).join(', ')}.</span>
     {/if}
   </div>
   <div class="num {manque.amount > 0 ? 'neg' : ''}">{money(manque.amount)}</div>
 </div>
+{#if repondre}
 <div class="actions" style="margin:0 0 6px">
   {#if manque.answer?.kind === 'smoothing'}
     <button class="btn small" onclick={() => app.withdrawAnswer(manque.answer!.answerId)}>Retirer le lissage</button>
@@ -79,6 +85,7 @@
 {#if erreur && !modifie}<div class="err">{erreur}</div>{/if}
 {#if modifie}
   {@render editeurLissage()}
+{/if}
 {/if}
 
 {#snippet editeurLissage()}

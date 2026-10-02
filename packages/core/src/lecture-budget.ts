@@ -7,7 +7,7 @@
  */
 import type { Cents, Id, ISODate, Ledger, NeedKind } from './model.js';
 import { alive } from './model.js';
-import { computePlan, type LineStatus } from './plan.js';
+import { computePlan, periodReadingDate, type LineStatus } from './plan.js';
 import { budgetPeriodContaining, nextPeriod, type Period } from './periods.js';
 import { dueDateShortfalls, type DueDateShortfall } from './shortfall.js';
 
@@ -69,7 +69,7 @@ export function readBudgetAhead(ledger: Ledger, today: ISODate, count: number): 
   const periods: BudgetPeriodReading[] = [];
   let p = budgetPeriodContaining(today, startDay);
   for (let i = 0; i < count; i++) {
-    const asOf = p.start <= today && today <= p.end ? today : p.start;
+    const asOf = periodReadingDate(p, today);
     const plan = computePlan(ledger, asOf, today);
     const needs = plan.lines.map(
       (l): BudgetNeedReading => ({

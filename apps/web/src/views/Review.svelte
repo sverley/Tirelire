@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, moneyClass, shortDate } from '../lib/format';
+  import Manque from '../lib/Manque.svelte';
   import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, budgetPeriodContaining, minDate, needActive, needCruise, nextPeriod, automationsByRank, automationLabel, readBudgetAhead, type CategoryReview, type Automation, type Need, type BudgetNeedReading } from '@tirelire/core';
 
   let horizon = $state(6);
@@ -154,17 +155,7 @@
       <p class="muted small">Ce que les virements permanents ne réuniront pas à temps, sur ces périodes. Vous y répondez dans le Plan : lisser ou refuser.</p>
       <div class="card warn">
         {#each budget.shortfalls as m (m.needId + m.dueDate)}
-          <div class="row">
-            <div class="label">
-              <strong>{m.name}</strong>{#if m.name !== m.tirelireName}<span class="sub"> dans {m.tirelireName}</span>{/if}
-              <span class="sub">échéance du {shortDate(m.dueDate)}</span>
-              {#if m.amount > 0}<span class="sub neg">Il manquera <span class="num">{money(m.amount)}</span> le {shortDate(m.dueDate)}.</span>{/if}
-              <span class="sub">
-                {#if m.answer?.kind === 'smoothing'}Lissage décidé : {m.answer.parts.map((x) => `${money(x.amount)} le ${shortDate(x.date)}`).join(', ')}{:else if m.answer?.kind === 'refusal'}Lissage refusé{:else}Aucune réponse pour l’instant{/if}
-              </span>
-            </div>
-            <div class="num {m.amount > 0 ? 'neg' : ''}">{money(m.amount)}</div>
-          </div>
+          <Manque manque={m} repondre={false} />
         {/each}
         <div class="actions" style="margin:6px 0 0">
           <button class="btn small" onclick={() => app.go('plan')}>Répondre dans le Plan</button>
