@@ -161,6 +161,9 @@ occurrence reprise sort du solde prévu et d'« Attendus, non reçus » (`flowOc
 - `correctPlannedOperation` : corriger une opération prévue, ou la masquer (montant nul), par une
   saisie verrouillée qui la reprend ; un virement corrigé a ses deux côtés.
 - `resumptionOf` dit ce qu'une opération reprend et l'écart ; `undoResumption` défait la reprise.
+- `removalBlockers` : une saisie reprise ne se supprime pas tant que la reprise tient ; l'interface
+  supprime par `supprimerOperations` (`apps/web/src/lib/suppression.ts`), qui propose de défaire
+  d'abord la reprise.
 
 ## Pipeline d'import (`runPipeline`)
 

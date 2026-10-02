@@ -457,6 +457,17 @@ export function resumerOf(ledger: Ledger, operationId: Id): Operation | undefine
 }
 
 /**
+ * Ce qui empêche de supprimer ces opérations (#306, point 9) : les opérations vivantes qui en
+ * reprennent une. Tant que la reprise tient, la saisie reprise ne se supprime pas — sinon
+ * l'occurrence qu'elle corrigeait redeviendrait libre, et le mouvement compterait deux fois.
+ * Défaire d'abord la reprise (`undoResumption`) la rend supprimable.
+ */
+export function removalBlockers(ledger: Ledger, operationIds: Id[]): Operation[] {
+  const ids = new Set(operationIds);
+  return alive(ledger.operations).filter((o) => !!o.resumedOperationId && ids.has(o.resumedOperationId) && !ids.has(o.id));
+}
+
+/**
  * Corriger une opération prévue, ou la masquer (D88, porteur, 30/09) : une saisie qui la reprend —
  * elle vaudra `amount`, à `date` ; zéro, elle n'aura pas lieu. La saisie est un fait de l'utilisateur,
  * verrouillée (D22), et prend la ventilation du flux, rejouée sur son montant pour un virement

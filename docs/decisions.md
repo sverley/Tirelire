@@ -777,18 +777,10 @@ la version en vigueur, sinon l'assistant offrirait deux lignes de même nom sans
 prendre. Elles reprennent aussi le nom du besoin quand il en porte un, la tirelire ne suffisant plus
 à les distinguer dès qu'elle en porte deux.
 
-**Deux défauts trouvés en chemin, corrigés ici.**
-
-`syncFlowAutomations` (D24) ne savait pas reconnaître la règle en cours d'un flux **daté** : elle
-cherchait une règle sans `validTo`, or un flux qui porte `activeTo` en pose une dès la création.
-Chaque passage créait donc une règle de plus au lieu de remplacer la précédente, et l'archivage
-n'avait jamais lieu. Une règle est désormais en cours tant que sa fin de validité n'est que celle du
-flux lui-même. Aucun test ne pouvait le voir : aucun flux de l'exemple n'était daté.
-
-`replaceWith`, côté interface, écrivait les tables une par une et avait **oublié `needs`** ainsi que
-`periodStartDay`. Charger l'exemple donnait donc des tirelires sans aucun besoin et un mois
-calendaire à la place du 28 — le plan s'affichait vide, ce qui ne se voyait dans aucun test parce
-que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parcourt maintenant
+**Un défaut trouvé en chemin, corrigé ici.** `replaceWith`, côté interface, écrivait les tables une
+par une et avait **oublié `needs`** ainsi que `periodStartDay`. Charger l'exemple donnait donc des
+tirelires sans aucun besoin et un mois calendaire à la place du 28 — le plan s'affichait vide, ce
+qui ne se voyait dans aucun test parce que le test du dépôt écrit l'exemple avec sa propre boucle. La fonction parcourt maintenant
 `LEDGER_KEYS`, et un test garde cette liste alignée sur le grand livre. Ajouter une table au modèle
 ne peut plus laisser une de ces boucles en arrière ; c'est exactement le genre d'écart que le lot 9
 (tests d'interface) est censé attraper, et qu'il attrapera mieux.

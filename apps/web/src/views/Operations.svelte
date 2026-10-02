@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
+  import { supprimerOperations } from '../lib/suppression';
   import {
     alive,
     applyMatch,
@@ -476,11 +477,10 @@
     editingId = undefined;
   }
 
+  /** Une saisie reprise ne se supprime pas tant que la reprise tient (#306, point 9). */
   function remove(op: Operation) {
-    if (!confirm(`Supprimer « ${op.label} » ? (un réimport la fera revenir)`)) return;
-    for (const a of allocByOp.get(op.id) ?? []) app.store.remove('subOperations', a.id);
-    app.remove('operations', op.id);
-    editingId = undefined;
+    const question = op.origin === 'imported' ? `Supprimer « ${op.label} » ? (un réimport la fera revenir)` : `Supprimer « ${op.label} » ?`;
+    if (supprimerOperations([op.id], question)) editingId = undefined;
   }
 </script>
 

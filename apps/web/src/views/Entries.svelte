@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
+  import { supprimerOperations } from '../lib/suppression';
   import { money, shortDate, centsToInput, inputToCents, openAccounts } from '../lib/format';
   import { alive, liveSubOperations, normalizeLabel, findCategoryByName, type SubOperation, type Category, type Operation } from '@tirelire/core';
 
@@ -144,10 +145,9 @@
     editingId = undefined;
   }
 
+  /** Une saisie reprise ne se supprime pas tant que la reprise tient (#306, point 9). */
   function remove(op: Operation) {
-    if (!confirm(`Supprimer « ${op.label} » ?`)) return;
-    for (const a of subsByOp.get(op.id) ?? []) app.remove('subOperations', a.id);
-    app.remove('operations', op.id);
+    supprimerOperations([op.id], `Supprimer « ${op.label} » ?`);
   }
 </script>
 

@@ -4,7 +4,8 @@
   import { revealed } from '../lib/actions';
   import { centsToInput, inputToCents } from '../lib/format';
   import Manque from '../lib/Manque.svelte';
-  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, liveSubOperations, periodsAround, missingFlows, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Operation, type Period, type PlanTransfer } from '@tirelire/core';
+  import { supprimerOperations } from '../lib/suppression';
+  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Operation, type Period, type PlanTransfer } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -175,12 +176,15 @@
     return op?.plannedFlowId && op.plannedDate ? op : undefined;
   }
 
-  /** Retirer la correction : la saisie, et l'autre côté d'un virement corrigé ; l'opération prévue compte de nouveau. */
+  /**
+   * Retirer la correction : la saisie, et l'autre côté d'un virement corrigé ; l'opération prévue
+   * compte de nouveau. Reprise par une opération du relevé, elle ne se retire qu'une fois la reprise
+   * défaite (#306, point 9).
+   */
   function retirerCorrection(op: Operation) {
     const jumelle = op.transferOperationId ? operationsParId.get(op.transferOperationId) : undefined;
     const ids = [op.id, ...(jumelle && jumelle.origin === 'manual' && jumelle.transferOperationId === op.id ? [jumelle.id] : [])];
-    for (const s of liveSubOperations(app.ledger.subOperations)) if (ids.includes(s.operationId)) app.store.remove('subOperations', s.id);
-    for (const id of ids) app.remove('operations', id);
+    supprimerOperations(ids);
   }
   const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
