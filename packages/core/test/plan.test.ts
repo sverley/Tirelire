@@ -120,11 +120,13 @@ describe('[niveau 2] plan de période, sur l’exemple de l’analyse (D02, D28,
     expect(plan.fixedCharges.map((f) => f.name)).not.toContain('Taxe foncière (prélèvement)');
   });
 
-  it('échéance en rattrapage : (échéance − retenu) ÷ périodes restantes', () => {
+  it('échéance en rattrapage : sa croisière plus la part du lissage décidé (D88, #184)', () => {
     const tf = line(plan, 'need-tf');
     expect(tf.cruise).toBe(euros(100));
     expect(tf.dueDate).toBe('2026-10-15');
-    // deux périodes de paie avant le 15 octobre (28 août et 28 septembre)
+    // deux périodes de paie avant le 15 octobre (28 août et 28 septembre) : le lissage décidé de
+    // l'exemple y répartit les 100 € qui manqueraient, 50 € par période.
+    expect(tf.smoothing).toBe(euros(50));
     expect(tf.catchUp).toBe(euros(150));
     expect(tf.requested).toBe(euros(150));
     expect(tf.status).toBe('catchUp');
@@ -133,10 +135,10 @@ describe('[niveau 2] plan de période, sur l’exemple de l’analyse (D02, D28,
   it('échéance en croisière', () => {
     const auto = line(plan, 'need-auto');
     expect(auto.cruise).toBe(euros(50));
-    // sept périodes de paie avant le 5 mars : (600 − 300) ÷ 7
-    expect(auto.catchUp).toBe(Math.ceil(30000 / 7));
+    // Rien ne se lisse d'office (#184) : l'échéance demande sa croisière, qui suffit.
+    expect(auto.catchUp).toBe(euros(50));
     expect(auto.requested).toBe(euros(50));
-    expect(auto.status).toBe('ahead');
+    expect(auto.status).toBe('ok');
   });
 
   it('échéance entièrement provisionnée : dotation nulle', () => {
@@ -237,8 +239,9 @@ describe('[niveau 2] besoins multiples dans une tirelire (D28)', () => {
     const tf = line(plan, 'need-charges-tf');
     const courant = line(plan, 'need-charges-courant');
     expect(tf.held).toBe(euros(500));
-    expect(tf.catchUp).toBe(euros(350));
-    expect(tf.floor).toBe(euros(350));
+    // Sans lissage décidé, l'échéance demande sa croisière, qui est son plancher (D06, #184).
+    expect(tf.catchUp).toBe(euros(100));
+    expect(tf.floor).toBe(euros(100));
     expect(courant.held).toBe(0);
     expect(courant.requested).toBe(euros(100));
     expect(tf.name).toBe('Taxe foncière');

@@ -11,8 +11,9 @@ Tirelire/
 │   ├── src/money.ts        centimes : parsing et formatage français
 │   ├── src/ids.ts          uuidv7, normalizeLabel, operationKey (`op_` + 16 hexadécimaux)
 │   ├── src/balances.ts     positions reconstruites (composantes par compte, besoins, dotations, demande d'une période répartie par placement, non affecté, solde à régler, état d'une tirelire)
-│   ├── src/plan.ts         plan de période : croisière / rattrapage, priorités, virements
+│   ├── src/plan.ts         plan de période : croisière, lissage décidé, rattrapage d'un déficit, priorités, virements
 │   ├── src/forecast.ts     solde prévu d'une période à venir : opérations prévues en mémoire, mouvements et origines, manque
+│   ├── src/shortfall.ts    manque d'une échéance, proposition de lissage, réponse (lissage retenu ou refus)
 │   ├── src/csv.ts          décodage et parseur CSV
 │   ├── src/importer.ts     profils d'import, lecture des lignes, clés, doublons
 │   ├── src/matching.ts     virements internes, virements par compte, rapprochement de flux, pipeline
@@ -48,7 +49,8 @@ Tirelire/
 | `Category` | classement des dépenses / revenus ; peut consommer un budget | UUID v7 |
 | `PlannedFlow` | revenu, charge fixe, échéance payée par une tirelire, virement attendu ; périodicité, fenêtre, tolérance, motif | UUID v7 |
 | `Operation` | ligne de relevé (`imported`) ou saisie (`manual`) ; état (non traitée / rapprochée / verrouillée) ; transfert ; flux rapproché | clé déterministe ou UUID v7 |
-| `SubOperation` | sous-opération (D88) : part (fixe, pourcentage, variable) du niveau qui la contient — l'opération, ou une sous-opération (`parentId`) —, catégorie, tirelire, renflouement ; se divise à son tour, sans limite de niveaux | UUID v7 |
+| `SubOperation` | sous-opération (D88) : part (fixe, pourcentage, variable) du niveau qui la contient — l'opération, ou une sous-opération (`parentId`) —, catégorie, tirelire, renflouement, date propre (une part de lissage) ; se divise à son tour, sans limite de niveaux | UUID v7 |
+| `ShortfallAnswer` | réponse au manque d'une échéance (D88, #184) : besoin, date de l'échéance, saisie du lissage retenu (absente pour un refus) ; une par échéance | `reponse:<besoin>:<date>` |
 | `Automation` | sélection + action à champs facultatifs + rang (clé triable) + validité | UUID v7 |
 | `ImportProfile` | colonnes, formats, correspondance des comptes | UUID v7 |
 | `Device` (branche sync) | appareil et personne | siteId |
@@ -99,7 +101,11 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
    lit se lit sur le réel.
 1. Période contenant `asOf` ; revenus et charges fixes = occurrences des flux dans la période.
 2. Par besoin (D28) : part du solde de la tirelire qui lui revient (ordre des priorités), croisière,
-   rattrapage, dotation = max, plancher = rattrapage d'une échéance.
+   rattrapage d'un déficit, dotation. Une échéance demande sa croisière plus la part d'un lissage
+   décidé datée dans la période, et rien d'autre ; son plancher est ce qu'elle demande (D06, D88).
+   Rien ne se lisse d'office : ce qui ne sera pas réuni à temps est un **manque**, le solde prévu
+   négatif de la tirelire à la date de l'échéance (`dueDateShortfalls`), annoncé avec la proposition
+   de le lisser tant que l'échéance n'a pas de réponse (#184).
 3. Lecture du financement (D06) : planchers par priorité, puis dotations, dans la limite de
    revenus − charges fixes. Une dotation reste acquise même non couverte ; le plan le dit.
 4. Écarts de placement (D20) : composantes hors du compte de placement, marquées « à faire »

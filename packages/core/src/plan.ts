@@ -2,6 +2,9 @@
  * Plan de période : à partir des revenus, charges fixes, besoins et positions des tirelires,
  * dire ce que la période dote (D29), ce que les revenus couvrent (D06, lecture), et quels
  * virements ramènent chaque tirelire à son placement voulu (D20, D21).
+ *
+ * Rien ne s'y lisse d'office (D88, #184) : une échéance demande sa croisière, plus la part d'un
+ * lissage que l'utilisateur a décidé ; le manque qui resterait s'annonce (`dueDateShortfalls`).
  */
 import type { Account, Cents, Id, ISODate, Ledger, NeedKind, PlannedFlow, Tirelire } from './model.js';
 import { alive, isDerivedFlow, needActive, needName } from './model.js';
@@ -55,12 +58,17 @@ export interface PlanLine {
   held: Cents;
   /** Mensualité de croisière (régime permanent). */
   cruise: Cents;
-  /** Mensualité de rattrapage (ce qu'exige l'échéance ou le déficit). */
+  /**
+   * Ce que le besoin demande au-delà du régime : le rattrapage d'un déficit (D29) ; pour une
+   * échéance, ce qu'elle demande, lissage décidé compris (D88, #184).
+   */
   catchUp: Cents;
   /** Dotation de la période : max(croisière, rattrapage), 0 si l'objectif est atteint. */
   requested: Cents;
-  /** Plancher en cas de marge négative. */
+  /** Plancher en cas de marge négative (D06) : ce qu'une échéance demande, lissage décidé compris. */
   floor: Cents;
+  /** Part d'un lissage décidé datée dans la période (D88, #184), comprise dans `requested`. */
+  smoothing: Cents;
   /** Ce que les revenus de la période couvrent (lecture D06 ; la dotation est acquise). */
   funded: Cents;
   dueDate?: ISODate;
@@ -90,7 +98,7 @@ export interface StandingOrder {
   tirelireName: string;
   /** Part permanente (jusqu'à la croisière des besoins de la tirelire). */
   standing: Cents;
-  /** Complément exceptionnel ce mois-ci (rattrapage, écart ancien). */
+  /** Complément exceptionnel ce mois-ci (rattrapage d'un déficit, lissage décidé, écart ancien). */
   exceptional: Cents;
   /** Montant total signé : positif = principal → compte. */
   amount: Cents;
@@ -249,6 +257,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
         catchUp: s.catchUp,
         requested: s.requested,
         floor: s.floor,
+        smoothing: s.smoothing,
         funded: 0,
         ...(s.dueDate ? { dueDate: s.dueDate } : {}),
         ...(s.target !== undefined ? { target: s.target } : {}),
@@ -290,7 +299,6 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     else if (l.funded === 0) l.status = 'unfunded';
     else if (l.funded < l.requested) l.status = 'reduced';
     else if (l.catchUp > l.cruise) l.status = 'catchUp';
-    else if (l.catchUp < l.cruise && l.kind === 'dueDate') l.status = 'ahead';
     else l.status = 'ok';
     if (l.status === 'unfunded')
       warnings.push({ code: 'unfunded', message: `« ${l.name} » n'est pas couverte par les revenus ce mois-ci.`, tirelireId: l.tirelireId, needId: l.needId });
@@ -352,7 +360,9 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
    * un livret et déjà à 3 200 € n'en réclame plus rien, sans quoi le plan demanderait d'en rapatrier
    * l'excédent tout en réglant un ordre permanent qui l'y renvoie.
    *
-   * Le rattrapage n'en fait pas partie : il est exceptionnel, un ordre permanent ne s'y règle pas.
+   * Ni le rattrapage d'un déficit ni un lissage décidé n'en font partie : ils sont exceptionnels, un
+   * ordre permanent ne s'y règle pas (D60) ; le virement de la période les porte en complément
+   * exceptionnel.
    */
   const wantedByAccount = new Map<Id, PlanTransfer['breakdown']>();
   for (const e of idx.tireliresById.values()) {

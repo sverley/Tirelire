@@ -72,7 +72,7 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
 
 /**
  * Répartit un virement constaté du compte principal vers `accountId` entre les tirelires placées sur ce
- * compte, par l'ordre de financement de D06 : les planchers (rattrapages d'échéances) d'abord,
+ * compte, par l'ordre de financement de D06 : les planchers (ce que demandent les échéances, lissage décidé compris) d'abord,
  * puis les écarts de placement par priorité ; le reste, s'il y en a, va à la première tirelire.
  * Rend, par tirelire, la part (positive) à ventiler.
  */

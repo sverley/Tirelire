@@ -123,10 +123,13 @@ export function reviewCategories(ledger: Ledger, periods: Period[]): CategoryRev
   }
   for (const op of idx.operationsById.values()) {
     if (op.transferAccountId) continue;
-    const p = periodOf(op.date);
-    if (!p) continue;
-    const pi = periods.indexOf(p);
+    // Un lissage décidé n'est ni une dépense ni un revenu : il compte comme des dotations (D88, #184).
+    if (idx.smoothingOperations.has(op.id)) continue;
     for (const line of idx.linesByOperation.get(op.id) ?? []) {
+      // Une ligne compte dans sa catégorie à sa propre date (#184).
+      const p = periodOf(line.date);
+      if (!p) continue;
+      const pi = periods.indexOf(p);
       // Un renflouement (D49) fausserait les moyennes : un cadeau gonflerait le revenu moyen, un
       // virement interne compterait deux fois. Il est compté ailleurs, par `reviewReplenishments`.
       if (line.replenishment) continue;
@@ -198,7 +201,7 @@ export function reviewProvisions(ledger: Ledger, from: ISODate, asOf: ISODate): 
     const fin = n.activeTo && n.activeTo < asOf ? n.activeTo : asOf;
     for (const due of occurrencesBetween(n.periodicity, debut, fin)) {
       const before = tirelireBalance(e, idx, addDays(due, -1));
-      const entries = (idx.entriesByTirelire.get(e.id) ?? []).filter(({ operation, effect }) => effect < 0 && Math.abs(diffDays(operation.date, due)) <= 15);
+      const entries = (idx.entriesByTirelire.get(e.id) ?? []).filter(({ date, effect }) => effect < 0 && Math.abs(diffDays(date, due)) <= 15);
       const paid = entries.reduce((s, x) => s - x.effect, 0);
       if (paid === 0 && due > asOf) continue;
       out.push({ needId: n.id, tirelireId: e.id, name: needName(n, e), dueDate: due, target, provisioned: before, paid, variance: paid - target });
@@ -241,8 +244,8 @@ export function reviewReplenishments(ledger: Ledger, periods: Period[]): Repleni
   const parTirelire = new Map<Id, ReplenishmentReview>();
 
   for (const op of idx.operationsById.values()) {
-    if (op.date < debut || op.date > fin) continue;
     for (const line of idx.linesByOperation.get(op.id) ?? []) {
+      if (line.date < debut || line.date > fin) continue;
       if (!line.replenishment || !line.tirelireId) continue;
       const e = idx.tireliresById.get(line.tirelireId);
       if (!e) continue;

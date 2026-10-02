@@ -35,7 +35,7 @@ import {
 } from '@tirelire/core';
 
 const SQL = await initSqlJs();
-const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'automations', 'importProfiles', 'devices'] as const;
+const CLES = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations', 'subOperations', 'shortfallAnswers', 'automations', 'importProfiles', 'devices'] as const;
 type Cle = (typeof CLES)[number];
 type Ligne = Record<string, unknown> & { id: string };
 const DATES = ['2026-09-06', '2026-10-20', '2027-01-10'];

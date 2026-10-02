@@ -13,7 +13,7 @@
  * `VM-U1-parcours`.
  */
 import { describe, expect, it } from 'vitest';
-import { computePlan, euros, historyStart, lastPeriods, reviewCategories, type Plan } from '../src/index.js';
+import { computePlan, dueDateShortfalls, euros, historyStart, lastPeriods, reviewCategories, type Plan } from '../src/index.js';
 import { AS_OF, DEBUT, PAIE, baseVide, ecrireLeBudget, relire } from './parcours.js';
 
 /**
@@ -36,12 +36,12 @@ function leParcoursSeLit(plan: Plan): void {
   expect(courses.virtual).toBe(true);
   expect(courses.requested).toBe(euros(500));
 
-  // L'échéance se lisse sur les périodes qui la précèdent (D02), sans le moindre historique.
+  // L'échéance demande sa croisière, sans le moindre historique ; rien ne se lisse d'office : ce
+  // qui ne sera pas réuni à temps s'annonce comme un manque, avec la proposition de le lisser (#184).
   const taxe = parNom.get('Taxe foncière')!;
   expect(taxe.virtual).toBe(false);
   expect(taxe.cruise).toBe(euros(100));
-  expect(taxe.catchUp).toBeGreaterThan(taxe.cruise);
-  expect(taxe.requested).toBe(taxe.catchUp);
+  expect(taxe.requested).toBe(taxe.cruise);
 
   expect(plan.totals.requested).toBe(plan.lines.reduce((s, l) => s + l.requested, 0));
   expect(plan.totals.funded).toBe(plan.totals.requested);
@@ -93,6 +93,13 @@ describe('[niveau 1] harnais du registre · I3 (U1)', () => {
       expect(ledger.tirelires).toHaveLength(3);
 
       leParcoursSeLit(computePlan(ledger, AS_OF));
+
+      // La taxe foncière part de zéro, deux périodes avant le 15 octobre : le manque s'annonce,
+      // montant et date, avec la proposition de le lisser, sans qu'aucune opération existe (#184).
+      const manque = dueDateShortfalls(ledger, AS_OF).find((m) => m.needId === 'bes-taxe')!;
+      expect(manque.dueDate).toBe('2026-10-15');
+      expect(manque.amount).toBe(euros(1000));
+      expect(manque.proposal?.reduce((s, p) => s + p.amount, 0)).toBe(euros(1000));
 
       // Le bilan ne fabrique pas d'observé : aucun historique, aucune moyenne — mais la cible du
       // budget s'y lit déjà (« ce qui est prévu », #15).

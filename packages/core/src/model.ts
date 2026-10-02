@@ -26,7 +26,7 @@ export interface Periodicity {
 }
 
 /**
- * Équivalent en mois d'un rythme, pour les calculs de lissage. Approché pour les jours et les
+ * Équivalent en mois d'un rythme, pour les calculs de croisière. Approché pour les jours et les
  * semaines — un mois ne fait pas un nombre entier de semaines — ce qui suffit à répartir une
  * dotation, jamais à dater une occurrence (`nextOccurrence` fait, lui, du calendrier exact).
  */
@@ -159,7 +159,9 @@ export interface Tirelire {
 /**
  * Un besoin de financement porté par une tirelire (D28) :
  * - `recurring` : `amount` par période (lissé sur `periodicity`, une période par défaut) ;
- * - `dueDate`   : `amount` pour chaque échéance de `periodicity`, rattrapage lissé sur les périodes restantes ;
+ * - `dueDate`   : `amount` pour chaque échéance de `periodicity`, doté de sa croisière ; ce qui ne sera
+ *   pas réuni à temps s'annonce comme un manque, et ne se lisse que sur décision de l'utilisateur
+ *   (`ShortfallAnswer`, D88) — rien ne se lisse d'office ;
  * - `goal`      : `monthlyAmount` par période jusqu'à `amount` (cible facultative).
  * Les priorités et planchers de D06 se posent sur les besoins ; le solde de la tirelire leur est
  * attribué dans l'ordre des priorités (D29).
@@ -515,12 +517,53 @@ export interface SubOperation {
    * moyennes du bilan, et comptée à part pour proposer un réajustement de la dotation.
    */
   replenishment?: ReplenishmentKind;
+  /**
+   * Date propre de la sous-opération (D88, #184) : elle compte à cette date dans la tirelire et la
+   * catégorie qui valent pour elle, alors que le compte réel bouge à la date de l'opération. Absente,
+   * elle prend celle du niveau qui la contient, de proche en proche, jusqu'à celle de l'opération.
+   * Seul un lissage en écrit.
+   */
+  date?: ISODate;
   deletedAt?: string;
 }
 
 /** Ligne fixe (raccourci de lecture). */
 export function fixedShare(amount: Cents): Share {
   return { kind: 'fixed', amount };
+}
+
+// ---------------------------------------------------------------------------
+// Réponse à un manque (D88, #184)
+// ---------------------------------------------------------------------------
+
+/**
+ * La réponse de l'utilisateur au manque d'une échéance (principe 1.4, D88) : le lissage qu'il a
+ * retenu, ou son refus. Une par échéance : elle désigne son échéance par le besoin et la date de
+ * l'échéance, et son identifiant s'en tire (`shortfallAnswerId`), si bien que deux instances qui
+ * répondent à la même échéance écrivent la même ligne — la synchronisation garde la plus récente et
+ * montre l'autre comme un conflit (D58).
+ *
+ * - Lissage retenu : `operationId` désigne la saisie divisée en sous-opérations datées, qui comptent
+ *   comme des dotations (`smoothingPatch`).
+ * - Refus : pas d'`operationId`. Un refus n'est pas une opération : il ne paraît ni dans les
+ *   opérations, ni dans le bilan, ni dans un solde.
+ *
+ * Tant qu'elle existe, la proposition de lisser ne revient pas. Un lissage dont la saisie est retirée
+ * ne répond plus : la proposition revient.
+ */
+export interface ShortfallAnswer {
+  id: Id;
+  needId: Id;
+  /** Date de l'échéance à laquelle elle répond. */
+  dueDate: ISODate;
+  /** La saisie du lissage retenu ; absente pour un refus. */
+  operationId?: Id;
+  deletedAt?: string;
+}
+
+/** Identifiant de la réponse à une échéance : le même sur toutes les instances. */
+export function shortfallAnswerId(needId: Id, dueDate: ISODate): Id {
+  return `reponse:${needId}:${dueDate}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -644,6 +687,8 @@ export interface Ledger {
   plannedFlows: PlannedFlow[];
   operations: Operation[];
   subOperations: SubOperation[];
+  /** Réponses aux manques des échéances (D88, #184). */
+  shortfallAnswers: ShortfallAnswer[];
   automations: Automation[];
   importProfiles: ImportProfile[];
   devices: Device[];
@@ -659,6 +704,7 @@ export function emptyLedger(settings: Partial<Settings> = {}): Ledger {
     plannedFlows: [],
     operations: [],
     subOperations: [],
+    shortfallAnswers: [],
     automations: [],
     importProfiles: [],
     devices: [],

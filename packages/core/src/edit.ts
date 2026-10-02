@@ -10,7 +10,7 @@
  * ici plutôt que dans l'interface, pour que l'invariant tienne aussi quand une règle ou une action
  * groupée écrit une ventilation.
  */
-import type { Cents, SubOperation, Id, Operation, ReplenishmentKind, Share } from './model.js';
+import type { Cents, SubOperation, Id, ISODate, Operation, ReplenishmentKind, Share } from './model.js';
 import { alive } from './model.js';
 import type { Ledger } from './model.js';
 import { emptyPatch, type Patch } from './matching.js';
@@ -25,6 +25,8 @@ export interface SubOperationDraft {
   share: Share;
   /** Cette sous-opération renfloue la tirelire (D49). */
   replenishment?: ReplenishmentKind;
+  /** Date propre de la sous-opération (#184) : seule une part de lissage en porte une. */
+  date?: ISODate;
 }
 
 export class EditError extends Error {}
@@ -48,6 +50,10 @@ export function unlock(op: Operation): Operation {
  * Valide une division à parts (D27) d'un niveau de montant `amount` : au plus une part variable,
  * pourcentages entre 0 et 100, parts fixes dans le sens de l'opération, et somme des parts fixes
  * et pourcentages qui ne dépasse pas le montant du niveau.
+ *
+ * Un niveau de montant nul n'a pas de sens : ses parts fixes vont dans l'un ou l'autre, et le reste
+ * de la division prend l'opposé. C'est la forme d'un lissage décidé, qui fait passer de l'argent du
+ * non affecté à la tirelire sans changer le compte réel (D88, #184).
  */
 export function validateShares(amount: Cents, drafts: SubOperationDraft[]): void {
   if (drafts.filter((d) => d.share.kind === 'variable').length > 1)
@@ -56,6 +62,7 @@ export function validateShares(amount: Cents, drafts: SubOperationDraft[]): void
     if (d.share.kind === 'percent' && (d.share.pct < 0 || d.share.pct > 100))
       throw new EditError('Un pourcentage se situe entre 0 et 100.');
   }
+  if (amount === 0) return;
   const sign = amount < 0 ? -1 : 1;
   const used = drafts.reduce((s, d) => {
     if (d.share.kind === 'fixed') return s + d.share.amount;
@@ -73,6 +80,7 @@ function sameSubOperation(a: SubOperation, b: SubOperation): boolean {
     (a.categoryId ?? undefined) === (b.categoryId ?? undefined) &&
     (a.tirelireId ?? undefined) === (b.tirelireId ?? undefined) &&
     (a.replenishment ?? undefined) === (b.replenishment ?? undefined) &&
+    (a.date ?? undefined) === (b.date ?? undefined) &&
     JSON.stringify(a.share) === JSON.stringify(b.share)
   );
 }
@@ -117,6 +125,7 @@ export function editDivision(
       ...(d.categoryId ? { categoryId: d.categoryId } : {}),
       ...(d.tirelireId ? { tirelireId: d.tirelireId } : {}),
       ...(d.replenishment ? { replenishment: d.replenishment } : {}),
+      ...(d.date ? { date: d.date } : {}),
     };
     keep.add(sub.id);
     const before = byId.get(sub.id);

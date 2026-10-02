@@ -259,8 +259,12 @@ function tirelireMovements(e: Tirelire, idx: LedgerIndex, today: ISODate, end: I
   if (e.openingDate > today && e.openingDate <= end && e.openingBalance !== 0)
     out.push({ date: e.openingDate, label: 'Solde initial', amount: e.openingBalance, origin: 'ouverture' });
   for (const entry of idx.entriesByTirelire.get(e.id) ?? []) {
-    if (entry.operation.date < e.openingDate || !compte(entry.operation) || entry.effect === 0) continue;
-    out.push(movementOf(entry.operation, entry.effect));
+    // Une ligne compte dans la tirelire à sa propre date (#184), qui peut différer de celle de l'opération.
+    if (entry.date < e.openingDate || !compte({ ...entry.operation, date: entry.date }) || entry.effect === 0) continue;
+    const m = movementOf(entry.operation, entry.effect);
+    // Une part d'un lissage décidé compte comme une dotation, à sa date (D88, #184) : son libellé dit
+    // qu'elle vient du lissage.
+    out.push(idx.smoothingOperations.has(entry.operation.id) ? { ...m, date: entry.date, origin: 'dotation' } : { ...m, date: entry.date });
   }
   for (const s of tirelireTimeline(e, idx, end)) {
     if (s.period.start > today && s.period.start <= end && s.dotation !== 0)

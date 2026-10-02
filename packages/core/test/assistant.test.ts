@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computePlan, emptyLedger, euros, DEFAULT_PRIORITY, type Ledger } from '../src/index.js';
+import { computePlan, dueDateShortfalls, emptyLedger, euros, DEFAULT_PRIORITY, type Ledger } from '../src/index.js';
 
 /**
  * L'assistant de configuration (D40) écrit des tirelires, des besoins et des flux à partir de
@@ -87,14 +87,18 @@ describe('[niveau 1] harnais du registre · I3 (U1)', () => {
       expect(plan.lines.map((l) => l.needId).sort()).toEqual(['n-assurance', 'n-courses']);
     });
 
-    it("lisse l'échéance annuelle sur les périodes qui restent avant la date", () => {
+    it("ne lisse pas l'échéance annuelle d'office : elle demande sa croisière, et le manque s'annonce", () => {
       const plan = computePlan(budgetDeLAssistant(), asOf);
       const assurance = plan.lines.find((l) => l.needId === 'n-assurance')!;
 
-      // De la période de septembre à l'échéance du 15 janvier, il reste cinq virements :
-      // 1 200 € / 5 = 240 € par période, en rattrapage puisque la réserve part de zéro.
-      expect(assurance.requested).toBe(euros(240));
-      expect(assurance.status).toBe('catchUp');
+      // De la période de septembre à l'échéance du 15 janvier, il reste cinq virements : la
+      // croisière de 100 € n'en réunit que 500. Rien ne se lisse d'office (#184) : les 700 € qui
+      // manqueront s'annoncent, avec la proposition de les lisser sur ces cinq périodes.
+      expect(assurance.requested).toBe(euros(100));
+      expect(assurance.status).toBe('ok');
+      const manque = dueDateShortfalls(budgetDeLAssistant(), asOf).find((m) => m.needId === 'n-assurance')!;
+      expect(manque.amount).toBe(euros(700));
+      expect(manque.proposal).toHaveLength(5);
     });
 
     it('laisse un reste à vivre cohérent avec ce qui a été déclaré', () => {
