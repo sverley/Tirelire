@@ -12,14 +12,15 @@
  * Données inventées (D84) : de petits grands livres écrits ici, et l'exemple, lu au 6 septembre 2026.
  *
  * Chaque `describe` reprend un point du « Fait quand » sous son numéro. Les phrases qui se lisent à
- * l'écran (points 2, 4 et 5) y ont leur épreuve ; le point 8 est de la documentation, relue.
+ * l'écran (points 2, 4, 5 et 9) y ont leur épreuve ; le point 8 est de la documentation, relue.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce que l'utilisateur a décidé sur une opération n'est jamais écrasé par une reprise (point 4),
  *   et modifier un flux ne réécrit aucune opération déjà reprise (point 6) : une classification ou un
  *   verrouillage écrasés ne se rétablissent pas en corrigeant le code.
  * - 1 · I2 (une dépense annoncée puis réalisée ne compte, pour le compte et la tirelire, qu'une
- *   fois — point 1), U1 (corriger ou masquer une opération prévue sans aucun import — point 2),
+ *   fois — point 1), U1 (corriger ou masquer une opération prévue sans aucun import — point 2 ; une
+ *   saisie reprise ne se supprime pas tant que la reprise tient — point 9),
  *   principe 4.4 et I10 (l'import ne reprend que ce que D12 permet, et jamais une saisie — point 3),
  *   C8 (le format change de version — point 7).
  * - 2 · les règles de D12, D22, D24 et D88 que ces phrases appliquent, nominales comme limites : la
@@ -47,6 +48,7 @@ import {
   LedgerStore,
   missingFlows,
   proposeMatches,
+  removalBlockers,
   resumeEntry,
   resumptionOf,
   reviewCategories,
@@ -547,5 +549,52 @@ describe('[niveau 2] #306 · 7. l’exemple s’écrit et se relit au nouveau fo
     const jan = computePlan(exampleLedger(), '2027-01-10');
     expect(jan.totals).toEqual({ incomes: 435000, fixedCharges: 27000, requested: 279500, funded: 279500, margin: 128500, cushion: 60000, principalUnallocated: -56100 });
     expect(net(jan)).toBe(353500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Point 9 (ajouté par l'architecte le 02/10, après la première vérification)
+// ---------------------------------------------------------------------------
+
+describe('[niveau 1] #306 · 9. une saisie qu’une opération reprend ne se supprime pas tant que la reprise tient ; la reprise défaite, elle se supprime (U1, I2, D88)', () => {
+  /**
+   * Le salaire de septembre corrigé à `montant` (0 : masqué), puis l'opération du relevé qui reprend
+   * cette saisie : `relevé` reprend `correction`, et l'occurrence ne compte plus ni ne manque.
+   */
+  function repris(montant: number): { l: Ledger; correction: Operation } {
+    let l = budget();
+    l = appliquer(l, correctPlannedOperation(l, 'f-salaire', '2026-09-25', montant, '2026-09-25'));
+    const correction = l.operations.find((o) => o.origin === 'manual')!;
+    l.operations.push(opération({ id: 'relevé', date: '2026-09-25', amount: euros(1850), label: 'VIR SALAIRE', normalizedLabel: 'VIR SALAIRE' }));
+    const proposition = proposeMatches(l, '2026-09-01', '2026-09-30').find((p) => p.operationId === 'relevé')!;
+    l = appliquer(l, applyMatch(l, proposition));
+    expect(lire(l, 'relevé').resumedOperationId, 'le décor : l’opération du relevé reprend la saisie').toBe(correction.id);
+    return { l, correction };
+  }
+  const salaires = (l: Ledger) => compteCC(l).movements.filter((m) => m.flowId === 'f-salaire').map((m) => m.date);
+  const supprimée = (l: Ledger, id: string): Ledger => ({ ...l, operations: l.operations.map((o) => (o.id === id ? { ...o, deletedAt: '2026-09-26T00:00:00.000Z' } : o)) });
+
+  it('ce qui reprend la saisie, corrigée ou masquée, l’empêche d’être supprimée ; rien n’empêche ce que rien ne reprend', () => {
+    for (const montant of [euros(1800), 0]) {
+      const { l, correction } = repris(montant);
+      expect(removalBlockers(l, [correction.id]).map((o) => o.id), `saisie de ${montant / 100} €`).toEqual(['relevé']);
+      expect(removalBlockers(l, ['relevé']), 'l’opération du relevé ne reprend rien qu’on supprime').toEqual([]);
+      // Supprimer ensemble la saisie et ce qui la reprend : rien ne reste pour la reprendre.
+      expect(removalBlockers(l, [correction.id, 'relevé'])).toEqual([]);
+      // Une opération supprimée ne reprend plus rien.
+      expect(removalBlockers(supprimée(l, 'relevé'), [correction.id])).toEqual([]);
+    }
+  });
+
+  it('la reprise défaite, la saisie se supprime et l’occurrence qu’elle corrigeait compte de nouveau', () => {
+    const { l: tenue, correction } = repris(euros(1800));
+    expect(salaires(tenue), 'la reprise tenant, l’occurrence de septembre ne compte plus').toEqual(['2026-10-25']);
+    const défaite = appliquer(tenue, undoResumption(tenue, 'relevé'));
+    expect(removalBlockers(défaite, [correction.id]), 'la reprise défaite, plus rien ne bloque').toEqual([]);
+    const supprimé = supprimée(défaite, correction.id);
+    expect(salaires(supprimé)).toEqual(['2026-09-25', '2026-10-25']);
+    // L'opération du relevé ne reprend plus rien : l'occurrence que la saisie corrigeait lui est de nouveau proposée.
+    expect(resumptionOf(supprimé, lire(supprimé, 'relevé'))).toBeUndefined();
+    expect(proposeMatches(supprimé, '2026-09-01', '2026-09-30').filter((p) => p.operationId === 'relevé').map((p) => [p.flowId, p.expectedDate])).toEqual([['f-salaire', '2026-09-25']]);
   });
 });

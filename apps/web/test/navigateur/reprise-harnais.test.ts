@@ -10,16 +10,38 @@
  * à venir et dont le salaire du 28 août a été repris par une opération du relevé. Les montants
  * attendus sont relus dans le cœur, sur le même exemple, et non figés ici.
  *
+ * Le point 9 (ajouté le 02/10) part d'un grand livre où une opération du relevé reprend une saisie :
+ * l'exemple n'a aucune opération du relevé. Il est écrit ici, par le cœur, puis importé par Réglages.
+ *
  * Niveaux (D83) : 1 pour ce que U1 promet à l'écran — corriger une opération prévue, ou la masquer,
  * depuis le détail d'un solde prévu, et la retrouver en retirant la saisie (point 2) ; 3 pour ce que
  * l'écran des opérations en dit, ce qu'une opération reprend et l'écart, et la reprise qui se défait
  * (point 4) ; 2 pour la seule sélection du flux à l'écran Flux prévus et la liste des automatismes
- * (point 5).
+ * (point 5) ; 1 encore pour ce que l'écran répond quand on supprime une saisie qu'une opération
+ * reprend, depuis l'écran Opérations et l'écran Saisie (point 9) : le mouvement ne compte pas deux
+ * fois. Le Plan n'offre pas cette suppression : voir la note du `describe`.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import initSqlJs from 'sql.js';
 import type { Page } from 'puppeteer-core';
-import { applyPatchToLedger, computePlan, correctPlannedOperation, euros, exampleLedger, formatCents } from '@tirelire/core';
-import { allerÀ, cliquer, navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
+import {
+  applyPatchToLedger,
+  computePlan,
+  correctPlannedOperation,
+  euros,
+  exampleLedger,
+  formatCents,
+  LEDGER_KEYS,
+  LedgerStore,
+  resumeEntry,
+  undoResumption,
+  type Ledger,
+  type Operation,
+} from '@tirelire/core';
+import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
 
 const pause = (ms = 200) => new Promise((r) => setTimeout(r, ms));
 /** Un montant tel que l'écran l'écrit, espaces normalisées comme à la lecture. */
@@ -278,6 +300,194 @@ describe.skipIf(!navigateur)('#306 · la reprise à l’écran, à 375 px', () =
       expect(enregistré).toBe(true);
       await pause(300);
       expect(await automatismes(), 'enregistrer un flux a engendré un automatisme').toEqual(avant);
+    } finally {
+      await page.close().catch(() => {});
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Point 9 : supprimer une saisie qu'une opération du relevé reprend
+// ---------------------------------------------------------------------------
+
+const SQL = await initSqlJs();
+const LECTURE_FICHIER = '2026-09-20';
+const PRINCIPAL = 'acc-principal';
+
+/**
+ * L'exemple, dont le salaire d'octobre est corrigé à 3 000 € par une saisie, que reprend une
+ * opération du relevé. Rend le grand livre, la saisie et l'opération du relevé.
+ */
+function avecReprise(): { l: Ledger; saisie: Operation; relevé: Operation } {
+  let l = exampleLedger();
+  const mv = computePlan(l, DÉBUT_OCTOBRE, LECTURE_FICHIER).forecast!.accounts.find((a) => a.name === COMPTE)!.movements.find((m) => m.flowId === 'flow-salaire')!;
+  l = applyPatchToLedger(l, correctPlannedOperation(l, 'flow-salaire', mv.date, euros(3000), mv.date));
+  const saisie = l.operations.find((o) => o.origin === 'manual' && o.plannedFlowId === 'flow-salaire' && o.plannedDate === mv.date)!;
+  const relevé: Operation = { id: 'releve-salaire', accountId: PRINCIPAL, origin: 'imported', date: mv.date, label: 'VIR SALAIRE OCTOBRE', normalizedLabel: 'VIR SALAIRE OCTOBRE', amount: euros(3100), state: 'untreated' };
+  l = { ...l, operations: [...l.operations, relevé] };
+  l = applyPatchToLedger(l, resumeEntry(l, relevé.id, saisie.id));
+  return { l, saisie, relevé: l.operations.find((o) => o.id === relevé.id)! };
+}
+
+/** Le solde prévu du compte courant en octobre, que le cœur calcule au jour de la page. */
+const soldeDuCœur = (l: Ledger) => fmt(computePlan(l, DÉBUT_OCTOBRE, LECTURE_FICHIER).forecast!.accounts.find((a) => a.name === COMPTE)!.end);
+
+/** Ce même grand livre, la reprise défaite puis la saisie supprimée. */
+function repriseDéfaiteSaisieSupprimée(l: Ledger, saisie: Operation, relevé: Operation): Ledger {
+  const défaite = applyPatchToLedger(l, undoResumption(l, relevé.id));
+  return { ...défaite, operations: défaite.operations.map((o) => (o.id === saisie.id ? { ...o, deletedAt: '2026-09-20T12:00:00.000Z' } : o)) };
+}
+
+/** Une page neuve sur ce grand livre, importé par le champ « Importer un fichier… » de Réglages. */
+async function pageAvec(site: Site, l: Ledger, dialogues: Dialogues): Promise<Page> {
+  const store = await LedgerStore.create({ sqlJs: SQL, siteId: 'audit-306' });
+  for (const clé of LEDGER_KEYS) for (const r of l[clé]) store.upsert(clé, r as never);
+  for (const clé of ['periodStartDay', 'principalCushion', 'transferThreshold', 'orderRounding'] as const) store.setSetting(clé, l.settings[clé]);
+  const octets = store.export();
+  store.close();
+  const dossier = mkdtempSync(join(tmpdir(), 'tirelire-306-'));
+  const chemin = join(dossier, 'grand-livre.sqlite');
+  writeFileSync(chemin, octets);
+  try {
+    const page = await nouvellePage(site);
+    // Le dialogue de l'import se confirme ; ensuite, ce sont ceux que l'écran pose qu'on note et qu'on tranche.
+    page.on('dialog', (d) => {
+      if (!dialogues.actif) return void d.accept();
+      dialogues.messages.push(d.message());
+      return void (dialogues.réponse === 'ok' ? d.accept() : d.dismiss());
+    });
+    await page.goto(site.url, { waitUntil: 'networkidle0' });
+    const fin = Date.now() + 15_000;
+    while (Date.now() < fin && !(await page.evaluate(() => !!document.querySelector('main') && !document.body.textContent?.includes('Ouverture de la base')).catch(() => false))) await pause(100);
+    await allerÀ(page, 'Plus');
+    expect(await cliquer(page, 'Réglages'), 'Réglages introuvable sous Plus').toBe(true);
+    await pause(300);
+    const champ = (await page.evaluateHandle(() => [...document.querySelectorAll<HTMLInputElement>('main input[type="file"]')].find((c) => /sqlite/i.test(c.accept)) ?? null)).asElement();
+    expect(champ, 'aucun champ pour importer un fichier SQLite dans Réglages').not.toBeNull();
+    await (champ as unknown as { uploadFile(p: string): Promise<void> }).uploadFile(chemin);
+    await pause(1_500);
+    dialogues.actif = true;
+    await allerÀ(page, 'Plan');
+    const prêt = Date.now() + 15_000;
+    while (Date.now() < prêt && !(await page.evaluate(() => [...document.querySelectorAll('main h2')].some((h) => h.textContent?.trim() === 'Tirelires')).catch(() => false))) await pause(100);
+    return page;
+  } finally {
+    rmSync(dossier, { recursive: true, force: true });
+  }
+}
+
+/** L'écran Opérations, sur toutes les opérations (il s'ouvre sur les non traitées). */
+async function toutesLesOpérations(page: Page): Promise<void> {
+  await allerÀ(page, 'Opérations');
+  await pause(300);
+  await page.evaluate(() => {
+    const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => (o.textContent ?? '').trim() === 'Non traitées')) as HTMLSelectElement | undefined;
+    const o = s && [...s.options].find((x) => (x.textContent ?? '').trim() === 'Toutes');
+    if (s && o) {
+      s.value = o.value;
+      s.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  await pause(300);
+}
+
+interface Dialogues {
+  actif: boolean;
+  réponse: 'ok' | 'annuler';
+  messages: string[];
+}
+const dialogues = (): Dialogues => ({ actif: false, réponse: 'annuler', messages: [] });
+
+/** Le solde prévu d'octobre, lu sur le Plan. */
+async function soldeAuPlan(page: Page): Promise<string | null> {
+  await allerÀ(page, 'Plan');
+  expect(await cliquer(page, OCTOBRE), 'bouton de la période octobre 2026 introuvable').toBe(true);
+  await pause(250);
+  return soldePrévu(page);
+}
+
+describe.skipIf(!navigateur)('#306 · point 9 — une saisie qu’une opération reprend ne se supprime pas tant que la reprise tient, à 375 px', () => {
+  // Pas d'épreuve depuis le Plan : une saisie reprise ne compte plus, le détail d'un solde prévu n'y liste
+  // alors que l'opération du relevé, sans bouton ; « Retirer la correction » n'y est pas offert pour elle.
+  let site: Site;
+  beforeAll(async () => {
+    site = await ouvrirLeSite();
+  }, 120_000);
+  afterAll(async () => {
+    await site?.fermer();
+  });
+
+  /** Le décor a un sens : la reprise tenue et la reprise défaite ne donnent pas le même solde prévu. */
+  function décor() {
+    const { l, saisie, relevé } = avecReprise();
+    const tenue = soldeDuCœur(l);
+    const défaite = soldeDuCœur(repriseDéfaiteSaisieSupprimée(l, saisie, relevé));
+    expect(tenue, 'défaire la reprise ne change rien au solde prévu : ce test ne vérifie rien').not.toBe(défaite);
+    return { l, saisie, relevé, tenue, défaite };
+  }
+
+  it.each([
+    ['Opérations', 'Supprimer'],
+    ['Saisie manuelle', '×'],
+  ])('[niveau 1] depuis l’écran %s, supprimer la saisie reprise le dit, et ne change rien tant qu’on ne défait pas la reprise ; acceptée, la reprise se défait et la saisie se supprime', async (écran, bouton) => {
+    const { l, saisie, tenue, défaite } = décor();
+    const d = dialogues();
+    const page = await pageAvec(site, l, d);
+    try {
+      expect(await soldeAuPlan(page)).toBe(tenue);
+      /** Ouvre l'écran, et clique `bouton` sur la ligne de la saisie ; rend si la ligne y était. */
+      const supprimer = async (): Promise<boolean> => {
+        if (écran === 'Opérations') {
+          await toutesLesOpérations(page);
+          const ouvert = await page.evaluate((libellé: string) => {
+            const ligne = [...document.querySelectorAll('main .row')].find((r) => (r.querySelector('button.label strong')?.textContent ?? '') === libellé);
+            (ligne?.querySelector('button.label') as HTMLButtonElement | null)?.click();
+            return !!ligne;
+          }, saisie.label);
+          if (!ouvert) return false;
+          await pause(200);
+        } else {
+          await allerÀ(page, 'Plus');
+          if (!(await cliquer(page, 'Saisie manuelle'))) return false;
+          await pause(300);
+        }
+        return page.evaluate(
+          (libellé: string, b: string, depuis: string) => {
+            const lignes = [...document.querySelectorAll('main .row')].filter((r) => (r.querySelector('strong')?.textContent ?? '') === libellé);
+            const ligne = depuis === 'Opérations' ? document.querySelector('main') : lignes[0];
+            const cible = [...(ligne?.querySelectorAll('button') ?? [])].find((x) => (x.textContent ?? '').trim() === b);
+            if (!cible || (depuis !== 'Opérations' && !lignes.length)) return false;
+            (cible as HTMLButtonElement).click();
+            return true;
+          },
+          saisie.label,
+          bouton,
+          écran,
+        );
+      };
+
+      d.réponse = 'annuler';
+      expect(await supprimer(), `la saisie « ${saisie.label} » n’a pas de bouton « ${bouton} » à l’écran ${écran}`).toBe(true);
+      await pause(250);
+      expect(d.messages, 'l’écran n’a posé aucune question').toHaveLength(1);
+      expect(d.messages[0]).toMatch(/ne se supprime pas tant que la reprise tient/);
+      expect(d.messages[0], 'le message ne dit pas ce qui reprend la saisie').toMatch(/VIR SALAIRE OCTOBRE/);
+      expect(await soldeAuPlan(page), 'refuser a changé le solde prévu').toBe(tenue);
+
+      d.réponse = 'ok';
+      expect(await supprimer(), 'la saisie n’est plus là après avoir refusé').toBe(true);
+      await pause(250);
+      expect(d.messages).toHaveLength(2);
+      expect(await soldeAuPlan(page), 'la reprise défaite et la saisie supprimée, le solde prévu n’est pas celui du cœur').toBe(défaite);
+      // La reprise est défaite : l'opération du relevé ne reprend plus la saisie supprimée, et l'occurrence
+      // que la saisie corrigeait lui est de nouveau proposée.
+      await toutesLesOpérations(page);
+      const ligne = await ligneOpération(page, /VIR SALAIRE OCTOBRE/);
+      expect(ligne, 'l’opération du relevé n’est plus à l’écran').not.toBeNull();
+      expect(ligne, 'l’opération du relevé reprend encore la saisie supprimée').not.toMatch(/reprend la saisie/);
+      expect(ligne, 'l’opération du relevé n’est pas de nouveau proposée à l’occurrence du salaire').toMatch(/Proposition : reprendre l’opération prévue « Salaire » du/);
+      expect(await supprimer(), 'la saisie supprimée se lit encore à l’écran').toBe(false);
+      expect(d.messages, 'supprimer une saisie que rien ne reprend plus ne devait rien demander de tel').toHaveLength(2);
     } finally {
       await page.close().catch(() => {});
     }
