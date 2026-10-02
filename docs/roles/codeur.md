@@ -17,10 +17,10 @@ Avant tout, lis les documents fondateurs (D77) et l'issue.
    non-régression navigateur) : l'auditeur va déplacer et modifier tes tests en composant le harnais,
    et ce que tu aurais joué de plus serait à rejouer (porteur, 02/10). En brouillon, ton verdict est
    local : `pnpm typecheck`, tes propres tests, joués à la main (`pnpm --dir <paquet> run test 4
-   <fichiers>`), le harnais du besoin s'il existe, au plus la garde (`pnpm --dir packages/gardes run
-   test`) et, si tu modifies une fonction de la garde, ses tests de développement (D81) : `pnpm --dir
-   packages/gardes run test 4 'dev/*.dev.mjs'` ; rien d'autre (D83). La livraison du push joue
-   d'elle-même ce que D83 prévoit.
+   <fichiers>`), le harnais du besoin s'il existe, au plus la garde (`node packages/gardes/cli.mjs pr
+   --issue <n>`, ou `--corps-fichier`, D81) et, si tu modifies une fonction de la garde, ses tests de
+   développement (D81) : `pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'` ; rien d'autre
+   (D83). La livraison du push joue d'elle-même ce que D83 prévoit.
 
    Chaque ensemble de tests a son empreinte, l'état des chemins qu'il lit, et chaque fichier de test
    ne se rejoue pas sur une empreinte déjà trouvée verte, ni à tes lancements suivants, ni aux

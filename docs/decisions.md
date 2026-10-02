@@ -1553,8 +1553,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   PR : à chaque livraison (pré-push, pré-fusion) et au Ready, en entier, niveau 4 compris, sauf
   chaque fichier vert sur son empreinte (définition commune : `.githooks/tests-de-l-issue.sh`, et
   `harnais-du-besoin.sh` pour le harnais) ; hors harnais, ils sont de la non-régression, qui bloque,
-  et ne s'attestent que fichier par fichier. Le codeur ou l'auditeur peut demander toute la
-  non-régression dans le navigateur par `pnpm livraison --navigateur`, qui juge le dernier commit de
+  et ne s'attestent que fichier par fichier. Le codeur, si l'issue le requiert (#316), ou
+  l'auditeur, sur demande justifiée ou pour une mesure, peut demander toute la non-régression dans le
+  navigateur par `pnpm livraison --navigateur`, qui juge le dernier commit de
   la branche comme un premier push, tests navigateur compris ; verts, ils sont attestés sur leur
   empreinte et l'attestation part sur `origin`. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
   demandés, et pourquoi. Un lancement des tests navigateur ne construit le site qu'une fois, quel
