@@ -27,7 +27,7 @@ recopier : son harnais échoue au-delà, ou sa vérification manuelle la constat
 - **Au passage en Ready de chaque PR**, par le job « Validation » : la section « Invariants et
   contraintes » de l'issue que la PR ferme (`Close #n`) déclare les identifiants touchés et ceux dont
   le lien pourrait être masqué ; un fichier modifié qui répond aux `Chemins` d'une entrée impose de la
-  déclarer, et la garde rougit en nommant l'entrée manquante ; chaque vérification manuelle des
+  déclarer, et la garde rougit en nommant l'entrée manquante et, dans le même passage, ses vérifications manuelles (#328) ; chaque vérification manuelle des
   entrées déclarées, et chaque garde retirée de ce document, figure dans la section avec sa consigne
   recopiée. Tant qu'il manque quelque chose, le job est rouge. Aucune case : la fusion vaut validation, et
   un changement de la PR ou de l'issue après le Ready est signalé en commentaire de la PR. La même vérification se joue en local, avant le Ready :

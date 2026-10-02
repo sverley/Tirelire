@@ -189,7 +189,10 @@ describe('[niveau 1] tests de la garde · D81 : la garde se vérifie elle-même,
     });
 
     test("un fichier modifié qui répond aux chemins d'une entrée impose de la déclarer", () => {
-      assert.match(texte(pr(section('aucun', 'aucun'), ['b/deux.mjs']).aCorriger), /C1 n'est pas déclaré alors que la PR modifie b\/deux\.mjs/);
+      const imposee = texte(pr(section('aucun', 'aucun'), ['b/deux.mjs']).aCorriger);
+      assert.match(imposee, /C1 n'est pas déclaré alors que la PR modifie b\/deux\.mjs/);
+      // Dans le même passage, ses vérifications manuelles sont demandées (#328).
+      assert.match(imposee, /`VM-C1-appareil` \(C1\) est demandée mais ne figure pas/);
       const declaree = pr(section('aucun', 'C1', item('VM-C1-appareil')), ['b/deux.mjs']);
       assert.deepEqual(declaree.aCorriger, []);
     });
