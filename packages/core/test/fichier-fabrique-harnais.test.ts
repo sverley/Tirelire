@@ -16,8 +16,8 @@
  * et sa version (D88, point 4 : « tout le reste refuse ») — qu'aucun test ne gardait ; la commande
  * jouée sans aucune connexion hors de la machine (I7), par le script du `package.json`.
  *
- * Chaque `describe` reprend un point du « Fait quand », sous son numéro. Le point 11, la
- * documentation, est relu. Le point 8 est joué selon le texte que le codeur propose au porteur dans
+ * Chaque `describe` reprend un point du « Fait quand », sous son numéro ; le dernier, `C5`, garde ce
+ * que la vérification ne doit jamais refuser. Le point 11, la documentation, est relu. Le point 8 est joué selon le texte que le codeur propose au porteur dans
  * l'issue — celui de l'issue ne peut pas tenir, l'exemple portant des réglages et un compte
  * principal renseignés — et attend sa réponse.
  *
@@ -419,7 +419,7 @@ describe('[niveau 2] #198 · 10. toute colonne qui désigne une ligne d’une au
   });
 });
 
-describe('[niveau 0] #198 · 11. une sauvegarde de l’application se rouvre sous la vérification entière (C5)', () => {
+describe('[niveau 0] #198 · C5. une sauvegarde de l’application se rouvre sous la vérification entière', () => {
   it('toutes les tables, des lignes supprimées, des sous-opérations sur trois niveaux, un appareil, des réglages : rien n’est refusé, rien n’est complété, tout revient', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 'a' });
     const l = exempleCompletDeToutesLesTables();
