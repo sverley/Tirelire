@@ -10,8 +10,11 @@
  * toutes tables, lignes supprimées et sous-opérations à plusieurs niveaux, qui se rouvre sous la
  * vérification entière (la vérification ne refuse jamais ce que l'application a écrit) ; une ligne
  * qui a déjà une horloge la garde ; chaque violation du point 2 qui se lit ligne par ligne, refusée
- * aussi à la réception d'un paquet (point 6 : le codeur n'en jouait que trois) ; la commande jouée
- * sans aucune connexion hors de la machine (I7), par le script du `package.json`.
+ * aussi à la réception d'un paquet (point 6 : le codeur n'en jouait que trois) ; les quatre refus que
+ * le codeur a ajoutés à la liste du point 2 — une sous-opération sous une autre opération que la
+ * sienne, un cycle de parents, une catégorie son propre parent, une clé de `meta` autre que le format
+ * et sa version (D88, point 4 : « tout le reste refuse ») — qu'aucun test ne gardait ; la commande
+ * jouée sans aucune connexion hors de la machine (I7), par le script du `package.json`.
  *
  * Chaque `describe` reprend un point du « Fait quand », sous son numéro. Le point 11, la
  * documentation, est relu. Le point 8 est joué selon le texte que le codeur propose au porteur dans
@@ -70,6 +73,10 @@ function fabriquer(tables: Tables = {}): Uint8Array {
   db.run('CREATE TABLE meta (key TEXT, value TEXT)');
   db.run('INSERT INTO meta VALUES (?, ?), (?, ?)', ['format', FILE_FORMAT, 'format_version', String(FORMAT_VERSION)]);
   for (const [nom, lignes] of Object.entries(tables)) {
+    if (nom === 'meta') {
+      for (const l of lignes) db.run('INSERT INTO meta VALUES (?, ?)', [l['key'] ?? null, l['value'] ?? null]); // des clés de plus, dans la table qui porte le format
+      continue;
+    }
     const cols = [...new Set(lignes.flatMap((l) => Object.keys(l)))];
     db.run(`CREATE TABLE ${nom} (${cols.join(', ')})`);
     for (const l of lignes) db.run(`INSERT INTO ${nom} VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => l[c] ?? null));
@@ -94,6 +101,7 @@ async function refus(octets: Uint8Array): Promise<FichierRefuse> {
 const OP: Ligne = { id: 'op-1', account_id: MAIN_ACCOUNT_ID, origin: 'manual', date: '2026-09-06', label: 'Pain', amount: -350, state: 'untreated' };
 const op = (o: Ligne = {}): Ligne => ({ ...OP, ...o });
 const VARIABLE = '{"kind":"variable"}';
+const FIXE = '{"kind":"fixed","amount":-100}';
 const part = (id: string, share: string, o: Ligne = {}): Ligne => ({ id, operation_id: 'op-1', share, ...o });
 const PLACEMENT_2_VARIABLES = JSON.stringify([
   { accountId: MAIN_ACCOUNT_ID, share: { kind: 'variable' } },
@@ -197,6 +205,10 @@ const VIOLATIONS: Violation[] = [
   },
   { cas: 'un identifiant qui se répète dans une table', tables: { operations: [OP, OP] }, table: 'operations', id: 'op-1', colonne: 'id', lie: true },
   { cas: 'une ventilation sans son opération', tables: { sub_operations: [part('s-1', VARIABLE, { operation_id: 'op-absente' })] }, table: 'sub_operations', id: 's-1', colonne: 'operation_id', lie: true },
+  { cas: 'une sous-opération rangée sous une sous-opération d’une autre opération (D88)', tables: { operations: [OP, op({ id: 'op-2' })], sub_operations: [part('s-1', FIXE), part('s-2', FIXE, { operation_id: 'op-2', parent_id: 's-1' })] }, table: 'sub_operations', id: 's-2', colonne: 'parent_id', lie: true },
+  { cas: 'des sous-opérations qui se contiennent l’une l’autre (D88)', tables: { operations: [OP], sub_operations: [part('s-1', FIXE, { parent_id: 's-2' }), part('s-2', FIXE, { parent_id: 's-1' })] }, table: 'sub_operations', id: 's-1', colonne: 'parent_id', lie: true },
+  { cas: 'une catégorie qui est son propre parent', tables: { categories: [{ id: 'c-1', name: 'Courses', nature: 'expense', parent_id: 'c-1' }] }, table: 'categories', id: 'c-1', colonne: 'parent_id', lie: true },
+  { cas: 'une clé de meta autre que le format et sa version', tables: { meta: [{ key: 'auteur', value: 'script' }] }, table: 'meta', id: 'auteur', lie: true },
   { cas: 'une horloge présente qui ne se lit pas', tables: { operations: [op({ hlc: 'hier' })] }, table: 'operations', id: 'op-1', colonne: 'hlc' },
   {
     cas: 'un second compte principal (D40)',
