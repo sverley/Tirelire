@@ -1477,9 +1477,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   chemin oublié de la liste fait jouer plus, jamais moins : tout fichier qu'elle n'écarte pas change
   l'empreinte. La garde et l'hébergement lisent tout le dépôt. Une PR qui ne change que
   des fichiers de `docs/` ne rejoue donc que la garde et l'hébergement, à tout lancement à
-  la main, sur la branche comme sur une tête détachée, à la livraison et au Ready — et, hors la
-  livraison, l'interface sans navigateur si elle change `docs/decisions.md`, que lit
-  `stockage-domaine.test.ts` ; le lancement dit, pour chaque autre ensemble, qu'il le saute et pourquoi (#314). Pour les tests navigateur, la liste
+  la main, sur la branche comme sur une tête détachée, à la livraison et au Ready, `docs/decisions.md`
+  compris : ce qui confronte une décision au code est un test de la garde ; le lancement dit, pour chaque autre ensemble, qu'il le saute et pourquoi (#314). Pour les tests navigateur, la liste
   est celle du point 9 de #237 : `docs/`, `.github/`, `.githooks/`, `packages/gardes/`,
   `apps/hebergement/`, `apps/relay/`, les fichiers `*.md` et `.gitignore`. La garde y figure : les
   tests navigateur la lisent par leur lanceur, mais l'interface sans navigateur, qui la lit par le

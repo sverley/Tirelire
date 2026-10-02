@@ -33,8 +33,8 @@ describe('[niveau 4] #314 · au Ready, une documentation seule', () => {
     assert.deepEqual(couverts('docs/roles/auditeur.md'), ['coeur', 'interface', 'relais']);
   });
 
-  test('[niveau 4] point 2 · `docs/decisions.md`, que lit aussi l’interface sans navigateur (`stockage-domaine.test.ts`) : elle se rejoue aussi', () => {
-    assert.deepEqual(couverts('docs/decisions.md'), ['coeur', 'relais']);
+  test('[niveau 4] points 2 et 6 · `docs/decisions.md` compris : l’interface sans navigateur ne lit plus rien de docs/', () => {
+    assert.deepEqual(couverts('docs/decisions.md'), ['coeur', 'interface', 'relais']);
   });
 });
 
