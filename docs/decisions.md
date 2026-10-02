@@ -1561,8 +1561,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   PR : à chaque livraison (pré-push, pré-fusion) et au Ready, en entier, niveau 4 compris, sauf
   chaque fichier vert sur son empreinte (définition commune : `.githooks/tests-de-l-issue.sh`, et
   `harnais-du-besoin.sh` pour le harnais) ; hors harnais, ils sont de la non-régression, qui bloque,
-  et ne s'attestent que fichier par fichier. Le codeur ou l'auditeur peut demander toute la
-  non-régression dans le navigateur par `pnpm livraison --navigateur`, qui juge le dernier commit de
+  et ne s'attestent que fichier par fichier. Le codeur, si l'issue le requiert (#316), ou
+  l'auditeur, sur demande justifiée ou pour une mesure, peut demander toute la non-régression dans le
+  navigateur par `pnpm livraison --navigateur`, qui juge le dernier commit de
   la branche comme un premier push, tests navigateur compris ; verts, ils sont attestés sur leur
   empreinte et l'attestation part sur `origin`. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
   demandés, et pourquoi. Un lancement des tests navigateur ne construit le site qu'une fois, quel
@@ -1577,8 +1578,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
 - **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck`, ses propres tests, à la main,
-  et le harnais du besoin s'il existe, plus, s'il modifie une fonction de la garde, ses tests de
-  développement (D81) ; l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready, hors
+  le harnais du besoin s'il existe, au plus la garde, et, s'il modifie une fonction de la garde, ses
+  tests de développement (D81) — pas la suite : l'auditeur déplacera et modifiera ses tests en
+  composant le harnais (#316) ; l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready, hors
   tests navigateur sauf sa demande. Aucune CI ne tourne en brouillon. Les crochets
   font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
   tests de niveau 0 des paquets que touchent les fichiers indexés — cœur ; garde ; relais ;
