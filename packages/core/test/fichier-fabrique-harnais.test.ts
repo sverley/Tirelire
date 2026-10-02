@@ -332,18 +332,26 @@ describe('#198 · 7. un fichier fabriqué qui s’est ouvert devient un fichier 
   });
 
   it('[niveau 1] un compte principal resté à son défaut cède toujours devant un compte principal renseigné, dans les deux sens (D40, I8)', async () => {
-    const sansPrincipal = tablesDe(exampleLedger(), { sansPrincipal: true });
     const renseigne = { id: MAIN_ACCOUNT_ID, name: 'Compte joint', kind: 'principal', openingBalance: 123_45, openingDate: '2026-01-01' } as const;
-    const a = await ouvrir(fabriquer(sansPrincipal), 'a');
-    const b = await LedgerStore.create({ sqlJs: SQL, siteId: 'b' });
-    b.upsert('accounts', renseigne);
-    importBundle(a, exportBundle(b));
-    expect(a.load().accounts.find((x) => x.id === MAIN_ACCOUNT_ID)).toMatchObject({ name: 'Compte joint', openingBalance: 123_45 });
-    const c = await ouvrir(fabriquer(sansPrincipal), 'c');
-    const d = await LedgerStore.create({ sqlJs: SQL, siteId: 'd' });
-    d.upsert('accounts', renseigne);
-    importBundle(d, exportBundle(c));
-    expect(d.load().accounts.find((x) => x.id === MAIN_ACCOUNT_ID)).toMatchObject({ name: 'Compte joint', openingBalance: 123_45 });
+    const parDefaut: Ligne = { id: MAIN_ACCOUNT_ID, name: 'Compte principal', kind: 'principal', opening_balance: 0, opening_date: '1970-01-01' };
+    const ancien = () => LedgerStore.create({ sqlJs: SQL, siteId: 'ailleurs', now: () => 1_700_000_000_000 }); // le compte renseigné est plus vieux que l'ouverture du fichier : seule l'absence d'horloge le fait gagner
+    const nomDuPrincipal = (s: LedgerStore) => s.load().accounts.find((x) => x.id === MAIN_ACCOUNT_ID)?.name;
+    for (const [cas, fichier] of [
+      ['compte principal absent du fichier', () => fabriquer()],
+      ['compte principal écrit à son défaut dans le fichier, sans horloge', () => fabriquer({ accounts: [parDefaut] })],
+    ] as const) {
+      const b = await ancien();
+      b.upsert('accounts', renseigne);
+      const a = await ouvrir(fichier(), 'a');
+      importBundle(a, exportBundle(b));
+      expect(nomDuPrincipal(a), `${cas} : le défaut reçoit le renseigné`).toBe('Compte joint');
+
+      const d = await ancien();
+      d.upsert('accounts', renseigne);
+      const c = await ouvrir(fichier(), 'c');
+      importBundle(d, exportBundle(c));
+      expect(nomDuPrincipal(d), `${cas} : le défaut envoyé ne remplace pas le renseigné`).toBe('Compte joint');
+    }
   });
 
   it('[niveau 2] un compte principal écrit dans le fichier exactement à son défaut, sans horloge, reste un défaut', async () => {
