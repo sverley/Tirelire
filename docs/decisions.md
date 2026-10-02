@@ -1342,7 +1342,8 @@ choses, et rien de plus :
    vérification manuelle décrite ;
 2. une PR qui modifie un document fondateur, ou un fichier qu'une entrée du registre nomme, a l'entrée
    déclarée dans la section « Invariants et contraintes » de l'issue qu'elle ferme (`Close #n`) ;
-   sinon elle est rouge, et la garde nomme l'entrée manquante ;
+   sinon elle est rouge, et la garde nomme l'entrée manquante et, dans le même passage, ses
+   vérifications manuelles (#328) ;
 3. chaque vérification manuelle des entrées déclarées figure dans cette section, sa consigne
    recopiée, sans case : la fusion vaut validation.
 

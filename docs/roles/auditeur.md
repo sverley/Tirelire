@@ -40,8 +40,11 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    documentation et la garde (D81) — n'a pas de harnais.
 3. Vérifie le travail en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
-   un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready, garde comprise
-   (`node packages/gardes/cli.mjs pr --issue <n>`). Une tête détachée reste permise quand tu en as
+   un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **À chaque tour,
+   joue aussi la garde**, l'outil, que `pnpm test 2` ne joue pas : `node packages/gardes/cli.mjs pr
+   --issue <n>`, ou `--corps-fichier` avec le corps de l'issue. Elle seule dit les entrées du
+   registre que les fichiers modifiés imposent, et leurs vérifications manuelles : ajoute-les dans
+   l'issue, signées (étape 1). Une tête détachée reste permise quand tu en as
    besoin : elle saute ce que couvre la base commune avec `main`, mais n'atteste rien (D83, « Les
    empreintes »). Avant de relancer, lis ce que le lanceur dit jouer et sauter, et pourquoi (D83).
    Les tests navigateur de l'issue — les fichiers

@@ -893,11 +893,14 @@ export function verifierPr({ entrees, entreesAvant = new Map(), corps, fichiersM
   for (const id of declares) if (!entrees.has(id)) aCorriger.push(`${id} est déclaré mais n'a pas d'entrée dans ${G}.`);
   for (const [id, fichiers] of imposes) {
     if (!declares.includes(id)) {
-      aCorriger.push(`${id} n'est pas déclaré alors que la PR modifie ${listeCourte(fichiers)} : l'ajouter à « Touchés » ou à « Lien possible masqué ».`);
+      aCorriger.push(`${id} n'est pas déclaré alors que la PR modifie ${listeCourte(fichiers)} : l'ajouter à « Touchés » ou à « Lien possible masqué », avec ses vérifications manuelles (\`demander --ids ${id}\` les écrit).`);
     }
   }
 
-  const requises = demandes(entrees, entreesAvant, declares, fichiersModifies);
+  // Une entrée imposée mais non déclarée fait demander ses vérifications dans le même passage :
+  // une seule correction de la section suffit (#328).
+  const aDemander = [...new Set([...declares, ...[...imposes.keys()].filter((id) => entrees.has(id))])];
+  const requises = demandes(entrees, entreesAvant, aDemander, fichiersModifies);
   const connues = new Set([...requises.keys(), ...[...entrees.values()].flatMap((e) => e.verifications.map((v) => v.id))]);
   const listees = new Map();
   for (const item of pr.items) {
