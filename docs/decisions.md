@@ -124,8 +124,10 @@ un virement vers ce compte (`matchTirelireTransfers`), puis ventilée sur ses ti
 
 Un flux prévu est pointé automatiquement seulement si le montant est exact (ou dans la tolérance
 avec libellé reconnu) et que le flux n'est pas marqué variable ; sinon c'est une proposition à
-confirmer. Une occurrence d'un flux n'est pointée qu'une fois. Les flux dont la fenêtre est
-passée sans opération remontent en « attendus, non reçus ».
+confirmer. Ce que la sélection du flux ne reconnaît pas — son compte, son motif de libellé, sa
+tolérance de montant, la fenêtre de ses occurrences (D24) — n'est ni pointé ni proposé. Une
+occurrence d'un flux se désigne par son flux et sa date (D88), et n'est pointée qu'une fois. Les
+flux dont la fenêtre est passée sans opération remontent en « attendus, non reçus ».
 
 Ce que l'hypothèse du pointage exact cachait : un prélèvement du 5 passe le 7 quand le 5 tombe un
 samedi, une facture varie, un salaire varie avec les heures supplémentaires, et deux abonnements
@@ -194,8 +196,10 @@ synchronisé — ce qui est verrouillé. Toute modification manuelle d'une opér
 c'est la modification qui change l'état, pas l'ouverture de l'éditeur. Seul l'utilisateur
 déverrouille, à l'unité ou par action groupée (D26). Renomme le pointage de D12 en **rapprochement
 de flux**, qui reste la mise en correspondance avec une échéance attendue — une reprise, au sens de
-D88 — et ne change aucun état à lui seul ; les deux sens du mot ne doivent plus cohabiter dans le
-code ni dans l'interface.
+D88, de l'opération prévue que désignent le flux et sa date — et ne change aucun état à lui seul ;
+les deux sens du mot ne doivent plus cohabiter dans le code ni dans l'interface. Ce qu'un flux
+reprend devient *rapproché* parce que le flux, un automatisme, le classe, et *verrouillé* si le flux
+le demande (D24).
 
 Ce que l'hypothèse de la donnée propre cachait : une opération importée, une opération saisie et une
 opération corrigée n'ont pas la même autorité ; sans état, la synchronisation écrase la correction
@@ -207,11 +211,11 @@ Une règle a une **sélection** (libellé, montant, compte, date, période de va
 dont chaque champ est facultatif : catégorie, tirelire, ventilation, état. L'état prend quatre
 valeurs — *Verrouiller*, *Rapprocher*, *Ne rien faire*, *Déverrouiller* — la dernière indisponible
 dans une règle. Défauts : *Rapprocher* pour une règle déterministe, *Ne rien faire* pour une règle
-contextuelle ou bayésienne, *Verrouiller* pour une règle issue d'un flux du budget et portant toute
-la classification. Le **rang** est l'index dans la liste ; les règles s'appliquent du rang le plus
-élevé au rang 1, chaque champ renseigné écrasant la valeur posée par une règle moins prioritaire,
-les champs vides laissant en place. Pas de détection de conflit : le rang tranche. Aperçu obligatoire
-avant validation, montrant l'avant et l'après sur les opérations concernées. Les règles ne sont pas
+contextuelle ou bayésienne ; un flux (D24) *Rapproche* ce qu'il reprend, et le *Verrouille* s'il le
+demande, portant alors toute sa classification. Le **rang** est l'index dans la liste ; les règles
+s'appliquent du rang le plus élevé au rang 1, chaque champ renseigné écrasant la valeur posée par
+une règle moins prioritaire, les champs vides laissant en place. Pas de détection de conflit : le
+rang tranche. Aperçu obligatoire avant validation, montrant l'avant et l'après sur les opérations concernées. Les règles ne sont pas
 de la vérité, ce sont des automatismes ; elles s'exportent avec leurs périodes de validité, ce qui
 les rend rejouables dans l'ordre chronologique sur un historique importé. Conséquence à traiter dans
 l'interface : avec *Ne rien faire*, une opération peut porter une classification tout en restant non
@@ -219,10 +223,14 @@ traitée — « rien dessus » et « quelque chose que personne n'a regardé » 
 
 ### D24 · Un flux est un automatisme
 
-Un flux prévu est un automatisme doté d'une récurrence (D88) : sa sélection, la seule, reconnaît
-l'opération qui réalise chaque occurrence ; ses actions, facultatives, la classent. Modifier le flux
-**archive** son automatisme en lui posant une fin de validité et en crée un nouveau : les opérations
-déjà classées ne sont pas réécrites, puisqu'aucun automatisme nouveau ne les sélectionne.
+Un flux prévu est un automatisme doté d'une récurrence (D88) : sa sélection, la seule — son compte,
+son motif de libellé, sa tolérance de montant et la fenêtre de ses occurrences (D12) —, reconnaît
+l'opération qui réalise chaque occurrence, qui la reprend ; ses actions, facultatives, la classent :
+sa ventilation, que l'opération prend si elle n'en a pas, et le verrouillage, s'il le demande. Aucun
+automatisme n'est engendré à part d'un flux : une opération que sa sélection ne reconnaît pas n'est
+ni reprise ni classée par lui. Modifier le flux ne réécrit aucune opération déjà reprise : elle a
+pris, en le reprenant, ce que le flux lui donnait, et le moteur d'automatismes repart de ce que la
+reprise a établi (D33).
 
 ### D25 · Abandon de l'année budgétaire
 
@@ -248,8 +256,8 @@ la part **variable** — calculée, égale au montant de l'opération moins les 
 opération a par défaut une ligne unique variable, qui prend donc l'intégralité du montant ; ajouter
 des lignes la réduit d'autant, jusqu'à zéro, jamais en négatif. Une seule ligne variable par
 ventilation. La ventilation ne dépend que de l'opération : le rejeu reste déterministe même à montant
-inconnu d'avance, donc un flux à montant variable peut engendrer une règle verrouillante. Une
-ventilation qui dépendrait du contexte — solde d'une tirelire, état du plan — sort de ce cadre :
+inconnu d'avance, donc un flux à montant variable peut classer et verrouiller ce qu'il reprend (D24).
+Une ventilation qui dépendrait du contexte — solde d'une tirelire, état du plan — sort de ce cadre :
 elle est une aide, et son résultat doit être figé sur l'opération au moment où il est produit.
 Remplace la ventilation de D10, dont « une catégorie et une tirelire par ligne » reste valable.
 Une ligne de ventilation est une sous-opération (D88), qui peut à son tour en contenir.
@@ -325,14 +333,13 @@ que retirer une règle défasse ce qu'elle avait posé. Mais le rapprochement de
 l'appariement des virements internes ne sont pas des règles, et un moteur qui repart vraiment de
 rien les efface aussitôt posés — le pipeline se défait lui-même.
 
-Le calcul part donc de ce que l'import a établi : une opération rapprochée d'un flux ou appariée
-en virement interne est *rapprochée*, avec la ventilation que cette étape lui a donnée ; les
-autres partent vierges et non traitées. Les règles écrivent par-dessus, champ par champ, selon
+Le calcul part donc de ce que l'import a établi : une opération qui en reprend une autre (D88) ou
+appariée en virement interne est *rapprochée*, avec la ventilation que cette étape lui a donnée ;
+les autres partent vierges et non traitées. Les règles écrivent par-dessus, champ par champ, selon
 D23. Retirer une règle rend l'opération à cet état d'import, pas à rien.
 
-Conséquence : un flux qui engendre une règle (D24) et le rapprochement de ce même flux disent la
-même chose, ce qui est cohérent — la règle verrouille et gagne, le rapprochement reste la trace
-de l'échéance servie.
+Conséquence : un flux n'a pas de règle à lui à côté de sa reprise (D24) ; ce qu'il reprend garde la
+ventilation qu'il lui a donnée, et un flux qui verrouille le met hors d'atteinte des règles (D22).
 
 ### D35 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
 
@@ -1087,7 +1094,7 @@ usage (I3) :
 
 Le format d'état ne reprend pas celui du journal : le produit n'a pas encore d'utilisateur, et un
 fichier au format du journal est refusé comme tout format inconnu. Le format parle le vocabulaire du
-domaine : la table `tirelires` et les colonnes `tirelire_id` (D42), `makes_automation` (D39) ; aucun
+domaine : la table `tirelires` et les colonnes `tirelire_id` (D42), la table `automations` (D39) ; aucun
 nom de table ni de colonne ne dit « enveloppe » ni « règle », et un même nom désigne la même chose
 d'une table à l'autre — `rank` n'est que la clé triable d'un automatisme (D31). Il ne porte ni
 colonne dépréciée, ni table laissée pour un pair en arrière, ni version du modèle à côté de celle du
@@ -1121,11 +1128,13 @@ Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'
 recalcule (D84). Importées : `account_id`, `date`, `label`, `details`, `amount` et
 `suggested_category`, la catégorie que propose la source. Saisie : `one_off`, et toutes les
 colonnes d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit pas
-dans la forme de l'identifiant, qui n'est qu'une identité (D09). Quatre colonnes établies sont
-gardées : `state`, que posent l'import, les automatismes ou l'utilisateur (D22), et
-`planned_flow_id`, `transfer_account_id` et `transfer_operation_id`, que le rapprochement établit.
-Elles ne se recalculent pas à l'identique : le rapprochement dépend des flux et des opérations du
-jour où il a eu lieu, une proposition confirmée ou un verrouillage est une décision de
+dans la forme de l'identifiant, qui n'est qu'une identité (D09). Six colonnes établies sont
+gardées : `state`, que posent l'import, les automatismes ou l'utilisateur (D22) ; `planned_flow_id`
+et `planned_date`, l'opération prévue reprise, désignée par son flux et sa date, ou
+`resumed_operation_id`, la saisie reprise, que la reprise établit (D88) ; `transfer_account_id` et
+`transfer_operation_id`, que la reconnaissance des virements établit. Elles ne se recalculent pas à
+l'identique : la reprise et la reconnaissance des virements dépendent des flux et des opérations du
+jour où elles ont eu lieu, une proposition confirmée ou un verrouillage est une décision de
 l'utilisateur (D12, D22), et le moteur d'automatismes repart de ce qu'elles établissent (D33). Le
 libellé normalisé, lui, se déduit du libellé seul (`normalizeLabel`) : il ne se stocke pas, il se
 recalcule à la lecture du fichier. Le rang parmi les identiques du jour n'entre que dans la clé
