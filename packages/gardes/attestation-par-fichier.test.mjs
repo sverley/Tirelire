@@ -10,8 +10,8 @@
  * à un seuil au moins égal (point 4) ; n'est pas attesté, ou pas au-delà du seuil joué, un fichier
  * rouge, sauté faute d'outil, écarté en partie par le seuil, ou joué pendant qu'un fichier lu changeait
  * (points 1 et 2) ; un appel nommé se joue toujours (point 2) ; le harnais du besoin pas joué en entier
- * se rejoue (point 5) ; sur `main`, une sous-branche ou une tête détachée — le tag —, rien ne se saute
- * (point 4).
+ * se rejoue (point 5) ; sur `main`, rien ne se saute ; sur une sous-branche ou une tête détachée — le
+ * tag —, seule la base commune avec `main`, jusqu'au seuil 2, et rien ne s'atteste (point 4 ; #314).
  *
  * **Le dégradé** (niveau 3) : si ces tests tombent, le résultat reste juste, obtenu plus lentement ou
  * moins lisiblement — ce qui a tourné vert ne se rejoue pas, et chaque lancement dit ce qu'il joue et
@@ -297,16 +297,19 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     assert.equal(f.attestation('codage/995-change'), null);
   });
 
-  test('[niveau 1] point 4 · sur main, sur une sous-branche et sur une tête détachée (le tag), rien ne se saute ni ne s’atteste', async () => {
+  test('[niveau 1] point 4 · sur main rien ne se saute ; sur une sous-branche et sur une tête détachée (le tag), seule la base commune avec main, jusqu’au seuil 2 (#314) ; rien ne s’y atteste', async () => {
     const f = dépôtInventé('main');
-    for (const branche of ['main', 'codage/994-x--codeur']) {
-      if (branche !== 'main') f.git('checkout', '-q', '-b', branche);
-      await f.tester('packages/core', '2');
-      const r = await f.tester('packages/core', '2');
-      assert.deepEqual(r.joués, ['a', 'b'], `${branche} : tout se joue\n${r.sortie}`);
-      assert.match(r.sortie, /rien ne se saute ni ne s'atteste/, r.sortie);
-      assert.equal(f.attestation(branche), null, branche);
-    }
+    await f.tester('packages/core', '2');
+    const surMain = await f.tester('packages/core', '2');
+    assert.deepEqual(surMain.joués, ['a', 'b'], `main : tout se joue\n${surMain.sortie}`);
+    assert.match(surMain.sortie, /sur main : rien ne se saute ni ne s'atteste/, surMain.sortie);
+    assert.equal(f.attestation('main'), null, 'main');
+    // Une sous-branche, sans changement depuis main : la base commune la couvre (#314), sans rien attester.
+    f.git('checkout', '-q', '-b', 'codage/994-x--codeur');
+    const sous = await f.tester('packages/core', '2');
+    assert.deepEqual(sous.joués, [], `sous-branche : la base commune couvre tout\n${sous.sortie}`);
+    assert.match(sous.sortie, /sous-branche codage\/994-x--codeur : seul se saute ce que couvre la base commune avec main/, sous.sortie);
+    assert.equal(f.attestation('codage/994-x--codeur'), null, 'sous-branche');
     // Une tête détachée, comme au tag (ajouté par l'auditeur) : l'attestation de la branche de ce commit ne la couvre pas.
     f.git('checkout', '-q', '-b', 'codage/992-tag');
     f.écrire('packages/core/lib.mjs', 'export const un = 5;\n');
@@ -314,9 +317,12 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     await f.tester('packages/core', '2');
     assert.equal(f.attestation('codage/992-tag').verts.length, 2, 'la branche a attesté ses deux fichiers');
     f.git('checkout', '-q', '--detach');
+    const détachée = await f.tester('packages/core', '2');
+    assert.deepEqual(détachée.joués, ['a', 'b'], `tête détachée : l'attestation de la branche n'est pas lue\n${détachée.sortie}`);
+    assert.match(détachée.sortie, /aucune branche extraite : seul se saute ce que couvre la base commune avec main/, détachée.sortie);
     const tag = await f.tester('packages/core', '3');
-    assert.deepEqual(tag.joués, ['a', 'b'], `tête détachée : tout se joue\n${tag.sortie}`);
-    assert.match(tag.sortie, /aucune branche extraite : rien ne se saute ni ne s'atteste/, tag.sortie);
+    assert.deepEqual(tag.joués, ['a', 'b'], `tête détachée au seuil 3 : tout se joue\n${tag.sortie}`);
+    assert.equal(f.attestation('codage/992-tag').verts.length, 2, 'rien de plus ne s’atteste');
   });
 
   test('[niveau 3] points 3 et 5 · le push qui suit un « pnpm test 2 » vert ne rejoue rien, hors le harnais du besoin qu’il n’a pas joué en entier ; la CI au Ready qui suit des tests navigateur verts ne les rejoue pas', async () => {

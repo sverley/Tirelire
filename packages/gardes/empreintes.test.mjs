@@ -101,7 +101,7 @@ const LUS = {
   coeur: [...RACINE_LUE, ...LANCEUR, 'packages/core/src/plan.ts', 'packages/core/test/plan.test.ts', 'packages/core/package.json'],
   relais: [...RACINE_LUE, ...LANCEUR, 'apps/relay/server.mjs'],
   hebergement: TYPES,
-  interface: [...RACINE_LUE, ...LANCEUR, 'docs/decisions.md', 'packages/core/src/plan.ts', 'apps/web/src/App.svelte', 'apps/web/vitest.config.ts', 'apps/web/test/harnais.ts', 'apps/web/test/stockage.test.ts'],
+  interface: [...RACINE_LUE, ...LANCEUR, 'packages/core/src/plan.ts', 'apps/web/src/App.svelte', 'apps/web/vitest.config.ts', 'apps/web/test/harnais.ts', 'apps/web/test/stockage.test.ts'],
   navigateur: [...RACINE_LUE, 'packages/core/src/plan.ts', 'apps/web/src/App.svelte', 'apps/web/vite.config.ts', 'apps/web/test/harnais.ts', 'apps/web/test/navigateur/acces.test.ts'],
 };
 const NON_LUS = {
@@ -109,7 +109,7 @@ const NON_LUS = {
   coeur: ['docs/decisions.md', 'README.md', '.github/workflows/ci.yml', '.githooks/livraison.sh', 'apps/web/src/App.svelte', 'apps/relay/server.mjs', 'packages/gardes/gardes.test.mjs', 'packages/gardes/dev/outil.dev.mjs'],
   relais: ['docs/decisions.md', 'apps/relay/README.md', 'packages/core/src/plan.ts', 'apps/web/src/App.svelte', 'apps/hebergement/apercu.sh', 'packages/gardes/gardes.test.mjs'],
   hebergement: [],
-  interface: ['docs/gardes.md', 'README.md', '.gitignore', '.github/workflows/ci.yml', 'apps/relay/server.mjs', 'apps/hebergement/serveur/relais.php', 'apps/web/test/navigateur/acces.test.ts', 'packages/gardes/gardes.test.mjs'],
+  interface: ['docs/decisions.md', 'docs/gardes.md', 'README.md', '.gitignore', '.github/workflows/ci.yml', 'apps/relay/server.mjs', 'apps/hebergement/serveur/relais.php', 'apps/web/test/navigateur/acces.test.ts', 'packages/gardes/gardes.test.mjs'],
   // La liste du point 9 de #237.
   navigateur: ['docs/decisions.md', '.github/workflows/ci.yml', '.githooks/livraison.sh', 'packages/gardes/lanceur.mjs', 'apps/hebergement/apercu.sh', 'apps/relay/server.mjs', 'README.md', 'apps/relay/README.md', '.gitignore'],
 };

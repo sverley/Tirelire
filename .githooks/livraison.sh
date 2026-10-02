@@ -19,7 +19,8 @@
 #    dernier push de la branche, ou de `main` à un premier push et à la demande — sont comparés à
 #    `packages/gardes/chemins-ignores` de l'arbre jugé (syntaxe de `.gitignore`) : un fichier listé
 #    est fonctionnel (les ensembles de ses paquets, et l'interface sans navigateur), un fichier absent
-#    est organisationnel (la garde). Les deux peuvent se cumuler. Le harnais du besoin se joue toujours.
+#    est organisationnel (la garde et l'hébergement, qui lisent tout le dépôt, #314). Les deux peuvent
+#    se cumuler. Le harnais du besoin se joue toujours.
 # 3. Empreintes (`attestation.mjs plan`, #266). Chaque ensemble de tests — garde, cœur, relais,
 #    hébergement, interface sans navigateur, interface dans le navigateur, harnais du besoin — a une
 #    empreinte : l'état, dans l'arbre jugé, des chemins qu'il lit (`packages/gardes/attestation.mjs`,
@@ -233,7 +234,7 @@ git -C "$classe" check-ignore --no-index --stdin <"$travail/modifies" >"$travail
 grep -vxF -f "$travail/fonctionnels" "$travail/modifies" | grep -v '^$' >"$travail/organisationnels"
 retenus=''
 grep -Eo '^(apps|packages)/[^/]+' "$travail/fonctionnels" | sort -u >"$travail/touches"
-[ -s "$travail/organisationnels" ] && retenus="$retenus garde"
+[ -s "$travail/organisationnels" ] && retenus="$retenus garde hebergement"
 if [ -s "$travail/fonctionnels" ]; then
   retenus="$retenus interface"
   for p in $(grep -Eo '^(apps|packages)/[^/]+/' "$travail/fonctionnels" | sed 's#/$##' | sort -u); do
@@ -348,14 +349,19 @@ autres=$(grep -Ev '^(apps|packages)/[^/]+/' "$journaux/harnais.txt" | tr '\n' ' 
 
 debut=$(date +%s)
 # Durée attendue de ce qui se joue, mesurée de nouveau le 01/10 sur 2 cœurs comme la CI (#307) : 30 s
-# pour les paquets fonctionnels et l'interface sans navigateur, 50 s pour la garde (mesure de l'auditeur) ; 630 s pour toute
+# pour les paquets fonctionnels et l'interface sans navigateur, 50 s pour la garde (mesure de l'auditeur), 5 s pour
+# l'hébergement sans paquet fonctionnel (mesure de l'architecte, 02/10, #314) ; 630 s pour toute
 # la non-régression dans le navigateur demandée, et, pour les tests navigateur de l'issue, 80 s pour
 # construire le site et lancer le navigateur, plus 25 s par fichier (la moyenne des fichiers ; le plus
 # lourd en prend 175). Un dépassement de plus de 20 % se dit, sans bloquer ; le harnais du besoin est
 # hors durée attendue.
-DUREE_FONCTIONNEL=30 DUREE_GARDE=50
+DUREE_FONCTIONNEL=30 DUREE_GARDE=50 DUREE_HEBERGEMENT=5
 attendue=0
-{ joue coeur || joue relais || joue hebergement || joue interface; } && attendue=$((attendue + DUREE_FONCTIONNEL))
+if { joue coeur || joue relais || joue interface || { joue hebergement && [ -s "$travail/fonctionnels" ]; }; }; then
+  attendue=$((attendue + DUREE_FONCTIONNEL))
+elif joue hebergement; then
+  attendue=$((attendue + DUREE_HEBERGEMENT))
+fi
 joue navigateur && attendue=$((attendue + 630))
 issues=$(grep -c . "$journaux/issue.txt")
 [ "$issues" -gt 0 ] && attendue=$((attendue + 80 + 25 * issues))
