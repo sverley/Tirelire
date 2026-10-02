@@ -21,9 +21,13 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    coder un ajout, dis-le dans tes retours (étape 5) : c'est un nouveau tour.
 2. Compose le harnais. Pour chaque phrase du « Fait quand » qu'un test peut trancher, retiens un test
    qui la tranche : un test du codeur, que tu déplaces dans le harnais et complètes s'il le faut, ou,
-   s'il n'y en a pas, un test que tu écris. Montre chaque test retenu rouge, sur le code de `main` ou
-   sur une mutation ciblée du code de la PR : un test qui ne rougit jamais ne garde rien. Classe-le
-   par la suite de questions de D83 et marque son niveau. Les tests du codeur que tu ne retiens pas
+   s'il n'y en a pas, un test que tu écris. Classe chaque test retenu par la suite de questions de
+   D83 et marque son niveau. Montre rouge, sur le code de `main` ou sur une mutation ciblée du code de
+   la PR, chaque test retenu au niveau 0 ou 1, et seulement ceux-là : un tel test qui ne rougit
+   jamais laisse passer l'irréparable ou une promesse qui tombe. Pour un test retenu à un autre
+   niveau, vérifie à la relecture qu'il affirme le résultat observable qu'annonce sa phrase du
+   « Fait quand » (porteur, #318). Le témoin rouge d'une ligne `Harnais` du registre reste exigé
+   (`docs/gardes.md`). Les tests du codeur que tu ne retiens pas
    restent dans ses fichiers, au niveau 4. Relis de même les tests existants que le codeur a adaptés,
    et corrige-les s'il le faut, dans leur fichier. Un harnais par issue, en un fichier ou deux, sauf
    raison dite : un harnais du registre prend sa forme normale (D81), un fichier de niveau 0 et 1 que
@@ -63,8 +67,8 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    y est vert sur son empreinte ; tu ne l'écris jamais (D83, « Les empreintes »). Une mutation du
    code a une autre empreinte : ce qu'elle doit faire rougir se rejoue.
    Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur. Elle
-   dit, pour chaque phrase du « Fait quand », le test du harnais qui la tranche et comment tu l'as vu
-   rouge, ou la vérification manuelle qui la couvre.
+   dit, pour chaque phrase du « Fait quand », le test du harnais qui la tranche et, s'il est de
+   niveau 0 ou 1, comment tu l'as vu rouge ; ou la vérification manuelle qui la couvre.
 4. Réponds aux commentaires du codeur : corrige le harnais, ou renvoie la question du besoin au
    porteur dans l'issue.
 5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
