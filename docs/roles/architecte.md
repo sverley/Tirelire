@@ -12,9 +12,11 @@ puis le glossaire et les catalogues.
 2. Décide si le besoin tient en une tâche. Sinon, ouvre les sous-issues, une par tâche, et
    arrête-toi : chacune aura son architecte.
 3. Écris dans l'issue un « Fait quand » vérifiable : des phrases qu'un test peut trancher. Décris le
-   besoin et ce qui le rend atteint, observable, sans prescrire la solution — ni fichiers, ni jobs,
-   ni mécanismes (principe 11.1). Une construction choisie par le porteur reste dans l'issue, comme sa
-   parole : elle fait partie du besoin. Borne le « Fait quand » aux cibles actives
+   besoin et ce qui le rend atteint, observable, du point de vue de qui s'en sert : précisément et
+   sans laisser de doute, même si cela ne laisse qu'une solution et pèse sur le codage. N'impose pas
+   de technique — ni fichiers, ni jobs, ni mécanismes : la façon de faire reste au codeur (principe
+   11.1). Une construction choisie par le porteur reste dans l'issue, comme sa parole : elle fait
+   partie du besoin. Borne le « Fait quand » aux cibles actives
    (`docs/cibles.md`). Ajoute une ligne « Usages » : ce que la tâche fait à chaque usage de la
    description, U1 à U8 — sert, indifférent, ou à surveiller (D86) —, et l'étiquette de son ou de ses
    domaines.
