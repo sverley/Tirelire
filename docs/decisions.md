@@ -1107,7 +1107,9 @@ sans horloge reçoit une horloge de l'instance qui ouvre. Tout le reste le fait 
 ouvrir, écrire ni effacer (D30) : une table ou une colonne hors du format ; une valeur qui ne tient
 pas dans sa colonne — obligatoire, énumération, booléen, entier, date, horodatage, JSON et sa forme,
 dont une seule part variable par ventilation et par placement (D27, D38) ; un identifiant répété ;
-une référence vers une ligne absente du fichier ; une horloge qui ne se lit pas ; un second compte
+une colonne, ou un identifiant dans une colonne JSON — le placement d'une tirelire, la sélection et
+l'action d'un automatisme, la table des comptes d'un profil d'import —, qui désigne une ligne absente
+du fichier ; une horloge qui ne se lit pas ; un second compte
 principal ; un réglage hors du format ou qui décrit une instance. Rien n'avertit seulement : un
 fichier s'ouvre ou il est refusé, car l'ouvrir en écartant des lignes cacherait ce qui manque
 (principe 4). Le refus nomme le premier problème — la table, la ligne, la colonne — et dit combien
