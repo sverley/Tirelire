@@ -97,7 +97,8 @@ export interface OpenedStore {
 
 /**
  * Ouvre le fichier enregistré, ou `bytes` (un fichier importé, une restauration) qui le remplace.
- * Un fichier refusé ne remplace rien : l'erreur `OuvertureRefusee` le rend, et rien n'est écrit.
+ * Un fichier refusé ne remplace rien : l'erreur `OuvertureRefusee` le rend, et rien n'est écrit. Le
+ * fichier importé est vérifié en entier, et ce qui lui manque et se déduit se complète (#198).
  */
 export async function openStore(bytes?: Uint8Array): Promise<OpenedStore> {
   const sqlJs = await initSqlJs({ locateFile: () => wasmUrl });
@@ -117,7 +118,9 @@ export async function openStore(bytes?: Uint8Array): Promise<OpenedStore> {
   }
   let store: LedgerStore;
   try {
-    store = await LedgerStore.create({ sqlJs, ...(source ? { bytes: source } : {}), ...(instance ? { instance } : {}) });
+    // Un fichier que l'utilisateur ouvre — restauration, fichier fabriqué — se vérifie en entier ;
+    // celui que l'application tient déjà ne passe que par le contrôle du format (#198).
+    store = await LedgerStore.create({ sqlJs, ...(source ? { bytes: source } : {}), ...(bytes ? { verifier: true } : {}), ...(instance ? { instance } : {}) });
   } catch (err) {
     if (err instanceof FormatRefused && source) throw new OuvertureRefusee(err.message, source, err.reason);
     throw err;

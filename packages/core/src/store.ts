@@ -19,6 +19,7 @@
  * première écriture locale lui donne une horloge, et elle voyage alors comme toute autre ligne.
  */
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
+import { settingProblem } from './formes.js';
 import { formatTimestamp, HLC, parseTimestamp } from './hlc.js';
 import { normalizeLabel, uuidv7 } from './ids.js';
 import { DEFAULT_SETTINGS, defaultMainAccount, emptyLedger, MAIN_ACCOUNT_ID, type Ledger, type Settings } from './model.js';
@@ -35,6 +36,7 @@ import {
   type LedgerKey,
   type TableDef,
 } from './schema.js';
+import { lireBase, messageDeRefus, type Completion, type Lecture, type Probleme } from './verification.js';
 
 /** Pour chaque instance, la plus grande horloge vue d'elle (D58). */
 export type Knowledge = Record<string, string>;
@@ -82,7 +84,7 @@ export interface InstanceState {
   local?: Record<string, string>;
 }
 
-export type RefusalReason = 'illisible' | 'etranger' | 'ancien' | 'recent';
+export type RefusalReason = 'illisible' | 'etranger' | 'ancien' | 'recent' | 'invalide';
 
 /** Un fichier ou un paquet qui n'est pas au format de cette version : rien n'en a été écrit. */
 export class FormatRefused extends Error {
@@ -92,6 +94,18 @@ export class FormatRefused extends Error {
   ) {
     super(message);
     this.name = 'FormatRefused';
+  }
+}
+
+/**
+ * Un fichier Tirelire de ce format, mais qui ne le respecte pas (#198) : rien n'a été ouvert, écrit
+ * ni effacé (D30). Le message nomme le premier problème et dit combien d'autres il y a ; `problemes`
+ * les porte tous.
+ */
+export class FichierRefuse extends FormatRefused {
+  constructor(readonly problemes: Probleme[]) {
+    super('invalide', messageDeRefus(problemes));
+    this.name = 'FichierRefuse';
   }
 }
 
@@ -112,11 +126,18 @@ export const REFUSAL_MESSAGES: Record<RefusalReason, string> = {
   ancien:
     'Ce fichier vient d’une version antérieure de Tirelire, dont le format n’est plus lu : le format a changé avant la première version publiée, sans reprise des anciens fichiers.',
   recent: 'Ce fichier vient d’une version plus récente de Tirelire, dont le format n’est pas encore lu ici : mettez l’application à jour.',
+  invalide: 'Ce fichier Tirelire ne s’ouvre pas, il ne respecte pas le format.',
 };
 
 export interface StoreOptions {
   /** Contenu d'un fichier SQLite existant. */
   bytes?: Uint8Array;
+  /**
+   * Le fichier vient de l'utilisateur — une restauration, un fichier fabriqué hors de l'application :
+   * il est vérifié en entier, et ce qui lui manque et se déduit se complète (#198). Sans cette option,
+   * le fichier que l'application tient déjà ne passe que par le contrôle du format.
+   */
+  verifier?: boolean;
   /** L'instance qui ouvre le fichier ; sans elle, une instance neuve. */
   instance?: InstanceState;
   /** Raccourci : identifiant de l'instance, sans le reste de son état. */
@@ -173,6 +194,8 @@ export class LedgerStore {
    * l'ouverture lui sont toutes proposées : il ne doit pas les croire vues.
    */
   private readonly ownAtOpen: string;
+  /** Ce que l'ouverture a complété dans un fichier vérifié ; rien pour un autre. */
+  readonly completion: Completion = { tables: [], colonnes: [], horloges: [], comptePrincipal: false };
 
   private constructor(
     private readonly db: Database,
@@ -198,21 +221,45 @@ export class LedgerStore {
   static async create(opts: StoreOptions = {}): Promise<LedgerStore> {
     const SQL = opts.sqlJs ?? (await initSqlJs(opts.locateFile ? { locateFile: opts.locateFile } : {}));
     let db: Database;
-    if (opts.bytes) {
+    let lecture: Lecture | undefined;
+    if (opts.bytes && opts.verifier) {
+      const lu = openChecked(SQL, opts.bytes);
+      try {
+        lecture = lireBase(lu);
+      } finally {
+        lu.close();
+      }
+      if (lecture.problemes.length) throw new FichierRefuse(lecture.problemes);
+      db = rebuild(SQL, lecture);
+    } else if (opts.bytes) {
       db = openChecked(SQL, opts.bytes);
       for (const sql of SYSTEM_SQL) db.run(sql);
       for (const t of Object.values(TABLES)) db.run(createTableSQL(t));
     } else {
-      db = new SQL.Database();
-      for (const sql of SYSTEM_SQL) db.run(sql);
-      for (const t of Object.values(TABLES)) db.run(createTableSQL(t));
-      db.run(`INSERT INTO meta (key, value) VALUES ('format', ?), ('format_version', ?)`, [FILE_FORMAT, String(FORMAT_VERSION)]);
+      db = newDatabase(SQL);
     }
     // Une ligne remplacée ne laisse rien d'elle dans le fichier : pas de trace de ce qui a changé.
     db.run('PRAGMA secure_delete = ON');
     bornWithMainAccount(db);
     const instance: InstanceState = opts.instance ?? { siteId: opts.siteId ?? newSiteId() };
-    return new LedgerStore(db, instance, opts.now ?? (() => Date.now()));
+    const store = new LedgerStore(db, instance, opts.now ?? (() => Date.now()));
+    if (lecture) store.complete(lecture.completion);
+    return store;
+  }
+
+  /**
+   * Date les lignes sans horloge d'un fichier fabriqué, au nom de cette instance (D58) : elles
+   * deviennent des lignes de l'application, et partent à la synchronisation comme les autres.
+   */
+  private complete(completion: Completion): void {
+    Object.assign(this.completion, completion);
+    if (!completion.horloges.length) return;
+    this.transaction(() => {
+      for (const { table, id } of completion.horloges) {
+        const key = table === SETTINGS_TABLE ? 'key' : 'id';
+        this.db.run(`UPDATE ${table} SET ${HLC_COLUMN} = ? WHERE ${key} = ?`, [this.tick(), id]);
+      }
+    });
   }
 
   /** Ce qui décrit cette instance, à garder à côté du fichier, jamais dedans. */
@@ -315,6 +362,8 @@ export class LedgerStore {
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
     if (key === 'siteId') return; // l'identité de l'instance n'est pas un réglage partagé
     if (jsonEq(this.readSettings()[key], value)) return;
+    const problem = settingProblem(key, value === undefined ? null : JSON.stringify(value));
+    if (problem) throw new RowRefused(SETTINGS_TABLE, problem);
     this.transaction(() => this.writeRow({ t: SETTINGS_TABLE, id: key, hlc: this.tick(), v: { value: JSON.stringify(value) } }));
     this.notify();
   }
@@ -623,6 +672,64 @@ function openChecked(SQL: SqlJsStatic, bytes: Uint8Array): Database {
   return db;
 }
 
+/** Une base vide, au format de cette version. */
+function newDatabase(SQL: SqlJsStatic): Database {
+  const db = new SQL.Database();
+  for (const sql of SYSTEM_SQL) db.run(sql);
+  for (const t of Object.values(TABLES)) db.run(createTableSQL(t));
+  db.run(`INSERT INTO meta (key, value) VALUES ('format', ?), ('format_version', ?)`, [FILE_FORMAT, String(FORMAT_VERSION)]);
+  return db;
+}
+
+/**
+ * Le fichier ouvert, réécrit au format de cette version depuis ce qu'en a lu la vérification : les
+ * tables et les colonnes absentes y sont, vides ; rien d'autre que le fichier n'y entre (#198).
+ */
+function rebuild(SQL: SqlJsStatic, lecture: Lecture): Database {
+  const db = newDatabase(SQL);
+  try {
+    for (const t of Object.values(TABLES)) {
+      const names = ['id', ...t.columns.filter((c) => c.col !== 'id').map((c) => c.col), HLC_COLUMN];
+      const sql = `INSERT INTO ${t.name} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})`;
+      for (const l of lecture.lignes.get(t.name) ?? []) db.run(sql, [l.id, ...names.slice(1, -1).map((n) => l.v[n] ?? null), l.hlc]);
+    }
+    for (const l of lecture.lignes.get(SETTINGS_TABLE) ?? []) db.run(`INSERT INTO settings (key, value, ${HLC_COLUMN}) VALUES (?, ?, ?)`, [l.id, l.v['value'] ?? null, l.hlc]);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
+  return db;
+}
+
+/** Ce que l'ouverture d'un fichier répondrait, sans rien ouvrir ni écrire (#198, point 5). */
+export type Verdict =
+  | { ouvre: true; completion: Completion }
+  | { ouvre: false; message: string; reason: RefusalReason; problemes: Probleme[] };
+
+/**
+ * Vérifie un fichier comme à son ouverture par l'utilisateur — restauration, fichier fabriqué — et
+ * rend le même verdict, avec chaque problème nommé, pas seulement le premier. Rien ne sort de la
+ * machine, rien n'est écrit (I7, D30).
+ */
+export async function verifierFichier(bytes: Uint8Array, opts: { sqlJs?: SqlJsStatic } = {}): Promise<Verdict> {
+  const SQL = opts.sqlJs ?? (await initSqlJs());
+  let db: Database;
+  try {
+    db = openChecked(SQL, bytes);
+  } catch (err) {
+    if (err instanceof FormatRefused) return { ouvre: false, message: err.message, reason: err.reason, problemes: [] };
+    throw err;
+  }
+  let lecture: Lecture;
+  try {
+    lecture = lireBase(db);
+  } finally {
+    db.close();
+  }
+  if (lecture.problemes.length) return { ouvre: false, message: messageDeRefus(lecture.problemes), reason: 'invalide', problemes: lecture.problemes };
+  return { ouvre: true, completion: lecture.completion };
+}
+
 function refused(reason: RefusalReason): FormatRefused {
   return new FormatRefused(reason, REFUSAL_MESSAGES[reason]);
 }
@@ -643,6 +750,8 @@ function checkRow(row: RowState): void {
   }
   if (row.t === SETTINGS_TABLE) {
     if (Object.keys(row.v).some((k) => k !== 'value')) throw bad('réglage');
+    const problem = settingProblem(row.id, row.v['value'] ?? null);
+    if (problem) throw new FormatRefused('etranger', `Ligne reçue refusée : ${problem} Rien n’a été écrit.`);
     return;
   }
   const t = tableByName(row.t);
