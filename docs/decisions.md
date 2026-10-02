@@ -1097,7 +1097,24 @@ opération importée (D09) est `op_` + 16 hexadécimaux. L'écriture par ligne e
 `CHECK` nommé `table.colonne`, et le cœur vérifie la même chose avant d'écrire, localement comme à la
 réception, si bien qu'une ligne incohérente est refusée sans rien écrire, en nommant la table et la
 colonne. Les références et les autres invariants sont vérifiés par une fonction du cœur, qui sert
-aussi à l'ouverture d'un fichier étranger. Le format est documenté dans
+aussi à l'ouverture d'un fichier étranger. Un fichier que l'utilisateur ouvre — une restauration, un
+fichier fabriqué hors de l'application — passe par cette vérification entière ; celui que
+l'application tient déjà, rouvert au démarrage, ne passe que par le contrôle du format, chaque
+écriture l'ayant vérifié ligne par ligne. S'y complète ce que l'application pose d'elle-même pour
+ses propres lignes : une table absente vaut une table vide, une colonne facultative absente vaut
+vide, un réglage absent prend sa valeur par défaut, le compte principal absent naît (D40), une ligne
+sans horloge reçoit une horloge de l'instance qui ouvre. Tout le reste le fait refuser, sans rien
+ouvrir, écrire ni effacer (D30) : une table ou une colonne hors du format ; une valeur qui ne tient
+pas dans sa colonne — obligatoire, énumération, booléen, entier, date, horodatage, JSON et sa forme,
+dont une seule part variable par ventilation et par placement (D27, D38) ; un identifiant répété ;
+une colonne, ou un identifiant dans une colonne JSON — le placement d'une tirelire, la sélection et
+l'action d'un automatisme, la table des comptes d'un profil d'import —, qui désigne une ligne absente
+du fichier ; une horloge qui ne se lit pas ; un second compte
+principal ; un réglage hors du format ou qui décrit une instance. Rien n'avertit seulement : un
+fichier s'ouvre ou il est refusé, car l'ouvrir en écartant des lignes cacherait ce qui manque
+(principe 4). Le refus nomme le premier problème — la table, la ligne, la colonne — et dit combien
+d'autres il y a ; la commande `verifier-fichier` du cœur rend le même verdict hors de l'interface,
+sur la machine, chaque problème nommé. Le format est documenté dans
 `docs/format-depot-sqlite.md` pour pouvoir être fabriqué depuis l'extérieur.
 
 Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'y stocke qui se
@@ -1438,7 +1455,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   test vert sur son empreinte, et le dit (voir « Les empreintes ») ; l'option
   `--attestation <fichier>`, que seules la CI et la livraison passent, lui donne ce qui couvre le
   lancement, et sans elle il le lit lui-même : l'attestation de la branche extraite et sa base
-  commune avec `main`.
+  commune avec `main` ; sur une tête détachée ou une sous-branche, cette base commune seule ; sur
+  `main`, rien (#314).
   Aucune variable d'environnement ne change ce qui se
   joue : tout passe par les arguments. Un test appelé nommément (`-t` de vitest,
   `--test-name-pattern` de `node --test`) se joue quel que soit son niveau. Le script `test` de
@@ -1474,7 +1492,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   l'ensemble écarte (`ENSEMBLES`, `packages/gardes/attestation.mjs`), chacun avec sa raison :
   l'ensemble ne le lit pas, ou ce qu'il en lit est vérifié par ce qui se joue quand il change. Un
   chemin oublié de la liste fait jouer plus, jamais moins : tout fichier qu'elle n'écarte pas change
-  l'empreinte. La garde et l'hébergement lisent tout le dépôt. Pour les tests navigateur, la liste
+  l'empreinte. La garde et l'hébergement lisent tout le dépôt. Une PR qui ne change que
+  des fichiers de `docs/` ne rejoue donc que la garde et l'hébergement, à tout lancement à
+  la main, sur la branche comme sur une tête détachée, à la livraison et au Ready, `docs/decisions.md`
+  compris : ce qui confronte une décision au code se joue dans l'ensemble de la garde, qui lit tout le dépôt ; le lancement dit, pour chaque autre ensemble, qu'il le saute et pourquoi (#314). Pour les tests navigateur, la liste
   est celle du point 9 de #237 : `docs/`, `.github/`, `.githooks/`, `packages/gardes/`,
   `apps/hebergement/`, `apps/relay/`, les fichiers `*.md` et `.gitignore`. La garde y figure : les
   tests navigateur la lisent par leur lanceur, mais l'interface sans navigateur, qui la lit par le
@@ -1497,7 +1518,10 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   la branche avec `main` compte aussi comme verte, pour tous ses fichiers, jusqu'au seuil 2 : la
   branche ne change rien de ce qu'il lit ; sauf pour l'interface dans le navigateur, que rien ne joue
   avant la fusion (#307) : ni `main`, ni le premier parent, ni une tête verte au Ready ne la disent
-  verte. Dans un lancement du harnais du besoin, seul ce qui couvre
+  verte. Cette base se calcule depuis la tête extraite, branche ou non : sur une tête détachée, comme
+  sur une sous-branche, un lancement de l'outil de test sans `--attestation` saute ce qu'elle couvre,
+  sans y lire l'attestation d'aucune branche ni y rien attester ; sur `main`, rien ne se saute
+  (#314). Dans un lancement du harnais du besoin, seul ce qui couvre
   le harnais, ou le fichier lui-même, couvre un de ses fichiers. Aucun moment ne fait exception
   (porteur, 28/09 : « si l'empreinte est verte, on ne joue pas les tests, c'est universel ») : au
   Ready, le seuil 1 non plus ; la vérification de l'auditeur non plus (porteur, 01/10, #302). Un
@@ -1506,8 +1530,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   se rejoue pas si son empreinte est celle qu'il a sur la tête d'une PR dont toute la CI a fini verte
   au Ready, ou sur le premier parent du commit arrivé. N'est pas vert sur son empreinte un ensemble
   dont un test a rougi, ou s'est sauté faute d'outil : il se rejoue au moment suivant qui le prévoit.
-  Au tag et pour une version forcée, rien ne se saute : le lanceur n'y lit aucune attestation — ni
-  sur une tête détachée, ni sur `main` — et la CI ne lui passe pas `--attestation`. Un fichier joué
+  Au tag et pour une version forcée, rien ne se saute : ils se jouent au seuil 3, que la base
+  commune avec `main` ne couvre pas, et le lanceur n'y lit aucune attestation — la CI ne lui passe
+  pas `--attestation`. Un fichier joué
   en entier est pourtant attesté au seuil 4, et un lancement à la main au seuil 3 ou 4 le saute.
   Chaque moment —
   pré-commit, pré-fusion, pré-push, demande, CI au Ready, CI sur `main`, tag — dit, pour chaque
@@ -1553,8 +1578,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   PR : à chaque livraison (pré-push, pré-fusion) et au Ready, en entier, niveau 4 compris, sauf
   chaque fichier vert sur son empreinte (définition commune : `.githooks/tests-de-l-issue.sh`, et
   `harnais-du-besoin.sh` pour le harnais) ; hors harnais, ils sont de la non-régression, qui bloque,
-  et ne s'attestent que fichier par fichier. Le codeur ou l'auditeur peut demander toute la
-  non-régression dans le navigateur par `pnpm livraison --navigateur`, qui juge le dernier commit de
+  et ne s'attestent que fichier par fichier. Le codeur, si l'issue le requiert (#316), ou
+  l'auditeur, sur demande justifiée ou pour une mesure, peut demander toute la non-régression dans le
+  navigateur par `pnpm livraison --navigateur`, qui juge le dernier commit de
   la branche comme un premier push, tests navigateur compris ; verts, ils sont attestés sur leur
   empreinte et l'attestation part sur `origin`. Le compte rendu du codeur et la vérification de l'auditeur disent s'ils les ont
   demandés, et pourquoi. Un lancement des tests navigateur ne construit le site qu'une fois, quel
@@ -1569,8 +1595,9 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
 - **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck`, ses propres tests, à la main,
-  et le harnais du besoin s'il existe, plus, s'il modifie une fonction de la garde, ses tests de
-  développement (D81) ; l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready, hors
+  le harnais du besoin s'il existe, au plus la garde, et, s'il modifie une fonction de la garde, ses
+  tests de développement (D81) — pas la suite : l'auditeur déplacera et modifiera ses tests en
+  composant le harnais (#316) ; l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready, hors
   tests navigateur sauf sa demande. Aucune CI ne tourne en brouillon. Les crochets
   font leur part, sur la copie de travail. Au commit, en moins de 5 s : les
   tests de niveau 0 des paquets que touchent les fichiers indexés — cœur ; garde ; relais ;
@@ -1581,7 +1608,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   livraison (pré-fusion et pré-push), sur l'état commis, au seuil 2 : la nature du besoin se lit par
   `packages/gardes/chemins-ignores` — fonctionnel (typecheck et tests des paquets touchés et de
   l'interface sans navigateur, 30 s ; 630 s de plus avec les tests navigateur demandés, et 80 s plus
-  25 s par fichier pour ceux de l'issue) ou organisationnel (garde, 50 s) —, mesurés sur 2 cœurs comme
+  25 s par fichier pour ceux de l'issue) ou organisationnel (garde, 50 s, et hébergement, 5 s, qui
+  lisent tout le dépôt, #314) —, mesurés sur 2 cœurs comme
   la CI (#307), et de ce qu'elle retient ne se joue que ce qui n'est pas vert sur
   son empreinte (voir « Les empreintes ») ; ce qu'elle ne retient pas, la CI le joue au Ready s'il
   n'est pas vert sur son empreinte. Les tests navigateur de non-régression
