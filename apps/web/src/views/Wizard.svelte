@@ -11,7 +11,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { app } from '../lib/state.svelte';
-  import { ACCOUNT_KINDS, UNITS, money, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
+  import { ACCOUNT_KINDS, UNITS, money, periodicityLabel, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
   import {
     activeAt,
     alive,
@@ -26,7 +26,8 @@
     nextOccurrence,
     budgetSuggestions,
     suggestedFlow,
-    nextDueDate,
+    suggestedTirelire,
+    suggestedOrder,
     monthsOf,
     DEFAULT_PRIORITY,
     DEFAULT_MAIN_ACCOUNT,
@@ -37,6 +38,8 @@
     type SettlementDirection,
     type Cents,
     type FlowSuggestion,
+    type OrderSuggestion,
+    type TirelireSuggestion,
     type Tirelire,
     type Need,
     type PlannedFlow,
@@ -78,10 +81,6 @@
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
   const fixedCharges = $derived(flows.filter((f) => f.kind === 'fixedCharge'));
   const tirelireById = (id: string) => tirelires.find((e) => e.id === id);
-  const needsOfKind = (k: Need['kind']) => needs.filter((n) => n.kind === k);
-  const everydayNeeds = $derived(needsOfKind('recurring'));
-  const periodicNeeds = $derived(needsOfKind('dueDate'));
-  const savingsNeeds = $derived(needsOfKind('goal'));
   const totals = $derived(app.assistantPlan.totals);
 
   /**
@@ -334,9 +333,28 @@
     const placement = accountId ? [{ accountId, share: { kind: 'variable' as const } }] : [];
     app.assistantUpsert('tirelires', { ...e, placement });
   }
-  const reserveTirelires = $derived(
-    tirelires.filter((e) => needs.some((n) => n.tirelireId === e.id && n.kind !== 'recurring')),
-  );
+  /**
+   * Retire un compte de l'assistant, et ce qui ne tient que par lui : la part du placement d'une
+   * tirelire qui y dort — elle n'a plus de placement, et ne produit aucun écart (D38) — et l'ordre
+   * permanent qui en part ou y arrive.
+   */
+  function retirerCompte(a: Account) {
+    app.assistantRemove('accounts', a.id);
+    for (const t of tirelires) {
+      if (t.placement.some((p) => p.accountId === a.id)) {
+        app.assistantUpsert('tirelires', { ...t, placement: t.placement.filter((p) => p.accountId !== a.id) });
+      }
+    }
+    for (const f of ordres) {
+      if (f.accountId === a.id || f.counterpartAccountId === a.id) app.assistantRemove('plannedFlows', f.id);
+    }
+  }
+
+  // --- Ordres permanents déjà posés chez la banque (D60) : ce qu'ils exécutent est un fait, le seul montant qui s'enregistre ---
+  const ordres = $derived(flows.filter((f) => f.kind === 'transfer' && f.origin === 'derived'));
+  const nomDuCompte = (id?: string) => accounts.find((a) => a.id === id)?.name ?? '';
+  /** Ce que le budget de l'assistant demande comme ordre permanent vers ce compte (D60) : un calcul, relu à chaque lecture. */
+  const demandeVers = (accountId?: string) => app.assistantPlan.transfers.find((t) => t.accountId === accountId)?.permanent ?? 0;
 
   /**
    * Les propositions ne s'offrent que sur un projet vierge (D43), tel qu'il était à l'ouverture de
@@ -372,9 +390,37 @@
   const montantDuRaccourci = (g: FluxPropose) => (g.versions.find((v) => activeAt(v, app.asOf)) ?? g.versions[0]!).amount;
   const restantsRevenus = $derived(parNom(propositions.incomes).filter((g) => !dejaPris(g.name)));
   const restantsCharges = $derived(parNom(propositions.charges).filter((g) => !dejaPris(g.name)));
-  const restantsCourants = $derived(propositions.everyday.filter((x) => !dejaPris(x.name)));
-  const restantsPeriodiques = $derived(propositions.periodic.filter((x) => !dejaPris(x.name)));
-  const restantsEpargnes = $derived(propositions.savings.filter((x) => !dejaPris(x.name)));
+  /** L'étape où se lit un besoin : celle de son genre. */
+  type EtapeTirelire = 'everyday' | 'periodic' | 'savings';
+  const GENRE_DE_L_ETAPE: Record<EtapeTirelire, Need['kind']> = { everyday: 'recurring', periodic: 'dueDate', savings: 'goal' };
+  /** L'étape d'une tirelire proposée : celle de ses besoins — une échéance d'abord, puis un objectif, sinon un budget. */
+  const etapeDe = (p: TirelireSuggestion): EtapeTirelire =>
+    p.needs.some((n) => n.kind === 'dueDate') ? 'periodic' : p.needs.some((n) => n.kind === 'goal') ? 'savings' : 'everyday';
+  /** Les tirelires d'une étape : celles qui y ont un besoin, chacune avec ses besoins de ce genre, dans l'ordre où ils sont venus. */
+  function parTirelire(etape: EtapeTirelire): Array<{ t: Tirelire; besoins: Need[] }> {
+    const genre = GENRE_DE_L_ETAPE[etape];
+    return tirelires
+      .map((t) => ({ t, besoins: needs.filter((n) => n.tirelireId === t.id && n.kind === genre) }))
+      .filter((x) => x.besoins.length > 0);
+  }
+  const tirelireCourantes = $derived(parTirelire('everyday'));
+  const tirelirePeriodiques = $derived(parTirelire('periodic'));
+  const tirelireEpargnes = $derived(parTirelire('savings'));
+  const restantesTirelires = (etape: EtapeTirelire) => propositions.tirelires.filter((x) => etapeDe(x) === etape && !dejaPris(x.name));
+  const restantsCourants = $derived(restantesTirelires('everyday'));
+  const restantsPeriodiques = $derived(restantesTirelires('periodic'));
+  const restantsEpargnes = $derived(restantesTirelires('savings'));
+  /** Le montant que montre le raccourci d'une tirelire : celui de son besoin en vigueur à la date de lecture, à défaut le premier. */
+  function montantDeLaTirelire(p: TirelireSuggestion): Cents {
+    const n = p.needs.find((x) => activeAt(x, app.asOf)) ?? p.needs[0];
+    return (n?.kind === 'goal' ? n.monthlyAmount : n?.amount) ?? 0;
+  }
+  /** Le compte du même nom, ici ; le compte principal se désigne par l'absence de nom. */
+  const compteNomme = (nom: string) => accounts.find((a) => a.name === nom)?.id;
+  /** Un ordre de l'exemple ne se propose que si ses deux comptes sont ici, et qu'aucun flux ne porte déjà son nom (D46). */
+  const restantsOrdres = $derived(
+    propositions.orders.filter((o) => !dejaPris(o.name) && suggestedOrder(o, { id: '', principalId: mainAccountId(), compte: compteNomme }) !== undefined),
+  );
   /** Un compte dont le nom existe déjà n'est plus proposé : les comptes se reconnaissent à leur nom (D46). */
   const restantsComptes = $derived(propositions.accounts.filter((x) => !accounts.some((a) => a.name === x.name)));
 
@@ -390,12 +436,28 @@
     app.assistantUpsert('plannedFlows', suggestedFlow(p, genre, { id: app.newId(), accountId: compteDuFlux(p) }));
   const appliquerRevenu = (g: FluxPropose) => g.versions.forEach((p) => appliquerVersion(p, 'income'));
   const appliquerCharge = (g: FluxPropose) => g.versions.forEach((p) => appliquerVersion(p, 'fixedCharge'));
-  const appliquerCourant = (p: (typeof propositions.everyday)[number]) =>
-    creerCourant(p.name, p.amount, p.keep);
-  const appliquerPeriodique = (p: (typeof propositions.periodic)[number]) =>
-    creerPeriodique(p.name, p.amount, p.interval, nextDueDate(p.month, p.day, app.asOf));
-  const appliquerEpargne = (p: (typeof propositions.savings)[number]) =>
-    creerEpargne(p.name, p.monthly, p.target);
+  /**
+   * Une tirelire de l'exemple, avec ce que l'exemple en dit : tous ses besoins, son reliquat, ce
+   * qui y est déjà mis de côté, son placement si le compte est ici, et le prélèvement qu'attend
+   * chacune de ses échéances. Ouverte au début de la période en cours (D40).
+   */
+  function appliquerTirelire(p: TirelireSuggestion) {
+    const cree = suggestedTirelire(p, {
+      id: app.newId(),
+      newId: () => app.newId(),
+      openingDate: periodStart(),
+      principalId: mainAccountId(),
+      compte: compteNomme,
+    });
+    app.assistantUpsert('tirelires', cree.tirelire);
+    for (const n of cree.needs) app.assistantUpsert('needs', n);
+    for (const f of cree.flows) app.assistantUpsert('plannedFlows', f);
+  }
+  /** L'ordre de l'exemple, déjà posé chez la banque : il s'enregistre à la validation, comme ce que la banque exécute (D60). */
+  function appliquerOrdre(p: OrderSuggestion) {
+    const f = suggestedOrder(p, { id: app.newId(), principalId: mainAccountId(), compte: compteNomme });
+    if (f) app.assistantUpsert('plannedFlows', f);
+  }
   /**
    * La clôture d'un compte clos de l'exemple : la veille du premier jour de la période en cours, de
    * sorte qu'il ne pèse rien sur le plan (D56). La période commence au jour que l'assistant retient
@@ -468,9 +530,11 @@
     }
     if (etape === 'income') restantsRevenus.forEach(appliquerRevenu);
     if (etape === 'fixed') restantsCharges.forEach(appliquerCharge);
-    if (etape === 'everyday') restantsCourants.forEach(appliquerCourant);
-    if (etape === 'periodic') restantsPeriodiques.forEach(appliquerPeriodique);
-    if (etape === 'savings') restantsEpargnes.forEach(appliquerEpargne);
+    if (etape === 'everyday') restantsCourants.forEach(appliquerTirelire);
+    if (etape === 'periodic') restantsPeriodiques.forEach(appliquerTirelire);
+    if (etape === 'savings') restantsEpargnes.forEach(appliquerTirelire);
+    // L'ordre se propose là où l'assistant demande où dort chaque tirelire : au résumé.
+    if (etape === 'summary') restantsOrdres.forEach(appliquerOrdre);
   }
 
   // --- Édition en place de ce qui a été ajouté ---
@@ -508,9 +572,21 @@
       app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate } });
     }
   }
-  function editNeedName(n: Need, v: string) {
-    const t = tirelireById(n.tirelireId);
-    if (t && v.trim() && v.trim() !== t.name) app.assistantUpsert('tirelires', { ...t, name: v.trim() });
+  function editTirelireName(t: Tirelire, v: string) {
+    if (v.trim() && v.trim() !== t.name) app.assistantUpsert('tirelires', { ...t, name: v.trim() });
+  }
+  /** Le nom propre d'un besoin, quand il en porte un (« Cours de piano ») ; vidé, le besoin reprend celui de sa tirelire. */
+  function editNeedOwnName(n: Need, v: string) {
+    const nom = v.trim();
+    if (nom === (n.name ?? '')) return;
+    const { name: _ancien, ...sans } = n;
+    app.assistantUpsert('needs', nom ? { ...n, name: nom } : sans);
+  }
+  /** Ce qui y est déjà mis de côté : le solde d'ouverture de la tirelire, réputé sur le premier compte de son placement. */
+  function editOpeningBalance(t: Tirelire, v: string) {
+    const c = inputToCents(v);
+    if (c === undefined || c < 0 || c === t.openingBalance) return;
+    app.assistantUpsert('tirelires', { ...t, openingBalance: c });
   }
   function editNeedAmount(n: Need, v: string) {
     const c = inputToCents(v);
@@ -527,9 +603,25 @@
     if (!v || !n.periodicity || v === n.periodicity.anchorDate) return;
     app.assistantUpsert('needs', { ...n, periodicity: { ...n.periodicity, anchorDate: v } });
   }
-  function editRollover(n: Need, keep: boolean) {
-    const t = tirelireById(n.tirelireId);
-    if (t) app.assistantUpsert('tirelires', { ...t, rollover: { mode: keep ? 'unlimited' : 'none' } });
+  function editRollover(t: Tirelire, keep: boolean) {
+    app.assistantUpsert('tirelires', { ...t, rollover: { mode: keep ? 'unlimited' : 'none' } });
+  }
+  /** Les prélèvements attendus pour les échéances d'une tirelire : ses flux d'échéance (D40). */
+  const prelevementsDe = (t: Tirelire) => flows.filter((f) => f.kind === 'dueDate' && f.tirelireId === t.id);
+  /** Attendre un prélèvement pour une échéance, ou ne plus l'attendre : le flux d'échéance se crée ou se retire. */
+  function editPrelevement(t: Tirelire, n: Need, attendu: boolean) {
+    if (!attendu) return prelevementsDe(t).forEach(removeFlow);
+    if (prelevementsDe(t).length || !n.periodicity) return;
+    app.assistantUpsert('plannedFlows', {
+      id: app.newId(),
+      name: t.name,
+      kind: 'dueDate',
+      amount: -(n.amount ?? 0),
+      accountId: mainAccountId(),
+      tirelireId: t.id,
+      periodicity: { ...n.periodicity },
+      dateWindowDays: 7,
+    } satisfies PlannedFlow);
   }
 
   /** Modification d'un compte, champ par champ, enregistrée à la volée. */
@@ -556,12 +648,17 @@
   function removeFlow(f: PlannedFlow) {
     app.assistantRemove('plannedFlows', f.id);
   }
-  /** Retire un besoin et la tirelire qui le portait si elle n'en a plus d'autre. */
+  /** Retire une tirelire, avec tous ses besoins et les prélèvements attendus pour ses échéances. */
+  function removeTirelire(t: Tirelire) {
+    for (const f of flows.filter((f) => f.tirelireId === t.id)) app.assistantRemove('plannedFlows', f.id);
+    for (const n of needs.filter((n) => n.tirelireId === t.id)) app.assistantRemove('needs', n.id);
+    app.assistantRemove('tirelires', t.id);
+  }
+  /** Retire un besoin d'une tirelire qui en porte d'autres ; le dernier emporte la tirelire. */
   function removeNeed(n: Need) {
-    const others = needs.filter((x) => x.tirelireId === n.tirelireId && x.id !== n.id);
-    for (const f of flows.filter((f) => f.tirelireId === n.tirelireId)) app.assistantRemove('plannedFlows', f.id);
+    const t = tirelireById(n.tirelireId);
+    if (t && !needs.some((x) => x.tirelireId === n.tirelireId && x.id !== n.id)) return removeTirelire(t);
     app.assistantRemove('needs', n.id);
-    if (others.length === 0) app.assistantRemove('tirelires', n.tirelireId);
   }
 
   /**
@@ -580,6 +677,45 @@
     }
   }
 </script>
+
+{#snippet enTeteTirelire(t: Tirelire, reliquat: boolean)}
+  <!-- La tirelire : son nom, ce qui y est déjà mis de côté, son reliquat ; ses besoins suivent. -->
+  <div class="ligne-tirelire">
+    <input class="nom" value={t.name} aria-label="Nom de la tirelire" onchange={(e) => editTirelireName(t, e.currentTarget.value)} />
+    <label class="deja small">Déjà de côté
+      <input class="mt" value={centsToInput(t.openingBalance)} inputmode="decimal" onchange={(e) => editOpeningBalance(t, e.currentTarget.value)} />
+    </label>
+    {#if reliquat}
+      <label class="garde small" title="Garder ce qui n'a pas été dépensé">
+        <input type="checkbox" checked={t.rollover?.mode !== 'none'} onchange={(e) => editRollover(t, e.currentTarget.checked)} /> garder
+      </label>
+    {/if}
+    <button class="btn small danger" title="Retirer cette tirelire" onclick={() => removeTirelire(t)}>×</button>
+  </div>
+{/snippet}
+
+{#snippet quoi(n: Need, seul: string)}
+  <!-- Un besoin qui porte son nom le montre, modifiable : c'est un besoin de la tirelire (D28). -->
+  {#if n.name !== undefined}
+    <input class="besoin" value={n.name} aria-label="Nom du besoin" onchange={(e) => editNeedOwnName(n, e.currentTarget.value)} />
+  {:else}
+    <span class="quoi muted small">{seul}</span>
+  {/if}
+{/snippet}
+
+{#snippet suiteBesoin(n: Need, besoins: Need[])}
+  {#if besoins.length > 1}
+    <button class="btn small danger" title="Retirer ce besoin" onclick={() => removeNeed(n)}>×</button>
+  {:else}
+    <span></span>
+  {/if}
+  {#if validityLabel(n)}
+    <!-- Une ligne que l'exemple borne le dit, avec sa date : deux versions d'un besoin sont deux lignes (D51). -->
+    <p class="muted small suite">
+      {#if validityBadge(n, app.asOf)}<span class="pill dim">{validityBadge(n, app.asOf)}</span> {/if}{validityLabel(n)}
+    </p>
+  {/if}
+{/snippet}
 
 <p class="small">
   <a href="#top" onclick={(e) => { e.preventDefault(); if (!app.back()) app.switchTab('more'); }}>‹ Retour</a>
@@ -795,23 +931,26 @@
     période et voir ce qu'il en reste. C'est une tirelire qui se remplit à chaque paie.
   </p>
   <h3>Budgets par période</h3>
-  <div class="tete tete-courant"><span>Quoi ?</span><span class="d">Par période</span><span>Reliquat</span><span></span></div>
-  {#each everydayNeeds as n (n.id)}
-    <div class="card ligne ligne-courant">
-      <input class="nom" value={needName(n, tirelireById(n.tirelireId))} onchange={(e) => editNeedName(n, e.currentTarget.value)} />
-      <input class="mt" value={centsToInput(n.amount ?? 0)} inputmode="decimal" onchange={(e) => editNeedAmount(n, e.currentTarget.value)} />
-      <label class="garde small" title="Garder ce qui n'a pas été dépensé">
-        <input type="checkbox" checked={tirelireById(n.tirelireId)?.rollover?.mode !== 'none'} onchange={(e) => editRollover(n, e.currentTarget.checked)} /> garder
-      </label>
-      <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
+  <div class="tete tete-courant"><span>Quoi ?</span><span class="d">Par période</span><span></span><span></span></div>
+  {#each tirelireCourantes as { t, besoins } (t.id)}
+    <div class="card tirelire">
+      {@render enTeteTirelire(t, true)}
+      {#each besoins as n (n.id)}
+        <div class="ligne ligne-courant">
+          {@render quoi(n, 'Par période')}
+          <input class="mt" value={centsToInput(n.amount ?? 0)} inputmode="decimal" aria-label="Par période" onchange={(e) => editNeedAmount(n, e.currentTarget.value)} />
+          <span class="vide"></span>
+          {@render suiteBesoin(n, besoins)}
+        </div>
+      {/each}
     </div>
   {/each}
   {#if restantsCourants.length}
     <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
     <div class="propositions">
       {#each restantsCourants as p (p.name)}
-        <button class="prop" onclick={() => appliquerCourant(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+        <button class="prop" onclick={() => appliquerTirelire(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p))}</span>
         </button>
       {/each}
     </div>
@@ -833,25 +972,37 @@
   </p>
   <h3>Dépenses à échéance</h3>
   <div class="tete tete-echeance"><span>Quoi ?</span><span class="d">Montant</span><span>Prochaine échéance</span><span></span></div>
-  {#each periodicNeeds as n (n.id)}
-    <div class="card">
-      <div class="ligne ligne-echeance">
-        <input class="nom" value={needName(n, tirelireById(n.tirelireId))} onchange={(e) => editNeedName(n, e.currentTarget.value)} />
-        <input class="mt" value={centsToInput(n.amount ?? 0)} inputmode="decimal" onchange={(e) => editNeedAmount(n, e.currentTarget.value)} />
-        <input class="date" type="date" value={n.periodicity?.anchorDate ?? todayISO()} onchange={(e) => editNeedDueDate(n, e.currentTarget.value)} />
-        <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
-      </div>
-      <p class="muted small" style="margin:4px 0 0">
-        {money(perPeriod(n.amount ?? 0, n.periodicity ? monthsOf(n.periodicity) : 12))} à mettre de côté par mois.
-      </p>
+  {#each tirelirePeriodiques as { t, besoins } (t.id)}
+    <div class="card tirelire">
+      {@render enTeteTirelire(t, false)}
+      {#each besoins as n (n.id)}
+        <div class="ligne ligne-echeance">
+          {@render quoi(n, 'La facture')}
+          <input class="mt" value={centsToInput(n.amount ?? 0)} inputmode="decimal" aria-label="Montant" onchange={(e) => editNeedAmount(n, e.currentTarget.value)} />
+          <input class="date" type="date" value={n.periodicity?.anchorDate ?? todayISO()} aria-label="Prochaine échéance" onchange={(e) => editNeedDueDate(n, e.currentTarget.value)} />
+          {@render suiteBesoin(n, besoins)}
+          <p class="muted small suite">
+            {money(perPeriod(n.amount ?? 0, n.periodicity ? monthsOf(n.periodicity) : 12))} à mettre de côté par mois.
+          </p>
+        </div>
+      {/each}
+      <!-- L'étape dit, pour chaque échéance, si un prélèvement y est attendu (D40). -->
+      <label class="prelevement small">
+        <input type="checkbox" checked={prelevementsDe(t).length > 0} onchange={(e) => editPrelevement(t, besoins[0]!, e.currentTarget.checked)} />
+        {#if prelevementsDe(t).length}
+          Prélèvement attendu : {#each prelevementsDe(t) as f, i (f.id)}{i ? ', ' : ''}« {f.name} », {money(Math.abs(f.amount))} sur {nomDuCompte(f.accountId)}{/each}
+        {:else}
+          Aucun prélèvement attendu
+        {/if}
+      </label>
     </div>
   {/each}
   {#if restantsPeriodiques.length}
     <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
     <div class="propositions">
       {#each restantsPeriodiques as p (p.name)}
-        <button class="prop" onclick={() => appliquerPeriodique(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+        <button class="prop" onclick={() => appliquerTirelire(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p))}</span>
         </button>
       {/each}
     </div>
@@ -887,20 +1038,25 @@
   </p>
   <h3>Objectifs d'épargne</h3>
   <div class="tete tete-epargne"><span>Quoi ?</span><span class="d">Par période</span><span class="d">Cible</span><span></span></div>
-  {#each savingsNeeds as n (n.id)}
-    <div class="card ligne ligne-epargne">
-      <input class="nom" value={needName(n, tirelireById(n.tirelireId))} onchange={(e) => editNeedName(n, e.currentTarget.value)} />
-      <input class="mt" value={centsToInput(n.monthlyAmount ?? 0)} inputmode="decimal" onchange={(e) => editNeedAmount(n, e.currentTarget.value)} />
-      <input class="mt" value={n.amount ? centsToInput(n.amount) : ''} inputmode="decimal" placeholder="cible" onchange={(e) => editNeedTarget(n, e.currentTarget.value)} />
-      <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
+  {#each tirelireEpargnes as { t, besoins } (t.id)}
+    <div class="card tirelire">
+      {@render enTeteTirelire(t, false)}
+      {#each besoins as n (n.id)}
+        <div class="ligne ligne-epargne">
+          {@render quoi(n, 'Par période, et la cible')}
+          <input class="mt" value={centsToInput(n.monthlyAmount ?? 0)} inputmode="decimal" aria-label="Par période" onchange={(e) => editNeedAmount(n, e.currentTarget.value)} />
+          <input class="mt" value={n.amount ? centsToInput(n.amount) : ''} inputmode="decimal" placeholder="cible" aria-label="Cible" onchange={(e) => editNeedTarget(n, e.currentTarget.value)} />
+          {@render suiteBesoin(n, besoins)}
+        </div>
+      {/each}
     </div>
   {/each}
   {#if restantsEpargnes.length}
     <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
     <div class="propositions">
       {#each restantsEpargnes as p (p.name)}
-        <button class="prop" onclick={() => appliquerEpargne(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(p.monthly)}</span>
+        <button class="prop" onclick={() => appliquerTirelire(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p))}</span>
         </button>
       {/each}
     </div>
@@ -946,7 +1102,7 @@
       <select value={a.kind} onchange={(e) => editAccountKind(a, e.currentTarget.value)}>
         {#each NATURES as k}<option value={k}>{ACCOUNT_KINDS[k]}</option>{/each}
       </select>
-      <button class="btn small danger" title="Retirer ce compte" onclick={() => app.assistantRemove('accounts', a.id)}>×</button>
+      <button class="btn small danger" title="Retirer ce compte" onclick={() => retirerCompte(a)}>×</button>
       <!-- Ce que l'étape dit du compte : tiers (suivi d'un solde à régler) ou clos. Ces réglages se modifient depuis Comptes (I11). -->
       {#if a.tracksSettlement || validityBadge(a, app.asOf)}
         <p class="muted small suite">
@@ -1016,14 +1172,14 @@
   <div class="card">
     <div class="row"><div class="label">Rentrées d'argent</div><div class="num pos">{money(totals.incomes)}</div></div>
     <div class="row"><div class="label">Charges fixes</div><div class="num">{money(-totals.fixedCharges)}</div></div>
-    <div class="row"><div class="label">Réserves à constituer ({needs.length})</div><div class="num">{money(-totals.requested)}</div></div>
+    <div class="row"><div class="label">Réserves à constituer ({needs.filter((n) => activeAt(n, app.asOf)).length})</div><div class="num">{money(-totals.requested)}</div></div>
     <div class="row total"><div class="label">Reste à vivre</div><div class="num {totals.margin < 0 ? 'neg' : 'pos'}">{money(totals.margin)}</div></div>
   </div>
 
-  {#if !valide && comptesOuverts.length > 1 && reserveTirelires.length}
-    <h3>Où doit dormir chaque réserve ?</h3>
-    <p class="muted small">Laissez sur le compte principal si vous ne savez pas : ça se change à tout moment.</p>
-    {#each reserveTirelires as e (e.id)}
+  {#if !valide && comptesOuverts.length > 1 && tirelires.length}
+    <h3>Où dort chaque tirelire ?</h3>
+    <p class="muted small">Le compte où son argent est mis de côté. Laissez « Peu importe » si vous ne savez pas : ça se change à tout moment.</p>
+    {#each tirelires as e (e.id)}
       <div class="card">
         <div class="row">
           <div class="label"><strong>{e.name}</strong></div>
@@ -1038,12 +1194,48 @@
     {/each}
   {/if}
 
+  {#if !valide && (ordres.length || restantsOrdres.length)}
+    <h3>Vos virements permanents déjà en place</h3>
+    <p class="muted small">
+      Un virement que vous avez déjà programmé chez votre banque. Indiquez ce qu'il vire vraiment : le
+      plan le compare à ce que votre budget demande, et vous dit quand le modifier.
+    </p>
+    {#each ordres as f (f.id)}
+      <div class="card ordre">
+        <div class="row">
+          <div class="label">
+            <strong>{f.name}</strong>
+            <div class="muted small">
+              {f.periodicity.unit === 'month' && f.periodicity.interval === 1 ? `Le ${parseDate(f.periodicity.anchorDate).d} de chaque mois` : periodicityLabel(f.periodicity)},
+              de {nomDuCompte(f.accountId)} vers {nomDuCompte(f.counterpartAccountId)}{f.labelPattern ? ` · libellé « ${f.labelPattern} »` : ''}.
+            </div>
+          </div>
+          <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
+          <button class="btn small danger" title="Retirer ce virement" onclick={() => removeFlow(f)}>×</button>
+        </div>
+        <p class="muted small" style="margin:4px 0 0">
+          Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {nomDuCompte(f.counterpartAccountId)}.
+        </p>
+      </div>
+    {/each}
+    {#if restantsOrdres.length}
+      <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+      <div class="propositions">
+        {#each restantsOrdres as p (p.name)}
+          <button class="prop" onclick={() => appliquerOrdre(p)}>
+            <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
+  {/if}
+
   {#if valide}
     <h3>Et maintenant</h3>
     <p class="muted small">
       Le Plan détaille période par période ce qu'il faut mettre de côté et les virements à faire.
-      Dans Configuration, vous pouvez affiner ce que l'assistant a créé : plusieurs besoins sur une même
-      tirelire, priorités de financement, ventilation des dépenses par catégorie. L'import d'un relevé
+      Dans Configuration, vous pouvez affiner ce que l'assistant a créé : les besoins de chaque
+      tirelire et leurs priorités de financement, la ventilation des dépenses par catégorie. L'import d'un relevé
       rapprochera ensuite vos opérations réelles de ce budget.
     </p>
     <div class="actions">

@@ -445,12 +445,13 @@ même identité sur toutes les instances (D58) : l'assistant ne le crée pas, il
 informations — nom, solde, date d'ouverture —, écrites avec le reste à la validation, et ce qui est
 renseigné l'emporte sur le défaut à la synchronisation. Le faire saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
 un budget entier tient sans eux (une tirelire sans placement déclaré ne produit aucun écart, D38).
-S'ils existent, l'assistant demande seulement où chaque réserve devrait dormir, ce qui remplit le
-placement de D38 sans exposer les parts.
+S'ils existent, l'assistant demande où dort chaque tirelire, ce qui remplit le placement de D38
+sans exposer les parts.
 
 L'assistant ne remplace pas les écrans de configuration : une fois validé, il amène à un budget qui
-se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (besoins multiples
-sur une tirelire, priorités, ventilations, catégories).
+se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations,
+catégories). Il propose les besoins multiples d'une tirelire et les priorités de l'exemple, qui se
+modifient ensuite dans Configuration.
 
 Deux ancrages sont imposés par le moteur et figés par `test/assistant.test.ts` : une tirelire est
 ouverte au **début de la période en cours** (`tirelireTimeline` ne démarre qu'à la première période
@@ -791,10 +792,10 @@ porte deux « Salaire » et deux « Alimentation ». Les flux — revenus et cha
 avec **toutes leurs versions**, chacune avec ses dates : le salaire qui change se lit comme deux
 lignes du même nom, chacune disant sa date de validité, et se retire une ligne à la fois ; un
 raccourci apporte le flux avec toutes ses versions, et disparaît dès qu'un flux du même nom existe
-(D46). Les besoins se proposent selon la version en vigueur à la date de lecture
-(`budgetSuggestions(asOf)`), sinon l'assistant offrirait deux lignes de même nom sans dire laquelle
-prendre. Elles reprennent aussi le nom du besoin quand il en porte un, la tirelire ne suffisant plus
-à les distinguer dès qu'elle en porte deux.
+(D46). Les besoins se proposent de même avec **toutes leurs versions**, chacune avec ses dates,
+sous la tirelire qui les porte : l'alimentation qui change se lit comme deux lignes de cette
+tirelire, chacune disant sa date de validité. Ils reprennent aussi le nom du besoin quand il en porte
+un, la tirelire ne suffisant plus à les distinguer dès qu'elle en porte deux.
 
 **Un défaut trouvé en chemin, corrigé ici.** `replaceWith`, côté interface, écrivait les tables une
 par une et avait **oublié `needs`** ainsi que `periodStartDay`. Charger l'exemple donnait donc des
@@ -1266,8 +1267,13 @@ l'épargne de précaution reprend la mensualité du crédit (D51). Aucune opéra
 l'exemple n'importe aucun relevé, et lui en donner une retrancherait 600 € de ce que le plan
 demande, alors que ce plan est celui de l'analyse au centime près.
 
+L'assistant propose l'ordre permanent de l'exemple comme un ordre déjà posé chez la banque, là où il
+demande où dort chaque tirelire, à côté de ce que son budget demande pour ce compte ; l'utilisateur
+le garde, en corrige le montant ou le retire, et il ne s'enregistre qu'à la validation de
+l'assistant.
+
 Ce que cela ne couvre pas encore : l'application ne sait pas préparer l'ordre chez la banque
-(virement SEPA, QR code), et l'assistant ne le propose pas encore.
+(virement SEPA, QR code).
 
 ### D61 · Deux catégories d'une même nature ne portent pas le même nom
 

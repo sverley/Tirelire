@@ -22,9 +22,9 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     const proposes = [
       ...s.incomes.map((x) => x.name),
       ...s.charges.map((x) => x.name),
-      ...s.everyday.map((x) => x.name),
-      ...s.periodic.map((x) => x.name),
-      ...s.savings.map((x) => x.name),
+      ...s.tirelires.map((x) => x.name),
+      ...s.tirelires.flatMap((x) => x.payments.map((f) => f.name)),
+      ...s.orders.map((x) => x.name),
       // Les comptes : le compte principal renseigné et les autres comptes proposés (#211).
       s.mainAccount.name,
       ...s.accounts.map((x) => x.name),
@@ -41,33 +41,64 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     );
   });
 
-  it("couvre les cinq questions du parcours à partir de l'exemple seul", () => {
-    expect(s.incomes.length).toBeGreaterThan(0);
-    expect(s.charges.length).toBeGreaterThan(0);
-    expect(s.everyday.length).toBeGreaterThan(0);
-    expect(s.periodic.length).toBeGreaterThan(0);
-    expect(s.savings.length).toBeGreaterThan(0);
+  it("propose toutes les tirelires de l'exemple, tous leurs besoins, leurs prélèvements attendus et son ordre permanent, et eux seuls (#336)", () => {
+    // Une empreinte par objet, faite de ce que l'exemple en dit : une proposition qui n'y serait pas,
+    // ou un objet de l'exemple qui ne serait pas proposé, fait échouer ce test dans les deux sens.
+    const nomDe = (id?: string) => {
+      const a = alive(l.accounts).find((x) => x.id === id);
+      return a?.kind === 'principal' ? undefined : a?.name;
+    };
+    const tirelire = (nom: string, reliquat: unknown, deCote: number, placement: unknown) => JSON.stringify([nom, reliquat ?? null, deCote, placement]);
+    expect(s.tirelires.map((t) => tirelire(t.name, t.rollover, t.openingBalance, t.placement.map((p) => [p.accountName ?? null, p.share]))).sort()).toEqual(
+      alive(l.tirelires).map((t) => tirelire(t.name, t.rollover, t.openingBalance, t.placement.map((p) => [nomDe(p.accountId) ?? null, p.share]))).sort(),
+    );
+
+    const besoin = (tirelireNom: string, n: { kind: string; name?: string; amount?: number; monthlyAmount?: number; periodicity?: unknown; priority: number; activeFrom?: string; activeTo?: string }) =>
+      JSON.stringify([tirelireNom, n.kind, n.name ?? null, n.amount ?? null, n.monthlyAmount ?? null, n.periodicity ?? null, n.priority, n.activeFrom ?? null, n.activeTo ?? null]);
+    const tirelireDe = (id: string) => alive(l.tirelires).find((t) => t.id === id)!.name;
+    expect(s.tirelires.flatMap((t) => t.needs.map((n) => besoin(t.name, n))).sort()).toEqual(
+      alive(l.needs).map((n) => besoin(tirelireDe(n.tirelireId), n)).sort(),
+    );
+    expect(alive(l.needs).length).toBe(13);
+
+    const fluxCle = (f: { name: string; amount: number; accountName?: string | undefined; anchorDate: string; interval: number; unit: string; dateWindowDays: number; labelPattern?: string | undefined; amountTolerance?: unknown }, autre: unknown) =>
+      JSON.stringify([f.name, Math.abs(f.amount), f.accountName ?? null, f.anchorDate, f.interval, f.unit, f.dateWindowDays, f.labelPattern ?? null, f.amountTolerance ?? null, autre]);
+    const versFlux = (f: (typeof l.plannedFlows)[number]) => ({
+      name: f.name, amount: f.amount, accountName: nomDe(f.accountId), anchorDate: f.periodicity.anchorDate, interval: f.periodicity.interval,
+      unit: f.periodicity.unit, dateWindowDays: f.dateWindowDays, labelPattern: f.labelPattern, amountTolerance: f.amountTolerance,
+    });
+    // Les prélèvements attendus : chacun sous sa tirelire, ni plus ni moins que les flux d'échéance de l'exemple.
+    expect(s.tirelires.flatMap((t) => t.payments.map((f) => fluxCle(f, t.name))).sort()).toEqual(
+      alive(l.plannedFlows).filter((f) => f.kind === 'dueDate').map((f) => fluxCle(versFlux(f), tirelireDe(f.tirelireId!))).sort(),
+    );
+    // Les ordres : les virements dérivés de l'exemple, avec leur compte d'arrivée.
+    expect(s.orders.map((o) => fluxCle(o, [o.toAccountName, o.origin ?? null])).sort()).toEqual(
+      alive(l.plannedFlows)
+        .filter((f) => f.kind === 'transfer' && f.origin === 'derived')
+        .map((f) => fluxCle(versFlux(f), [nomDe(f.counterpartAccountId), f.origin])).sort(),
+    );
   });
 
-  it('ne propose qu’une version de chaque besoin, celle en vigueur ; les flux se proposent avec toutes leurs versions (D51)', () => {
-    const noms = [...s.everyday.map((x) => x.name), ...s.savings.map((x) => x.name)];
-    expect(new Set(noms).size).toBe(noms.length);
-    expect(s.everyday.find((x) => x.name === 'Alimentation')!.amount).toBe(euros(900));
+  it("couvre les cinq questions du parcours à partir de l'exemple seul", () => {
+    const genres = new Set(s.tirelires.flatMap((t) => t.needs.map((n) => n.kind)));
+    expect(s.incomes.length).toBeGreaterThan(0);
+    expect(s.charges.length).toBeGreaterThan(0);
+    expect([...genres].sort()).toEqual(['dueDate', 'goal', 'recurring']);
+  });
+
+  it('propose toutes les versions des besoins comme des flux, chacune avec ses dates, à toute date (D51)', () => {
+    const alimentation = s.tirelires.find((t) => t.name === 'Alimentation')!;
+    expect(alimentation.needs.map((n) => [n.amount, n.activeFrom, n.activeTo])).toEqual([
+      [euros(900), undefined, '2026-10-27'],
+      [euros(950), '2026-10-28', undefined],
+    ]);
     // Le salaire change à la paie de novembre : les deux versions sont proposées, chacune avec sa date.
     expect(s.incomes.filter((x) => x.name === 'Salaire').map((x) => [x.amount, x.activeFrom, x.activeTo])).toEqual([
       [euros(3400), undefined, '2026-10-27'],
       [euros(3550), '2026-10-28', undefined],
     ]);
-  });
-
-  it('suit la version en vigueur quand un besoin a changé ; les flux se proposent de même à toute date', () => {
-    // Novembre : l'alimentation est passée à 950 et le piano est apparu.
-    const apres = budgetSuggestions('2026-11-15');
-    expect(apres.everyday.find((x) => x.name === 'Alimentation')!.amount).toBe(euros(950));
-    expect(apres.everyday.filter((x) => x.name === 'Alimentation').length).toBe(1);
-    // Les flux ne suivent pas la date : toutes leurs versions, en novembre comme en janvier, où le crédit est terminé.
-    expect(apres.incomes).toEqual(s.incomes);
-    expect(apres.charges).toEqual(s.charges);
+    // Rien ne suit la date de lecture : en novembre comme en janvier, les mêmes propositions.
+    expect(budgetSuggestions('2026-11-15')).toEqual(s);
     expect(budgetSuggestions('2027-01-15').charges.some((x) => x.name === 'Crédit immobilier')).toBe(true);
   });
 
@@ -81,9 +112,8 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     const credit = s.charges.find((x) => x.name === 'Crédit immobilier')!;
     expect(credit.amount).toBeGreaterThan(0);
 
-    const tf = s.periodic.find((x) => x.name === 'Taxe foncière')!;
-    expect({ interval: tf.interval, unit: tf.unit }).toEqual({ interval: 12, unit: 'month' });
-    expect({ month: tf.month, day: tf.day }).toEqual({ month: 10, day: 15 });
+    const tf = s.tirelires.find((x) => x.name === 'Taxe foncière')!.needs[0]!;
+    expect(tf.periodicity).toEqual({ interval: 12, unit: 'month', anchorDate: '2026-10-15' });
   });
 
   it("date l'échéance proposée sur sa prochaine occurrence, sans demander l'année", () => {
