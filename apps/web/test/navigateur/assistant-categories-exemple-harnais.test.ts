@@ -3,17 +3,21 @@
  * 375 px. Les points 1 à 4, 6 et 7 du « Fait quand ». Le point 5 (« le test des propositions échoue si une catégorie
  * ou un lien proposé n'est pas dans l'exemple, ou si l'un de ceux de l'exemple n'est pas proposé ») est tranché par
  * `packages/core/test/suggestions.test.ts`, que le codeur a étendu aux catégories ; les points 8 (D40) et 9
- * (D61, que l'auditeur ajoute), par `packages/core/test/assistant-categories-decision-harnais.test.ts`. La lecture des catégories dans l'exemple, côté
+ * (D61, que l'auditeur ajoute), par `packages/gardes/assistant-categories-decision-harnais.test.mjs`. La lecture des catégories dans l'exemple, côté
  * cœur, reste dans ses `suggestions-categories.test.ts`, au niveau 4 : ce que ce fichier-ci observe à l'écran la couvre.
  *
  * Retenus parmi les tests du codeur (`navigateur/assistant-categories-exemple.test.ts`, d'où ils sont déplacés, ce
  * fichier-là n'existe plus), l'un d'eux corrigé (le point 7 comptait les gestes dans un tableau qu'il
  * remplit lui-même, ce qui ne pouvait pas échouer) et l'autre complété (le point 4 ne regardait, après la seconde
  * validation, que la tirelire de « Santé » : il compte maintenant toutes les catégories que le projet porte, pour
- * que rouvrir l'assistant ne casse ni ne double rien, D43).
+ * que rouvrir l'assistant ne casse ni ne double rien, D43). Leurs assertions sur la ligne d'une catégorie lisent ce
+ * qu'elle dit — quelles tirelires, quels flux —, non la forme du texte : la phrase 2 la laisse libre (précisé par
+ * l'architecte, 03/10). Et un test s'y ajoute, que le codeur n'avait pas : le lien par le nom que la même phrase écrit
+ * maintenant (parcours « renommé »).
  *
- * Trois parcours, chacun dans sa page et joué dans l'ordre :
+ * Quatre parcours, chacun dans sa page et joué dans l'ordre :
  * - « tel quel » : un projet vierge, l'assistant accepté sans rien toucher (points 1, 2, 6 et 7) ;
+ * - « renommé » : un flux et une tirelire renommés avant l'étape (point 2) ;
  * - « corrigé » : l'étape retouchée sur place, puis validée (point 3) ;
  * - « rouvert » : l'assistant rouvert sur ce projet, ses raccourcis (point 4).
  *
@@ -63,7 +67,20 @@ const lesCategories = (page: Page): Promise<Ligne[]> =>
 
 /** Les noms de l'étape, d'une nature (« Dépenses », « Revenus »). */
 const noms = (lignes: Ligne[], nature: string) => lignes.filter((l) => l.nature === nature).map((l) => l.nom);
-const detailDe = (lignes: Ligne[], nom: string, nature = 'Dépenses') => lignes.find((l) => l.nature === nature && l.nom === nom)?.detail;
+const detailDe = (lignes: Ligne[], nom: string, nature = 'Dépenses') => lignes.find((l) => l.nature === nature && l.nom === nom)?.detail ?? '';
+
+/**
+ * Les tirelires et les flux de l'exemple que la ligne d'une catégorie nomme. La phrase 2 laisse libre la forme de la
+ * ligne : on lit ce qu'elle dit — quelles tirelires, quels flux —, pas la façon dont elle le dit.
+ */
+const TIRELIRES_DE_L_EXEMPLE = ['Alimentation', 'Santé', 'Enfants et loisirs'];
+const FLUX_DE_L_EXEMPLE = ['Salaire', 'Loyer locatif', 'Allocations', 'Crédit immobilier', 'Électricité', 'Assurance habitation', 'Internet et mobiles'];
+const dit = (lignes: Ligne[], nom: string, nature = 'Dépenses') => {
+  const ligne = lignes.find((l) => l.nature === nature && l.nom === nom);
+  expect(ligne, `pas de catégorie « ${nom} » (${nature}) dans l’étape`).toBeDefined();
+  const d = ligne!.detail;
+  return { tirelires: TIRELIRES_DE_L_EXEMPLE.filter((n) => d.includes(n)), flux: FLUX_DE_L_EXEMPLE.filter((n) => d.includes(n)) };
+};
 
 /** Les raccourcis offerts par l'étape : leur nom et leur nature, tels qu'ils s'écrivent (« + Logement », « dépense »). */
 const raccourcis = (page: Page): Promise<string[]> =>
@@ -273,17 +290,18 @@ describe.skipIf(!navigateur)('#212 — l’assistant propose les catégories de 
 
     it('[niveau 2] point 2 — chaque ligne dit la tirelire par défaut et les flux qui portent la catégorie', async () => {
       const lignes = await lesCategories(page);
-      expect(detailDe(lignes, 'Alimentation')).toBe('Tirelire par défaut : Alimentation');
-      expect(detailDe(lignes, 'Santé')).toBe('Tirelire par défaut : Santé');
-      expect(detailDe(lignes, 'Enfants')).toBe('Tirelire par défaut : Enfants et loisirs');
-      expect(detailDe(lignes, 'Logement')).toBe('Flux : Crédit immobilier, Électricité');
-      expect(detailDe(lignes, 'Assurances')).toBe('Flux : Assurance habitation');
-      expect(detailDe(lignes, 'Abonnements')).toBe('Flux : Internet et mobiles');
-      expect(detailDe(lignes, 'Virement interne')).toBe('');
+      expect(dit(lignes, 'Alimentation')).toEqual({ tirelires: ['Alimentation'], flux: [] });
+      expect(dit(lignes, 'Santé')).toEqual({ tirelires: ['Santé'], flux: [] });
+      expect(dit(lignes, 'Enfants')).toEqual({ tirelires: ['Enfants et loisirs'], flux: [] });
+      expect(dit(lignes, 'Logement')).toEqual({ tirelires: [], flux: ['Crédit immobilier', 'Électricité'] });
+      expect(dit(lignes, 'Assurances')).toEqual({ tirelires: [], flux: ['Assurance habitation'] });
+      expect(dit(lignes, 'Abonnements')).toEqual({ tirelires: [], flux: ['Internet et mobiles'] });
+      expect(dit(lignes, 'Virement interne')).toEqual({ tirelires: [], flux: [] });
       // Les deux versions du salaire ne font qu'un flux dans la ligne.
-      expect(detailDe(lignes, 'Salaire', 'Revenus')).toBe('Flux : Salaire');
-      expect(detailDe(lignes, 'Loyer perçu', 'Revenus')).toBe('Flux : Loyer locatif');
-      expect(detailDe(lignes, 'Allocations', 'Revenus')).toBe('Flux : Allocations');
+      expect(dit(lignes, 'Salaire', 'Revenus')).toEqual({ tirelires: [], flux: ['Salaire'] });
+      expect(detailDe(lignes, 'Salaire', 'Revenus').split('Salaire').length - 1, 'le flux « Salaire » est nommé une fois').toBe(1);
+      expect(dit(lignes, 'Loyer perçu', 'Revenus')).toEqual({ tirelires: [], flux: ['Loyer locatif'] });
+      expect(dit(lignes, 'Allocations', 'Revenus')).toEqual({ tirelires: [], flux: ['Allocations'] });
     });
 
     it('[niveau 1] point 7 (I4) — l’étape se franchit par son seul bouton primaire, sans rien refuser', async () => {
@@ -350,6 +368,51 @@ describe.skipIf(!navigateur)('#212 — l’assistant propose les catégories de 
     }, 60_000);
   });
 
+  describe('renommé', () => {
+    let page: Page;
+
+    beforeAll(async () => {
+      page = await ouvrirLAssistant(site);
+      await suivant(page, 2); // Comptes → Revenus → Charges fixes
+      // Un flux renommé à une étape précédente : « Électricité » devient « Énergie ».
+      expect(await poser(page, 'main .ligne-flux input.nom', 'Électricité', 'Énergie'), 'pas de flux « Électricité »').toBe(true);
+      await pause(250);
+      await suivant(page, 1); // Charges fixes → Budgets
+      // Une tirelire renommée à une étape précédente : « Alimentation » devient « Courses ».
+      expect(await poser(page, 'main .card.tirelire input.nom', 'Alimentation', 'Courses'), 'pas de tirelire « Alimentation »').toBe(true);
+      await pause(250);
+      await suivant(page, 3); // Budgets → Pas tous les mois → Épargne → Catégories
+    }, 120_000);
+
+    afterAll(async () => {
+      await page?.close();
+    });
+
+    it('[niveau 2] point 2 — une catégorie se lie par le nom : un flux ou une tirelire renommé à une étape précédente ne lui est pas lié, la ligne ne le montre pas, et le projet validé le laisse sans catégorie', async () => {
+      expect(await titre(page)).toContain('classer');
+      const lignes = await lesCategories(page);
+      expect(lignes).toHaveLength(10);
+      // Le flux renommé n'est pas sur « Logement » ; celui qui garde son nom l'est.
+      expect(dit(lignes, 'Logement').flux).toEqual(['Crédit immobilier']);
+      expect(detailDe(lignes, 'Logement')).not.toMatch(/Énergie|Électricité/);
+      // La tirelire renommée n'est plus la tirelire par défaut d'« Alimentation » : la catégorie arrive sans.
+      expect(dit(lignes, 'Alimentation').tirelires).toEqual([]);
+      expect(detailDe(lignes, 'Alimentation')).not.toContain('Courses');
+      // Le reste arrive comme à l'ordinaire.
+      expect(dit(lignes, 'Santé').tirelires).toEqual(['Santé']);
+      expect(dit(lignes, 'Assurances').flux).toEqual(['Assurance habitation']);
+
+      await suivant(page, 1);
+      expect(await cliquer(page, 'Valider mon budget')).toBe(true);
+      await pause(500);
+      expect(await categoriesDuFlux(page, 'Énergie')).toEqual(['—']);
+      expect(await categoriesDuFlux(page, 'Crédit immobilier')).toEqual(['Logement']);
+      const cats = await categoriesDuProjet(page);
+      expect(cats.find((c) => c.nom === 'Alimentation')?.budget).toBe('');
+      expect(cats.find((c) => c.nom === 'Santé')?.budget).toBe('Santé');
+    }, 90_000);
+  });
+
   describe('corrigé', () => {
     let page: Page;
 
@@ -370,8 +433,8 @@ describe.skipIf(!navigateur)('#212 — l’assistant propose les catégories de 
       const lignes = await lesCategories(page);
       expect(lignes).toHaveLength(10);
       expect(noms(lignes, 'Dépenses')).toContain('Alimentation');
-      expect(detailDe(lignes, 'Alimentation')).toBe('');
-      expect(detailDe(lignes, 'Santé')).toBe('Tirelire par défaut : Santé');
+      expect(dit(lignes, 'Alimentation').tirelires).toEqual([]);
+      expect(dit(lignes, 'Santé').tirelires).toEqual(['Santé']);
     });
 
     it('[niveau 2] point 3 — le nom d’une catégorie se corrige sur place, et la correction tient quand on quitte l’étape et qu’on y revient', async () => {
@@ -379,7 +442,7 @@ describe.skipIf(!navigateur)('#212 — l’assistant propose les catégories de 
       let lignes = await lesCategories(page);
       expect(noms(lignes, 'Dépenses')).toContain('Soins');
       expect(noms(lignes, 'Dépenses')).not.toContain('Santé');
-      expect(detailDe(lignes, 'Soins')).toBe('Tirelire par défaut : Santé');
+      expect(dit(lignes, 'Soins').tirelires).toEqual(['Santé']);
       expect(await erreurs(page)).toEqual([]);
 
       await etape(page, 'Résumé');
@@ -433,8 +496,8 @@ describe.skipIf(!navigateur)('#212 — l’assistant propose les catégories de 
       await etape(page, 'Catégories');
       const lignes = await lesCategories(page);
       expect(noms(lignes, 'Dépenses')).toContain('Enfants');
-      expect(detailDe(lignes, 'Enfants')).toBe('');
-      expect(detailDe(lignes, 'Soins')).toBe('Tirelire par défaut : Santé');
+      expect(dit(lignes, 'Enfants').tirelires).toEqual([]);
+      expect(dit(lignes, 'Soins').tirelires).toEqual(['Santé']);
     });
 
     it('[niveau 2] point 3 — validé, le projet porte les catégories gardées et corrigées, sans celles qui ont été retirées, et leurs flux n’ont plus de catégorie', async () => {
@@ -468,10 +531,10 @@ describe.skipIf(!navigateur)('#212 — l’assistant propose les catégories de 
       // Le raccourci apporte la catégorie avec ses liens vers ce qui existe : les flux de même nom, la tirelire par défaut.
       expect(await cliquer(page, '+ Logement')).toBe(true);
       await pause(250);
-      expect(detailDe(await lesCategories(page), 'Logement')).toBe('Flux : Crédit immobilier, Électricité');
+      expect(dit(await lesCategories(page), 'Logement').flux).toEqual(['Crédit immobilier', 'Électricité']);
       expect(await cliquer(page, '+ Santé')).toBe(true);
       await pause(250);
-      expect(detailDe(await lesCategories(page), 'Santé')).toBe('Tirelire par défaut : Santé');
+      expect(dit(await lesCategories(page), 'Santé').tirelires).toEqual(['Santé']);
       expect(await raccourcis(page)).toEqual(['Loyer perçu · revenu', 'Assurances · dépense']);
 
       // Une catégorie de même nom, mais de l'autre nature, ne fait pas disparaître le raccourci…
@@ -484,7 +547,7 @@ describe.skipIf(!navigateur)('#212 — l’assistant propose les catégories de 
       expect(await raccourcis(page)).toEqual(['Loyer perçu · revenu']);
       expect(await cliquer(page, '+ Loyer perçu')).toBe(true);
       await pause(250);
-      expect(detailDe(await lesCategories(page), 'Loyer perçu', 'Revenus')).toBe('Flux : Loyer locatif');
+      expect(dit(await lesCategories(page), 'Loyer perçu', 'Revenus').flux).toEqual(['Loyer locatif']);
       expect(await raccourcis(page)).toEqual([]);
     }, 90_000);
 
