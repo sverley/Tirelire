@@ -1,18 +1,35 @@
 /**
- * Tests du codeur de #213 — « L'assistant propose tous les revenus et toutes les charges fixes de l'exemple, versions
+ * Harnais d'audit de #213 — « L'assistant propose tous les revenus et toutes les charges fixes de l'exemple, versions
  * datées comprises », côté écran : sur le site construit, à 375 px, au jour des tests (`JOUR_DES_TESTS`, 20 septembre 2026).
- * La lecture de ces flux dans l'exemple et le flux qu'en fait une proposition, côté cœur, sont dans
- * `packages/core/test/suggestions-flux.test.ts`.
+ * Les points 1 à 5 et 7 du « Fait quand », et le point 9 que l'auditeur y ajoute (ce que montre le raccourci d'un flux
+ * à plusieurs versions).
  *
- * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie. Tous sont de niveau 4 (D83) : l'auditeur
- * donne leur niveau à ceux qu'il retient.
+ * Retenus parmi les tests du codeur (`navigateur/assistant-flux-exemple.test.ts`, d'où ils sont déplacés, ce fichier-là
+ * n'existe plus), puis complétés : le compte et le groupe de chacun des huit flux dans Flux prévus (point 7), et, pour
+ * chacun des huit, ce que dit son formulaire — fenêtre, tolérance, motif, montant variable, dates —, comparé à ce que
+ * l'exemple lui-même porte (point 2) ; le codeur ne lisait que le formulaire du premier « Salaire ». Les points 4 et 6,
+ * côté cœur, sont dans `packages/core/test/suggestions-flux-harnais.test.ts` ; la première phrase du point 6 (« le test
+ * des propositions échoue si… ») est tranchée par `packages/core/test/suggestions.test.ts`, que le codeur a étendu aux
+ * flux ; le point 8 (D51) est de la documentation, vérifiée à la relecture.
  *
- * Les dates se lisent à l'écran sous la forme de l'application (« jusqu’au 27 oct. 2026 ») : les tests ne figent que le
- * jour et l'année, pas l'abréviation du mois.
+ * Niveaux (D83), par phrase du « Fait quand » :
+ *  - 2 pour les points 1 à 5 et 9 : D43 et D46 (des propositions déjà là, tirées de l'exemple, qui disparaissent quand
+ *    elles existent), D50 (ce que le bandeau compte) et D51 (chaque version se lit avec sa date et se retire seule) sont
+ *    des décisions ; une ligne absente, fausse ou sans sa date en est un cas faux, l'usage restant possible. Pas 1 : la
+ *    description ne porte pas, comme énoncé, que l'assistant accepté tel quel redonne l'exemple (c'est la parole du
+ *    porteur, chantier 5, que l'issue cite).
+ *  - 1 pour les deux tests du point 7 : leur phrase est I11 telle qu'elle est écrite (« tout ce qu'une étape d'assistant
+ *    crée ou fait se fait et se modifie aussi hors assistant ») appliquée aux huit flux et à leurs dates. Rouges sur
+ *    `main` (sept flux au lieu de huit, aucune ligne « Salaire » bornée), et sur deux mutations du code de la PR : sans
+ *    les dates de validité, les deux rougissent ; avec les flux posés sur un autre compte que le principal, le premier
+ *    seul.
+ *
+ * Les dates se lisent à l'écran sous la forme de l'application (« jusqu’au 27 oct. 2026 », `validityLabel`, comme sur un
+ * compte) : les tests ne figent que le jour et l'année, pas l'abréviation du mois.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
-import { euros } from '@tirelire/core';
+import { alive, euros, exampleLedger } from '@tirelire/core';
 import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLeSite, type Site } from '../harnais.js';
 
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
@@ -234,6 +251,69 @@ async function saisirChamp(page: Page, libellé: string, valeur: string) {
   await pause(200);
 }
 
+/** Les revenus et les charges fixes de l'exemple : ce que l'assistant accepté tel quel laisse dans le projet (points 2 et 7). */
+const exemple = exampleLedger();
+const compteDe = (id: string) => alive(exemple.accounts).find((a) => a.id === id)!.name;
+const fluxDeLExemple = alive(exemple.plannedFlows).filter((f) => f.kind === 'income' || f.kind === 'fixedCharge');
+
+/** Ce que dit le formulaire d'un flux de Flux prévus, tel qu'il se lit : des textes. */
+interface FluxLu {
+  nom: string;
+  compte: string;
+  montant: string;
+  tousLes: string;
+  unite: string;
+  premiere: string;
+  fenetre: string;
+  toleranceEuros: string;
+  tolerancePct: string;
+  motif: string;
+  de: string;
+  a: string;
+  variable: boolean;
+}
+
+/**
+ * Ouvre, l'un après l'autre, le formulaire de chaque revenu et de chaque charge fixe de Flux prévus, lit ce qu'il
+ * dit, et le referme sans rien changer.
+ */
+const formulairesDesFlux = (page: Page): Promise<FluxLu[]> =>
+  page.evaluate(async () => {
+    const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
+    const attendre = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
+    const lignes = () =>
+      ([...document.querySelectorAll('main .row')] as HTMLElement[]).filter(
+        (r) => r.querySelector('.label strong') && /^(Revenu|Charge fixe)/.test(t(r.closest('.card')?.previousElementSibling)),
+      );
+    const bouton = (parent: ParentNode, texte: string) => ([...parent.querySelectorAll('button')] as HTMLButtonElement[]).find((b) => t(b) === texte);
+    const champ = (libelle: string) => ([...document.querySelectorAll('form.edit label.f')] as HTMLElement[]).find((l) => t(l).startsWith(libelle));
+    const entree = (libelle: string) => champ(libelle)?.querySelector('input, select') as HTMLInputElement | HTMLSelectElement | null | undefined;
+    const lus: FluxLu[] = [];
+    const n = lignes().length;
+    for (let i = 0; i < n; i++) {
+      bouton(lignes()[i]!, 'Modifier')?.click();
+      await attendre(150);
+      lus.push({
+        nom: entree('Nom')?.value ?? '',
+        compte: (entree('Compte') as HTMLSelectElement | null | undefined)?.selectedOptions[0]?.textContent?.trim() ?? '',
+        montant: entree('Montant')?.value ?? '',
+        tousLes: entree('Tous les')?.value ?? '',
+        unite: entree('Unité')?.value ?? '',
+        premiere: entree('Première date')?.value ?? '',
+        fenetre: entree('Fenêtre des échéances')?.value ?? '',
+        toleranceEuros: entree('Tolérance de montant (€)')?.value ?? '',
+        tolerancePct: entree('Tolérance de montant (%)')?.value ?? '',
+        motif: entree('Motif de libellé')?.value ?? '',
+        de: entree('Actif à partir du')?.value ?? '',
+        a: entree('Actif jusqu')?.value ?? '',
+        variable: (entree('Montant variable') as HTMLInputElement | null | undefined)?.checked ?? false,
+      });
+      bouton(document, 'Annuler')?.click();
+      await attendre(150);
+    }
+    return lus;
+  });
+
 describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et toutes les charges fixes de l’exemple, versions datées comprises', () => {
   let site: Site;
 
@@ -260,16 +340,16 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
       await page?.close().catch(() => {});
     });
 
-    it('[niveau 4] #213 · 1 — l’étape arrive avec les quatre revenus de l’exemple, et eux seuls : les deux « Salaire », « Loyer locatif », « Allocations »', () => {
+    it('[niveau 2] point 1 — l’étape arrive avec les quatre revenus de l’exemple, et eux seuls : les deux « Salaire », « Loyer locatif », « Allocations »', () => {
       expect(arrivee.map((l) => l.nom)).toEqual(['Salaire', 'Salaire', 'Loyer locatif', 'Allocations']);
     });
 
-    it('[niveau 4] #213 · 2 — chacun avec son montant et son jour, tels que l’exemple les dit', () => {
+    it('[niveau 2] point 2 — chacun avec son montant et son jour, tels que l’exemple les dit', () => {
       expect(arrivee.map((l) => centimes(l.montant))).toEqual([euros(3400), euros(3550), euros(700), euros(100)]);
       expect(arrivee.map((l) => l.jour)).toEqual(['28', '28', '5', '5']);
     });
 
-    it('[niveau 4] #213 · 3 — deux versions d’un même flux se lisent comme deux lignes du même nom, chacune avec sa date', () => {
+    it('[niveau 2] point 3 — deux versions d’un même flux se lisent comme deux lignes du même nom, chacune avec sa date', () => {
       const [avant, apres, loyer, alloc] = arrivee as [Ligne, Ligne, Ligne, Ligne];
       expect(avant.suites.join(' ')).toMatch(/jusqu’au 27 \S+ 2026/);
       expect(apres.suites.join(' ')).toMatch(/à partir du 28 \S+ 2026/);
@@ -280,12 +360,12 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
       for (const l of [loyer, alloc]) expect(l.suites.join(' '), l.nom).not.toMatch(/jusqu’au|à partir du/);
     });
 
-    it('[niveau 4] #213 · 1 — les raccourcis sont tous consommés d’entrée, et l’étape se franchit par son seul bouton primaire (D46, I4)', async () => {
+    it('[niveau 2] point 1 — les raccourcis sont tous consommés d’entrée, et l’étape se franchit par son seul bouton primaire (D46, I4)', async () => {
       expect(await raccourcis(page), 'sur un projet vierge, la rangée des raccourcis est vide').toEqual([]);
       expect((await lire(page)).primaires.some((p) => /Suivant/.test(p))).toBe(true);
     });
 
-    it('[niveau 4] #213 · 3 — les deux lignes « Salaire » se retirent une à une', async () => {
+    it('[niveau 2] point 3 — les deux lignes « Salaire » se retirent une à une', async () => {
       await retirer(page, 'Salaire');
       const reste = await lignes(page);
       expect(reste.map((l) => l.nom)).toEqual(['Salaire', 'Loyer locatif', 'Allocations']);
@@ -296,7 +376,7 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
   });
 
   describe('sur un projet vierge, à l’étape Charges fixes', () => {
-    it('[niveau 4] #213 · 1 — l’étape arrive avec les quatre charges fixes de l’exemple, et elles seules, chacune avec son montant, son jour et sa date de fin', async () => {
+    it('[niveau 2] point 1 — l’étape arrive avec les quatre charges fixes de l’exemple, et elles seules, chacune avec son montant, son jour et sa date de fin', async () => {
       const page = await nouvellePage(site);
       try {
         await ouvrir(page, site);
@@ -316,7 +396,7 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
       }
     }, 180_000);
 
-    it('[niveau 4] #213 · 4 — le bandeau ne compte que les versions en vigueur au début de la période : un seul salaire, et le crédit', async () => {
+    it('[niveau 2] point 4 — le bandeau ne compte que les versions en vigueur au début de la période : un seul salaire, et le crédit', async () => {
       const page = await nouvellePage(site);
       try {
         await ouvrir(page, site);
@@ -334,7 +414,7 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
   });
 
   describe('sur un projet existant', () => {
-    it('[niveau 4] #213 · 5 — le raccourci d’un flux apporte toutes ses versions, avec leurs dates, et disparaît dès qu’un flux du même nom existe', async () => {
+    it('[niveau 2] point 5 et 9 — le raccourci d’un flux apporte toutes ses versions, avec leurs dates, et disparaît dès qu’un flux du même nom existe ; il montre le montant de la version en vigueur', async () => {
       const page = await projetValide(site);
       try {
         // Le projet n'est plus vierge : l'assistant part de son contenu, il ne sème plus rien (D43).
@@ -366,7 +446,7 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
       }
     }, 240_000);
 
-    it('[niveau 4] #213 · 5 — un flux saisi à la main sous le même nom fait disparaître le raccourci', async () => {
+    it('[niveau 2] point 5 — un flux saisi à la main sous le même nom fait disparaître le raccourci', async () => {
       const page = await projetValide(site);
       try {
         await rouvrirAuxRevenus(page);
@@ -397,37 +477,59 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
       await page?.close().catch(() => {});
     });
 
-    it('[niveau 4] #213 · 7 — laisse dans le projet les huit flux de revenu et de charge fixe, et eux seuls, retrouvables dans Flux prévus, avec leur date', async () => {
+    it('[niveau 1] point 7 — laisse dans le projet les huit flux de revenu et de charge fixe, et eux seuls, chacun dans son groupe et sur son compte, retrouvables dans Flux prévus avec leur date (I11)', async () => {
       const l = revenusEtCharges(await fluxPrevus(page));
-      expect(l.map((x) => x.nom).sort((a, b) => a.localeCompare(b, 'fr'))).toEqual([
-        'Allocations',
-        'Assurance habitation',
-        'Crédit immobilier',
-        'Électricité',
-        'Internet et mobiles',
-        'Loyer locatif',
-        'Salaire',
-        'Salaire',
-      ]);
+      const vus = l.map((x) => `${x.nom} | ${/^Revenu/.test(x.genre) ? 'income' : 'fixedCharge'} | ${x.sous.split(' · ')[0]}`).sort();
+      const attendus = fluxDeLExemple.map((f) => `${f.name} | ${f.kind} | ${compteDe(f.accountId)}`).sort();
+      expect(vus, 'les flux de Flux prévus (nom | genre | compte) ne sont pas ceux de l’exemple').toEqual(attendus);
+      expect(l).toHaveLength(8);
       const salaires = l.filter((x) => x.nom === 'Salaire');
       expect(salaires.map((x) => x.sous).join(' | ')).toMatch(/jusqu’au 27 \S+ 2026/);
       expect(salaires.map((x) => x.sous).join(' | ')).toMatch(/à partir du 28 \S+ 2026/);
       expect(l.find((x) => x.nom === 'Crédit immobilier')!.sous).toMatch(/jusqu’au 5 \S+ 2026/);
     });
 
-    it('[niveau 4] #213 · 2 et 7 — ce que l’étape ne montrait pas se lit dans Flux prévus, tel que l’exemple le dit : fenêtre, tolérance de montant, motif de libellé, montant variable', async () => {
-      await modifier(page, 'Salaire', /jusqu’au 27/);
-      expect(await champ(page, 'Première date')).toBe('2026-08-28');
-      expect(await champ(page, 'Fenêtre des échéances')).toBe('3');
-      expect(await champ(page, 'Tolérance de montant (%)')).toBe('10');
-      expect(await champ(page, 'Motif de libellé')).toBe('VIR(EMENT)? .*SALAIRE');
-      expect(await champ(page, 'Montant variable')).toBe(true);
-      expect(await champ(page, 'Actif à partir du')).toBe('');
-      expect(await champ(page, 'Actif jusqu')).toBe('2026-10-27');
+    it('[niveau 2] point 2 — chacun des huit flux se lit dans son formulaire tel que l’exemple le dit : montant, rythme, première date, compte, fenêtre, tolérance, motif, montant variable, dates de début et de fin', async () => {
+      const lus = (await formulairesDesFlux(page)).map((x) => ({
+        nom: x.nom,
+        compte: x.compte,
+        montant: Math.abs(centimes(x.montant)),
+        tousLes: x.tousLes,
+        unite: x.unite,
+        premiere: x.premiere,
+        fenetre: x.fenetre,
+        toleranceEuros: x.toleranceEuros === '' ? null : centimes(x.toleranceEuros),
+        tolerancePct: x.tolerancePct === '' ? null : Number(x.tolerancePct),
+        motif: x.motif,
+        de: x.de,
+        a: x.a,
+        variable: x.variable,
+      }));
+      const attendus = fluxDeLExemple.map((f) => ({
+        nom: f.name,
+        compte: compteDe(f.accountId),
+        montant: Math.abs(f.amount),
+        tousLes: String(f.periodicity.interval),
+        unite: f.periodicity.unit,
+        premiere: f.periodicity.anchorDate,
+        fenetre: String(f.dateWindowDays),
+        toleranceEuros: f.amountTolerance?.abs ?? null,
+        tolerancePct: f.amountTolerance?.pct ?? null,
+        motif: f.labelPattern ?? '',
+        de: f.activeFrom ?? '',
+        a: f.activeTo ?? '',
+        variable: !!f.variable,
+      }));
+      const parNomEtDate = (a: { nom: string; premiere: string }, b: { nom: string; premiere: string }) =>
+        `${a.nom}|${a.premiere}`.localeCompare(`${b.nom}|${b.premiere}`);
+      expect(lus.sort(parNomEtDate)).toEqual(attendus.sort(parNomEtDate));
     });
 
-    it('[niveau 4] #213 · 7 — les dates de début et de fin se modifient dans Flux prévus, et la ligne le dit', async () => {
-      // Le formulaire du salaire en vigueur est ouvert (test précédent) : on repousse sa date de fin.
+    it('[niveau 1] point 7 — les dates de début et de fin se modifient dans Flux prévus, et la ligne le dit (I11)', async () => {
+      // Le salaire en vigueur : on lit ses deux dates, puis on repousse sa date de fin.
+      await modifier(page, 'Salaire', /jusqu’au 27/);
+      expect(await champ(page, 'Actif à partir du')).toBe('');
+      expect(await champ(page, 'Actif jusqu')).toBe('2026-10-27');
       await saisirChamp(page, 'Actif jusqu', '2026-11-30');
       expect(await cliquer(page, 'Enregistrer')).toBe(true);
       await pause(300);

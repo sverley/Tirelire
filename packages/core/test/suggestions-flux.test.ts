@@ -1,21 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  alive,
-  budgetSuggestions,
-  computePlan,
-  emptyLedger,
-  euros,
-  exampleLedger,
-  suggestedFlow,
-  type FlowSuggestion,
-} from '../src/index.js';
+import { describe, expect, it } from 'vitest';
+import { alive, budgetSuggestions, euros, exampleLedger, suggestedFlow, type FlowSuggestion } from '../src/index.js';
 
 /**
  * Tests du codeur de #213 — « L'assistant propose tous les revenus et toutes les charges fixes de
  * l'exemple, versions datées comprises » : la lecture de ces flux dans l'exemple par
  * `budgetSuggestions`, et le flux qu'en fait `suggestedFlow` (`src/suggestions.ts`), sans navigateur.
  * Ce qui se voit à l'écran — les lignes des étapes, leur date, les raccourcis, ce que la validation
- * laisse dans Flux prévus — est dans `apps/web/test/navigateur/assistant-flux-exemple.test.ts`.
+ * laisse dans Flux prévus — est dans le harnais d'audit
+ * `apps/web/test/navigateur/assistant-flux-exemple-harnais.test.ts`, d'où l'auditeur a aussi repris les
+ * points 4 et 6 : ils sont dans `suggestions-flux-harnais.test.ts`. Les tests de ce fichier-ci, de niveau 4,
+ * restent le diagnostic du codeur.
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
  */
@@ -161,85 +155,5 @@ describe('[niveau 4] #213 · 3 — une ligne dont l’exemple borne la validité
       ['Internet et mobiles', undefined, undefined],
       ['Électricité', undefined, undefined],
     ]);
-  });
-});
-
-describe('[niveau 4] #213 · 4 — le bandeau ne compte, pour la période en cours, que les versions en vigueur au début de celle-ci, comme le Plan (D50)', () => {
-  // L'assistant lit son brouillon avec le calcul du Plan : les flux que les raccourcis écrivent, lus par `computePlan`.
-  const principal = alive(exemple.accounts).find((a) => a.kind === 'principal')!;
-  function brouillon() {
-    const l = emptyLedger({ periodStartDay: exemple.settings.periodStartDay });
-    l.accounts.push({ ...principal });
-    propositions.forEach(([p, genre], i) => l.plannedFlows.push(suggestedFlow(p, genre, { id: `prop-${i}`, accountId: principal.id })));
-    return l;
-  }
-  const totaux = (date: string) => {
-    const t = computePlan(brouillon(), date).totals;
-    return { revenus: t.incomes, charges: t.fixedCharges };
-  };
-
-  it('en septembre, une seule version du salaire compte : 3 400 €, et non les deux versions ensemble', () => {
-    // 3 400 (salaire) + 700 (loyer perçu) + 100 (allocations) ; 950 + 45 + 75 + 150.
-    expect(totaux('2026-09-06')).toEqual({ revenus: euros(4200), charges: euros(1220) });
-  });
-
-  it('à la période de novembre, c’est la version à 3 550 € qui compte, seule ; le crédit court encore', () => {
-    expect(totaux('2026-11-15')).toEqual({ revenus: euros(4350), charges: euros(1220) });
-  });
-
-  it('à la période de janvier, le crédit ne compte plus : sa dernière échéance est le 5 décembre', () => {
-    expect(totaux('2027-01-15')).toEqual({ revenus: euros(4350), charges: euros(270) });
-  });
-
-  it('à chaque période, mêmes totaux que le Plan de l’exemple lui-même', () => {
-    for (const date of ['2026-09-06', '2026-10-15', '2026-11-15', '2026-12-15', '2027-01-15']) {
-      const plan = computePlan(exemple, date).totals;
-      expect(totaux(date), date).toEqual({ revenus: plan.incomes, charges: plan.fixedCharges });
-    }
-  });
-});
-
-describe('[niveau 4] #213 · 6 — ces propositions viennent de l’exemple et de lui seul', () => {
-  afterEach(() => {
-    vi.doUnmock('../src/example.js');
-    vi.resetModules();
-  });
-
-  it('un flux de revenu ou de charge fixe ajouté à l’exemple est proposé sans autre écriture, avec tout ce que l’exemple en dit', async () => {
-    vi.resetModules();
-    vi.doMock('../src/example.js', async () => {
-      const reel = await vi.importActual<typeof import('../src/example.js')>('../src/example.js');
-      return {
-        ...reel,
-        exampleLedger: () => {
-          const l = reel.exampleLedger();
-          l.plannedFlows.push({
-            id: 'flow-cantine',
-            name: 'Cantine',
-            kind: 'fixedCharge',
-            amount: -6000,
-            accountId: 'acc-enfants',
-            periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-08' },
-            dateWindowDays: 2,
-            labelPattern: 'CANTINE',
-            activeTo: '2027-06-30',
-          });
-          return l;
-        },
-      };
-    });
-    const { budgetSuggestions: lire } = await import('../src/suggestions.js');
-    const cantine = lire('2026-09-06').charges.find((p) => p.name === 'Cantine');
-    expect(cantine, 'le flux ajouté à l’exemple n’est pas proposé').toBeDefined();
-    expect(cantine).toMatchObject({
-      amount: 6000,
-      day: 8,
-      anchorDate: '2026-09-08',
-      dateWindowDays: 2,
-      labelPattern: 'CANTINE',
-      activeTo: '2027-06-30',
-      accountName: 'Carte enfants',
-    });
-    expect(lire('2026-09-06').charges).toHaveLength(5);
   });
 });
