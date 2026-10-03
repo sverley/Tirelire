@@ -353,8 +353,8 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
         expect((await lignes(page)).map((l) => l.nom), 'sur un projet existant, rien n’est semé d’office').toEqual(['Compte courant', 'Livret A']);
         expect(await raccourcis(page)).toEqual(['+ Carte enfants', '+ Compte de Marie', '+ Livret jeune']);
 
-        // Un compte saisi à la main sous le même nom fait disparaître le raccourci.
-        await saisir(page, 'main form.edit input[placeholder="Livret A"]', 'Compte de Marie');
+        // Un compte saisi à la main sous le même nom fait disparaître le raccourci. Le formulaire a pour aide la ligne du premier raccourci restant, « Carte enfants » (#214) : le nom saisi n'est pas le sien, le compte se crée à la main.
+        await saisir(page, 'main form.edit input[placeholder="Carte enfants"]', 'Compte de Marie');
         expect(await cliquer(page, 'Ajouter un compte')).toBe(true);
         await pause(250);
         expect(await raccourcis(page)).toEqual(['+ Carte enfants', '+ Livret jeune']);

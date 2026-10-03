@@ -3,6 +3,7 @@
   import { revealed } from '../lib/actions';
   import { supprimerOperations } from '../lib/suppression';
   import { money, shortDate, centsToInput, inputToCents, openAccounts } from '../lib/format';
+  import { aidesDeSaisie } from '../lib/aides';
   import { alive, liveSubOperations, normalizeLabel, findCategoryByName, type SubOperation, type Category, type Operation } from '@tirelire/core';
 
   type Nature = 'expense' | 'income' | 'transfer';
@@ -23,6 +24,8 @@
     transferAccountId: '',
   });
   let error = $state('');
+  /** Les aides des champs (D43) : le libellé, le montant et la catégorie d'une même opération saisie de l'exemple, de la nature choisie. */
+  const aides = $derived(aidesDeSaisie(form.nature));
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -176,8 +179,8 @@
         </select>
       </label>
       <label class="f">Date <input type="date" bind:value={form.date} /></label>
-      <label class="f">Libellé <input bind:value={form.label} placeholder="Dentiste" /></label>
-      <label class="f">Montant <input bind:value={form.amount} inputmode="decimal" placeholder="80,00" /></label>
+      <label class="f">Libellé <input bind:value={form.label} placeholder={aides.label} /></label>
+      <label class="f">Montant <input bind:value={form.amount} inputmode="decimal" placeholder={aides.amount} /></label>
       {#if form.nature === 'transfer'}
         <label class="f">Vers le compte
           <select bind:value={form.transferAccountId}>
@@ -195,7 +198,7 @@
           {#each categories as c}<option value={c.id}>{c.name}</option>{/each}
         </select>
       </label>
-      <label class="f">ou nouvelle catégorie <input bind:value={form.newCategory} placeholder="Santé" /></label>
+      <label class="f">ou nouvelle catégorie <input bind:value={form.newCategory} placeholder={aides.newCategory} /></label>
       <label class="f">Tirelire
         <select bind:value={form.tirelireId}>
           <option value="">— (non affecté)</option>

@@ -2,6 +2,7 @@
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
   import { alive, findCategoryByName, type Category, type CategoryNature } from '@tirelire/core';
+  import { aidesDeCategorie } from '../lib/aides';
 
   let editing = $state<Category | undefined>(undefined);
   /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
@@ -12,6 +13,8 @@
     `Ajouter une catégorie de ${nature === 'expense' ? 'dépense' : 'revenu'}`;
   let form = $state({ name: '', nature: 'expense' as CategoryNature, parentId: '', tirelireId: '' });
   let error = $state('');
+  /** L'aide du nom (D43) : celui d'une catégorie de l'exemple de la nature choisie. */
+  const aides = $derived(aidesDeCategorie(form.nature));
 
   const categories = $derived(alive(app.ledger.categories));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -106,7 +109,7 @@
   <form class="edit attached" use:revealed onsubmit={save}>
     <p class="titre-panneau">{titre}</p>
     <div class="grid">
-      <label class="f">Nom <input bind:value={form.name} placeholder="Santé" /></label>
+      <label class="f">Nom <input bind:value={form.name} placeholder={aides.name} /></label>
       <label class="f">Nature
         <select bind:value={form.nature} onchange={onNatureChange}>
           <option value="expense">Dépense</option>

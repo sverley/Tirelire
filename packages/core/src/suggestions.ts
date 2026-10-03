@@ -16,6 +16,7 @@
  */
 import { parseDate } from './dates.js';
 import { exampleLedger } from './example.js';
+import { liveSubOperations } from './suboperations.js';
 import {
   alive,
   type Account,
@@ -369,6 +370,45 @@ export function suggestedCategory(p: CategorySuggestion, ids: { id: Id; tirelire
     nature: p.nature,
     ...(ids.tirelireId !== undefined && p.nature === 'expense' ? { tirelireId: ids.tirelireId } : {}),
   };
+}
+
+/**
+ * Une opération saisie de l'exemple, telle que la lit le formulaire de Saisie : ce que l'exemple en
+ * dit, de quoi donner aux champs de ce formulaire les valeurs d'une même ligne (#214, D43). Ce n'est
+ * pas une proposition : l'assistant n'en offre aucune, les opérations n'en sont pas (porteur,
+ * 24 septembre 2026).
+ */
+export interface EntrySuggestion {
+  label: string;
+  /** Positif : le sens appartient à la nature de la saisie, pas à son montant. */
+  amount: Cents;
+  nature: 'expense' | 'income' | 'transfer';
+  /** La catégorie de la seule part de l'opération, par son nom, quand l'exemple lui en donne une. */
+  categoryName?: string;
+}
+
+/**
+ * Les opérations saisies de l'exemple, dans son ordre : celles qui ont un montant — une opération à
+ * zéro, comme le lissage de la taxe foncière, n'est pas une saisie qu'un formulaire accepte —, chacune
+ * de la nature que Saisie lui donne : un virement vers un compte, sinon une dépense ou un revenu
+ * selon le signe de son montant.
+ */
+export function entrySuggestions(): EntrySuggestion[] {
+  const l = exampleLedger();
+  const parts = liveSubOperations(l.subOperations).filter((s) => !s.parentId);
+  const categories = alive(l.categories);
+  return alive(l.operations)
+    .filter((o) => o.origin === 'manual' && o.amount !== 0)
+    .map((o) => {
+      const siennes = parts.filter((s) => s.operationId === o.id);
+      const categorie = siennes.length === 1 && siennes[0]!.categoryId !== undefined ? categories.find((c) => c.id === siennes[0]!.categoryId) : undefined;
+      return {
+        label: o.label,
+        amount: Math.abs(o.amount),
+        nature: o.transferAccountId ? ('transfer' as const) : o.amount < 0 ? ('expense' as const) : ('income' as const),
+        ...(categorie ? { categoryName: categorie.name } : {}),
+      };
+    });
 }
 
 /**

@@ -455,7 +455,8 @@ describe.skipIf(!navigateur)('#213 · l’assistant propose tous les revenus et 
         expect((await raccourcis(page)).map((r) => r.nom)).toEqual(['+ Salaire']);
 
         await saisir(page, 'main form.edit input[placeholder="Salaire"]', 'Salaire');
-        await saisir(page, 'main form.edit input[placeholder="2 400,00"]', '2 000,00');
+        // L'aide du montant est celui de la ligne du raccourci restant, le « Salaire » de l'exemple, 3 400,00 € (#214) ; 2 000,00 € n'est pas le sien.
+        await saisir(page, 'main form.edit input[placeholder="3 400,00"]', '2 000,00');
         expect(await cliquer(page, 'Ajouter')).toBe(true);
         await pause(250);
         expect(await raccourcis(page)).toEqual([]);

@@ -512,6 +512,18 @@ geste, et les deux ne peuvent pas diverger. En contrepartie l'exemple porte une 
 responsabilité : ses libellés sont lus par quelqu'un qui découvre l'application, et ses montants sont
 les ordres de grandeur qu'on lui propose.
 
+**Les aides des champs viennent de l'exemple, comme les propositions.** Le texte qu'un champ vide
+montre quand il propose une valeur — « Salaire », « 3 400,00 » — est la valeur de ce champ dans une
+ligne de l'exemple : aucun écran ne l'écrit en dur. Dans l'assistant, toutes les aides d'un formulaire
+d'ajout viennent d'une même ligne, celle que le premier raccourci restant de l'étape apporterait, à
+défaut la première ligne de l'exemple de l'étape ; ajouter une ligne dont chaque champ porte la
+valeur de son aide fait ce que fait le raccourci de cette ligne. Hors de l'assistant — Comptes,
+Tirelires, Flux prévus, Catégories, Saisie —, les aides d'un formulaire viennent d'une même ligne de
+l'exemple du même genre, et un champ que l'exemple ne renseigne pas n'a pas d'aide qui en invente une.
+Un texte qui nomme le champ ou son formulaire sans proposer de valeur (« Nom du compte », « Banque »,
+« FR76 … ») reste permis. Un test échoue si une aide qui propose une valeur n'est pas celle que
+l'exemple désigne.
+
 **Rouvrir l'assistant ne doit rien casser.** Les propositions ne s'offrent que sur un projet vierge —
 aucune tirelire, aucun besoin, aucun flux, aucun compte en plus du principal. Les opérations ne
 comptent pas : un relevé peut avoir été importé avant que le budget existe. L'état est figé à

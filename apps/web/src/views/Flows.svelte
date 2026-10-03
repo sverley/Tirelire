@@ -3,6 +3,7 @@
   import { revealed } from '../lib/actions';
   import FiltreEtat from '../lib/FiltreEtat.svelte';
   import { money, shortDate, centsToInput, inputToCents, openAccounts, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
+  import { aidesDeFluxPrevu } from '../lib/aides';
   import {
     addMonths,
     alive,
@@ -46,6 +47,8 @@
   });
   let error = $state('');
   let etatsVisibles = $state<StateVisibility>({ ...DEFAULT_VISIBILITY });
+  /** Les aides des champs (D43) : le nom, le montant et le motif d'un même flux de l'exemple, du type choisi. */
+  const aides = $derived(aidesDeFluxPrevu(form.kind));
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -175,13 +178,13 @@
   <form class="edit attached" use:revealed onsubmit={save}>
     <p class="titre-panneau">{titre}</p>
     <div class="grid">
-      <label class="f">Nom <input bind:value={form.name} placeholder="Salaire" /></label>
+      <label class="f">Nom <input bind:value={form.name} placeholder={aides.name} /></label>
       <label class="f">Type
         <select bind:value={form.kind}>
           {#each Object.entries(FLOW_KINDS) as [k, label]}<option value={k}>{label}</option>{/each}
         </select>
       </label>
-      <label class="f">Montant <input bind:value={form.amount} inputmode="decimal" placeholder="3 400,00" /></label>
+      <label class="f">Montant <input bind:value={form.amount} inputmode="decimal" placeholder={aides.amount} /></label>
       <label class="f">Compte
         <select bind:value={form.accountId}>
           {#each comptesChoisis as a}<option value={a.id}>{a.name}</option>{/each}
@@ -219,7 +222,7 @@
       <label class="f">Fenêtre des échéances (± jours) <input type="number" min="0" bind:value={form.dateWindowDays} /></label>
       <label class="f">Tolérance de montant (€) <input bind:value={form.toleranceAbs} inputmode="decimal" /></label>
       <label class="f">Tolérance de montant (%) <input type="number" min="0" bind:value={form.tolerancePct} /></label>
-      <label class="f">Motif de libellé (regex) <input bind:value={form.labelPattern} placeholder="ECHEANCE PRET" /></label>
+      <label class="f">Motif de libellé (regex) <input bind:value={form.labelPattern} placeholder={aides.labelPattern} /></label>
       <label class="f">Actif à partir du <input type="date" bind:value={form.activeFrom} /></label>
       <label class="f">Actif jusqu'au <input type="date" bind:value={form.activeTo} /></label>
       <label class="f check"><input type="checkbox" bind:checked={form.variable} /> Montant variable (reprise à confirmer)</label>
