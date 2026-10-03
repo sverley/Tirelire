@@ -193,3 +193,21 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
   .ligne-echeance > .date, .ligne-compte > input:nth-child(2), .ligne-compte > input:nth-child(3) { grid-column: 1 / -1; }
 }
 .ligne > .suite, .ligne-compte > .suite { grid-column: 1 / -1; margin: 2px 0 0; }
+/* Une tirelire de l'assistant : son en-tête (nom, déjà de côté, reliquat), puis ses besoins (D28, #336). */
+.card.tirelire { padding: 8px; margin-bottom: 6px; }
+.ligne-tirelire { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+.ligne-tirelire input { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; font-family: inherit; font-size: 14px; }
+.ligne-tirelire > .nom { flex: 1 1 160px; font-weight: 600; }
+.ligne-tirelire .deja { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; }
+.ligne-tirelire .deja .mt { width: 96px; font-family: var(--mono); text-align: right; }
+.ligne-tirelire .garde { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; font-size: 12px; }
+.ligne-tirelire .btn.danger { padding: 4px 9px; line-height: 1.1; margin-left: auto; }
+.card.tirelire .ligne { padding: 2px 0; margin-left: 12px; min-width: 0; }
+.card.tirelire .ligne > * { min-width: 0; }
+.card.tirelire .quoi { padding-left: 2px; }
+.card.tirelire .prelevement { display: flex; align-items: center; gap: 6px; margin: 4px 0 0 12px; color: var(--muted); }
+.card.ordre .row { gap: 8px; align-items: center; }
+.card.ordre .row .mt { width: 110px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: var(--mono); text-align: right; font-size: 14px; }
+@media (max-width: 640px) {
+  .ligne > .vide { display: none; }
+}

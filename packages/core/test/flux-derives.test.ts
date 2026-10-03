@@ -186,12 +186,14 @@ describe('[niveau 2] le jeu d’exemple porte un ordre permanent décalé (D60)'
     expect(t.breakdown.reduce((s, b) => s + b.cruise, 0)).toBe(t.permanent);
   });
 
-  it('il ne se glisse pas dans les propositions de l’assistant', () => {
-    // Un flux dérivé est une conséquence du budget, pas une ligne à proposer (D43, D57).
+  it('il ne se glisse pas parmi les revenus, les charges ni les tirelires de l’assistant : il s’y propose comme un ordre déjà posé', () => {
+    // Un flux dérivé n'est pas un revenu ni une charge (D57) ; l'assistant le propose à part, comme
+    // l'ordre que l'exemple a déjà posé chez la banque, enregistré à sa validation (D60, #336).
     const s = budgetSuggestions(asOf);
-    const noms = [...s.incomes, ...s.charges, ...s.everyday, ...s.periodic, ...s.savings].map((x) => x.name);
+    const noms = [...s.incomes, ...s.charges, ...s.tirelires, ...s.tirelires.flatMap((t) => t.payments)].map((x) => x.name);
     expect(noms).not.toContain('Virement Livret A');
     expect(noms.length).toBeGreaterThan(0);
+    expect(s.orders.map((o) => [o.name, o.origin])).toEqual([['Virement Livret A', 'derived']]);
   });
 });
 
