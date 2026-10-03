@@ -4,7 +4,8 @@
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie. Ce qui se voit à l'écran
  * — l'assistant lui-même, ses boutons, son résumé — est dans
- * `navigateur/assistant-valide-a-la-fin.test.ts`.
+ * `navigateur/assistant-valide-a-la-fin-harnais.test.ts`, le harnais de l'auditeur, qui a repris les tests
+ * navigateur du codeur ; la validation tout à la fois est aussi dans `assistant-valide-a-la-fin-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -126,24 +127,6 @@ describe('[niveau 4] #210 · 2 — la validation écrit exactement ce que l’as
       for (const [id, ligne] of attendu) expect(obtenu.get(id), `${cle} ${id}`).toMatchObject(ligne);
     }
     expect(store.readSettings()).toMatchObject({ periodStartDay: montre.settings.periodStartDay });
-  });
-
-  it('toutes les écritures ont lieu pendant l’appel : aucune attente entre deux d’entre elles où le projet serait à moitié écrit', async () => {
-    const { store } = await depot();
-    const projet = store.load();
-    const b = preparer(projet);
-    let pendant = false;
-    let hors = 0;
-    let dans = 0;
-    store.onChange(() => (pendant ? dans++ : hors++));
-
-    pendant = true;
-    const rendu: unknown = valider(store, projet, b);
-    pendant = false;
-
-    expect(rendu).toBeUndefined(); // ni promesse, ni suite différée
-    expect(dans).toBeGreaterThan(0);
-    expect(hors).toBe(0);
   });
 
   it('une validation interrompue puis reprise donne le même projet qu’une validation menée jusqu’au bout', async () => {
@@ -283,7 +266,7 @@ describe('[niveau 4] #210 · 4 — projet vierge ou projet existant', () => {
 
 describe('[niveau 4] #210 · 1 et 2 — l’écran de l’assistant n’écrit dans le projet que par sa validation', () => {
   // La structure, pas le comportement : le comportement est joué dans le navigateur
-  // (`navigateur/assistant-valide-a-la-fin.test.ts`) ; ceci garde que l'écran n'a plus d'autre chemin.
+  // (`navigateur/assistant-valide-a-la-fin-harnais.test.ts`) ; ceci garde que l'écran n'a plus d'autre chemin.
   it('Wizard.svelte n’écrit pas dans le projet, ne lit que le projet montré avec son brouillon, et valide en un seul endroit', () => {
     const ecran = source('views/Wizard.svelte');
     expect(ecran).not.toMatch(/\bapp\.(upsert|remove|setSetting|store|ledger|plan)\b/);
