@@ -214,7 +214,7 @@
   <div class="stats">
     <div class="stat"><div class="v">{money(plan.totals.incomes)}</div><div class="k">Revenus prévus</div></div>
     <div class="stat"><div class="v">{money(plan.totals.fixedCharges)}</div><div class="k">Charges fixes</div></div>
-    <div class="stat"><div class="v">{money(plan.totals.funded)}</div><div class="k">Réservé et viré</div></div>
+    <div class="stat"><div class="v">{money(plan.totals.funded)}</div><div class="k">Couvert par les revenus</div></div>
     <div class="stat">
       <div class="v {moneyClass(plan.totals.margin)}">{money(plan.totals.margin)}</div>
       <div class="k">Marge{plan.totals.cushion ? ` (coussin ${money(plan.totals.cushion)})` : ''}</div>
@@ -471,6 +471,9 @@
   {/if}
 
   <h2>Tirelires</h2>
+  {#if plan.lines.length === 0}
+    <p class="muted">Aucune tirelire n’est dotée sur cette période : aucun besoin de votre budget n’y est en vigueur.</p>
+  {:else}
   <div class="card">
     {#each [...transferLines, ...virtualLines] as l (l.needId)}
       <div class="row">
@@ -486,8 +489,9 @@
         <div class="num" style="font-size:17px">{money(l.funded)}</div>
       </div>
     {/each}
-    <div class="row total"><div class="label">Total réservé et viré</div><div class="num">{money(plan.totals.funded)}</div></div>
+    <div class="row total"><div class="label">Couvert par les revenus</div><div class="num">{money(plan.totals.funded)}</div></div>
   </div>
+  {/if}
 
   <h2>Revenus de la période</h2>
   <div class="card">
