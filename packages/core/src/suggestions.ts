@@ -16,7 +16,16 @@
  */
 import { parseDate, todayISO } from './dates.js';
 import { exampleLedger } from './example.js';
-import { activeAt, alive, type Cents, type ISODate, type PeriodUnit } from './model.js';
+import {
+  activeAt,
+  alive,
+  type Account,
+  type AccountKind,
+  type Cents,
+  type ISODate,
+  type PeriodUnit,
+  type SettlementDirection,
+} from './model.js';
 
 export interface IncomeSuggestion {
   name: string;
@@ -57,7 +66,32 @@ export interface SavingsSuggestion {
   target?: Cents;
 }
 
+/** Ce que l'exemple dit du compte principal. L'assistant le renseigne, il ne le crée pas (D40). */
+export interface MainAccountSuggestion {
+  name: string;
+  balance: Cents;
+}
+
+/** Un autre compte de l'exemple, de quoi en créer la ligne et rien de plus. */
+export interface AccountSuggestion {
+  name: string;
+  kind: Exclude<AccountKind, 'principal'>;
+  balance: Cents;
+  /**
+   * Le suivi d'un solde à régler avec le compte principal, tel que l'exemple le dit : c'est ce qui
+   * fait d'un compte un compte tiers (D04, D45).
+   */
+  settlement?: { threshold: Cents; direction: SettlementDirection };
+  /**
+   * L'exemple le dit clos (D56) : « vidé et fermé avant la période en cours ». Sa date de clôture ne
+   * se copie pas, elle suit la période en cours de celui qui ouvre l'assistant.
+   */
+  closed?: boolean;
+}
+
 export interface BudgetSuggestions {
+  mainAccount: MainAccountSuggestion;
+  accounts: AccountSuggestion[];
   incomes: IncomeSuggestion[];
   charges: ChargeSuggestion[];
   everyday: EverydaySuggestion[];
@@ -81,6 +115,22 @@ export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions
   // piano » se reconnaît mieux que « Enfants et loisirs » répété deux fois.
   const nameOf = (n: { name?: string; tirelireId?: string }) =>
     n.name ?? alive(l.tirelires).find((t) => t.id === n.tirelireId)?.name ?? '';
+
+  // Les comptes : tous ceux de l'exemple, le compte clos et les comptes tiers compris (porteur,
+  // 24 septembre 2026). L'exemple porte toujours son compte principal.
+  const main = alive(l.accounts).find((a) => a.kind === 'principal')!;
+  const mainAccount: MainAccountSuggestion = { name: main.name, balance: main.openingBalance };
+  const accounts: AccountSuggestion[] = alive(l.accounts)
+    .filter((a): a is Account & { kind: AccountSuggestion['kind'] } => a.kind !== 'principal')
+    .map((a) => ({
+      name: a.name,
+      kind: a.kind,
+      balance: a.openingBalance,
+      ...(a.tracksSettlement
+        ? { settlement: { threshold: a.settlementThreshold ?? 0, direction: a.settlementDirection ?? ('both' as const) } }
+        : {}),
+      ...(a.activeTo !== undefined ? { closed: true } : {}),
+    }));
 
   const incomes: IncomeSuggestion[] = flows
     .filter((f) => f.kind === 'income')
@@ -131,7 +181,7 @@ export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions
       ...(n.amount !== undefined ? { target: n.amount } : {}),
     }));
 
-  return { incomes, charges, everyday, periodic, savings };
+  return { mainAccount, accounts, incomes, charges, everyday, periodic, savings };
 }
 
 /**

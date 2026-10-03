@@ -19,6 +19,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
+import { exampleLedger } from '@tirelire/core';
 import { allerÀ, navigateur, nouvellePage, ouvrirLeSite, type Site } from '../harnais.js';
 
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
@@ -210,7 +211,8 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
       expect(cartes.length, await texteDuMain(page)).toBeGreaterThan(0);
       for (const c of cartes) {
         expect(c.alerte, c.texte).toBe(false);
-        expect(c.rubrique, c.texte).toBe('Compte principal');
+        // L'assistant a renseigné le compte principal avec le nom que l'exemple lui donne (#211).
+        expect(c.rubrique, c.texte).toBe(exampleLedger().accounts.find((a) => a.kind === 'principal')!.name);
         expect(c.texte, c.texte).toContain('voulu : libre');
         expect(c.texte, `${c.texte} · point 4 · vouvoiement`).not.toMatch(TUTOIEMENT);
         expect(c.texte, `${c.texte} · son solde`).toMatch(/\d\s?,\d{2}\s?€/);

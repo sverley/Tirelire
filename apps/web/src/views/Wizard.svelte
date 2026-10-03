@@ -11,9 +11,10 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { app } from '../lib/state.svelte';
-  import { ACCOUNT_KINDS, UNITS, money, shortDate, centsToInput, inputToCents } from '../lib/format';
+  import { ACCOUNT_KINDS, UNITS, money, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
   import {
     alive,
+    addDays,
     divideCents,
     dateInMonth,
     parseDate,
@@ -31,6 +32,7 @@
     type Account,
     type PeriodUnit,
     type AccountKind,
+    type SettlementDirection,
     type Cents,
     type Tirelire,
     type Need,
@@ -68,6 +70,8 @@
   const flows = $derived(alive(app.assistantLedger.plannedFlows));
   const principal = $derived(accounts.find((a) => a.kind === 'principal'));
   const otherAccounts = $derived(accounts.filter((a) => a.kind !== 'principal'));
+  /** Les comptes des menus : un compte clos n'en fait plus partie (D56) ; il reste listé à l'étape Comptes. */
+  const comptesOuverts = $derived(openAccounts(accounts, app.asOf));
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
   const fixedCharges = $derived(flows.filter((f) => f.kind === 'fixedCharge'));
   const tirelireById = (id: string) => tirelires.find((e) => e.id === id);
@@ -125,6 +129,7 @@
     const d = Math.min(31, Math.max(1, Number(startDay) || 1));
     startDay = String(d);
     if (app.assistantLedger.settings.periodStartDay !== d) app.assistantSetSetting('periodStartDay', d);
+    recalerLesClotures();
   }
   /** Jour du plus gros revenu déclaré : ce que l'assistant propose comme début de période. */
   const jourDuRevenu = $derived.by(() => {
@@ -298,6 +303,12 @@
   // --- Comptes complémentaires (facultatif) et placement des réserves ---
   /** Natures proposées, hors compte principal. Typée : un genre renommé casse la compilation. */
   const NATURES: Array<Exclude<AccountKind, 'principal'>> = ['courant', 'epargne'];
+  /** Le sens autorisé des virements de règlement d'un compte tiers, en clair. */
+  const SENS_DE_REGLEMENT: Record<SettlementDirection, string> = {
+    both: 'dans les deux sens',
+    toThird: 'du compte principal vers ce compte seulement',
+    fromThird: 'de ce compte vers le compte principal seulement',
+  };
   let acc = $state({ name: '', kind: 'courant' as Exclude<AccountKind, 'principal'>, balance: '0,00' });
   let accError = $state('');
   function addAccount() {
@@ -343,6 +354,8 @@
   const restantsCourants = $derived(propositions.everyday.filter((x) => !dejaPris(x.name)));
   const restantsPeriodiques = $derived(propositions.periodic.filter((x) => !dejaPris(x.name)));
   const restantsEpargnes = $derived(propositions.savings.filter((x) => !dejaPris(x.name)));
+  /** Un compte dont le nom existe déjà n'est plus proposé : les comptes se reconnaissent à leur nom (D46). */
+  const restantsComptes = $derived(propositions.accounts.filter((x) => !accounts.some((a) => a.name === x.name)));
 
   // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
   const appliquerRevenu = (p: (typeof propositions.incomes)[number]) =>
@@ -355,6 +368,62 @@
     creerPeriodique(p.name, p.amount, p.interval, nextDueDate(p.month, p.day, app.asOf));
   const appliquerEpargne = (p: (typeof propositions.savings)[number]) =>
     creerEpargne(p.name, p.monthly, p.target);
+  /**
+   * La clôture d'un compte clos de l'exemple : la veille du premier jour de la période en cours, de
+   * sorte qu'il ne pèse rien sur le plan (D56). La période commence au jour que l'assistant retient
+   * — il se choisit à l'étape des revenus, après l'étape Comptes qui sème le compte.
+   */
+  const clotureDeLExemple = () => addDays(periodStart(), -1);
+  /**
+   * Recale la clôture des comptes clos que l'assistant a lui-même créés sur le début de période qu'il
+   * retient maintenant : à chaque changement de ce jour, et à la validation, de sorte que ce qui entre
+   * dans le projet est la veille du premier jour de la période retenue, quel que soit le moment où le
+   * compte a été semé. L'assistant ne donne pas de clôture lui-même : un compte clos qu'il a créé,
+   * absent du projet, porte celle de l'exemple ; un compte clos du projet n'est jamais touché.
+   */
+  function recalerLesClotures() {
+    const veille = clotureDeLExemple();
+    const duProjet = new Set(app.ledger.accounts.map((a) => a.id));
+    for (const a of accounts) {
+      if (a.activeTo !== undefined && !duProjet.has(a.id) && a.activeTo !== veille) {
+        app.assistantUpsert('accounts', { ...a, activeTo: veille });
+      }
+    }
+  }
+  /**
+   * Un compte de l'exemple, avec ce que l'exemple en dit : son solde, le suivi de son solde à régler
+   * s'il est tiers, sa clôture s'il est clos. Les réglages se modifient ensuite depuis Comptes (I11).
+   */
+  const appliquerCompte = (p: (typeof propositions.accounts)[number]) => {
+    const debut = periodStart();
+    app.assistantUpsert('accounts', {
+      id: app.newId(),
+      name: p.name,
+      kind: p.kind,
+      openingBalance: p.balance,
+      openingDate: debut,
+      ...(p.settlement
+        ? { tracksSettlement: true, settlementThreshold: p.settlement.threshold, settlementDirection: p.settlement.direction }
+        : {}),
+      ...(p.closed ? { activeTo: clotureDeLExemple() } : {}),
+    } satisfies Account);
+  };
+  /**
+   * Le compte principal arrive avec ce que l'exemple en dit, là où il reste à renseigner : un nom ou
+   * un solde que l'utilisateur a déjà posés ne sont pas remplacés (D43 : rouvrir l'assistant ne doit
+   * rien casser). Même règle que le solde saisi : « à renseigner » se lit à la date d'ouverture.
+   */
+  const appliquerPrincipal = (p: typeof propositions.mainAccount) => {
+    if (!principal) return;
+    const nomAFaire = principal.name === DEFAULT_MAIN_ACCOUNT.name;
+    const soldeAFaire = principal.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate;
+    if (!nomAFaire && !soldeAFaire) return;
+    app.assistantUpsert('accounts', {
+      ...principal,
+      ...(nomAFaire ? { name: p.name } : {}),
+      ...(soldeAFaire ? { openingBalance: p.balance, openingDate: periodStart() } : {}),
+    });
+  };
 
   /**
    * Projet vierge : on présente d'office tous les raccourcis de l'étape, dans l'assistant — comme si
@@ -365,6 +434,10 @@
   function semer(etape: Step) {
     if (!projetVierge || brouillon.semees.includes(etape)) return;
     brouillon.semees.push(etape);
+    if (etape === 'accounts') {
+      appliquerPrincipal(propositions.mainAccount);
+      restantsComptes.forEach(appliquerCompte);
+    }
     if (etape === 'income') restantsRevenus.forEach(appliquerRevenu);
     if (etape === 'fixed') restantsCharges.forEach(appliquerCharge);
     if (etape === 'everyday') restantsCourants.forEach(appliquerCourant);
@@ -470,6 +543,7 @@
    */
   function valider() {
     try {
+      recalerLesClotures();
       app.validerAssistant();
       valide = true;
       erreurValidation = '';
@@ -530,9 +604,9 @@
   </p>
 
   <h3>Rentrées d'argent</h3>
-  <div class="tete tete-flux" class:avec-compte={accounts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if accounts.length > 1}<span>Compte</span>{/if}<span></span></div>
+  <div class="tete tete-flux" class:avec-compte={comptesOuverts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if comptesOuverts.length > 1}<span>Compte</span>{/if}<span></span></div>
   {#each incomes as f (f.id)}
-    <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
+    <div class="card ligne ligne-flux" class:avec-compte={comptesOuverts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
       {#if f.periodicity.unit === 'month' && f.periodicity.interval === 1}
@@ -544,9 +618,9 @@
       <select class="unite" value={f.periodicity.unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
         {#each Object.entries(UNITS) as [u, l]}<option value={u}>{f.periodicity.interval > 1 ? l.pluriel : l.un}</option>{/each}
       </select>
-      {#if accounts.length > 1}
+      {#if comptesOuverts.length > 1}
         <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
-          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+          {#each openAccounts(accounts, app.asOf, f.accountId) as a}<option value={a.id}>{a.name}</option>{/each}
         </select>
       {/if}
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
@@ -576,10 +650,10 @@
         </select>
       </label>
       <label class="f">Vers le (jour) <input type="number" min="1" max="31" bind:value={inc.day} /></label>
-        {#if accounts.length > 1}
+        {#if comptesOuverts.length > 1}
           <label class="f">Sur quel compte ?
             <select bind:value={inc.accountId}>
-              {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+              {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
         {/if}
@@ -618,9 +692,9 @@
     réserve — il suffit que le plan sache que cet argent est déjà engagé.
   </p>
   <h3>Charges fixes</h3>
-  <div class="tete tete-flux" class:avec-compte={accounts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if accounts.length > 1}<span>Compte</span>{/if}<span></span></div>
+  <div class="tete tete-flux" class:avec-compte={comptesOuverts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if comptesOuverts.length > 1}<span>Compte</span>{/if}<span></span></div>
   {#each fixedCharges as f (f.id)}
-    <div class="card ligne ligne-flux" class:avec-compte={accounts.length > 1}>
+    <div class="card ligne ligne-flux" class:avec-compte={comptesOuverts.length > 1}>
       <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
       <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
       {#if f.periodicity.unit === 'month' && f.periodicity.interval === 1}
@@ -632,9 +706,9 @@
       <select class="unite" value={f.periodicity.unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
         {#each Object.entries(UNITS) as [u, l]}<option value={u}>{f.periodicity.interval > 1 ? l.pluriel : l.un}</option>{/each}
       </select>
-      {#if accounts.length > 1}
+      {#if comptesOuverts.length > 1}
         <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
-          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+          {#each openAccounts(accounts, app.asOf, f.accountId) as a}<option value={a.id}>{a.name}</option>{/each}
         </select>
       {/if}
       <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
@@ -664,10 +738,10 @@
         </select>
       </label>
       <label class="f">Vers le (jour) <input type="number" min="1" max="31" bind:value={fix.day} /></label>
-        {#if accounts.length > 1}
+        {#if comptesOuverts.length > 1}
           <label class="f">Sur quel compte ?
             <select bind:value={fix.accountId}>
-              {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+              {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
         {/if}
@@ -749,10 +823,10 @@
       <label class="f">Montant de la facture <input bind:value={per.amount} inputmode="decimal" placeholder="1 200,00" /></label>
       <label class="f">Elle revient tous les <input type="number" min="1" bind:value={per.months} /> mois</label>
       <label class="f">Prochaine échéance <input type="date" bind:value={per.dueDate} /></label>
-        {#if accounts.length > 1}
+        {#if comptesOuverts.length > 1}
           <label class="f">Sur quel compte ?
             <select bind:value={per.accountId}>
-              {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+              {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
         {/if}
@@ -834,9 +908,30 @@
         {#each NATURES as k}<option value={k}>{ACCOUNT_KINDS[k]}</option>{/each}
       </select>
       <button class="btn small danger" title="Retirer ce compte" onclick={() => app.assistantRemove('accounts', a.id)}>×</button>
+      <!-- Ce que l'étape dit du compte : tiers (suivi d'un solde à régler) ou clos. Ces réglages se modifient depuis Comptes (I11). -->
+      {#if a.tracksSettlement || validityBadge(a, app.asOf)}
+        <p class="muted small suite">
+          {#if a.tracksSettlement}
+            <span class="pill">tiers</span> Solde à régler avec le compte principal{a.settlementThreshold ? ` dès ${money(a.settlementThreshold)}` : ''}, {SENS_DE_REGLEMENT[a.settlementDirection ?? 'both']}.
+          {/if}
+          {#if validityBadge(a, app.asOf)}
+            <span class="pill dim">{validityBadge(a, app.asOf)}</span> {validityLabel(a)}
+          {/if}
+        </p>
+      {/if}
     </div>
   {/each}
 
+  {#if restantsComptes.length}
+    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+    <div class="propositions">
+      {#each restantsComptes as p (p.name)}
+        <button class="prop" onclick={() => appliquerCompte(p)}>
+          <span class="n">+ {p.name}</span><span class="v num">{money(p.balance)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addAccount(); }}>
     <div class="grid">
       <label class="f">Nom du compte <input bind:value={acc.name} placeholder="Livret A" /></label>
@@ -886,7 +981,7 @@
     <div class="row total"><div class="label">Reste à vivre</div><div class="num {totals.margin < 0 ? 'neg' : 'pos'}">{money(totals.margin)}</div></div>
   </div>
 
-  {#if !valide && otherAccounts.length && reserveTirelires.length}
+  {#if !valide && comptesOuverts.length > 1 && reserveTirelires.length}
     <h3>Où doit dormir chaque réserve ?</h3>
     <p class="muted small">Laissez sur le compte principal si vous ne savez pas : ça se change à tout moment.</p>
     {#each reserveTirelires as e (e.id)}
@@ -895,7 +990,7 @@
           <div class="label"><strong>{e.name}</strong></div>
           <select onchange={(ev) => setPlacement(e, (ev.currentTarget as HTMLSelectElement).value)}>
             <option value="" selected={e.placement.length === 0}>Peu importe</option>
-            {#each accounts as a}
+            {#each openAccounts(accounts, app.asOf, e.placement[0]?.accountId) as a}
               <option value={a.id} selected={e.placement[0]?.accountId === a.id}>{a.name}</option>
             {/each}
           </select>

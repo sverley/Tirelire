@@ -114,11 +114,27 @@ describe('[niveau 1] I11 · harnais du registre', () => {
   }
 
   /**
+   * Les écrans de cartes rangent ce qui est clos (D56) : l'assistant sème le compte clos de l'exemple
+   * (#211), que Comptes ne montre qu'une fois « Clos » allumé. Rend vrai s'il a fallu l'allumer.
+   */
+  async function allumerLeClos(page: Page): Promise<boolean> {
+    const allumé = await page.evaluate(() => {
+      const b = ([...document.querySelectorAll('main button.filtre')] as HTMLButtonElement[]).find(
+        (x) => (x.textContent ?? '').trim().startsWith('Clos') && x.getAttribute('aria-pressed') === 'false',
+      );
+      b?.click();
+      return !!b;
+    });
+    if (allumé) await pause(200);
+    return allumé;
+  }
+
+  /**
    * Clique l'action attachée au nom (« Modifier », ou « Placer » pour une tirelire semée sans
    * placement, qui ouvre le même formulaire), et vérifie qu'un champ éditable le porte ensuite.
    */
   async function vérifierUnÉquivalent(page: Page, nom: string, écran: string): Promise<Équivalence> {
-    const clic = await page.evaluate((nom: string) => {
+    const chercher = () => page.evaluate((nom: string) => {
       // Le nom porté par un `.label` : dans son `<strong>` s'il en a un (Comptes, Flux, tirelire
       // placée, qui peut être suivi d'un `.pill`) ; sinon dans son texte de tête, avant tout enfant
       // (tirelire « Sans compte de placement »).
@@ -147,6 +163,8 @@ describe('[niveau 1] I11 · harnais du registre', () => {
       bouton.click();
       return { trouvé: true, bouton: true };
     }, nom);
+    let clic = await chercher();
+    if (!clic.trouvé && (await allumerLeClos(page))) clic = await chercher();
     if (!clic.bouton) return { nom, écran, trouvé: clic.trouvé, bouton: false, éditable: false };
 
     await pause(200);
