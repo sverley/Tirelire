@@ -103,12 +103,15 @@
             <strong>Dernière opération connue le {shortDate(app.lastOperationDate)}</strong>
             <span class="sub">
               Il y a {app.staleDays} jours. Les soldes et le plan au {shortDate(app.asOf)} supposent
-              qu'il ne s'est rien passé depuis : importez un relevé, ou lisez à cette date.
+              qu'il ne s'est rien passé depuis : mettez vos opérations à jour, en important un relevé
+              ou en les saisissant, ou lisez à cette date.
             </span>
           </div>
         </div>
+        <!-- Importer et saisir au même rang (#321) : l'import n'est qu'un des deux moyens (D57). -->
         <div class="actions" style="margin:6px 0 0">
           <button class="btn small primary" onclick={() => app.switchTab('import')}>Importer un relevé</button>
+          <button class="btn small primary" onclick={() => app.go('entries')}>Saisir une opération</button>
           <button class="btn small" onclick={() => (app.asOf = app.lastOperationDate!)}>Lire au {shortDate(app.lastOperationDate)}</button>
         </div>
       </div>

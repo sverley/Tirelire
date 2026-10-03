@@ -486,6 +486,20 @@
 
 <h1>Opérations {#if untreatedCount}<span class="pill catchUp">{untreatedCount} non traitées</span>{/if}</h1>
 
+{#if totalOps === 0}
+<!-- Sans opération (#321) : le budget s'en passe (D57). L'écran offre les deux moyens d'en avoir, au
+     même rang, et rien d'autre : la recherche et les actions n'auraient rien à traiter. -->
+<div class="card" style="margin-top:8px" data-sans-operation>
+  <p style="margin-top:0">
+    Aucune opération pour l'instant : votre budget et votre plan se tiennent sans elles ; des
+    opérations, importées d'un relevé ou saisies, les confronteront au réel.
+  </p>
+  <div class="actions" style="margin:0">
+    <button class="btn primary" onclick={() => app.switchTab('import')}>Importer un relevé</button>
+    <button class="btn primary" onclick={() => app.go('entries')}>Saisir une opération</button>
+  </div>
+</div>
+{:else}
 <!-- Recherche = sélection d'un automatisme (D36, D39) : ces champs partent tels quels. -->
 <div class="card" style="margin-top:8px">
   <div class="row">
@@ -732,13 +746,9 @@
     </div>
   {:else}
     <div class="muted">
-      {#if totalOps === 0}
-        Aucune opération connue : importe un relevé depuis l'écran Import, ou saisis-en une depuis Saisie manuelle.
-      {:else}
-        Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}
-        {#if matching.length === 0}
-          <span class="sub">Le dépôt contient {totalOps} opération(s) : élargis la recherche ou passe le filtre d'affichage sur « Toutes ».</span>
-        {/if}
+      Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}
+      {#if matching.length === 0}
+        <span class="sub">Le dépôt contient {totalOps} opération(s) : élargis la recherche ou passe le filtre d'affichage sur « Toutes ».</span>
       {/if}
     </div>
   {/each}
@@ -749,3 +759,4 @@
     </div>
   {/if}
 </div>
+{/if}
