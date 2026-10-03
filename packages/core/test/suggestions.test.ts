@@ -13,7 +13,7 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
   const l = exampleLedger();
   const s = budgetSuggestions(asOf);
 
-  it("ne propose rien qui ne vienne de l'exemple", () => {
+  it("ne propose rien qui ne vienne de l'exemple, et propose tous ses revenus et toutes ses charges fixes", () => {
     const connus = new Set([
       ...alive(l.plannedFlows).map((f) => f.name),
       ...alive(l.tirelires).map((t) => t.name),
@@ -31,6 +31,14 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     ];
     expect(proposes.length).toBeGreaterThan(0);
     for (const nom of proposes) expect(connus).toContain(nom);
+
+    // L'autre sens (#213) : un flux de revenu ou de charge fixe de l'exemple qui ne serait pas proposé
+    // fait échouer ce test, version datée comprise — une proposition par flux, ni plus ni moins.
+    const cle = (nom: string, montant: number, de?: string, a?: string) => `${nom}|${montant}|${de ?? ''}|${a ?? ''}`;
+    const flux = alive(l.plannedFlows).filter((f) => f.kind === 'income' || f.kind === 'fixedCharge');
+    expect([...s.incomes, ...s.charges].map((x) => cle(x.name, x.amount, x.activeFrom, x.activeTo)).sort()).toEqual(
+      flux.map((f) => cle(f.name, Math.abs(f.amount), f.activeFrom, f.activeTo)).sort(),
+    );
   });
 
   it("couvre les cinq questions du parcours à partir de l'exemple seul", () => {
@@ -41,22 +49,26 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     expect(s.savings.length).toBeGreaterThan(0);
   });
 
-  it('ne propose qu’une version de chaque budget, celle en vigueur (D51)', () => {
-    const noms = [...s.incomes.map((x) => x.name), ...s.everyday.map((x) => x.name), ...s.savings.map((x) => x.name)];
+  it('ne propose qu’une version de chaque besoin, celle en vigueur ; les flux se proposent avec toutes leurs versions (D51)', () => {
+    const noms = [...s.everyday.map((x) => x.name), ...s.savings.map((x) => x.name)];
     expect(new Set(noms).size).toBe(noms.length);
     expect(s.everyday.find((x) => x.name === 'Alimentation')!.amount).toBe(euros(900));
-    expect(s.incomes.find((x) => x.name === 'Salaire')!.amount).toBe(euros(3400));
+    // Le salaire change à la paie de novembre : les deux versions sont proposées, chacune avec sa date.
+    expect(s.incomes.filter((x) => x.name === 'Salaire').map((x) => [x.amount, x.activeFrom, x.activeTo])).toEqual([
+      [euros(3400), undefined, '2026-10-27'],
+      [euros(3550), '2026-10-28', undefined],
+    ]);
   });
 
-  it('suit la version en vigueur quand le budget a changé', () => {
-    // Novembre : l'alimentation est passée à 950, le salaire à 3 550, et le piano est apparu.
+  it('suit la version en vigueur quand un besoin a changé ; les flux se proposent de même à toute date', () => {
+    // Novembre : l'alimentation est passée à 950 et le piano est apparu.
     const apres = budgetSuggestions('2026-11-15');
     expect(apres.everyday.find((x) => x.name === 'Alimentation')!.amount).toBe(euros(950));
-    expect(apres.incomes.find((x) => x.name === 'Salaire')!.amount).toBe(euros(3550));
     expect(apres.everyday.filter((x) => x.name === 'Alimentation').length).toBe(1);
-    // Le crédit court encore en novembre, plus en janvier : une charge peut disparaître des propositions.
-    expect(budgetSuggestions('2026-11-15').charges.some((x) => x.name === 'Crédit immobilier')).toBe(true);
-    expect(budgetSuggestions('2027-01-15').charges.some((x) => x.name === 'Crédit immobilier')).toBe(false);
+    // Les flux ne suivent pas la date : toutes leurs versions, en novembre comme en janvier, où le crédit est terminé.
+    expect(apres.incomes).toEqual(s.incomes);
+    expect(apres.charges).toEqual(s.charges);
+    expect(budgetSuggestions('2027-01-15').charges.some((x) => x.name === 'Crédit immobilier')).toBe(true);
   });
 
   it('reprend les montants et les rythmes tels que l’exemple les porte', () => {

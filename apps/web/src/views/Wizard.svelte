@@ -13,6 +13,7 @@
   import { app } from '../lib/state.svelte';
   import { ACCOUNT_KINDS, UNITS, money, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
   import {
+    activeAt,
     alive,
     addDays,
     divideCents,
@@ -24,6 +25,7 @@
     needName,
     nextOccurrence,
     budgetSuggestions,
+    suggestedFlow,
     nextDueDate,
     monthsOf,
     DEFAULT_PRIORITY,
@@ -34,6 +36,7 @@
     type AccountKind,
     type SettlementDirection,
     type Cents,
+    type FlowSuggestion,
     type Tirelire,
     type Need,
     type PlannedFlow,
@@ -344,13 +347,31 @@
 
   // --- Propositions (D43) : elles ne se présentent que dans l'assistant, rien n'entre d'office dans le projet (D40) ---
   // Les raccourcis sont toujours offerts : l'interface ne change pas d'un projet à l'autre (D46).
-  // La date compte : l'exemple porte plusieurs versions d'un même budget (D51), et l'on ne propose
-  // que celle en vigueur. Figée à l'ouverture, comme le reste de l'état de l'assistant (D43).
+  // La date compte pour les besoins : l'exemple en porte plusieurs versions (D51), et l'on ne propose
+  // que celle en vigueur. Figée à l'ouverture, comme le reste de l'état de l'assistant (D43). Les
+  // flux, eux, se proposent avec toutes leurs versions, quelle que soit la date.
   const propositions = budgetSuggestions(app.asOf);
   /** Un raccourci déjà repris disparaît : on ne propose pas ce qui existe déjà. */
   const dejaPris = (nom: string) => flows.some((f) => f.name === nom) || tirelires.some((t) => t.name === nom);
-  const restantsRevenus = $derived(propositions.incomes.filter((x) => !dejaPris(x.name)));
-  const restantsCharges = $derived(propositions.charges.filter((x) => !dejaPris(x.name)));
+  /**
+   * Un flux proposé : toutes ses versions, regroupées par leur nom dans l'ordre de l'exemple. Un
+   * raccourci apporte le flux avec toutes ses versions, et disparaît dès qu'un flux du même nom
+   * existe (D46, D51).
+   */
+  type FluxPropose = { name: string; versions: FlowSuggestion[] };
+  function parNom(liste: FlowSuggestion[]): FluxPropose[] {
+    const groupes: FluxPropose[] = [];
+    for (const p of liste) {
+      const groupe = groupes.find((g) => g.name === p.name);
+      if (groupe) groupe.versions.push(p);
+      else groupes.push({ name: p.name, versions: [p] });
+    }
+    return groupes;
+  }
+  /** Le montant que montre le raccourci d'un flux : celui de la version en vigueur à la date de lecture, à défaut la première. */
+  const montantDuRaccourci = (g: FluxPropose) => (g.versions.find((v) => activeAt(v, app.asOf)) ?? g.versions[0]!).amount;
+  const restantsRevenus = $derived(parNom(propositions.incomes).filter((g) => !dejaPris(g.name)));
+  const restantsCharges = $derived(parNom(propositions.charges).filter((g) => !dejaPris(g.name)));
   const restantsCourants = $derived(propositions.everyday.filter((x) => !dejaPris(x.name)));
   const restantsPeriodiques = $derived(propositions.periodic.filter((x) => !dejaPris(x.name)));
   const restantsEpargnes = $derived(propositions.savings.filter((x) => !dejaPris(x.name)));
@@ -358,10 +379,17 @@
   const restantsComptes = $derived(propositions.accounts.filter((x) => !accounts.some((a) => a.name === x.name)));
 
   // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
-  const appliquerRevenu = (p: (typeof propositions.incomes)[number]) =>
-    creerRevenu(p.name, p.amount, p.interval, p.unit, p.day);
-  const appliquerCharge = (p: (typeof propositions.charges)[number]) =>
-    creerCharge(p.name, p.amount, p.interval, p.unit, p.day);
+  /**
+   * Le compte d'un flux proposé : celui que l'exemple dit, quand il n'est pas le principal et qu'il
+   * existe ici ; sinon le compte principal (D40).
+   */
+  const compteDuFlux = (p: FlowSuggestion) =>
+    (p.accountName ? accounts.find((a) => a.name === p.accountName)?.id : undefined) ?? mainAccountId();
+  /** Une version d'un flux de l'exemple, avec tout ce que l'exemple en dit : bornes, fenêtre, tolérance, motif, montant variable. */
+  const appliquerVersion = (p: FlowSuggestion, genre: 'income' | 'fixedCharge') =>
+    app.assistantUpsert('plannedFlows', suggestedFlow(p, genre, { id: app.newId(), accountId: compteDuFlux(p) }));
+  const appliquerRevenu = (g: FluxPropose) => g.versions.forEach((p) => appliquerVersion(p, 'income'));
+  const appliquerCharge = (g: FluxPropose) => g.versions.forEach((p) => appliquerVersion(p, 'fixedCharge'));
   const appliquerCourant = (p: (typeof propositions.everyday)[number]) =>
     creerCourant(p.name, p.amount, p.keep);
   const appliquerPeriodique = (p: (typeof propositions.periodic)[number]) =>
@@ -627,6 +655,12 @@
       {#if f.periodicity.unit !== 'month' || f.periodicity.interval !== 1}
         <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
       {/if}
+      {#if validityLabel(f)}
+        <!-- Une ligne que l'exemple borne le dit, avec sa date : deux versions d'un flux sont deux lignes du même nom (D51). -->
+        <p class="muted small suite">
+          {#if validityBadge(f, app.asOf)}<span class="pill dim">{validityBadge(f, app.asOf)}</span> {/if}{validityLabel(f)}
+        </p>
+      {/if}
     </div>
   {/each}
   {#if restantsRevenus.length}
@@ -634,7 +668,7 @@
     <div class="propositions">
       {#each restantsRevenus as p (p.name)}
         <button class="prop" onclick={() => appliquerRevenu(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDuRaccourci(p))}</span>
         </button>
       {/each}
     </div>
@@ -715,6 +749,11 @@
       {#if f.periodicity.unit !== 'month' || f.periodicity.interval !== 1}
         <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
       {/if}
+      {#if validityLabel(f)}
+        <p class="muted small suite">
+          {#if validityBadge(f, app.asOf)}<span class="pill dim">{validityBadge(f, app.asOf)}</span> {/if}{validityLabel(f)}
+        </p>
+      {/if}
     </div>
   {/each}
   {#if restantsCharges.length}
@@ -722,7 +761,7 @@
     <div class="propositions">
       {#each restantsCharges as p (p.name)}
         <button class="prop" onclick={() => appliquerCharge(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(p.amount)}</span>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDuRaccourci(p))}</span>
         </button>
       {/each}
     </div>

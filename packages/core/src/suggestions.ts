@@ -21,27 +21,46 @@ import {
   alive,
   type Account,
   type AccountKind,
+  type AmountTolerance,
   type Cents,
+  type Id,
   type ISODate,
+  type Ledger,
   type PeriodUnit,
+  type PlannedFlow,
   type SettlementDirection,
 } from './model.js';
 
-export interface IncomeSuggestion {
+/**
+ * Un flux de revenu ou de charge fixe de l'exemple, une version par proposition, avec tout ce que
+ * l'exemple en dit : de quoi créer le même flux (`suggestedFlow`), dates de validité comprises
+ * (D51). Deux versions d'un même flux — le salaire qui change — sont deux propositions du même nom,
+ * chacune avec sa date.
+ */
+export interface FlowSuggestion {
   name: string;
+  /** Positif : le signe appartient au genre du flux, pas à la saisie. */
   amount: Cents;
   interval: number;
   unit: PeriodUnit;
+  /** Le jour du mois de la première occurrence. */
   day: number;
+  /** Première occurrence, à la date que l'exemple lui donne (D40 : jamais postérieure à celle de la période en cours, sauf pour une version qui commence plus tard). */
+  anchorDate: ISODate;
+  /** Ce que l'étape ne montre pas, tel que l'exemple le dit : la sélection du flux (D24). */
+  dateWindowDays: number;
+  amountTolerance?: AmountTolerance;
+  labelPattern?: string;
+  variable?: boolean;
+  /** Les bornes de la version, quand l'exemple la borne ; incluses (D23). */
+  activeFrom?: ISODate;
+  activeTo?: ISODate;
+  /** Le compte du flux, par son nom, quand l'exemple ne le met pas sur le compte principal. */
+  accountName?: string;
 }
 
-export interface ChargeSuggestion {
-  name: string;
-  amount: Cents;
-  interval: number;
-  unit: PeriodUnit;
-  day: number;
-}
+export type IncomeSuggestion = FlowSuggestion;
+export type ChargeSuggestion = FlowSuggestion;
 
 export interface EverydaySuggestion {
   name: string;
@@ -99,17 +118,69 @@ export interface BudgetSuggestions {
   savings: SavingsSuggestion[];
 }
 
+/** Les flux d'un genre, dans l'ordre de l'exemple : toutes leurs versions, quelle que soit la date de lecture (D51). */
+function flowSuggestions(l: Ledger, kind: 'income' | 'fixedCharge'): FlowSuggestion[] {
+  const comptes = alive(l.accounts);
+  return alive(l.plannedFlows)
+    .filter((f) => f.kind === kind)
+    .map((f) => {
+      const compte = comptes.find((a) => a.id === f.accountId);
+      return {
+        name: f.name,
+        amount: Math.abs(f.amount),
+        interval: f.periodicity.interval,
+        unit: f.periodicity.unit,
+        day: parseDate(f.periodicity.anchorDate).d,
+        anchorDate: f.periodicity.anchorDate,
+        dateWindowDays: f.dateWindowDays,
+        ...(f.amountTolerance ? { amountTolerance: { ...f.amountTolerance } } : {}),
+        ...(f.labelPattern !== undefined ? { labelPattern: f.labelPattern } : {}),
+        ...(f.variable ? { variable: true } : {}),
+        ...(f.activeFrom !== undefined ? { activeFrom: f.activeFrom } : {}),
+        ...(f.activeTo !== undefined ? { activeTo: f.activeTo } : {}),
+        ...(compte && compte.kind !== 'principal' ? { accountName: compte.name } : {}),
+      };
+    });
+}
+
+/**
+ * Le flux que crée une proposition : ce que l'exemple en dit, et rien d'autre — la catégorie, qui
+ * n'est pas une proposition, reste à ceux qui la donnent. `id` et `accountId` sont ceux de qui
+ * l'écrit : l'identité d'un flux et le compte où il se trouve dans le projet ne sont pas ceux de
+ * l'exemple.
+ */
+export function suggestedFlow(
+  p: FlowSuggestion,
+  kind: 'income' | 'fixedCharge',
+  ids: { id: Id; accountId: Id },
+): PlannedFlow {
+  return {
+    id: ids.id,
+    name: p.name,
+    kind,
+    amount: kind === 'income' ? p.amount : -p.amount,
+    accountId: ids.accountId,
+    periodicity: { interval: p.interval, unit: p.unit, anchorDate: p.anchorDate },
+    dateWindowDays: p.dateWindowDays,
+    ...(p.amountTolerance ? { amountTolerance: { ...p.amountTolerance } } : {}),
+    ...(p.labelPattern !== undefined ? { labelPattern: p.labelPattern } : {}),
+    ...(p.variable ? { variable: true } : {}),
+    ...(p.activeFrom !== undefined ? { activeFrom: p.activeFrom } : {}),
+    ...(p.activeTo !== undefined ? { activeTo: p.activeTo } : {}),
+  };
+}
+
 /**
  * Propositions à offrir dans l'assistant, lues dans le jeu d'exemple.
  *
- * L'exemple porte plusieurs versions d'un même budget (D50, D51) : « Alimentation » y figure à 900
- * puis à 950 €. Seule celle **en vigueur à `asOf`** est proposée, sinon l'assistant offrirait deux
- * lignes de même nom et l'on ne saurait pas laquelle prendre. C'est aussi ce qu'on veut dire : on
- * propose le budget d'aujourd'hui, et les dates de validité servent à le faire changer ensuite.
+ * L'exemple porte plusieurs versions d'un même flux ou d'un même besoin (D50, D51) : « Salaire » y
+ * figure à 3 400 puis à 3 550 €, « Alimentation » à 900 puis à 950 €. Les **flux** — revenus et
+ * charges fixes — se proposent avec toutes leurs versions, chacune avec ses dates : la ligne dit
+ * laquelle elle est. Les **besoins** ne se proposent encore que dans la version en vigueur à
+ * `asOf`, sinon l'assistant offrirait deux lignes de même nom sans dire laquelle prendre.
  */
 export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions {
   const l = exampleLedger();
-  const flows = alive(l.plannedFlows).filter((f) => activeAt(f, asOf));
   const needs = alive(l.needs).filter((n) => activeAt(n, asOf));
   // Le nom du besoin s'il en porte un — une tirelire peut en porter plusieurs (D28), et « Cours de
   // piano » se reconnaît mieux que « Enfants et loisirs » répété deux fois.
@@ -132,25 +203,8 @@ export function budgetSuggestions(asOf: ISODate = todayISO()): BudgetSuggestions
       ...(a.activeTo !== undefined ? { closed: true } : {}),
     }));
 
-  const incomes: IncomeSuggestion[] = flows
-    .filter((f) => f.kind === 'income')
-    .map((f) => ({
-      name: f.name,
-      amount: Math.abs(f.amount),
-      interval: f.periodicity.interval,
-      unit: f.periodicity.unit,
-      day: parseDate(f.periodicity.anchorDate).d,
-    }));
-
-  const charges: ChargeSuggestion[] = flows
-    .filter((f) => f.kind === 'fixedCharge')
-    .map((f) => ({
-      name: f.name,
-      amount: Math.abs(f.amount),
-      interval: f.periodicity.interval,
-      unit: f.periodicity.unit,
-      day: parseDate(f.periodicity.anchorDate).d,
-    }));
+  const incomes: IncomeSuggestion[] = flowSuggestions(l, 'income');
+  const charges: ChargeSuggestion[] = flowSuggestions(l, 'fixedCharge');
 
   const everyday: EverydaySuggestion[] = needs
     .filter((n) => n.kind === 'recurring')
