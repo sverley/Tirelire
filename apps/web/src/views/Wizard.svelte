@@ -129,6 +129,7 @@
     const d = Math.min(31, Math.max(1, Number(startDay) || 1));
     startDay = String(d);
     if (app.assistantLedger.settings.periodStartDay !== d) app.assistantSetSetting('periodStartDay', d);
+    recalerLesClotures();
   }
   /** Jour du plus gros revenu déclaré : ce que l'assistant propose comme début de période. */
   const jourDuRevenu = $derived.by(() => {
@@ -368,9 +369,30 @@
   const appliquerEpargne = (p: (typeof propositions.savings)[number]) =>
     creerEpargne(p.name, p.monthly, p.target);
   /**
+   * La clôture d'un compte clos de l'exemple : la veille du premier jour de la période en cours, de
+   * sorte qu'il ne pèse rien sur le plan (D56). La période commence au jour que l'assistant retient
+   * — il se choisit à l'étape des revenus, après l'étape Comptes qui sème le compte.
+   */
+  const clotureDeLExemple = () => addDays(periodStart(), -1);
+  /**
+   * Recale la clôture des comptes clos que l'assistant a lui-même créés sur le début de période qu'il
+   * retient maintenant : à chaque changement de ce jour, et à la validation, de sorte que ce qui entre
+   * dans le projet est la veille du premier jour de la période retenue, quel que soit le moment où le
+   * compte a été semé. L'assistant ne donne pas de clôture lui-même : un compte clos qu'il a créé,
+   * absent du projet, porte celle de l'exemple ; un compte clos du projet n'est jamais touché.
+   */
+  function recalerLesClotures() {
+    const veille = clotureDeLExemple();
+    const duProjet = new Set(app.ledger.accounts.map((a) => a.id));
+    for (const a of accounts) {
+      if (a.activeTo !== undefined && !duProjet.has(a.id) && a.activeTo !== veille) {
+        app.assistantUpsert('accounts', { ...a, activeTo: veille });
+      }
+    }
+  }
+  /**
    * Un compte de l'exemple, avec ce que l'exemple en dit : son solde, le suivi de son solde à régler
-   * s'il est tiers, sa clôture s'il est clos — la veille du début de la période en cours, de sorte
-   * qu'il ne pèse rien sur le plan (D56). Les réglages se modifient ensuite depuis Comptes (I11).
+   * s'il est tiers, sa clôture s'il est clos. Les réglages se modifient ensuite depuis Comptes (I11).
    */
   const appliquerCompte = (p: (typeof propositions.accounts)[number]) => {
     const debut = periodStart();
@@ -383,7 +405,7 @@
       ...(p.settlement
         ? { tracksSettlement: true, settlementThreshold: p.settlement.threshold, settlementDirection: p.settlement.direction }
         : {}),
-      ...(p.closed ? { activeTo: addDays(debut, -1) } : {}),
+      ...(p.closed ? { activeTo: clotureDeLExemple() } : {}),
     } satisfies Account);
   };
   /**
@@ -521,6 +543,7 @@
    */
   function valider() {
     try {
+      recalerLesClotures();
       app.validerAssistant();
       valide = true;
       erreurValidation = '';
@@ -858,9 +881,8 @@
 {:else if step === 'accounts'}
   <h2>Vos comptes en banque</h2>
   <p class="muted small">
-    Le compte principal est celui par lequel tout transite ; les autres sont facultatifs. Un compte
-    tiers n’a pas de relevé importé : on suit seulement le solde à régler avec le compte principal.
-    Un compte clos ne reçoit plus rien de nouveau.
+    Uniquement des comptes bancaires réels — ceux dont vous recevez un relevé. Le compte principal
+    est celui par lequel tout transite ; les autres sont facultatifs.
   </p>
 
   <div class="tete tete-compte"><span>Nom du compte</span><span>Banque</span><span>Numéro ou IBAN</span><span class="d">Solde actuel</span><span>Type</span><span></span></div>
