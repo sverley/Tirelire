@@ -94,6 +94,21 @@ function rangee(col: ColumnDef, valeur: unknown): string | number | null {
   }
 }
 
+/** Refuse, comme le dépôt le ferait avant d'écrire, une ligne qui ne s'écrirait pas. */
+function verifier(key: LedgerKey, ligne: Ligne): void {
+  const t = TABLES[key]!;
+  const v: Record<string, string | number | null> = {};
+  for (const col of t.columns) if (col.prop !== 'id') v[col.col] = rangee(col, (ligne as Record<string, unknown>)[col.prop]);
+  const probleme = rowProblem(t, ligne.id, v);
+  if (probleme) throw new RowRefused(t.name, probleme);
+}
+
+/** Refuse, comme le dépôt le ferait avant d'écrire, un réglage qui ne s'écrirait pas. */
+function verifierReglage(key: keyof Settings, value: unknown): void {
+  const probleme = settingProblem(key, value === undefined ? null : JSON.stringify(value));
+  if (probleme) throw new RowRefused('settings', probleme);
+}
+
 /**
  * Écrit une ligne, entière, dans le brouillon : la ligne du projet qui porte le même identifiant est
  * masquée. Une ligne que le dépôt refuserait d'écrire est refusée ici, au geste qui la prépare, comme
@@ -101,18 +116,15 @@ function rangee(col: ColumnDef, valeur: unknown): string | number | null {
  */
 export function ecrire<K extends LedgerKey>(b: Brouillon, key: K, row: Ledger[K][number]): void {
   const ligne = row as unknown as Ligne;
-  const t = TABLES[key]!;
-  const v: Record<string, string | number | null> = {};
-  for (const col of t.columns) if (col.prop !== 'id') v[col.col] = rangee(col, (ligne as Record<string, unknown>)[col.prop]);
-  const probleme = rowProblem(t, ligne.id, v);
-  if (probleme) throw new RowRefused(t.name, probleme);
+  verifier(key, ligne);
   table(b, key)[ligne.id] = ligne;
 }
 
 /**
  * Retire une ligne du brouillon. Une ligne que le projet a déjà est marquée supprimée, comme le fait
  * le dépôt (suppression logique) ; une ligne que le brouillon a créée disparaît, le projet n'en a rien
- * à retirer.
+ * à retirer. Un retrait que le dépôt refuserait — le compte principal ne se supprime pas — est refusé
+ * ici, au geste, comme pour une ligne écrite.
  */
 export function retirer(
   b: Brouillon,
@@ -128,14 +140,14 @@ export function retirer(
   }
   const courante = b.lignes[key]?.[id] ?? duProjet;
   if (courante.deletedAt) return;
+  if (!duProjet.deletedAt) verifier(key, { ...duProjet, deletedAt: maintenant }); // la ligne que le dépôt supprimera
   table(b, key)[id] = { ...courante, deletedAt: maintenant };
 }
 
 /** Change un réglage dans le brouillon ; un réglage que le dépôt refuserait l'est ici, comme pour une ligne. */
 export function reglage<K extends keyof Settings>(b: Brouillon, key: K, value: Settings[K]): void {
   if (key === 'siteId') return; // l'identité de l'instance n'est pas un réglage du foyer, le dépôt l'ignore aussi
-  const probleme = settingProblem(key, value === undefined ? null : JSON.stringify(value));
-  if (probleme) throw new RowRefused('settings', probleme);
+  verifierReglage(key, value);
   b.reglages[key] = value;
 }
 
@@ -163,8 +175,12 @@ export function montrer(projet: Ledger, b: Brouillon): Ledger {
  * Écrit dans le projet ce que le brouillon change : tout, en une seule suite d'écritures sans rien
  * d'asynchrone entre elles. L'application ne conserve le fichier qu'après un délai qui suit la
  * dernière écriture (`openStore`, `db.ts`) : ce qui est conservé est le projet d'avant ou le projet
- * d'après, jamais un projet à moitié écrit. Les lignes et les réglages du brouillon ont été admis à
- * leur écriture (`ecrire`, `reglage`) : aucune n'est refusée en route.
+ * d'après, jamais un projet à moitié écrit.
+ *
+ * Rien ne s'écrit si le dépôt refuserait une seule des écritures : toutes sont vérifiées avant la
+ * première, et le refus (`RowRefused`) laisse le projet comme il était et le brouillon intact. Les
+ * lignes et les réglages ont déjà été vérifiés à leur préparation ; c'est la même vérification, que
+ * la validation refait pour ne pas dépendre de la façon dont le brouillon a été rempli.
  *
  * Rejouable : une ligne identique à celle du projet n'est pas réécrite par le dépôt, et une ligne
  * déjà supprimée l'est déjà. Si malgré tout une écriture échouait, ce qui a été écrit resterait, le
@@ -174,6 +190,7 @@ export function montrer(projet: Ledger, b: Brouillon): Ledger {
  * `projet` est le projet avant la première écriture : il dit quelles lignes un retrait doit supprimer.
  */
 export function valider(store: LedgerStore, projet: Ledger, b: Brouillon): void {
+  const ecritures: Array<() => void> = [];
   for (const key of LEDGER_KEYS) {
     const changees = b.lignes[key];
     if (!changees) continue;
@@ -181,11 +198,19 @@ export function valider(store: LedgerStore, projet: Ledger, b: Brouillon): void 
     for (const [id, ligne] of Object.entries(changees)) {
       if (ligne.deletedAt) {
         const existante = duProjet.get(id);
-        if (existante && !existante.deletedAt) store.remove(key, id);
+        if (existante && !existante.deletedAt) {
+          verifier(key, { ...existante, deletedAt: ligne.deletedAt });
+          ecritures.push(() => store.remove(key, id));
+        }
         continue;
       }
-      store.upsert(key, ligne as never);
+      verifier(key, ligne);
+      ecritures.push(() => store.upsert(key, ligne as never));
     }
   }
-  for (const key of Object.keys(b.reglages) as Array<keyof Settings>) store.setSetting(key, b.reglages[key] as never);
+  for (const key of Object.keys(b.reglages) as Array<keyof Settings>) {
+    verifierReglage(key, b.reglages[key]);
+    ecritures.push(() => store.setSetting(key, b.reglages[key] as never));
+  }
+  for (const ecriture of ecritures) ecriture();
 }

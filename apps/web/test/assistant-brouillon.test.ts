@@ -163,6 +163,39 @@ describe('[niveau 4] #210 · 2 — la validation écrit exactement ce que l’as
   });
 });
 
+describe('[niveau 4] #210 · 2 — le budget entre en entier ou pas du tout, même quand le dépôt refuserait une écriture', () => {
+  it('le retrait du compte principal, que le dépôt refuse, est refusé au geste qui le prépare et le brouillon n’en garde rien', async () => {
+    const { store } = await depot();
+    const projet = store.load();
+    const b = nouveauBrouillon(projet);
+
+    expect(() => store.remove('accounts', MAIN_ACCOUNT_ID)).toThrow(RowRefused);
+    expect(() => retirer(b, projet, 'accounts', MAIN_ACCOUNT_ID)).toThrow(RowRefused);
+    expect(brouillonIntact(b)).toBe(true);
+  });
+
+  it('la validation vérifie toutes ses écritures avant la première : un retrait refusé glissé dans le brouillon ne laisse ni compte, ni tirelire, ni besoin, ni flux, ni réglage', async () => {
+    const { store, ecritures } = await depot();
+    const projet = store.load();
+    const b = preparer(projet);
+    const avant = JSON.stringify([store.load(), store.readSettings()]);
+    // Un brouillon rempli autrement que par `retirer` : la validation ne s'y fie pas.
+    b.lignes.accounts![MAIN_ACCOUNT_ID] = { ...projet.accounts.find((a) => a.id === MAIN_ACCOUNT_ID)!, deletedAt: '2026-10-03T08:00:00.000Z' } as never;
+
+    expect(() => valider(store, projet, b)).toThrow(RowRefused);
+    expect(ecritures.n).toBe(0);
+    expect(JSON.stringify([store.load(), store.readSettings()])).toBe(avant);
+
+    // Le brouillon n'a rien perdu : sans le retrait refusé, il entre en entier.
+    delete b.lignes.accounts![MAIN_ACCOUNT_ID];
+    ecrire(b, 'accounts', { ...projet.accounts.find((a) => a.id === MAIN_ACCOUNT_ID)!, name: 'Compte courant', openingBalance: 150000 });
+    valider(store, projet, b);
+    expect([...vivantes(store.load(), 'tirelires').keys()].sort()).toEqual(['t-loyer', 't-vacances']);
+    expect([...vivantes(store.load(), 'plannedFlows').keys()]).toEqual(['f-salaire']);
+    expect(vivantes(store.load(), 'accounts').get(MAIN_ACCOUNT_ID)).toMatchObject({ name: 'Compte courant', openingBalance: 150000 });
+  });
+});
+
 describe('[niveau 4] #210 · 3 — quitter sans valider n’enregistre rien ; ce qui est préparé reste tant que l’application reste ouverte', () => {
   it('un brouillon abandonné laisse le dépôt tel qu’il était, et un nouveau brouillon repart du projet', async () => {
     const { store, ecritures } = await depot();
