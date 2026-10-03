@@ -16,6 +16,11 @@
  *
  * Ajoutés à ceux du codeur : le chemin « renseigné par l'assistant » du point 3, la carte qui montre
  * son solde et ses besoins (point 1), l'annonce qui nomme un montant, le vouvoiement des textes.
+ *
+ * Adapté par l'auditeur de #336, sans changer une assertion : l'assistant place désormais chaque
+ * tirelire comme l'exemple, et les crée dans l'ordre de ses tirelires. Le parcours laisse donc chaque
+ * tirelire « Peu importe » au résumé, pour obtenir des tirelires sans placement voulu, et l'échéance
+ * en manque s'ajoute à « Essence », que ce test prenait en premier avant #336.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -115,6 +120,26 @@ const saisirLeSoldeDuPrincipal = (page: Page, valeur: string) =>
   }, valeur);
 
 /**
+ * Au résumé, laisse chaque tirelire « Peu importe » : l'assistant les place désormais comme
+ * l'exemple (#336, point 5), et ce harnais veut des tirelires sans placement voulu (point 1).
+ * Adapté par l'auditeur de #336 ; sans effet sur une étape qui ne demande pas de placement.
+ */
+async function laisserSansPlacement(page: Page): Promise<void> {
+  const changés = await page.evaluate(() => {
+    let n = 0;
+    for (const s of [...document.querySelectorAll('main select')] as HTMLSelectElement[]) {
+      const libre = [...s.options].find((o) => o.textContent?.trim() === 'Peu importe');
+      if (!libre || s.value === libre.value) continue;
+      s.value = libre.value;
+      s.dispatchEvent(new Event('change', { bubbles: true }));
+      n++;
+    }
+    return n;
+  });
+  if (changés) await pause(200);
+}
+
+/**
  * L'assistant, de l'accueil au plan, par ses seuls boutons primaires (le chemin simple d'I4), en
  * saisissant `solde` pour le compte principal quand l'étape des comptes s'affiche.
  */
@@ -124,6 +149,7 @@ async function traverserLAssistant(page: Page, solde: string): Promise<boolean> 
   let àSaisir: string | undefined = solde;
   for (let i = 0; i < 15; i++) {
     if (àSaisir && (await saisirLeSoldeDuPrincipal(page, àSaisir))) àSaisir = undefined;
+    await laisserSansPlacement(page);
     const primaire = await page.evaluate(() => {
       const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
       if ([...document.querySelectorAll('main button')].some((b) => t(b) === 'Voir le plan')) return 'Voir le plan';
@@ -188,7 +214,7 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
     });
   });
 
-  describe('après l’assistant, mené par ses boutons primaires, avec 1 500 € saisis pour le compte principal', () => {
+  describe('après l’assistant, mené par ses boutons primaires, ses tirelires laissées « Peu importe », avec 1 500 € saisis pour le compte principal', () => {
     let page: Page;
     beforeAll(async () => {
       page = await pageNeuve();
@@ -224,8 +250,11 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
 
     it('[niveau 1] point 1 · une échéance en manque, ajoutée à une tirelire sans placement, s’annonce aussitôt, avec son montant', async () => {
       await écran(page, 'Tirelires');
-      const [première] = await lireLesTirelires(page);
-      const nom = première!.texte.split(' voulu')[0]!;
+      // « Essence », la tirelire que ce test prenait en premier avant #336 : l'assistant suit
+      // désormais l'ordre des tirelires de l'exemple, et la première, « Alimentation », reçoit
+      // assez de ses 900 € par période pour que 1 200 € au 15 octobre ne manquent pas (auditeur de #336).
+      const nom = 'Essence';
+      expect((await lireLesTirelires(page)).some((c) => c.texte.startsWith(`${nom} voulu : libre`)), await texteDuMain(page)).toBe(true);
       expect(await geste(page, 'Ajouter un besoin', nom)).toBe(true);
       expect(await remplir(page, 'Type', 'dueDate')).toBe(true);
       expect(await remplir(page, 'Montant de l', '1 200,00')).toBe(true);

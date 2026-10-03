@@ -1,12 +1,22 @@
 /**
- * Tests du codeur de #336 — « L'assistant propose toutes les tirelires de l'exemple, leurs besoins,
- * leur placement et l'ordre permanent », vus dans l'assistant (`Wizard.svelte`) : les étapes Budgets,
- * Pas tous les mois et Épargne sur un projet vierge, le résumé (placement et ordre), ce que la
- * validation laisse dans Tirelires et dans le Plan, un compte retiré, et les raccourcis sur un projet
- * existant. La lecture de l'exemple elle-même est dans `packages/core/test/suggestions-tirelires.test.ts`.
+ * Harnais d'audit de #336 — « L'assistant propose toutes les tirelires de l'exemple, leurs besoins,
+ * leur placement et l'ordre permanent », côté écran : sur le site construit, à 375 px, au 20 septembre 2026.
  *
- * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie. Les pages tournent au
- * 20 septembre 2026 (`JOUR_DES_TESTS`).
+ * Retenus parmi les tests du codeur (`navigateur/assistant-tirelires-exemple.test.ts`, déplacé ici en
+ * entier), puis complétés : ce que l'étape laisse corriger — le déjà mis de côté (point 3), la réponse
+ * à « où dort chaque tirelire » (point 5), le montant de l'ordre (point 6) — et, après la validation,
+ * le prélèvement et l'ordre retrouvés dans Flux prévus, modifiables, et le piano dans sa tirelire
+ * (point 10). La lecture de l'exemple elle-même est dans `packages/core/test/suggestions-tirelires-harnais.test.ts`.
+ *
+ * Niveaux (D83), par phrase du « Fait quand » :
+ *  - 2 pour les points 1 à 6 et 8 : D43, D46, D51, D40, D38 et D60 sont des décisions ; une ligne
+ *    absente, fausse ou non corrigeable en est un cas faux, l'usage restant possible.
+ *  - 1 pour le point 7 et le point 10 : l'ordre validé s'enregistre comme ce que la banque exécute et
+ *    le Plan en montre l'écart sans le réécrire, l'ordre retiré ne s'enregistre pas (I10, « aucun ordre
+ *    enregistré ne change sans validation ») ; ce que l'assistant a créé se retrouve et se modifie hors
+ *    de lui (I11, tel qu'il est écrit). Rouges sur `main` (ni ordre ni piano après la validation) ; le
+ *    test de l'ordre retiré, vert sur `main` qui n'en propose aucun, rouge sur une mutation du code de
+ *    la PR : le × de l'ordre sans effet.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -117,7 +127,7 @@ const carteDuPlan = (page: Page, compte: string) =>
     return [...c.querySelectorAll(':scope > .row')].map((r) => [t(r.querySelector('.label')), t(r.querySelector(':scope > .num, :scope > div:last-child'))]);
   }, compte);
 
-describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tirelires, leurs besoins, leur placement et l’ordre de l’exemple', () => {
+describe.skipIf(!navigateur)('#336 — l’assistant propose les tirelires, leurs besoins, leur placement et l’ordre de l’exemple', () => {
   let site: Site;
 
   beforeAll(async () => {
@@ -137,7 +147,7 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       await page?.close();
     });
 
-    it('1, 2, 3 — Budgets : cinq tirelires, toutes leurs versions, le piano sous Enfants et loisirs, le reliquat et le déjà de côté', async () => {
+    it('[niveau 2] 1, 2, 3 — Budgets : cinq tirelires, toutes leurs versions, le piano sous Enfants et loisirs, le reliquat et le déjà de côté', async () => {
       await etape(page, 'Budgets');
       const vu = await cartes(page);
       expect(vu.map((c) => c.nom)).toEqual(['Alimentation', 'Essence', 'Divers et sorties', 'Enfants et loisirs', 'Santé']);
@@ -165,7 +175,7 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       expect(await raccourcis(page)).toEqual([]);
     });
 
-    it('1, 3, 4 — Pas tous les mois : trois échéances, leur déjà de côté, et le prélèvement attendu de la seule taxe foncière', async () => {
+    it('[niveau 2] 1, 3, 4 — Pas tous les mois : trois échéances, leur déjà de côté, et le prélèvement attendu de la seule taxe foncière', async () => {
       await etape(page, 'Pas tous les mois');
       const vu = await cartes(page);
       expect(vu.map((c) => [c.nom, c.deja, c.besoins.map((b) => b.montants)])).toEqual([
@@ -179,7 +189,7 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       expect(prelevement['Vacances']).toBe('Aucun prélèvement attendu');
     });
 
-    it('1, 2, 3 — Épargne : l’épargne de précaution, ses deux versions et ses 3 200 € déjà de côté', async () => {
+    it('[niveau 2] 1, 2, 3 — Épargne : l’épargne de précaution, ses deux versions et ses 3 200 € déjà de côté', async () => {
       await etape(page, 'Épargne');
       const vu = await cartes(page);
       expect(vu.map((c) => [c.nom, c.deja, c.besoins.map((b) => b.montants)])).toEqual([
@@ -187,7 +197,7 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       ]);
     });
 
-    it('5, 6 — Résumé : chaque tirelire placée comme dans l’exemple, et l’ordre vers Livret A à côté de ce que le budget demande', async () => {
+    it('[niveau 2] 5, 6 — Résumé : chaque tirelire placée comme dans l’exemple, et l’ordre vers Livret A à côté de ce que le budget demande', async () => {
       await etape(page, 'Résumé');
       expect(await placements(page)).toEqual({
         'Taxe foncière': 'Livret A',
@@ -207,7 +217,7 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       expect(o[0]!.texte).toMatch(/budget demande 650,00 € par mois pour Livret A/);
     });
 
-    it('7, 10 — validé tel quel : le Plan montre l’ordre à 600 € contre 650 € demandés, et Tirelires retrouve tout', async () => {
+    it('[niveau 1] 7, 10 — validé tel quel : le Plan montre l’ordre à 600 € contre 650 € demandés, et Tirelires retrouve tout', async () => {
       expect(await cliquer(page, 'Valider mon budget')).toBe(true);
       await pause(400);
       await allerÀ(page, 'Plan');
@@ -217,6 +227,14 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       const ligne = (debut: string) => livret!.find(([l]) => l!.startsWith(debut))?.[1];
       expect(ligne('Virement permanent')).toBe('650,00 €');
       expect(ligne('Ordre permanent chez la banque')).toBe('600,00 €');
+      // L'ordre se corrige hors de l'assistant, depuis le Plan (I11, D60).
+      const corriger = await page.evaluate(() =>
+        [...document.querySelectorAll('main .card')].some(
+          (c) => (c.querySelector(':scope > .row .label strong')?.textContent ?? '').trim() === 'Livret A' &&
+            [...c.querySelectorAll('button')].some((b) => (b.textContent ?? '').trim() === 'Corriger mon ordre'),
+        ),
+      );
+      expect(corriger, 'pas de « Corriger mon ordre » sur la carte Livret A du Plan').toBe(true);
 
       await allerÀ(page, 'Plus');
       expect(await cliquer(page, 'Tirelires')).toBe(true);
@@ -225,6 +243,85 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       for (const nom of ['Taxe foncière', 'Assurance auto', 'Vacances', 'Épargne de précaution', 'Alimentation', 'Essence', 'Divers et sorties', 'Enfants et loisirs', 'Santé', 'Cours de piano']) {
         expect(texte, nom).toContain(nom);
       }
+      // Le piano est un besoin d'« Enfants et loisirs », pas une tirelire à part (point 2, D28).
+      expect(texte).toMatch(/Enfants et loisirs voulu : [^]*?Cours de piano[^]*?Ajouter un besoin Modifier Supprimer/);
+      expect(texte).not.toMatch(/Cours de piano voulu :/);
+
+      // Le prélèvement et l'ordre se retrouvent dans Flux prévus (I11) : le prélèvement s'y modifie ;
+      // l'ordre, dérivé du budget, y renvoie au Plan, où il se corrige (#183, D60).
+      await allerÀ(page, 'Plus');
+      expect(await cliquer(page, 'Flux prévus')).toBe(true);
+      await pause(300);
+      const flux = await page.evaluate(() => {
+        const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
+        return ([...document.querySelectorAll('main .row')] as HTMLElement[])
+          .filter((r) => r.querySelector('.label strong'))
+          .map((r) => [t(r.querySelector('.label strong')), [...r.querySelectorAll('button')].map(t).filter((b) => b !== 'Supprimer').join(' / ')] as const);
+      });
+      expect(flux.filter(([n]) => n === 'Taxe foncière (prélèvement)')).toEqual([['Taxe foncière (prélèvement)', 'Modifier']]);
+      expect(flux.filter(([n]) => n === 'Virement Livret A')).toEqual([['Virement Livret A', 'Voir dans le Plan']]);
+    });
+  });
+
+  describe('corrigé sur place : un déjà mis de côté, un placement, le montant de l’ordre', () => {
+    let page: Page;
+    beforeAll(async () => {
+      page = await ouvrirLAssistant(site);
+    }, 60_000);
+    afterAll(async () => {
+      await page?.close();
+    });
+
+    it('[niveau 2] 3, 5, 6 — chaque correction s’enregistre à la validation : 500 € de côté pour Vacances, Santé sur Livret A, l’ordre à 620 €', async () => {
+      await etape(page, 'Budgets');
+      await etape(page, 'Pas tous les mois');
+      // Le déjà mis de côté se corrige sur la carte de la tirelire (point 3).
+      const deja = await page.evaluate(() => {
+        const c = ([...document.querySelectorAll('main .card.tirelire')] as HTMLElement[]).find(
+          (x) => (x.querySelector('.ligne-tirelire input.nom') as HTMLInputElement | null)?.value === 'Vacances',
+        );
+        const i = c?.querySelector('.deja input') as HTMLInputElement | null;
+        if (!i) return false;
+        i.value = '500,00';
+        i.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      });
+      expect(deja, 'pas de « Déjà de côté » pour Vacances').toBe(true);
+      await pause(200);
+      await etape(page, 'Épargne');
+      await etape(page, 'Résumé');
+      // La réponse à « où dort chaque tirelire » se corrige sur place (point 5), le montant de l'ordre aussi (point 6).
+      const corrige = await page.evaluate(() => {
+        const carte = ([...document.querySelectorAll('main .card')] as HTMLElement[]).find((c) => (c.querySelector('.label strong')?.textContent ?? '').trim() === 'Santé');
+        const sel = carte?.querySelector('select') as HTMLSelectElement | null;
+        const o = sel && [...sel.options].find((x) => x.textContent?.trim() === 'Livret A');
+        if (!sel || !o) return 'placement';
+        sel.value = o.value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        const mt = document.querySelector('main .card.ordre input.mt') as HTMLInputElement | null;
+        if (!mt) return 'ordre';
+        mt.value = '620,00';
+        mt.dispatchEvent(new Event('change', { bubbles: true }));
+        return '';
+      });
+      expect(corrige, `rien à corriger : ${corrige}`).toBe('');
+      await pause(250);
+      expect((await placements(page))['Santé']).toBe('Livret A');
+      expect((await ordres(page)).map((x) => x.montant)).toEqual(['620,00']);
+
+      expect(await cliquer(page, 'Valider mon budget')).toBe(true);
+      await pause(400);
+      await allerÀ(page, 'Plan');
+      await pause(300);
+      const livret = await carteDuPlan(page, 'Livret A');
+      expect(livret?.find(([l]) => l!.startsWith('Ordre permanent chez la banque'))?.[1]).toBe('620,00 €');
+
+      await allerÀ(page, 'Plus');
+      expect(await cliquer(page, 'Tirelires')).toBe(true);
+      await pause(300);
+      const texte = espaces(await page.evaluate(() => document.querySelector('main')?.textContent ?? ''));
+      expect(texte).toMatch(/Vacances voulu : le reste sur Livret A réel : 500,00 € sur Livret A/);
+      expect(texte).toMatch(/Santé voulu : le reste sur Livret A/);
     });
   });
 
@@ -238,7 +335,7 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       await page?.close();
     });
 
-    it('5, 6 — les réserves arrivent sans placement, et aucun ordre n’est proposé', async () => {
+    it('[niveau 2] 5, 6 — les réserves arrivent sans placement, et aucun ordre n’est proposé', async () => {
       await etape(page, 'Budgets');
       await etape(page, 'Pas tous les mois');
       await etape(page, 'Épargne');
@@ -271,14 +368,14 @@ describe.skipIf(!navigateur)('[niveau 4] #336 — l’assistant propose les tire
       await page?.close();
     });
 
-    it('7 — retiré, aucun ordre n’est enregistré', async () => {
+    it('[niveau 1] 7 — retiré, aucun ordre n’est enregistré', async () => {
       await allerÀ(page, 'Plan');
       await pause(300);
       const livret = await carteDuPlan(page, 'Livret A');
       expect(livret?.some(([l]) => l!.startsWith('Ordre permanent chez la banque')) ?? false).toBe(false);
     });
 
-    it('8 — rouvert, un raccourci apporte « Santé » avec son placement, et celui de l’ordre l’apporte tant qu’aucun flux ne porte son nom', async () => {
+    it('[niveau 2] 8 — rouvert, un raccourci apporte « Santé » avec son placement, et celui de l’ordre l’apporte tant qu’aucun flux ne porte son nom', async () => {
       await allerÀ(page, 'Plus');
       expect(await cliquer(page, 'Lancer'), 'pas de bouton « Lancer » pour ouvrir l’assistant').toBe(true);
       await pause(300);

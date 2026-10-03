@@ -1,3 +1,21 @@
+/**
+ * Harnais d'audit de #336 — « L'assistant propose toutes les tirelires de l'exemple, leurs besoins,
+ * leur placement et l'ordre permanent », côté cœur : la lecture de l'exemple par `budgetSuggestions`,
+ * et ce qu'en font `suggestedTirelire` et `suggestedOrder`, que l'assistant appelle tels quels.
+ *
+ * Retenus parmi les tests du codeur (`suggestions-tirelires.test.ts`, déplacé ici en entier). Ce qui
+ * se voit dans l'assistant est dans `apps/web/test/navigateur/assistant-tirelires-exemple-harnais.test.ts` ;
+ * le point 9 est tranché par `suggestions.test.ts`, que le codeur a étendu aux tirelires et aux ordres ;
+ * le point 11 (D40, D51, D60) est de la documentation, vérifiée à la relecture.
+ *
+ * Niveaux (D83), par phrase du « Fait quand » :
+ *  - 2 pour les points 1 à 6 et la fin du point 10 (« avec tout ce que l'exemple en dit ») : D43, D46,
+ *    D51, D40, D38, D60 sont des décisions ; une proposition absente ou fausse en est un cas faux,
+ *    l'usage restant possible.
+ *  - 1 pour le point 7 au 6 septembre 2026 : l'ordre enregistré reste ce que la banque exécute, et le
+ *    plan en signale l'écart « sans le réécrire » (I10, tel qu'il est écrit). Rouge sur une mutation
+ *    du code de la PR : `suggestedOrder` qui perd l'origine `derived` de l'ordre.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   alive,
@@ -13,14 +31,6 @@ import {
   type Ledger,
 } from '../src/index.js';
 
-/**
- * Tests du codeur de #336 — « L'assistant propose toutes les tirelires de l'exemple, leurs besoins,
- * leur placement et l'ordre permanent » : la lecture de l'exemple par `budgetSuggestions`, et ce
- * qu'en font `suggestedTirelire` et `suggestedOrder` (`src/suggestions.ts`), sans navigateur. Ce qui
- * se voit dans l'assistant est dans `apps/web/test/navigateur/assistant-tirelires-exemple.test.ts`.
- *
- * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
- */
 const exemple = exampleLedger();
 const s = budgetSuggestions('2026-09-20');
 const DEBUT = '2026-08-28';
@@ -57,7 +67,7 @@ const nomDuCompte = (l: Ledger, id?: string) => {
 };
 const nomDeLaTirelire = (l: Ledger, id?: string) => l.tirelires.find((t) => t.id === id)?.name;
 
-describe('[niveau 4] #336 · 1 — toutes les tirelires et tous leurs besoins, et eux seuls, versions datées comprises', () => {
+describe('[niveau 2] #336 · 1 — toutes les tirelires et tous leurs besoins, et eux seuls, versions datées comprises', () => {
   it('neuf tirelires, dans l’ordre de l’exemple', () => {
     expect(s.tirelires.map((t) => t.name)).toEqual([
       'Taxe foncière',
@@ -91,7 +101,7 @@ describe('[niveau 4] #336 · 1 — toutes les tirelires et tous leurs besoins, e
   });
 });
 
-describe('[niveau 4] #336 · 2 — chaque besoin arrive avec ce que l’exemple en dit', () => {
+describe('[niveau 2] #336 · 2 — chaque besoin arrive avec ce que l’exemple en dit', () => {
   it('les versions datées, le second besoin nommé et la priorité', () => {
     const besoins = (nom: string) => s.tirelires.find((t) => t.name === nom)!.needs;
     expect(besoins('Alimentation').map((n) => [n.amount, n.activeFrom ?? null, n.activeTo ?? null])).toEqual([
@@ -116,7 +126,7 @@ describe('[niveau 4] #336 · 2 — chaque besoin arrive avec ce que l’exemple 
   });
 });
 
-describe('[niveau 4] #336 · 3 — reliquat et déjà mis de côté', () => {
+describe('[niveau 2] #336 · 3 — reliquat et déjà mis de côté', () => {
   it('le reliquat gardé ou non, et ce qui y est déjà mis de côté', () => {
     const lu = Object.fromEntries(s.tirelires.map((t) => [t.name, [t.rollover?.mode ?? 'unlimited', t.openingBalance]]));
     expect(lu).toEqual({
@@ -133,7 +143,7 @@ describe('[niveau 4] #336 · 3 — reliquat et déjà mis de côté', () => {
   });
 });
 
-describe('[niveau 4] #336 · 4 — le prélèvement attendu, et lui seul', () => {
+describe('[niveau 2] #336 · 4 — le prélèvement attendu, et lui seul', () => {
   it('« Taxe foncière (prélèvement) » sous la taxe foncière, aucun ailleurs', () => {
     expect(Object.fromEntries(s.tirelires.map((t) => [t.name, t.payments.map((f) => f.name)]))).toMatchObject({
       'Taxe foncière': ['Taxe foncière (prélèvement)'],
@@ -149,7 +159,7 @@ describe('[niveau 4] #336 · 4 — le prélèvement attendu, et lui seul', () =>
   });
 });
 
-describe('[niveau 4] #336 · 5 — chaque tirelire arrive placée comme dans l’exemple, et sans placement sur un compte retiré', () => {
+describe('[niveau 2] #336 · 5 — chaque tirelire arrive placée comme dans l’exemple, et sans placement sur un compte retiré', () => {
   it('les réserves sur Livret A, Enfants et loisirs sur Carte enfants, les autres budgets sur le compte principal', () => {
     const l = valideTelQuel();
     expect(Object.fromEntries(l.tirelires.map((t) => [t.name, t.placement.map((p) => nomDuCompte(l, p.accountId))]))).toEqual({
@@ -176,7 +186,7 @@ describe('[niveau 4] #336 · 5 — chaque tirelire arrive placée comme dans l�
   });
 });
 
-describe('[niveau 4] #336 · 6 — l’ordre permanent de l’exemple, et aucun si Livret A est retiré', () => {
+describe('[niveau 2] #336 · 6 — l’ordre permanent de l’exemple, et aucun si Livret A est retiré', () => {
   it('« Virement Livret A », 600 € le 28, tous les mois, de Compte courant vers Livret A, avec sa fenêtre, sa tolérance et son libellé', () => {
     const l = valideTelQuel();
     const f = alive(l.plannedFlows).find((x) => x.kind === 'transfer')!;
@@ -190,8 +200,8 @@ describe('[niveau 4] #336 · 6 — l’ordre permanent de l’exemple, et aucun 
   });
 });
 
-describe('[niveau 4] #336 · 7 et 10 — validé tel quel, le plan montre l’ordre et son écart, sans le réécrire', () => {
-  it('600 € contre 650 € au 6 septembre 2026, et le montant enregistré reste 600 €', () => {
+describe('#336 · 7 et 10 — validé tel quel, le plan montre l’ordre et son écart, sans le réécrire', () => {
+  it('[niveau 1] 600 € contre 650 € au 6 septembre 2026, et le montant enregistré reste 600 €', () => {
     const l = valideTelQuel();
     const plan = computePlan(l, '2026-09-06');
     const livret = plan.transfers.find((t) => t.accountName === 'Livret A')!;
@@ -200,7 +210,7 @@ describe('[niveau 4] #336 · 7 et 10 — validé tel quel, le plan montre l’or
     expect(alive(l.plannedFlows).find((x) => x.kind === 'transfer')!.amount).toBe(-euros(600));
   });
 
-  it('le projet porte les neuf tirelires, leurs treize besoins, le prélèvement et l’ordre, comme l’exemple (identités et ouverture mises à part)', () => {
+  it('[niveau 2] le projet porte les neuf tirelires, leurs treize besoins, le prélèvement et l’ordre, comme l’exemple (identités et ouverture mises à part)', () => {
     const l = valideTelQuel();
     const cle = (x: Ledger) => ({
       tirelires: alive(x.tirelires).map(({ id: _i, openingDate: _d, placement, ...t }) => ({ ...t, placement: placement.map((p) => [nomDuCompte(x, p.accountId), p.share]) })),
