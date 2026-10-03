@@ -3,7 +3,8 @@
  *
  * Sans navigateur : ce que l'écran Plan écrit (source de `Plan.svelte`), et, par le cœur, la
  * prémisse du point 2 — une période où aucun besoin n'est en vigueur n'a aucune ligne de tirelire.
- * Le rendu à l'écran est vérifié par `navigateur/plan-couvert-par-les-revenus.test.ts`.
+ * Le rendu à l'écran est vérifié par le harnais de l'auditeur,
+ * `navigateur/plan-couvert-par-les-revenus-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
