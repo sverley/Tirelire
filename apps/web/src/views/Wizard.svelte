@@ -365,10 +365,9 @@
 
   // --- Propositions (D43) : elles ne se présentent que dans l'assistant, rien n'entre d'office dans le projet (D40) ---
   // Les raccourcis sont toujours offerts : l'interface ne change pas d'un projet à l'autre (D46).
-  // La date compte pour les besoins : l'exemple en porte plusieurs versions (D51), et l'on ne propose
-  // que celle en vigueur. Figée à l'ouverture, comme le reste de l'état de l'assistant (D43). Les
-  // flux, eux, se proposent avec toutes leurs versions, quelle que soit la date.
-  const propositions = budgetSuggestions(app.asOf);
+  // Flux et besoins se proposent avec toutes leurs versions, chacune avec ses dates, quelle que soit
+  // la date de lecture (D51) : seul le montant d'un raccourci suit la version en vigueur.
+  const propositions = budgetSuggestions();
   /** Un raccourci déjà repris disparaît : on ne propose pas ce qui existe déjà. */
   const dejaPris = (nom: string) => flows.some((f) => f.name === nom) || tirelires.some((t) => t.name === nom);
   /**

@@ -355,13 +355,3 @@ export function budgetSuggestions(_asOf?: ISODate): BudgetSuggestions {
     orders: orderSuggestions(l),
   };
 }
-
-/**
- * Prochaine occurrence d'un jour et d'un mois donnés, à partir de `from` : l'assistant s'en sert
- * pour dater l'échéance proposée sans demander l'année.
- */
-export function nextDueDate(month: number, day: number, from: string): string {
-  const { y, m, d } = parseDate(from);
-  const year = month > m || (month === m && day >= d) ? y : y + 1;
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeAt, alive, budgetSuggestions, exampleLedger, euros, nextDueDate } from '../src/index.js';
+import { activeAt, alive, budgetSuggestions, exampleLedger, euros } from '../src/index.js';
 
 /**
  * Les propositions de l'assistant (D43) n'ont pas de contenu propre : elles sont une lecture du jeu
@@ -114,14 +114,5 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
 
     const tf = s.tirelires.find((x) => x.name === 'Taxe foncière')!.needs[0]!;
     expect(tf.periodicity).toEqual({ interval: 12, unit: 'month', anchorDate: '2026-10-15' });
-  });
-
-  it("date l'échéance proposée sur sa prochaine occurrence, sans demander l'année", () => {
-    // Le 15 octobre est encore devant nous en septembre…
-    expect(nextDueDate(10, 15, '2026-09-08')).toBe('2026-10-15');
-    // …mais derrière nous en novembre, donc l'année suivante.
-    expect(nextDueDate(10, 15, '2026-11-01')).toBe('2027-10-15');
-    // Le jour même compte comme à venir.
-    expect(nextDueDate(10, 15, '2026-10-15')).toBe('2026-10-15');
   });
 });
