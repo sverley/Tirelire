@@ -1,13 +1,35 @@
 /**
- * Tests du codeur de #214 — « Les aides des champs viennent de l'exemple », côté écran : sur le site
- * construit, à 375 px, au jour des tests (`JOUR_DES_TESTS`, 20 septembre 2026). Ce que lisent les
- * écrans — la ligne d'aide de chaque étape de l'assistant, ses raccourcis, les formulaires de Comptes,
- * de Tirelires, de Flux prévus, de Catégories et de Saisie — se vérifie ici ; la lecture de l'exemple
- * qui les nourrit est dans `../aides-exemple.test.ts` et `packages/core/test/suggestions-saisies.test.ts`.
+ * Harnais d'audit de #214 — « Les aides des champs viennent de l'exemple », côté écran : sur le site construit,
+ * à 375 px, au jour des tests (`JOUR_DES_TESTS`, 20 septembre 2026). Les points 1 à 4 du « Fait quand », et le
+ * point 7 que l'auditeur y ajoute (une ligne dont un champ ne porte pas la valeur de son aide est ajoutée telle
+ * qu'elle est saisie).
  *
- * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie. Les valeurs attendues sont
- * celles que l'exemple dit (`exampleLedger`), écrites ici en euros et en texte, pas relues par le code
- * que le test contrôle.
+ * Retenus parmi les tests du codeur (`navigateur/aides-exemple.test.ts`, d'où ils sont déplacés, ce fichier-là
+ * n'existe plus) : les douze, tels quels, sauf leur niveau ; le deuxième du point 2 devient celui du point 7. Le
+ * point 5 (« un test échoue si une aide… n'est pas celle que l'exemple désigne ») est tranché par ces douze, qui
+ * lisent chaque aide à l'écran et la comparent à l'exemple, et par `../aides-exemple-harnais.test.ts`, qui
+ * refuse une aide écrite en dur et lit les versions en vigueur à d'autres dates ; le point 6 (D43) est de la
+ * documentation, vérifiée à la relecture. La lecture de l'exemple côté cœur (`suggestions-saisies.test.ts`) et
+ * les tests de `../aides-exemple.test.ts` qui ne sont pas retenus restent dans les fichiers du codeur, au
+ * niveau 4 : ce que ce fichier-ci observe à l'écran les couvre.
+ *
+ * Niveaux (D83), par phrase du « Fait quand » :
+ *  - 2 pour les points 1 à 3 et 7 : D43 (les aides d'un formulaire viennent d'une même ligne de l'exemple) et D46
+ *    (ajouter une ligne qui les recopie fait ce que fait le raccourci de cette ligne) sont des décisions ; une aide
+ *    fausse, une ligne recopiée qui perd ce que l'exemple en dit, ou une valeur saisie remplacée par celle de
+ *    l'exemple en est un cas faux, l'usage restant possible : la ligne se lit dans l'étape avec son montant et se
+ *    corrige sur place, et rien n'entre dans le projet avant la validation (D40). Pas 1 : la description ne porte
+ *    pas, comme énoncé, que l'assistant parcouru en suivant ses aides redonne l'exemple (c'est la parole du
+ *    porteur du 24 septembre, que l'issue cite). Pas 0 pour le point 7, contrairement au point 7 de #211, où le nom
+ *    ou le solde posés étaient remplacés à la validation : ici une valeur saisie remplacée l'est à l'ajout de la
+ *    ligne, qui la montre dans l'étape, avant la validation finale.
+ *
+ * Deux des trois choix du codeur, que l'issue ne tranche pas et qu'il a posés au porteur (commentaire de l'issue,
+ * 03/10), sont tenus par des assertions de ce fichier : les champs sans texte indicatif — jour, liste, date, case —
+ * prennent, tant qu'on n'y a pas touché, la valeur de la ligne d'aide (le jour au point 1, le type du compte à
+ * l'étape Comptes) ; une aide est la valeur exacte de la ligne, pour le genre choisi (« Dentiste (payé par Marie) »
+ * dans Saisie, la cible et la mensualité du même objectif dans Tirelires). Si le porteur en retient un autre, ces
+ * assertions changent. Le troisième, un solde laissé vide vaut zéro, n'est tenu par aucun test retenu.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -251,7 +273,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
   });
 
   describe('dans l’assistant, sur un projet vierge', () => {
-    it('[niveau 4] point 1 — à l’étape Revenus, toutes les aides du formulaire viennent d’une même ligne : la première de l’étape, puis celle du premier raccourci restant', async () => {
+    it('[niveau 2] point 1 — à l’étape Revenus, toutes les aides du formulaire viennent d’une même ligne : la première de l’étape, puis celle du premier raccourci restant', async () => {
       const page = await nouvellePage(site);
       try {
         await ouvrir(page, site);
@@ -284,7 +306,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       }
     }, 240_000);
 
-    it('[niveau 4] point 1 — chaque étape de l’assistant montre les aides de la première ligne de l’exemple de l’étape : comptes, charges fixes, budgets, échéances, épargne, catégories', async () => {
+    it('[niveau 2] point 1 — chaque étape de l’assistant montre les aides de la première ligne de l’exemple de l’étape : comptes, charges fixes, budgets, échéances, épargne, catégories', async () => {
       const page = await nouvellePage(site);
       try {
         await ouvrir(page, site);
@@ -313,7 +335,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       }
     }, 240_000);
 
-    it('[niveau 4] point 2 — ajouter « Loyer locatif » en recopiant ses aides fait ce que fait son raccourci : la ligne revient avec son motif de libellé et sa fenêtre, une fois l’assistant validé', async () => {
+    it('[niveau 2] point 2 — ajouter « Loyer locatif » en recopiant ses aides fait ce que fait son raccourci : la ligne revient avec son motif de libellé et sa fenêtre, une fois l’assistant validé', async () => {
       const loyer = flux.find((f) => f.name === 'Loyer locatif')!;
       expect(loyer.labelPattern, 'l’exemple donne un motif au loyer : sans lui, ce test ne prouverait rien').toBeTruthy();
       const page = await nouvellePage(site);
@@ -335,7 +357,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       }
     }, 240_000);
 
-    it('[niveau 4] point 2 — un champ qui change et la ligne n’est plus celle de l’exemple : « Loyer locatif » à 710,00 € ne reçoit ni le motif ni la fenêtre de l’exemple', async () => {
+    it('[niveau 2] point 7 (ajouté par l’auditeur) — un champ qui change et la ligne n’est plus celle de l’exemple : « Loyer locatif » à 710,00 € garde son montant et ne reçoit ni le motif ni la fenêtre de l’exemple', async () => {
       const loyer = flux.find((f) => f.name === 'Loyer locatif')!;
       const page = await nouvellePage(site);
       try {
@@ -358,7 +380,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       }
     }, 240_000);
 
-    it('[niveau 4] point 2 — une étape vidée puis remplie en recopiant chaque aide finit avec les lignes de l’exemple, et elles seules, versions datées du « Salaire » comprises', async () => {
+    it('[niveau 2] point 2 — une étape vidée puis remplie en recopiant chaque aide finit avec les lignes de l’exemple, et elles seules, versions datées du « Salaire » comprises', async () => {
       const revenus = flux.filter((f) => f.kind === 'income');
       const page = await nouvellePage(site);
       try {
@@ -384,7 +406,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       }
     }, 240_000);
 
-    it('[niveau 4] point 2 — à chaque étape, l’élément retiré puis rajouté en recopiant ses aides est celui que son raccourci apportait : versions datées, prélèvement, suivi du solde, liens des catégories', async () => {
+    it('[niveau 2] point 2 — à chaque étape, l’élément retiré puis rajouté en recopiant ses aides est celui que son raccourci apportait : versions datées, prélèvement, suivi du solde, liens des catégories', async () => {
       const page = await nouvellePage(site);
       page.on('dialog', (d) => void d.accept());
       try {
@@ -429,7 +451,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await page?.close().catch(() => {});
     });
 
-    it('[niveau 4] point 3 — Comptes : l’aide du nom est celle d’un compte de l’exemple du type choisi ; le numéro n’a qu’un texte indicatif', async () => {
+    it('[niveau 2] point 3 — Comptes : l’aide du nom est celle d’un compte de l’exemple du type choisi ; le numéro n’a qu’un texte indicatif', async () => {
       await ecran(page, 'Comptes');
       expect(await cliquer(page, 'Ajouter un compte')).toBe(true);
       await pause(200);
@@ -444,7 +466,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await cliquer(page, 'Annuler');
     }, 120_000);
 
-    it('[niveau 4] point 3 — Tirelires : l’aide du nom de la tirelire est celle d’une tirelire de l’exemple', async () => {
+    it('[niveau 2] point 3 — Tirelires : l’aide du nom de la tirelire est celle d’une tirelire de l’exemple', async () => {
       await ecran(page, 'Tirelires');
       expect(await cliquer(page, 'Ajouter une tirelire')).toBe(true);
       await pause(200);
@@ -452,7 +474,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await cliquer(page, 'Annuler');
     }, 120_000);
 
-    it('[niveau 4] point 3 — Tirelires, besoin : les aides sont les valeurs d’un besoin de l’exemple du type choisi, et le « montant à reverser » d’un versement n’en a aucune', async () => {
+    it('[niveau 2] point 3 — Tirelires, besoin : les aides sont les valeurs d’un besoin de l’exemple du type choisi, et le « montant à reverser » d’un versement n’en a aucune', async () => {
       await ecran(page, 'Tirelires');
       expect(await cliquer(page, 'Ajouter un besoin')).toBe(true);
       await pause(200);
@@ -471,7 +493,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await cliquer(page, 'Annuler');
     }, 120_000);
 
-    it('[niveau 4] point 3 — Flux prévus : le nom, le montant et le motif d’aide sont ceux d’un même flux de l’exemple du type choisi', async () => {
+    it('[niveau 2] point 3 — Flux prévus : le nom, le montant et le motif d’aide sont ceux d’un même flux de l’exemple du type choisi', async () => {
       await ecran(page, 'Flux prévus');
       expect(await cliquer(page, 'Ajouter un flux')).toBe(true);
       await pause(200);
@@ -485,7 +507,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await cliquer(page, 'Annuler');
     }, 120_000);
 
-    it('[niveau 4] point 3 — Catégories : l’aide du nom est celle d’une catégorie de l’exemple de la nature choisie', async () => {
+    it('[niveau 2] point 3 — Catégories : l’aide du nom est celle d’une catégorie de l’exemple de la nature choisie', async () => {
       await ecran(page, 'Catégories');
       const categories = alive(exemple.categories);
       expect(await cliquer(page, 'Ajouter une catégorie de dépenses')).toBe(true);
@@ -500,7 +522,7 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await cliquer(page, 'Annuler');
     }, 120_000);
 
-    it('[niveau 4] point 3 — Saisie : le libellé, le montant et la catégorie d’aide sont ceux d’une même opération saisie de l’exemple de la nature choisie', async () => {
+    it('[niveau 2] point 3 — Saisie : le libellé, le montant et la catégorie d’aide sont ceux d’une même opération saisie de l’exemple de la nature choisie', async () => {
       await ecran(page, 'Saisie');
       expect(await cliquer(page, 'Saisir une opération')).toBe(true);
       await pause(200);

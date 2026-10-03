@@ -3,13 +3,11 @@
  * qui donne leurs aides aux champs (`src/lib/aides.ts`), sans navigateur — la ligne d'aide de chaque
  * étape de l'assistant, la reconnaissance d'un formulaire qui recopie ses aides, et les aides des
  * formulaires hors de l'assistant. Ce qui se voit à l'écran, et le geste de recopier, est dans
- * `navigateur/aides-exemple.test.ts`.
+ * `navigateur/aides-exemple-harnais.test.ts`.
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { budgetSuggestions, entrySuggestions, exampleLedger, alive, type FlowSuggestion, type TirelireSuggestion } from '@tirelire/core';
 import {
   aideCategorie,
@@ -35,11 +33,8 @@ import {
   recopiePeriodique,
 } from '../src/lib/aides';
 
-const source = (chemin: string) => readFileSync(resolve(process.cwd(), 'src', chemin), 'utf8');
-
 /** Le jour des tests : le Salaire y est à 3 400,00, sa hausse ne vient qu'au 28 octobre. */
 const JOUR = '2026-09-20';
-const APRES_LA_HAUSSE = '2026-11-15';
 const s = budgetSuggestions(JOUR);
 const revenus = parNom(s.incomes);
 const charges = parNom(s.charges);
@@ -82,11 +77,6 @@ describe('[niveau 4] #214 · 1 — dans l’assistant, la ligne d’aide est cel
     expect(montantAide(a.amount)).toBe('3 400,00');
   });
 
-  it('revenus : le montant d’aide est celui de la version que montre le raccourci à la date de lecture — 3 550,00 € après la hausse du 28 octobre', () => {
-    const a = aideFlux(revenus, revenus, APRES_LA_HAUSSE)!;
-    expect(a).toMatchObject({ name: 'Salaire', amount: 355000, day: 28 });
-  });
-
   it('revenus : une fois « Salaire » ajouté, toutes les aides passent à la ligne suivante, « Loyer locatif » : 700,00 €, le 5', () => {
     const a = aideFlux(revenus.slice(1), revenus, JOUR)!;
     expect(a).toMatchObject({ name: 'Loyer locatif', amount: 70000, interval: 1, unit: 'month', day: 5 });
@@ -118,20 +108,11 @@ describe('[niveau 4] #214 · 1 — dans l’assistant, la ligne d’aide est cel
     expect(aideCourant(enfants, courants, JOUR)).toMatchObject({ name: 'Enfants et loisirs', amount: 20000, keep: true });
   });
 
-  it('budgets : le montant d’aide est celui du besoin en vigueur à la date de lecture — 950,00 € pour « Alimentation » après le 28 octobre', () => {
-    expect(aideCourant(courants, courants, APRES_LA_HAUSSE)).toMatchObject({ name: 'Alimentation', amount: 95000 });
-  });
-
   it('échéances : « Taxe foncière » d’abord — 1 200,00 €, tous les 12 mois, au 15 octobre 2026, avec son prélèvement —, puis « Assurance auto », sans prélèvement', () => {
     const a = aidePeriodique(periodiques, periodiques, JOUR)!;
     expect(a).toMatchObject({ name: 'Taxe foncière', amount: 120000, months: 12, dueDate: '2026-10-15', withFlow: true });
     const b = aidePeriodique(periodiques.slice(1), periodiques, JOUR)!;
     expect(b).toMatchObject({ name: 'Assurance auto', amount: 60000, months: 12, dueDate: '2027-03-05', withFlow: false });
-  });
-
-  it('épargne : « Épargne de précaution » — 300,00 € par mois pour une cible de 6 000,00 € —, ses deux valeurs du même besoin, et du suivant après le 28 décembre', () => {
-    expect(aideEpargne(epargnes, epargnes, JOUR)).toMatchObject({ name: 'Épargne de précaution', monthly: 30000, target: 600000 });
-    expect(aideEpargne(epargnes, epargnes, '2026-12-28')).toMatchObject({ name: 'Épargne de précaution', monthly: 80000, target: 1200000 });
   });
 
   it('catégories : la première restante, avec sa nature — « Salaire » est un revenu, « Alimentation » une dépense', () => {
@@ -327,30 +308,5 @@ describe('[niveau 4] #214 · 3 — hors de l’assistant, chaque aide qui propos
       expect(sienne, `saisie « ${nature} » : ses aides viennent de plusieurs opérations`).toBe(true);
     }
     expect(aidesDeSaisie('expense')).toEqual({ label: 'Dentiste (payé par Marie)', amount: '80,00', newCategory: 'Santé' });
-  });
-});
-
-/** Les écrans dont les aides viennent de l'exemple : les formulaires de l'assistant, de Comptes, de Tirelires, de Flux prévus, de Catégories et de Saisie. */
-const ECRANS = ['views/Wizard.svelte', 'views/Accounts.svelte', 'views/Tirelires.svelte', 'views/Flows.svelte', 'views/Categories.svelte', 'views/Entries.svelte'];
-/** Les textes indicatifs qui nomment le champ ou son formulaire sans proposer de valeur (point 4) : les seuls qu'un écran peut encore écrire en dur. */
-const INDICATIFS = ['Nom du compte', 'Banque', 'FR76 …', 'cible'];
-const litteraux = (ecran: string): string[] => [...source(ecran).matchAll(/placeholder="([^"]*)"/g)].map((m) => m[1]!);
-
-describe('[niveau 4] #214 · 5 — une aide qui propose une valeur sans venir de l’exemple fait échouer le test', () => {
-  it('aucun écran n’écrit en dur un texte d’aide qui propose une valeur : ses aides sont lues par `lib/aides`, sauf les textes indicatifs du point 4', () => {
-    for (const ecran of ECRANS) {
-      for (const l of litteraux(ecran)) expect(INDICATIFS, `${ecran} : « ${l} » propose une valeur écrite en dur`).toContain(l);
-    }
-  });
-
-  it('le contrôle n’est pas vide : il voit bien les textes indicatifs du point 4, et refuserait « Dentiste » ou « 2 400,00 » écrits en dur', () => {
-    expect(litteraux('views/Wizard.svelte')).toEqual(expect.arrayContaining(['Banque', 'FR76 …', 'Nom du compte', 'cible']));
-    expect(INDICATIFS).not.toContain('Dentiste');
-    expect(INDICATIFS).not.toContain('2 400,00');
-    expect([...'<input placeholder="Dentiste" />'.matchAll(/placeholder="([^"]*)"/g)].map((m) => m[1])).toEqual(['Dentiste']);
-  });
-
-  it('chaque formulaire qui propose des valeurs lit `lib/aides` : aucun écran n’en écrit les valeurs lui-même', () => {
-    for (const ecran of ECRANS) expect(source(ecran), ecran).toMatch(/from '\.\.\/lib\/aides'/);
   });
 });
