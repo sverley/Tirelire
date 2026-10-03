@@ -169,6 +169,18 @@ async function ecranOrdinaire(page: Page, ecran: string): Promise<string> {
   await allerÀ(page, 'Plus');
   expect(await cliquer(page, ecran), `pas d’écran « ${ecran} » dans le menu Plus`).toBe(true);
   await pause(200);
+  // L'assistant sème le compte clos de l'exemple (#211) ; Comptes range ce qui est clos (D56) : on allume « Clos »
+  // pour lire tous les comptes, avant comme après l'assistant.
+  if (ecran === 'Comptes') {
+    const allume = await page.evaluate(() => {
+      const b = ([...document.querySelectorAll('main button.filtre')] as HTMLButtonElement[]).find(
+        (x) => (x.textContent ?? '').trim().startsWith('Clos') && x.getAttribute('aria-pressed') === 'false',
+      );
+      b?.click();
+      return !!b;
+    });
+    if (allume) await pause(200);
+  }
   return (await lire(page)).texte;
 }
 
@@ -205,7 +217,7 @@ async function preparer(page: Page) {
   await avancer(page); // le principe → les comptes
   await saisir(page, 'main .ligne-compte.principal input', NOM_PRINCIPAL, 0);
   await saisir(page, 'main .ligne-compte.principal input.mt', '1234,56');
-  // L'assistant ne propose aucun autre compte d'office : on en ajoute un, par le formulaire de l'étape.
+  // L'assistant propose d'office les comptes de l'exemple (#211) : on en ajoute encore un, par le formulaire de l'étape.
   await saisir(page, 'main form.edit input[placeholder="Livret A"]', NOM_AUTRE_COMPTE);
   expect(await cliquer(page, 'Ajouter un compte'), 'pas de bouton « Ajouter un compte »').toBe(true);
   await pause(250);

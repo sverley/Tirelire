@@ -20,6 +20,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
+import { exampleLedger } from '@tirelire/core';
 import { allerÀ, navigateur, nouvellePage, ouvrirLeSite, type Site } from '../harnais.js';
 
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
@@ -214,11 +215,14 @@ describe('[niveau 1] #209 · à l’écran', () => {
     }, 60_000);
 
     it('4. l’assistant parcouru jusqu’au plan n’ajoute aucun compte principal : celui d’avant reste le seul', async () => {
-      const avant = vérifierUnSeulPrincipal(await comptes(page), 'avant l’assistant');
+      vérifierUnSeulPrincipal(await comptes(page), 'avant l’assistant');
       expect(await traverserLAssistant(page), 'l’assistant ne mène pas au plan par ses boutons primaires').toBe(true);
       vérifierPlanSansAbsence(await texteDuMain(page), 'après l’assistant');
       const après = vérifierUnSeulPrincipal(await comptes(page), 'après l’assistant');
-      expect(après.nom, 'l’assistant, parcouru sans rien saisir, a changé le compte principal').toBe(avant.nom);
+      // L'assistant renseigne le compte principal avec ce que l'exemple en dit (#211) : le même compte, qui prend
+      // le nom de l'exemple ; aucun second compte principal n'apparaît.
+      const dansLExemple = exampleLedger().accounts.find((a) => a.kind === 'principal')!;
+      expect(après.nom, 'l’assistant, parcouru sans rien saisir, ne renseigne pas le compte principal comme l’exemple le dit').toBe(dansLExemple.name);
     }, 120_000);
 
     it('1. après « Tout effacer », la base neuve a de nouveau son compte principal, et un seul', async () => {

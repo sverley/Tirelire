@@ -17,6 +17,7 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     const connus = new Set([
       ...alive(l.plannedFlows).map((f) => f.name),
       ...alive(l.tirelires).map((t) => t.name),
+      ...alive(l.accounts).map((a) => a.name),
     ]);
     const proposes = [
       ...s.incomes.map((x) => x.name),
@@ -24,6 +25,9 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
       ...s.everyday.map((x) => x.name),
       ...s.periodic.map((x) => x.name),
       ...s.savings.map((x) => x.name),
+      // Les comptes : le compte principal renseigné et les autres comptes proposés (#211).
+      s.mainAccount.name,
+      ...s.accounts.map((x) => x.name),
     ];
     expect(proposes.length).toBeGreaterThan(0);
     for (const nom of proposes) expect(connus).toContain(nom);
