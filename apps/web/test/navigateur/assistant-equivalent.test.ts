@@ -106,6 +106,10 @@ describe('[niveau 1] I11 · harnais du registre', () => {
       await cliquer(page, 'Suivant');
       await pause(250);
     }
+    // L'assistant n'écrit dans le projet qu'à sa validation (D40) : ce qu'il a semé ne se retrouve
+    // hors de lui qu'une fois le budget validé.
+    await cliquer(page, 'Valider mon budget');
+    await pause(400);
     return parÉcran;
   }
 

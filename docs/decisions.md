@@ -420,23 +420,36 @@ une tirelire, puis un besoin. Il demandait donc de connaître le modèle avant d
 servir — exactement ce qu'un nouvel arrivant ne sait pas.
 
 L'assistant pose désormais des questions de budget, et en déduit les objets. « Qu'est-ce qui rentre,
-et quand ? » écrit le jour de paie et des flux de revenu ; « qu'est-ce qui part tout seul au même
-montant ? » écrit des charges fixes ; « sur quoi voulez-vous vous tenir à un montant ? » écrit une
+et quand ? » prépare le jour de paie et des flux de revenu ; « qu'est-ce qui part tout seul au même
+montant ? » prépare des charges fixes ; « sur quoi voulez-vous vous tenir à un montant ? » prépare une
 tirelire et un besoin récurrent ; « qu'est-ce qui ne tombe pas tous les mois ? » — le cœur du
-sujet — écrit une tirelire, un besoin à échéance et le flux attendu à la date, en montrant tout de
+sujet — prépare une tirelire, un besoin à échéance et le flux attendu à la date, en montrant tout de
 suite le montant à mettre de côté par période. Les mots « tirelire », « besoin » et « flux » ne
 sont jamais demandés à l'utilisateur, seulement expliqués.
 
+**L'assistant n'écrit dans le projet qu'à sa validation.** Ce qu'il montre — les propositions
+présentes d'office, les lignes que l'utilisateur ajoute, corrige ou retire, les informations du compte
+principal, les autres comptes, le placement des réserves — est préparé dans l'assistant, qui lit le
+projet avec cette préparation dessus. Tant que l'assistant n'est pas validé, la base, les écrans
+ordinaires, le plan et la synchronisation restent ce qu'ils étaient à son ouverture. Le résumé se
+termine par une validation explicite, qui fait entrer dans le projet exactement ce que l'assistant
+montre, en une seule suite d'écritures sans attente entre elles : l'application ne conserve le projet
+qu'après la dernière, et une validation interrompue ne laisse pas une partie du budget sans le reste.
+Quitter l'assistant sans valider n'enregistre rien : ce qui y est préparé s'y retrouve en y revenant
+tant que l'application reste ouverte, et un rechargement ou une fermeture le perd. Le résumé le dit :
+rien n'est enregistré avant la validation. C'est I10 dans l'assistant : le budget et les flux ne
+changent que sur une validation de l'utilisateur.
+
 Le **compte principal existe dès la naissance de la base**, même vide, avant tout assistant, sous la
 même identité sur toutes les instances (D58) : l'assistant ne le crée pas, il en renseigne les
-informations — nom, solde, date d'ouverture —, et ce qui est renseigné l'emporte sur le défaut à la
-synchronisation. Le faire saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
+informations — nom, solde, date d'ouverture —, écrites avec le reste à la validation, et ce qui est
+renseigné l'emporte sur le défaut à la synchronisation. Le faire saisir n'apprend rien. Les autres comptes sont **proposés en fin de parcours et jamais imposés** —
 un budget entier tient sans eux (une tirelire sans placement déclaré ne produit aucun écart, D38).
 S'ils existent, l'assistant demande seulement où chaque réserve devrait dormir, ce qui remplit le
 placement de D38 sans exposer les parts.
 
-L'assistant ne remplace pas les écrans de configuration : il amène à un budget qui se lit dans le
-plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (besoins multiples
+L'assistant ne remplace pas les écrans de configuration : une fois validé, il amène à un budget qui
+se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (besoins multiples
 sur une tirelire, priorités, ventilations, catégories).
 
 Deux ancrages sont imposés par le moteur et figés par `test/assistant.test.ts` : une tirelire est
@@ -487,7 +500,7 @@ ne répond bien qu'en voyant des réponses : on reconnaît sa taxe foncière dan
 retrouve pas de mémoire devant un champ vide.
 
 Chaque étape offre donc des **propositions** : touchez-en une, elle remplit le formulaire, que vous
-corrigez avant d'ajouter. Rien n'est ajouté d'office, et ce qui a été ajouté reste **modifiable sur
+corrigez avant d'ajouter. Rien n'est ajouté d'office dans le projet (D40), et ce qui a été ajouté reste **modifiable sur
 place** — nom, montant, jour, date d'échéance, compte, report — sans passer par un écran d'édition.
 
 Ces propositions n'ont **aucun contenu propre** : elles sont une lecture du jeu d'exemple
@@ -501,7 +514,8 @@ les ordres de grandeur qu'on lui propose.
 aucune tirelire, aucun besoin, aucun flux, aucun compte en plus du principal. Les opérations ne
 comptent pas : un relevé peut avoir été importé avant que le budget existe. L'état est figé à
 l'ouverture de l'assistant, sinon la première ligne ajoutée ferait disparaître les propositions
-suivantes. Dans le même esprit, la saisie du solde ne retouche pas la date d'ouverture du compte, qui
+suivantes. Sur un projet existant, l'assistant part de son contenu, et ce qu'il y change n'entre aussi
+qu'à la validation (D40). Dans le même esprit, la saisie du solde ne retouche pas la date d'ouverture du compte, qui
 cale les soldes d'un compte déjà importé.
 
 **Les comptes passent en tête du parcours**, juste après le principe. Ils restent facultatifs — tout
@@ -583,8 +597,9 @@ en toucher une, relire le formulaire, valider, recommencer. Un geste par ligne, 
 compte vingt.
 
 Les raccourcis restent, mais **ils créent la ligne** au lieu de remplir un formulaire à valider. Et
-sur un projet vierge, l'assistant les **applique tous d'entrée** : les lignes existent déjà à
-l'arrivée sur l'étape, on corrige ce qui ne va pas et on supprime ce qui ne concerne pas le foyer.
+sur un projet vierge, l'assistant les **applique tous d'entrée** : les lignes sont déjà là, dans
+l'assistant, à l'arrivée sur l'étape — elles n'entrent dans le projet qu'à la validation (D40) —, on
+corrige ce qui ne va pas et on supprime ce qui ne concerne pas le foyer.
 C'est le mouvement naturel — reconnaître et retrancher — plutôt que se souvenir et saisir.
 
 L'interface, elle, ne change pas d'un projet à l'autre : les raccourcis sont toujours offerts, et

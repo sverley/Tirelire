@@ -163,7 +163,7 @@ async function traverserLAssistant(page: Page): Promise<boolean> {
     const primaire = await page.evaluate(() => {
       const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
       if ([...document.querySelectorAll('main button')].some((b) => t(b) === 'Voir le plan')) return 'Voir le plan';
-      const b = ([...document.querySelectorAll('main .actions button.primary')] as HTMLButtonElement[]).find((x) => /Suivant|Commencer/.test(t(x)));
+      const b = ([...document.querySelectorAll('main .actions button.primary')] as HTMLButtonElement[]).find((x) => /Suivant|Commencer|Valider/.test(t(x)));
       return b ? t(b) : '';
     });
     if (!primaire) return false;
