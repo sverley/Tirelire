@@ -359,7 +359,8 @@ describe.skipIf(!navigateur)('#210 · l’assistant n’écrit dans le projet qu
       try {
         await ouvrir(page, site);
         const prepare = await preparer(page);
-        const lignes = [...prepare.parEtape].filter(([etape]) => !/comptes/i.test(etape));
+        // Les comptes et les catégories (#212) ont leur propre écran : leurs lignes ne sont ni des flux ni des tirelires.
+        const lignes = [...prepare.parEtape].filter(([etape]) => !/comptes|classer/i.test(etape));
         const nomsFlux = lignes.filter(([etape]) => /rentre|part tout seul/i.test(etape)).flatMap(([, n]) => n);
         const nomsTirelires = lignes.filter(([etape]) => !/rentre|part tout seul/i.test(etape)).flatMap(([, n]) => n);
         expect(nomsFlux.length, 'aucune ligne de flux préparée').toBeGreaterThanOrEqual(2);
@@ -489,9 +490,9 @@ describe.skipIf(!navigateur)('#210 · l’assistant n’écrit dans le projet qu
         await avancer(page); // le principe → les comptes
         await avancer(page); // les comptes → les revenus
 
-        // Cinq étapes proposent : revenus, charges fixes, budgets, pas tous les mois, épargne.
+        // Six étapes proposent : revenus, charges fixes, budgets, pas tous les mois, épargne, catégories (#212).
         const apresRetrait = new Map<string, string[]>();
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 6; i++) {
           const etape = (await lire(page)).h2;
           const arrivee = await noms(page);
           expect(arrivee.length, `l’étape « ${etape} » ne propose rien d’office à l’arrivée`).toBeGreaterThanOrEqual(1);
@@ -502,11 +503,11 @@ describe.skipIf(!navigateur)('#210 · l’assistant n’écrit dans le projet qu
           apresRetrait.set(etape, restantes);
           expect(await avancer(page)).toBe(true);
         }
-        expect(apresRetrait.size, 'les cinq étapes n’ont pas des titres distincts').toBe(5);
+        expect(apresRetrait.size, 'les six étapes n’ont pas des titres distincts').toBe(6);
 
         // On repasse par chaque étape, en remontant depuis le résumé : rien ne revient.
         expect((await lire(page)).primaires).toContain('Valider mon budget');
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 6; i++) {
           await cliquer(page, 'Précédent');
           await pause(250);
           const etape = (await lire(page)).h2;

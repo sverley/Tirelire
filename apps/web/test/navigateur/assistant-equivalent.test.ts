@@ -6,9 +6,9 @@
  *
  * Ce que ce harnais mesure : sur un projet vierge, l'assistant « Construire mon budget »
  * (`Wizard.svelte`) sème automatiquement des lignes nommées à chaque étape — comptes, revenus,
- * charges fixes, budgets courants, échéances, épargnes — à partir des raccourcis proposés (D43).
+ * charges fixes, budgets courants, échéances, épargnes, catégories — à partir des raccourcis proposés (D43).
  * Pour chaque nom ainsi créé, le harnais retrouve son équivalent dans l'écran de configuration
- * ordinaire correspondant (Comptes, Flux prévus, Tirelires) et vérifie qu'un bouton « Modifier »
+ * ordinaire correspondant (Comptes, Flux prévus, Tirelires, Catégories) et vérifie qu'un bouton « Modifier »
  * y ouvre un champ éditable portant ce même nom : ce que l'assistant a fait n'est pas un îlot,
  * on peut le reprendre à la main.
  *
@@ -34,6 +34,7 @@ const ÉTAPES: Array<{ id: string; écran: string }> = [
   { id: 'everyday', écran: 'Tirelires' },
   { id: 'periodic', écran: 'Tirelires' },
   { id: 'savings', écran: 'Tirelires' },
+  { id: 'categories', écran: 'Catégories' },
 ];
 
 interface Équivalence {

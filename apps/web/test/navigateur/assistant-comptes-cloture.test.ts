@@ -108,8 +108,8 @@ describe.skipIf(!navigateur)('#211 · 3 — le compte clos de l’exemple suit l
   });
 
   it('[niveau 4] point 3 — validé, « Livret jeune » est clos dans le projet la veille du premier jour de la période retenue', async () => {
-    for (let i = 0; i < 6; i++) {
-      await cliquer(page, 'Suivant'); // Comptes → Revenus → … → Résumé
+    for (let i = 0; i < 7; i++) {
+      await cliquer(page, 'Suivant'); // Comptes → Revenus → … → Catégories → Résumé
       await pause(250);
     }
     expect(await cliquer(page, 'Valider mon budget')).toBe(true);

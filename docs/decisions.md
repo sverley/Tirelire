@@ -449,9 +449,10 @@ S'ils existent, l'assistant demande où dort chaque tirelire, ce qui remplit le 
 sans exposer les parts.
 
 L'assistant ne remplace pas les écrans de configuration : une fois validé, il amène à un budget qui
-se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations,
-catégories). Il propose les besoins multiples d'une tirelire et les priorités de l'exemple, qui se
-modifient ensuite dans Configuration.
+se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations).
+Il propose les besoins multiples d'une tirelire et les priorités de l'exemple, qui se modifient
+ensuite dans Configuration, et les catégories de l'exemple, avec leur tirelire par défaut (D32) et les
+flux qui les portent : une catégorie se garde sans tirelire (I3).
 
 Deux ancrages sont imposés par le moteur et figés par `test/assistant.test.ts` : une tirelire est
 ouverte au **début de la période en cours** (`tirelireTimeline` ne démarre qu'à la première période
