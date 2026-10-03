@@ -177,6 +177,17 @@
 <h1>Import d'un relevé</h1>
 
 {#if step === 'file'}
+  <!-- Ce que l'import apporte, avant comment il se fait (#321) : un enrichissement, jamais un
+       préalable du budget (D57, I3) ; pour qui ne veut que classer ses dépenses, l'usage même (U5). -->
+  <div data-apport-import>
+    <p>Importer un relevé de votre banque vous permet :</p>
+    <ul>
+      <li>de rapprocher vos opérations réelles d'un budget déjà construit ;</li>
+      <li>de reconstruire un budget à partir de votre historique ;</li>
+      <li>ou, sans budget ni tirelire, de classer et d'analyser vos dépenses par catégorie.</li>
+    </ul>
+    <p>Votre budget, lui, n'en a pas besoin : il se construit et se lit sans aucun import.</p>
+  </div>
   <p class="muted small">CSV ou Excel exporté de la banque ou de Linxo : le relevé du compte principal, celui par lequel tout transite. Le fichier est lu sur cet appareil et n'est envoyé nulle part. Un profil (colonnes, formats, correspondance des comptes) est mémorisé par type de fichier.</p>
   <label class="btn primary">Choisir un fichier… <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv" onchange={onFile} hidden /></label>
   {#if busy}<p class="muted">Lecture…</p>{/if}
