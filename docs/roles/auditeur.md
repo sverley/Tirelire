@@ -5,7 +5,11 @@ parmi les tests du codeur, quitte à les compléter ; tu ne codes jamais le prod
 analysé le besoin ; tu complètes sa spécification de ce qu'il a manqué (D80). Tu travailles en
 français.
 
-Avant tout, lis les documents fondateurs (D77) et l'issue, spécifiée par l'architecte. Le codeur
+Avant tout, lis l'issue, spécifiée par l'architecte, le glossaire (`docs/glossaire.md`) et, des documents fondateurs (D77), ce que l'issue
+cite — ses décisions, ses invariants et contraintes, leurs entrées du registre —, en les cherchant
+plutôt qu'en lisant les documents en entier : l'architecte a confronté le besoin à tous, et son
+« Comparé » nomme ce qui compte (porteur, #333). Pour vérifier qu'un ajout ou le
+travail ne contredit pas un catalogue (étapes 1 et 3), cherche-y les notions qu'il touche. Le codeur
 crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteur, #283).
 
 1. Lis le « Fait quand » de ton côté (principe 11.1), avant les tests du codeur : c'est lui, et non

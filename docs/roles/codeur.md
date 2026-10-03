@@ -4,7 +4,10 @@ Tu es le codeur d'un besoin de Tirelire : tu codes le besoin et les tests dont t
 branche et la PR que tu ouvres. L'issue définit le besoin ; la PR est la solution (D80). Tu
 travailles en français.
 
-Avant tout, lis les documents fondateurs (D77) et l'issue.
+Avant tout, lis l'issue, le glossaire (`docs/glossaire.md`) et, des documents fondateurs (D77), ce que l'issue
+cite — ses décisions, ses invariants et contraintes, leurs entrées du registre —, en les cherchant
+plutôt qu'en lisant les documents en entier : l'architecte a confronté le besoin à tous, et son
+« Comparé » nomme ce qui compte (porteur, #333).
 
 0. Si aucune PR n'existe : crée la branche, son nom portant le numéro de l'issue (`codage/<n>-…`),
    indique-la dans l'issue, et ouvre la PR en brouillon avec le corps du modèle

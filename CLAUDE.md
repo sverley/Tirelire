@@ -3,9 +3,11 @@
 Ce fichier n'est pas source de vérité : il renvoie aux documents fondateurs et ne les contredit
 jamais (D77).
 
-- Lire d'abord `docs/description-projet.md` — ses principes et ses usages —, puis le glossaire et
-  les catalogues : `docs/invariants.md`, `docs/contraintes.md`, `docs/cibles.md`,
-  `docs/decisions.md`, `docs/gardes.md` ; les documents des domaines, `docs/domaines/` ; le catalogue des versions, `docs/versions.md`.
+- Les documents fondateurs (D77) : `docs/description-projet.md` — ses principes et ses usages —, le
+  glossaire et les catalogues : `docs/invariants.md`, `docs/contraintes.md`, `docs/cibles.md`,
+  `docs/decisions.md`, `docs/gardes.md` ; les documents des domaines, `docs/domaines/` ; le catalogue
+  des versions, `docs/versions.md`. Ce que chaque session en lit d'abord est dans son rôle :
+  l'architecte les lit tous ; le codeur et l'auditeur, l'issue, le glossaire et ce que l'issue cite.
 - La méthode est dans `docs/decisions.md`, partie « Le travail ».
 - Chaque session tient un rôle, décrit dans `docs/roles/` : `architecte.md`, `auditeur.md`,
   `codeur.md`, `porteur.md`.

@@ -5,12 +5,16 @@ suis une version (dernière section) ; tu ne codes ni le produit ni le harnais, 
 le codage (D80). Tu travailles en français, dans l'issue.
 
 Avant tout, lis les documents fondateurs (D77) : la description d'abord, ses principes et ses usages,
-puis le glossaire et les catalogues.
+puis le glossaire et les catalogues. Tu es le seul à les lire tous : le codeur et l'auditeur ne
+lisent que l'issue, le glossaire et ce que l'issue cite (#333).
 
 1. Pose l'étiquette « en cours » sur l'issue. Lis-la. Si le besoin n'est pas clair, pose tes
    questions au porteur dans l'issue et arrête-toi.
-2. Décide si le besoin tient en une tâche. Sinon, ouvre les sous-issues, une par tâche, et
-   arrête-toi : chacune aura son architecte.
+2. Décide si le besoin tient en une tâche : ce qu'une session de codeur tient, un écran ou un
+   module du cœur, avec leurs tests (#333). Sinon, ouvre les sous-issues, une par tâche, et
+   arrête-toi : chacune aura son architecte. À l'inverse, des besoins voisins et petits — des textes,
+   de la documentation — qui touchent les mêmes fichiers pour le même souci se fondent en un seul
+   besoin, plutôt que d'être codés chacun à part (principe 13 ; porteur, #333).
 3. Écris dans l'issue un « Fait quand » vérifiable : des phrases qu'un test peut trancher. Décris le
    besoin et ce qui le rend atteint, observable, du point de vue de qui s'en sert : précisément et
    sans laisser de doute, même si cela ne laisse qu'une solution et pèse sur le codage. N'impose pas
@@ -26,9 +30,12 @@ puis le glossaire et les catalogues.
 5. Si le besoin ajoute ou modifie une décision ou un invariant, vérifie qu'il ne contredit ni les
    autres entrées de son catalogue, ni les documents fondateurs (principe 9.1, D78), et écris dans
    l'issue ce que tu as comparé et pourquoi cela tient. Une contradiction ne se spécifie pas : elle
-   devient une question au porteur.
+   devient une question au porteur. Ce « Comparé » nomme les décisions, invariants et contraintes que
+   le codeur et l'auditeur doivent lire : ils ne lisent que ce que l'issue cite (#333).
 6. Quand le besoin est spécifié, dis-le dans l'issue : le codeur prend la suite ; l'auditeur compose
-   le harnais après son compte rendu (#283).
+   le harnais après son compte rendu (#283). Suggère le modèle de son codeur et de son auditeur :
+   Sonnet pour une tâche bornée à un écran ou à un module ; Opus pour une tâche qui touche la garde,
+   les workflows, le format des données ou plusieurs domaines (porteur, #333).
 
 ## Suivre une version
 
