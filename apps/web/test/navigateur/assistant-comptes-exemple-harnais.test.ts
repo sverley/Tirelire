@@ -1,7 +1,7 @@
 /**
  * Harnais d'audit de #211 — « L'assistant propose les comptes de l'exemple », côté écran : sur le site construit, à
- * 375 px. Les points 1 à 4 et 6 du « Fait quand », et le point 7 que l'auditeur y ajoute (le compte principal que
- * l'utilisateur a déjà renseigné).
+ * 375 px. Les points 1 à 4 et 6 du « Fait quand », et les points 7 et 8 que l'auditeur y ajoute (le compte principal que
+ * l'utilisateur a déjà renseigné ; le compte clos que le projet porte déjà).
  *
  * Retenus parmi les tests du codeur (`navigateur/assistant-comptes-exemple.test.ts`, d'où ils sont déplacés, ce
  * fichier-là n'existe plus), puis complétés d'un test : la clôture du compte clos quand le jour de début de période
@@ -21,7 +21,10 @@
  *  - 0 pour le point 7 : un nom ou un solde que l'utilisateur a posés, remplacés à la validation par ceux de
  *    l'exemple, restent altérés après correction du code (D40 : le compte principal se renseigne ; D43 : rouvrir
  *    l'assistant ne doit rien casser) ; même famille que « ce qui est renseigné l'emporte sur le défaut » (#209,
- *    niveau 0). Rouge sur une mutation qui renseigne le compte principal sans regarder ce qu'il porte.
+ *    niveau 0).
+ *  - 0 pour le point 8 : la clôture qu'un compte clos du projet porte déjà, déplacée à la validation suivante par le
+ *    recalage de la clôture (second tour du codeur), reste altérée après correction du code ; même famille que le
+ *    point 7. Rouge sur une mutation qui recale aussi les comptes clos du projet. Rouge sur une mutation qui renseigne le compte principal sans regarder ce qu'il porte.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -410,5 +413,39 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
         await page.close();
       }
     }, 180_000);
+  });
+
+  describe('sur un projet existant dont le compte clos porte déjà sa clôture', () => {
+    it('[niveau 0] point 8 (ajouté par l’auditeur) — la clôture que le projet porte déjà n’est pas déplacée quand on rouvre l’assistant, qu’on change le début de période et qu’on valide', async () => {
+      const page = await nouvellePage(site);
+      try {
+        await ouvrir(page, site);
+        await arriverAuxComptes(page);
+        await jusquAuResume(page);
+        expect(await cliquer(page, 'Valider mon budget')).toBe(true);
+        await pause(400);
+        await ecran(page, 'Comptes');
+        await montrerLeClos(page);
+        await modifier(page, 'Livret jeune');
+        expect(await champ(page, 'Compte clos le'), 'au départ, la clôture est celle du premier passage (début de période le 1er)').toBe(VEILLE_DU_DEBUT_DE_PERIODE);
+
+        // On rouvre l'assistant sur ce projet, on commence la période au jour de paie, on valide de nouveau.
+        await rouvrirAuxComptes(page);
+        expect(await avancer(page), 'l’étape des revenus ne se franchit pas par son bouton primaire').toBe(true);
+        expect(await cliquer(page, 'Commencer au jour de ma paie'), 'pas de raccourci « Commencer au jour de ma paie »').toBe(true);
+        const jour = await jourDeDebutDePeriode(page);
+        expect(jour, 'le jour proposé est le 1er, celui du premier passage : ce test ne départagerait rien').toBeGreaterThan(1);
+        await jusquAuResume(page);
+        expect(await cliquer(page, 'Valider mon budget')).toBe(true);
+        await pause(400);
+
+        await ecran(page, 'Comptes');
+        await montrerLeClos(page);
+        await modifier(page, 'Livret jeune');
+        expect(await champ(page, 'Compte clos le'), 'la clôture que le projet portait a été déplacée par le second passage').toBe(VEILLE_DU_DEBUT_DE_PERIODE);
+      } finally {
+        await page.close();
+      }
+    }, 240_000);
   });
 });
