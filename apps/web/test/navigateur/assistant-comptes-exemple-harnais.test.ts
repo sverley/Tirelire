@@ -1,15 +1,27 @@
 /**
- * Tests du codeur de #211 — « L'assistant propose les comptes de l'exemple » : l'écran, sur le site construit, à
- * 375 px. La lecture des comptes dans l'exemple (points 1, 2, 3 et 5) est dans
- * `packages/core/test/suggestions-comptes.test.ts`, sans navigateur.
+ * Harnais d'audit de #211 — « L'assistant propose les comptes de l'exemple », côté écran : sur le site construit, à
+ * 375 px. Les points 1 à 4 et 6 du « Fait quand », et le point 7 que l'auditeur y ajoute (le compte principal que
+ * l'utilisateur a déjà renseigné).
  *
- * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie :
- *  - 1, 2, 3 : sur un projet vierge, l'étape Comptes arrive avec les comptes de l'exemple et le compte principal
- *    renseigné, chacun avec ce que l'exemple en dit ; l'étape dit qu'un compte est tiers ou clos ;
- *  - 4 : sur un projet existant, les raccourcis offrent les comptes qui manquent ;
- *  - 6 : validé tel quel, l'assistant laisse les comptes dans le projet, retrouvables et modifiables dans Comptes.
- * Un dernier test garde un choix du codeur, que l'issue ne tranche pas : le compte principal que l'utilisateur a déjà
- * renseigné n'est pas remplacé par celui de l'exemple (D43 : rouvrir l'assistant ne doit rien casser).
+ * Retenus parmi les tests du codeur (`navigateur/assistant-comptes-exemple.test.ts`, d'où ils sont déplacés, ce
+ * fichier-là n'existe plus), puis complétés d'un test : la clôture du compte clos quand le jour de début de période
+ * change dans l'assistant (point 3, que ses tests ne jouaient qu'au jour de départ). Le point 5 (« le test des
+ * propositions échoue si un compte proposé n'y figure pas ») est tranché par `packages/core/test/suggestions.test.ts`,
+ * que le codeur a étendu aux comptes ; la lecture des comptes dans l'exemple, côté cœur, reste dans ses
+ * `suggestions-comptes.test.ts`, au niveau 4 : ce que ce fichier-ci observe à l'écran la couvre.
+ *
+ * Niveaux (D83), par phrase du « Fait quand » :
+ *  - 2 pour les points 1 à 4 : D43 et D46 (des propositions déjà là, tirées de l'exemple, qui disparaissent quand
+ *    elles existent) et D56 (un compte clos n'est plus offert aux menus) sont des décisions ; un compte absent, faux
+ *    ou mal clos en est un cas faux, l'usage restant possible. Pas 1 : la description ne porte pas, comme énoncé,
+ *    que l'assistant accepté tel quel redonne l'exemple (c'est la parole du porteur, chantier 5 et 02/10, que l'issue cite).
+ *  - 1 pour le point 6 : sa phrase est I11 telle qu'elle est écrite (« tout ce qu'une étape d'assistant crée ou fait se
+ *    fait et se modifie aussi hors assistant ») appliquée aux comptes et à leurs réglages. Rouge sur `main`, où l'assistant ne
+ *    laisse aucun de ces comptes.
+ *  - 0 pour le point 7 : un nom ou un solde que l'utilisateur a posés, remplacés à la validation par ceux de
+ *    l'exemple, restent altérés après correction du code (D40 : le compte principal se renseigne ; D43 : rouvrir
+ *    l'assistant ne doit rien casser) ; même famille que « ce qui est renseigné l'emporte sur le défaut » (#209,
+ *    niveau 0). Rouge sur une mutation qui renseigne le compte principal sans regarder ce qu'il porte.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -182,6 +194,13 @@ const champ = (page: Page, libellé: string) =>
     return el instanceof HTMLInputElement && el.type === 'checkbox' ? el.checked : el.value;
   }, libellé);
 
+/** Le jour où la période commence, tel que l'étape des revenus l'affiche dans son champ « La période commence le ». */
+const jourDeDebutDePeriode = (page: Page) =>
+  page.evaluate(() => {
+    const label = ([...document.querySelectorAll('main form.edit label.f')] as HTMLElement[]).find((x) => (x.textContent ?? '').trim().startsWith('La période commence le'));
+    return Number((label?.querySelector('input') as HTMLInputElement | null)?.value);
+  });
+
 describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’exemple', () => {
   let site: Site;
 
@@ -208,26 +227,26 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
       await page?.close().catch(() => {});
     });
 
-    it('[niveau 4] point 1 — l’étape Comptes arrive avec « Livret A », « Carte enfants », « Compte de Marie » et « Livret jeune », chacun avec son nom, son type et son solde', () => {
+    it('[niveau 2] point 1 — l’étape Comptes arrive avec « Livret A », « Carte enfants », « Compte de Marie » et « Livret jeune », chacun avec son nom, son type et son solde', () => {
       const autres = arrivee.filter((l) => !l.principal);
       expect(autres.map((l) => l.nom)).toEqual(['Livret A', 'Carte enfants', 'Compte de Marie', 'Livret jeune']);
       expect(autres.map((l) => l.type)).toEqual(['epargne', 'courant', 'courant', 'epargne']);
       expect(autres.map((l) => centimes(l.solde))).toEqual([euros(4815), 0, 0, 0]);
     });
 
-    it('[niveau 4] point 1 — les raccourcis sont tous consommés d’entrée, et l’étape se franchit par son seul bouton primaire (D46, I4)', async () => {
+    it('[niveau 2] point 1 — les raccourcis sont tous consommés d’entrée, et l’étape se franchit par son seul bouton primaire (D46, I4)', async () => {
       expect(await raccourcis(page), 'sur un projet vierge, la rangée des raccourcis est vide').toEqual([]);
       expect((await lire(page)).primaires.some((p) => /Suivant/.test(p))).toBe(true);
     });
 
-    it('[niveau 4] point 2 — le compte principal arrive avec le nom « Compte courant » et le solde 2 340,00 €', () => {
+    it('[niveau 2] point 2 — le compte principal arrive avec le nom « Compte courant » et le solde 2 340,00 €', () => {
       const principal = arrivee.filter((l) => l.principal);
       expect(principal).toHaveLength(1);
       expect(principal[0]!.nom).toBe('Compte courant');
       expect(centimes(principal[0]!.solde)).toBe(euros(2340));
     });
 
-    it('[niveau 4] point 3 — l’étape dit qu’un compte est tiers, avec le suivi de son solde à régler tel que l’exemple le dit, et qu’un compte est clos', () => {
+    it('[niveau 2] point 3 — l’étape dit qu’un compte est tiers, avec le suivi de son solde à régler tel que l’exemple le dit, et qu’un compte est clos', () => {
       const par = (nom: string) => arrivee.find((l) => l.nom === nom)!;
       for (const nom of ['Carte enfants', 'Compte de Marie']) {
         expect(par(nom).pastilles, nom).toContain('tiers');
@@ -239,11 +258,9 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
         expect(par(nom).pastilles, nom).not.toContain('tiers');
         expect(par(nom).pastilles, nom).not.toContain('clos');
       }
-      expect(par('Livret A').pastilles).not.toContain('tiers');
-      expect(par('Livret jeune').pastilles).not.toContain('tiers');
     });
 
-    it('[niveau 4] point 3 — le compte clos ne figure plus dans les menus de comptes des autres étapes (D56)', async () => {
+    it('[niveau 2] point 3 — le compte clos ne figure plus dans les menus de comptes des autres étapes (D56)', async () => {
       await avancer(page); // → les revenus
       const menus = await page.evaluate(() =>
         ([...document.querySelectorAll('main select')] as HTMLSelectElement[])
@@ -260,7 +277,7 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
       await pause(250);
     });
 
-    it('[niveau 4] point 6 — validé tel quel, l’assistant laisse les comptes de l’exemple dans le projet, retrouvables dans Comptes avec leur suivi et leur clôture, et modifiables', async () => {
+    it('[niveau 1] point 6 — validé tel quel, l’assistant laisse les comptes de l’exemple dans le projet, retrouvables dans Comptes avec leur suivi et leur clôture, et modifiables', async () => {
       await jusquAuResume(page);
       expect(await cliquer(page, 'Valider mon budget')).toBe(true);
       await pause(400);
@@ -288,8 +305,37 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
     }, 120_000);
   });
 
+  describe('sur un projet vierge, quand le début de période est choisi dans l’assistant', () => {
+    it('[niveau 2] point 3 — la clôture du compte clos reste la veille du premier jour de la période qui contient la date de l’assistant, quel que soit le jour où la période commence', async () => {
+      const page = await nouvellePage(site);
+      try {
+        await ouvrir(page, site);
+        await arriverAuxComptes(page);
+        expect(await avancer(page), 'l’étape des revenus ne se franchit pas par son bouton primaire').toBe(true);
+        // Le geste que l'assistant propose lui-même : commencer la période au jour de la paie de l'exemple.
+        expect(await cliquer(page, 'Commencer au jour de ma paie'), 'pas de raccourci « Commencer au jour de ma paie »').toBe(true);
+        const jour = await jourDeDebutDePeriode(page);
+        expect(jour, 'le jour proposé est le 1er, le même qu’au départ : ce test ne départagerait rien').toBeGreaterThan(1);
+        await jusquAuResume(page);
+        expect(await cliquer(page, 'Valider mon budget')).toBe(true);
+        await pause(400);
+
+        await ecran(page, 'Comptes');
+        await montrerLeClos(page);
+        await modifier(page, 'Livret jeune');
+        const veille = addDays(budgetPeriodContaining(JOUR, jour).start, -1);
+        expect(
+          await champ(page, 'Compte clos le'),
+          `la période qui contient ${JOUR} commence le ${budgetPeriodContaining(JOUR, jour).start} (jour ${jour}) : la clôture est la veille, ${veille}`,
+        ).toBe(veille);
+      } finally {
+        await page.close();
+      }
+    }, 180_000);
+  });
+
   describe('sur un projet existant', () => {
-    it('[niveau 4] point 4 — les raccourcis offrent les comptes de l’exemple qui manquent, chacun disparaît dès qu’un compte du même nom existe, et rien n’est semé d’office', async () => {
+    it('[niveau 2] point 4 — les raccourcis offrent les comptes de l’exemple qui manquent, chacun disparaît dès qu’un compte du même nom existe, et rien n’est semé d’office', async () => {
       const page = await nouvellePage(site);
       try {
         await ouvrir(page, site);
@@ -328,7 +374,7 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
   });
 
   describe('sur un projet vierge dont le compte principal est déjà renseigné', () => {
-    it('[niveau 4] choix du codeur — le nom et le solde que l’utilisateur a posés ne sont pas remplacés par ceux de l’exemple, les autres comptes arrivent', async () => {
+    it('[niveau 0] point 7 (ajouté par l’auditeur) — le nom et le solde que l’utilisateur a posés ne sont pas remplacés par ceux de l’exemple, les autres comptes arrivent', async () => {
       const page = await nouvellePage(site);
       try {
         await ouvrir(page, site);
