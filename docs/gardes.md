@@ -333,10 +333,11 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
 `apps/web/src/views/Flows.svelte`, `apps/web/src/views/Accounts.svelte`,
 `packages/core/src/suggestions.ts`
 
-- **Harnais** · `apps/web/test/navigateur/assistant-equivalent.test.ts` — sur un projet vierge, chaque étape de
-  l'assistant qui sème une ligne (compte, revenu, charge fixe, budget courant, échéance, épargne) a
-  cette ligne retrouvée dans l'écran de configuration ordinaire correspondant (Comptes, Flux
-  prévus, Tirelires), avec un bouton d'édition (« Modifier », pour une tirelire semée sans
+- **Harnais** · `apps/web/test/navigateur/assistant-equivalent.test.ts` — sur un projet vierge,
+  l'assistant parcouru jusqu'à sa validation (il n'écrit dans le projet qu'à elle), chaque étape qui
+  sème une ligne (compte, revenu, charge fixe, budget courant, échéance, épargne) a cette ligne
+  retrouvée, après la validation, dans l'écran de configuration ordinaire correspondant (Comptes,
+  Flux prévus, Tirelires), avec un bouton d'édition (« Modifier », pour une tirelire semée sans
   placement comme pour toute autre) qui ouvre un champ éditable portant ce même nom.
   Témoin rouge : « témoin rouge · une ligne créée par l’assistant introuvable hors assistant »
 - **Vérification manuelle** · `VM-I11-hors-assistant` — Pour une étape d'assistant que la PR ajoute

@@ -5,8 +5,8 @@
  * C'est ce que ce harnais mesure, sur une base vide, dans le navigateur.
  *
  * **Le chemin simple.** Depuis l'accueil, l'assistant s'atteint en au plus deux gestes, puis chaque
- * étape se franchit par son seul bouton primaire — aucun champ rempli, aucune liste dépliée, aucun
- * détour par la Configuration. À l'arrivée, le Plan de la période en cours montre un budget : des
+ * étape se franchit par son seul bouton primaire, la validation finale comprise — aucun champ rempli,
+ * aucune liste dépliée, aucun détour par la Configuration. À l'arrivée, le Plan de la période en cours montre un budget : des
  * tirelires dotées et un total réservé non nul. Un utilisateur qui ne sait rien doit pouvoir
  * traverser ainsi.
  *
@@ -108,7 +108,7 @@ const lireLÉcran = (page: Page) =>
   page.evaluate(() => {
     const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
     const primaire = ([...document.querySelectorAll('main .actions button.primary')] as HTMLButtonElement[]).find(
-      (b) => /Suivant|Commencer/.test(t(b)),
+      (b) => /Suivant|Commencer|Valider/.test(t(b)),
     );
     return {
       h1: t(document.querySelector('main h1')),

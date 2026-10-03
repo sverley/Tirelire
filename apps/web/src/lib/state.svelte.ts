@@ -26,6 +26,16 @@ import {
 } from '@tirelire/core';
 import type { LedgerKey } from '@tirelire/core';
 import { lireSauvegarde, lireSynchronisation, noterSauvegarde, noterSynchronisation, type DerniereSynchronisation, type Moyen } from './sauvegarde';
+import {
+  brouillonIntact,
+  ecrire as ecrireDansLeBrouillon,
+  montrer,
+  nouveauBrouillon,
+  reglage as reglerDansLeBrouillon,
+  retirer as retirerDuBrouillon,
+  valider as validerLeBrouillon,
+  type Brouillon,
+} from './brouillon';
 import { eraseStore, openStore, OuvertureRefusee, type OpenedStore } from './db';
 import { demanderPersistance, type EtatPersistance } from './persistance';
 import { saveFile } from './platform';
@@ -88,6 +98,19 @@ class AppState {
 
   plan: Plan = $derived(computePlan(this.ledger, this.asOf));
 
+  /**
+   * Le brouillon de l'assistant (D40) : tout ce que l'assistant change tient là, à côté du projet,
+   * jusqu'à sa validation. Il vit avec l'application : quitter l'assistant le garde, recharger ou
+   * fermer l'application le perd ; il est vide quand aucun assistant n'est en cours.
+   */
+  assistant = $state<Brouillon | undefined>(undefined);
+
+  /** Le projet tel que l'assistant le montre : le projet, avec son brouillon dessus. Sans brouillon, le projet. */
+  assistantLedger: Ledger = $derived(this.assistant ? montrer(this.ledger, this.assistant) : this.ledger);
+
+  /** Le plan de ce que l'assistant montre : ce que le projet donnerait une fois l'assistant validé. */
+  assistantPlan: Plan = $derived(computePlan(this.assistantLedger, this.asOf));
+
   /** Date de la dernière opération connue, tous comptes confondus (undefined sans opération). */
   lastOperationDate: string | undefined = $derived.by(() => {
     let last: string | undefined;
@@ -142,6 +165,7 @@ class AppState {
     await eraseStore();
     this.opened = await openStore();
     this.refused = undefined;
+    this.assistant = undefined;
     this.reload();
     this.ready = true;
     if (example) await this.loadExample();
@@ -187,6 +211,51 @@ class AppState {
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
     this.store.setSetting(key, value);
     this.reload();
+  }
+
+  /**
+   * Ouvre l'assistant : reprend son brouillon s'il y a déjà quelque chose de préparé, sinon repart du
+   * projet tel qu'il est (D43 : son état d'ouverture, projet vierge ou non, se relit alors).
+   */
+  ouvrirAssistant(): Brouillon {
+    if (!this.assistant || brouillonIntact(this.assistant)) this.assistant = nouveauBrouillon(this.ledger);
+    return this.assistant;
+  }
+
+  /** L'écriture de l'assistant : dans son brouillon, jamais dans le projet. */
+  assistantUpsert<K extends LedgerKey>(key: K, row: Ledger[K][number]): void {
+    ecrireDansLeBrouillon(this.brouillonOuvert(), key, row);
+  }
+
+  /** Le retrait de l'assistant : dans son brouillon, jamais dans le projet. */
+  assistantRemove(key: LedgerKey, id: string): void {
+    retirerDuBrouillon(this.brouillonOuvert(), this.ledger, key, id);
+  }
+
+  /** Le réglage de l'assistant : dans son brouillon, jamais dans le projet. */
+  assistantSetSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
+    reglerDansLeBrouillon(this.brouillonOuvert(), key, value);
+  }
+
+  private brouillonOuvert(): Brouillon {
+    if (!this.assistant) throw new Error('Aucun assistant n’est ouvert : rien ne s’écrit dans le projet à sa place.');
+    return this.assistant;
+  }
+
+  /**
+   * Valide l'assistant : ce qu'il montre entre dans le projet, tout en une fois, puis son brouillon
+   * se vide. Si une écriture est refusée, l'erreur remonte et le brouillon reste : valider de nouveau
+   * écrit ce qui manque (`brouillon.ts`).
+   */
+  validerAssistant(): void {
+    const brouillon = this.assistant;
+    if (!brouillon) return;
+    try {
+      validerLeBrouillon(this.store, this.ledger, brouillon);
+    } finally {
+      this.reload();
+    }
+    this.assistant = undefined;
   }
 
   newId(): string {
@@ -301,8 +370,9 @@ class AppState {
     this.reload();
   }
 
-  /** Efface tout et repart d'un dépôt vide. */
+  /** Efface tout et repart d'un dépôt vide. Le brouillon de l'assistant ne parlait que des données effacées : il s'en va. */
   async eraseAll(): Promise<void> {
+    this.assistant = undefined;
     await this.opened?.flush();
     this.opened?.store.close();
     await eraseStore();
@@ -342,6 +412,7 @@ class AppState {
     const next = await openStore(bytes);
     this.opened?.store.close();
     this.opened = next;
+    this.assistant = undefined;
     this.reload();
   }
 }

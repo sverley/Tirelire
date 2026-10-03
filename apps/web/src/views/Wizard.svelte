@@ -1,7 +1,10 @@
 <!--
   Assistant de configuration (D40) : construire un budget en répondant à des questions simples,
-  pas en remplissant les écrans de configuration. Chaque réponse crée les objets du modèle
+  pas en remplissant les écrans de configuration. Chaque réponse prépare les objets du modèle
   (tirelires, besoins, flux prévus) sans que l'utilisateur ait à connaître ces mots.
+  L'assistant n'écrit dans le projet qu'à sa validation, au résumé : jusque-là il lit et écrit son
+  brouillon (`app.assistantLedger`, `app.assistantUpsert`…), jamais le projet. Quitter l'assistant
+  sans valider n'enregistre rien.
   Le compte principal existe dans toute base : l'assistant en renseigne les informations, il ne le
   crée pas ; les autres comptes sont proposés, jamais imposés.
 -->
@@ -47,13 +50,22 @@
     { id: 'summary', label: 'Résumé' },
   ];
 
-  let step = $state<Step>('intro');
-  const stepIndex = $derived(STEPS.findIndex((s) => s.id === step));
+  /**
+   * Le brouillon : ce que l'assistant prépare, tenu par l'application. On y retrouve, en revenant, ce
+   * qui a été préparé et l'étape où l'on s'était arrêté ; il n'entre dans le projet qu'à la validation.
+   */
+  const brouillon = app.ouvrirAssistant();
 
-  const accounts = $derived(alive(app.ledger.accounts));
-  const tirelires = $derived(alive(app.ledger.tirelires));
-  const needs = $derived(alive(app.ledger.needs));
-  const flows = $derived(alive(app.ledger.plannedFlows));
+  let step = $state<Step>(untrack(() => brouillon.etape as Step));
+  const stepIndex = $derived(STEPS.findIndex((s) => s.id === step));
+  /** Le budget est validé : il est entré dans le projet, et l'assistant n'a plus rien à préparer. */
+  let valide = $state(false);
+  let erreurValidation = $state('');
+
+  const accounts = $derived(alive(app.assistantLedger.accounts));
+  const tirelires = $derived(alive(app.assistantLedger.tirelires));
+  const needs = $derived(alive(app.assistantLedger.needs));
+  const flows = $derived(alive(app.assistantLedger.plannedFlows));
   const principal = $derived(accounts.find((a) => a.kind === 'principal'));
   const otherAccounts = $derived(accounts.filter((a) => a.kind !== 'principal'));
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
@@ -63,7 +75,7 @@
   const everydayNeeds = $derived(needsOfKind('recurring'));
   const periodicNeeds = $derived(needsOfKind('dueDate'));
   const savingsNeeds = $derived(needsOfKind('goal'));
-  const totals = $derived(app.plan.totals);
+  const totals = $derived(app.assistantPlan.totals);
 
   /**
    * Ancrage d'un flux sur le jour `day` : la dernière occurrence à cette date qui soit déjà
@@ -96,6 +108,7 @@
 
   function goStep(s: Step) {
     step = s;
+    brouillon.etape = s;
     semer(s);
   }
   function next() {
@@ -107,11 +120,11 @@
 
   // --- Début de la période budgétaire : un choix du foyer, pas un champ de compte (D44) ---
   // Valeur initiale volontairement figée : le champ est ensuite piloté par la saisie.
-  let startDay = $state(untrack(() => String(app.ledger.settings.periodStartDay)));
+  let startDay = $state(untrack(() => String(app.assistantLedger.settings.periodStartDay)));
   function saveStartDay() {
     const d = Math.min(31, Math.max(1, Number(startDay) || 1));
     startDay = String(d);
-    if (app.ledger.settings.periodStartDay !== d) app.setSetting('periodStartDay', d);
+    if (app.assistantLedger.settings.periodStartDay !== d) app.assistantSetSetting('periodStartDay', d);
   }
   /** Jour du plus gros revenu déclaré : ce que l'assistant propose comme début de période. */
   const jourDuRevenu = $derived.by(() => {
@@ -132,7 +145,7 @@
       periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
       dateWindowDays: 5,
     };
-    app.upsert('plannedFlows', row);
+    app.assistantUpsert('plannedFlows', row);
   }
   function addIncome() {
     const amount = inputToCents(inc.amount);
@@ -156,7 +169,7 @@
       periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
       dateWindowDays: 5,
     };
-    app.upsert('plannedFlows', row);
+    app.assistantUpsert('plannedFlows', row);
   }
   function addFixed() {
     const amount = inputToCents(fix.amount);
@@ -172,7 +185,7 @@
   let dayError = $state('');
   function creerCourant(nom: string, montant: number, garde: boolean) {
     const tirelireId = app.newId();
-    app.upsert('tirelires', {
+    app.assistantUpsert('tirelires', {
       id: tirelireId,
       name: nom,
       placement: [],
@@ -180,7 +193,7 @@
       openingDate: periodStart(),
       rollover: { mode: garde ? 'unlimited' : 'none' },
     } satisfies Tirelire);
-    app.upsert('needs', {
+    app.assistantUpsert('needs', {
       id: app.newId(),
       tirelireId,
       kind: 'recurring',
@@ -206,7 +219,7 @@
   });
   function creerPeriodique(nom: string, montant: number, mois: number, echeance: string, compte?: string, avecFlux = true) {
     const tirelireId = app.newId();
-    app.upsert('tirelires', {
+    app.assistantUpsert('tirelires', {
       id: tirelireId,
       name: nom,
       placement: [],
@@ -214,7 +227,7 @@
       openingDate: periodStart(),
       rollover: { mode: 'unlimited' },
     } satisfies Tirelire);
-    app.upsert('needs', {
+    app.assistantUpsert('needs', {
       id: app.newId(),
       tirelireId,
       kind: 'dueDate',
@@ -223,7 +236,7 @@
       priority: DEFAULT_PRIORITY.dueDate,
     } satisfies Need);
     if (avecFlux) {
-      app.upsert('plannedFlows', {
+      app.assistantUpsert('plannedFlows', {
         id: app.newId(),
         name: nom,
         kind: 'dueDate',
@@ -256,7 +269,7 @@
   });
   function creerEpargne(nom: string, mensuel: number, cible?: number) {
     const tirelireId = app.newId();
-    app.upsert('tirelires', {
+    app.assistantUpsert('tirelires', {
       id: tirelireId,
       name: nom,
       placement: [],
@@ -264,7 +277,7 @@
       openingDate: periodStart(),
       rollover: { mode: 'unlimited' },
     } satisfies Tirelire);
-    app.upsert('needs', {
+    app.assistantUpsert('needs', {
       id: app.newId(),
       tirelireId,
       kind: 'goal',
@@ -298,33 +311,27 @@
       openingBalance,
       openingDate: todayISO(),
     };
-    app.upsert('accounts', row);
+    app.assistantUpsert('accounts', row);
     acc = { name: '', kind: 'courant', balance: '0,00' };
     accError = '';
   }
   /** Placement voulu d'une tirelire (D38) : tout sur un compte, ou rien de déclaré. */
   function setPlacement(e: Tirelire, accountId: string) {
     const placement = accountId ? [{ accountId, share: { kind: 'variable' as const } }] : [];
-    app.upsert('tirelires', { ...e, placement });
+    app.assistantUpsert('tirelires', { ...e, placement });
   }
   const reserveTirelires = $derived(
     tirelires.filter((e) => needs.some((n) => n.tirelireId === e.id && n.kind !== 'recurring')),
   );
 
   /**
-   * Les propositions ne s'offrent que sur un projet vide (D43). Les opérations ne comptent pas :
-   * un relevé peut avoir été importé avant que le budget existe. L'état est figé à l'ouverture de
-   * l'assistant, sinon la première ligne ajoutée ferait disparaître les propositions suivantes.
+   * Les propositions ne s'offrent que sur un projet vierge (D43), tel qu'il était à l'ouverture de
+   * l'assistant : l'état est figé dans le brouillon, sinon la première ligne préparée ferait
+   * disparaître les propositions suivantes. Sur un projet existant, l'assistant part de son contenu.
    */
-  const projetVierge = untrack(
-    () =>
-      alive(app.ledger.tirelires).length === 0 &&
-      alive(app.ledger.needs).length === 0 &&
-      alive(app.ledger.plannedFlows).length === 0 &&
-      alive(app.ledger.accounts).filter((a) => a.kind !== 'principal').length === 0,
-  );
+  const projetVierge = brouillon.projetVierge;
 
-  // --- Propositions (D43) : elles remplissent le formulaire, elles n'ajoutent rien d'office ---
+  // --- Propositions (D43) : elles ne se présentent que dans l'assistant, rien n'entre d'office dans le projet (D40) ---
   // Les raccourcis sont toujours offerts : l'interface ne change pas d'un projet à l'autre (D46).
   // La date compte : l'exemple porte plusieurs versions d'un même budget (D51), et l'on ne propose
   // que celle en vigueur. Figée à l'ouverture, comme le reste de l'état de l'assistant (D43).
@@ -337,7 +344,7 @@
   const restantsPeriodiques = $derived(propositions.periodic.filter((x) => !dejaPris(x.name)));
   const restantsEpargnes = $derived(propositions.savings.filter((x) => !dejaPris(x.name)));
 
-  // Ce que fait un clic sur un raccourci : créer la ligne, directement.
+  // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
   const appliquerRevenu = (p: (typeof propositions.incomes)[number]) =>
     creerRevenu(p.name, p.amount, p.interval, p.unit, p.day);
   const appliquerCharge = (p: (typeof propositions.charges)[number]) =>
@@ -350,14 +357,14 @@
     creerEpargne(p.name, p.monthly, p.target);
 
   /**
-   * Projet vierge : on applique tous les raccourcis de l'étape, exactement comme si l'utilisateur
-   * les avait touchés un par un — il n'a plus qu'à corriger et retrancher. Une seule fois par
-   * étape : sans cette mémoire, tout supprimer les ferait repousser au retour sur l'étape.
+   * Projet vierge : on présente d'office tous les raccourcis de l'étape, dans l'assistant — comme si
+   * l'utilisateur les avait touchés un par un —, il n'a plus qu'à corriger et retrancher. Une seule
+   * fois par étape : sans cette mémoire, tout supprimer les ferait repousser au retour sur l'étape.
+   * La mémoire est celle du brouillon : elle se retrouve en revenant dans l'assistant.
    */
-  const semees = new Set<Step>();
   function semer(etape: Step) {
-    if (!projetVierge || semees.has(etape)) return;
-    semees.add(etape);
+    if (!projetVierge || brouillon.semees.includes(etape)) return;
+    brouillon.semees.push(etape);
     if (etape === 'income') restantsRevenus.forEach(appliquerRevenu);
     if (etape === 'fixed') restantsCharges.forEach(appliquerCharge);
     if (etape === 'everyday') restantsCourants.forEach(appliquerCourant);
@@ -367,18 +374,18 @@
 
   // --- Édition en place de ce qui a été ajouté ---
   function editFlowName(f: PlannedFlow, v: string) {
-    if (v.trim() && v.trim() !== f.name) app.upsert('plannedFlows', { ...f, name: v.trim() });
+    if (v.trim() && v.trim() !== f.name) app.assistantUpsert('plannedFlows', { ...f, name: v.trim() });
   }
   /** Le signe est porté par le genre du flux, pas par la saisie : on la prend en valeur absolue. */
   function editFlowAmount(f: PlannedFlow, v: string) {
     const c = inputToCents(v);
     if (c === undefined) return;
     const signe = f.kind === 'income' ? Math.abs(c) : -Math.abs(c);
-    if (signe !== f.amount) app.upsert('plannedFlows', { ...f, amount: signe });
+    if (signe !== f.amount) app.assistantUpsert('plannedFlows', { ...f, amount: signe });
   }
   /** Rythme non mensuel : l'ancrage porte la date entière, dont toutes les occurrences découlent. */
   function editFlowDate(f: PlannedFlow, v: string) {
-    if (v && v !== f.periodicity.anchorDate) app.upsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate: v } });
+    if (v && v !== f.periodicity.anchorDate) app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate: v } });
   }
   function editFlowStep(f: PlannedFlow, champ: 'interval' | 'unit', v: string) {
     const actuel = f.periodicity;
@@ -387,51 +394,51 @@
         ? { ...actuel, interval: Math.max(1, Number(v) || 1) }
         : { ...actuel, unit: v as PeriodUnit };
     if (suivant.interval === actuel.interval && suivant.unit === actuel.unit) return;
-    app.upsert('plannedFlows', { ...f, periodicity: { ...suivant, anchorDate: f.periodicity.anchorDate } });
+    app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...suivant, anchorDate: f.periodicity.anchorDate } });
   }
   function editFlowAccount(f: PlannedFlow, v: string) {
-    if (v && v !== f.accountId) app.upsert('plannedFlows', { ...f, accountId: v });
+    if (v && v !== f.accountId) app.assistantUpsert('plannedFlows', { ...f, accountId: v });
   }
   function editFlowDay(f: PlannedFlow, v: string) {
     const d = Math.min(31, Math.max(1, Number(v) || 1));
     const { y, m } = parseDate(f.periodicity.anchorDate);
     const anchorDate = dateInMonth(y, m, Math.min(d, daysInMonth(y, m)));
     if (anchorDate !== f.periodicity.anchorDate) {
-      app.upsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate } });
+      app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate } });
     }
   }
   function editNeedName(n: Need, v: string) {
     const t = tirelireById(n.tirelireId);
-    if (t && v.trim() && v.trim() !== t.name) app.upsert('tirelires', { ...t, name: v.trim() });
+    if (t && v.trim() && v.trim() !== t.name) app.assistantUpsert('tirelires', { ...t, name: v.trim() });
   }
   function editNeedAmount(n: Need, v: string) {
     const c = inputToCents(v);
     if (c === undefined || c < 0) return;
     const champ = n.kind === 'goal' ? 'monthlyAmount' : 'amount';
-    if (n[champ] !== c) app.upsert('needs', { ...n, [champ]: c });
+    if (n[champ] !== c) app.assistantUpsert('needs', { ...n, [champ]: c });
   }
   function editNeedTarget(n: Need, v: string) {
     const c = inputToCents(v);
     if (c === undefined || c < 0) return;
-    if (n.amount !== c) app.upsert('needs', { ...n, amount: c });
+    if (n.amount !== c) app.assistantUpsert('needs', { ...n, amount: c });
   }
   function editNeedDueDate(n: Need, v: string) {
     if (!v || !n.periodicity || v === n.periodicity.anchorDate) return;
-    app.upsert('needs', { ...n, periodicity: { ...n.periodicity, anchorDate: v } });
+    app.assistantUpsert('needs', { ...n, periodicity: { ...n.periodicity, anchorDate: v } });
   }
   function editRollover(n: Need, keep: boolean) {
     const t = tirelireById(n.tirelireId);
-    if (t) app.upsert('tirelires', { ...t, rollover: { mode: keep ? 'unlimited' : 'none' } });
+    if (t) app.assistantUpsert('tirelires', { ...t, rollover: { mode: keep ? 'unlimited' : 'none' } });
   }
 
   /** Modification d'un compte, champ par champ, enregistrée à la volée. */
   function editAccount(a: Account, champ: 'name' | 'bank' | 'accountNumber', v: string) {
     const valeur = v.trim();
     if (valeur === (a[champ] ?? '')) return;
-    app.upsert('accounts', { ...a, [champ]: valeur || undefined });
+    app.assistantUpsert('accounts', { ...a, [champ]: valeur || undefined });
   }
   function editAccountKind(a: Account, v: string) {
-    if (v !== a.kind) app.upsert('accounts', { ...a, kind: v as AccountKind });
+    if (v !== a.kind) app.assistantUpsert('accounts', { ...a, kind: v as AccountKind });
   }
   /**
    * Le solde saisi est celui du début de la période. La date d'ouverture n'est jamais retouchée —
@@ -442,18 +449,33 @@
     const c = inputToCents(v);
     if (c === undefined || c === a.openingBalance) return;
     const openingDate = a.id === MAIN_ACCOUNT_ID && a.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate ? periodStart() : a.openingDate;
-    app.upsert('accounts', { ...a, openingBalance: c, openingDate });
+    app.assistantUpsert('accounts', { ...a, openingBalance: c, openingDate });
   }
 
   function removeFlow(f: PlannedFlow) {
-    app.remove('plannedFlows', f.id);
+    app.assistantRemove('plannedFlows', f.id);
   }
   /** Retire un besoin et la tirelire qui le portait si elle n'en a plus d'autre. */
   function removeNeed(n: Need) {
     const others = needs.filter((x) => x.tirelireId === n.tirelireId && x.id !== n.id);
-    for (const f of flows.filter((f) => f.tirelireId === n.tirelireId)) app.remove('plannedFlows', f.id);
-    app.remove('needs', n.id);
-    if (others.length === 0) app.remove('tirelires', n.tirelireId);
+    for (const f of flows.filter((f) => f.tirelireId === n.tirelireId)) app.assistantRemove('plannedFlows', f.id);
+    app.assistantRemove('needs', n.id);
+    if (others.length === 0) app.assistantRemove('tirelires', n.tirelireId);
+  }
+
+  /**
+   * La validation : seul geste qui écrit dans le projet, et il y écrit tout ce que l'assistant montre
+   * (D40). Refusée en cours de route, elle le dit et garde le brouillon : valider de nouveau écrit ce
+   * qui manque.
+   */
+  function valider() {
+    try {
+      app.validerAssistant();
+      valide = true;
+      erreurValidation = '';
+    } catch (err) {
+      erreurValidation = `L’enregistrement s’est arrêté : ${err instanceof Error ? err.message : String(err)} Vos réponses sont toujours là : validez de nouveau pour enregistrer ce qui manque.`;
+    }
   }
 </script>
 
@@ -462,13 +484,15 @@
 </p>
 <h1>Construire mon budget</h1>
 
-<div class="wizard-steps">
-  {#each STEPS as s, i (s.id)}
-    <button class="wstep" class:active={s.id === step} class:done={i < stepIndex} onclick={() => goStep(s.id)}>{s.label}</button>
-  {/each}
-</div>
+{#if !valide}
+  <div class="wizard-steps">
+    {#each STEPS as s, i (s.id)}
+      <button class="wstep" class:active={s.id === step} class:done={i < stepIndex} onclick={() => goStep(s.id)}>{s.label}</button>
+    {/each}
+  </div>
+{/if}
 
-{#if step !== 'intro' && step !== 'accounts'}
+{#if !valide && step !== 'intro' && step !== 'accounts'}
   <div class="stats">
     <div class="stat"><div class="v num pos">{money(totals.incomes)}</div><div class="k">Revenus par période</div></div>
     <div class="stat"><div class="v num">{money(-totals.fixedCharges)}</div><div class="k">Charges fixes</div></div>
@@ -491,8 +515,9 @@
       quelle part est déjà réservée, et ce qui reste vraiment disponible.
     </p>
     <p class="muted small">
-      Les questions qui suivent construisent ce budget. Rien n'est définitif : tout se modifie ensuite
-      dans Configuration, et vous pouvez sauter une étape qui ne vous concerne pas.
+      Les questions qui suivent préparent ce budget : il n’est enregistré que lorsque vous le validez,
+      à la fin. Rien n’est définitif : tout se modifie ensuite dans Configuration, et vous pouvez
+      sauter une étape qui ne vous concerne pas.
     </p>
     <div class="actions" style="margin-bottom:0">
       <button class="btn primary" onclick={next}>Commencer</button>
@@ -808,7 +833,7 @@
       <select value={a.kind} onchange={(e) => editAccountKind(a, e.currentTarget.value)}>
         {#each NATURES as k}<option value={k}>{ACCOUNT_KINDS[k]}</option>{/each}
       </select>
-      <button class="btn small danger" title="Retirer ce compte" onclick={() => app.remove('accounts', a.id)}>×</button>
+      <button class="btn small danger" title="Retirer ce compte" onclick={() => app.assistantRemove('accounts', a.id)}>×</button>
     </div>
   {/each}
 
@@ -827,7 +852,16 @@
   </form>
 
 {:else if step === 'summary'}
-  <h2>Votre budget</h2>
+  <h2>{valide ? 'Votre budget est enregistré' : 'Votre budget'}</h2>
+  {#if !valide}
+    <div class="card">
+      <p style="margin:0">
+        <strong>Rien n’est encore enregistré.</strong> Votre budget n’entre dans l’application que
+        lorsque vous le validez ci-dessous. Si vous fermez ou rechargez l’application avant, ce que
+        vous avez préparé ici est perdu.
+      </p>
+    </div>
+  {/if}
   {#if totals.margin < 0}
     <div class="card warn">
       <p style="margin:0">
@@ -852,7 +886,7 @@
     <div class="row total"><div class="label">Reste à vivre</div><div class="num {totals.margin < 0 ? 'neg' : 'pos'}">{money(totals.margin)}</div></div>
   </div>
 
-  {#if otherAccounts.length && reserveTirelires.length}
+  {#if !valide && otherAccounts.length && reserveTirelires.length}
     <h3>Où doit dormir chaque réserve ?</h3>
     <p class="muted small">Laissez sur le compte principal si vous ne savez pas : ça se change à tout moment.</p>
     {#each reserveTirelires as e (e.id)}
@@ -870,18 +904,26 @@
     {/each}
   {/if}
 
-  <h3>Et maintenant</h3>
-  <p class="muted small">
-    Le Plan détaille période par période ce qu'il faut mettre de côté et les virements à faire.
-    Dans Configuration, vous pouvez affiner ce que l'assistant a créé : plusieurs besoins sur une même
-    tirelire, priorités de financement, ventilation des dépenses par catégorie. L'import d'un relevé
-    rapprochera ensuite vos opérations réelles de ce budget.
-  </p>
-  <div class="actions">
-    <button class="btn primary" onclick={() => app.switchTab('plan')}>Voir le plan</button>
-    <button class="btn" onclick={() => app.switchTab('more')}>Configuration</button>
-    <button class="btn" onclick={() => app.switchTab('import')}>Importer un relevé</button>
-  </div>
+  {#if valide}
+    <h3>Et maintenant</h3>
+    <p class="muted small">
+      Le Plan détaille période par période ce qu'il faut mettre de côté et les virements à faire.
+      Dans Configuration, vous pouvez affiner ce que l'assistant a créé : plusieurs besoins sur une même
+      tirelire, priorités de financement, ventilation des dépenses par catégorie. L'import d'un relevé
+      rapprochera ensuite vos opérations réelles de ce budget.
+    </p>
+    <div class="actions">
+      <button class="btn primary" onclick={() => app.switchTab('plan')}>Voir le plan</button>
+      <button class="btn" onclick={() => app.switchTab('more')}>Configuration</button>
+      <button class="btn" onclick={() => app.switchTab('import')}>Importer un relevé</button>
+    </div>
+  {:else}
+    {#if erreurValidation}<div class="err">{erreurValidation}</div>{/if}
+    <div class="actions">
+      <button class="btn" onclick={prev}>‹ Précédent</button>
+      <button class="btn primary" onclick={valider}>Valider mon budget</button>
+    </div>
+  {/if}
 {/if}
 
 {#if step !== 'summary'}

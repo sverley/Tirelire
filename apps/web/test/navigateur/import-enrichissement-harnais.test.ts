@@ -115,7 +115,7 @@ async function menerLAssistant(page: Page) {
       const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
       const boutons = [...document.querySelectorAll('main button')] as HTMLButtonElement[];
       const fin = boutons.find((x) => t(x) === 'Voir le plan');
-      const b = fin ?? boutons.find((x) => x.classList.contains('primary') && /Suivant|Commencer/.test(t(x)));
+      const b = fin ?? boutons.find((x) => x.classList.contains('primary') && /Suivant|Commencer|Valider/.test(t(x)));
       b?.click();
       return fin ? 'fin' : b ? 'suite' : 'rien';
     });
