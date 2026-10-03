@@ -787,8 +787,12 @@ trois en avant). `test/exemple-dates.test.ts` fige ce qu'on doit voir à chaque 
 aussi bien si l'un de ces changements disparaît que s'il déborde sur la période en cours.
 
 **Les propositions de l'assistant prennent une date.** L'exemple étant leur seule source (D43), il
-porte désormais deux « Alimentation » et deux « Salaire » ; `budgetSuggestions(asOf)` ne retient que
-la version en vigueur, sinon l'assistant offrirait deux lignes de même nom sans dire laquelle
+porte deux « Salaire » et deux « Alimentation ». Les flux — revenus et charges fixes — se proposent
+avec **toutes leurs versions**, chacune avec ses dates : le salaire qui change se lit comme deux
+lignes du même nom, chacune disant sa date de validité, et se retire une ligne à la fois ; un
+raccourci apporte le flux avec toutes ses versions, et disparaît dès qu'un flux du même nom existe
+(D46). Les besoins se proposent selon la version en vigueur à la date de lecture
+(`budgetSuggestions(asOf)`), sinon l'assistant offrirait deux lignes de même nom sans dire laquelle
 prendre. Elles reprennent aussi le nom du besoin quand il en porte un, la tirelire ne suffisant plus
 à les distinguer dès qu'elle en porte deux.
 
