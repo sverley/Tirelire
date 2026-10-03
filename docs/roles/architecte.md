@@ -12,7 +12,9 @@ lisent que l'issue, le glossaire et ce que l'issue cite (#333).
    questions au porteur dans l'issue et arrête-toi.
 2. Décide si le besoin tient en une tâche : ce qu'une session de codeur tient, un écran ou un
    module du cœur, avec leurs tests (#333). Sinon, ouvre les sous-issues, une par tâche, et
-   arrête-toi : chacune aura son architecte.
+   arrête-toi : chacune aura son architecte. À l'inverse, des besoins voisins et petits — des textes,
+   de la documentation — qui touchent les mêmes fichiers pour le même souci se fondent en un seul
+   besoin, plutôt que d'être codés chacun à part (principe 13 ; porteur, #333).
 3. Écris dans l'issue un « Fait quand » vérifiable : des phrases qu'un test peut trancher. Décris le
    besoin et ce qui le rend atteint, observable, du point de vue de qui s'en sert : précisément et
    sans laisser de doute, même si cela ne laisse qu'une solution et pèse sur le codage. N'impose pas
