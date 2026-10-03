@@ -20,13 +20,22 @@
  *  - 3 pour le point 3, ce qui se retrouve en revenant et ce que dit le résumé : le résultat reste juste, mais
  *    perdre ce qu'on avait préparé en changeant d'onglet, ou ne pas savoir que rien n'est enregistré, le rend
  *    moins bon. Quitter sans valider n'enregistre rien est, lui, le point 1.
+ *  - 2 pour la perte au remplacement du projet (« Tout effacer », ouverture d'un fichier ; phrase ajoutée au point 3
+ *    par l'architecte le 03/10) : ce qui était préparé sur un projet ne doit pas se valider sur un autre, ce serait
+ *    un cas faux, l'usage restant possible.
  *  - 2 pour le point 4 : D43 et D46 sont des décisions, des propositions qui reviennent ou qui manquent en sont
  *    un cas faux.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import initSqlJs from 'sql.js';
 import type { Page } from 'puppeteer-core';
+import { LedgerStore } from '@tirelire/core';
 import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
 
+const SQL = await initSqlJs();
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 const NOM_PRINCIPAL = 'Compte de la maison';
 const NOM_AUTRE_COMPTE = 'Livret de la maison';
@@ -401,6 +410,60 @@ describe.skipIf(!navigateur)('#210 · l’assistant n’écrit dans le projet qu
         expect(apres.boutons).toContain('Voir le plan');
       } finally {
         await page.close();
+      }
+    }, 180_000);
+  });
+
+  describe('[niveau 2] point 3 — remplacer le projet perd ce qui était préparé', () => {
+    /** Un assistant préparé jusqu'aux revenus sur un projet vierge, puis on quitte l'assistant pour Réglages. */
+    async function preparerPuisAllerAuxReglages(): Promise<Page> {
+      const page = await nouvellePage(site);
+      page.on('dialog', (d) => void d.accept());
+      await ouvrir(page, site);
+      await ouvrirLAssistant(page);
+      await avancer(page);
+      await allerALEtape(page, /Qu.est-ce qui rentre/);
+      expect((await noms(page)).length, 'rien n’est préparé d’office').toBeGreaterThanOrEqual(2);
+      await ecranOrdinaire(page, 'Réglages');
+      return page;
+    }
+
+    /** L'assistant rouvert repart du début : le principe, « Commencer » ; il ne reprend pas aux revenus. */
+    async function repartDuDebut(page: Page, apres: string) {
+      await ouvrirLAssistant(page);
+      const e = await lire(page);
+      expect(e.h1, `après ${apres}`).toBe('Construire mon budget');
+      expect(e.primaires.some((p) => p.includes('Commencer')), `l’assistant reprend ce qui était préparé sur le projet remplacé (après ${apres})`).toBe(true);
+    }
+
+    it('« Tout effacer »', async () => {
+      const page = await preparerPuisAllerAuxReglages();
+      try {
+        expect(await cliquer(page, 'Tout effacer'), 'pas de bouton « Tout effacer »').toBe(true);
+        await pause(1_500);
+        await repartDuDebut(page, '« Tout effacer »');
+      } finally {
+        await page.close();
+      }
+    }, 180_000);
+
+    it('l’ouverture d’un fichier', async () => {
+      const store = await LedgerStore.create({ sqlJs: SQL, siteId: 'audit-210' });
+      const octets = store.export();
+      store.close();
+      const dossier = mkdtempSync(join(tmpdir(), 'tirelire-210-'));
+      const chemin = join(dossier, 'projet.sqlite');
+      writeFileSync(chemin, octets);
+      const page = await preparerPuisAllerAuxReglages();
+      try {
+        const champ = (await page.evaluateHandle(() => [...document.querySelectorAll<HTMLInputElement>('main input[type="file"]')].find((c) => /sqlite/i.test(c.accept)) ?? null)).asElement();
+        expect(champ, 'aucun champ pour importer un fichier SQLite dans Réglages').not.toBeNull();
+        await (champ as unknown as { uploadFile(p: string): Promise<void> }).uploadFile(chemin);
+        await pause(1_500);
+        await repartDuDebut(page, 'l’ouverture d’un fichier');
+      } finally {
+        await page.close();
+        rmSync(dossier, { recursive: true, force: true });
       }
     }, 180_000);
   });
