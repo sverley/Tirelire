@@ -4,6 +4,7 @@
   import FiltreEtat from '../lib/FiltreEtat.svelte';
   import Manque from '../lib/Manque.svelte';
   import { money, shortDate, centsToInput, inputToCents, openAccounts, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS, periodicityLabel, validityLabel, validityBadge } from '../lib/format';
+  import { aidesDeBesoin, aidesDeTirelire } from '../lib/aides';
   import {
     alive,
     activeAt,
@@ -59,6 +60,12 @@
     activeTo: '',
   });
   let needError = $state('');
+  /**
+   * Les aides des champs (D43) : le nom d'une tirelire de l'exemple ; pour un besoin, les valeurs d'un
+   * besoin de l'exemple du type choisi. Un type que l'exemple ne porte pas — le versement — n'a pas d'aide.
+   */
+  const aidesTirelire = aidesDeTirelire();
+  const aidesBesoin = $derived(aidesDeBesoin(needForm.kind));
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -343,7 +350,7 @@
   <form class="edit attached" use:revealed onsubmit={save}>
     <p class="titre-panneau">{titre}</p>
     <div class="grid">
-      <label class="f">Nom <input bind:value={form.name} placeholder="Charges" /></label>
+      <label class="f">Nom <input bind:value={form.name} placeholder={aidesTirelire.name} /></label>
       <div class="f" style="grid-column:1/-1">
         <span class="sub">Placement voulu — où cet argent devrait dormir. Plusieurs comptes possibles : un montant, un pourcentage, et « le reste ».</span>
         {#each form.placement as p, i (i)}
@@ -401,13 +408,13 @@
           {#each Object.entries(NEED_KINDS) as [k, label]}<option value={k}>{label}</option>{/each}
         </select>
       </label>
-      <label class="f">Nom (facultatif) <input bind:value={needForm.name} placeholder="Taxe foncière" /></label>
+      <label class="f">Nom (facultatif) <input bind:value={needForm.name} placeholder={aidesBesoin.name} /></label>
       {#if needForm.kind === 'dueDate'}
-        <label class="f">Montant de l'échéance <input bind:value={needForm.amount} inputmode="decimal" placeholder="1 200,00" /></label>
+        <label class="f">Montant de l'échéance <input bind:value={needForm.amount} inputmode="decimal" placeholder={aidesBesoin.amount} /></label>
         <label class="f">Tous les (mois) <input type="number" min="1" bind:value={needForm.interval} /></label>
         <label class="f">Première échéance <input type="date" bind:value={needForm.anchorDate} /></label>
       {:else if needForm.kind === 'recurring'}
-        <label class="f">Montant <input bind:value={needForm.amount} inputmode="decimal" placeholder="900,00" /></label>
+        <label class="f">Montant <input bind:value={needForm.amount} inputmode="decimal" placeholder={aidesBesoin.amount} /></label>
         <label class="f">Par période de (mois) <input type="number" min="1" bind:value={needForm.interval} /></label>
         <label class="f">Depuis le <input type="date" bind:value={needForm.anchorDate} /></label>
       {:else if needForm.kind === 'payout'}
@@ -415,12 +422,12 @@
           Une réserve qui alimente le budget au lieu de le consommer : les revenus d'une saison,
           encaissés en quelques mois, reversés régulièrement le reste de l'année.
         </p>
-        <label class="f">Montant à reverser <input bind:value={needForm.amount} inputmode="decimal" placeholder="12 000,00" /></label>
+        <label class="f">Montant à reverser <input bind:value={needForm.amount} inputmode="decimal" placeholder={aidesBesoin.amount} /></label>
         <label class="f">Réparti sur (mois) <input type="number" min="1" bind:value={needForm.interval} /></label>
         <label class="f">Depuis le <input type="date" bind:value={needForm.anchorDate} /></label>
       {:else}
-        <label class="f">Mensualité <input bind:value={needForm.monthlyAmount} inputmode="decimal" placeholder="300,00" /></label>
-        <label class="f">Cible (facultatif) <input bind:value={needForm.amount} inputmode="decimal" /></label>
+        <label class="f">Mensualité <input bind:value={needForm.monthlyAmount} inputmode="decimal" placeholder={aidesBesoin.monthlyAmount} /></label>
+        <label class="f">Cible (facultatif) <input bind:value={needForm.amount} inputmode="decimal" placeholder={aidesBesoin.amount} /></label>
       {/if}
       <label class="f">Priorité (petit = servi d'abord) <input type="number" min="0" bind:value={needForm.priority} /></label>
       <p class="muted small" style="grid-column:1/-1;margin:0">
