@@ -25,6 +25,8 @@
     needName,
     nextOccurrence,
     budgetSuggestions,
+    findCategoryByName,
+    suggestedCategory,
     suggestedFlow,
     suggestedTirelire,
     suggestedOrder,
@@ -36,6 +38,9 @@
     type PeriodUnit,
     type AccountKind,
     type SettlementDirection,
+    type Category,
+    type CategoryNature,
+    type CategorySuggestion,
     type Cents,
     type FlowSuggestion,
     type OrderSuggestion,
@@ -45,7 +50,7 @@
     type PlannedFlow,
   } from '@tirelire/core';
 
-  type Step = 'intro' | 'income' | 'fixed' | 'everyday' | 'periodic' | 'savings' | 'accounts' | 'summary';
+  type Step = 'intro' | 'income' | 'fixed' | 'everyday' | 'periodic' | 'savings' | 'categories' | 'accounts' | 'summary';
 
   const STEPS: Array<{ id: Step; label: string }> = [
     { id: 'intro', label: 'Le principe' },
@@ -55,6 +60,7 @@
     { id: 'everyday', label: 'Budgets' },
     { id: 'periodic', label: 'Pas tous les mois' },
     { id: 'savings', label: 'Épargne' },
+    { id: 'categories', label: 'Catégories' },
     { id: 'summary', label: 'Résumé' },
   ];
 
@@ -74,6 +80,7 @@
   const tirelires = $derived(alive(app.assistantLedger.tirelires));
   const needs = $derived(alive(app.assistantLedger.needs));
   const flows = $derived(alive(app.assistantLedger.plannedFlows));
+  const categories = $derived(alive(app.assistantLedger.categories));
   const principal = $derived(accounts.find((a) => a.kind === 'principal'));
   const otherAccounts = $derived(accounts.filter((a) => a.kind !== 'principal'));
   /** Les comptes des menus : un compte clos n'en fait plus partie (D56) ; il reste listé à l'étape Comptes. */
@@ -113,6 +120,8 @@
   }
 
   function goStep(s: Step) {
+    catLigneError = '';
+    catError = '';
     step = s;
     brouillon.etape = s;
     semer(s);
@@ -422,6 +431,8 @@
   );
   /** Un compte dont le nom existe déjà n'est plus proposé : les comptes se reconnaissent à leur nom (D46). */
   const restantsComptes = $derived(propositions.accounts.filter((x) => !accounts.some((a) => a.name === x.name)));
+  /** Une catégorie de même nature et de même nom n'est plus proposée : une catégorie se reconnaît à sa nature et à son nom (D46, D61). */
+  const restantesCategories = $derived(propositions.categories.filter((p) => !findCategoryByName(categories, p.name, p.nature)));
 
   // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
   /**
@@ -456,6 +467,22 @@
   function appliquerOrdre(p: OrderSuggestion) {
     const f = suggestedOrder(p, { id: app.newId(), principalId: mainAccountId(), compte: compteNomme });
     if (f) app.assistantUpsert('plannedFlows', f);
+  }
+  /**
+   * Une catégorie de l'exemple, avec ses liens vers ce qui existe ici, par noms (D46) : sa tirelire
+   * par défaut quand une tirelire porte le nom que l'exemple dit — sinon elle se garde sans (D32, I3) —,
+   * et chaque flux que l'exemple lui donne : le flux de même nom et de même genre, quand il n'a pas
+   * déjà une catégorie, que celle posée l'emporte.
+   */
+  function appliquerCategorie(p: CategorySuggestion) {
+    const id = app.newId();
+    const tirelire = p.tirelireName === undefined ? undefined : tirelires.find((t) => t.name === p.tirelireName);
+    app.assistantUpsert('categories', suggestedCategory(p, { id, ...(tirelire ? { tirelireId: tirelire.id } : {}) }));
+    for (const lie of p.flows) {
+      for (const f of flows.filter((x) => x.name === lie.name && x.kind === lie.kind && x.categoryId === undefined)) {
+        app.assistantUpsert('plannedFlows', { ...f, categoryId: id });
+      }
+    }
   }
   /**
    * La clôture d'un compte clos de l'exemple : la veille du premier jour de la période en cours, de
@@ -532,6 +559,8 @@
     if (etape === 'everyday') restantsCourants.forEach(appliquerTirelire);
     if (etape === 'periodic') restantsPeriodiques.forEach(appliquerTirelire);
     if (etape === 'savings') restantsEpargnes.forEach(appliquerTirelire);
+    // Les catégories viennent après les flux et les tirelires, vers lesquels elles se lient (D32).
+    if (etape === 'categories') restantesCategories.forEach(appliquerCategorie);
     // L'ordre se propose là où l'assistant demande où dort chaque tirelire : au résumé.
     if (etape === 'summary') restantsOrdres.forEach(appliquerOrdre);
   }
@@ -647,11 +676,82 @@
   function removeFlow(f: PlannedFlow) {
     app.assistantRemove('plannedFlows', f.id);
   }
-  /** Retire une tirelire, avec tous ses besoins et les prélèvements attendus pour ses échéances. */
+  /**
+   * Retire une tirelire, avec tous ses besoins et les prélèvements attendus pour ses échéances. Les
+   * catégories dont elle était la tirelire par défaut la perdent et se gardent sans (D32, I3).
+   */
   function removeTirelire(t: Tirelire) {
     for (const f of flows.filter((f) => f.tirelireId === t.id)) app.assistantRemove('plannedFlows', f.id);
     for (const n of needs.filter((n) => n.tirelireId === t.id)) app.assistantRemove('needs', n.id);
+    for (const c of categories.filter((c) => c.tirelireId === t.id)) {
+      const { tirelireId: _retiree, ...sans } = c;
+      app.assistantUpsert('categories', sans);
+    }
     app.assistantRemove('tirelires', t.id);
+  }
+
+  // --- Catégories : celles de l'exemple, avec leurs liens (D32), modifiables sur place ---
+  const NATURES_DE_CATEGORIE: Array<{ nature: CategoryNature; titre: string; vide: string }> = [
+    { nature: 'expense', titre: 'Dépenses', vide: 'Aucune catégorie de dépense pour l’instant.' },
+    { nature: 'income', titre: 'Revenus', vide: 'Aucune catégorie de revenu pour l’instant.' },
+  ];
+  let cat = $state({ name: '', nature: 'expense' as CategoryNature });
+  /** Ce qu'un geste sur une ligne de catégorie refuse (renommer en doublon, retirer un parent), et pourquoi. Chaque refus s'efface au geste suivant de l'étape, et quand on la quitte. */
+  let catLigneError = $state('');
+  let catError = $state('');
+  /**
+   * Deux catégories de même nature ne portent pas le même nom (D61) : le message dit laquelle existe
+   * déjà. `sauf` est la catégorie qu'on renomme, qui ne fait pas doublon avec elle-même (« santé » pour « Santé »).
+   */
+  const doublonDe = (nom: string, nature: CategoryNature, sauf?: string) => {
+    const existante = findCategoryByName(categories.filter((x) => x.id !== sauf), nom, nature);
+    return existante ? `Une catégorie « ${existante.name} » existe déjà pour cette nature.` : '';
+  };
+  /** Ce que l'étape dit d'une catégorie : sa catégorie parente, sa tirelire par défaut et les flux qui la portent, une fois chacun. */
+  function detailDe(c: Category): string {
+    const parties: string[] = [];
+    const parent = c.parentId ? categories.find((x) => x.id === c.parentId)?.name : undefined;
+    if (parent) parties.push(`Dans « ${parent} »`);
+    const tirelire = c.tirelireId ? tirelireById(c.tirelireId)?.name : undefined;
+    if (tirelire) parties.push(`Tirelire par défaut : ${tirelire}`);
+    const portes = [...new Set(flows.filter((f) => f.categoryId === c.id).map((f) => f.name))];
+    if (portes.length) parties.push(`Flux : ${portes.join(', ')}`);
+    return parties.join(' · ');
+  }
+  /** Renomme une catégorie ; un nom vide ou déjà pris par une catégorie de même nature est refusé, et le champ reprend le nom d'avant. */
+  function editCategoryName(c: Category, champ: HTMLInputElement) {
+    catError = '';
+    const nom = champ.value.trim();
+    const refus = !nom ? 'Le nom est obligatoire.' : nom === c.name ? '' : doublonDe(nom, c.nature, c.id);
+    if (refus || nom === c.name) {
+      champ.value = c.name;
+      catLigneError = refus;
+      return;
+    }
+    catLigneError = '';
+    app.assistantUpsert('categories', { ...c, name: nom });
+  }
+  /** Retire une catégorie, et elle ne reste sur aucun flux. Une catégorie qui en porte d'autres ne se retire pas, comme dans Catégories. */
+  function removeCategory(c: Category) {
+    catError = '';
+    const enfants = categories.filter((x) => x.parentId === c.id).length;
+    if (enfants) return void (catLigneError = `« ${c.name} » a ${enfants} sous-catégorie(s) : détachez-les ou retirez-les d’abord.`);
+    for (const f of flows.filter((f) => f.categoryId === c.id)) {
+      const { categoryId: _retiree, ...sans } = f;
+      app.assistantUpsert('plannedFlows', sans);
+    }
+    app.assistantRemove('categories', c.id);
+    catLigneError = '';
+  }
+  function addCategory() {
+    catLigneError = '';
+    const nom = cat.name.trim();
+    if (!nom) return void (catError = 'Donne un nom à cette catégorie.');
+    const refus = doublonDe(nom, cat.nature);
+    if (refus) return void (catError = refus);
+    app.assistantUpsert('categories', { id: app.newId(), name: nom, nature: cat.nature } satisfies Category);
+    cat = { ...cat, name: '' };
+    catError = '';
   }
   /** Retire un besoin d'une tirelire qui en porte d'autres ; le dernier emporte la tirelire. */
   function removeNeed(n: Need) {
@@ -1071,6 +1171,48 @@
     {/if}
     {#if savError}<div class="err">{savError}</div>{/if}
     <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
+  </form>
+{:else if step === 'categories'}
+  <h2>Comment classer vos dépenses et vos rentrées ?</h2>
+  <p class="muted small">
+    Une catégorie dit à quoi sert une opération : les courses, le loyer, un salaire. Elle classe vos
+    opérations sans demander de tirelire ; gardez celles qui vous parlent, renommez ou retirez les autres.
+  </p>
+  {#each NATURES_DE_CATEGORIE as g (g.nature)}
+    <h3>{g.titre}</h3>
+    {#each categories.filter((c) => c.nature === g.nature) as c (c.id)}
+      {@const detail = detailDe(c)}
+      <div class="card ligne ligne-categorie">
+        <input class="nom" value={c.name} aria-label="Nom de la catégorie" onchange={(e) => editCategoryName(c, e.currentTarget)} />
+        <button class="btn small danger" title="Retirer cette catégorie" onclick={() => removeCategory(c)}>×</button>
+        {#if detail}<p class="muted small suite">{detail}</p>{/if}
+      </div>
+    {:else}
+      <p class="muted small">{g.vide}</p>
+    {/each}
+  {/each}
+  {#if catLigneError}<div class="err">{catLigneError}</div>{/if}
+  {#if restantesCategories.length}
+    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
+    <div class="propositions">
+      {#each restantesCategories as p (p.nature + p.name)}
+        <button class="prop" onclick={() => appliquerCategorie(p)}>
+          <span class="n">+ {p.name}</span><span class="v">{p.nature === 'income' ? 'revenu' : 'dépense'}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+  <form class="edit" onsubmit={(e) => { e.preventDefault(); addCategory(); }}>
+    <div class="grid">
+      <label class="f">Nom de la catégorie <input bind:value={cat.name} placeholder="Santé" /></label>
+      <label class="f">Nature
+        <select bind:value={cat.nature}>
+          {#each NATURES_DE_CATEGORIE as g}<option value={g.nature}>{g.nature === 'expense' ? 'Dépense' : 'Revenu'}</option>{/each}
+        </select>
+      </label>
+    </div>
+    {#if catError}<div class="err">{catError}</div>{/if}
+    <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter une catégorie</button></div>
   </form>
 {:else if step === 'accounts'}
   <h2>Vos comptes en banque</h2>

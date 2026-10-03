@@ -79,6 +79,19 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     );
   });
 
+  it("propose toutes les catégories de l'exemple, avec leur tirelire par défaut et les flux qui les portent, et elles seules (#212)", () => {
+    // Une empreinte par catégorie, faite de ce que l'exemple en dit : une catégorie ou un lien qui n'y
+    // seraient pas, ou une catégorie ou un lien de l'exemple qui ne seraient pas proposés, font échouer
+    // ce test dans les deux sens (D43).
+    const tirelireDe = (id?: string) => alive(l.tirelires).find((t) => t.id === id)?.name ?? null;
+    const portes = (id: string) => [...new Set(alive(l.plannedFlows).filter((f) => f.categoryId === id).map((f) => `${f.kind}|${f.name}`))].sort();
+    const categorie = (nature: string, nom: string, tirelire: string | null, flux: string[]) => JSON.stringify([nature, nom, tirelire, flux]);
+    expect(
+      s.categories.map((c) => categorie(c.nature, c.name, c.tirelireName ?? null, c.flows.map((f) => `${f.kind}|${f.name}`).sort())).sort(),
+    ).toEqual(alive(l.categories).map((c) => categorie(c.nature, c.name, tirelireDe(c.tirelireId), portes(c.id))).sort());
+    expect(alive(l.categories).length).toBe(10);
+  });
+
   it("couvre les cinq questions du parcours à partir de l'exemple seul", () => {
     const genres = new Set(s.tirelires.flatMap((t) => t.needs.map((n) => n.kind)));
     expect(s.incomes.length).toBeGreaterThan(0);

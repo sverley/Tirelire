@@ -21,6 +21,8 @@ import {
   type Account,
   type AccountKind,
   type AmountTolerance,
+  type Category,
+  type CategoryNature,
   type Cents,
   type Id,
   type ISODate,
@@ -141,6 +143,21 @@ export interface AccountSuggestion {
   closed?: boolean;
 }
 
+/**
+ * Une catégorie de l'exemple, avec ses liens : sa tirelire par défaut quand l'exemple lui en donne
+ * une (D32), et les flux qui la portent. Elle s'identifie par sa nature et son nom (D61) ; ses liens
+ * se disent par noms, comme ceux des comptes (D46), puisque ceux qui l'écrivent n'ont pas les
+ * identifiants de l'exemple.
+ */
+export interface CategorySuggestion {
+  name: string;
+  nature: CategoryNature;
+  /** Sa tirelire par défaut (D32), par son nom, quand l'exemple lui en donne une. Un simple raccourci de saisie, pas un lien comptable. */
+  tirelireName?: string;
+  /** Les flux de l'exemple qui la portent, par leur nom et leur genre, une fois chacun — deux versions d'un même flux n'en font qu'un —, dans l'ordre de l'exemple. */
+  flows: Array<{ name: string; kind: PlannedFlowKind }>;
+}
+
 export interface BudgetSuggestions {
   mainAccount: MainAccountSuggestion;
   accounts: AccountSuggestion[];
@@ -150,6 +167,8 @@ export interface BudgetSuggestions {
   tirelires: TirelireSuggestion[];
   /** Les ordres permanents que l'exemple a déjà posés chez la banque (D60). */
   orders: OrderSuggestion[];
+  /** Les catégories de l'exemple, dans son ordre, chacune avec ses liens. */
+  categories: CategorySuggestion[];
 }
 
 /** Un flux de l'exemple, tel qu'il se propose : ce que l'exemple en dit, le compte par son nom quand ce n'est pas le principal. */
@@ -226,8 +245,27 @@ function orderSuggestions(l: Ledger): OrderSuggestion[] {
 }
 
 /**
- * Le flux que crée une proposition : ce que l'exemple en dit, et rien d'autre — la catégorie, qui
- * n'est pas une proposition, reste à ceux qui la donnent. `id` et les comptes sont ceux de qui
+ * Les catégories de l'exemple, dans son ordre, chacune avec ses liens : sa tirelire par défaut, par
+ * son nom, et les flux qui la portent, par leur nom et leur genre. Rien ne se calcule : c'est ce que
+ * l'exemple dit de chacune.
+ */
+function categorySuggestions(l: Ledger): CategorySuggestion[] {
+  const tirelires = alive(l.tirelires);
+  const flux = alive(l.plannedFlows);
+  return alive(l.categories).map((c) => {
+    const tirelire = c.tirelireId === undefined ? undefined : tirelires.find((t) => t.id === c.tirelireId);
+    const portes: CategorySuggestion['flows'] = [];
+    for (const f of flux) {
+      if (f.categoryId === c.id && !portes.some((p) => p.name === f.name && p.kind === f.kind)) portes.push({ name: f.name, kind: f.kind });
+    }
+    return { name: c.name, nature: c.nature, ...(tirelire ? { tirelireName: tirelire.name } : {}), flows: portes };
+  });
+}
+
+/**
+ * Le flux que crée une proposition : ce que l'exemple en dit, et rien d'autre — la catégorie, que
+ * l'exemple lie au flux mais que la proposition d'un flux ne porte pas (elle se pose avec la
+ * catégorie, `CategorySuggestion.flows`). `id` et les comptes sont ceux de qui
  * l'écrit : l'identité d'un flux et le compte où il se trouve dans le projet ne sont pas ceux de
  * l'exemple ; de même la tirelire que vide un prélèvement attendu, et le compte où arrive un ordre.
  * Le signe suit le genre : seul un revenu entre.
@@ -319,6 +357,21 @@ export function suggestedOrder(
 }
 
 /**
+ * La catégorie que crée une proposition : son nom et sa nature, et la tirelire par défaut que
+ * l'exemple lui donne si celui qui l'écrit a une tirelire de ce nom (`tirelireId` : D32, un simple
+ * raccourci de saisie). Sans elle, la catégorie se garde sans tirelire par défaut. Les flux qui la
+ * portent se lient à part, par ceux qui les écrivent.
+ */
+export function suggestedCategory(p: CategorySuggestion, ids: { id: Id; tirelireId?: Id }): Category {
+  return {
+    id: ids.id,
+    name: p.name,
+    nature: p.nature,
+    ...(ids.tirelireId !== undefined && p.nature === 'expense' ? { tirelireId: ids.tirelireId } : {}),
+  };
+}
+
+/**
  * Propositions à offrir dans l'assistant, lues dans le jeu d'exemple : tout ce qui le constitue,
  * opérations exceptées (porteur, 24 septembre 2026).
  *
@@ -353,5 +406,6 @@ export function budgetSuggestions(_asOf?: ISODate): BudgetSuggestions {
     charges: flowSuggestions(l, 'fixedCharge'),
     tirelires: tirelireSuggestions(l),
     orders: orderSuggestions(l),
+    categories: categorySuggestions(l),
   };
 }

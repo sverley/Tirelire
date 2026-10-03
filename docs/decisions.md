@@ -449,9 +449,10 @@ S'ils existent, l'assistant demande où dort chaque tirelire, ce qui remplit le 
 sans exposer les parts.
 
 L'assistant ne remplace pas les écrans de configuration : une fois validé, il amène à un budget qui
-se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations,
-catégories). Il propose les besoins multiples d'une tirelire et les priorités de l'exemple, qui se
-modifient ensuite dans Configuration.
+se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations).
+Il propose les besoins multiples d'une tirelire et les priorités de l'exemple, qui se modifient
+ensuite dans Configuration, et les catégories de l'exemple, avec leur tirelire par défaut (D32) et les
+flux qui les portent : une catégorie se garde sans tirelire (I3).
 
 Deux ancrages sont imposés par le moteur et figés par `test/assistant.test.ts` : une tirelire est
 ouverte au **début de la période en cours** (`tirelireTimeline` ne démarre qu'à la première période
@@ -1281,7 +1282,9 @@ Parmi les catégories vivantes d'une même nature, deux ne portent pas le même 
 comparent sans tenir compte de la casse, des accents ni des espaces autour ; une catégorie supprimée
 ne compte plus (`findCategoryByName`, `model.ts`). L'écran Catégories refuse le doublon, à la
 création comme au renommage ; une catégorie créée à la volée depuis les écrans Opérations ou Saisie
-reprend celle qui existe déjà au lieu d'en créer une seconde.
+reprend celle qui existe déjà au lieu d'en créer une seconde. L'assistant tient la règle avec ces
+trois écrans (#212) : son étape Catégories refuse le doublon, à l'ajout comme au renommage, et le
+raccourci d'une catégorie disparaît dès qu'une catégorie de même nature et de même nom existe (D46).
 
 À la question « `findCategoryByName` […] empêche deux catégories du même nom pour une même nature,
 sans tenir compte de la casse, des accents ni des espaces autour, les catégories supprimées
@@ -1292,10 +1295,9 @@ Ce que l'hypothèse d'un nom libre cachait : taper « alimentation » en classan
 « Alimentation » existe, créerait une seconde catégorie, et le Bilan compterait en deux lignes ce qui
 en fait une.
 
-Ce que cela ne couvre pas encore : seuls ces trois écrans tiennent la règle. Deux instances qui
-créent chacune « Santé » avant de se synchroniser gardent les deux, puisque la synchronisation
-fusionne les lignes par identifiant (D58) ; un fichier fabriqué dehors peut aussi en porter deux,
-que son ouverture ne refuse pas.
+Ce que cela ne couvre pas encore : deux instances qui créent chacune « Santé » avant de se
+synchroniser gardent les deux, puisque la synchronisation fusionne les lignes par identifiant (D58) ;
+un fichier fabriqué dehors peut aussi en porter deux, que son ouverture ne refuse pas.
 
 ## Le travail
 
