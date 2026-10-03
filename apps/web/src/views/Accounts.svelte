@@ -5,6 +5,7 @@
   import { money, moneyClass, shortDate, centsToInput, inputToCents, validityBadge, validityLabel, ACCOUNT_KINDS } from '../lib/format';
   import {
     accountBalance,
+    budgetPeriodContaining,
     countStates,
     indexLedger,
     settlementBalance,
@@ -12,6 +13,7 @@
     unallocated,
     alive,
     validityState,
+    DEFAULT_MAIN_ACCOUNT,
     DEFAULT_VISIBILITY,
     type Account,
     type AccountKind,
@@ -42,6 +44,11 @@
   const idx = $derived(indexLedger(app.ledger));
   /** Le compte principal existe dans toute base, unique (D40) : l'écran n'en crée pas, il le renseigne. */
   const isMain = (a: Account) => a.kind === 'principal';
+  /**
+   * Le compte principal tel qu'il naît avec la base : sa date d'ouverture dit « à renseigner »
+   * (`DEFAULT_MAIN_ACCOUNT`). L'assistant comme ce formulaire la renseignent avec le solde.
+   */
+  const aRenseigner = (a: Account) => isMain(a) && a.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate;
 
   // Un compte n'a pas de besoins : son état est celui de ses propres dates d'ouverture et de
   // clôture (D56).
@@ -80,7 +87,8 @@
       bank: a.bank ?? '',
       accountNumber: a.accountNumber ?? '',
       openingBalance: centsToInput(a.openingBalance),
-      openingDate: a.openingDate,
+      // Pas encore renseigné : le solde à saisir est celui du début de la période, comme dans l'assistant.
+      openingDate: aRenseigner(a) ? budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay).start : a.openingDate,
       tracksSettlement: !!a.tracksSettlement,
       settlementThreshold: centsToInput(a.settlementThreshold ?? 1000),
       settlementDirection: a.settlementDirection ?? 'both',
@@ -207,7 +215,7 @@
       <div class="label">
         <strong>{a.name}</strong> <span class="pill">{a.kind === 'principal' ? 'principal' : a.kind === 'epargne' ? 'accueil' : 'tiers'}</span>
         {#if badge}<span class="pill dim">{badge}</span>{/if}
-        <span class="sub">{a.bank ? a.bank + ' · ' : ''}solde initial {money(a.openingBalance)} au {shortDate(a.openingDate)}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
+        <span class="sub">{a.bank ? a.bank + ' · ' : ''}{aRenseigner(a) ? 'solde initial à renseigner' : `solde initial ${money(a.openingBalance)} au ${shortDate(a.openingDate)}`}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
         {#if validite}<span class="sub">{validite}</span>{/if}
         {#if retenues.length}<span class="sub">⚠ compte clos, encore désigné par : {retenues.join(', ')}</span>{/if}
       </div>

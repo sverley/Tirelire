@@ -95,20 +95,25 @@
       ? 'Aucun besoin : cette tirelire ne demande rien au plan.'
       : `Ses ${needsOf(e).length} besoin(s) sont masqués par le filtre.`;
 
-  // Regroupement d'affichage : par premier compte de placement (D38), ou « sans placement ».
+  /**
+   * Le compte sous lequel une tirelire se range : son premier compte de placement (D38) ; sans
+   * placement voulu, le compte principal, où restent ses dotations (D29) — un budget entier tient
+   * sans placement, qui ne produit aucun écart (D40, D38).
+   */
+  const principal = $derived(accounts.find((a) => a.kind === 'principal'));
+  const rangéeSous = (e: Tirelire) => (e.placement.length === 0 ? principal?.id : e.placement[0]?.accountId);
   const byPlacement = $derived(
     accounts
-      .map((a) => ({ account: a, tirelires: tirelires.filter((e) => e.placement[0]?.accountId === a.id && visible(e)) }))
+      .map((a) => ({ account: a, tirelires: tirelires.filter((e) => rangéeSous(e) === a.id && visible(e)) }))
       .filter((g) => g.tirelires.length > 0),
   );
-  const orphans = $derived(
-    tirelires.filter((e) => (e.placement.length === 0 || !accounts.some((a) => a.id === e.placement[0]?.accountId)) && visible(e)),
-  );
+  /** À part, en alerte : la tirelire dont le placement vise un compte qui n'existe plus. */
+  const orphans = $derived(tirelires.filter((e) => !accounts.some((a) => a.id === rangéeSous(e)) && visible(e)));
   /** Comptes offerts au placement : les vivants, plus ceux que la tirelire désigne déjà (D56). */
   const comptesPlacement = $derived(openAccounts(accounts, app.asOf, ...form.placement.map((p) => p.accountId)));
 
   function placementText(e: Tirelire): string {
-    if (e.placement.length === 0) return 'placement libre';
+    if (e.placement.length === 0) return 'libre, aucun écart proposé';
     return e.placement
       .map((p) => {
         const where = accountName(p.accountId);
@@ -505,7 +510,7 @@
 {#if orphans.length}
   <h2>Sans compte de placement</h2>
   {#each orphans as e (e.id)}
-    <div class="card warn" class:editing={editing?.id === e.id}><div class="row"><div class="label">{e.name}<span class="sub">aucun placement voulu : aucun écart ne sera proposé</span></div><button class="btn small" onclick={() => startEdit(e)}>Placer</button></div></div>
+    <div class="card warn" class:editing={editing?.id === e.id}><div class="row"><div class="label"><strong>{e.name}</strong><span class="sub">son placement vise un compte qui n'existe plus : modifiez-le pour dire où cet argent doit dormir</span></div><button class="btn small" onclick={() => startEdit(e)}>Modifier</button></div></div>
     {#if editing?.id === e.id}
       {@render editeurTirelire()}
     {/if}

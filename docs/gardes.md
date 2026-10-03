@@ -336,8 +336,8 @@ Chemins : `apps/web/src/views/Wizard.svelte`, `apps/web/src/views/Tirelires.svel
 - **Harnais** · `apps/web/test/navigateur/assistant-equivalent.test.ts` — sur un projet vierge, chaque étape de
   l'assistant qui sème une ligne (compte, revenu, charge fixe, budget courant, échéance, épargne) a
   cette ligne retrouvée dans l'écran de configuration ordinaire correspondant (Comptes, Flux
-  prévus, Tirelires), avec un bouton d'édition (« Modifier », ou « Placer » pour une tirelire semée
-  sans placement — même formulaire) qui ouvre un champ éditable portant ce même nom.
+  prévus, Tirelires), avec un bouton d'édition (« Modifier », pour une tirelire semée sans
+  placement comme pour toute autre) qui ouvre un champ éditable portant ce même nom.
   Témoin rouge : « témoin rouge · une ligne créée par l’assistant introuvable hors assistant »
 - **Vérification manuelle** · `VM-I11-hors-assistant` — Pour une étape d'assistant que la PR ajoute
   et que le harnais ci-dessus ne couvre pas encore (nouvel assistant hors de « Construire mon
