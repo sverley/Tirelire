@@ -49,6 +49,25 @@
     type Need,
     type PlannedFlow,
   } from '@tirelire/core';
+  import {
+    aideCategorie,
+    aideCompte,
+    aideCourant,
+    aideEpargne,
+    aideFlux,
+    aidePeriodique,
+    montantAide,
+    montantDeLaTirelire,
+    parNom,
+    recopieCategorie,
+    recopieCompte,
+    recopieCourant,
+    recopieEpargne,
+    recopieFlux,
+    recopiePeriodique,
+    versionMontree,
+    type FluxPropose,
+  } from '../lib/aides';
 
   type Step = 'intro' | 'income' | 'fixed' | 'everyday' | 'periodic' | 'savings' | 'categories' | 'accounts' | 'summary';
 
@@ -149,7 +168,13 @@
   });
 
   // --- Revenus ---
-  let inc = $state({ name: '', amount: '', interval: 1, unit: 'month' as PeriodUnit, day: '1', accountId: '' });
+  /**
+   * Les champs du formulaire d'ajout d'un flux. Le nom et le montant se saisissent, et leur aide est
+   * un texte indicatif ; les autres champs, tant qu'on n'y a pas touché (`undefined`), prennent la
+   * valeur de la ligne d'aide (#214) : une liste, un nombre ne montrent pas de texte indicatif.
+   */
+  type SaisieDeFlux = { name: string; amount: string; interval?: string | undefined; unit?: PeriodUnit | undefined; day?: string | undefined; accountId?: string | undefined };
+  let inc = $state<SaisieDeFlux>({ name: '', amount: '' });
   let incError = $state('');
   function creerRevenu(nom: string, montant: number, interval: number, unit: PeriodUnit, jour: number, compte?: string) {
     const row: PlannedFlow = {
@@ -167,13 +192,22 @@
     const amount = inputToCents(inc.amount);
     if (!inc.name.trim()) return void (incError = 'Donne un nom à cette rentrée d’argent.');
     if (amount === undefined || amount <= 0) return void (incError = 'Indique un montant, en positif.');
-    creerRevenu(inc.name.trim(), amount, inc.interval, inc.unit, Number(inc.day) || 1, inc.accountId);
-    inc = { ...inc, name: '', amount: '' };
+    const interval = Math.max(1, Number(evRevenu.interval) || 1);
+    const jour = Number(evRevenu.day) || 1;
+    // Une ligne dont chaque champ porte la valeur de son aide fait ce que fait le raccourci de cette ligne (#214).
+    const ligne = aideRevenu;
+    if (ligne && recopieFlux({ name: inc.name.trim(), amount, interval, unit: evRevenu.unit, day: jour, accountId: evRevenu.accountId }, ligne, compteDuFlux(ligne.version))) {
+      appliquerRevenu(ligne.ligne);
+      inc = { name: '', amount: '' };
+    } else {
+      creerRevenu(inc.name.trim(), amount, interval, evRevenu.unit, jour, evRevenu.accountId);
+      inc = { ...inc, name: '', amount: '' };
+    }
     incError = '';
   }
 
   // --- Charges fixes : montant fixe, tous les mois, sans réserve à constituer ---
-  let fix = $state({ name: '', amount: '', interval: 1, unit: 'month' as PeriodUnit, day: '5', accountId: '' });
+  let fix = $state<SaisieDeFlux>({ name: '', amount: '' });
   let fixError = $state('');
   function creerCharge(nom: string, montant: number, interval: number, unit: PeriodUnit, jour: number, compte?: string) {
     const row: PlannedFlow = {
@@ -191,13 +225,22 @@
     const amount = inputToCents(fix.amount);
     if (!fix.name.trim()) return void (fixError = 'Donne un nom à cette charge.');
     if (amount === undefined || amount <= 0) return void (fixError = 'Indique un montant, en positif.');
-    creerCharge(fix.name.trim(), amount, fix.interval, fix.unit, Number(fix.day) || 1, fix.accountId);
-    fix = { ...fix, name: '', amount: '' };
+    const interval = Math.max(1, Number(evCharge.interval) || 1);
+    const jour = Number(evCharge.day) || 1;
+    const ligne = aideCharge;
+    if (ligne && recopieFlux({ name: fix.name.trim(), amount, interval, unit: evCharge.unit, day: jour, accountId: evCharge.accountId }, ligne, compteDuFlux(ligne.version))) {
+      appliquerCharge(ligne.ligne);
+      fix = { name: '', amount: '' };
+    } else {
+      creerCharge(fix.name.trim(), amount, interval, evCharge.unit, jour, evCharge.accountId);
+      fix = { ...fix, name: '', amount: '' };
+    }
     fixError = '';
   }
 
   // --- Budgets courants : une tirelire + un besoin récurrent ---
-  let day = $state({ name: '', amount: '', keep: false });
+  /** Le report se coche ou se décoche ; tant qu'on n'y a pas touché (`undefined`), il est celui de la ligne d'aide (#214). */
+  let day = $state<{ name: string; amount: string; keep?: boolean | undefined }>({ name: '', amount: '' });
   let dayError = $state('');
   function creerCourant(nom: string, montant: number, garde: boolean) {
     const tirelireId = app.newId();
@@ -222,16 +265,23 @@
     const amount = inputToCents(day.amount);
     if (!day.name.trim()) return void (dayError = 'Donne un nom à ce budget.');
     if (amount === undefined || amount <= 0) return void (dayError = 'Indique un montant par période.');
-    creerCourant(day.name.trim(), amount, day.keep);
-    day = { name: '', amount: '', keep: day.keep };
+    const ligne = aideBudget;
+    if (ligne && recopieCourant({ name: day.name.trim(), amount, keep: gardeBudget }, ligne)) {
+      appliquerTirelire(ligne.ligne);
+      day = { name: '', amount: '' };
+    } else {
+      creerCourant(day.name.trim(), amount, gardeBudget);
+      day = { name: '', amount: '', keep: day.keep };
+    }
     dayError = '';
   }
   // --- Dépenses qui ne tombent pas tous les mois : tirelire + besoin à échéance + flux ---
-  let per = $state({ name: '', amount: '', months: 12, dueDate: '', withFlow: true, accountId: '' });
+  /** Le rythme, l'échéance, le compte et le prélèvement, tant qu'on n'y a pas touché (`undefined`), sont ceux de la ligne d'aide (#214). */
+  let per = $state<{ name: string; amount: string; months?: string | undefined; dueDate?: string | undefined; withFlow?: boolean | undefined; accountId?: string | undefined }>({ name: '', amount: '' });
   let perError = $state('');
   const perPreview = $derived.by(() => {
     const a = inputToCents(per.amount);
-    return a === undefined || a <= 0 ? undefined : perPeriod(a, per.months);
+    return a === undefined || a <= 0 ? undefined : perPeriod(a, Number(evEcheance.months) || 1);
   });
   function creerPeriodique(nom: string, montant: number, mois: number, echeance: string, compte?: string, avecFlux = true) {
     const tirelireId = app.newId();
@@ -268,9 +318,17 @@
     const amount = inputToCents(per.amount);
     if (!per.name.trim()) return void (perError = 'Donne un nom à cette dépense.');
     if (amount === undefined || amount <= 0) return void (perError = 'Indique le montant de la facture.');
-    if (!per.dueDate) return void (perError = 'Indique la date de la prochaine échéance.');
-    creerPeriodique(per.name.trim(), amount, per.months, per.dueDate, per.accountId, per.withFlow);
-    per = { name: '', amount: '', months: per.months, dueDate: '', withFlow: per.withFlow, accountId: per.accountId };
+    const echeance = evEcheance.dueDate;
+    if (!echeance) return void (perError = 'Indique la date de la prochaine échéance.');
+    const mois = Math.max(1, Number(evEcheance.months) || 1);
+    const ligne = aideEcheance;
+    if (ligne && recopiePeriodique({ name: per.name.trim(), amount, months: mois, dueDate: echeance, withFlow: evEcheance.withFlow, accountId: evEcheance.accountId }, ligne, compteNommeOuPrincipal(ligne.accountName))) {
+      appliquerTirelire(ligne.ligne);
+      per = { name: '', amount: '' };
+    } else {
+      creerPeriodique(per.name.trim(), amount, mois, echeance, evEcheance.accountId, evEcheance.withFlow);
+      per = { ...per, name: '', amount: '', dueDate: undefined };
+    }
     perError = '';
   }
 
@@ -306,7 +364,10 @@
     const monthly = inputToCents(sav.monthly);
     if (!sav.name.trim()) return void (savError = 'Donne un nom à cet objectif.');
     if (monthly === undefined || monthly <= 0) return void (savError = 'Indique combien mettre de côté par période.');
-    creerEpargne(sav.name.trim(), monthly, inputToCents(sav.target));
+    const cible = inputToCents(sav.target);
+    const ligne = aideObjectif;
+    if (ligne && recopieEpargne({ name: sav.name.trim(), monthly, target: cible }, ligne)) appliquerTirelire(ligne.ligne);
+    else creerEpargne(sav.name.trim(), monthly, cible);
     sav = { name: '', monthly: '', target: '' };
     savError = '';
   }
@@ -320,21 +381,27 @@
     toThird: 'du compte principal vers ce compte seulement',
     fromThird: 'de ce compte vers le compte principal seulement',
   };
-  let acc = $state({ name: '', kind: 'courant' as Exclude<AccountKind, 'principal'>, balance: '0,00' });
+  /** Le type se choisit ; tant qu'on n'y a pas touché (`undefined`), il est celui de la ligne d'aide (#214). Un solde laissé vide est un solde nul. */
+  let acc = $state<{ name: string; kind?: Exclude<AccountKind, 'principal'> | undefined; balance: string }>({ name: '', balance: '' });
   let accError = $state('');
   function addAccount() {
     if (!acc.name.trim()) return void (accError = 'Donne un nom à ce compte.');
-    const openingBalance = inputToCents(acc.balance);
+    const openingBalance = acc.balance.trim() ? inputToCents(acc.balance) : 0;
     if (openingBalance === undefined) return void (accError = 'Solde invalide.');
-    const row: Account = {
-      id: app.newId(),
-      name: acc.name.trim(),
-      kind: acc.kind,
-      openingBalance,
-      openingDate: todayISO(),
-    };
-    app.assistantUpsert('accounts', row);
-    acc = { name: '', kind: 'courant', balance: '0,00' };
+    const ligne = aideDeCompte;
+    if (ligne && recopieCompte({ name: acc.name.trim(), kind: typeDeCompte, balance: openingBalance }, ligne)) {
+      appliquerCompte(ligne.ligne);
+    } else {
+      const row: Account = {
+        id: app.newId(),
+        name: acc.name.trim(),
+        kind: typeDeCompte,
+        openingBalance,
+        openingDate: todayISO(),
+      };
+      app.assistantUpsert('accounts', row);
+    }
+    acc = { name: '', balance: '' };
     accError = '';
   }
   /** Placement voulu d'une tirelire (D38) : tout sur un compte, ou rien de déclaré. */
@@ -379,23 +446,11 @@
   const propositions = budgetSuggestions();
   /** Un raccourci déjà repris disparaît : on ne propose pas ce qui existe déjà. */
   const dejaPris = (nom: string) => flows.some((f) => f.name === nom) || tirelires.some((t) => t.name === nom);
-  /**
-   * Un flux proposé : toutes ses versions, regroupées par leur nom dans l'ordre de l'exemple. Un
-   * raccourci apporte le flux avec toutes ses versions, et disparaît dès qu'un flux du même nom
-   * existe (D46, D51).
-   */
-  type FluxPropose = { name: string; versions: FlowSuggestion[] };
-  function parNom(liste: FlowSuggestion[]): FluxPropose[] {
-    const groupes: FluxPropose[] = [];
-    for (const p of liste) {
-      const groupe = groupes.find((g) => g.name === p.name);
-      if (groupe) groupe.versions.push(p);
-      else groupes.push({ name: p.name, versions: [p] });
-    }
-    return groupes;
-  }
+  // Un flux proposé (`FluxPropose`) : toutes ses versions, regroupées par leur nom dans l'ordre de
+  // l'exemple (`parNom`). Un raccourci apporte le flux avec toutes ses versions, et disparaît dès
+  // qu'un flux du même nom existe (D46, D51).
   /** Le montant que montre le raccourci d'un flux : celui de la version en vigueur à la date de lecture, à défaut la première. */
-  const montantDuRaccourci = (g: FluxPropose) => (g.versions.find((v) => activeAt(v, app.asOf)) ?? g.versions[0]!).amount;
+  const montantDuRaccourci = (g: FluxPropose) => versionMontree(g, app.asOf).amount;
   const restantsRevenus = $derived(parNom(propositions.incomes).filter((g) => !dejaPris(g.name)));
   const restantsCharges = $derived(parNom(propositions.charges).filter((g) => !dejaPris(g.name)));
   /** L'étape où se lit un besoin : celle de son genre. */
@@ -418,11 +473,7 @@
   const restantsCourants = $derived(restantesTirelires('everyday'));
   const restantsPeriodiques = $derived(restantesTirelires('periodic'));
   const restantsEpargnes = $derived(restantesTirelires('savings'));
-  /** Le montant que montre le raccourci d'une tirelire : celui de son besoin en vigueur à la date de lecture, à défaut le premier. */
-  function montantDeLaTirelire(p: TirelireSuggestion): Cents {
-    const n = p.needs.find((x) => activeAt(x, app.asOf)) ?? p.needs[0];
-    return (n?.kind === 'goal' ? n.monthlyAmount : n?.amount) ?? 0;
-  }
+  // Le montant que montre le raccourci d'une tirelire (`montantDeLaTirelire`) : celui de son besoin en vigueur à la date de lecture, à défaut le premier.
   /** Le compte du même nom, ici ; le compte principal se désigne par l'absence de nom. */
   const compteNomme = (nom: string) => accounts.find((a) => a.name === nom)?.id;
   /** Un ordre de l'exemple ne se propose que si ses deux comptes sont ici, et qu'aucun flux ne porte déjà son nom (D46). */
@@ -433,6 +484,45 @@
   const restantsComptes = $derived(propositions.accounts.filter((x) => !accounts.some((a) => a.name === x.name)));
   /** Une catégorie de même nature et de même nom n'est plus proposée : une catégorie se reconnaît à sa nature et à son nom (D46, D61). */
   const restantesCategories = $derived(propositions.categories.filter((p) => !findCategoryByName(categories, p.name, p.nature)));
+
+  // --- Aides des champs (#214) : ce que les champs vides d'un formulaire d'ajout laissent lire ---
+  // Elles viennent de l'exemple (`../lib/aides`), d'une même ligne par formulaire : celle que le
+  // premier raccourci restant de l'étape apporterait, ou, quand il n'en reste aucun, la première
+  // ligne de l'exemple de cette étape. Un champ qui ne montre pas de texte indicatif — liste, case,
+  // date, nombre — prend la valeur de cette ligne tant qu'on n'y a pas touché ; et ajouter une ligne
+  // dont chaque champ porte la valeur de son aide fait ce que fait le raccourci de cette ligne.
+  const toutesLesTirelires = (etape: EtapeTirelire) => propositions.tirelires.filter((x) => etapeDe(x) === etape);
+  const aideRevenu = $derived(aideFlux(restantsRevenus, parNom(propositions.incomes), app.asOf));
+  const aideCharge = $derived(aideFlux(restantsCharges, parNom(propositions.charges), app.asOf));
+  const aideBudget = $derived(aideCourant(restantsCourants, toutesLesTirelires('everyday'), app.asOf));
+  const aideEcheance = $derived(aidePeriodique(restantsPeriodiques, toutesLesTirelires('periodic'), app.asOf));
+  const aideObjectif = $derived(aideEpargne(restantsEpargnes, toutesLesTirelires('savings'), app.asOf));
+  const aideDeCategorie = $derived(aideCategorie(restantesCategories, propositions.categories));
+  const aideDeCompte = $derived(aideCompte(restantsComptes, propositions.accounts));
+  /** Le compte que l'exemple donne à une ligne, ici : celui du même nom, à défaut le compte principal (D40). */
+  const compteNommeOuPrincipal = (nom?: string) => (nom ? compteNomme(nom) : undefined) ?? mainAccountId();
+  /** Ce que montrent les champs sans texte indicatif d'un flux : ce qu'on y a posé, sinon la valeur de la ligne d'aide. */
+  const evRevenu = $derived({
+    interval: inc.interval ?? String(aideRevenu?.interval ?? 1),
+    unit: inc.unit ?? aideRevenu?.unit ?? ('month' as PeriodUnit),
+    day: inc.day ?? String(aideRevenu?.day ?? 1),
+    accountId: inc.accountId ?? compteNommeOuPrincipal(aideRevenu?.version.accountName),
+  });
+  const evCharge = $derived({
+    interval: fix.interval ?? String(aideCharge?.interval ?? 1),
+    unit: fix.unit ?? aideCharge?.unit ?? ('month' as PeriodUnit),
+    day: fix.day ?? String(aideCharge?.day ?? 5),
+    accountId: fix.accountId ?? compteNommeOuPrincipal(aideCharge?.version.accountName),
+  });
+  const gardeBudget = $derived(day.keep ?? aideBudget?.keep ?? false);
+  const evEcheance = $derived({
+    months: per.months ?? String(aideEcheance?.months ?? 12),
+    dueDate: per.dueDate ?? aideEcheance?.dueDate ?? '',
+    withFlow: per.withFlow ?? aideEcheance?.withFlow ?? true,
+    accountId: per.accountId ?? compteNommeOuPrincipal(aideEcheance?.accountName),
+  });
+  const natureDeCategorie = $derived.by((): CategoryNature => cat.nature ?? aideDeCategorie?.nature ?? 'expense');
+  const typeDeCompte = $derived<Exclude<AccountKind, 'principal'>>(acc.kind ?? aideDeCompte?.kind ?? 'courant');
 
   // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
   /**
@@ -695,7 +785,8 @@
     { nature: 'expense', titre: 'Dépenses', vide: 'Aucune catégorie de dépense pour l’instant.' },
     { nature: 'income', titre: 'Revenus', vide: 'Aucune catégorie de revenu pour l’instant.' },
   ];
-  let cat = $state({ name: '', nature: 'expense' as CategoryNature });
+  /** La nature se choisit ; tant qu'on n'y a pas touché (`undefined`), elle est celle de la ligne d'aide (#214). */
+  let cat = $state<{ name: string; nature?: CategoryNature | undefined }>({ name: '' });
   /** Ce qu'un geste sur une ligne de catégorie refuse (renommer en doublon, retirer un parent), et pourquoi. Chaque refus s'efface au geste suivant de l'étape, et quand on la quitte. */
   let catLigneError = $state('');
   let catError = $state('');
@@ -747,10 +838,17 @@
     catLigneError = '';
     const nom = cat.name.trim();
     if (!nom) return void (catError = 'Donne un nom à cette catégorie.');
-    const refus = doublonDe(nom, cat.nature);
+    const nature = natureDeCategorie;
+    const refus = doublonDe(nom, nature);
     if (refus) return void (catError = refus);
-    app.assistantUpsert('categories', { id: app.newId(), name: nom, nature: cat.nature } satisfies Category);
-    cat = { ...cat, name: '' };
+    const ligne = aideDeCategorie;
+    if (ligne && recopieCategorie({ name: nom, nature }, ligne)) {
+      appliquerCategorie(ligne.ligne);
+      cat = { name: '' };
+    } else {
+      app.assistantUpsert('categories', { id: app.newId(), name: nom, nature } satisfies Category);
+      cat = { ...cat, name: '' };
+    }
     catError = '';
   }
   /** Retire un besoin d'une tirelire qui en porte d'autres ; le dernier emporte la tirelire. */
@@ -910,18 +1008,18 @@
   {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addIncome(); }}>
     <div class="grid">
-      <label class="f">Quoi ? <input bind:value={inc.name} placeholder="Salaire" /></label>
-      <label class="f">Combien ? <input bind:value={inc.amount} inputmode="decimal" placeholder="2 400,00" /></label>
-      <label class="f">Tous les <input type="number" min="1" bind:value={inc.interval} /></label>
+      <label class="f">Quoi ? <input bind:value={inc.name} placeholder={aideRevenu?.name} /></label>
+      <label class="f">Combien ? <input bind:value={inc.amount} inputmode="decimal" placeholder={aideRevenu ? montantAide(aideRevenu.amount) : undefined} /></label>
+      <label class="f">Tous les <input type="number" min="1" value={evRevenu.interval} oninput={(e) => (inc.interval = e.currentTarget.value)} /></label>
       <label class="f">Unité
-        <select bind:value={inc.unit}>
-          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{inc.interval > 1 ? l.pluriel : l.un}</option>{/each}
+        <select value={evRevenu.unit} onchange={(e) => (inc.unit = e.currentTarget.value as PeriodUnit)}>
+          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{Number(evRevenu.interval) > 1 ? l.pluriel : l.un}</option>{/each}
         </select>
       </label>
-      <label class="f">Vers le (jour) <input type="number" min="1" max="31" bind:value={inc.day} /></label>
+      <label class="f">Vers le (jour) <input type="number" min="1" max="31" value={evRevenu.day} oninput={(e) => (inc.day = e.currentTarget.value)} /></label>
         {#if comptesOuverts.length > 1}
           <label class="f">Sur quel compte ?
-            <select bind:value={inc.accountId}>
+            <select value={evRevenu.accountId} onchange={(e) => (inc.accountId = e.currentTarget.value)}>
               {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
@@ -1003,18 +1101,18 @@
   {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addFixed(); }}>
     <div class="grid">
-      <label class="f">Quoi ? <input bind:value={fix.name} placeholder="Loyer" /></label>
-      <label class="f">Combien ? <input bind:value={fix.amount} inputmode="decimal" placeholder="750,00" /></label>
-      <label class="f">Tous les <input type="number" min="1" bind:value={fix.interval} /></label>
+      <label class="f">Quoi ? <input bind:value={fix.name} placeholder={aideCharge?.name} /></label>
+      <label class="f">Combien ? <input bind:value={fix.amount} inputmode="decimal" placeholder={aideCharge ? montantAide(aideCharge.amount) : undefined} /></label>
+      <label class="f">Tous les <input type="number" min="1" value={evCharge.interval} oninput={(e) => (fix.interval = e.currentTarget.value)} /></label>
       <label class="f">Unité
-        <select bind:value={fix.unit}>
-          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{fix.interval > 1 ? l.pluriel : l.un}</option>{/each}
+        <select value={evCharge.unit} onchange={(e) => (fix.unit = e.currentTarget.value as PeriodUnit)}>
+          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{Number(evCharge.interval) > 1 ? l.pluriel : l.un}</option>{/each}
         </select>
       </label>
-      <label class="f">Vers le (jour) <input type="number" min="1" max="31" bind:value={fix.day} /></label>
+      <label class="f">Vers le (jour) <input type="number" min="1" max="31" value={evCharge.day} oninput={(e) => (fix.day = e.currentTarget.value)} /></label>
         {#if comptesOuverts.length > 1}
           <label class="f">Sur quel compte ?
-            <select bind:value={fix.accountId}>
+            <select value={evCharge.accountId} onchange={(e) => (fix.accountId = e.currentTarget.value)}>
               {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
@@ -1049,16 +1147,16 @@
     <div class="propositions">
       {#each restantsCourants as p (p.name)}
         <button class="prop" onclick={() => appliquerTirelire(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p))}</span>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p, app.asOf))}</span>
         </button>
       {/each}
     </div>
   {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addEveryday(); }}>
     <div class="grid">
-      <label class="f">Quoi ? <input bind:value={day.name} placeholder="Courses" /></label>
-      <label class="f">Combien par période ? <input bind:value={day.amount} inputmode="decimal" placeholder="500,00" /></label>
-      <label class="f check"><input type="checkbox" bind:checked={day.keep} /> Garder ce qui n'a pas été dépensé</label>
+      <label class="f">Quoi ? <input bind:value={day.name} placeholder={aideBudget?.name} /></label>
+      <label class="f">Combien par période ? <input bind:value={day.amount} inputmode="decimal" placeholder={aideBudget ? montantAide(aideBudget.amount) : undefined} /></label>
+      <label class="f check"><input type="checkbox" checked={gardeBudget} onchange={(e) => (day.keep = e.currentTarget.checked)} /> Garder ce qui n'a pas été dépensé</label>
     </div>
     {#if dayError}<div class="err">{dayError}</div>{/if}
     <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
@@ -1101,25 +1199,25 @@
     <div class="propositions">
       {#each restantsPeriodiques as p (p.name)}
         <button class="prop" onclick={() => appliquerTirelire(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p))}</span>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p, app.asOf))}</span>
         </button>
       {/each}
     </div>
   {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addPeriodic(); }}>
     <div class="grid">
-      <label class="f">Quoi ? <input bind:value={per.name} placeholder="Assurance auto" /></label>
-      <label class="f">Montant de la facture <input bind:value={per.amount} inputmode="decimal" placeholder="1 200,00" /></label>
-      <label class="f">Elle revient tous les <input type="number" min="1" bind:value={per.months} /> mois</label>
-      <label class="f">Prochaine échéance <input type="date" bind:value={per.dueDate} /></label>
+      <label class="f">Quoi ? <input bind:value={per.name} placeholder={aideEcheance?.name} /></label>
+      <label class="f">Montant de la facture <input bind:value={per.amount} inputmode="decimal" placeholder={aideEcheance ? montantAide(aideEcheance.amount) : undefined} /></label>
+      <label class="f">Elle revient tous les <input type="number" min="1" value={evEcheance.months} oninput={(e) => (per.months = e.currentTarget.value)} /> mois</label>
+      <label class="f">Prochaine échéance <input type="date" value={evEcheance.dueDate} oninput={(e) => (per.dueDate = e.currentTarget.value)} /></label>
         {#if comptesOuverts.length > 1}
           <label class="f">Sur quel compte ?
-            <select bind:value={per.accountId}>
+            <select value={evEcheance.accountId} onchange={(e) => (per.accountId = e.currentTarget.value)}>
               {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
             </select>
           </label>
         {/if}
-      <label class="f check"><input type="checkbox" bind:checked={per.withFlow} /> Attendre le prélèvement à cette date</label>
+      <label class="f check"><input type="checkbox" checked={evEcheance.withFlow} onchange={(e) => (per.withFlow = e.currentTarget.checked)} /> Attendre le prélèvement à cette date</label>
     </div>
     {#if perPreview !== undefined}
       <p class="small" style="margin:0">
@@ -1155,16 +1253,16 @@
     <div class="propositions">
       {#each restantsEpargnes as p (p.name)}
         <button class="prop" onclick={() => appliquerTirelire(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p))}</span>
+          <span class="n">+ {p.name}</span><span class="v num">{money(montantDeLaTirelire(p, app.asOf))}</span>
         </button>
       {/each}
     </div>
   {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addSavings(); }}>
     <div class="grid">
-      <label class="f">Quoi ? <input bind:value={sav.name} placeholder="Vacances" /></label>
-      <label class="f">Combien par période ? <input bind:value={sav.monthly} inputmode="decimal" placeholder="150,00" /></label>
-      <label class="f">Cible (facultatif) <input bind:value={sav.target} inputmode="decimal" placeholder="1 800,00" /></label>
+      <label class="f">Quoi ? <input bind:value={sav.name} placeholder={aideObjectif?.name} /></label>
+      <label class="f">Combien par période ? <input bind:value={sav.monthly} inputmode="decimal" placeholder={aideObjectif ? montantAide(aideObjectif.monthly) : undefined} /></label>
+      <label class="f">Cible (facultatif) <input bind:value={sav.target} inputmode="decimal" placeholder={aideObjectif?.target !== undefined ? montantAide(aideObjectif.target) : undefined} /></label>
     </div>
     {#if savPreview !== undefined}
       <p class="small" style="margin:0">Cible atteinte en <strong>{savPreview} périodes</strong>.</p>
@@ -1204,9 +1302,9 @@
   {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addCategory(); }}>
     <div class="grid">
-      <label class="f">Nom de la catégorie <input bind:value={cat.name} placeholder="Santé" /></label>
+      <label class="f">Nom de la catégorie <input bind:value={cat.name} placeholder={aideDeCategorie?.name} /></label>
       <label class="f">Nature
-        <select bind:value={cat.nature}>
+        <select value={natureDeCategorie} onchange={(e) => (cat.nature = e.currentTarget.value as CategoryNature)}>
           {#each NATURES_DE_CATEGORIE as g}<option value={g.nature}>{g.nature === 'expense' ? 'Dépense' : 'Revenu'}</option>{/each}
         </select>
       </label>
@@ -1270,13 +1368,13 @@
   {/if}
   <form class="edit" onsubmit={(e) => { e.preventDefault(); addAccount(); }}>
     <div class="grid">
-      <label class="f">Nom du compte <input bind:value={acc.name} placeholder="Livret A" /></label>
+      <label class="f">Nom du compte <input bind:value={acc.name} placeholder={aideDeCompte?.name} /></label>
       <label class="f">Type
-        <select bind:value={acc.kind}>
+        <select value={typeDeCompte} onchange={(e) => (acc.kind = e.currentTarget.value as Exclude<AccountKind, 'principal'>)}>
           {#each NATURES as k}<option value={k}>{ACCOUNT_KINDS[k]}</option>{/each}
         </select>
       </label>
-      <label class="f">Solde actuel <input bind:value={acc.balance} inputmode="decimal" /></label>
+      <label class="f">Solde actuel <input bind:value={acc.balance} inputmode="decimal" placeholder={aideDeCompte ? montantAide(aideDeCompte.balance) : undefined} /></label>
     </div>
     {#if accError}<div class="err">{accError}</div>{/if}
     <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter un compte</button></div>

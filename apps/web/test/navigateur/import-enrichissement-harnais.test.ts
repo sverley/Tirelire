@@ -201,7 +201,8 @@ describe.skipIf(!navigateur)('#321 · l’import, un enrichissement et non un pr
       expect(await cliquer(page, 'Saisir une opération')).toBe(true);
       await attendreTitre(page, 'Saisie');
       expect(await cliquer(page, 'Saisir une opération')).toBe(true);
-      await page.type('main input[placeholder="Dentiste"]', 'Boulangerie');
+      // Les aides de Saisie sont celles d'une même opération de l'exemple (#214) : « Dentiste (payé par Marie) », 80,00 €.
+      await page.type('main input[placeholder="Dentiste (payé par Marie)"]', 'Boulangerie');
       await page.type('main input[placeholder="80,00"]', '4,20');
       expect(await cliquer(page, 'Enregistrer')).toBe(true);
       await pause(300);

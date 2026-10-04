@@ -3,6 +3,7 @@
   import { revealed } from '../lib/actions';
   import FiltreEtat from '../lib/FiltreEtat.svelte';
   import { money, moneyClass, shortDate, centsToInput, inputToCents, validityBadge, validityLabel, ACCOUNT_KINDS } from '../lib/format';
+  import { aidesDeCompte } from '../lib/aides';
   import {
     accountBalance,
     budgetPeriodContaining,
@@ -39,6 +40,8 @@
   });
   let error = $state('');
   let etatsVisibles = $state<StateVisibility>({ ...DEFAULT_VISIBILITY });
+  /** L'aide du nom : celui d'un compte de l'exemple du type choisi (D43). Le numéro n'a aucune valeur dans l'exemple : « FR76 … » n'en propose pas. */
+  const aides = $derived(aidesDeCompte(form.kind));
 
   const accounts = $derived(alive(app.ledger.accounts));
   const idx = $derived(indexLedger(app.ledger));
@@ -156,7 +159,7 @@
   <form class="edit attached" use:revealed onsubmit={save}>
     <p class="titre-panneau">{titre}</p>
     <div class="grid">
-      <label class="f">Nom <input bind:value={form.name} placeholder="Compte courant" /></label>
+      <label class="f">Nom <input bind:value={form.name} placeholder={aides.name} /></label>
       <label class="f">Type
         {#if editing && isMain(editing)}
           <input value={ACCOUNT_KINDS.principal} disabled />
@@ -167,7 +170,7 @@
         {/if}
       </label>
       <label class="f">Banque (facultatif) <input bind:value={form.bank} /></label>
-      <label class="f">Numéro de compte ou IBAN (facultatif) <input bind:value={form.accountNumber} placeholder="FR76 1234 5678 90…" /></label>
+      <label class="f">Numéro de compte ou IBAN (facultatif) <input bind:value={form.accountNumber} placeholder="FR76 …" /></label>
       <label class="f">Solde initial <input bind:value={form.openingBalance} inputmode="decimal" /></label>
       <label class="f">Date du solde initial <input type="date" bind:value={form.openingDate} /></label>
       <p class="muted small" style="grid-column:1/-1;margin:0">
