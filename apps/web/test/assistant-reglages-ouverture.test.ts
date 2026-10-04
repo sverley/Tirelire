@@ -31,7 +31,7 @@ describe('[niveau 4] #324 · 1 et 2 — sur un projet vierge, l’ouverture prop
     expect(brouillonIntact(nouveauBrouillon(store.load()))).toBe(true);
   });
 
-  it('validé, le projet porte ces réglages, et Réglages les montre', async () => {
+  it('validé, le projet porte ces réglages, ceux que lit l’écran Réglages', async () => {
     const store = await depot();
     const projet = store.load();
     valider(store, projet, nouveauBrouillon(projet));
