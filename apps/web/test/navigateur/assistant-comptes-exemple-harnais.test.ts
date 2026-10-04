@@ -33,9 +33,9 @@ import { allerÀ, cliquer, JOUR_DES_TESTS, navigateur, nouvellePage, ouvrirLeSit
 
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 
-/** Le jour où tournent les pages, et la veille du début de sa période (le jour de paie d'un projet vierge est le 1er). */
+/** Le jour où tournent les pages, et la veille du début de sa période (sur un projet vierge, l'assistant arrive au 28, jour de paie de l'exemple : #324, D44). */
 const JOUR = JOUR_DES_TESTS.slice(0, 10);
-const VEILLE_DU_DEBUT_DE_PERIODE = addDays(budgetPeriodContaining(JOUR, 1).start, -1);
+const VEILLE_DU_DEBUT_DE_PERIODE = addDays(budgetPeriodContaining(JOUR, 28).start, -1);
 
 interface Ligne {
   principal: boolean;
@@ -315,10 +315,10 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
         await ouvrir(page, site);
         await arriverAuxComptes(page);
         expect(await avancer(page), 'l’étape des revenus ne se franchit pas par son bouton primaire').toBe(true);
-        // Le geste que l'assistant propose lui-même : commencer la période au jour de la paie de l'exemple.
-        expect(await cliquer(page, 'Commencer au jour de ma paie'), 'pas de raccourci « Commencer au jour de ma paie »').toBe(true);
+        // Le geste que l'assistant propose lui-même : suivre le mois calendaire, quand il arrive au jour de paie de l'exemple.
+        expect(await cliquer(page, 'Suivre le mois calendaire'), 'pas de raccourci « Suivre le mois calendaire »').toBe(true);
         const jour = await jourDeDebutDePeriode(page);
-        expect(jour, 'le jour proposé est le 1er, le même qu’au départ : ce test ne départagerait rien').toBeGreaterThan(1);
+        expect(jour, 'le jour proposé est le 28, le même qu’au départ : ce test ne départagerait rien').toBe(1);
         await jusquAuResume(page);
         expect(await cliquer(page, 'Valider mon budget')).toBe(true);
         await pause(400);
@@ -427,14 +427,14 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
         await ecran(page, 'Comptes');
         await montrerLeClos(page);
         await modifier(page, 'Livret jeune');
-        expect(await champ(page, 'Compte clos le'), 'au départ, la clôture est celle du premier passage (début de période le 1er)').toBe(VEILLE_DU_DEBUT_DE_PERIODE);
+        expect(await champ(page, 'Compte clos le'), 'au départ, la clôture est celle du premier passage (début de période le 28)').toBe(VEILLE_DU_DEBUT_DE_PERIODE);
 
-        // On rouvre l'assistant sur ce projet, on commence la période au jour de paie, on valide de nouveau.
+        // On rouvre l'assistant sur ce projet, on suit le mois calendaire, on valide de nouveau.
         await rouvrirAuxComptes(page);
         expect(await avancer(page), 'l’étape des revenus ne se franchit pas par son bouton primaire').toBe(true);
-        expect(await cliquer(page, 'Commencer au jour de ma paie'), 'pas de raccourci « Commencer au jour de ma paie »').toBe(true);
+        expect(await cliquer(page, 'Suivre le mois calendaire'), 'pas de raccourci « Suivre le mois calendaire »').toBe(true);
         const jour = await jourDeDebutDePeriode(page);
-        expect(jour, 'le jour proposé est le 1er, celui du premier passage : ce test ne départagerait rien').toBeGreaterThan(1);
+        expect(jour, 'le jour proposé est le 28, celui du premier passage : ce test ne départagerait rien').toBe(1);
         await jusquAuResume(page);
         expect(await cliquer(page, 'Valider mon budget')).toBe(true);
         await pause(400);

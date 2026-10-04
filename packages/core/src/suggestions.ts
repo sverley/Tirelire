@@ -125,6 +125,8 @@ export interface OrderSuggestion extends FlowSuggestion {
 export interface MainAccountSuggestion {
   name: string;
   balance: Cents;
+  /** Le coussin que l'exemple lui donne : ce que le plan veut laisser en non affecté (D41, `principalCushion`). */
+  cushion: Cents;
 }
 
 /** Un autre compte de l'exemple, de quoi en créer la ligne et rien de plus. */
@@ -161,6 +163,8 @@ export interface CategorySuggestion {
 
 export interface BudgetSuggestions {
   mainAccount: MainAccountSuggestion;
+  /** Le jour où commence la période budgétaire de l'exemple : celui de son plus gros revenu (D44, `periodStartDay`). */
+  periodStartDay: number;
   accounts: AccountSuggestion[];
   incomes: IncomeSuggestion[];
   charges: ChargeSuggestion[];
@@ -426,7 +430,11 @@ export function budgetSuggestions(_asOf?: ISODate): BudgetSuggestions {
   // Les comptes : tous ceux de l'exemple, le compte clos et les comptes tiers compris (porteur,
   // 24 septembre 2026). L'exemple porte toujours son compte principal.
   const main = alive(l.accounts).find((a) => a.kind === 'principal')!;
-  const mainAccount: MainAccountSuggestion = { name: main.name, balance: main.openingBalance };
+  const mainAccount: MainAccountSuggestion = {
+    name: main.name,
+    balance: main.openingBalance,
+    cushion: l.settings.principalCushion,
+  };
   const accounts: AccountSuggestion[] = alive(l.accounts)
     .filter((a): a is Account & { kind: AccountSuggestion['kind'] } => a.kind !== 'principal')
     .map((a) => ({
@@ -441,6 +449,7 @@ export function budgetSuggestions(_asOf?: ISODate): BudgetSuggestions {
 
   return {
     mainAccount,
+    periodStartDay: l.settings.periodStartDay,
     accounts,
     incomes: flowSuggestions(l, 'income'),
     charges: flowSuggestions(l, 'fixedCharge'),

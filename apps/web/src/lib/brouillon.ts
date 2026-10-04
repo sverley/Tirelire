@@ -13,10 +13,12 @@
  * Sans Svelte ni navigateur : l'état de l'application (`state.svelte.ts`) le tient et l'expose.
  */
 import {
+  DEFAULT_SETTINGS,
   LEDGER_KEYS,
   RowRefused,
   TABLES,
   alive,
+  budgetSuggestions,
   rowProblem,
   settingProblem,
   type ColumnDef,
@@ -40,6 +42,13 @@ export interface Brouillon {
   semees: string[];
   /** Le projet était-il vierge à l'ouverture (D43) ? Figé : la première ligne préparée ne le change pas. */
   projetVierge: boolean;
+  /**
+   * Les réglages que l'ouverture propose d'elle-même, sur un projet vierge : le jour de début de
+   * période et le coussin du compte principal de l'exemple (D43, D44). Figés avec `projetVierge`.
+   * Ils sont montrés et validés comme les réglages préparés, qui l'emportent sur eux, mais ils ne
+   * comptent pas comme préparés : un brouillon qui n'a que eux est intact.
+   */
+  reglagesProposes: Partial<Settings>;
 }
 
 /**
@@ -55,9 +64,31 @@ export function projetEstVierge(projet: Ledger): boolean {
   );
 }
 
+/**
+ * Ce que l'exemple dit des réglages, pour un projet vierge : le jour de début de période et le coussin
+ * (D44, D41). Un réglage que le projet a déjà posé n'est pas remplacé : « à renseigner » se lit à sa
+ * valeur par défaut, comme pour le nom et le solde du compte principal (D43 : rouvrir l'assistant ne
+ * doit rien casser).
+ */
+function reglagesDeLExemple(projet: Ledger): Partial<Settings> {
+  const exemple = budgetSuggestions();
+  const proposes: Partial<Settings> = {};
+  if (projet.settings.periodStartDay === DEFAULT_SETTINGS.periodStartDay) proposes.periodStartDay = exemple.periodStartDay;
+  if (projet.settings.principalCushion === DEFAULT_SETTINGS.principalCushion) proposes.principalCushion = exemple.mainAccount.cushion;
+  return proposes;
+}
+
 /** Un brouillon neuf : l'ouverture de l'assistant sur ce projet. */
 export function nouveauBrouillon(projet: Ledger): Brouillon {
-  return { lignes: {}, reglages: {}, etape: 'intro', semees: [], projetVierge: projetEstVierge(projet) };
+  const vierge = projetEstVierge(projet);
+  return {
+    lignes: {},
+    reglages: {},
+    etape: 'intro',
+    semees: [],
+    projetVierge: vierge,
+    reglagesProposes: vierge ? reglagesDeLExemple(projet) : {},
+  };
 }
 
 /**
@@ -157,7 +188,7 @@ export function reglage<K extends keyof Settings>(b: Brouillon, key: K, value: S
  * il l'a écrite.
  */
 export function montrer(projet: Ledger, b: Brouillon): Ledger {
-  const montre: Ledger = { ...projet, settings: { ...projet.settings, ...b.reglages } };
+  const montre: Ledger = { ...projet, settings: { ...projet.settings, ...b.reglagesProposes, ...b.reglages } };
   for (const key of LEDGER_KEYS) {
     const changees = b.lignes[key];
     if (!changees) continue;
@@ -208,9 +239,10 @@ export function valider(store: LedgerStore, projet: Ledger, b: Brouillon): void 
       ecritures.push(() => store.upsert(key, ligne as never));
     }
   }
-  for (const key of Object.keys(b.reglages) as Array<keyof Settings>) {
-    verifierReglage(key, b.reglages[key]);
-    ecritures.push(() => store.setSetting(key, b.reglages[key] as never));
+  const reglages: Partial<Settings> = { ...b.reglagesProposes, ...b.reglages };
+  for (const key of Object.keys(reglages) as Array<keyof Settings>) {
+    verifierReglage(key, reglages[key]);
+    ecritures.push(() => store.setSetting(key, reglages[key] as never));
   }
   for (const ecriture of ecritures) ecriture();
 }

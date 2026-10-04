@@ -5,7 +5,8 @@
  * la veille du premier jour de la période que l'assistant retient (point 3 de l'issue).
  *
  * Un seul parcours, joué dans l'ordre : le texte de l'étape, la date que l'étape montre quand on y
- * revient après avoir choisi le jour de paie, puis ce que le projet porte une fois le budget validé.
+ * revient après avoir choisi le mois calendaire (l'assistant arrive au 28, jour de paie de
+ * l'exemple : #324, D44), puis ce que le projet porte une fois le budget validé.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -91,20 +92,20 @@ describe.skipIf(!navigateur)('#211 · 3 — le compte clos de l’exemple suit l
     expect((texte.match(/\./g) ?? []).length, texte).toBe(2);
   });
 
-  it('[niveau 4] point 3 — le jour de paie choisi aux revenus, l’étape Comptes, en y revenant, dit la clôture à la veille de la période retenue', async () => {
-    // Avant : le mois calendaire, la période du 20 septembre commence le 1er.
-    expect(await detailDeLivretJeune(page)).toContain(shortDate(veille(1)));
+  it('[niveau 4] point 3 — le mois calendaire choisi aux revenus, l’étape Comptes, en y revenant, dit la clôture à la veille de la période retenue', async () => {
+    // Avant : l'assistant arrive au jour de paie de l'exemple, la période du 20 septembre commence le 28.
+    expect(await detailDeLivretJeune(page)).toContain(shortDate(veille(28)));
 
     await cliquer(page, 'Suivant'); // → Revenus
     await pause(250);
-    expect(await cliquer(page, 'Commencer au jour de ma paie')).toBe(true);
+    expect(await cliquer(page, 'Suivre le mois calendaire')).toBe(true);
     await pause(250);
     await cliquer(page, 'Précédent'); // → Comptes
     await pause(250);
 
     const detail = await detailDeLivretJeune(page);
-    expect(detail, 'la période commence le 28 : la clôture est la veille').toContain(shortDate(veille(28)));
-    expect(detail).not.toContain(shortDate(veille(1)));
+    expect(detail, 'la période commence le 1er : la clôture est la veille').toContain(shortDate(veille(1)));
+    expect(detail).not.toContain(shortDate(veille(28)));
   });
 
   it('[niveau 4] point 3 — validé, « Livret jeune » est clos dans le projet la veille du premier jour de la période retenue', async () => {
@@ -114,6 +115,6 @@ describe.skipIf(!navigateur)('#211 · 3 — le compte clos de l’exemple suit l
     }
     expect(await cliquer(page, 'Valider mon budget')).toBe(true);
     await pause(400);
-    expect(await clotureDansComptes(page)).toBe(veille(28));
+    expect(await clotureDansComptes(page)).toBe(veille(1));
   }, 60_000);
 });

@@ -227,13 +227,12 @@ async function preparer(page: Page) {
       .filter(Boolean),
   );
   await avancer(page); // → les revenus
-  expect(await cliquer(page, 'Commencer au jour de ma paie'), 'pas de proposition « Commencer au jour de ma paie »').toBe(true);
-  await pause(200);
+  // Sur un projet vierge, l'assistant arrive au jour de paie de l'exemple (#324, D44) : il n'y a plus à le proposer.
   const jour = await page.evaluate(() => {
     const champ = [...document.querySelectorAll('main label.f')].find((l) => (l.textContent ?? '').includes('La période commence le'));
     return (champ?.querySelector('input') as HTMLInputElement | null)?.value ?? null;
   });
-  expect(jour, 'le jour de début de période n’a pas changé').not.toBe('1');
+  expect(jour, 'l’assistant n’arrive pas au jour de paie de l’exemple').toBe('28');
   const parEtape = await jusquAuResume(page);
 
   // Une réserve placée ailleurs que sur le compte principal (le résumé en propose le choix).
