@@ -11,6 +11,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { app } from '../lib/state.svelte';
+  import Manque from '../lib/Manque.svelte';
   import { ACCOUNT_KINDS, UNITS, money, periodicityLabel, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
   import {
     activeAt,
@@ -18,6 +19,8 @@
     addDays,
     divideCents,
     dateInMonth,
+    dueDateShortfalls,
+    shortfallsForPeriod,
     parseDate,
     todayISO,
     daysInMonth,
@@ -107,7 +110,16 @@
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
   const fixedCharges = $derived(flows.filter((f) => f.kind === 'fixedCharge'));
   const tirelireById = (id: string) => tirelires.find((e) => e.id === id);
-  const totals = $derived(app.assistantPlan.totals);
+  const plan = $derived(app.assistantPlan);
+  const totals = $derived(plan.totals);
+  /**
+   * Ce que le Plan de la période en cours annoncera une fois l'assistant validé : ses annonces, et ses
+   * échéances en manque, lues comme le Plan les lit (`Plan.svelte`) mais sur ce que l'assistant montre.
+   * Le résumé les dit toutes : rien ne se cache (principe 4), et il ne dit « Tout est finançable » que
+   * si le Plan n'en annonce aucune.
+   */
+  const manques = $derived(shortfallsForPeriod(dueDateShortfalls(app.assistantLedger, app.asOf), plan.period, app.asOf));
+  const nbAnnonces = $derived(plan.warnings.length + manques.length);
 
   /**
    * Ancrage d'un flux sur le jour `day` : la dernière occurrence à cette date qui soit déjà
@@ -762,6 +774,17 @@
     const openingDate = a.id === MAIN_ACCOUNT_ID && a.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate ? periodStart() : a.openingDate;
     app.assistantUpsert('accounts', { ...a, openingBalance: c, openingDate });
   }
+  /**
+   * Le coussin du compte principal (D41) : un réglage du foyer, préparé dans le brouillon comme le
+   * début de période — l'assistant le propose avec celui de l'exemple sur un projet vierge, et il
+   * n'entre dans le projet qu'à la validation, où Réglages le montre.
+   */
+  const coussin = $derived(app.assistantLedger.settings.principalCushion);
+  function editCoussin(v: string) {
+    const c = inputToCents(v);
+    if (c === undefined || c < 0 || c === coussin) return;
+    app.assistantSetSetting('principalCushion', c);
+  }
 
   function removeFlow(f: PlannedFlow) {
     app.assistantRemove('plannedFlows', f.id);
@@ -1329,6 +1352,10 @@
       <input class="mt" value={centsToInput(principal.openingBalance)} inputmode="decimal" onchange={(e) => editAccountBalance(principal, e.currentTarget.value)} />
       <span class="pill">principal</span>
       <span></span>
+      <label class="coussin">
+        <span class="muted small">Coussin : montant minimum à laisser en non affecté ; le plan avertit si la marge passe en dessous.</span>
+        <input class="mt" value={centsToInput(coussin)} inputmode="decimal" aria-label="Coussin du compte principal" onchange={(e) => editCoussin(e.currentTarget.value)} />
+      </label>
     </div>
   {/if}
 
@@ -1391,29 +1418,55 @@
       </p>
     </div>
   {/if}
-  {#if totals.margin < 0}
-    <div class="card warn">
-      <p style="margin:0">
-        Il manque <strong>{money(-totals.margin)}</strong> par période pour tout financer. Ce n'est pas
-        une erreur de votre part : c'est exactement ce que l'application est là pour montrer. Baissez un
-        budget, étalez une échéance, ou mettez une épargne en attente.
-      </p>
-    </div>
-  {:else}
+  <p class="muted small">
+    Période du {shortDate(plan.period.start)} au {shortDate(plan.period.end)} : ce que le Plan dira de cette
+    période une fois votre budget validé.
+  </p>
+  {#if nbAnnonces === 0}
     <div class="card accent">
       <p style="margin:0">
         Tout est finançable, et il vous reste <strong>{money(totals.margin)}</strong> par période une fois
         les réserves mises de côté.
       </p>
     </div>
+  {:else}
+    <div class="card warn">
+      <p style="margin:0">
+        <strong>Le plan annonce {nbAnnonces} point{nbAnnonces > 1 ? 's' : ''} à regarder.</strong> Ce n'est pas
+        une erreur de votre part : c'est exactement ce que l'application est là pour montrer. Baissez un
+        budget, étalez une échéance, ou mettez une épargne en attente.
+      </p>
+    </div>
   {/if}
 
   <div class="card">
-    <div class="row"><div class="label">Rentrées d'argent</div><div class="num pos">{money(totals.incomes)}</div></div>
-    <div class="row"><div class="label">Charges fixes</div><div class="num">{money(-totals.fixedCharges)}</div></div>
-    <div class="row"><div class="label">Réserves à constituer ({needs.filter((n) => activeAt(n, app.asOf)).length})</div><div class="num">{money(-totals.requested)}</div></div>
-    <div class="row total"><div class="label">Reste à vivre</div><div class="num {totals.margin < 0 ? 'neg' : 'pos'}">{money(totals.margin)}</div></div>
+    <div class="row"><div class="label">Revenus prévus</div><div class="num pos">{money(totals.incomes)}</div></div>
+    <div class="row"><div class="label">Charges fixes</div><div class="num">{money(totals.fixedCharges)}</div></div>
+    <div class="row"><div class="label">Dotations demandées ({needs.filter((n) => activeAt(n, app.asOf)).length})</div><div class="num">{money(totals.requested)}</div></div>
+    <div class="row"><div class="label">Couvert par les revenus</div><div class="num">{money(totals.funded)}</div></div>
+    {#if plan.warnings.some((w) => w.code === 'principalOverdrawn')}
+      <div class="row"><div class="label">Non affecté sur le compte principal</div><div class="num neg">{money(totals.principalUnallocated)}</div></div>
+    {/if}
+    <div class="row total"><div class="label">Marge{totals.cushion ? ` (coussin ${money(totals.cushion)})` : ''}</div><div class="num {totals.margin < 0 ? 'neg' : 'pos'}">{money(totals.margin)}</div></div>
   </div>
+
+  {#if plan.warnings.length}
+    <div class="warnings">
+      {#each plan.warnings as w}
+        <div>{w.message}</div>
+      {/each}
+    </div>
+  {/if}
+
+  {#if manques.length}
+    <h3>Échéances en manque</h3>
+    <p class="muted small">Ce qui ne sera pas réuni à temps par les virements permanents. Rien ne se lisse sans vous : le Plan vous propose de lisser, une fois votre budget validé.</p>
+    <div class="card warn">
+      {#each manques as m (m.needId + m.dueDate)}
+        <Manque manque={m} repondre={false} />
+      {/each}
+    </div>
+  {/if}
 
   {#if !valide && comptesOuverts.length > 1 && tirelires.length}
     <h3>Où dort chaque tirelire ?</h3>

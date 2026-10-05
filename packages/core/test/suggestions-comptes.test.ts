@@ -43,8 +43,8 @@ describe('[niveau 4] #211 · 1 — tous les comptes de l’exemple sont proposé
 
 describe('[niveau 4] #211 · 2 — le compte principal arrive avec ce que l’exemple en dit : le nom « Compte courant » et le solde 2 340,00 €', () => {
   it('le nom et le solde du compte principal sont ceux de l’exemple', () => {
-    expect(s.mainAccount).toEqual({ name: 'Compte courant', balance: euros(2340) });
-    expect(s.mainAccount).toEqual({ name: principal.name, balance: principal.openingBalance });
+    expect(s.mainAccount).toMatchObject({ name: 'Compte courant', balance: euros(2340) });
+    expect(s.mainAccount).toMatchObject({ name: principal.name, balance: principal.openingBalance });
   });
 });
 
@@ -90,6 +90,7 @@ describe('[niveau 4] #211 · 5 — ces propositions viennent de l’exemple et d
     const permis = new Set(['name', 'kind', 'balance', 'settlement', 'closed']);
     // L'exemple ne dit ni banque ni numéro : l'assistant n'en invente pas.
     for (const p of s.accounts) for (const cle of Object.keys(p)) expect(permis, `${p.name} : ${cle}`).toContain(cle);
-    expect(Object.keys(s.mainAccount).sort()).toEqual(['balance', 'name']);
+    // Le coussin, que #324 y ajoute, est celui des réglages de l'exemple : voir `suggestions-reglages.test.ts`.
+    expect(Object.keys(s.mainAccount).sort()).toEqual(['balance', 'cushion', 'name']);
   });
 });

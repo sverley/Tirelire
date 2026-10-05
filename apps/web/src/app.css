@@ -193,6 +193,7 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
   .ligne-echeance > .date, .ligne-compte > input:nth-child(2), .ligne-compte > input:nth-child(3) { grid-column: 1 / -1; }
 }
 .ligne > .suite, .ligne-compte > .suite { grid-column: 1 / -1; margin: 2px 0 0; }
+.ligne-compte > .coussin { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 6px; align-items: center; margin: 2px 0 0; }
 /* Une catégorie de l'assistant : son nom et de quoi la retirer ; ce qu'elle porte (tirelire par défaut, flux) vient dessous (#212). */
 .ligne.ligne-categorie { grid-template-columns: minmax(0, 1fr) 44px; } /* 44 px : la cible tactile du bouton (C9), pour qu'il ne déborde pas de la carte */
 /* Une tirelire de l'assistant : son en-tête (nom, déjà de côté, reliquat), puis ses besoins (D28, #336). */

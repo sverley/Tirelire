@@ -85,8 +85,8 @@ describe('[niveau 4] #210 · 1 — rien de ce que l’assistant montre n’entre
     expect(projet.settings.periodStartDay).toBe(1);
   });
 
-  it('une ligne créée puis retirée dans le brouillon n’y laisse rien, et sa validation n’écrit rien', async () => {
-    const { store, ecritures } = await depot();
+  it('une ligne créée puis retirée dans le brouillon n’y laisse rien, et sa validation n’écrit que les réglages de départ de l’ouverture (D44, D41)', async () => {
+    const { store } = await depot();
     const projet = store.load();
     const b = nouveauBrouillon(projet);
     ecrire(b, 'tirelires', tirelire('t-passage', 'De passage'));
@@ -94,7 +94,9 @@ describe('[niveau 4] #210 · 1 — rien de ce que l’assistant montre n’entre
 
     expect(brouillonIntact(b)).toBe(true);
     valider(store, projet, b);
-    expect(ecritures.n).toBe(0);
+    const apres = store.load();
+    for (const cle of CLES) expect(apres[cle], cle).toEqual(projet[cle]);
+    expect(store.readSettings()).toMatchObject({ periodStartDay: 28, principalCushion: 60000 });
   });
 
   it('une ligne que le dépôt refuserait est refusée au geste qui la prépare, comme le dépôt la refuse, et le brouillon n’en garde rien', async () => {
@@ -207,7 +209,8 @@ describe('[niveau 4] #210 · 3 — quitter sans valider n’enregistre rien ; ce
     expect(ecritures.n).toBe(0);
     expect(JSON.stringify([store.load(), store.readSettings()])).toBe(avant);
     expect(brouillonIntact(neuf)).toBe(true);
-    expect(montrer(store.load(), neuf)).toEqual(store.load());
+    // Le projet, avec les réglages de départ que l'ouverture propose sur un projet vierge (D44, D41).
+    expect(montrer(store.load(), neuf)).toEqual({ ...store.load(), settings: { ...store.load().settings, periodStartDay: 28, principalCushion: 60000 } });
   });
 
   it('un brouillon dont une étape a présenté ses propositions n’est plus intact : on le retrouve en revenant', async () => {

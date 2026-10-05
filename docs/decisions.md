@@ -553,7 +553,12 @@ On peut être payé le 28 et vouloir raisonner en mois calendaire, ou l'inverse.
 période devient donc le réglage `settings.periodStartDay` (défaut `1`, qui redonne le mois
 calendaire), et l'écran Réglages l'expose avec sa raison d'être. L'assistant le **propose** à partir
 du jour du plus gros revenu déclaré — « commencer au jour de ma paie » ou « suivre le mois
-calendaire » — au lieu de le demander à froid avant que le moindre revenu existe.
+calendaire » — au lieu de le demander à froid avant que le moindre revenu existe. Sur un projet
+vierge (D43), il arrive d'office au jour de l'exemple, celui de son plus gros revenu — le salaire du
+28 — dès son ouverture : les étapes qui datent du début de la période en cours, à commencer par les
+comptes, le datent de la période qui commence ce jour-là, et « La période commence le » le montre à
+l'étape des revenus. « Suivre le mois calendaire » reste proposé ; « commencer au jour de ma paie »
+l'est dès que le jour du plus gros revenu n'est plus celui où la période commence.
 
 Le vocabulaire suit : `payPeriodContaining` devient `budgetPeriodContaining`, et le paramètre
 `payDay` devient `startDay` dans tout le cœur. Un compte ne porte aucun jour de paie.
