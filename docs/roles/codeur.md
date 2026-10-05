@@ -68,10 +68,8 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
    avec la raison ; ce qui appelle une validation humaine — pour chaque vérification manuelle
    demandée, ce que tes modifications changent et ce qui reste à constater —, si tu as
    demandé les tests navigateur, et pourquoi, et, si tu changes le comportement de la garde, ce
-   qu'en demande D81. Honnête et court. Puis arrête-toi.
-
-   La PR porte ton avancement, et ton compte rendu y est le seul : ce que tu rends en fin de
-   session — à qui t'a lancé, s'il y en a un — y renvoie, sans en être une autre version (D78).
+   qu'en demande D81. Honnête et court. Ce que tu rends en fin de session — à qui t'a lancé, s'il
+   y en a un — renvoie à ce compte rendu, sans le reprendre (D80). Puis arrête-toi.
 
 Tu ne passes jamais la PR en Ready et ne la fusionnes jamais. Tu n'ouvres pas d'issue. Tu ne
 publies jamais une version : seul le porteur pousse un tag `v*` ou déclenche la version forcée
