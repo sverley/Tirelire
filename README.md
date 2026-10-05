@@ -25,7 +25,7 @@ Seuls les fichiers Markdown de `docs/` sont fondateurs.
   contrainte a son harnais ou sa vérification manuelle (`pnpm test`), et l'issue de chaque PR déclare les siennes.
 - `apps/web` — l'interface, PWA en Svelte 5 + Vite. Les données restent dans le
   navigateur (SQLite en WebAssembly, persisté dans IndexedDB), exportables en un fichier.
-- `docs` — description du projet, invariants du produit, contraintes du projet, analyse du besoin, journal des décisions, architecture, formats d'import, prompt de reprise.
+- `docs` — description du projet, invariants du produit, contraintes du projet, analyse du besoin, décisions du produit et méthodes, architecture, formats d'import, prompt de reprise.
 
 ## Démarrer
 
@@ -97,8 +97,8 @@ niveau :
   push suivant. Un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
   n'atteste rien (D83, « Les empreintes »).
 - **pré-commit**, moins de 5 s, sur la copie de travail : les tests des paquets que touchent les
-  fichiers du commit — cœur ; garde ou règles (décisions, méthodes, description du projet, invariants,
-  contraintes, `CLAUDE.md`) ; relais ; hébergement. Rien pour la seule
+  fichiers du commit — cœur ; garde ou règles (décisions, méthodes, description du projet,
+  invariants, contraintes, `CLAUDE.md`) ; relais ; hébergement. Rien pour la seule
   documentation, l'interface ou la configuration. Parmi ces tests, la **non-régression** bloque :
   un test existant en échec refuse le commit. Le **harnais du besoin** — les fichiers de test que la
   branche ajoute ou modifie depuis sa base commune avec `origin/main` — est joué, et le crochet en

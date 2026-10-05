@@ -52,7 +52,7 @@ Des catalogues (`docs/invariants.md`, `docs/contraintes.md`, `docs/decisions.md`
 - **C9** : les propositions se lisent et se choisissent sur 375 px, au doigt.
 - **D43, D53** : aucune proposition n'a de contenu propre ; l'exemple garde de quoi démontrer le
   plan.
-- **D84** : l'exemple reste inventé.
+- **D89** : l'exemple reste inventé.
 
 Propres au domaine, paroles du porteur du 24 septembre 2026 :
 

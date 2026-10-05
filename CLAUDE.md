@@ -6,8 +6,9 @@ jamais (D77).
 - Les documents fondateurs (D77) : `docs/description-projet.md` — ses principes et ses usages —, le
   glossaire et les catalogues : `docs/invariants.md`, `docs/contraintes.md`, `docs/cibles.md`,
   `docs/decisions.md`, `docs/methodes.md`, `docs/gardes.md` ; les documents des domaines,
-  `docs/domaines/` ; le catalogue des versions, `docs/versions.md`. Ce que chaque session en lit d'abord est dans son rôle :
-  l'architecte les lit tous ; le codeur et l'auditeur, l'issue, le glossaire et ce que l'issue cite.
+  `docs/domaines/` ; le catalogue des versions, `docs/versions.md`. Ce que chaque session en lit
+  d'abord est dans son rôle : l'architecte les lit tous ; le codeur et l'auditeur, l'issue, le
+  glossaire et ce que l'issue cite.
 - La méthode est dans `docs/methodes.md`.
 - Chaque session tient un rôle, décrit dans `docs/roles/` : `architecte.md`, `auditeur.md`,
   `codeur.md`, `porteur.md`.

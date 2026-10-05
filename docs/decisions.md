@@ -1409,6 +1409,7 @@ d'une opération (D22) ; le rattrapage d'un déficit (D29).
   jamais stocker ce qui se recalcule (soldes, plan, soldes à régler). Écritures locales uniquement
   via `LedgerStore.upsert/remove/setSetting`, qui datent la ligne entière (D58) ; ce qui vient d'une
   autre instance passe par `LedgerStore.receive`.
+- L'exemple livré dans l'application est inventé : aucune donnée bancaire réelle.
 
 ### D91 · Des bêtas, puis le verrou du format
 

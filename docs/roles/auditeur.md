@@ -22,8 +22,8 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    ni les autres entrées de son catalogue ni les documents fondateurs (principe 9.1) : une
    contradiction devient une question au porteur, dans l'issue. Tu ne prends jamais d'hypothèse sur
    le besoin ; vérifie que chaque hypothèse que le codeur a inscrite dans l'issue est fondée et
-   juste, et dis-le dans ta vérification : celle qui ne l'est pas devient un retour au codeur, ou une
-   question au porteur si le besoin ne la tranche pas (D80). Dans la PR, les tests qui tranchent
+   juste, et dis-le dans ta vérification : celle qui ne l'est pas devient un retour au codeur, ou
+   une question au porteur si le besoin ne la tranche pas (D80). Dans la PR, les tests qui tranchent
    tes ajouts vont dans le harnais ; sa description reste celle du modèle (D82). Si le codeur doit
    coder un ajout, dis-le dans tes retours (étape 5) : c'est un nouveau tour.
 2. Compose le harnais. Pour chaque phrase du « Fait quand » qu'un test peut trancher, retiens un test
@@ -78,8 +78,9 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    code a une autre empreinte : ce qu'elle doit faire rougir se rejoue.
    Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur. Elle
    dit, pour chaque phrase du « Fait quand », le test du harnais qui la tranche et, s'il est de
-   niveau 0 ou 1, comment tu l'as vu rouge ; ou la vérification manuelle qui la couvre. Ce que tu
-   rends en fin de session — à qui t'a lancé, s'il y en a un — renvoie à ta vérification et à
+   niveau 0 ou 1, comment tu l'as vu rouge ; ou la vérification manuelle qui la couvre. Tes retours,
+   transmets-les aussi en direct à l'architecte, en plus de les consigner dans l'issue et la PR
+   quand il y en a ; pour le reste, ce que tu rends en fin de session renvoie à ta vérification et à
    l'issue, sans les reprendre (D80).
 4. Réponds aux commentaires du codeur : corrige le harnais, ou renvoie la question du besoin au
    porteur dans l'issue.

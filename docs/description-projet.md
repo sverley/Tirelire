@@ -882,14 +882,25 @@ l'architecte, les doublons et la coupure de ligne. Je les applique ? » :
 
 > oui, et amende la description
 
-Puis, aux questions de l'auditeur — « faut-il scinder D84, D85 et D87, leur part produit prenant de
-nouveaux numéros dans `decisions.md` à partir de D89, ou les laisser entières dans `methodes.md` ? »
-et « Qui valide les hypothèses que le codeur et l'auditeur écrivent dans l'issue ? » — :
+Puis, aux questions de l'auditeur — Q1 : « faut-il scinder D84, D85 et D87, leur part produit
+prenant de nouveaux numéros dans `decisions.md` à partir de D89, ou les laisser entières dans
+`methodes.md` ? » ; Q3 : « Qui valide les hypothèses que le codeur et l'auditeur écrivent dans
+l'issue ? » — :
 
 > Q1 : oui, il faut une séparation du contenu des décisions entre fonctionnel et organisationnel
 > Q3 : Soit le codeur prends une hypothèse qui semble tres probable et il la renseigne dans l'issue et l'auditeur vérifiera qu'elle est fondée et juste. Soit le codeur revient vers l'architecte avec les hypothèses à valider. L'auditeur ne prends jamais d'hypothèse
 
-Ce qui en est tiré : `docs/methodes.md`, qui reçoit D77 à D87 ; la part produit de D84 en D89, celle
-de D85 qui garde son numéro dans `docs/decisions.md`, sa part du travail en D90, la part produit de
-D87 en D91 ; D80 ; les rôles du codeur, de l'auditeur et de l'architecte ; les deux passages barrés
-le 5 octobre.
+Puis, aux questions de l'auditeur suivant — Q1 : la part produit de D85 garde-t-elle son numéro,
+sa part du travail prenant D90 ? ; Q2 : « exemples et tests sur données inventées » (D84) a-t-il une
+part produit, l'exemple livré dans l'application ? ; Q4 : où sont écrits les retours de l'audit
+précédent ? — :
+
+> Q1 : oui
+> Q2 : je séparerai les exemple qui sont du produit des tests qui sont de la méthodes
+> Q3 : pas compris
+> Q4 : les retours de l'auditeur sont transmis en direct à l'architecte en plus d'être consignés dans le ticket (quand il y en a un)
+
+Ce qui en est tiré : `docs/methodes.md`, qui reçoit D77 à D84, D86 et D87 ; D85, le vouvoiement,
+reste dans `docs/decisions.md` et sa part du travail devient D90 ; la part produit de D84, l'exemple
+inventé compris, devient D89 ; celle de D87, D91 ; D80 ; les rôles du codeur, de l'auditeur et de
+l'architecte ; les deux passages barrés le 5 octobre.

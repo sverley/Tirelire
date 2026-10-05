@@ -1,7 +1,7 @@
 # Méthodes
 
-Les décisions du porteur sur **le travail** : la méthode et les rôles. Celles sur **le produit** sont
-dans [`decisions.md`](decisions.md) ; les deux catalogues se partagent les identifiants. Même
+Les décisions du porteur sur **le travail** : la méthode et les rôles. Celles sur **le produit**
+sont dans [`decisions.md`](decisions.md) ; les deux catalogues se partagent les identifiants. Même
 autorité, même cohérence : une décision ne contrevient jamais à un principe ni à une autre décision,
 de l'un ou l'autre catalogue (principe 9.1), elle respecte les invariants
 ([`invariants.md`](invariants.md)) et les contraintes ([`contraintes.md`](contraintes.md)). Si un
@@ -17,8 +17,9 @@ ne se réemploient pas.
 
 Les documents fondateurs : `docs/description-projet.md` (les paroles du porteur, ouvertes par ses
 sections « Principes » et « Usages »), `docs/glossaire.md`, les catalogues — `docs/invariants.md`,
-`docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/methodes.md`, `docs/gardes.md` (le registre : chaque
-invariant et chaque contrainte, avec son harnais ou sa vérification manuelle) — les documents des
+`docs/contraintes.md`, `docs/cibles.md`, `docs/decisions.md`, `docs/methodes.md`,
+`docs/gardes.md` (le registre : chaque invariant et chaque contrainte, avec son harnais ou sa
+vérification manuelle) — les documents des
 domaines, `docs/domaines/`, le catalogue des versions, `docs/versions.md`, et les descriptifs des rôles, `docs/roles/`. Un document fondateur est
 forcément un fichier Markdown de `docs/` : un document d'un autre format (HTML, par exemple) ne l'est jamais, et ce qu'il porte de fondateur se
 reprend dans un Markdown. Tout Markdown de `docs/` n'est pas fondateur pour autant : la liste est
@@ -78,8 +79,10 @@ une question, une hypothèse du codeur, un ajout de l'auditeur — s'écrit dans
 inscrit une hypothèse et ne poursuit que si elle lui semble très probable : l'auditeur vérifie
 qu'elle est fondée et juste. Sinon, il soumet ses hypothèses à l'architecte, qui les tranche dans
 l'issue. L'auditeur ne prend jamais d'hypothèse. Le compte rendu du codeur, la vérification de
-l'auditeur et ses retours s'écrivent dans la PR. Ce qu'une session rend en fin de session, à qui l'a lancée, y renvoie sans
-le reprendre : une information à un seul endroit (D78 ; porteur, 05/10).
+l'auditeur et ses retours s'écrivent dans la PR. Ce qu'une session rend en fin de session, à qui
+l'a lancée, y renvoie sans le reprendre : une information à un seul endroit (D78). Seule exception :
+l'auditeur transmet aussi ses retours en direct à l'architecte, en plus de les consigner dans
+l'issue et la PR quand il y en a (porteur, 05/10).
 
 ### D81 · La garde
 
@@ -435,13 +438,13 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
 
 ### D84 · Le dépôt et les commits
 
-- **Aucune donnée bancaire réelle dans le dépôt.** Les fichiers bancaires servent à vérifier l'import
-  en local et ne se versionnent jamais (`*.csv`, `*.sqlite` ignorés) ; exemples et tests sur données
-  inventées.
+- **Aucune donnée bancaire réelle dans le dépôt.** Les fichiers bancaires servent à vérifier
+  l'import en local et ne se versionnent jamais (`*.csv`, `*.sqlite` ignorés) ; les tests portent
+  sur des données inventées.
 - **Signature des APK de test** : `apps/web/android/keystore/tirelire-test.jks` (mot de passe
   `tirelire-test`) signe les APK de test, pour que les mises à jour s'installent par-dessus. Jamais
   pour un magasin ; des secrets `ANDROID_KEYSTORE_*` la remplacent en CI.
-- Commits : un lot ou une décision par commit, message en français, corps explicatif.
+- Commits : un lot ou une décision par commit, corps explicatif ; leur langue suit D90.
 
 ### D86 · Des domaines, des issues de conception
 
