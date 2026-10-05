@@ -900,6 +900,12 @@ précédent ? — :
 > Q3 : pas compris
 > Q4 : les retours de l'auditeur sont transmis en direct à l'architecte en plus d'être consignés dans le ticket (quand il y en a un)
 
+Puis, à la question Q3 reformulée — « Ces deux phrases plaidaient pour un seul catalogue, ce que
+vous venez de contredire. Le barré les conserve tout en indiquant qu'elles ne valent plus. Êtes-vous
+d'accord pour qu'elles restent barrées ? » — :
+
+> Oui
+
 Ce qui en est tiré : `docs/methodes.md`, qui reçoit D77 à D84, D86 et D87 ; D85, le vouvoiement,
 reste dans `docs/decisions.md` et sa part du travail devient D90 ; la part produit de D84, l'exemple
 inventé compris, devient D89 ; celle de D87, D91 ; D80 ; les rôles du codeur, de l'auditeur et de
