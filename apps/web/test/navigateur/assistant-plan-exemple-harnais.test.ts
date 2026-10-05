@@ -1,9 +1,17 @@
 /**
- * Tests du codeur de #324 — « L'assistant conduit au plan, et son résumé dit ce que dira le plan » :
- * l'assistant mené jusqu'à sa validation par ses seuls boutons primaires, sur un projet vierge, au
- * 6 septembre 2026, à 375 px, sur le site construit.
+ * Harnais d'audit de #324 — « L'assistant conduit au plan, et son résumé dit ce que dira le plan ».
  *
- * Tous de niveau 4 (D83) : l'auditeur retient, déplace et modifie.
+ * L'assistant mené jusqu'à sa validation, sur un projet vierge, au 6 septembre 2026 (jour de
+ * l'exemple), à 375 px, sur le site construit. Tests du codeur retenus et complétés par l'auditeur.
+ *
+ * Niveaux (D83) :
+ * - points 3 et 4 (le résumé dit ce que dira le Plan, et « Tout est finançable » seulement si le Plan
+ *   n'annonce rien) : niveau 1, principe 4 (« rien ne se fait de manière cachée ») et principe 1.4
+ *   (l'application « avertit du montant qui manquera ») ;
+ * - points 1 (D44), 2 (D41) et 5 (le critère d'ensemble, les propositions de l'exemple) : niveau 2,
+ *   l'usage restant possible si l'un tombe.
+ * Le point 6 (I4) est tranché par le harnais du registre `assistant-simple.test.ts` ; le point 7, par
+ * la relecture de D44.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
@@ -96,6 +104,20 @@ const lireLePlan = (page: Page) =>
         .map((r): [string, string, string] => [t(r.querySelector('.label strong')), t(r.querySelector('.sub.neg')), t(r.querySelector(':scope > .num'))]),
     };
   });
+
+/** Le coussin que montre l'écran Réglages (Plus → Réglages). */
+async function coussinDeReglages(page: Page): Promise<string> {
+  await allerÀ(page, 'Plus');
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('main button')].find((x) => (x.textContent ?? '').includes('Réglages'));
+    (b as HTMLButtonElement | undefined)?.click();
+  });
+  await pause(300);
+  return page.evaluate(() => {
+    const champ = [...document.querySelectorAll('main label.f')].find((l) => (l.textContent ?? '').trim().startsWith('Coussin'));
+    return (champ?.querySelector('input') as HTMLInputElement | null)?.value ?? '';
+  });
+}
 
 /** Le fichier que l'application a conservé, relu côté Node. */
 async function projetConserve(page: Page): Promise<Ledger> {
@@ -216,7 +238,7 @@ type Geste = [ceQuOnVoit: string, geste: (page: Page) => Promise<void>];
  * Un projet vierge, l'assistant mené à son résumé en faisant les `gestes`, le résumé lu, le budget
  * validé, puis le Plan de la période en cours lu à son tour.
  */
-async function resumeEtPlan(site: Site, gestes: Geste[]) {
+async function resumeEtPlan(site: Site, gestes: Geste[], apres?: (page: Page) => Promise<void>) {
   const page = await ouvrirLAssistant(site);
   try {
     await primaire(page, 'Commencer');
@@ -231,7 +253,9 @@ async function resumeEtPlan(site: Site, gestes: Geste[]) {
     await allerÀ(page, 'Plan');
     await pause(300);
     const plan = await lireLePlan(page);
-    return { resume, plan, projet: await projetConserve(page) };
+    const projet = await projetConserve(page);
+    if (apres) await apres(page);
+    return { resume, plan, projet };
   } finally {
     await page.close();
   }
@@ -288,7 +312,7 @@ describe.skipIf(!navigateur)('#324 — l’assistant conduit au plan, et son ré
 
   describe('un projet vierge, accepté tel quel par les seuls boutons primaires', () => {
     let page: Page;
-    const vus: { periode?: string; propositions?: string[]; coussin?: string; resume?: Awaited<ReturnType<typeof lireLeResume>>; plan?: Awaited<ReturnType<typeof lireLePlan>> } = {};
+    const vus: { periode?: string; propositions?: string[]; coussin?: string; coussinReglages?: string; resume?: Awaited<ReturnType<typeof lireLeResume>>; plan?: Awaited<ReturnType<typeof lireLePlan>> } = {};
 
     beforeAll(async () => {
       page = await ouvrirLAssistant(site);
@@ -308,29 +332,31 @@ describe.skipIf(!navigateur)('#324 — l’assistant conduit au plan, et son ré
       vus.resume = await lireLeResume(page);
       await primaire(page, 'Valider mon budget');
       await pause(300);
+      vus.coussinReglages = await coussinDeReglages(page);
     }, 120_000);
 
     afterAll(async () => {
       await page?.close();
     });
 
-    it('[niveau 4] 1, 7 — la période commence le 28 dès l’arrivée sur l’étape Revenus, et « Suivre le mois calendaire » est seul proposé', () => {
+    it('[niveau 2] 1 — la période commence le 28 dès l’arrivée sur l’étape Revenus, et « Suivre le mois calendaire » est seul proposé', () => {
       expect(vus.periode).toBe('28');
       expect(vus.propositions!.filter((p) => /mois calendaire|jour de ma paie/.test(p))).toEqual([expect.stringMatching(/^Suivre le mois calendaire/)]);
     });
 
-    it('[niveau 4] 2 — l’étape Comptes montre le coussin de l’exemple, 600,00, sur la ligne du compte principal', () => {
+    it('[niveau 2] 2 — l’étape Comptes montre le coussin de l’exemple, 600,00, sur la ligne du compte principal, et Réglages le montre une fois validé', () => {
       expect(vus.coussin).toBe('600,00');
+      expect(vus.coussinReglages).toBe('600,00');
     });
 
-    it('[niveau 4] 5 — le plan du projet validé est celui de l’exemple privé de ses opérations, sur treize périodes', async () => {
+    it('[niveau 2] 5 — le plan du projet validé est celui de l’exemple privé de ses opérations, sur treize périodes', async () => {
       const projet = await projetConserve(page);
       const attendu = lirePlans(exempleSansOperations(), JOUR);
       const obtenu = lirePlans(projet, JOUR);
       expect(obtenu).toEqual(attendu);
     });
 
-    it('[niveau 4] 5 — les chiffres que dit l’issue : la période en cours, la taxe foncière et le lissage proposé, l’ordre vers Livret A', async () => {
+    it('[niveau 2] 5 — les chiffres que dit l’issue : la période en cours, la taxe foncière et le lissage proposé, l’ordre vers Livret A', async () => {
       const [courante] = lirePlans(await projetConserve(page), JOUR);
       expect(courante!.periode).toEqual(['2026-08-28', '2026-09-27']);
       expect(courante!.totaux).toMatchObject({ incomes: 420000, fixedCharges: 122000, requested: 230000, funded: 230000, margin: 68000, cushion: 60000 });
@@ -341,7 +367,7 @@ describe.skipIf(!navigateur)('#324 — l’assistant conduit au plan, et son ré
       expect(lirePlans(await projetConserve(page), JOUR)).toHaveLength(13);
     });
 
-    it('[niveau 4] 3 — le résumé dit ce que dit le Plan de la période en cours une fois validé', async () => {
+    it('[niveau 1] 3 — le résumé dit ce que dit le Plan de la période en cours une fois validé', async () => {
       await allerÀ(page, 'Plan');
       await pause(300);
       vus.plan = await lireLePlan(page);
@@ -349,15 +375,57 @@ describe.skipIf(!navigateur)('#324 — l’assistant conduit au plan, et son ré
     });
   });
 
+  describe('ce que l’assistant propose se corrige (ajouté par l’auditeur)', () => {
+    it('[niveau 2] 1, 2 — le coussin corrigé à l’étape Comptes est celui que montre Réglages ; « Commencer au jour de ma paie » revient quand le plus gros revenu ne tombe plus le 28', async () => {
+      let propositions: string[] = [];
+      let coussin = '';
+      const lu = await resumeEtPlan(
+        site,
+        [
+          ['Numéro ou IBAN', (p) => saisir(p, 'input[aria-label="Coussin du compte principal"]', 0, '450,00')],
+          [
+            "Rentrées d'argent",
+            async (p) => {
+              // Le plus gros revenu tombe désormais le 5.
+              const fait = await p.evaluate(() => {
+                const lignes = [...document.querySelectorAll<HTMLElement>('main .ligne-flux')].filter((l) => l.querySelector('input.jour'));
+                const montant = (l: HTMLElement) => Number((l.querySelector('input.mt') as HTMLInputElement).value.replace(/[^\d,]/g, '').replace(',', '.'));
+                const plusGros = lignes.sort((a, b) => montant(b) - montant(a))[0];
+                const jour = plusGros?.querySelector('input.jour') as HTMLInputElement | null;
+                if (!jour) return false;
+                jour.value = '5';
+                jour.dispatchEvent(new Event('change', { bubbles: true }));
+                return true;
+              });
+              expect(fait, 'pas de jour de revenu à changer').toBe(true);
+              await pause(250);
+              propositions = await p.evaluate(() =>
+                ([...document.querySelectorAll('main .propositions .prop')] as HTMLElement[]).map((n) => (n.textContent ?? '').replace(/[\s\u00a0\u202f]+/g, ' ').trim()),
+              );
+            },
+          ],
+        ],
+        async (p) => {
+          coussin = await coussinDeReglages(p);
+        },
+      );
+      expect(propositions.some((x) => x.startsWith('Commencer au jour de ma paie') && x.endsWith('le 5')), propositions.join(' | ')).toBe(true);
+      expect(propositions.some((x) => x.startsWith('Suivre le mois calendaire')), propositions.join(' | ')).toBe(true);
+      expect(lu.projet.settings.periodStartDay, 'rien ne change le début de période sans geste').toBe(28);
+      expect(lu.projet.settings.principalCushion).toBe(45000);
+      expect(coussin).toBe('450,00');
+    }, 120_000);
+  });
+
   describe('le résumé dit ce que dira le Plan, sur des budgets qui ne se ressemblent pas', () => {
-    it('[niveau 4] 4 — accepté tel quel, avec 1 500,00 € sur le compte principal : le non affecté négatif et l’échéance en manque y sont dits', async () => {
+    it('[niveau 1] 4 — accepté tel quel, avec 1 500,00 € sur le compte principal : le non affecté négatif et l’échéance en manque y sont dits', async () => {
       const lu = await resumeEtPlan(site, [['Numéro ou IBAN', (p) => saisir(p, '.ligne-compte.principal > input.mt', 0, '1500,00')]]);
       expect(lu.plan.annonces.some((a) => a.includes('non affecté est négatif'))).toBe(true);
       expect(lu.plan.manques.map(([nom]) => nom)).toEqual(['Taxe foncière']);
       leResumeEstLePlan(lu);
     }, 120_000);
 
-    it('[niveau 4] 4 — des revenus qui ne couvrent pas les dotations : chaque ligne non couverte et la marge négative y sont dites, pas « Tout est finançable »', async () => {
+    it('[niveau 1] 4 — des revenus qui ne couvrent pas les dotations : chaque ligne non couverte et la marge négative y sont dites, pas « Tout est finançable »', async () => {
       const lu = await resumeEtPlan(site, [
         ["Rentrées d'argent", async (p) => { for (let i = 0; i < 4; i++) await saisir(p, 'main .ligne-flux > input.mt', i, '100,00'); }],
       ]);
@@ -366,7 +434,7 @@ describe.skipIf(!navigateur)('#324 — l’assistant conduit au plan, et son ré
       leResumeEstLePlan(lu);
     }, 120_000);
 
-    it('[niveau 4] 3 — un budget que le Plan n’annonce rien à regarder : le résumé dit « Tout est finançable »', async () => {
+    it('[niveau 1] 3 — un budget que le Plan n’annonce rien à regarder : le résumé dit « Tout est finançable »', async () => {
       const lu = await resumeEtPlan(site, [
         ['Dépenses à échéance', (p) => retirerLaTirelire(p, 'Taxe foncière')],
         // Sans la taxe foncière, le budget demande 550,00 € vers le Livret A : l'ordre permanent déjà en place les vire.
