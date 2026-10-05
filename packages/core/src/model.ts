@@ -450,7 +450,7 @@ export interface Operation {
   label: string;
   /**
    * Dérivé du libellé (`normalizeLabel`) : jamais stocké, recalculé à la lecture du fichier (D58,
-   * D84). Tenu en mémoire parce que la recherche, les automatismes et le rapprochement le lisent.
+   * D89). Tenu en mémoire parce que la recherche, les automatismes et le rapprochement le lisent.
    */
   normalizedLabel: string;
   /** Libellé complet fourni par la banque (références, motifs). */

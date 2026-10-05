@@ -8,7 +8,7 @@ cibles actives, par incréments, chacun placé juste avant la première version 
 (D87). Le premier est `v0.0 · Données sûres`.
 
 Les versions `v0.x` sont des bêtas ; `v1`, la première version publique, pose le verrou du format
-(D87, D30). Le socle est `v0.0`, les versions d'usage `v0.1` à `v0.5` ; U6, U7 et U8 n'ont pas
+(D91, D30). Le socle est `v0.0`, les versions d'usage `v0.1` à `v0.5` ; U6, U7 et U8 n'ont pas
 encore de version (#300).
 
 Une version se termine quand son critère de fin est atteint et que le porteur a fait ses
@@ -78,7 +78,7 @@ de travail : une version prévue attend que les précédentes soient publiées (
 ## v1 · Format figé
 
 - **Usage** · aucun en propre : la première version publique, qui pose le verrou du format (D30,
-  D87).
+  D91).
 - **Cibles** · les cibles actives quand elle se travaille (`docs/cibles.md`).
 - **Fin** · les bêtas `v0.0` à `v0.5` sont publiées, et l'usage inversé (U4), l'import de sources
   diverses (U3, U5) et la synchronisation entre plateformes ont été exercés ; le signal sur la

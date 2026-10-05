@@ -179,7 +179,10 @@ Corrigé par le porteur le 23 septembre 2026 (#162) :
 > Non, j'ai fait une erreur. Les regles au sens actuel sont organisationnelles. Elles décrivent des méthodes à respecter. Les decisions sont fonctionnelles, elle décrivent le fonctionnement du produit. Le comportement décrit les rôles et ce qui est attendus de chaque rôle.
 > Il y a une réflexion structurelle à mener. Je souhaitait ce découpage pour que les decisions ne puissent pas être en contraction avec les regles. Mais puisque c'est aussi vrai pour les regles envers les regles (idem pour les decisions), je ne sais pas s'il est encore utile de faire cette différenciation. Est-ce qu'on ne décrit pas le concept sémantique des exigences d'un projet ? Où les exigences sont ailleurs ?
 
-> Je pense que décision et méthodes sont décidées par moi, elles suivent la meme autorité et ordonnent à tout le projet. Pourquoi les différencier ? Par contre, les rôles peuvent avoir un descriptif dédié qui servira de prompt. La question de savoir si toutes les decisions, fonctionnelles ou organisationnelles, ont un invariants se pose. Tout en sachant qu'un invariant quantifie une mesure mais cette mesure n'est pas nécessairement programmable (tous les invariants n'ont pas forcément un harnais autre qu'une validation manuelle)
+> Je pense que décision et méthodes sont décidées par moi, elles suivent la meme autorité et ordonnent à tout le projet. ~~Pourquoi les différencier ?~~ Par contre, les rôles peuvent avoir un descriptif dédié qui servira de prompt. La question de savoir si toutes les decisions, fonctionnelles ou organisationnelles, ont un invariants se pose. Tout en sachant qu'un invariant quantifie une mesure mais cette mesure n'est pas nécessairement programmable (tous les invariants n'ont pas forcément un harnais autre qu'une validation manuelle)
+
+Barré par le porteur le 5 octobre 2026 : voir « 5 octobre 2026 · les méthodes à part, le besoin
+dans l'issue ».
 
 > Ok, le catalogue des decisions est docs/decisions.md
 
@@ -469,7 +472,10 @@ Paroles du porteur du 23 septembre, dans #162.
 Les paroles qui corrigent le catalogue de règles séparé sont citées sous la parole du 13–14 septembre
 qu'elles barrent.
 
-> A moins que tu aies une bonne raison de garder séparée les decisions et méthodes
+> ~~A moins que tu aies une bonne raison de garder séparée les decisions et méthodes~~
+
+Barré par le porteur le 5 octobre 2026 : voir « 5 octobre 2026 · les méthodes à part, le besoin
+dans l'issue ».
 
 > Il faut ajouter un rôle : architecte qui analyse un besoin et défini ses spécifications. C'est aujourd'hui réalisé par la première phase de l'auditeur mais je voudrais que l'auditeur soit vraiment réduit à coder le harnais si nécessaire et vérifier le codage. L'analyse du besoin doit être indépendante.
 > Pour le reste je valide les changements décidés maintenant qui vont engendrer un nouveau tour dans cette issue et pr
@@ -854,3 +860,53 @@ automatisme, avec une seule sélection au lieu de deux ? » :
 > C'est ça
 
 Ce qui en est tiré : D24 et D88.
+
+## 5 octobre 2026 · les méthodes à part, le besoin dans l'issue
+
+Paroles du porteur, dans une session sans issue :
+
+> Plutôt que d' utiliser une sessions architecte pour la v0.1, et une session codeur et une auditeur pour chaque besoin, je ne pourrais pas plutôt ouvrir une session architecte pour un besoin, et lui demander de lancer le codeur et l'auditeur en sous agent avec le modèle adapté à la complexité identifié lors de la spécification ?
+
+> Oui, edite les rôles pour d'ores et déjà demander aux codeur et auditeur de passer par l'issue pour demander ou apporter des clarifications du besoin, des hypothèses prises ou toute information qui definie le besoin, et par la PR pour faire un rapport d'avancement.
+
+> modifie aussi l'architecte pour qu'il ne donne pas de consignes à l'auditeur qui prendrait en compte le retour du codeur
+
+Puis, à la question de l'auditeur — faut-il écrire cette règle dans les décisions ? — :
+
+> non, je souhaite que les decisions organisationnelles soient séparées des décisions du produit.
+
+> c'est pour cette raison qu'il faut séparer decisions.md de methodes.md
+
+Puis, à la question « Restent les retours 1, 3 et 4 de l'auditeur : la faille de l'étape 7 de
+l'architecte, les doublons et la coupure de ligne. Je les applique ? » :
+
+> oui, et amende la description
+
+Puis, aux questions de l'auditeur — Q1 : « faut-il scinder D84, D85 et D87, leur part produit
+prenant de nouveaux numéros dans `decisions.md` à partir de D89, ou les laisser entières dans
+`methodes.md` ? » ; Q3 : « Qui valide les hypothèses que le codeur et l'auditeur écrivent dans
+l'issue ? » — :
+
+> Q1 : oui, il faut une séparation du contenu des décisions entre fonctionnel et organisationnel
+> Q3 : Soit le codeur prends une hypothèse qui semble tres probable et il la renseigne dans l'issue et l'auditeur vérifiera qu'elle est fondée et juste. Soit le codeur revient vers l'architecte avec les hypothèses à valider. L'auditeur ne prends jamais d'hypothèse
+
+Puis, aux questions de l'auditeur suivant — Q1 : la part produit de D85 garde-t-elle son numéro,
+sa part du travail prenant D90 ? ; Q2 : « exemples et tests sur données inventées » (D84) a-t-il une
+part produit, l'exemple livré dans l'application ? ; Q4 : où sont écrits les retours de l'audit
+précédent ? — :
+
+> Q1 : oui
+> Q2 : je séparerai les exemple qui sont du produit des tests qui sont de la méthodes
+> Q3 : pas compris
+> Q4 : les retours de l'auditeur sont transmis en direct à l'architecte en plus d'être consignés dans le ticket (quand il y en a un)
+
+Puis, à la question Q3 reformulée — « Ces deux phrases plaidaient pour un seul catalogue, ce que
+vous venez de contredire. Le barré les conserve tout en indiquant qu'elles ne valent plus. Êtes-vous
+d'accord pour qu'elles restent barrées ? » — :
+
+> Oui
+
+Ce qui en est tiré : `docs/methodes.md`, qui reçoit D77 à D84, D86 et D87 ; D85, le vouvoiement,
+reste dans `docs/decisions.md` et sa part du travail devient D90 ; la part produit de D84, l'exemple
+inventé compris, devient D89 ; celle de D87, D91 ; D80 ; les rôles du codeur, de l'auditeur et de
+l'architecte ; les deux passages barrés le 5 octobre.

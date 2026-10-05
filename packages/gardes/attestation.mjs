@@ -80,7 +80,7 @@ export const ENSEMBLES = Object.freeze([
     id: 'coeur',
     nom: 'cœur',
     dossier: 'packages/core',
-    ecartes: [DOCUMENTATION, OUTILLAGE_CI, { motifs: ['apps/'], raison: "le cœur ne dépend d'aucune application (D84)" }, TESTS_DE_LA_GARDE],
+    ecartes: [DOCUMENTATION, OUTILLAGE_CI, { motifs: ['apps/'], raison: "le cœur ne dépend d'aucune application (D89)" }, TESTS_DE_LA_GARDE],
   },
   {
     id: 'relais',
