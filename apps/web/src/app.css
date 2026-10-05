@@ -214,3 +214,8 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 @media (max-width: 640px) {
   .ligne > .vide { display: none; }
 }
+.card.tirelire .ajout-besoin { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0 12px; }
+.card.tirelire .ajout-besoin input { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); min-width: 0; font-family: inherit; font-size: 14px; }
+.card.tirelire .ajout-besoin .besoin-nom { flex: 1 1 140px; }
+.card.tirelire .ajout-besoin .mt { width: 96px; font-family: var(--mono); text-align: right; }
+.card.tirelire .ajout-besoin .err { flex: 1 0 100%; }

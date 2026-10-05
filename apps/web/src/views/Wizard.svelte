@@ -31,6 +31,7 @@
     findCategoryByName,
     suggestedCategory,
     suggestedFlow,
+    suggestedNeed,
     suggestedTirelire,
     suggestedOrder,
     monthsOf,
@@ -58,10 +59,12 @@
     aideCourant,
     aideEpargne,
     aideFlux,
+    aideBesoin,
     aidePeriodique,
     montantAide,
     montantDeLaTirelire,
     parNom,
+    recopieBesoin,
     recopieCategorie,
     recopieCompte,
     recopieCourant,
@@ -287,6 +290,39 @@
     }
     dayError = '';
   }
+  // --- Un besoin de plus sur une tirelire de l'étape (D28) : un nom et un montant par période ---
+  /** Le besoin de l'exemple dont viennent les aides du formulaire : « Cours de piano », 45,00 (#344, #214). */
+  const aideBesoinAjoute = aideBesoin();
+  /** La saisie et l'erreur du formulaire d'ajout de chaque carte, par tirelire. */
+  let ajoutBesoin = $state<Record<string, { name: string; amount: string; error: string }>>({});
+  const saisieDuBesoin = (t: Tirelire) => ajoutBesoin[t.id] ?? { name: '', amount: '', error: '' };
+  /**
+   * Ajoute un besoin par période à la tirelire : en vigueur dès la période en cours, sans date de fin,
+   * avec la priorité par défaut. Un formulaire qui recopie ses aides fait ce que fait le raccourci du
+   * besoin de l'exemple, date de début comprise (#214).
+   */
+  function addNeedTo(t: Tirelire) {
+    const s = saisieDuBesoin(t);
+    const nom = s.name.trim();
+    const montant = inputToCents(s.amount);
+    if (!nom) return void (ajoutBesoin[t.id] = { ...s, error: 'Donne un nom à ce besoin.' });
+    if (montant === undefined || montant <= 0) return void (ajoutBesoin[t.id] = { ...s, error: 'Indique un montant par période, en positif.' });
+    if (aideBesoinAjoute && recopieBesoin({ name: nom, amount: montant }, aideBesoinAjoute)) {
+      app.assistantUpsert('needs', suggestedNeed(aideBesoinAjoute.ligne, { id: app.newId(), tirelireId: t.id }));
+    } else {
+      app.assistantUpsert('needs', {
+        id: app.newId(),
+        tirelireId: t.id,
+        kind: 'recurring',
+        name: nom,
+        amount: montant,
+        periodicity: { interval: 1, unit: 'month' as const, anchorDate: periodStart() },
+        priority: DEFAULT_PRIORITY.recurring,
+      } satisfies Need);
+    }
+    ajoutBesoin[t.id] = { name: '', amount: '', error: '' };
+  }
+
   // --- Dépenses qui ne tombent pas tous les mois : tirelire + besoin à échéance + flux ---
   /** Le rythme, l'échéance, le compte et le prélèvement, tant qu'on n'y a pas touché (`undefined`), sont ceux de la ligne d'aide (#214). */
   let per = $state<{ name: string; amount: string; months?: string | undefined; dueDate?: string | undefined; withFlow?: boolean | undefined; accountId?: string | undefined }>({ name: '', amount: '' });
@@ -1163,6 +1199,13 @@
           {@render suiteBesoin(n, besoins)}
         </div>
       {/each}
+      <!-- Un besoin de plus sur cette tirelire (D28) : un nom et un montant par période. -->
+      <form class="ajout-besoin" onsubmit={(e) => { e.preventDefault(); addNeedTo(t); }}>
+        <input class="besoin-nom" aria-label="Nom du besoin à ajouter" value={saisieDuBesoin(t).name} placeholder={aideBesoinAjoute?.name} oninput={(e) => (ajoutBesoin[t.id] = { ...saisieDuBesoin(t), name: e.currentTarget.value })} />
+        <input class="mt" aria-label="Montant par période du besoin à ajouter" inputmode="decimal" value={saisieDuBesoin(t).amount} placeholder={aideBesoinAjoute ? montantAide(aideBesoinAjoute.amount) : undefined} oninput={(e) => (ajoutBesoin[t.id] = { ...saisieDuBesoin(t), amount: e.currentTarget.value })} />
+        <button class="btn small" type="submit">Ajouter un besoin</button>
+        {#if saisieDuBesoin(t).error}<div class="err">{saisieDuBesoin(t).error}</div>{/if}
+      </form>
     </div>
   {/each}
   {#if restantsCourants.length}
