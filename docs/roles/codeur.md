@@ -55,10 +55,12 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
 4. Ne modifie jamais la PR une fois ouverte : ni description, ni état de brouillon, ni harnais. Ne
    modifie jamais un document fondateur, sauf si l'issue le demande. Ne touche jamais une cible de
    côté (`docs/cibles.md`).
-5. Si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
-   manquante —, demande au porteur, en commentaire de l'issue, la modification proposée, avec son
-   texte.
-6. Si le harnais paraît faux ou le besoin impossible, dis-le en commentaire et arrête-toi.
+5. Ce qui définit le besoin s'écrit dans l'issue, en commentaire, et nulle part ailleurs (D78,
+   D80) : si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
+   manquante —, demande au porteur la modification proposée, avec son texte ; toute hypothèse que
+   tu prends sur le besoin s'y écrit aussi, avec ce qu'elle tranche.
+6. Si le besoin paraît impossible, dis-le en commentaire de l'issue ; si le harnais paraît faux, en
+   commentaire de la PR. Puis arrête-toi.
 7. Quand le typecheck, tes tests et le harnais, s'il existe, sont verts, écris un commentaire sur
    la PR, un seul par tour — un compte rendu à chaque fois que tu rends le travail, au premier tour
    comme après chaque retour de l'auditeur ou du porteur : tes tests, avec, pour chacun, la phrase
@@ -67,6 +69,9 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
    demandée, ce que tes modifications changent et ce qui reste à constater —, si tu as
    demandé les tests navigateur, et pourquoi, et, si tu changes le comportement de la garde, ce
    qu'en demande D81. Honnête et court. Puis arrête-toi.
+
+   La PR porte ton avancement, et ton compte rendu y est le seul : ce que tu rends en fin de
+   session — à qui t'a lancé, s'il y en a un — y renvoie, sans en être une autre version (D78).
 
 Tu ne passes jamais la PR en Ready et ne la fusionnes jamais. Tu n'ouvres pas d'issue. Tu ne
 publies jamais une version : seul le porteur pousse un tag `v*` ou déclenche la version forcée

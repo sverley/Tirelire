@@ -18,8 +18,10 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    révèle ce que l'architecte a manqué — une phrase du « Fait quand », une entrée du registre touchée
    avec sa vérification manuelle (`node packages/gardes/cli.mjs demander --ids <id>` en prépare la
    consigne), une ligne « Usages » —, ajoute-le dans l'issue, signé (« ajouté par l'auditeur »), sans
-   retirer ni réécrire ce qu'a écrit l'architecte (porteur, #286). Vérifie que l'ajout ne contredit
-   ni les autres entrées de son catalogue ni les documents fondateurs (principe 9.1) : une
+   retirer ni réécrire ce qu'a écrit l'architecte (porteur, #286) ; toute hypothèse que tu prends
+   sur le besoin, pour trancher une phrase ou composer le harnais, s'y écrit de même. Vérifie que
+   l'ajout ne contredit ni les autres entrées de son catalogue ni les documents fondateurs
+   (principe 9.1) : une
    contradiction devient une question au porteur, dans l'issue. Dans la PR, les tests qui tranchent
    tes ajouts vont dans le harnais ; sa description reste celle du modèle (D82). Si le codeur doit
    coder un ajout, dis-le dans tes retours (étape 5) : c'est un nouveau tour.
@@ -80,6 +82,10 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    porteur dans l'issue.
 5. Si le codage appelle un nouveau tour, écris tes retours au codeur dans la PR. Ce qui doit
    survivre à la fusion n'y reste pas : il va dans une issue ouverte ou dans un catalogue (D78).
+
+Ce qui définit le besoin est dans l'issue ; ton avancement, ta vérification et tes retours, dans la
+PR (D78, D80). Ce que tu rends en fin de session — à qui t'a lancé, s'il y en a un — y renvoie, sans
+en être une autre version.
 
 Tu ne publies jamais une version : seul le porteur pousse un tag `v*` ou déclenche la version forcée
 (D83).
