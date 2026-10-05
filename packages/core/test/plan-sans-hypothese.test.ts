@@ -36,7 +36,7 @@
  * Niveaux (D83) : tous à 1. Le plan sans hypothèse est la parole du porteur (principe 1.3), et la
  * promesse tombe si le plan affiche une position de compte qu'aucune donnée ne porte, si un
  * manquement se cache, ou si l'import change ce que le budget demande ; aucune donnée n'est perdue
- * par là, le plan se calculant sans être stocké (D84).
+ * par là, le plan se calculant sans être stocké (D89).
  */
 import { describe, expect, it } from 'vitest';
 import {

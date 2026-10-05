@@ -191,7 +191,7 @@ besoin qu'il garde, un harnais est la **garde** ou des **tests**.
 ## Garde
 
 L'outil qui aide à ne pas dévier des documents fondateurs : description du projet, glossaire,
-invariants, contraintes, décisions, registre. Elle vérifie trois choses (D81) et rien de plus.
+invariants, contraintes, décisions, méthodes, registre. Elle vérifie trois choses (D81) et rien de plus.
 
 Elle a deux emplois, à ne pas confondre : garantir que ce qu'elle garde n'est pas altéré, et garantir
 que le contenu de ce qu'elle garde est respecté.

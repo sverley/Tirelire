@@ -74,9 +74,11 @@ descriptif de rôle dit ce que le rôle fait, dans quel ordre ; il renvoie aux c
 décisions qu'il applique.
 
 L'issue définit le besoin ; la PR porte la solution et son avancement. Ce qui définit le besoin —
-une question au porteur, une hypothèse prise par le codeur ou l'auditeur, un ajout de l'auditeur —
-s'écrit dans l'issue ; le compte rendu du codeur, la vérification de l'auditeur et ses retours
-s'écrivent dans la PR. Ce qu'une session rend en fin de session, à qui l'a lancée, y renvoie sans
+une question, une hypothèse du codeur, un ajout de l'auditeur — s'écrit dans l'issue. Le codeur n'y
+inscrit une hypothèse et ne poursuit que si elle lui semble très probable : l'auditeur vérifie
+qu'elle est fondée et juste. Sinon, il soumet ses hypothèses à l'architecte, qui les tranche dans
+l'issue. L'auditeur ne prend jamais d'hypothèse. Le compte rendu du codeur, la vérification de
+l'auditeur et ses retours s'écrivent dans la PR. Ce qu'une session rend en fin de session, à qui l'a lancée, y renvoie sans
 le reprendre : une information à un seul endroit (D78 ; porteur, 05/10).
 
 ### D81 · La garde
@@ -431,14 +433,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   déclenchement ne crée jamais une version numérotée. Un commit qui porte déjà une version, forcée
   ou numérotée, ne se republie pas, et le déclenchement le dit.
 
-### D84 · Le code, les données et les commits
+### D84 · Le dépôt et les commits
 
-- Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
-  (vitest, `pnpm test`). L'interface (`apps/web`) ne fait qu'afficher et saisir.
-- Montants en centimes entiers signés ; dates `AAAA-MM-JJ` ; `deletedAt` au lieu de supprimer ;
-  jamais stocker ce qui se recalcule (soldes, plan, soldes à régler). Écritures locales uniquement
-  via `LedgerStore.upsert/remove/setSetting`, qui datent la ligne entière (D58) ; ce qui vient d'une
-  autre instance passe par `LedgerStore.receive`.
 - **Aucune donnée bancaire réelle dans le dépôt.** Les fichiers bancaires servent à vérifier l'import
   en local et ne se versionnent jamais (`*.csv`, `*.sqlite` ignorés) ; exemples et tests sur données
   inventées.
@@ -446,13 +442,6 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   `tirelire-test`) signe les APK de test, pour que les mises à jour s'installent par-dessus. Jamais
   pour un magasin ; des secrets `ANDROID_KEYSTORE_*` la remplacent en CI.
 - Commits : un lot ou une décision par commit, message en français, corps explicatif.
-
-### D85 · La langue, et la lecture sur téléphone
-
-Français partout : code, commentaires, commits, interface, documents. L'outil vouvoie
-l'utilisateur, partout où il s'adresse à lui : écrans, boutons, messages, aides, documentation qui
-lui est destinée ; le tutoiement n'y a pas cours. Le porteur lit surtout sur téléphone : réponses
-courtes, en prose, une question à la fois.
 
 ### D86 · Des domaines, des issues de conception
 
@@ -499,15 +488,15 @@ croisement d'une cible et d'un usage : son entrée énumère ses contraintes, et
 porte sur leurs harnais et vérifications manuelles, sur ses issues de conception, et sur ce qu'elles
 demandent de vérifier en attendant le codage réel de ce qu'elles conçoivent.
 
-Un numéro de version porte une promesse. Les versions `v0.x`, socle et versions d'usage, sont des
-**bêtas** : publiées par leur tag et utilisables, elles laissent le format du fichier libre de
-changer d'une version à la suivante sans migration (D30), et le disent à l'utilisateur avant qu'il y
-mette de vraies données (C4, C5). `v1` est la **première version publique** : elle pose le
-**verrou** du format — à partir d'elle, tout changement de format fournit une migration ou reste
-rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été exercé : son entrée dans
-`docs/versions.md` le nomme.
+Ce que promet un numéro de version, bêta ou publique, est dans D91.
 
 Le travail est tiré par les versions : une tâche appartient au jalon de la version qui en a besoin,
 quel que soit son domaine (D86), et son ordre de traitement se résout dans cette version. Sur GitHub,
 un jalon du même nom que la version regroupe ces tâches ; son architecte les ordonne
 (`docs/roles/architecte.md`, « Suivre une version »).
+
+### D90 · La langue du travail, et la lecture sur téléphone
+
+Français partout dans le travail : code, commentaires, commits, documents ; ce que l'outil dit à
+l'utilisateur suit D85. Le porteur lit surtout sur téléphone : réponses courtes, en prose, une
+question à la fois.

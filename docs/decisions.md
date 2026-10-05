@@ -1,16 +1,8 @@
 # Décisions
 
 Les décisions du porteur sur **le produit** : comment il est fait. Celles sur **le travail**, la
-méthode et les rôles, sont dans [`methodes.md`](methodes.md) ; les deux catalogues se partagent les
-identifiants. Même autorité, même cohérence : une décision ne contrevient
-jamais à un principe ni à une autre décision (principe 9.1), elle respecte les invariants
-([`invariants.md`](invariants.md)) et les contraintes ([`contraintes.md`](contraintes.md)). Si un
-besoin semble exiger le contraire, la question se pose d'abord dans une issue.
-
-Chaque décision dit ce qu'elle implique, et pourquoi l'hypothèse qu'elle écarte ne tenait pas. Pour
-en changer une, on l'amende : pas d'entrée qui en remplace une autre, pas de renvoi à ce qu'elle
-remplace. Les identifiants sont ceux des entrées, sans date ; l'historique appartient à git. Les
-numéros retirés ne se réemploient pas.
+méthode et les rôles, sont dans [`methodes.md`](methodes.md), qui dit aussi ce qui vaut pour les
+deux catalogues : leur autorité, leur cohérence, leurs identifiants communs.
 
 ## Le produit
 
@@ -301,7 +293,7 @@ Le fichier et chaque paquet de synchronisation portent leur format et sa version
 version que l'application ne lit pas est refusée en le disant, sans rien ouvrir, écrire ni
 effacer : l'utilisateur garde le fichier tel quel et choisit la suite (C1, C8).
 
-La liberté du format vaut pour les bêtas (D87). Avant `v1`, la première version publique, une
+La liberté du format vaut pour les bêtas (D91). Avant `v1`, la première version publique, une
 version publiée peut refuser un fichier d'un format antérieur en le disant, sans migration : un
 changement de format passe par une nouvelle version du format, l'ancienne est refusée comme une
 version inconnue, et le code ne garde rien d'elle — ni colonne retirée, ni table laissée pour un pair
@@ -1150,7 +1142,7 @@ sur la machine, chaque problème nommé. Le format est documenté dans
 `docs/format-depot-sqlite.md` pour pouvoir être fabriqué depuis l'extérieur.
 
 Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'y stocke qui se
-recalcule (D84). Importées : `account_id`, `date`, `label`, `details`, `amount` et
+recalcule (D89). Importées : `account_id`, `date`, `label`, `details`, `amount` et
 `suggested_category`, la catégorie que propose la source. Saisie : `one_off`, et toutes les
 colonnes d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit pas
 dans la forme de l'identifiant, qui n'est qu'une identité (D09). Six colonnes établies sont
@@ -1311,6 +1303,11 @@ Ce que cela ne couvre pas encore : deux instances qui créent chacune « Santé 
 synchroniser gardent les deux, puisque la synchronisation fusionne les lignes par identifiant (D58) ;
 un fichier fabriqué dehors peut aussi en porter deux, que son ouverture ne refuse pas.
 
+### D85 · L'outil parle français et vouvoie
+
+L'outil parle français à l'utilisateur et le vouvoie, partout où il s'adresse à lui : écrans,
+boutons, messages, aides, documentation qui lui est destinée ; le tutoiement n'y a pas cours.
+
 ### D88 · Opérations, sous-opérations, étiquettes : un modèle, un calcul
 
 Précise D57, sous le principe 13 (#291).
@@ -1403,3 +1400,22 @@ individuelle, reste pour la suite.
 **Ce qui ne change pas.** Ce qui se fige (D57) ; l'ordre permanent, somme des croisières, et ce qui se
 recalcule, qui ne se stocke pas (D60) ; les fenêtres et tolérances de la reprise (D12) ; les états
 d'une opération (D22) ; le rattrapage d'un déficit (D29).
+
+### D89 · Le cœur calcule, l'interface affiche ; ce qui se stocke
+
+- Cœur (`packages/core`) sans dépendance à Svelte ni au navigateur ; tout calcul y est testé
+  (vitest, `pnpm test`). L'interface (`apps/web`) ne fait qu'afficher et saisir.
+- Montants en centimes entiers signés ; dates `AAAA-MM-JJ` ; `deletedAt` au lieu de supprimer ;
+  jamais stocker ce qui se recalcule (soldes, plan, soldes à régler). Écritures locales uniquement
+  via `LedgerStore.upsert/remove/setSetting`, qui datent la ligne entière (D58) ; ce qui vient d'une
+  autre instance passe par `LedgerStore.receive`.
+
+### D91 · Des bêtas, puis le verrou du format
+
+Un numéro de version porte une promesse. Les versions `v0.x`, socle et versions d'usage, sont des
+**bêtas** : publiées par leur tag et utilisables, elles laissent le format du fichier libre de
+changer d'une version à la suivante sans migration (D30), et le disent à l'utilisateur avant qu'il y
+mette de vraies données (C4, C5). `v1` est la **première version publique** : elle pose le
+**verrou** du format — à partir d'elle, tout changement de format fournit une migration ou reste
+rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été exercé : son entrée dans
+`docs/versions.md` le nomme.

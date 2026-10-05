@@ -97,7 +97,7 @@ niveau :
   push suivant. Un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
   n'atteste rien (D83, « Les empreintes »).
 - **pré-commit**, moins de 5 s, sur la copie de travail : les tests des paquets que touchent les
-  fichiers du commit — cœur ; garde ou règles (décisions, description du projet, invariants,
+  fichiers du commit — cœur ; garde ou règles (décisions, méthodes, description du projet, invariants,
   contraintes, `CLAUDE.md`) ; relais ; hébergement. Rien pour la seule
   documentation, l'interface ou la configuration. Parmi ces tests, la **non-régression** bloque :
   un test existant en échec refuse le commit. Le **harnais du besoin** — les fichiers de test que la

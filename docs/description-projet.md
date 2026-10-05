@@ -877,5 +877,19 @@ Puis, à la question de l'auditeur — faut-il écrire cette règle dans les dé
 
 > c'est pour cette raison qu'il faut séparer decisions.md de methodes.md
 
-Ce qui en est tiré : `docs/methodes.md`, qui reçoit D77 à D87 ; D80 ; les rôles du codeur, de
-l'auditeur et de l'architecte.
+Puis, à la question « Restent les retours 1, 3 et 4 de l'auditeur : la faille de l'étape 7 de
+l'architecte, les doublons et la coupure de ligne. Je les applique ? » :
+
+> oui, et amende la description
+
+Puis, aux questions de l'auditeur — « faut-il scinder D84, D85 et D87, leur part produit prenant de
+nouveaux numéros dans `decisions.md` à partir de D89, ou les laisser entières dans `methodes.md` ? »
+et « Qui valide les hypothèses que le codeur et l'auditeur écrivent dans l'issue ? » — :
+
+> Q1 : oui, il faut une séparation du contenu des décisions entre fonctionnel et organisationnel
+> Q3 : Soit le codeur prends une hypothèse qui semble tres probable et il la renseigne dans l'issue et l'auditeur vérifiera qu'elle est fondée et juste. Soit le codeur revient vers l'architecte avec les hypothèses à valider. L'auditeur ne prends jamais d'hypothèse
+
+Ce qui en est tiré : `docs/methodes.md`, qui reçoit D77 à D87 ; la part produit de D84 en D89, celle
+de D85 qui garde son numéro dans `docs/decisions.md`, sa part du travail en D90, la part produit de
+D87 en D91 ; D80 ; les rôles du codeur, de l'auditeur et de l'architecte ; les deux passages barrés
+le 5 octobre.

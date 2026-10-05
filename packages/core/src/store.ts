@@ -287,7 +287,7 @@ export class LedgerStore {
     for (const key of LEDGER_KEYS) {
       (ledger[key] as unknown[]) = this.readTable(TABLES[key]!);
     }
-    // Ce qui se recalcule ne se stocke pas (D58, D84) : le libellé normalisé se déduit du libellé.
+    // Ce qui se recalcule ne se stocke pas (D58, D89) : le libellé normalisé se déduit du libellé.
     for (const op of ledger.operations) op.normalizedLabel = normalizeLabel(op.label);
     ledger.settings = this.readSettings();
     return ledger;

@@ -56,9 +56,11 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
    modifie jamais un document fondateur, sauf si l'issue le demande. Ne touche jamais une cible de
    côté (`docs/cibles.md`).
 5. Ce qui définit le besoin s'écrit dans l'issue, en commentaire, et nulle part ailleurs (D78,
-   D80) : si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
-   manquante —, demande au porteur la modification proposée, avec son texte ; toute hypothèse que
-   tu prends sur le besoin s'y écrit aussi, avec ce qu'elle tranche.
+   D80). Si l'issue ne traite pas un point dont le codage a besoin — une ambiguïté, une section
+   manquante —, de deux choses l'une : si l'hypothèse qui le tranche te semble très probable,
+   écris-la dans l'issue, avec ce qu'elle tranche, et poursuis — l'auditeur vérifiera qu'elle est
+   fondée et juste ; sinon, soumets tes hypothèses à l'architecte, dans l'issue, et arrête-toi
+   jusqu'à sa réponse.
 6. Si le besoin paraît impossible, dis-le en commentaire de l'issue ; si le harnais paraît faux, en
    commentaire de la PR. Puis arrête-toi.
 7. Quand le typecheck, tes tests et le harnais, s'il existe, sont verts, écris un commentaire sur

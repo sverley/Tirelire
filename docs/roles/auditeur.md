@@ -18,10 +18,12 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    révèle ce que l'architecte a manqué — une phrase du « Fait quand », une entrée du registre touchée
    avec sa vérification manuelle (`node packages/gardes/cli.mjs demander --ids <id>` en prépare la
    consigne), une ligne « Usages » —, ajoute-le dans l'issue, signé (« ajouté par l'auditeur »), sans
-   retirer ni réécrire ce qu'a écrit l'architecte (porteur, #286) ; toute hypothèse que tu prends
-   sur le besoin, pour trancher une phrase ou composer le harnais, s'y écrit de même (D80). Vérifie
-   que l'ajout ne contredit ni les autres entrées de son catalogue ni les documents fondateurs
-   (principe 9.1) : une contradiction devient une question au porteur, dans l'issue. Dans la PR, les tests qui tranchent
+   retirer ni réécrire ce qu'a écrit l'architecte (porteur, #286). Vérifie que l'ajout ne contredit
+   ni les autres entrées de son catalogue ni les documents fondateurs (principe 9.1) : une
+   contradiction devient une question au porteur, dans l'issue. Tu ne prends jamais d'hypothèse sur
+   le besoin ; vérifie que chaque hypothèse que le codeur a inscrite dans l'issue est fondée et
+   juste, et dis-le dans ta vérification : celle qui ne l'est pas devient un retour au codeur, ou une
+   question au porteur si le besoin ne la tranche pas (D80). Dans la PR, les tests qui tranchent
    tes ajouts vont dans le harnais ; sa description reste celle du modèle (D82). Si le codeur doit
    coder un ajout, dis-le dans tes retours (étape 5) : c'est un nouveau tour.
 2. Compose le harnais. Pour chaque phrase du « Fait quand » qu'un test peut trancher, retiens un test
