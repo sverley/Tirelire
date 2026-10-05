@@ -9,7 +9,8 @@ ce que le produit doit rester : [`docs/invariants.md`](docs/invariants.md) ;
 ce que les plateformes imposent : [`docs/contraintes.md`](docs/contraintes.md) ;
 ce qui les garde : [`docs/gardes.md`](docs/gardes.md) ;
 le vocabulaire, du produit comme du travail : [`docs/glossaire.md`](docs/glossaire.md) ;
-les choix de mise en œuvre : [`docs/decisions.md`](docs/decisions.md).
+les choix de mise en œuvre : [`docs/decisions.md`](docs/decisions.md) ;
+la méthode et les rôles : [`docs/methodes.md`](docs/methodes.md).
 
 Seuls les fichiers Markdown de `docs/` sont fondateurs.
 

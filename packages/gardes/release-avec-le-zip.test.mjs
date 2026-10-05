@@ -141,8 +141,8 @@ describe('[niveau 4] #289 · la release d’une version publiée porte son ZIP d
 
   test('« Fait quand » 5 · D83 et docs/hebergement-web.md disent que la release porte le ZIP, et l’APK s’il est construit', () => {
     const espaces = (t) => t.replace(/\s+/g, ' ');
-    const d83 = espaces(lire('docs/decisions.md').split('- **Seul le porteur publie une version**')[1]?.split('\n- ')[0] ?? '');
-    assert.ok(d83, 'docs/decisions.md : l’entrée « Seul le porteur publie une version » manque ; le test est à relire');
+    const d83 = espaces(lire('docs/methodes.md').split('- **Seul le porteur publie une version**')[1]?.split('\n- ')[0] ?? '');
+    assert.ok(d83, 'docs/methodes.md : l’entrée « Seul le porteur publie une version » manque ; le test est à relire');
     assert.match(d83, /tirelire-hebergement\.zip/, 'D83 (« Seul le porteur publie une version ») ne dit pas que la release porte le ZIP');
     assert.match(d83, /avec l'APK s'il est construit/, 'D83 (« Seul le porteur publie une version ») ne dit pas que l’APK est joint s’il est construit');
     const hébergement = espaces(lire('docs/hebergement-web.md'));

@@ -147,8 +147,8 @@ L'intervalle sur lequel se lit un budget : de date de paie à date de paie, ou l
 
 Terme générique. Un besoin est :
 
-- **organisationnel** — décisions du travail, invariants, usages, principes, description du
-  projet, descriptifs de rôle, fichiers d'agent comme `CLAUDE.md` ;
+- **organisationnel** — décisions du travail (`docs/methodes.md`), invariants, usages, principes,
+  description du projet, descriptifs de rôle, fichiers d'agent comme `CLAUDE.md` ;
 - **fonctionnel** — le produit final ;
 - **d'outil** ;
 - **de documentation**.

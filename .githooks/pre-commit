@@ -5,8 +5,8 @@
 # travail, en parallèle, au seuil 0 (#232 : seuls les tests de niveau 0, l'irréparable) :
 #   packages/core/**                                   → tests du cœur (sans isolation, pour tenir le budget)
 #   la garde (packages/gardes/**, docs/gardes.md, .github/**)
-#   ou les règles (docs/decisions.md, docs/description-projet.md, docs/invariants.md,
-#   docs/contraintes.md, CLAUDE.md)                     → tests de la garde
+#   ou les règles (docs/decisions.md, docs/methodes.md, docs/description-projet.md,
+#   docs/invariants.md, docs/contraintes.md, CLAUDE.md) → tests de la garde
 #   apps/relay/**                                      → tests du relais
 #   apps/hebergement/**                                → tests de l'hébergement
 #   le reste (documentation, interface, configuration) → rien ; la livraison et la CI jugent le reste.
@@ -44,7 +44,7 @@ while IFS= read -r f; do
   case $f in
     packages/core/*) coeur=1 ;;
     packages/gardes/* | .github/* | docs/gardes.md) garde=1 ;;
-    docs/decisions.md | docs/description-projet.md | docs/invariants.md | docs/contraintes.md | CLAUDE.md) garde=1 ;;
+    docs/decisions.md | docs/methodes.md | docs/description-projet.md | docs/invariants.md | docs/contraintes.md | CLAUDE.md) garde=1 ;;
     apps/relay/*) relais=1 ;;
     apps/hebergement/*) hebergement=1 ;;
   esac
