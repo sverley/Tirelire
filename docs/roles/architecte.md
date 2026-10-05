@@ -36,6 +36,10 @@ lisent que l'issue, le glossaire et ce que l'issue cite (#333).
    le harnais après son compte rendu (#283). Suggère le modèle de son codeur et de son auditeur :
    Sonnet pour une tâche bornée à un écran ou à un module ; Opus pour une tâche qui touche la garde,
    les workflows, le format des données ou plusieurs domaines (porteur, #333).
+7. Ta consigne au codeur et à l'auditeur est l'issue, et rien d'autre, même quand tu lances leurs
+   sessions. Ne transmets pas à l'auditeur ce que le codeur a rendu, ni ce que tu en retiens : il lit
+   lui-même le « Fait quand », avant les tests du codeur, puis le compte rendu dans la PR (principe
+   11.1, D80). Ce qu'il faudrait ajouter au besoin s'écrit dans l'issue, pour les deux.
 
 ## Suivre une version
 
