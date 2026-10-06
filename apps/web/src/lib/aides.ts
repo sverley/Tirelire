@@ -217,12 +217,6 @@ export const recopieCompte = (s: { name: string; kind: AccountKind; balance: Cen
 // Hors de l'assistant : la première ligne de l'exemple du genre du formulaire
 // ---------------------------------------------------------------------------------------------
 
-/** Compte : le nom d'un compte de l'exemple du type choisi. Le numéro et la banque n'ont aucune valeur dans l'exemple : ils n'ont pas d'aide qui en invente une. */
-export function aidesDeCompte(kind: AccountKind): { name: string | undefined } {
-  const s = budgetSuggestions();
-  return { name: kind === 'principal' ? s.mainAccount.name : s.accounts.find((a) => a.kind === kind)?.name };
-}
-
 /** Tirelire : le nom d'une tirelire de l'exemple. */
 export function aidesDeTirelire(): { name: string | undefined } {
   return { name: budgetSuggestions().tirelires[0]?.name };
