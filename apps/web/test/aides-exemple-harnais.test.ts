@@ -52,7 +52,7 @@ describe('[niveau 2] #214 · 1 — à une autre date de lecture, l’aide est ce
 });
 
 /** Les écrans dont les aides viennent de l'exemple : les formulaires de l'assistant, de Comptes, de Tirelires, de Flux prévus, de Catégories et de Saisie. */
-const ECRANS = ['views/Wizard.svelte', 'views/Accounts.svelte', 'views/Tirelires.svelte', 'views/Flows.svelte', 'views/Categories.svelte', 'views/Entries.svelte'];
+const ECRANS = ['views/Wizard.svelte', 'views/Accounts.svelte', 'views/Tirelires.svelte', 'views/Flows.svelte', 'views/Categories.svelte', 'views/Entries.svelte', 'lib/SectionTirelires.svelte'];
 /** Les textes indicatifs qui nomment le champ ou son formulaire sans proposer de valeur (point 4) : les seuls qu'un écran peut encore écrire en dur. */
 const INDICATIFS = ['Nom du compte', 'Banque', 'FR76 …', 'cible'];
 
@@ -75,7 +75,7 @@ describe('[niveau 2] #214 · 5 — une aide qui propose une valeur sans venir de
   });
 
   it('le contrôle n’est pas vide : il voit les textes indicatifs du point 4, et refuserait « Dentiste » écrit en dur de chaque manière', () => {
-    expect(litteraux(source('views/Wizard.svelte'))).toEqual(expect.arrayContaining(['Banque', 'FR76 …', 'Nom du compte', 'cible']));
+    expect(litteraux(source('views/Wizard.svelte') + source('lib/SectionTirelires.svelte'))).toEqual(expect.arrayContaining(['Banque', 'FR76 …', 'Nom du compte', 'cible']));
     expect(INDICATIFS).not.toContain('Dentiste');
     expect(INDICATIFS).not.toContain('2 400,00');
     for (const ecrit of [
@@ -91,6 +91,6 @@ describe('[niveau 2] #214 · 5 — une aide qui propose une valeur sans venir de
   });
 
   it('chaque formulaire qui propose des valeurs lit `lib/aides` : aucun écran n’en écrit les valeurs lui-même', () => {
-    for (const ecran of ECRANS) expect(source(ecran), ecran).toMatch(/from '\.\.\/lib\/aides'/);
+    for (const ecran of ECRANS) expect(source(ecran), ecran).toMatch(/from '(?:\.\.\/lib|\.)\/aides'/);
   });
 });
