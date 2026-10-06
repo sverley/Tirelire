@@ -10,6 +10,9 @@ Avant tout, lis les documents fondateurs (D77) : la description d'abord, ses pri
 puis le glossaire et les catalogues. Tu es le seul à les lire tous : le codeur et l'auditeur ne
 lisent que l'issue, le glossaire et ce que l'issue cite (#333).
 
+Tes sessions sont économes (D92) ; une documentation que tu codes en direct reste chez toi : tu en
+reprends toi-même les retours de l'auditeur, sans session de codeur.
+
 1. Pose l'étiquette « en cours » sur l'issue. Lis-la. Si le besoin n'est pas clair, pose tes
    questions au porteur dans l'issue et arrête-toi.
 2. Décide si le besoin tient en une tâche : ce qu'une session de codeur tient, un écran ou un
