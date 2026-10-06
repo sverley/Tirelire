@@ -104,7 +104,7 @@
   function supprimerOrdre(t: PlanTransfer) {
     const id = t.bankOrder?.flowId;
     if (!id) return;
-    if (!confirm(`Supprimer l'ordre permanent vers « ${t.accountName} » ?\n\nÀ faire une fois qu'il est supprimé chez ta banque — sinon le virement continuera d'arriver sans être reconnu.`)) return;
+    if (!confirm(`Supprimer l'ordre permanent vers « ${t.accountName} » ?\n\nÀ faire une fois qu'il est supprimé chez votre banque — sinon le virement continuera d'arriver sans être reconnu.`)) return;
     app.remove('plannedFlows', id);
   }
 
@@ -112,7 +112,7 @@
     e.preventDefault();
     if (!principalId) return;
     const montant = inputToCents(montantOrdre);
-    if (montant === undefined || montant <= 0) return void (erreurOrdre = 'Montant invalide (le montant que vire ton ordre, en positif).');
+    if (montant === undefined || montant <= 0) return void (erreurOrdre = 'Montant invalide (le montant que vire votre ordre, en positif).');
     const flow = standingTransferFlow(plan, t, principalId, t.bankOrder?.flowId ?? app.newId(), montant);
     if (!flow) return;
     app.upsert('plannedFlows', flow);
@@ -421,8 +421,8 @@
           <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
             <p class="titre-panneau">{titreOrdre}</p>
             <p class="muted small" style="margin:0">
-              Le montant que <strong>ton ordre exécute chez ta banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
-              Proposé arrondi au-dessus de {money(t.permanent)} ; corrige-le pour coller à ce que tu as réellement posé.
+              Le montant que <strong>votre ordre exécute chez votre banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
+              Proposé arrondi au-dessus de {money(t.permanent)} ; corrigez-le pour coller à ce que vous avez réellement posé.
             </p>
             <div class="grid">
               <label class="f">Montant de l’ordre permanent (€) <input bind:value={montantOrdre} inputmode="decimal" /></label>

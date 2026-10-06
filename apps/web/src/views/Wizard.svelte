@@ -205,8 +205,8 @@
   }
   function addIncome() {
     const amount = inputToCents(inc.amount);
-    if (!inc.name.trim()) return void (incError = 'Donne un nom à cette rentrée d’argent.');
-    if (amount === undefined || amount <= 0) return void (incError = 'Indique un montant, en positif.');
+    if (!inc.name.trim()) return void (incError = 'Donnez un nom à cette rentrée d’argent.');
+    if (amount === undefined || amount <= 0) return void (incError = 'Indiquez un montant, en positif.');
     const interval = Math.max(1, Number(evRevenu.interval) || 1);
     const jour = Number(evRevenu.day) || 1;
     // Une ligne dont chaque champ porte la valeur de son aide fait ce que fait le raccourci de cette ligne (#214).
@@ -238,8 +238,8 @@
   }
   function addFixed() {
     const amount = inputToCents(fix.amount);
-    if (!fix.name.trim()) return void (fixError = 'Donne un nom à cette charge.');
-    if (amount === undefined || amount <= 0) return void (fixError = 'Indique un montant, en positif.');
+    if (!fix.name.trim()) return void (fixError = 'Donnez un nom à cette charge.');
+    if (amount === undefined || amount <= 0) return void (fixError = 'Indiquez un montant, en positif.');
     const interval = Math.max(1, Number(evCharge.interval) || 1);
     const jour = Number(evCharge.day) || 1;
     const ligne = aideCharge;
@@ -278,8 +278,8 @@
   }
   function addEveryday() {
     const amount = inputToCents(day.amount);
-    if (!day.name.trim()) return void (dayError = 'Donne un nom à ce budget.');
-    if (amount === undefined || amount <= 0) return void (dayError = 'Indique un montant par période.');
+    if (!day.name.trim()) return void (dayError = 'Donnez un nom à ce budget.');
+    if (amount === undefined || amount <= 0) return void (dayError = 'Indiquez un montant par période.');
     const ligne = aideBudget;
     if (ligne && recopieCourant({ name: day.name.trim(), amount, keep: gardeBudget }, ligne)) {
       appliquerTirelire(ligne.ligne);
@@ -305,8 +305,8 @@
     const s = saisieDuBesoin(t);
     const nom = s.name.trim();
     const montant = inputToCents(s.amount);
-    if (!nom) return void (ajoutBesoin[t.id] = { ...s, error: 'Donne un nom à ce besoin.' });
-    if (montant === undefined || montant <= 0) return void (ajoutBesoin[t.id] = { ...s, error: 'Indique un montant par période, en positif.' });
+    if (!nom) return void (ajoutBesoin[t.id] = { ...s, error: 'Donnez un nom à ce besoin.' });
+    if (montant === undefined || montant <= 0) return void (ajoutBesoin[t.id] = { ...s, error: 'Indiquez un montant par période, en positif.' });
     if (aideBesoinAjoute && recopieBesoin({ name: nom, amount: montant }, aideBesoinAjoute)) {
       app.assistantUpsert('needs', suggestedNeed(aideBesoinAjoute.ligne, { id: app.newId(), tirelireId: t.id }));
     } else {
@@ -364,10 +364,10 @@
   }
   function addPeriodic() {
     const amount = inputToCents(per.amount);
-    if (!per.name.trim()) return void (perError = 'Donne un nom à cette dépense.');
-    if (amount === undefined || amount <= 0) return void (perError = 'Indique le montant de la facture.');
+    if (!per.name.trim()) return void (perError = 'Donnez un nom à cette dépense.');
+    if (amount === undefined || amount <= 0) return void (perError = 'Indiquez le montant de la facture.');
     const echeance = evEcheance.dueDate;
-    if (!echeance) return void (perError = 'Indique la date de la prochaine échéance.');
+    if (!echeance) return void (perError = 'Indiquez la date de la prochaine échéance.');
     const mois = Math.max(1, Number(evEcheance.months) || 1);
     const ligne = aideEcheance;
     if (ligne && recopiePeriodique({ name: per.name.trim(), amount, months: mois, dueDate: echeance, withFlow: evEcheance.withFlow, accountId: evEcheance.accountId }, ligne, compteNommeOuPrincipal(ligne.accountName))) {
@@ -410,8 +410,8 @@
   }
   function addSavings() {
     const monthly = inputToCents(sav.monthly);
-    if (!sav.name.trim()) return void (savError = 'Donne un nom à cet objectif.');
-    if (monthly === undefined || monthly <= 0) return void (savError = 'Indique combien mettre de côté par période.');
+    if (!sav.name.trim()) return void (savError = 'Donnez un nom à cet objectif.');
+    if (monthly === undefined || monthly <= 0) return void (savError = 'Indiquez combien mettre de côté par période.');
     const cible = inputToCents(sav.target);
     const ligne = aideObjectif;
     if (ligne && recopieEpargne({ name: sav.name.trim(), monthly, target: cible }, ligne)) appliquerTirelire(ligne.ligne);
@@ -433,7 +433,7 @@
   let acc = $state<{ name: string; kind?: Exclude<AccountKind, 'principal'> | undefined; balance: string }>({ name: '', balance: '' });
   let accError = $state('');
   function addAccount() {
-    if (!acc.name.trim()) return void (accError = 'Donne un nom à ce compte.');
+    if (!acc.name.trim()) return void (accError = 'Donnez un nom à ce compte.');
     const openingBalance = acc.balance.trim() ? inputToCents(acc.balance) : 0;
     if (openingBalance === undefined) return void (accError = 'Solde invalide.');
     const ligne = aideDeCompte;
@@ -896,7 +896,7 @@
   function addCategory() {
     catLigneError = '';
     const nom = cat.name.trim();
-    if (!nom) return void (catError = 'Donne un nom à cette catégorie.');
+    if (!nom) return void (catError = 'Donnez un nom à cette catégorie.');
     const nature = natureDeCategorie;
     const refus = doublonDe(nom, nature);
     if (refus) return void (catError = refus);

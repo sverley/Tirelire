@@ -4,7 +4,6 @@ import {
   parseCents,
   parseDate,
   validityState,
-  MONTHS_FR,
   type Account,
   type Cents,
   type NeedKind,
@@ -21,12 +20,12 @@ export function moneyClass(c: Cents): string {
   return c < 0 ? 'num neg' : c > 0 ? 'num pos' : 'num';
 }
 
+const MOIS_ABREGES = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
 /** « 15 oct. 2026 » */
 export function shortDate(iso: string): string {
   const { y, m, d } = parseDate(iso);
-  const mon = MONTHS_FR[m - 1]!;
-  const abbr = mon.length > 4 ? mon.slice(0, 4).replace(/\.$/, '') + '.' : mon;
-  return `${d} ${abbr} ${y}`;
+  return `${d} ${MOIS_ABREGES[m - 1]!} ${y}`;
 }
 
 export function centsToInput(c: Cents | undefined): string {
@@ -70,6 +69,14 @@ export const FLOW_KINDS: Record<PlannedFlowKind, string> = {
   fixedCharge: 'Charge fixe',
   dueDate: "Échéance payée par une tirelire",
   transfer: 'Virement interne attendu',
+};
+
+/** Titres des groupes de l'écran Flux prévus : le pluriel de chaque type. */
+export const FLOW_GROUP_TITLES: Record<PlannedFlowKind, string> = {
+  income: 'Revenus',
+  fixedCharge: 'Charges fixes',
+  dueDate: 'Échéances payées par une tirelire',
+  transfer: 'Virements internes attendus',
 };
 
 export const STATUS_LABELS: Record<string, string> = {
