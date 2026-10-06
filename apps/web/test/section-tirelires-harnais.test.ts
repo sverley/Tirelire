@@ -24,7 +24,8 @@ describe('[niveau 1] #361 · 1 — une section Tirelires, que les trois étapes 
   it('l’assistant n’écrit plus rien des tirelires à part : ni tirelire, ni besoin, ni carte, ni formulaire d’ajout', () => {
     // Le résumé, hors de la section, touche seulement le placement d'une tirelire (« où dort chaque tirelire »).
     for (const m of wizard.matchAll(/assistantUpsert\('tirelires', \{ \.\.\.\w+, (\w+)/g)) expect(m[1]).toBe('placement');
-    expect([...wizard.matchAll(/assistantUpsert\('tirelires'/g)].length).toBe(2);
+    // Le retrait d'un compte, qui ôte la part du placement d'une tirelire, est passé dans la section Comptes (#362) : il n'en reste qu'une, le placement du résumé.
+    expect([...wizard.matchAll(/assistantUpsert\('tirelires'/g)].length).toBe(1);
     expect(wizard).not.toMatch(/assistantUpsert\('needs'/);
     expect(wizard).not.toMatch(/class="card tirelire"/);
     expect(wizard).not.toMatch(/Ajouter un besoin|Garder ce qui n'a pas été dépensé|Montant de la facture|Cible \(facultatif\)/);

@@ -48,7 +48,9 @@ async function geste(page: Page, libellé: string, dansLaCarte?: string): Promis
   const fait = await page.evaluate(
     (l: string, carte: string | null) => {
       const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
-      const nomDe = (c: Element) => (c.querySelector('input.nom') as HTMLInputElement | null)?.value ?? t(c.querySelector('strong, .label'));
+      // Une carte de compte porte son nom dans le champ de sa ligne (la section Comptes, #362) ; une tirelire, dans son champ.
+      const nomDe = (c: Element) =>
+        ((c.querySelector(':scope > .ligne-compte > input') ?? c.querySelector('input.nom')) as HTMLInputElement | null)?.value ?? t(c.querySelector('strong, .label'));
       const portée = carte ? [...document.querySelectorAll('main .card')].find((c) => nomDe(c).includes(carte)) : document;
       const b = portée && ([...portée.querySelectorAll(carte ? 'button' : 'main button, .tabbar button')] as HTMLButtonElement[]).find((x) => t(x).includes(l));
       b?.click();
@@ -235,11 +237,11 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
       expect(ligne, 'point 4 · vouvoiement').not.toMatch(TUTOIEMENT);
     });
 
-    it('[niveau 2] point 3 · « Modifier » renseigne le compte principal, qui dit alors son solde initial et sa date', async () => {
+    it('[niveau 2] point 3 · la ligne du compte principal se renseigne sur place, et il dit alors son solde initial et sa date', async () => {
       await écran(page, 'Comptes');
-      expect(await geste(page, 'Modifier', 'Compte principal')).toBe(true);
-      expect(await remplir(page, 'Solde initial', '1 500,00')).toBe(true);
-      await geste(page, 'Enregistrer');
+      // Le solde se corrige sur la ligne, comme dans l'assistant (#362) : le panneau ne porte plus que les champs avancés.
+      expect(await saisirLeSoldeDuPrincipal(page, '1 500,00')).toBe(true);
+      await pause(200);
       const ligne = await soldeInitialDuPrincipal(page);
       expect(ligne).toMatch(/solde initial 1\s?500,00\s?€ au /);
       expect(ligne).not.toMatch(/à renseigner|1970/);
@@ -297,9 +299,9 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
 
     it('[niveau 2] point 2 · seule une tirelire dont le compte de placement n’existe plus reste à part, et « Modifier » ouvre son placement', async () => {
       await écran(page, 'Comptes');
+      // Le formulaire d'ajout de la section Comptes est toujours là (#362) : il n'ouvre pas de panneau.
+      await remplir(page, 'Nom du compte', 'Livret Témoin');
       await geste(page, 'Ajouter un compte');
-      await remplir(page, 'Nom', 'Livret Témoin');
-      await geste(page, 'Enregistrer');
       await écran(page, 'Tirelires');
       await geste(page, 'Ajouter une tirelire');
       await remplir(page, 'Quoi', 'Orpheline');

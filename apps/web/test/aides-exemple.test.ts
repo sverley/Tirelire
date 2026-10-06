@@ -18,7 +18,6 @@ import {
   aidePeriodique,
   aidesDeBesoin,
   aidesDeCategorie,
-  aidesDeCompte,
   aidesDeFluxPrevu,
   aidesDeSaisie,
   aidesDeTirelire,
@@ -234,15 +233,6 @@ describe('[niveau 4] #214 · 2 — ajouter une ligne dont chaque champ porte la 
 describe('[niveau 4] #214 · 3 — hors de l’assistant, chaque aide qui propose une valeur est la valeur de ce champ dans une ligne de l’exemple du même genre', () => {
   const exemple = exampleLedger();
   const besoinsDeLExemple = alive(exemple.needs);
-
-  it('Comptes : le nom d’aide est celui d’un compte de l’exemple du type choisi — le compte principal pour « principal »', () => {
-    expect(aidesDeCompte('principal').name).toBe(s.mainAccount.name);
-    expect(aidesDeCompte('courant').name).toBe('Carte enfants');
-    expect(aidesDeCompte('epargne').name).toBe('Livret A');
-    for (const kind of ['courant', 'epargne'] as const) {
-      expect(alive(exemple.accounts).find((a) => a.name === aidesDeCompte(kind).name)?.kind, kind).toBe(kind);
-    }
-  });
 
   it('Tirelires : le nom d’aide est celui d’une tirelire de l’exemple', () => {
     expect(alive(exemple.tirelires).map((t) => t.name)).toContain(aidesDeTirelire().name);

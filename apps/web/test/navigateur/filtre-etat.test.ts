@@ -17,8 +17,11 @@ import { allerÀ, cliquer, navigateur, ouvrirLExemple, ouvrirLeSite, type Site }
 function lire() {
   const texte = (el: Element | null | undefined) => (el?.textContent ?? '').trim().replace(/\s+/g, ' ');
   return {
-    // Le nom d'une carte de tirelire se lit dans son champ (la carte est celle de l'assistant, #369).
-    cartes: [...document.querySelectorAll('.card > .row > .label > strong, .card.tirelire > .ligne-tirelire > input.nom')].map((e) => (e instanceof HTMLInputElement ? e.value.trim() : texte(e))),
+    // Le nom d'une carte de compte se lit dans le champ de sa ligne (la section Comptes, #362), celui d'une tirelire dans son champ (#369) ; les autres, dans leur titre.
+    cartes: [
+      ...document.querySelectorAll('.card > .row > .label > strong, .card.tirelire > .ligne-tirelire > input.nom'),
+      ...document.querySelectorAll('.card > .ligne-compte > input:first-child'),
+    ].map((e) => (e instanceof HTMLInputElement ? e.value.trim() : texte(e))),
     filtres: [...document.querySelectorAll('.filtre')].map((b) => texte(b)),
     allumés: [...document.querySelectorAll('.filtre.actif')].map((b) => texte(b)),
     pastilles: [...document.querySelectorAll('.pill.dim')].map((p) => texte(p)),

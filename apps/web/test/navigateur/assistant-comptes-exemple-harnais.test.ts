@@ -160,7 +160,8 @@ const cartes = (page: Page) =>
     const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
     return [...document.querySelectorAll('main .card')]
       .filter((c) => c.querySelector('.pill'))
-      .map((c) => ({ nom: t(c.querySelector('strong')), pastilles: [...c.querySelectorAll('.pill')].map(t), texte: t(c) }));
+      // Le nom d'un compte se corrige sur la ligne de sa carte (la section Comptes, #362) : il est dans son champ.
+      .map((c) => ({ nom: (c.querySelector(':scope > .ligne-compte > input') as HTMLInputElement | null)?.value.trim() ?? t(c.querySelector('strong')), pastilles: [...c.querySelectorAll('.pill')].map(t), texte: t(c) }));
   });
 
 /** L'écran Comptes range les comptes clos (D56) : pour les lire, on allume « Clos ». */
@@ -179,7 +180,8 @@ async function montrerLeClos(page: Page) {
 async function modifier(page: Page, nom: string) {
   const fait = await page.evaluate((n: string) => {
     const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
-    const carte = [...document.querySelectorAll('main .card')].find((c) => t(c.querySelector('strong')) === n);
+    const nomDuCompte = (c: Element) => (c.querySelector(':scope > .ligne-compte > input') as HTMLInputElement | null)?.value.trim() ?? t(c.querySelector('strong'));
+    const carte = [...document.querySelectorAll('main .card')].find((c) => nomDuCompte(c) === n);
     const b = ([...(carte?.querySelectorAll('button') ?? [])] as HTMLButtonElement[]).find((x) => t(x) === 'Modifier');
     b?.click();
     return !!b;
@@ -382,20 +384,9 @@ describe.skipIf(!navigateur)('#211 · l’assistant propose les comptes de l’e
       try {
         await ouvrir(page, site);
         await ecran(page, 'Comptes');
-        await modifier(page, 'Compte principal');
-        await saisir(page, 'form.edit label.f input[placeholder="Compte courant"]', 'Compte de la maison');
-        const soldeInitial = await page.evaluate(() => {
-          const label = ([...document.querySelectorAll('form.edit label.f')] as HTMLElement[]).find((x) => (x.textContent ?? '').trim().startsWith('Solde initial'));
-          return !!label;
-        });
-        expect(soldeInitial, 'le formulaire du compte n’a pas de « Solde initial »').toBe(true);
-        await page.evaluate(() => {
-          const label = ([...document.querySelectorAll('form.edit label.f')] as HTMLElement[]).find((x) => (x.textContent ?? '').trim().startsWith('Solde initial'));
-          const el = label!.querySelector('input') as HTMLInputElement;
-          el.value = '1 500,00';
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-        expect(await cliquer(page, 'Enregistrer')).toBe(true);
+        // Le nom et le solde du compte principal se corrigent sur sa ligne, écrits aussitôt dans le projet (#362).
+        await saisir(page, 'main .ligne-compte.principal > input:first-child', 'Compte de la maison');
+        await saisir(page, 'main .ligne-compte.principal input.mt', '1 500,00');
         await pause(300);
 
         await arriverAuxComptes(page);

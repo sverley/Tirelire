@@ -160,16 +160,19 @@ describe('[niveau 1] I11 · harnais du registre', () => {
         return { trouvé: true, bouton: true };
       }
       const label = [...document.querySelectorAll('.label')].find((l) => propre(l) === nom);
-      if (!label) return { trouvé: false, bouton: false };
+      // Un compte porte son nom dans le champ de sa ligne, dans sa carte (la section Comptes, #362) : le bouton est dans la carte.
+      const ligneDeCompte = [...document.querySelectorAll('.card > .ligne-compte')].find((l) => ((l.querySelector('input') as HTMLInputElement | null)?.value ?? '').trim() === nom);
+      if (!label && !ligneDeCompte) return { trouvé: false, bouton: false };
       const boutonParmi = (bloc: Element | null, sélecteur: string) =>
         bloc
           ? ([...bloc.querySelectorAll(sélecteur)] as HTMLButtonElement[]).find((b) => ['Modifier', 'Placer'].includes(b.textContent?.trim() ?? ''))
           : undefined;
       // La ligne porte son propre bouton (Comptes, Flux, tirelire non placée) ; sinon c'est la
       // carte qui le porte, après d'éventuelles lignes de besoin imbriquées (Tirelires placées).
-      const bouton =
-        boutonParmi(label.closest('.row'), ':scope > button, :scope > .actions button') ??
-        boutonParmi(label.closest('.card'), ':scope > .actions button');
+      const bouton = ligneDeCompte
+        ? boutonParmi(ligneDeCompte.closest('.card'), ':scope > .row > .actions button')
+        : boutonParmi(label!.closest('.row'), ':scope > button, :scope > .actions button') ??
+          boutonParmi(label!.closest('.card'), ':scope > .actions button');
       if (!bouton) return { trouvé: true, bouton: false };
       bouton.click();
       return { trouvé: true, bouton: true };

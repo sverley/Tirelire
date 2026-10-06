@@ -180,6 +180,8 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .avec-compte { --col-compte: 110px; }
 
 .ligne-compte { display: grid; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 6px; }
+/* Dans l'écran Comptes, la ligne est dans une carte : la carte porte le cadre (#362). */
+.card > .ligne-compte { border: 0; padding: 0; background: none; margin: 0 0 6px; }
 .ligne-compte.principal { border-left: 3px solid var(--accent); }
 .ligne-compte input, .ligne-compte select { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--bg); color: var(--ink); min-width: 0; width: 100%; font-family: inherit; font-size: 14px; }
 .ligne-compte .mt { font-family: var(--mono); text-align: right; }
