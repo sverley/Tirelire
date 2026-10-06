@@ -303,9 +303,11 @@ describe('[niveau 4] #210 · 4 — projet vierge ou projet existant', () => {
 describe('[niveau 4] #210 · 1 et 2 — l’écran de l’assistant n’écrit dans le projet que par sa validation', () => {
   // La structure, pas le comportement : le comportement est joué dans le navigateur
   // (`navigateur/assistant-valide-a-la-fin-harnais.test.ts`) ; ceci garde que l'écran n'a plus d'autre chemin.
-  it('Wizard.svelte n’écrit pas dans le projet, ne lit que le projet montré avec son brouillon, et valide en un seul endroit', () => {
+  it('Wizard.svelte n’écrit pas dans le projet (le lire est permis) et valide en un seul endroit', () => {
     const ecran = source('views/Wizard.svelte');
-    expect(ecran).not.toMatch(/\bapp\.(upsert|remove|setSetting|store|ledger|plan)\b/);
+    expect(ecran).not.toMatch(/\bapp\.(upsert|remove|setSetting|store|plan)\b/);
+    // Lire le projet (`app.ledger`) est permis ; y écrire, non : ni affectation, ni méthode qui modifie.
+    expect(ecran).not.toMatch(/\bapp\.ledger\b[^;\n]*(\.(push|pop|shift|unshift|splice|sort|reverse|set|delete|add|clear)\(|[^=!<>]=(?![=>]))/);
     expect(ecran.match(/app\.validerAssistant\(/g) ?? []).toHaveLength(1);
   });
 
