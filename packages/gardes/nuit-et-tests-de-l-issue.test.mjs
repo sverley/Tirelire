@@ -249,7 +249,7 @@ describe('[niveau 2] #307, point 2 · les tests navigateur de l’issue : ce que
 
 // ─── Point 3 : la nuit ───────────────────────────────────────────────────────────────────────────
 
-describe('[niveau 1] #307, point 3 · chaque nuit, vers 3 h à Paris, les tests navigateur sur main, sauf fichier vert sur son empreinte', () => {
+describe('[niveau 1] #307, point 3 · chaque nuit, vers 3 h UTC, les tests navigateur sur main, sauf fichier vert sur son empreinte', () => {
   test('le workflow de la nuit : sur main, au seuil 2, avec l’attestation de la nuit', () => {
     const w = lireFichier('.github/workflows/nuit.yml');
     assert.match(w, /ref: main/);
@@ -260,31 +260,11 @@ describe('[niveau 1] #307, point 3 · chaque nuit, vers 3 h à Paris, les tests 
     assert.match(w, /node packages\/gardes\/nuit\.mjs signaler/);
   });
 
-  test('chaque jour, un seul des deux déclenchements joue, et il tombe à 3 h à Paris, heure d’été comme d’hiver', () => {
+  test('un seul déclenchement planifié, à 3 h 00 UTC, toute l’année, sans condition d’heure ni de fuseau (#348)', () => {
     const w = lireFichier('.github/workflows/nuit.yml');
-    const crons = [...w.matchAll(/^\s+- cron: '(\d+) (\d+) \* \* \*'/gm)].map((m) => ({ planifié: `${m[1]} ${m[2]} * * *`, minute: Number(m[1]), heure: Number(m[2]) }));
-    assert.equal(crons.length, 2, 'deux déclenchements UTC');
-    const cas = w.slice(w.indexOf('case "$GITHUB_EVENT_NAME'), w.indexOf('esac') + 4);
-    assert.ok(cas.startsWith('case'), 'la décision de l’heure se lit dans le workflow');
-    const mémo = new Map();
-    const joue = (planifié, décalage) => {
-      const clé = `${planifié}|${décalage}`;
-      if (!mémo.has(clé)) mémo.set(clé, spawnSync('sh', ['-c', `GITHUB_EVENT_NAME=schedule PLANIFIE='${planifié}' decalage='${décalage}'; ${cas}; echo $jouer`], { encoding: 'utf8' }).stdout.trim() === 'oui');
-      return mémo.get(clé);
-    };
-    const paris = (t) => {
-      const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', timeZoneName: 'longOffset', hour: 'numeric', hourCycle: 'h23' }).formatToParts(t);
-      return { décalage: p.find((x) => x.type === 'timeZoneName').value.replace('GMT', '').replace(':', ''), heure: Number(p.find((x) => x.type === 'hour').value) };
-    };
-    for (let jour = Date.UTC(2026, 0, 1); jour < Date.UTC(2028, 0, 1); jour += 86400000) {
-      const date = new Date(jour).toISOString().slice(0, 10);
-      const quiJouent = crons.map((c) => ({ ...c, ...paris(new Date(jour + (c.heure * 60 + c.minute) * 60000)) })).filter((d) => joue(d.planifié, d.décalage));
-      assert.equal(quiJouent.length, 1, `${date} : ${quiJouent.length} déclenchement(s) jouent`);
-      assert.equal(quiJouent[0].heure, 3, `${date} : le déclenchement qui joue tombe à ${quiJouent[0].heure} h à Paris`);
-    }
-    assert.equal(joue('', '+0100'), false, 'un déclenchement inconnu ne joue pas');
-    const manuel = spawnSync('sh', ['-c', `GITHUB_EVENT_NAME=workflow_dispatch PLANIFIE='' decalage='+0100'; ${cas}; echo $jouer`], { encoding: 'utf8' }).stdout.trim();
-    assert.equal(manuel, 'oui', 'le lancement manuel joue toujours');
+    assert.deepEqual([...w.matchAll(/^\s+- cron: '([^']*)'/gm)].map((m) => m[1]), ['0 3 * * *'], 'un seul déclenchement, à 3 h 00 UTC');
+    assert.match(w, /^\s+workflow_dispatch:/m, 'le lancement manuel demeure');
+    assert.doesNotMatch(w, /github\.event\.schedule|TZ=|Europe\//, 'aucune exécution ne dépend du déclenchement ni d’un fuseau');
   });
 
   test('ce qu’une nuit trouve vert vaut pour les suivantes ; une nuit sans changement ne joue rien et le dit ; un fichier rouge se rejoue', () => {
@@ -394,7 +374,7 @@ describe('[niveau 1] #307, point 4 · une nuit rouge — même sans avoir pu jou
   test('une nuit qui devait jouer se signale rouge, même si elle échoue avant de savoir ce qu’elle joue, et nomme alors le commit du déclenchement ; une nuit qui n’a rien à jouer ne dit rien', () => {
     const SHA = 's'.repeat(40);
     const nuit = (plan, échoue) => {
-      const ctx = { github: { event: {}, event_name: 'schedule', sha: SHA }, vars: {}, secrets: {}, inputs: {}, needs: { heure: { outputs: { jouer: 'oui' } } }, steps: { plan, tests: { outcome: 'skipped', outputs: {} } } };
+      const ctx = { github: { event: {}, event_name: 'schedule', sha: SHA }, vars: {}, secrets: {}, inputs: {}, needs: {}, steps: { plan, tests: { outcome: 'skipped', outputs: {} } } };
       const jouées = jouer(lireFichier('.github/workflows/nuit.yml'), ctx, (é) => échoue && /^\s+(?:- )?id: plan\b/m.test(é.texte)).flatMap((j) => j.joués);
       const signal = jouées.find((é) => /nuit\.mjs signaler/.test(é.texte));
       return signal ? { commit: interpoler(/^\s+COMMIT: (.*)$/m.exec(signal.texte)[1], ctx) } : null;

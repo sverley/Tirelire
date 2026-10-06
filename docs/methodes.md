@@ -225,7 +225,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; sauf ce qui est vert sur son empreinte |
   | CI au Ready | 1, plus le harnais du besoin et les tests navigateur de l'issue, en entier ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
   | CI après la fusion, sur `main` | 1, sans tests navigateur ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
-  | Nuit, sur le dernier commit de `main` (vers 3 h, heure de Paris) | 2, les tests navigateur seuls ; sauf ce qu'une nuit a trouvé vert sur son empreinte |
+  | Nuit, sur le dernier commit de `main` (vers 3 h UTC) | 2, les tests navigateur seuls ; sauf ce qu'une nuit a trouvé vert sur son empreinte |
   | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option ; sauf ce qui est vert sur son empreinte |
 
@@ -319,8 +319,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   navigateur de non-régression — tout fichier de `apps/web/test/navigateur/` qui n'est pas un test de
   l'issue, harnais du registre compris — ne se jouent ni avant la fusion ni à la CI d'une fusion sur
   `main` : ni à la livraison, ni au Ready, ni après la fusion ; ils ne décident d'aucune fusion
-  (porteur, #307 : « main ne part pas en prod, mais en preview »). Chaque nuit, vers 3 h, heure de
-  Paris, `nuit.yml` les joue sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur
+  (porteur, #307 : « main ne part pas en prod, mais en preview »). Chaque nuit, vers 3 h UTC,
+  `nuit.yml` les joue sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur
   son empreinte : une nuit où rien de ce qu'ils lisent n'a changé ne joue rien, et le dit ; ce qu'une
   nuit trouve vert vaut pour les nuits suivantes, tant que ce qu'il lit ne change pas (l'attestation
   de la nuit, sur la branche `attestation-de-la-nuit`, écrite par l'outillage). Une nuit rouge se
