@@ -227,7 +227,7 @@
     {:else if app.view === 'more'}
       <More />
     {:else if app.view === 'wizard'}
-      <Wizard />
+      {#key app.versionAssistant}<Wizard />{/key}
     {:else if app.view === 'accounts'}
       <Accounts />
     {:else if app.view === 'tirelires'}

@@ -108,6 +108,12 @@ class AppState {
    */
   assistant = $state<Brouillon | undefined>(undefined);
 
+  /**
+   * Change quand l'assistant reçoit un autre brouillon (un import) : l'écran de l'assistant, qui lit son
+   * brouillon au montage, se remonte alors sur le nouveau, même s'il est déjà affiché (#367).
+   */
+  versionAssistant = $state(0);
+
   /** Ce que l'assistant a préparé sans le valider : un import le remplacerait (#367). */
   get assistantPrepare(): boolean {
     return !!this.assistant && !brouillonIntact(this.assistant);
@@ -125,6 +131,7 @@ class AppState {
     const lu = lireBudgetJson(texte, this.ledger);
     if (!lu.ok) return { ok: false, message: lu.message };
     this.assistant = brouillonDImport(this.ledger, lu.budget);
+    this.versionAssistant++;
     return { ok: true };
   }
 

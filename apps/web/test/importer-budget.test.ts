@@ -111,3 +111,10 @@ describe('[niveau 4] #367 · 4 — par une adresse, avec un brouillon non vide, 
     expect(lire('src/App.svelte')).toMatch(/app\.importEnAttente !== undefined[\s\S]*repondreImportEnAttente\(true\)[\s\S]*repondreImportEnAttente\(false\)/);
   });
 });
+
+describe('[niveau 4] #367 · 2 — l’assistant déjà affiché passe au brouillon importé', () => {
+  it('un import change la version de l’assistant, et l’écran se remonte sur elle', () => {
+    expect(lire('src/lib/state.svelte.ts')).toMatch(/this\.assistant = brouillonDImport\([^)]*\);\s*this\.versionAssistant\+\+;/);
+    expect(lire('src/App.svelte')).toMatch(/\{#key app\.versionAssistant\}<Wizard \/>\{\/key\}/);
+  });
+});
