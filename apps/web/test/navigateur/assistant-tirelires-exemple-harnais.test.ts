@@ -255,7 +255,7 @@ describe.skipIf(!navigateur)('#336 — l’assistant propose les tirelires, leur
         expect(texte, nom).toContain(nom);
       }
       // Le piano est un besoin d'« Enfants et loisirs », pas une tirelire à part (point 2, D28).
-      expect(texte).toMatch(/Enfants et loisirs Déjà de côté[^]*?voulu : [^]*?Cours de piano[^]*?Ajouter un besoin Modifier/);
+      expect(texte).toMatch(/Enfants et loisirs Déjà de côté[^]*?voulu : [^]*?Cours de piano[^]*?Ajouter un besoin d'un autre type Modifier/);
       expect(texte).not.toMatch(/Cours de piano Déjà de côté/);
 
       // Le prélèvement et l'ordre se retrouvent dans Flux prévus (I11) : le prélèvement s'y modifie ;
