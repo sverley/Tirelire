@@ -39,9 +39,13 @@ const NOMS = {
   compteA: court('Cpt'),
   compteB: court('Cpt'),
   compteLong: insécable('CPT'),
+  /** Le compte que le harnais supprime après y avoir placé la tirelire orpheline. */
+  compteSupprimé: court('Cpt'),
   tirelireA: court('Tir'),
   tirelireB: court('Tir'),
   tirelireSansPlacement: insécable('TIR'),
+  /** Placée sur un compte, puis ce compte est supprimé : son placement vise un compte qui n'existe plus. */
+  tirelireOrpheline: court('Tir'),
   besoinNommé: court('Bes'),
   catégorie: court('Cat'),
   sousCatégorie: court('Sca'),
@@ -79,8 +83,12 @@ const ÉCRANS: Array<{ menu: string; titre: string; couverture: Couverture[] }> 
       { requis: [NOMS.tirelireA], conteneur: 'ligne' },
       { requis: [NOMS.tirelireA, NOMS.besoinNommé], conteneur: 'ligne' },
       { requis: [NOMS.tirelireB], conteneur: 'carte', min: 2 },
-      // Une tirelire sans placement ne s'ouvre que depuis sa ligne.
-      { requis: [NOMS.tirelireSansPlacement], conteneur: 'ligne' },
+      // Une tirelire sans placement voulu se range sous le compte principal et s'ouvre depuis sa
+      // carte, comme toute tirelire (#322) : ajout d'un besoin, et la tirelire elle-même.
+      { requis: [NOMS.tirelireSansPlacement], conteneur: 'carte', min: 2 },
+      // Une tirelire dont le placement vise un compte supprimé reste à part, en alerte : sa carte
+      // n'a qu'un bouton « Modifier », dans sa ligne.
+      { requis: [NOMS.tirelireOrpheline], conteneur: 'ligne' },
       { requis: [] },
     ],
   },
@@ -378,7 +386,7 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
       await aller(COMPTES);
       await page.evaluate(async (n: Noms) => {
         const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-        for (const nom of [n.compteA, n.compteB, n.compteLong]) {
+        for (const nom of [n.compteA, n.compteB, n.compteLong, n.compteSupprimé]) {
           o.bouton(document, 'Ajouter un compte').click();
           await o.attendre();
           const f = o.panneaux()[0]!;
@@ -390,7 +398,7 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
       await aller(TIRELIRES);
       await page.evaluate(async (n: Noms) => {
         const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-        for (const [nom, placée] of [[n.tirelireA, true], [n.tirelireB, true], [n.tirelireSansPlacement, false]] as const) {
+        for (const [nom, placée] of [[n.tirelireA, true], [n.tirelireB, true], [n.tirelireSansPlacement, false], [n.tirelireOrpheline, true]] as const) {
           o.bouton(document, 'Ajouter une tirelire').click();
           await o.attendre();
           const f = o.panneaux()[0]!;
@@ -402,7 +410,8 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
               o.bouton(f, 'Ajouter un compte').click();
               await o.attendre();
             }
-            await o.remplir(f, 'Compte', n.compteB).catch(() => o.remplir(f, 'Compte', n.compteA));
+            const compte = nom === n.tirelireOrpheline ? n.compteSupprimé : n.compteB;
+            await o.remplir(f, 'Compte', compte).catch(() => o.remplir(f, 'Compte', n.compteA));
           } else {
             while (aUneLigne()) {
               o.bouton(f, 'Retirer').click();
@@ -421,6 +430,24 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
           await o.remplir(f, 'Montant', '100,00');
           await o.soumettre(f);
         }
+      }, NOMS);
+
+      // Le compte visé par la tirelire orpheline disparaît, par l'interface : le placement de cette
+      // tirelire vise désormais un compte qui n'existe plus.
+      await aller(COMPTES);
+      await page.evaluate(async (n: Noms) => {
+        const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        const carte = o.carte(n.compteSupprimé);
+        if (!carte) throw new Error(`carte « ${n.compteSupprimé} » introuvable`);
+        const confirmer = window.confirm;
+        window.confirm = () => true;
+        try {
+          o.bouton(carte, 'Supprimer').click();
+          await o.attendre();
+        } finally {
+          window.confirm = confirmer;
+        }
+        if (o.carte(n.compteSupprimé)) throw new Error(`le compte « ${n.compteSupprimé} » n'a pas été supprimé`);
       }, NOMS);
 
       await aller(CATÉGORIES);
