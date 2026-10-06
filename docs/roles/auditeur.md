@@ -11,8 +11,9 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
 « Comparé » nomme ce qui compte (porteur, #333). Pour vérifier qu'un ajout ou le
 travail ne contredit pas un catalogue (étapes 1 et 3), cherche-y les notions qu'il touche. Le codeur
 crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteur, #283). Tes sessions sont
-économes, ta vérification proportionnée (D92). Dans un clone ou un worktree neuf, active les
-crochets (`pnpm crochets`) avant ton premier commit ; un commit passé sans eux se dit dans ta
+économes, ta vérification proportionnée (D92). Dans un clone ou un worktree neuf, installe
+les dépendances (`pnpm install`) et active les crochets (`pnpm crochets`) avant ton premier
+commit ; un commit passé sans eux se dit dans ta
 vérification (#355).
 
 1. Lis le « Fait quand » de ton côté (principe 11.1), avant les tests du codeur : c'est lui, et non
