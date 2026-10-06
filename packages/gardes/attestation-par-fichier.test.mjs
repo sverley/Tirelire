@@ -232,6 +232,8 @@ function dépôtInventé(nom) {
   return { dépôt, distant, env, git, écrire, tester, joués, vider, attestation: attestationOuRien };
 }
 
+const détailDe = (sortie) => { const m = sortie.match(/attestation : détail : (.+)$/m); return m ? readFileSync(m[1].trim(), 'utf8') : ''; };
+
 describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute ce qui l’est', { concurrency: true }, () => {
   test('[niveau 3] points 1 et 4 · un lancement atteste chaque fichier joué vert ; le suivant le saute et dit pourquoi ; un changement de ce que lit l’ensemble fait tout rejouer', async () => {
     const f = dépôtInventé('saut');
@@ -241,13 +243,14 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     const premier = await f.tester('packages/core', '2');
     assert.equal(premier.code, 0, premier.sortie);
     assert.deepEqual(premier.joués, ['a', 'b'], premier.sortie);
-    assert.match(premier.sortie, /attestation : cœur, seuil 2 : 2 fichier\(s\) joué\(s\), 0 sauté\(s\)/);
+    assert.match(premier.sortie, /attestation : cœur, seuil 2 : vert — 2 joué\(s\), 0 sauté\(s\)\./);
     const a = f.attestation('codage/997-saut');
     assert.deepEqual(a.verts.map((v) => `${v.ensemble}:${v.fichier}:${v.seuil}`).sort(), ['coeur:packages/core/a.test.mjs:4', 'coeur:packages/core/b.test.mjs:4'], 'joués en entier, ils sont attestés au seuil 4');
     const second = await f.tester('packages/core', '2');
     assert.equal(second.code, 0, second.sortie);
     assert.deepEqual(second.joués, [], second.sortie);
-    assert.match(second.sortie, /attestation : cœur : sauté\(s\) — fichier attesté vert par le lancement « test 2 » dans packages\/core, sur l'arbre [0-9a-f]{10}, au seuil 4 : a\.test\.mjs, b\.test\.mjs\./, second.sortie);
+    assert.match(second.sortie, /attestation : cœur, seuil 2 : vert — 0 joué\(s\), 2 sauté\(s\) \(2 attesté\(s\) vert\(s\)\)\./, second.sortie);
+    assert.match(détailDe(second.sortie), /cœur : sauté\(s\) — fichier attesté vert par le lancement « test 2 » dans packages\/core, sur l'arbre [0-9a-f]{10}, au seuil 4 : a\.test\.mjs, b\.test\.mjs\./, second.sortie);
     f.écrire('packages/core/lib.mjs', 'export const un = 2;\n');
     const après = await f.tester('packages/core', '2');
     assert.deepEqual(après.joués, ['a', 'b'], `un fichier que lit l'ensemble a changé, copie de travail comprise : tout se rejoue\n${après.sortie}`);
@@ -342,7 +345,7 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     const push = await lancer('sh', ['.githooks/livraison.sh', 'push', `refs/heads/${B}`, sha, `refs/heads/${B}`, '0'.repeat(40), 'origin'], { cwd: f.dépôt, env: f.env });
     assert.equal(push.code, 0, push.sortie);
     assert.deepEqual(f.joués(), ['h', 'h4'], `seul le harnais du besoin, joué au seuil 2 sans son test de niveau 4, se rejoue en entier\n${push.sortie}`);
-    assert.match(push.sortie, /pré-push : cœur : non rejoué au seuil 2 — chaque fichier est vert sur son empreinte : vert\./, push.sortie);
+    assert.match(push.sortie, /pré-push : cœur : non rejoué au seuil 2 — chaque fichier est vert sur son empreinte : vert(?: — [^\n]*)?\./, push.sortie);
     f.git('push', '-q', '--no-verify', 'origin', `HEAD:refs/heads/${B}`);
 
     // La CI au Ready, sur la tête poussée : un clone du distant, ce qui couvre l'arbre, les tests navigateur au seuil 2.

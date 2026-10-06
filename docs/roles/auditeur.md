@@ -58,7 +58,7 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    registre que les fichiers modifiés imposent, et leurs vérifications manuelles : ajoute-les dans
    l'issue, signées (étape 1). Une tête détachée reste permise quand tu en as
    besoin : elle saute ce que couvre la base commune avec `main`, mais n'atteste rien (D83, « Les
-   empreintes »). Avant de relancer, lis ce que le lanceur dit jouer et sauter, et pourquoi (D83).
+   empreintes »). Avant de relancer, lis ce que le lanceur dit jouer et sauter, et pourquoi, et son détail s'il le faut (D83, #352).
    Les tests navigateur de l'issue — les fichiers
    de tests navigateur que la PR ajoute ou modifie — se jouent à chaque livraison et au Ready, en
    entier ; la non-régression dans le navigateur se joue la nuit, sur `main`, et ne décide pas de la

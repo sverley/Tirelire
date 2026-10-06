@@ -167,6 +167,10 @@ function nature(texte) {
 
 function extrait(journal) {
   const lignes = journal.split('\n');
+  // Le lanceur nomme chaque fichier rouge et chaque test en échec, avec son message et son endroit
+  // (#352, point 4) : ce sont eux qui se disent, sans les tests verts ; le reste est au détail.
+  const echecs = lignes.filter((l, i) => /^✗ .+ :$/.test(l) || (/^  « /.test(l) && lignes.slice(0, i).some((x) => /^✗ .+ :$/.test(x))));
+  if (echecs.length) return echecs.join('\n');
   const utiles = lignes.filter((l) => /^\s*not ok|FAIL|✗|×|AssertionError|ERR_PNPM|error TS\d|^Error/.test(l)).slice(0, 40);
   return [...utiles, '  … fin du journal :', ...lignes.slice(-30)].join('\n');
 }
