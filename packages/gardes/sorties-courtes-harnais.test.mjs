@@ -1,5 +1,7 @@
 /**
- * Tests du codeur de #352 (sorties courtes quand tout est vert), tous de niveau 4.
+ * Harnais d'audit de #352 : les crochets et le lanceur parlent peu quand tout est vert.
+ * Tests du codeur, retenus et classés par l'auditeur (D83), et ses ajouts : point 5 (fichier lu
+ * changé pendant le lancement), point 4 (vitest, fichier qui ne se charge pas), point 1 (crochet).
  *
  * Le lanceur et le pré-commit se jouent dans un petit dépôt inventé : une garde, un cœur en
  * `node --test` (trois fichiers), une interface en vitest.
@@ -67,8 +69,8 @@ const NOMS = /alpha-fichier|beta-fichier|gamma-fichier/;
 const lignesDuLanceur = (sortie) => sortie.split('\n').filter((l) => l.startsWith('attestation : '));
 const détailDe = (sortie) => readFileSync(sortie.match(/^attestation : détail : (.+)$/m)[1].trim(), 'utf8');
 
-describe('[niveau 4] #352 · le lanceur parle peu quand tout est vert', { concurrency: true }, () => {
-  test('[niveau 4] points 1, 2 et 3 · tout vert : une ligne par ensemble, sans nom de fichier ; le détail se lit après le lancement', async () => {
+describe('#352 · le lanceur parle peu quand tout est vert', { concurrency: true }, () => {
+  test('[niveau 3] points 1, 2 et 3 · tout vert : une ligne par ensemble, sans nom de fichier ; le détail se lit après le lancement', async () => {
     const f = dépôtInventé('vert');
     const premier = await f.tester('packages/core', '2');
     assert.equal(premier.code, 0, premier.sortie);
@@ -89,7 +91,7 @@ describe('[niveau 4] #352 · le lanceur parle peu quand tout est vert', { concur
     for (const l of lignesDuLanceur(second.sortie)) assert.ok(l.length <= 160, l);
   });
 
-  test('[niveau 4] point 4 · un fichier rougit : il est nommé avec chaque test en échec, son message et son endroit ; les verts sont comptés', async () => {
+  test('[niveau 2] point 4 · un fichier rougit : il est nommé avec chaque test en échec, son message et son endroit ; les verts sont comptés', async () => {
     const f = dépôtInventé('rouge');
     f.écrire('packages/core/rouge.test.mjs', "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('r1 [niveau 1]', () => {\n  assert.equal(1, 2);\n});\ntest('r2 [niveau 1]', () => {\n  throw new Error('deuxième');\n});\ntest('r3 [niveau 1]', () => {});\n");
     const r = await f.tester('packages/core', '2');
@@ -102,7 +104,7 @@ describe('[niveau 4] #352 · le lanceur parle peu quand tout est vert', { concur
     assert.match(r.sortie, /attestation : cœur, seuil 2 : rouge \(1 fichier\(s\) rouge\(s\), 3 vert\(s\)\) — 4 joué\(s\), 0 sauté\(s\)\./, r.sortie);
   });
 
-  test('[niveau 4] point 5 · un fichier qui a tourné sans être attesté est nommé, avec la raison', async () => {
+  test('[niveau 2] point 5 · un fichier qui a tourné sans être attesté est nommé, avec la raison', async () => {
     const f = dépôtInventé('saute');
     f.écrire('packages/core/outil.test.mjs', "import { test } from 'node:test';\ntest('o [niveau 1]', { skip: 'outil absent' }, () => {});\n");
     const r = await f.tester('packages/core', '2');
@@ -111,7 +113,7 @@ describe('[niveau 4] #352 · le lanceur parle peu quand tout est vert', { concur
     assert.equal((r.sortie.match(/outil\.test\.mjs/g) ?? []).length, 1, `une ligne, une fois\n${r.sortie}`);
   });
 
-  test('[niveau 4] point 6 · en CI, le lanceur dit encore, fichier par fichier, ce qu’il joue et ce qu’il saute', async () => {
+  test('[niveau 2] point 6 · en CI, le lanceur dit encore, fichier par fichier, ce qu’il joue et ce qu’il saute', async () => {
     const f = dépôtInventé('ci');
     await f.tester('packages/core', '2');
     const ci = await lancer('pnpm', ['--dir', join(f.dépôt, 'packages/core'), 'run', 'test', '2'], { cwd: f.dépôt, env: { ...f.env, GITHUB_ACTIONS: 'true' } });
@@ -120,7 +122,7 @@ describe('[niveau 4] #352 · le lanceur parle peu quand tout est vert', { concur
     assert.doesNotMatch(ci.sortie, /attestation : détail : /, ci.sortie);
   });
 
-  test('[niveau 4] points 1 à 3 · le pré-commit dit chaque ensemble en une ligne, et où lire son détail, qui reste après lui', async () => {
+  test('[niveau 3] points 1 à 3 · le pré-commit dit chaque ensemble en une ligne, et où lire son détail, qui reste après lui', async () => {
     const f = dépôtInventé('crochet');
     f.écrire('packages/gardes/outil.mjs', 'export const x = 1;\n');
     f.git('add', '-A');
@@ -128,10 +130,32 @@ describe('[niveau 4] #352 · le lanceur parle peu quand tout est vert', { concur
     assert.equal(r.code, 0, r.sortie);
     assert.match(r.sortie, /^pré-commit : garde : joué au seuil 0 : vert — 1 joué\(s\), 0 sauté\(s\)\.$/m, r.sortie);
     assert.doesNotMatch(r.sortie, /g\.test\.mjs/, r.sortie);
+    for (const l of r.sortie.split('\n').filter((x) => /^pré-commit : .+ : (?:joué|non rejoué) au seuil/.test(x))) assert.ok(l.length <= 160, `ligne d'ensemble de ${l.length} caractères (point 1)\n${l}`);
     const m = r.sortie.match(/^pré-commit : détail — .* : (.+)\/ \(\*\.detail, \*\.log\)\.$/m);
     assert.ok(m, r.sortie);
     assert.ok(existsSync(join(m[1], 'garde.log')), `la sortie de l'exécuteur reste après le crochet\n${r.sortie}`);
     assert.match(readFileSync(join(m[1], 'garde.detail'), 'utf8'), /garde : joué\(s\) : g\.test\.mjs\./);
+  });
+
+  test('[niveau 2] point 5 · un fichier dont ce qu’il lit change pendant le lancement est nommé, avec la raison (ajouté par l’auditeur)', async () => {
+    const f = dépôtInventé('change');
+    f.écrire('packages/core/change.test.mjs', "import { test } from 'node:test';\nimport { writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\ntest('c [niveau 1]', () => { writeFileSync(join(import.meta.dirname, 'lib.mjs'), 'export const un = 2;\\n'); });\n");
+    const r = await f.tester('packages/core', '2');
+    assert.equal(r.code, 0, r.sortie);
+    assert.match(r.sortie, /^attestation : [a-z-]+\.test\.mjs : non attesté — un fichier qu'il lit a changé pendant le lancement\.$/m, r.sortie);
+    assert.doesNotMatch(r.sortie, /fichier\(s\) attesté\(s\) vert\(s\)/, r.sortie);
+  });
+
+  test('[niveau 2] point 4 · vitest : le test en échec est nommé avec son message et son endroit ; un fichier qui ne se charge pas aussi (ajouté par l’auditeur)', async () => {
+    const f = dépôtInventé('vitest');
+    f.écrire('apps/web/test/r.test.mjs', "import { test, expect } from 'vitest';\ntest('rv [niveau 1]', () => {\n  expect(1).toBe(2);\n});\n");
+    f.écrire('apps/web/test/s.test.mjs', "import { test } from 'vitest';\ntest('sv [niveau 1]', () => { ;\n");
+    const r = await f.tester('apps/web', '2');
+    assert.notEqual(r.code, 0, r.sortie);
+    assert.match(r.sortie, /^✗ test\/r\.test\.mjs :$/m, r.sortie);
+    assert.match(r.sortie, /^ {2}« rv \[niveau 1\] » — .*\(test\/r\.test\.mjs:3:\d+\)$/m, r.sortie);
+    assert.match(r.sortie, /^✗ test\/s\.test\.mjs :$/m, r.sortie);
+    assert.doesNotMatch(r.sortie, /w\.test\.mjs/, `des fichiers verts, seulement leur nombre\n${r.sortie}`);
   });
 });
 
@@ -144,7 +168,7 @@ describe('[niveau 4] #352 · les échecs, dits court', () => {
     assert.deepEqual(lignesDesEchecs([{ fichier: '/d/t.test.mjs', test: 'a', message: 'm', endroit: '/d/t.test.mjs:1:2' }, { fichier: '/d/t.test.mjs', test: 'b', message: '', endroit: null }], '/d'), ['✗ t.test.mjs :', '  « a » — m (t.test.mjs:1:2)', '  « b » — échec sans message']);
   });
 
-  test('[niveau 4] point 7 · la règle de #302 amendée est écrite dans les rôles et suivie par l’en-tête du lanceur', () => {
+  test('[niveau 3] point 7 · la règle de #302 amendée est écrite dans les rôles et suivie par l’en-tête du lanceur', () => {
     const codeur = readFileSync(join(RACINE, 'docs/roles/codeur.md'), 'utf8').replace(/\s+/g, ' ');
     assert.ok(codeur.includes("Tout lancement de l'outil de test, les tiens compris, atteste les fichiers qu'il joue verts, et dit, pour chaque ensemble, combien de fichiers il joue et combien il saute, et pourquoi ; le détail, fichier par fichier, se lit à la demande, et le lancement dit où"));
     const auditeur = readFileSync(join(RACINE, 'docs/roles/auditeur.md'), 'utf8').replace(/\s+/g, ' ');
