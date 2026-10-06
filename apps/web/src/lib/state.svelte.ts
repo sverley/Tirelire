@@ -8,7 +8,7 @@ import {
   emptyLedger,
   exampleLedger,
   LEDGER_KEYS,
-  lireBudgetJson,
+  importerBudgetJson,
   marqueDesDonnees,
   refusalAnswer,
   sauvegardeARappeler,
@@ -128,9 +128,9 @@ class AppState {
    * validation, et ce que l'assistant avait préparé est remplacé. Refusé, rien ne change.
    */
   importerBudget(texte: string): { ok: true } | { ok: false; message: string } {
-    const lu = lireBudgetJson(texte, this.ledger);
+    const lu = importerBudgetJson(texte, this.ledger);
     if (!lu.ok) return { ok: false, message: lu.message };
-    this.assistant = brouillonDImport(this.ledger, lu.budget);
+    this.assistant = brouillonDImport(this.ledger, lu.application);
     this.versionAssistant++;
     return { ok: true };
   }

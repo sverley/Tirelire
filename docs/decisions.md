@@ -1444,6 +1444,20 @@ fichier. Son format porte son nom et sa version ; une version que l'application 
 refusée en le disant, et le format est libre de changer jusqu'à `v1`, comme celui du fichier (D30,
 D87, D91).
 
+**Le budget JSON définit les parties qu'il contient** (#378, version 2 du format) : chaque table
+présente, et chaque clé de réglage présente, définit entièrement cette partie du projet — une ligne
+qu'elle ne nomme pas n'y existe pas —, et une partie absente n'est pas définie. Il se lit seul, sans
+le projet ; un identifiant absent se déduit du nom. Il est aussi **le brouillon de l'assistant** :
+l'assistant, complet ou partiel, garde l'état qu'il a lu des parties qu'il couvre, et **la
+validation n'applique que la différence** entre le fichier et cet état lu — ajouts, modifications,
+retraits en suppression logique —, au projet du moment ; pour un import, l'état lu est le projet du
+moment. Ce qui a changé ailleurs entre-temps reste ; une ligne que la différence touche et que le
+projet a changée depuis l'état lu est un conflit, qui **suit la règle de la synchronisation** (D58) :
+la version de l'application, la plus récente, est retenue, et le conflit est rendu avec la ligne, la
+version retenue et l'écartée. La différence et les conflits se lisent avant d'appliquer (I10), et le
+projet qui en résulterait passe par la vérification d'un fichier ouvert, tout ou rien. La version 1,
+où une ligne du projet absente du JSON restait, est refusée.
+
 ### D94 · Une section par partie du budget, écrite une fois
 
 Chaque partie du budget — comptes, revenus et charges fixes, tirelires, catégories, et plus tard les

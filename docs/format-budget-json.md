@@ -2,11 +2,14 @@
 
 Aucune donnée réelle ici : seulement la forme du fichier, et l'exemple inventé de l'application (D84).
 
-Le budget JSON est un **format d'échange** du budget, sans ses opérations : comptes, tirelires et
-leurs besoins, flux prévus — ordres permanents enregistrés compris —, catégories et réglages du
-budget. Ce n'est pas un second stockage : le fichier SQLite reste la vérité (D08, D58), et le budget
-JSON entre par l'assistant (#366, #367). Il ne porte ni opération, ni sous-opération, ni réponse à un
-manque, ni automatisme, ni profil d'import, ni ce qui décrit une instance (`siteId`, les appareils).
+Le budget JSON est un fichier qui **définit** les parties du budget qu'il contient, sans les
+opérations : comptes, tirelires et leurs besoins, flux prévus — ordres permanents enregistrés
+compris —, catégories et réglages du budget (D93, #378). Ce n'est pas un second stockage : le
+fichier SQLite reste la vérité (D08, D58). Il est aussi le **brouillon de l'assistant** : la
+validation n'applique au projet que la différence entre le fichier et l'état que l'assistant a lu
+(voir « La différence et son application »). Il ne porte ni opération, ni sous-opération, ni
+réponse à un manque, ni automatisme, ni profil d'import, ni ce qui décrit une instance (`siteId`,
+les appareils), ni ce qui décrit une session de l'assistant (l'étape en cours, les étapes garnies).
 Le format est libre de changer jusqu'à `v1`, comme celui du fichier (D30, D91) : une version que
 l'application ne lit pas est refusée en le disant.
 
@@ -17,9 +20,9 @@ Un objet JSON, encodé en UTF-8 :
 | Clé | Obligatoire | Forme |
 | --- | --- | --- |
 | `format` | oui | `"tirelire-budget"` |
-| `version` | oui | `1`, la seule version lue aujourd'hui |
-| `accounts`, `tirelires`, `needs`, `categories`, `planned_flows` | non | une liste de lignes ; absente, la table n'apporte rien |
-| `settings` | non | un objet, une clé par réglage ; un réglage absent ne change pas |
+| `version` | oui | `2`, la seule version lue aujourd'hui ; la version 1 est refusée |
+| `accounts`, `tirelires`, `needs`, `categories`, `planned_flows` | non | une liste de lignes : présente, la table entière ; absente, la table n'est pas définie |
+| `settings` | non | un objet, une clé par réglage : présente, le réglage est défini ; absente, il ne l'est pas |
 
 Aucune autre clé n'est acceptée. Les noms de tables et de colonnes sont ceux du fichier SQLite
 (D42, D58). Chaque valeur s'écrit en JSON natif :
@@ -28,30 +31,74 @@ Aucune autre clé n'est acceptée. Les noms de tables et de colonnes sont ceux d
 - **date** : un texte `AAAA-MM-JJ` qui existe au calendrier ;
 - **booléen** : `true` ou `false` ;
 - **objet JSON** (placement, report, rythme, tolérance) : un objet ou une liste, pas un texte ;
-- une colonne facultative absente ou `null` reste vide.
+- une colonne facultative absente ou `null` prend sa valeur par défaut : vide, sauf ce que dit sa
+  ligne dans les tables ci-dessous (un report absent vaut illimité, une origine absente vaut
+  déclaré).
+
+## Les parties, chacune définie entièrement
+
+Les **parties** sont les cinq tables et chaque clé de `settings`. Une partie présente **se définit
+entièrement** : une table présente dit toutes les lignes de cette table, et une ligne qu'elle ne
+nomme pas n'existe pas dans l'état qu'elle définit — une liste vide définit une table vide. Une
+table ou une clé de réglage absente **n'est pas définie** et ne change pas. Le fichier peut donc être
+simple — une seule table, quelques colonnes — ou complet — toutes les tables, toutes les colonnes.
+
+Le fichier **se lit seul**, sans le projet : format, version, colonnes, valeurs, identifiants et
+références entre ses propres lignes. Une référence vers une table qu'il ne définit pas se vérifie à
+l'application, contre le projet.
 
 ## Les identifiants et les références
 
-Chaque ligne a un identifiant (`id`), une chaîne choisie par qui écrit le fichier, unique dans sa
-table ; il se garde tel quel dans le projet. Les lignes se désignent par ces identifiants : le besoin
-sa tirelire (`tirelire_id`), le flux son compte (`account_id`), sa tirelire, son compte de
-contrepartie et sa catégorie, le placement ses comptes (`accountId`), la catégorie sa parente et sa
-tirelire par défaut. Une référence désigne une ligne du JSON ou une ligne déjà dans le projet.
+Chaque ligne a un identifiant (`id`), unique dans sa table, qui se garde tel quel dans le projet.
+**Absent, il se déduit du nom** (`name`) et de la table : le début de la table — `acc-` pour
+`accounts`, `env-` pour `tirelires`, `need-` pour `needs`, `cat-` pour `categories`, `flow-` pour
+`planned_flows` —, puis le nom sans accent, en minuscules, chaque suite d'autres caractères devenue
+un tiret (« Taxe foncière » donne `flow-taxe-fonciere` dans `planned_flows`). Le même nom donne
+toujours le même identifiant ; deux lignes de même nom sans identifiant dans une même table sont
+refusées. Une ligne sans identifiant ni nom est refusée.
 
-Le **compte principal** du JSON, le seul de genre `principal`, renseigne le compte principal du
-projet au lieu d'en créer un second (D40) : quel que soit son identifiant dans le JSON, il devient
-`acc-principal`, et ce qui le désigne dans le JSON désigne le compte principal du projet.
+Les lignes se désignent par ces identifiants : le besoin sa tirelire (`tirelire_id`), le flux son
+compte (`account_id`), sa tirelire, son compte de contrepartie et sa catégorie, le placement ses
+comptes (`accountId`), la catégorie sa parente et sa tirelire par défaut. Une référence vers une
+table que le fichier définit désigne une de ses lignes ; vers une table qu'il ne définit pas, une
+ligne du projet.
 
-## La lecture, tout ou rien
+Le **compte principal** du fichier, le seul de genre `principal`, est celui du projet, au lieu d'en
+créer un second (D40) : quel que soit son identifiant dans le fichier, il devient `acc-principal`,
+et ce qui le désigne dans le fichier désigne le compte principal du projet. Il ne se retire jamais :
+une table `accounts` qui ne le nomme pas laisse celui du projet tel quel.
 
-Le budget passe par la même vérification qu'un fichier ouvert (D58) : valeurs obligatoires,
-énumérations, montants en centimes entiers, dates, forme des objets JSON, une seule part variable par
-placement, références, identifiants répétés, un seul compte principal. Une seule faute refuse le
-tout ; le refus nomme le premier problème — la table, la ligne, la colonne — et dit combien d'autres
-il y a. Rien d'un budget refusé n'est retenu.
+## La différence et son application
 
-**Réimporter.** Une ligne dont l'identifiant existe déjà dans le projet le remplace ; une ligne du
-projet absente du JSON reste. Importer deux fois le même JSON donne le même projet qu'une fois.
+L'assistant, complet ou partiel, garde **l'état lu** : les parties qu'il couvre, telles qu'il les a
+lues dans le projet à son ouverture. **Pour un import, l'état lu est le projet du moment.**
+
+**La différence.** Le cœur compare le fichier à l'état lu et en tire, partie par partie, les lignes
+ajoutées, les lignes modifiées avec leurs colonnes changées, les lignes retirées, et les réglages
+changés. Une partie que le fichier ne définit pas n'a pas de différence.
+
+**L'application**, au projet du moment : les ajouts et les modifications s'écrivent, ligne entière ;
+un retrait est la suppression logique de la ligne (D58). Ce que le projet a changé depuis l'état lu,
+et que la différence ne touche pas, reste tel quel. Ainsi, pour un import, appliquer donne au projet,
+pour chaque partie définie, exactement les lignes du fichier.
+
+**Les conflits.** Une ligne que la différence touche et que le projet a changée depuis l'état lu —
+modifiée, ajoutée ou retirée de part et d'autre — est un conflit. La règle est celle de la
+synchronisation (D58, `docs/synchronisation.md`, « Conflits ») : la version la plus récente, celle de
+l'application, est retenue, et le conflit est rendu avec la ligne, la version retenue et l'écartée.
+Un réglage changé des deux côtés l'est de même. La différence et les conflits se lisent avant
+d'appliquer (I10).
+
+**Tout ou rien.** Le projet qui résulterait de l'application passe par la même vérification qu'un
+fichier ouvert (D58) : valeurs obligatoires, énumérations, montants en centimes entiers, dates,
+forme des objets JSON, une seule part variable par placement, références — une ligne retirée
+qu'une autre ligne, une opération comprise, désigne encore —, identifiants répétés, un seul compte
+principal. Une seule faute refuse le tout ; le refus nomme le premier problème — la partie, la
+ligne, la colonne — et dit combien d'autres il y a. Rien n'est écrit.
+
+**Écrire un état.** Le cœur écrit en version 2 les parties choisies d'un projet, toutes par défaut :
+ses lignes vivantes, sans les colonnes vides, et ses réglages. Relire ce qu'il a écrit redonne les
+mêmes lignes, colonne pour colonne.
 
 ## Les tables
 
@@ -61,7 +108,7 @@ Les comptes bancaires du foyer.
 
 | Colonne | Obligatoire | Forme et sens |
 | --- | --- | --- |
-| `id` | oui | identifiant de la ligne |
+| `id` | non | identifiant de la ligne ; absent, déduit du nom |
 | `name` | oui | texte : le nom du compte |
 | `kind` | oui | `principal`, `courant` ou `epargne` ; un seul `principal` |
 | `bank` | non | texte : la banque |
@@ -78,7 +125,7 @@ Les comptes bancaires du foyer.
 
 | Colonne | Obligatoire | Forme et sens |
 | --- | --- | --- |
-| `id` | oui | identifiant de la ligne |
+| `id` | non | identifiant de la ligne ; absent, déduit du nom |
 | `name` | oui | texte : le nom de la tirelire |
 | `placement` | oui | liste de `{ "accountId": <compte>, "share": <part> }` : où l'argent est placé (D38) ; une part est `{ "kind": "fixed", "amount": <montant> }`, `{ "kind": "percent", "pct": <nombre> }` ou `{ "kind": "variable" }`, une seule variable |
 | `opening_balance` | oui | montant : le solde de la tirelire à son ouverture |
@@ -91,7 +138,7 @@ Les besoins d'une tirelire.
 
 | Colonne | Obligatoire | Forme et sens |
 | --- | --- | --- |
-| `id` | oui | identifiant de la ligne |
+| `id` | non | identifiant de la ligne ; absent, déduit du nom |
 | `tirelire_id` | oui | la tirelire qui porte le besoin |
 | `kind` | oui | `recurring` (un montant par rythme), `dueDate` (une échéance à provisionner), `goal` (un objectif, une mensualité) ou `payout` (une tirelire qui verse au budget, D48) |
 | `name` | non | texte : le nom du besoin |
@@ -106,7 +153,7 @@ Les besoins d'une tirelire.
 
 | Colonne | Obligatoire | Forme et sens |
 | --- | --- | --- |
-| `id` | oui | identifiant de la ligne |
+| `id` | non | identifiant de la ligne ; absent, déduit du nom |
 | `name` | oui | texte : le nom de la catégorie |
 | `parent_id` | non | la catégorie parente, sans cycle |
 | `tirelire_id` | non | la tirelire par défaut des opérations de cette catégorie |
@@ -119,7 +166,7 @@ enregistrés.
 
 | Colonne | Obligatoire | Forme et sens |
 | --- | --- | --- |
-| `id` | oui | identifiant de la ligne |
+| `id` | non | identifiant de la ligne ; absent, déduit du nom |
 | `name` | oui | texte : le nom du flux |
 | `kind` | oui | `income`, `fixedCharge`, `dueDate` ou `transfer` |
 | `amount` | oui | montant signé : positif crédite `account_id`, négatif le débite ; pour un ordre permanent, ce que la banque exécute (D60) |
@@ -156,7 +203,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
 ```json
 {
   "format": "tirelire-budget",
-  "version": 1,
+  "version": 2,
   "accounts": [
     {
       "id": "acc-principal",

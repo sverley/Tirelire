@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import initSqlJs from 'sql.js';
-import { LedgerStore, computePlan, exampleLedger, lireBudgetJson, type Ledger } from '@tirelire/core';
+import { LedgerStore, computePlan, exampleLedger, importerBudgetJson, type Ledger } from '@tirelire/core';
 import { brouillonDImport, brouillonIntact, montrer, valider } from '../src/lib/brouillon';
 import { ADRESSE_BUDGET, adressePorteUnBudget, budgetDeLAdresse } from '../src/lib/importBudget';
 
@@ -27,9 +27,9 @@ const sansOperations = (): Ledger => ({ ...exampleLedger(), operations: [], subO
 async function importe() {
   const store = await LedgerStore.create({ sqlJs: SQL, siteId: 'test' });
   const projet = store.load();
-  const lu = lireBudgetJson(EXEMPLE, projet);
+  const lu = importerBudgetJson(EXEMPLE, projet);
   if (!lu.ok) throw new Error(lu.message);
-  return { store, projet, brouillon: brouillonDImport(projet, lu.budget) };
+  return { store, projet, brouillon: brouillonDImport(projet, lu.application) };
 }
 
 describe('[niveau 4] #367 · 3 — un JSON accepté ouvre l’assistant sur son résumé, le budget posé sur le projet', () => {
@@ -64,7 +64,7 @@ describe('[niveau 4] #367 · 4 — la validation fait entrer le budget, tout en 
 
 describe('[niveau 4] #367 · 2 — l’adresse porte le JSON après « # »', () => {
   it('le JSON encodé pour une adresse se retrouve tel quel, accents compris', () => {
-    const json = JSON.stringify({ format: 'tirelire-budget', version: 1, accounts: [{ name: 'Épargne & « livret » 100 %' }] });
+    const json = JSON.stringify({ format: 'tirelire-budget', version: 2, accounts: [{ name: 'Épargne & « livret » 100 %' }] });
     const hash = ADRESSE_BUDGET + encodeURIComponent(json);
     expect(adressePorteUnBudget(hash)).toBe(true);
     expect(budgetDeLAdresse(hash)).toEqual({ texte: json });
