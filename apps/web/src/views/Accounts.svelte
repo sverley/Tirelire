@@ -192,6 +192,7 @@
   {@const retenues = stillUsed(a)}
   <div class="row">
     <div class="label">
+      {#if a.kind === 'epargne'}<span class="pill">accueil</span>{/if}
       <span class="sub">{aRenseigner(a) ? 'solde initial à renseigner' : `solde initial ${money(a.openingBalance)} au ${shortDate(a.openingDate)}`}</span>
       {#if retenues.length}<span class="sub">⚠ compte clos, encore désigné par : {retenues.join(', ')}</span>{/if}
     </div>
