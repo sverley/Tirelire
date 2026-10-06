@@ -1,6 +1,7 @@
 /**
- * Tests du codeur de #352, réouverture (points 8 et 9), tous de niveau 4 : l'outillage de la garde
- * ne tire pas son comportement de l'environnement ; ce qui dépend du contexte lui est servi.
+ * Harnais d'audit de #352, réouverture (points 8 et 9) : l'outillage de la garde ne tire pas son
+ * comportement de l'environnement ; ce qui dépend du contexte lui est servi. Tests du codeur, retenus
+ * et classés par l'auditeur (D83) ; second fichier, pour son propre dépôt inventé.
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -47,8 +48,8 @@ function lanceur(d, args, ci) {
   return { code: r.status, sortie };
 }
 
-describe('[niveau 4] #352, réouverture · le lanceur ne lit pas l’environnement', () => {
-  test('[niveau 4] point 8 · avec --complet (la CI), un fichier non attesté parce qu’un test s’y est sauté est dit avec la raison réelle', () => {
+describe('#352, réouverture · le lanceur ne lit pas l’environnement', () => {
+  test('[niveau 3] point 8 · avec --complet (la CI), un fichier non attesté parce qu’un test s’y est sauté est dit avec la raison réelle', () => {
     const { d } = dépôt('raison');
     const r = lanceur(d, ['1', '--complet'], false);
     assert.equal(r.code, 0, r.sortie);
@@ -56,7 +57,7 @@ describe('[niveau 4] #352, réouverture · le lanceur ne lit pas l’environneme
     assert.match(r.sortie, /cœur, seuil 1 : 2 fichier\(s\) joué\(s\), 0 sauté\(s\)/, 'la sortie complète, celle de la CI');
   });
 
-  test('[niveau 4] point 9 · même lancement, mêmes options : même sortie et même verdict, avec ou sans CI et GITHUB_ACTIONS', () => {
+  test('[niveau 2] point 9 · même lancement, mêmes options : même sortie et même verdict, avec ou sans CI et GITHUB_ACTIONS', () => {
     for (const args of [['1'], ['1', '--complet']]) {
       const sans = lanceur(dépôt(`sans-${args.length}`).d, args, false);
       const avec = lanceur(dépôt(`avec-${args.length}`).d, args, true);
@@ -66,7 +67,7 @@ describe('[niveau 4] #352, réouverture · le lanceur ne lit pas l’environneme
     }
   });
 
-  test('[niveau 4] point 9 · le harnais du besoin se reconnaît à la branche servie (--branche), pas à GITHUB_HEAD_REF', () => {
+  test('[niveau 2] point 9 · le harnais du besoin se reconnaît à la branche servie (--branche), pas à GITHUB_HEAD_REF', () => {
     const { d, git, écrire } = dépôt('harnais');
     git('update-ref', 'refs/remotes/origin/main', 'main');
     écrire('packages/core/h.test.mjs', "// Harnais d'audit de #991\nimport { test } from 'node:test';\ntest('h [niveau 4]', () => {});\n");
@@ -88,8 +89,8 @@ describe('[niveau 4] #352, réouverture · le lanceur ne lit pas l’environneme
   });
 });
 
-describe('[niveau 4] #352, réouverture · la garde ne lit pas l’environnement', () => {
-  test('[niveau 4] point 9 · le résumé et les annotations sont servis (--resume, --annotations), pas lus de GITHUB_STEP_SUMMARY ni de GITHUB_ACTIONS', () => {
+describe('#352, réouverture · la garde ne lit pas l’environnement', () => {
+  test('[niveau 2] point 9 · le résumé et les annotations sont servis (--resume, --annotations), pas lus de GITHUB_STEP_SUMMARY ni de GITHUB_ACTIONS', () => {
     const corps = join(temp, 'corps.md');
     writeFileSync(corps, '## Invariants et contraintes\n\nTouchés : aucun\nLien possible masqué : aucun\n');
     const resume = join(temp, 'resume-servi.md');
