@@ -1427,3 +1427,19 @@ mette de vraies données (C4, C5). `v1` est la **première version publique** : 
 **verrou** du format — à partir d'elle, tout changement de format fournit une migration ou reste
 rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été exercé : son entrée dans
 `docs/versions.md` le nomme.
+
+### D93 · Un seul stockage ; le budget JSON, un format d'échange
+
+Le porteur voulait reprendre un budget tenu ailleurs sans refaire l'assistant ni fabriquer un
+fichier SQLite (#366). Séparer le stockage — le budget en JSON, les opérations en SQLite — a été
+examiné et écarté : deux fichiers à sauvegarder ensemble (C5), des références d'une sous-opération ou
+d'une reprise qui franchiraient la frontière, deux mécanismes de synchronisation (I8) et deux
+formats à versionner (D30).
+
+Il n'y a donc qu'**un seul stockage, le fichier SQLite** (D08, D58). Le **budget JSON** est un format
+d'échange du budget sans ses opérations, aux mots des tables (D42), décrit dans
+`docs/format-budget-json.md`. Le cœur le lit tout ou rien, par la même vérification qu'un fichier
+ouvert (D58), et il **entre par l'assistant** (#367) : il n'est ni une sauvegarde ni un second
+fichier. Son format porte son nom et sa version ; une version que l'application ne lit pas est
+refusée en le disant, et le format est libre de changer jusqu'à `v1`, comme celui du fichier (D30,
+D87, D91).
