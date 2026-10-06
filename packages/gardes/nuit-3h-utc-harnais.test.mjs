@@ -1,5 +1,6 @@
 /**
- * #348 · La nuit se déclenche une seule fois, à 3 h UTC. Tests du codeur, tous de niveau 4.
+ * Harnais d'audit de #348 : la nuit se déclenche une seule fois, à 3 h UTC. Composé par l'auditeur à
+ * partir des tests du codeur ; les points 1, 2, 4 et 6 sont tranchés aussi dans le harnais de #307.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,23 +16,27 @@ const verifier = (w) => {
   assert.doesNotMatch(w, /github\.event\.schedule|TZ=|Europe\//, 'aucune exécution ne dépend du déclenchement ni d’un fuseau');
 };
 
-describe('[niveau 4] #348 · un seul déclenchement planifié, à 3 h 00 UTC', () => {
-  test('point 1 et 2 : nuit.yml n’a qu’un cron, 0 3 * * *, et ne lit aucun fuseau', () => verifier(NUIT));
+describe('[niveau 1] #348 · un seul déclenchement planifié, à 3 h 00 UTC, qui joue toujours', () => {
+  test('points 1 et 2 : nuit.yml n’a qu’un cron, 0 3 * * *, et ne lit aucun fuseau', () => verifier(NUIT));
 
-  test('point 3 : plus de job qui écarte un déclenchement ; le job navigateur joue sans condition d’heure, le lancement manuel demeure', () => {
+  test('point 3 : aucun job n’écarte un déclenchement ; le job navigateur joue sans condition, sur main ; le lancement manuel demeure', () => {
     assert.doesNotMatch(NUIT, /needs\.heure|^\s{2}heure:/m);
+    const job = NUIT.slice(NUIT.indexOf('\n  navigateur:'));
+    assert.doesNotMatch(job.slice(0, job.indexOf('steps:')), /^\s{4}(?:if|needs):/m, 'le job navigateur ne dépend d’aucune condition');
     assert.match(NUIT, /^\s+workflow_dispatch:/m);
     assert.match(NUIT, /ref: main/);
   });
 
-  test('point 6, témoin : la vérification rougit sur un workflow à deux déclenchements', () => {
+  test('point 6, témoin rouge : la vérification rougit sur un workflow à deux déclenchements', () => {
     const deux = NUIT.replace("    - cron: '0 3 * * *'\n", "    - cron: '7 1 * * *'\n    - cron: '7 2 * * *'\n");
     assert.notEqual(deux, NUIT);
     assert.throws(() => verifier(deux));
     assert.throws(() => verifier(NUIT.replace("'0 3 * * *'", "'7 3 * * *'")), 'une autre heure rougit aussi');
   });
+});
 
-  test('point 5 : les textes disent « vers 3 h UTC », sans Paris ni deux déclenchements', () => {
+describe('[niveau 2] #348 · point 5, les textes disent « vers 3 h UTC »', () => {
+  test('méthode, rôle du porteur, en-tête du workflow : « vers 3 h UTC », sans Paris ni deux déclenchements', () => {
     for (const f of ['docs/methodes.md', 'docs/roles/porteur.md', '.github/workflows/nuit.yml']) {
       const t = readFileSync(join(RACINE, f), 'utf8').replace(/\s+/g, ' ');
       assert.match(t, /vers 3 h UTC/, f);
