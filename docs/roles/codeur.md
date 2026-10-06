@@ -20,9 +20,9 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
    non-régression navigateur) : l'auditeur va déplacer et modifier tes tests en composant le harnais,
    et ce que tu aurais joué de plus serait à rejouer (porteur, 02/10). En brouillon, ton verdict est
    local : `pnpm typecheck`, tes propres tests, joués à la main (`pnpm --dir <paquet> run test 4
-   <fichiers>`), le harnais du besoin s'il existe, la garde, à chaque tour avant ton compte rendu
-   (`node packages/gardes/cli.mjs pr --issue <n>`, ou `--corps-fichier` avec le corps de l'issue,
-   D81 ; porteur, #349) et, si tu modifies une fonction de la garde, ses tests de développement
+   <fichiers>`), le harnais du besoin s'il existe, la garde, à chaque tour avant ton compte rendu,
+   hors ligne, sur le corps de l'issue tel qu'il est sur GitHub, en entier, jamais un commentaire, donné en fichier (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`) ou en texte (variable `CORPS`) — si ce corps n'a pas de section « Invariants et contraintes », dis-le dans
+   l'issue, sans la chercher ailleurs (D81 ; porteur, #349) — et, si tu modifies une fonction de la garde, ses tests de développement
    (D81) : `pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'` ; rien d'autre (D83). La livraison du push joue d'elle-même ce que D83 prévoit.
 
    Chaque ensemble de tests a son empreinte, l'état des chemins qu'il lit, et chaque fichier de test

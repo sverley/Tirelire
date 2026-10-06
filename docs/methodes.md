@@ -98,8 +98,10 @@ choses, et rien de plus :
 3. chaque vérification manuelle des entrées déclarées figure dans cette section, sa consigne
    recopiée, sans case : la fusion vaut validation.
 
-Il tourne en CI au passage en Ready de chaque PR, et à la demande en local
-(`node packages/gardes/cli.mjs pr --issue <n>`, sur les fichiers modifiés depuis `origin/main`). En
+Il tourne en CI au passage en Ready de chaque PR, et à la demande en local, hors ligne, sur le corps
+de l'issue donné en fichier ou en texte (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`,
+ou la variable `CORPS`), sur les fichiers modifiés depuis `origin/main` (#349). Il ne lit que le corps
+de l'issue, jamais ses commentaires. En
 CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'elle juge est le contenu
 de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
 et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde

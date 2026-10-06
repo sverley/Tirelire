@@ -17,7 +17,8 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    par un test ni par une vérification manuelle, dis-le dans l'issue et arrête-toi. Si ta lecture
    révèle ce que l'architecte a manqué — une phrase du « Fait quand », une entrée du registre touchée
    avec sa vérification manuelle (`node packages/gardes/cli.mjs demander --ids <id>` en prépare la
-   consigne), une ligne « Usages » —, ajoute-le dans l'issue, signé (« ajouté par l'auditeur »), sans
+   consigne), une ligne « Usages » —, ajoute-le dans le corps de l'issue, que la garde lit seul (#349),
+   signé (« ajouté par l'auditeur »), sans
    retirer ni réécrire ce qu'a écrit l'architecte (porteur, #286). Vérifie que l'ajout ne contredit
    ni les autres entrées de son catalogue ni les documents fondateurs (principe 9.1) : une
    contradiction devient une question au porteur, dans l'issue. Tu ne prends jamais d'hypothèse sur
@@ -48,8 +49,9 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
 3. Vérifie le travail en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
    un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **À chaque tour,
-   joue aussi la garde**, l'outil, que `pnpm test 2` ne joue pas : `node packages/gardes/cli.mjs pr
-   --issue <n>`, ou `--corps-fichier` avec le corps de l'issue. Elle seule dit les entrées du
+   joue aussi la garde**, l'outil, que `pnpm test 2` ne joue pas, hors ligne, sur le corps de l'issue tel qu'il est sur GitHub, en entier, jamais un commentaire, donné en fichier (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`) ou en texte (variable `CORPS`) ; si ce corps n'a pas
+   de section « Invariants et contraintes », dis-le dans l'issue, sans la chercher ailleurs (#349).
+   Elle seule dit les entrées du
    registre que les fichiers modifiés imposent, et leurs vérifications manuelles : ajoute-les dans
    l'issue, signées (étape 1). Une tête détachée reste permise quand tu en as
    besoin : elle saute ce que couvre la base commune avec `main`, mais n'atteste rien (D83, « Les
