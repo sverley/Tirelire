@@ -1,6 +1,18 @@
 /**
- * Tests du codeur de #378 — « Le budget JSON définit ses parties, et le cœur n'applique que la
- * différence avec l'état lu ». Chaque `describe` reprend un point du « Fait quand » sous son numéro.
+ * Harnais d'audit de #378 — le budget JSON définit ses parties ; le cœur n'applique que la différence
+ * avec l'état lu.
+ *
+ * Composé après le codage (auditeur.md, étape 2) : les tests du codeur, tous retenus ; chaque
+ * `describe` reprend un point du « Fait quand » sous son numéro. Sont de l'auditeur : au point 7, ce
+ * que le projet a changé depuis l'état lu et que la différence ne touche pas reste ; au point 8, rien
+ * n'est écrit d'une application refusée, par la voie de l'application (importer, puis appliquer si
+ * l'import passe). Les points 10 et 11 : `budget-json-harnais.test.ts` (#366 · 6 et 7) et la relecture.
+ *
+ * Niveaux (D83), par le besoin couvert :
+ * - 0 · l'irréparable : ce que le projet a changé depuis l'état lu et que la différence ne touche pas
+ *   reste (point 7) ; rien d'une application refusée n'est écrit (point 8) — sinon une saisie de
+ *   l'utilisateur serait écrasée ou le projet altéré.
+ * - 2 · un cas est faux : le reste.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -37,7 +49,7 @@ async function projetExemple(): Promise<LedgerStore> {
 }
 const vivantes = <T extends { deletedAt?: string }>(l: T[]) => l.filter((x) => !x.deletedAt);
 
-describe('[niveau 4] #378 · 1 — la version 2', () => {
+describe('[niveau 2] #378 · 1 — la version 2', () => {
   it('la version 2 se lit ; la version 1 est refusée en le disant', () => {
     expect(lireBudgetJson(v2({})).ok).toBe(true);
     const lu = lireBudgetJson({ ...exemple(), version: 1 });
@@ -46,7 +58,7 @@ describe('[niveau 4] #378 · 1 — la version 2', () => {
   });
 });
 
-describe('[niveau 4] #378 · 2 — une partie présente se définit entièrement', () => {
+describe('[niveau 2] #378 · 2 — une partie présente se définit entièrement', () => {
   it('une ligne qu’une table présente ne nomme pas est retirée ; une table absente ne change pas', async () => {
     const s = await projetExemple();
     const avant = s.load();
@@ -74,7 +86,7 @@ describe('[niveau 4] #378 · 2 — une partie présente se définit entièrement
   });
 });
 
-describe('[niveau 4] #378 · 3 — le simple et le complet', () => {
+describe('[niveau 2] #378 · 3 — le simple et le complet', () => {
   it('sans identifiant ni colonne facultative : l’identifiant se déduit du nom, les valeurs par défaut s’appliquent', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     const r = importerBudgetJson(v2({ categories: [{ name: 'Énergie & eau', nature: 'expense' }] }), s.load());
@@ -98,7 +110,7 @@ describe('[niveau 4] #378 · 3 — le simple et le complet', () => {
   });
 });
 
-describe('[niveau 4] #378 · 4 — le fichier se lit seul', () => {
+describe('[niveau 2] #378 · 4 — le fichier se lit seul', () => {
   it('une référence vers une table qu’il définit vise ses lignes ; vers une autre, elle attend le projet', async () => {
     const besoin = { tirelire_id: 'env-x', kind: 'recurring', priority: 1, name: 'B' };
     expect(lireBudgetJson(v2({ tirelires: [], needs: [besoin] })).ok).toBe(false);
@@ -107,7 +119,7 @@ describe('[niveau 4] #378 · 4 — le fichier se lit seul', () => {
   });
 });
 
-describe('[niveau 4] #378 · 5 — écrire un état', () => {
+describe('[niveau 2] #378 · 5 — écrire un état', () => {
   it('relire ce que le cœur écrit redonne les mêmes lignes, colonne pour colonne ; les parties choisies seulement', async () => {
     const projet = (await projetExemple()).load();
     const ecrit = ecrireBudgetJson(projet);
@@ -119,7 +131,7 @@ describe('[niveau 4] #378 · 5 — écrire un état', () => {
   });
 });
 
-describe('[niveau 4] #378 · 6 — la différence', () => {
+describe('[niveau 2] #378 · 6 — la différence', () => {
   it('ajouts, modifications et leurs colonnes, retraits, réglages ; une partie non définie n’en a pas', async () => {
     const projet = (await projetExemple()).load();
     const etatLu = etatDuProjet(projet, ['categories', 'tirelires', 'periodStartDay']);
@@ -140,19 +152,43 @@ describe('[niveau 4] #378 · 6 — la différence', () => {
   });
 });
 
-describe('[niveau 4] #378 · 7 — appliquer la différence au projet du moment', () => {
-  async function scenario(modifierProjet: (s: LedgerStore) => void, modifierFichier: (cats: Array<Record<string, unknown>>) => void) {
-    const s = await projetExemple();
-    const etatLu = etatDuProjet(s.load(), ['categories']);
-    const j = ecrireBudgetJson(s.load(), ['categories']);
-    modifierProjet(s);
-    modifierFichier(j['categories'] as Array<Record<string, unknown>>);
-    const lu = lireBudgetJson(j);
-    if (!lu.ok) throw new Error(lu.message);
-    const prep = preparerApplication(differenceBudget(lu.budget, etatLu), etatLu, s.load());
-    if (!prep.ok) throw new Error(prep.message);
-    return { s, prep };
-  }
+async function scenario(modifierProjet: (s: LedgerStore) => void, modifierFichier: (cats: Array<Record<string, unknown>>) => void) {
+  const s = await projetExemple();
+  const etatLu = etatDuProjet(s.load(), ['categories']);
+  const j = ecrireBudgetJson(s.load(), ['categories']);
+  modifierProjet(s);
+  modifierFichier(j['categories'] as Array<Record<string, unknown>>);
+  const lu = lireBudgetJson(j);
+  if (!lu.ok) throw new Error(lu.message);
+  const prep = preparerApplication(differenceBudget(lu.budget, etatLu), etatLu, s.load());
+  if (!prep.ok) throw new Error(prep.message);
+  return { s, prep };
+}
+
+describe('[niveau 0] #378 · 7 — ce que le projet a changé depuis l’état lu, et que la différence ne touche pas, reste', () => {
+  it('une ligne modifiée dans le projet, que le fichier laisse telle qu’il l’a lue, garde la modification du projet', async () => {
+    const { s, prep } = await scenario(
+      (s) => s.upsert('categories', { id: 'cat-enfants', name: 'Petits', nature: 'expense' }),
+      (cats) => (cats.find((c) => c['id'] === 'cat-alim')!['name'] = 'Courses'),
+    );
+    expect(prep.conflits).toEqual([]);
+    appliquerBudget(s, prep);
+    const l = s.load();
+    expect(l.categories.find((c) => c.id === 'cat-enfants')).toMatchObject({ name: 'Petits' });
+    expect(l.categories.find((c) => c.id === 'cat-enfants')!.deletedAt).toBeUndefined();
+    expect(l.categories.find((c) => c.id === 'cat-alim')!.name).toBe('Courses');
+  });
+  it('une ligne ajoutée dans le projet, dans une table que le fichier définit, reste', async () => {
+    const { s, prep } = await scenario(
+      (s) => s.upsert('categories', { id: 'cat-ailleurs', name: 'Ailleurs', nature: 'income' }),
+      () => {},
+    );
+    appliquerBudget(s, prep);
+    expect(s.load().categories.find((c) => c.id === 'cat-ailleurs')!.deletedAt).toBeUndefined();
+  });
+});
+
+describe('[niveau 2] #378 · 7 — appliquer la différence au projet du moment', () => {
   it('ce que le projet a changé ailleurs reste, sans conflit', async () => {
     const { s, prep } = await scenario(
       (s) => s.upsert('categories', { id: 'cat-ailleurs', name: 'Ailleurs', nature: 'income' }),
@@ -186,7 +222,24 @@ describe('[niveau 4] #378 · 7 — appliquer la différence au projet du moment'
   });
 });
 
-describe('[niveau 4] #378 · 8 — tout ou rien', () => {
+describe('[niveau 0] #378 · 8 — rien d’une application refusée n’est écrit', () => {
+  it('importer puis appliquer si l’import passe : un retrait qu’une opération désigne encore laisse le projet tel quel, octet pour octet', async () => {
+    const s = await projetExemple();
+    const op = exampleLedger().operations[0]!;
+    s.upsert('operations', op);
+    s.upsert('subOperations', { id: 'sub-enfants', operationId: op.id, categoryId: 'cat-enfants', share: { kind: 'variable' } });
+    const avant = s.export();
+    const j = ecrireBudgetJson(s.load(), ['categories', 'periodStartDay']);
+    j['categories'] = (j['categories'] as Array<Record<string, unknown>>).filter((c) => c['id'] !== 'cat-enfants');
+    (j['settings'] as Record<string, unknown>)['periodStartDay'] = 2;
+    const r = importerBudgetJson(j, s.load());
+    if (r.ok) appliquerBudget(s, r.application);
+    expect(r.ok).toBe(false);
+    expect(s.export()).toEqual(avant);
+  });
+});
+
+describe('[niveau 2] #378 · 8 — tout ou rien', () => {
   it('une ligne retirée qu’une opération désigne encore refuse le tout, rien n’est écrit', async () => {
     const s = await projetExemple();
     const op = exampleLedger().operations[0]!;
@@ -209,7 +262,7 @@ describe('[niveau 4] #378 · 8 — tout ou rien', () => {
   });
 });
 
-describe('[niveau 4] #378 · 9 — l’import donne exactement les lignes du fichier', () => {
+describe('[niveau 2] #378 · 9 — l’import donne exactement les lignes du fichier', () => {
   it('pour chaque partie définie, les lignes vivantes du projet sont celles du fichier', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     const autre: Ledger = { ...exampleLedger(), operations: [], subOperations: [], shortfallAnswers: [] };
