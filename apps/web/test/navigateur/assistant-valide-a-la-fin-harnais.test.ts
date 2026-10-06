@@ -181,7 +181,13 @@ async function ecranOrdinaire(page: Page, ecran: string): Promise<string> {
     });
     if (allume) await pause(200);
   }
-  return (await lire(page)).texte;
+  const texte = (await lire(page)).texte;
+  // Les comptes se corrigent sur leur ligne, dans des champs (la section Comptes, #362) : leurs valeurs sont ce que l'écran dit.
+  if (ecran !== 'Comptes') return texte;
+  const champs = await page.evaluate(() =>
+    ([...document.querySelectorAll('main .ligne-compte input')] as HTMLInputElement[]).map((i) => i.value).join(' | '),
+  );
+  return `${texte} || ${champs}`;
 }
 
 /** Ce que disent les écrans qui lisent le projet : Plan, Comptes, Flux prévus, Tirelires, et le jour de début de période (Réglages). */
