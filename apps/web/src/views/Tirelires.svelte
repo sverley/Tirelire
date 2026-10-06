@@ -49,7 +49,7 @@
   let error = $state('');
 
   // Besoin : un ou plusieurs par tirelire (D28).
-  let editingNeed = $state<{ need: Need } | undefined>(undefined);
+  let editingNeed = $state<{ need: Need; isNew: boolean } | undefined>(undefined);
   let needTitre = $state('');
   let needForm = $state({
     name: '',
@@ -200,8 +200,16 @@
     editing = undefined;
   }
 
+  /** L'ajout d'un besoin de tout type — échéance, objectif, versement — sur une tirelire existante, par un panneau nommé (D59). */
+  function startNewNeed(e: Tirelire) {
+    editingNeed = { need: { id: app.newId(), tirelireId: e.id, kind: 'recurring', priority: DEFAULT_PRIORITY.recurring }, isNew: true };
+    needForm = { name: '', kind: 'recurring', amount: '', interval: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring), activeFrom: '', activeTo: '' };
+    needTitre = `Ajouter un besoin — ${e.name}`;
+    needError = '';
+  }
+
   function startEditNeed(n: Need) {
-    editingNeed = { need: n };
+    editingNeed = { need: n, isNew: false };
     needForm = {
       name: n.name ?? '',
       kind: n.kind,
@@ -483,14 +491,18 @@
       </span>
     {/snippet}
     {#snippet apresBesoin(n)}
-      {#if editingNeed && editingNeed.need.id === n.id}
+      {#if editingNeed && !editingNeed.isNew && editingNeed.need.id === n.id}
         {@render editeurBesoin()}
       {/if}
     {/snippet}
     {#snippet pied(e)}
       <div class="actions" style="margin:6px 0 0">
+        <button class="btn small" onclick={() => startNewNeed(e)}>Ajouter un besoin d'un autre type</button>
         <button class="btn small" onclick={() => startEdit(e)}>Modifier</button>
       </div>
+      {#if editingNeed?.isNew && editingNeed.need.tirelireId === e.id}
+        {@render editeurBesoin()}
+      {/if}
       {#if annonceManque && annonceManque.tirelireId === e.id}
         <div class="card warn" style="margin:8px 0 0" role="status">
           <Manque manque={annonceManque} />

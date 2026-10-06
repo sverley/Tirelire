@@ -45,7 +45,7 @@ describe('[niveau 4] #369 · 1 — les mêmes cartes, écrites une fois', () => 
 
 describe('[niveau 4] #369 · 2 — ce que l’écran garde en propre', () => {
   it('le rangement par compte, « Sans compte de placement », le filtre d’état, « Réviser », l’annonce du manque et les panneaux nommés', () => {
-    for (const garde of ['byPlacement', 'Sans compte de placement', '<FiltreEtat', 'reviseNeed', 'Réviser', '<Manque', 'titre-panneau', 'startEditNeed', 'startEdit(', 'voulu :', 'réel :', 'priorité']) {
+    for (const garde of ['byPlacement', 'Sans compte de placement', '<FiltreEtat', 'reviseNeed', 'Réviser', '<Manque', 'titre-panneau', 'startEditNeed', 'startNewNeed', 'startEdit(', 'voulu :', 'réel :', 'priorité']) {
       expect(ecran, garde).toContain(garde);
     }
   });

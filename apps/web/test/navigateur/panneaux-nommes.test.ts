@@ -77,20 +77,18 @@ const ÉCRANS: Array<{ menu: string; titre: string; couverture: Couverture[] }> 
   {
     ...TIRELIRES,
     couverture: [
-      // La tirelire elle-même : sa carte est celle de l'assistant (#369), dont le seul panneau de carte est
-      // « Modifier » (placement en parts, solde initial, report). L'ajout d'un besoin se fait sur place.
-      { requis: [NOMS.tirelireA], conteneur: 'carte' },
+      // La tirelire elle-même (« Modifier »), et l'ajout d'un besoin de tout type sur elle (#369).
+      { requis: [NOMS.tirelireA], conteneur: 'carte', min: 2 },
       // Son besoin sans nom, puis son besoin nommé.
       { requis: [NOMS.tirelireA], conteneur: 'ligne' },
       { requis: [NOMS.tirelireA, NOMS.besoinNommé], conteneur: 'ligne' },
-      { requis: [NOMS.tirelireB], conteneur: 'carte' },
+      { requis: [NOMS.tirelireB], conteneur: 'carte', min: 2 },
       // Une tirelire sans placement voulu se range sous le compte principal et s'ouvre depuis sa
       // carte, comme toute tirelire (#322).
-      { requis: [NOMS.tirelireSansPlacement], conteneur: 'carte' },
+      { requis: [NOMS.tirelireSansPlacement], conteneur: 'carte', min: 2 },
       // Une tirelire dont le placement vise un compte supprimé reste à part, en alerte : sa carte est
       // celle des autres, avec son « Modifier » (#369).
-      { requis: [NOMS.tirelireOrpheline], conteneur: 'carte' },
-      { requis: [NOMS.tirelireOrpheline], conteneur: 'ligne' },
+      { requis: [NOMS.tirelireOrpheline], conteneur: 'carte', min: 2 },
       { requis: [] },
     ],
   },
@@ -612,7 +610,7 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
           let pourA: HTMLButtonElement | undefined;
           let pourB: HTMLButtonElement | undefined;
           for (const x of deCarte(a, 'carte')) if (!pourA && (await où(x)) === 'après') pourA = x;
-          for (const x of deCarte(b, 'ligne')) if (!pourB && (await où(x)) === 'dans') pourB = x;
+          for (const x of deCarte(b, 'carte')) if (!pourB && (await où(x)) === 'dans') pourB = x;
           if (!pourA || !pourB) return { trouvé: false, panneaux: 0, après: '', dans: '', carte: '' };
           pourA.click();
           await o.attendre();

@@ -135,6 +135,24 @@ describe.skipIf(!navigateur)('[niveau 4] #369 · l’écran Tirelires emploie la
     await cliquer(page, 'Annuler');
   });
 
+  it('point 2 — l’écran garde l’ajout d’un besoin de tout type sur une tirelire existante, par un panneau nommé', async () => {
+    await ouvrir();
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('main .card.tirelire > .actions button')].find((x) => (x.textContent ?? '').includes('autre type')) as HTMLButtonElement;
+      b.click();
+    });
+    await pause(250);
+    const nom = (await cartes())[0]!;
+    const panneau = await page.evaluate(() => {
+      const f = document.querySelector('main form.edit') as HTMLElement;
+      const types = [...(f.querySelector('select') as HTMLSelectElement).options].map((o) => o.value);
+      return { titre: (f.querySelector('.titre-panneau')?.textContent ?? '').trim(), types };
+    });
+    expect(panneau.titre).toContain(nom);
+    expect(panneau.types).toEqual(expect.arrayContaining(['dueDate', 'goal', 'payout']));
+    await cliquer(page, 'Annuler');
+  });
+
   it('points 1 et 5 — le formulaire d’ajout est celui de la section, avec ses aides ; une échéance ajoute sa ligne et son prélèvement attendu', async () => {
     await ouvrir();
     expect(await cliquer(page, 'Ajouter une tirelire')).toBe(true);
