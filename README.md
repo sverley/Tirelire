@@ -131,7 +131,7 @@ niveau :
   navigateur, ceux de l'issue seuls), build, en mode strict
   (`TIRELIRE_STRICT`) : un outil manquant fait échouer le job. Un fichier de test déjà vert sur son
   empreinte ne s'y rejoue pas, seuil 1 compris ; au tag, rien ne se saute.
-- **Nuit** (`nuit.yml`) : chaque nuit, vers 3 h, heure de Paris, les tests navigateur de
+- **Nuit** (`nuit.yml`) : chaque nuit, vers 3 h UTC, les tests navigateur de
   non-régression sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur son
   empreinte ; une nuit rouge ouvre une issue, ou complète celle d'une nuit précédente, sans bloquer
   aucune fusion (#307).

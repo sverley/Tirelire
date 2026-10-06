@@ -1,6 +1,6 @@
 name: Tests navigateur de la nuit
 
-# Chaque nuit, vers 3 h, heure de Paris (#307) : les tests navigateur de non-régression
+# Chaque nuit, vers 3 h UTC (#307, #348) : les tests navigateur de non-régression
 # (`apps/web/test/navigateur/`) se jouent sur le dernier commit de `main`, au seuil 2, sauf chaque
 # fichier vert sur son empreinte. Ils ne se jouent plus ni avant la fusion ni à la CI d'une fusion sur
 # `main` (`ci.yml`) : ils ne décident d'aucune fusion. `main` ne part qu'en recette ; la production ne
@@ -18,20 +18,17 @@ name: Tests navigateur de la nuit
 # et qui échoue avant de savoir ce qu'elle joue — extraction, outil de la nuit — est une nuit rouge :
 # elle se signale de même, sans fichier rouge à nommer ; sans le dépôt extrait, par `gh`.
 #
-# L'heure : la planification de GitHub est en UTC. Deux déclenchements, à 1 h 07 et 2 h 07 UTC ; seul
-# joue celui qui tombe à 3 h à Paris — le premier à l'heure d'été (UTC+2), le second à l'heure
-# d'hiver (UTC+1) —, quel que soit son retard. Le lancement manuel, sur `main`, joue toujours.
+# L'heure : un seul déclenchement planifié, à 3 h 00 UTC, toute l'année (#348) ; aucun fuseau
+# n'entre en compte. Le lancement manuel, sur `main`, joue toujours.
 #
 # Place des jobs sur le second axe des harnais (#113) :
-# - `heure` est hors harnais : il dit si ce déclenchement est celui de 3 h à Paris.
 # - `navigateur` lit des fichiers suivis : il joue les tests navigateur sur `main`, en mode strict
 #   (`TIRELIRE_STRICT`, un outil manquant fait échouer le job) ; il écrit l'attestation de la nuit sur
 #   sa branche et signale une nuit rouge par une issue, par l'API.
 
 on:
   schedule:
-    - cron: '7 1 * * *'
-    - cron: '7 2 * * *'
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions: {}
@@ -42,31 +39,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  heure:
-    name: 3 h à Paris
-    runs-on: ubuntu-latest
-    outputs:
-      jouer: ${{ steps.heure.outputs.jouer }}
-    steps:
-      - id: heure
-        env:
-          PLANIFIE: ${{ github.event.schedule }}
-        run: |
-          decalage=$(TZ=Europe/Paris date +%z)
-          case "$GITHUB_EVENT_NAME:$PLANIFIE:$decalage" in
-            workflow_dispatch:*) jouer=oui ;;
-            "schedule:7 1 * * *:+0200" | "schedule:7 2 * * *:+0100") jouer=oui ;;
-            *) jouer=non ;;
-          esac
-          echo "jouer=$jouer" >> "$GITHUB_OUTPUT"
-          if [ "$jouer" = non ]; then
-            echo "Déclenchement de « $PLANIFIE » (UTC) : pas celui de 3 h à Paris (décalage $decalage) ; l'autre joue." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
   navigateur:
     name: Tests navigateur sur main
-    needs: heure
-    if: needs.heure.outputs.jouer == 'oui'
     runs-on: ubuntu-latest
     permissions:
       contents: write # l'attestation de la nuit, sur sa branche
