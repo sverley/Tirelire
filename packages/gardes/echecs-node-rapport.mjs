@@ -9,10 +9,12 @@ import { endroitDans, messageDe } from './echecs.mjs';
 
 export default async function* rapport(source) {
   let enAttente = [];
+  let sauts = [];
   for await (const { type, data } of source) {
-    if (type === 'test:skip' && data.file && typeof data.skip === 'string') {
+    if (type === 'test:pass' && data.file && typeof data.skip === 'string') {
       // La raison d'un test sauté (#352, point 5) : le lanceur la donne sur la ligne de son fichier.
-      yield `${JSON.stringify({ saute: true, fichier: resolve(data.file), raison: data.skip })}\n`;
+      // Sous l'enveloppe des niveaux, `data.file` est l'enveloppe : le bilan du fichier le rattache.
+      sauts.push(data.skip);
     } else if (type === 'test:fail') {
       const erreur = data.details?.error;
       if (erreur?.failureType === 'subtestsFailed') continue;
@@ -24,7 +26,9 @@ export default async function* rapport(source) {
         const endroit = endroitDans(e.pile, fichier) ?? (e.lieu && !/niveaux-node-enveloppe\.mjs:/.test(e.lieu) ? e.lieu : null);
         yield `${JSON.stringify({ fichier, test: e.test, message: e.message, endroit })}\n`;
       }
+      for (const raison of new Set(sauts)) yield `${JSON.stringify({ saute: true, fichier, raison })}\n`;
       enAttente = [];
+      sauts = [];
     }
   }
 }
