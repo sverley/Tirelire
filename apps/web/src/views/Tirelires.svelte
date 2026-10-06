@@ -3,8 +3,13 @@
   import { revealed } from '../lib/actions';
   import FiltreEtat from '../lib/FiltreEtat.svelte';
   import Manque from '../lib/Manque.svelte';
-  import { money, shortDate, centsToInput, inputToCents, openAccounts, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS, periodicityLabel, validityLabel, validityBadge } from '../lib/format';
-  import { aidesDeBesoin, aidesDeTirelire } from '../lib/aides';
+  import CarteTirelire from '../lib/CarteTirelire.svelte';
+  import FormulaireTirelire from '../lib/FormulaireTirelire.svelte';
+  import RaccourcisTirelires from '../lib/RaccourcisTirelires.svelte';
+  import { EXPLICATION } from '../lib/explicationTirelires';
+  import { SectionTirelires as Section, type GenreDeLaSection } from '../lib/sectionTirelires.svelte';
+  import { money, centsToInput, inputToCents, openAccounts, NEED_KINDS, NEED_KINDS_SHORT, ROLLOVER_LABELS } from '../lib/format';
+  import { aidesDeBesoin } from '../lib/aides';
   import {
     alive,
     activeAt,
@@ -18,11 +23,10 @@
     indexLedger,
     dueDateFlowForNeed,
     dueDateShortfalls,
-    needCruise,
-    nextOccurrence,
     validityState,
     DEFAULT_PRIORITY,
     DEFAULT_VISIBILITY,
+    MAIN_ACCOUNT_ID,
     type Tirelire,
     type Need,
     type NeedKind,
@@ -30,13 +34,12 @@
     type ValidityState,
   } from '@tirelire/core';
 
-  // Tirelire : nom, placement voulu (D20), solde initial, report (D05/D29).
+  // Tirelire : placement voulu (D20), solde initial, report (D05/D29) — ce que la carte ne corrige pas sur place.
   let editing = $state<Tirelire | undefined>(undefined);
   /** Ce qu'annoncent les panneaux : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
   let titre = $state('');
   type PlacementForm = { accountId: string; kind: 'fixed' | 'percent' | 'variable'; value: string };
   let form = $state({
-    name: '',
     placement: [] as PlacementForm[],
     openingBalance: '0,00',
     openingDate: app.asOf,
@@ -64,8 +67,26 @@
    * Les aides des champs (D43) : le nom d'une tirelire de l'exemple ; pour un besoin, les valeurs d'un
    * besoin de l'exemple du type choisi. Un type que l'exemple ne porte pas — le versement — n'a pas d'aide.
    */
-  const aidesTirelire = aidesDeTirelire();
   const aidesBesoin = $derived(aidesDeBesoin(needForm.kind));
+
+  /** La section Tirelires, la même que l'assistant (#361), qui écrit ici dans le projet. */
+  const section = new Section({
+    get ledger() {
+      return app.ledger;
+    },
+    upsert: (key, row) => app.upsert(key, row),
+    remove: (key, id) => app.remove(key, id),
+    newId: () => app.newId(),
+    get asOf() {
+      return app.asOf;
+    },
+    periodStart: () => budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay).start,
+    mainAccountId: () => accounts.find((a) => a.kind === 'principal')?.id ?? MAIN_ACCOUNT_ID,
+  });
+  /** L'ajout d'une tirelire : le formulaire de la section, ouvert à la demande, pour le genre choisi. */
+  let ajout = $state(false);
+  let genreAjout = $state<GenreDeLaSection>('everyday');
+  const GENRES: Array<[GenreDeLaSection, string]> = [['everyday', 'Budget par période'], ['periodic', 'Dépense à échéance'], ['savings', 'Objectif d\'épargne']];
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -131,25 +152,9 @@
       .join(', ');
   }
 
-  function startNew() {
-    const principal = accounts.find((a) => a.kind === 'principal');
-    editing = { id: app.newId(), name: '', placement: [], openingBalance: 0, openingDate: app.asOf };
-    form = {
-      name: '',
-      placement: principal ? [{ accountId: principal.id, kind: 'variable' as const, value: '' }] : [],
-      openingBalance: '0,00',
-      openingDate: app.asOf,
-      rollover: 'unlimited',
-      rolloverMonths: '3',
-    };
-    titre = 'Ajouter une tirelire';
-    error = '';
-  }
-
   function startEdit(e: Tirelire) {
     editing = e;
     form = {
-      name: e.name,
       placement: e.placement.map((p) => ({
         accountId: p.accountId,
         kind: p.share.kind,
@@ -167,15 +172,14 @@
   function save(ev: Event) {
     ev.preventDefault();
     if (!editing) return;
-    if (!form.name.trim()) return void (error = 'Le nom est obligatoire.');
     if (form.placement.filter((p) => p.kind === 'variable').length > 1)
       return void (error = 'Une seule ligne « le reste » : les autres doivent porter un montant ou un pourcentage.');
     if (form.placement.some((p) => !p.accountId)) return void (error = 'Chaque ligne de placement vise un compte.');
     const openingBalance = inputToCents(form.openingBalance);
     if (openingBalance === undefined) return void (error = 'Solde initial invalide.');
+    // La carte corrige le nom sur place : le panneau repart de la tirelire telle qu'elle est maintenant.
     const row: Tirelire = {
-      id: editing.id,
-      name: form.name.trim(),
+      ...(tirelires.find((x) => x.id === editing!.id) ?? editing),
       placement: form.placement.map((p) => ({
         accountId: p.accountId,
         share:
@@ -196,12 +200,7 @@
     editing = undefined;
   }
 
-  function remove(e: Tirelire) {
-    if (!confirm(`Supprimer la tirelire « ${e.name} » et ses besoins ?`)) return;
-    for (const n of needsOf(e)) app.remove('needs', n.id);
-    app.remove('tirelires', e.id);
-  }
-
+  /** L'ajout d'un besoin de tout type — échéance, objectif, versement — sur une tirelire existante, par un panneau nommé (D59). */
   function startNewNeed(e: Tirelire) {
     editingNeed = { need: { id: app.newId(), tirelireId: e.id, kind: 'recurring', priority: DEFAULT_PRIORITY.recurring }, isNew: true };
     needForm = { name: '', kind: 'recurring', amount: '', interval: '1', anchorDate: app.asOf, monthlyAmount: '', priority: String(DEFAULT_PRIORITY.recurring), activeFrom: '', activeTo: '' };
@@ -289,7 +288,7 @@
     app.upsert('needs', row);
     editingNeed = undefined;
     // Une échéance enregistrée trop près de sa date se dit aussitôt (principe 1.4, #184).
-    annonce = row.kind === 'dueDate' ? row.id : undefined;
+    section.derniereEcheance = row.kind === 'dueDate' ? row.id : undefined;
   }
 
   /*
@@ -297,14 +296,11 @@
    * en manque, l'application dit aussitôt le montant qui manquera et sa date, à côté de ce que
    * l'ordre permanent demande par période, avec la proposition de lisser (#184, point 3).
    */
-  let annonce = $state<string | undefined>(undefined);
   const annonceManque = $derived(
-    annonce ? dueDateShortfalls(app.ledger, app.asOf).find((s) => s.needId === annonce && (s.amount > 0 || s.answer)) : undefined,
+    section.derniereEcheance
+      ? dueDateShortfalls(app.ledger, app.asOf).find((s) => s.needId === section.derniereEcheance && (s.amount > 0 || s.answer))
+      : undefined,
   );
-
-  function removeNeed(n: Need) {
-    if (confirm('Supprimer ce besoin ?')) app.remove('needs', n.id);
-  }
 
   /**
    * L'autre face d'une échéance : le flux qui la paiera le jour venu. Le dire ici évite d'avoir à
@@ -317,16 +313,6 @@
     return f ? `payée par le flux « ${f.name} »` : 'aucun flux ne paie cette échéance';
   }
 
-  function describeNeed(n: Need): string {
-    const validite = validityLabel(n);
-    const suffixe = validite ? ` · ${validite}` : '';
-    if (n.kind === 'dueDate')
-      return `${money(n.amount ?? 0)} ${periodicityLabel(n.periodicity)} · prochaine ${n.periodicity ? shortDate(nextOccurrence(n.periodicity, app.asOf)) : '?'}${suffixe}`;
-    if (n.kind === 'goal') return `${money(n.monthlyAmount ?? 0)} par période${n.amount !== undefined ? ` · cible ${money(n.amount)}` : ''}${suffixe}`;
-    const per = n.periodicity && n.periodicity.interval === 12 ? 'par an' : n.periodicity && n.periodicity.interval > 1 ? `tous les ${n.periodicity.interval} mois` : 'par période';
-    return `${money(n.amount ?? 0)} ${per} · dotation ${money(needCruise(n))}${suffixe}`;
-  }
-
   /** Position réelle : où l'argent se trouve vraiment, comparé au placement voulu (D19, D20). */
   function positionOf(e: Tirelire): Array<{ accountId: string; amount: number }> {
     return [...tirelireComponents(e, idx, app.asOf)]
@@ -337,12 +323,29 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Tirelires</h1>
-<p class="muted small">Une tirelire est un pot à solde unique, réparti sur les comptes où son argent se trouve vraiment. Elle déclare où il devrait dormir, et porte un ou plusieurs besoins : échéance, récurrent, objectif.</p>
+
+<details class="explication muted small">
+  <summary>Comment ça marche ?</summary>
+  {#each Object.values(EXPLICATION) as texte}<p>{texte}</p>{/each}
+</details>
 
 <div class="actions">
-  <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter une tirelire</button>
+  <button class="btn primary" onclick={() => (ajout = !ajout)} aria-expanded={ajout}>Ajouter une tirelire</button>
 </div>
-{#if accounts.length === 0}<div class="empty">Créez d'abord un compte.</div>{/if}
+{#if ajout}
+  <div use:revealed>
+  <FormulaireTirelire s={section} genre={genreAjout} titre="Ajouter une tirelire" onajoute={() => (ajout = false)} onannule={() => (ajout = false)}>
+    {#snippet avant()}
+      <label class="f">Quelle sorte ?
+        <select value={genreAjout} onchange={(ev) => (genreAjout = (ev.currentTarget as HTMLSelectElement).value as GenreDeLaSection)}>
+          {#each GENRES as [g, nom]}<option value={g}>{nom}</option>{/each}
+        </select>
+      </label>
+    {/snippet}
+  </FormulaireTirelire>
+  </div>
+{/if}
+<RaccourcisTirelires s={section} genres={['everyday', 'periodic', 'savings']} />
 
 <FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les tirelires" />
 
@@ -350,7 +353,6 @@
   <form class="edit attached" use:revealed onsubmit={save}>
     <p class="titre-panneau">{titre}</p>
     <div class="grid">
-      <label class="f">Nom <input bind:value={form.name} placeholder={aidesTirelire.name} /></label>
       <div class="f" style="grid-column:1/-1">
         <span class="sub">Placement voulu — où cet argent devrait dormir. Plusieurs comptes possibles : un montant, un pourcentage, et « le reste ».</span>
         {#each form.placement as p, i (i)}
@@ -446,58 +448,57 @@
   </form>
 {/snippet}
 
-<!-- Une tirelire qu'on crée n'a pas encore de carte : son formulaire suit le bouton qui l'ouvre. -->
-{#if editing && !tirelires.some((e) => e.id === editing?.id)}
-  {@render editeurTirelire()}
-{/if}
 
-{#each byPlacement as g (g.account.id)}
-  <h2>{g.account.name}</h2>
-  {#each g.tirelires as e (e.id)}
-    {@const bal = tirelireBalance(e, idx, app.asOf)}
-    {@const pos = positionOf(e)}
-    <div class="card" class:editing={editing?.id === e.id}>
-      <div class="row">
-        <div class="label">
-          <strong>{e.name}</strong>
-          <span class="sub">
-            voulu : {placementText(e)}
-            <br />réel : {pos.length ? pos.map((c) => `${money(c.amount)} sur ${accountName(c.accountId)}`).join(', ') : 'rien'}
-            · {ROLLOVER_LABELS[e.rollover?.mode ?? 'unlimited'].toLowerCase()}
-          </span>
-        </div>
-        <div class="num {bal < 0 ? 'neg' : ''}" style="font-size:18px">{money(bal)}</div>
-      </div>
-      {#each besoinsVisibles(e) as n (n.id)}
-        {@const badge = validityBadge(n, app.asOf)}
-        {@const paidBy = paidByText(n)}
-        <div class="row {badge ? 'dormant' : ''}" style="padding-left:8px">
+{#snippet carte(e: Tirelire, alerte: boolean)}
+  <CarteTirelire
+    s={section}
+    t={e}
+    besoins={besoinsVisibles(e)}
+    reliquat
+    ajoutBesoin
+    entetes
+    confirmer
+    alerte={alerte}
+    editing={editing?.id === e.id}
+    sansBesoin={sansBesoin(e)}
+  >
+    {#snippet enTete(e)}
+      {#if alerte}
+        <div class="sub">son placement vise un compte qui n'existe plus : modifiez-le pour dire où cet argent doit dormir</div>
+      {:else}
+        {@const bal = tirelireBalance(e, idx, app.asOf)}
+        {@const pos = positionOf(e)}
+        <div class="row">
           <div class="label">
-            <span class="pill">{NEED_KINDS_SHORT[n.kind]}</span>
-            {#if badge}<span class="pill dim">{badge}</span>{/if}
-            {n.name ?? e.name}
-            <span class="sub">{describeNeed(n)} · priorité {n.priority}</span>
-            {#if paidBy}<span class="sub">{paidBy}</span>{/if}
+            <span class="sub">
+              voulu : {placementText(e)}
+              <br />réel : {pos.length ? pos.map((c) => `${money(c.amount)} sur ${accountName(c.accountId)}`).join(', ') : 'rien'}
+            </span>
           </div>
-          <div class="actions" style="margin:0">
-            {#if activeAt(n, app.asOf)}
-              <button class="btn small" onclick={() => reviseNeed(n)} title="Clore ce budget à la fin de la période et en ouvrir un nouveau">Réviser</button>
-            {/if}
-            <button class="btn small" onclick={() => startEditNeed(n)}>Modifier</button>
-            <button class="btn small danger" onclick={() => removeNeed(n)}>×</button>
-          </div>
+          <div class="num {bal < 0 ? 'neg' : ''}" style="font-size:18px">{money(bal)}</div>
         </div>
-        {#if editingNeed && !editingNeed.isNew && editingNeed.need.id === n.id}
-          {@render editeurBesoin()}
-        {/if}
-      {/each}
-      {#if besoinsVisibles(e).length === 0}
-        <div class="sub" style="padding-left:8px">{sansBesoin(e)}</div>
       {/if}
+    {/snippet}
+    {#snippet parBesoin(n)}
+      {@const paidBy = paidByText(n)}
+      <span class="pill">{NEED_KINDS_SHORT[n.kind]}</span>
+      <span class="sub">priorité {n.priority}{#if paidBy} · {paidBy}{/if}</span>
+      <span class="actions" style="margin:0">
+        {#if activeAt(n, app.asOf)}
+          <button class="btn small" onclick={() => reviseNeed(n)} title="Clore ce budget à la fin de la période et en ouvrir un nouveau">Réviser</button>
+        {/if}
+        <button class="btn small" onclick={() => startEditNeed(n)}>Modifier</button>
+      </span>
+    {/snippet}
+    {#snippet apresBesoin(n)}
+      {#if editingNeed && !editingNeed.isNew && editingNeed.need.id === n.id}
+        {@render editeurBesoin()}
+      {/if}
+    {/snippet}
+    {#snippet pied(e)}
       <div class="actions" style="margin:6px 0 0">
-        <button class="btn small" onclick={() => startNewNeed(e)}>Ajouter un besoin</button>
+        <button class="btn small" onclick={() => startNewNeed(e)}>Ajouter un besoin d'un autre type</button>
         <button class="btn small" onclick={() => startEdit(e)}>Modifier</button>
-        <button class="btn small danger" onclick={() => remove(e)}>Supprimer</button>
       </div>
       {#if editingNeed?.isNew && editingNeed.need.tirelireId === e.id}
         {@render editeurBesoin()}
@@ -505,26 +506,30 @@
       {#if annonceManque && annonceManque.tirelireId === e.id}
         <div class="card warn" style="margin:8px 0 0" role="status">
           <Manque manque={annonceManque} />
-          <div class="actions" style="margin:0"><button class="btn small" onclick={() => (annonce = undefined)}>Fermer</button></div>
+          <div class="actions" style="margin:0"><button class="btn small" onclick={() => (section.derniereEcheance = undefined)}>Fermer</button></div>
         </div>
       {/if}
-    </div>
-    {#if editing?.id === e.id}
-      {@render editeurTirelire()}
-    {/if}
+    {/snippet}
+  </CarteTirelire>
+  {#if editing?.id === e.id}
+    {@render editeurTirelire()}
+  {/if}
+{/snippet}
+
+{#each byPlacement as g (g.account.id)}
+  <h2>{g.account.name}</h2>
+  {#each g.tirelires as e (e.id)}
+    {@render carte(e, false)}
   {/each}
 {/each}
 {#if orphans.length}
   <h2>Sans compte de placement</h2>
   {#each orphans as e (e.id)}
-    <div class="card warn" class:editing={editing?.id === e.id}><div class="row"><div class="label"><strong>{e.name}</strong><span class="sub">son placement vise un compte qui n'existe plus : modifiez-le pour dire où cet argent doit dormir</span></div><button class="btn small" onclick={() => startEdit(e)}>Modifier</button></div></div>
-    {#if editing?.id === e.id}
-      {@render editeurTirelire()}
-    {/if}
+    {@render carte(e, true)}
   {/each}
 {/if}
-{#if tirelires.length === 0 && accounts.length > 0}
-  <div class="empty">Aucune tirelire pour l'instant.</div>
-{:else if tirelires.length > 0 && masquées === tirelires.length}
+{#if tirelires.length === 0}
+  <div class="empty">Aucune tirelire pour l'instant : les raccourcis ci-dessus, ou « Ajouter une tirelire », en créent une.</div>
+{:else if masquées === tirelires.length}
   <div class="empty">Tout est masqué par le filtre : {masquées} tirelire(s) rangée(s).</div>
 {/if}

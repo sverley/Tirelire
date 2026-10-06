@@ -77,18 +77,18 @@ const ÉCRANS: Array<{ menu: string; titre: string; couverture: Couverture[] }> 
   {
     ...TIRELIRES,
     couverture: [
-      // La tirelire elle-même, et l'ajout d'un besoin sur elle.
+      // La tirelire elle-même (« Modifier »), et l'ajout d'un besoin de tout type sur elle (#369).
       { requis: [NOMS.tirelireA], conteneur: 'carte', min: 2 },
       // Son besoin sans nom, puis son besoin nommé.
       { requis: [NOMS.tirelireA], conteneur: 'ligne' },
       { requis: [NOMS.tirelireA, NOMS.besoinNommé], conteneur: 'ligne' },
       { requis: [NOMS.tirelireB], conteneur: 'carte', min: 2 },
       // Une tirelire sans placement voulu se range sous le compte principal et s'ouvre depuis sa
-      // carte, comme toute tirelire (#322) : ajout d'un besoin, et la tirelire elle-même.
+      // carte, comme toute tirelire (#322).
       { requis: [NOMS.tirelireSansPlacement], conteneur: 'carte', min: 2 },
-      // Une tirelire dont le placement vise un compte supprimé reste à part, en alerte : sa carte
-      // n'a qu'un bouton « Modifier », dans sa ligne.
-      { requis: [NOMS.tirelireOrpheline], conteneur: 'ligne' },
+      // Une tirelire dont le placement vise un compte supprimé reste à part, en alerte : sa carte est
+      // celle des autres, avec son « Modifier » (#369).
+      { requis: [NOMS.tirelireOrpheline], conteneur: 'carte', min: 2 },
       { requis: [] },
     ],
   },
@@ -147,8 +147,8 @@ function installer() {
     await pause(30);
     await new Promise((fin) => requestAnimationFrame(() => requestAnimationFrame(fin)));
   };
-  // Un panneau est un formulaire attaché à sa ligne (D52) : le formulaire d'ajout de la section Comptes, toujours là (#362), n'en est pas un.
-  const panneaux = () => [...document.querySelectorAll('form.edit.attached')] as HTMLFormElement[];
+  // Le formulaire d'ajout de la section Comptes, toujours là (#362), n'est pas un panneau : il n'en ouvre pas.
+  const panneaux = () => ([...document.querySelectorAll('form.edit')] as HTMLFormElement[]).filter((f) => !([...f.querySelectorAll('button')].some((b) => b.type === 'submit' && texte(b) === 'Ajouter un compte')));
   /** Ce que le panneau annonce : sa ligne de titre, ou à défaut un intitulé ; rien sinon. */
   const titreDe = (f: Element) => f.querySelector('.titre-panneau, h1, h2, h3, h4, legend');
 
@@ -203,15 +203,33 @@ function installer() {
   /** Tout bouton hors panneau, ni destructif, ni filtre, ni « Réviser » (qui écrit une révision). */
   const ouvreursPossibles = () =>
     ([...document.querySelectorAll('main button')] as HTMLButtonElement[]).filter(
-      (b) => !b.closest('form.edit') && !b.disabled && !b.classList.contains('danger') && !b.classList.contains('filtre') && !b.classList.contains('prop') && texte(b) !== 'Réviser',
+      (b) =>
+        !b.closest('form.edit') &&
+        !b.disabled &&
+        !b.classList.contains('danger') &&
+        !b.classList.contains('filtre') &&
+        // Un raccourci de l'exemple et l'ajout d'un besoin sur place écrivent : ils n'ouvrent pas de panneau (#369).
+        !b.classList.contains('prop') &&
+        !b.closest('.ajout-besoin') &&
+        texte(b) !== 'Réviser',
     );
 
   const nomsDans = (el: Element | null | undefined, noms: string[]) => {
     const t = propre(el);
     return noms.filter((n) => t.includes(n));
   };
+  /** Le nom d'une carte de tirelire, ou d'un besoin qui porte le sien : dans leurs champs, la carte étant celle de l'assistant (#369). */
+  const valeur = (el: Element | null | undefined) => ((el as HTMLInputElement | null | undefined)?.value ?? '').trim();
   /** Les noms que le titre doit porter, lus sur la ligne ou la carte du bouton. */
   const attendus = (b: Element, noms: string[]) => {
+    const tirelire = b.closest('.card.tirelire');
+    if (tirelire) {
+      const ligne = b.closest('.ligne');
+      const lus = [valeur(tirelire.querySelector(':scope > .ligne-tirelire > input.nom'))];
+      if (ligne) lus.push(valeur(ligne.querySelector('input.besoin')));
+      const requis = noms.filter((n) => lus.some((l) => l.includes(n)));
+      return { requis: [...new Set(requis)].sort(), conteneur: (ligne ? 'ligne' : 'carte') as Conteneur };
+    }
     const ligne = b.closest('.row');
     const carte = b.closest('.card');
     // Une carte de compte porte son nom dans le champ de sa ligne (la section Comptes, #362).
@@ -231,7 +249,10 @@ function installer() {
 
   const carte = (nom: string) =>
     [...document.querySelectorAll('.card')].find(
-      (c) => propre(c.querySelector(':scope > .row > .label')) === nom || (c.querySelector(':scope > .ligne-compte > input') as HTMLInputElement | null)?.value === nom,
+      (c) =>
+        propre(c.querySelector(':scope > .row > .label')) === nom ||
+        valeur(c.querySelector(':scope > .ligne-tirelire > input.nom')) === nom ||
+        (c.querySelector(':scope > .ligne-compte > input') as HTMLInputElement | null)?.value === nom,
     );
   const bouton = (racine: ParentNode, libellé: string) => {
     const b = ([...racine.querySelectorAll('button')] as HTMLButtonElement[]).find(
@@ -405,38 +426,41 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
       await aller(TIRELIRES);
       await page.evaluate(async (n: Noms) => {
         const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        // Une tirelire se crée par le formulaire de la section (#369), avec son premier besoin sans nom ; le
+        // placement voulu se dit ensuite dans le panneau « Modifier » de sa carte (D59).
         for (const [nom, placée] of [[n.tirelireA, true], [n.tirelireB, true], [n.tirelireSansPlacement, false], [n.tirelireOrpheline, true]] as const) {
           o.bouton(document, 'Ajouter une tirelire').click();
           await o.attendre();
           const f = o.panneaux()[0]!;
-          await o.remplir(f, 'Nom', nom);
-          // Le formulaire peut proposer d'emblée une ligne de placement : on la complète, ou on la retire.
-          const aUneLigne = () => [...f.querySelectorAll('label')].some((l) => o.texte(l).startsWith('Compte'));
-          if (placée) {
-            if (!aUneLigne()) {
-              o.bouton(f, 'Ajouter un compte').click();
-              await o.attendre();
-            }
-            const compte = nom === n.tirelireOrpheline ? n.compteSupprimé : n.compteB;
-            await o.remplir(f, 'Compte', compte).catch(() => o.remplir(f, 'Compte', n.compteA));
-          } else {
-            while (aUneLigne()) {
-              o.bouton(f, 'Retirer').click();
-              await o.attendre();
-            }
-          }
+          await o.remplir(f, 'Quoi', nom);
+          await o.remplir(f, 'Combien par période', '100,00');
           await o.soumettre(f);
-        }
-        for (const nom of ['', n.besoinNommé]) {
-          const carte = o.carte(n.tirelireA);
-          if (!carte) throw new Error(`carte « ${n.tirelireA} » introuvable`);
-          o.bouton(carte, 'Ajouter un besoin').click();
+          if (!placée) continue;
+          const carte = o.carte(nom);
+          const modifier = ([...(carte?.querySelectorAll(':scope > .actions button') ?? [])] as HTMLButtonElement[]).find((x) => o.texte(x) === 'Modifier');
+          if (!modifier) throw new Error(`« Modifier » introuvable sur la carte « ${nom} »`);
+          modifier.click();
           await o.attendre();
-          const f = o.panneaux()[0]!;
-          if (nom) await o.remplir(f, 'Nom', nom);
-          await o.remplir(f, 'Montant', '100,00');
-          await o.soumettre(f);
+          const p = o.panneaux()[0]!;
+          o.bouton(p, 'Ajouter un compte').click();
+          await o.attendre();
+          const compte = nom === n.tirelireOrpheline ? n.compteSupprimé : n.compteB;
+          await o.remplir(p, 'Compte', compte).catch(() => o.remplir(p, 'Compte', n.compteA));
+          await o.soumettre(p);
         }
+        // Le besoin nommé de la première tirelire s'ajoute sur place, par le formulaire de sa carte.
+        const carte = o.carte(n.tirelireA);
+        if (!carte) throw new Error(`carte « ${n.tirelireA} » introuvable`);
+        const ajout = carte.querySelector('form.ajout-besoin')!;
+        const poser = (i: HTMLInputElement, v: string) => {
+          i.value = v;
+          i.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        poser(ajout.querySelector('.besoin-nom') as HTMLInputElement, n.besoinNommé);
+        poser(ajout.querySelector('.mt') as HTMLInputElement, '100,00');
+        await o.attendre();
+        (ajout as HTMLFormElement).requestSubmit();
+        await o.attendre();
       }, NOMS);
 
       // Le compte visé par la tirelire orpheline disparaît, par l'interface : le placement de cette
@@ -578,10 +602,10 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
       const r = await page.evaluate(
         async (noms: string[], a: string, b: string) => {
           const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
-          const deCarte = (nom: string) =>
+          const deCarte = (nom: string, conteneur: 'carte' | 'ligne') =>
             o.ouvreursPossibles().filter((x) => {
               const at = o.attendus(x, noms);
-              return at.conteneur === 'carte' && at.requis.length === 1 && at.requis[0] === nom;
+              return at.conteneur === conteneur && at.requis.length === 1 && at.requis[0] === nom;
             });
           // Le panneau de la tirelire s'ouvre après sa carte ; celui d'un besoin, dans la carte.
           const où = async (x: HTMLButtonElement) => {
@@ -594,8 +618,8 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
           };
           let pourA: HTMLButtonElement | undefined;
           let pourB: HTMLButtonElement | undefined;
-          for (const x of deCarte(a)) if (!pourA && (await où(x)) === 'après') pourA = x;
-          for (const x of deCarte(b)) if (!pourB && (await où(x)) === 'dans') pourB = x;
+          for (const x of deCarte(a, 'carte')) if (!pourA && (await où(x)) === 'après') pourA = x;
+          for (const x of deCarte(b, 'carte')) if (!pourB && (await où(x)) === 'dans') pourB = x;
           if (!pourA || !pourB) return { trouvé: false, panneaux: 0, après: '', dans: '', carte: '' };
           pourA.click();
           await o.attendre();
@@ -609,7 +633,7 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
             panneaux: ps.length,
             après: fApres ? o.lire(fApres).titre : '',
             dans: fDans ? o.lire(fDans).titre : '',
-            carte: fDans ? o.propre(fDans.closest('.card')!.querySelector(':scope > .row > .label')) : '',
+            carte: fDans ? ((fDans.closest('.card')!.querySelector(':scope > .ligne-tirelire > input.nom') as HTMLInputElement | null)?.value ?? '') : '',
           };
           await o.annuler();
           return résultat;
@@ -671,8 +695,9 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
           const at = o.attendus(b, noms);
           return o.texte(b) === 'Réviser' && at.conteneur === 'ligne' && at.requis.join() === a;
         });
-        const ligne = réviser?.closest('.row');
-        const modifier = ligne ? o.ouvreursPossibles().find((b) => b.closest('.row') === ligne) : undefined;
+        // La ligne d'un besoin est celle de la carte de l'assistant (#369) : « Réviser » et « Modifier » y sont côte à côte.
+        const ligne = réviser?.closest('.ligne');
+        const modifier = ligne ? o.ouvreursPossibles().find((b) => b.closest('.ligne') === ligne) : undefined;
         if (!réviser || !modifier) return { trouvé: false, modification: '', révision: '' };
         modifier.click();
         await o.attendre();

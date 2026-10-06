@@ -164,6 +164,17 @@ async function remonterALEtape(page: Page, titre: RegExp) {
   expect((await lire(page)).h2, `l’étape ${titre} n’a pas été retrouvée en remontant`).toMatch(titre);
 }
 
+/**
+ * Le texte de l'écran Tirelires, noms compris : sa carte est celle de l'assistant (#369), dont le nom de la
+ * tirelire et celui d'un besoin se lisent dans des champs.
+ */
+const texteDesTirelires = (page: Page) =>
+  page.evaluate(() => {
+    const m = document.querySelector('main')!.cloneNode(true) as HTMLElement;
+    for (const i of [...m.querySelectorAll('input.nom, input.besoin')] as HTMLInputElement[]) i.replaceWith(document.createTextNode(` ${i.value} `));
+    return (m.textContent ?? '').trim().replace(/\s+/g, ' ');
+  });
+
 /** Le texte d'un écran ordinaire, atteint par le menu Plus. */
 async function ecranOrdinaire(page: Page, ecran: string): Promise<string> {
   await allerÀ(page, 'Plus');
@@ -181,7 +192,7 @@ async function ecranOrdinaire(page: Page, ecran: string): Promise<string> {
     });
     if (allume) await pause(200);
   }
-  const texte = (await lire(page)).texte;
+  const texte = ecran === 'Tirelires' ? await texteDesTirelires(page) : (await lire(page)).texte;
   // Les comptes se corrigent sur leur ligne, dans des champs (la section Comptes, #362) : leurs valeurs sont ce que l'écran dit.
   if (ecran !== 'Comptes') return texte;
   const champs = await page.evaluate(() =>

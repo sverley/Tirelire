@@ -109,6 +109,7 @@ export class SectionTirelires {
     const cree = suggestedTirelire(p, { id: d.newId(), newId: () => d.newId(), openingDate: d.periodStart(), principalId: d.mainAccountId(), compte: this.compteNomme });
     d.upsert('tirelires', cree.tirelire);
     for (const n of cree.needs) d.upsert('needs', n);
+    this.derniereEcheance = cree.needs.filter((n) => n.kind === 'dueDate').at(-1)?.id;
     for (const f of cree.flows) d.upsert('plannedFlows', f);
   };
   /** Le garnissage d'office : chaque raccourci restant du genre, repris. L'endroit décide s'il le fait (D46). */
@@ -127,6 +128,12 @@ export class SectionTirelires {
     return aideEpargne(this.restantes('savings'), this.toutesLesTirelires('savings'), this.asOf);
   }
   readonly aideBesoinAjoute = aideBesoin();
+
+  /**
+   * La dernière échéance que la section ou son endroit vient d'enregistrer : l'endroit qui annonce un
+   * manque tout de suite (#184) la lit, et l'efface quand l'annonce est fermée.
+   */
+  derniereEcheance = $state<Id | undefined>(undefined);
 
   // --- Saisies des formulaires d'ajout : elles se gardent d'une étape à l'autre ---
   /** Le report se coche ou se décoche ; tant qu'on n'y a pas touché (`undefined`), il est celui de la ligne d'aide (#214). */
@@ -173,8 +180,10 @@ export class SectionTirelires {
   }
   #creerPeriodique(nom: string, montant: number, mois: number, echeance: string, compte?: string, avecFlux = true) {
     const tirelireId = this.#nouvelleTirelire(nom, true);
+    const besoinId = this.#d.newId();
+    this.derniereEcheance = besoinId;
     this.#d.upsert('needs', {
-      id: this.#d.newId(),
+      id: besoinId,
       tirelireId,
       kind: 'dueDate',
       amount: montant,
@@ -206,11 +215,11 @@ export class SectionTirelires {
     } satisfies Need);
   }
 
-  addEveryday() {
+  addEveryday(): boolean {
     const day = this.day;
     const amount = inputToCents(day.amount);
-    if (!day.name.trim()) return void (this.dayError = 'Donnez un nom à ce budget.');
-    if (amount === undefined || amount <= 0) return void (this.dayError = 'Indiquez un montant par période.');
+    if (!day.name.trim()) { this.dayError = 'Donnez un nom à ce budget.'; return false; }
+    if (amount === undefined || amount <= 0) { this.dayError = 'Indiquez un montant par période.'; return false; }
     const ligne = this.aideBudget;
     const garde = this.gardeBudget;
     if (ligne && recopieCourant({ name: day.name.trim(), amount, keep: garde }, ligne)) {
@@ -221,15 +230,16 @@ export class SectionTirelires {
       this.day = { name: '', amount: '', keep: day.keep };
     }
     this.dayError = '';
+    return true;
   }
-  addPeriodic() {
+  addPeriodic(): boolean {
     const per = this.per;
     const amount = inputToCents(per.amount);
-    if (!per.name.trim()) return void (this.perError = 'Donnez un nom à cette dépense.');
-    if (amount === undefined || amount <= 0) return void (this.perError = 'Indiquez le montant de la facture.');
+    if (!per.name.trim()) { this.perError = 'Donnez un nom à cette dépense.'; return false; }
+    if (amount === undefined || amount <= 0) { this.perError = 'Indiquez le montant de la facture.'; return false; }
     const ev = this.evEcheance;
     const echeance = ev.dueDate;
-    if (!echeance) return void (this.perError = 'Indiquez la date de la prochaine échéance.');
+    if (!echeance) { this.perError = 'Indiquez la date de la prochaine échéance.'; return false; }
     const mois = Math.max(1, Number(ev.months) || 1);
     const ligne = this.aideEcheance;
     if (ligne && recopiePeriodique({ name: per.name.trim(), amount, months: mois, dueDate: echeance, withFlow: ev.withFlow, accountId: ev.accountId }, ligne, this.compteNommeOuPrincipal(ligne.accountName))) {
@@ -240,18 +250,20 @@ export class SectionTirelires {
       this.per = { ...per, name: '', amount: '', dueDate: undefined };
     }
     this.perError = '';
+    return true;
   }
-  addSavings() {
+  addSavings(): boolean {
     const sav = this.sav;
     const monthly = inputToCents(sav.monthly);
-    if (!sav.name.trim()) return void (this.savError = 'Donnez un nom à cet objectif.');
-    if (monthly === undefined || monthly <= 0) return void (this.savError = 'Indiquez combien mettre de côté par période.');
+    if (!sav.name.trim()) { this.savError = 'Donnez un nom à cet objectif.'; return false; }
+    if (monthly === undefined || monthly <= 0) { this.savError = 'Indiquez combien mettre de côté par période.'; return false; }
     const cible = inputToCents(sav.target);
     const ligne = this.aideObjectif;
     if (ligne && recopieEpargne({ name: sav.name.trim(), monthly, target: cible }, ligne)) this.appliquer(ligne.ligne);
     else this.#creerEpargne(sav.name.trim(), monthly, cible);
     this.sav = { name: '', monthly: '', target: '' };
     this.savError = '';
+    return true;
   }
   /**
    * Un besoin par période de plus sur la tirelire (D28, #344) : en vigueur dès la période en cours,
