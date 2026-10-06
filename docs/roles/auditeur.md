@@ -10,7 +10,8 @@ cite — ses décisions, ses invariants et contraintes, leurs entrées du regist
 plutôt qu'en lisant les documents en entier : l'architecte a confronté le besoin à tous, et son
 « Comparé » nomme ce qui compte (porteur, #333). Pour vérifier qu'un ajout ou le
 travail ne contredit pas un catalogue (étapes 1 et 3), cherche-y les notions qu'il touche. Le codeur
-crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteur, #283).
+crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteur, #283). Tes sessions sont
+économes, ta vérification proportionnée (D92).
 
 1. Lis le « Fait quand » de ton côté (principe 11.1), avant les tests du codeur : c'est lui, et non
    ces tests, qui dit ce que le harnais doit trancher. Si une de ses phrases ne peut se trancher ni
@@ -46,10 +47,12 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    quand il est du registre, qui n'en accueille jamais (D81), mets-les dans le second fichier : le
    codeur n'en voit que le verdict. Un besoin que la relecture suffit à vérifier — par défaut la
    documentation et la garde (D81) — n'a pas de harnais.
-3. Vérifie le travail en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
+3. Pour un besoin sans code, ta vérification est la relecture et la garde hors ligne, sans
+   `pnpm test 2` ; ce que la livraison a attesté ne se rejoue pas (D92). Sinon, vérifie le travail
+   en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
-   un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **À chaque tour,
-   joue aussi la garde**, l'outil, que `pnpm test 2` ne joue pas, hors ligne, sur le corps de l'issue tel qu'il est sur GitHub, en entier, jamais un commentaire, donné en fichier (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`) ou en texte (variable `CORPS`) ; si ce corps n'a pas
+   un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **Dans les deux cas,
+   à chaque tour, joue la garde**, l'outil, que `pnpm test 2` ne joue pas, hors ligne, sur le corps de l'issue tel qu'il est sur GitHub, en entier, jamais un commentaire, donné en fichier (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`) ou en texte (variable `CORPS`) ; si ce corps n'a pas
    de section « Invariants et contraintes », dis-le dans l'issue, sans la chercher ailleurs (#349).
    Elle seule dit les entrées du
    registre que les fichiers modifiés imposent, et leurs vérifications manuelles : ajoute-les dans

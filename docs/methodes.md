@@ -506,3 +506,29 @@ un jalon du même nom que la version regroupe ces tâches ; son architecte les o
 Français partout dans le travail : code, commentaires, commits, documents ; ce que l'outil dit à
 l'utilisateur suit D85. Le porteur lit surtout sur téléphone : réponses courtes, en prose, une
 question à la fois.
+
+### D92 · Économie des sessions
+
+Une session coûte ce qu'elle lit et ce qu'elle rejoue ; le compromis entre le coût et la stabilité
+que le principe 10.1 demande à la CI vaut pour elle (#351).
+
+- **Lire par extraits.** Le code, les diffs, les fils de l'issue et de la PR se lisent par extraits,
+  en cherchant ce que la tâche demande, comme les documents fondateurs (#333). D'un tour à l'autre,
+  une session ne lit que ce qui a changé depuis son dernier passage : les nouveaux commentaires, le
+  diff depuis le dernier commit qu'elle a vu.
+- **Les sorties longues dans un fichier.** Les sorties longues — installation, tests, crochets —
+  s'écrivent dans un fichier, dont la session ne lit que le verdict et ce qui échoue.
+- **L'audit d'un besoin sans code.** Pour un besoin sans code, l'audit est la relecture et la garde
+  hors ligne, sans `pnpm test 2` (D81). Ce que la livraison a attesté ne se rejoue pas : le lanceur
+  dit ce qu'il saute (D83, « Les empreintes »).
+- **La documentation de l'architecte.** Une documentation codée en direct par l'architecte reste
+  chez lui : il reprend lui-même les retours de l'auditeur, sans session de codeur. L'auditeur la
+  vérifie : celui qui vérifie n'est pas celui qui code (principe 11).
+- **Des écrits proportionnés.** Le compte rendu du codeur et la vérification de l'auditeur se
+  proportionnent : le relevé phrase par phrase du « Fait quand » pour ce qu'un test tranche ; pour
+  une documentation, quelques lignes.
+
+L'hypothèse écartée, tout lire en entier et tout rejouer pour ne rien manquer, ne tenait pas : le
+tour de #349, une modification de documentation, a coûté environ 340 000 tokens à trois sessions,
+qui relisaient fils et sorties en entier et rejouaient `pnpm test 2`, puis un second tour de deux
+sessions pour deux phrases.

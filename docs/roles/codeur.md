@@ -7,7 +7,8 @@ travailles en français.
 Avant tout, lis l'issue, le glossaire (`docs/glossaire.md`) et, des documents fondateurs (D77), ce que l'issue
 cite — ses décisions, ses invariants et contraintes, leurs entrées du registre —, en les cherchant
 plutôt qu'en lisant les documents en entier : l'architecte a confronté le besoin à tous, et son
-« Comparé » nomme ce qui compte (porteur, #333).
+« Comparé » nomme ce qui compte (porteur, #333). Tes sessions sont économes, ton compte rendu
+proportionné (D92).
 
 0. Si aucune PR n'existe : crée la branche, son nom portant le numéro de l'issue (`codage/<n>-…`),
    indique-la dans l'issue, et ouvre la PR en brouillon avec le corps du modèle
