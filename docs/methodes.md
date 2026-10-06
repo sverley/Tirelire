@@ -98,9 +98,11 @@ choses, et rien de plus :
 3. chaque vérification manuelle des entrées déclarées figure dans cette section, sa consigne
    recopiée, sans case : la fusion vaut validation.
 
-Il tourne en CI au passage en Ready de chaque PR, et à la demande en local
-(`node packages/gardes/cli.mjs pr --issue <n>`, sur les fichiers modifiés depuis `origin/main`). En
-CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'elle juge est le contenu
+Il tourne en CI au passage en Ready de chaque PR, et à la demande en local, hors ligne, sur le corps
+de l'issue donné en fichier ou en texte (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`,
+ou la variable `CORPS`), sur les fichiers modifiés depuis `origin/main` (#349). De l'issue, il ne lit
+que le corps, jamais ses commentaires. En CI, la garde qui juge est celle de `main`, avec le workflow
+de `main` ; ce qu'elle juge est le contenu
 de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
 et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
 ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
@@ -348,7 +350,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
 - **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck`, ses propres tests, à la main,
-  le harnais du besoin s'il existe, au plus la garde, et, s'il modifie une fonction de la garde, ses
+  le harnais du besoin s'il existe, la garde à chaque tour, avant son compte rendu (#349), et, s'il
+  modifie une fonction de la garde, ses
   tests de développement (D81) — pas la suite : l'auditeur déplacera et modifiera ses tests en
   composant le harnais (#316) ; l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready, hors
   tests navigateur sauf sa demande. Aucune CI ne tourne en brouillon. Les crochets

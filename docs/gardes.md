@@ -30,9 +30,10 @@ recopier : son harnais échoue au-delà, ou sa vérification manuelle la constat
   déclarer, et la garde rougit en nommant l'entrée manquante et, dans le même passage, ses vérifications manuelles (#328) ; chaque vérification manuelle des
   entrées déclarées, et chaque garde retirée de ce document, figure dans la section avec sa consigne
   recopiée. Tant qu'il manque quelque chose, le job est rouge. Aucune case : la fusion vaut validation, et
-  un changement de la PR ou de l'issue après le Ready est signalé en commentaire de la PR. La même vérification se joue en local, avant le Ready :
-  `node packages/gardes/cli.mjs pr --issue <n>` (ou `--corps-fichier`), sur les fichiers modifiés
-  depuis `origin/main`, copie de travail comprise.
+  un changement de la PR ou de l'issue après le Ready est signalé en commentaire de la PR. La même vérification se joue en local, avant le Ready, hors ligne :
+  `node packages/gardes/cli.mjs pr --corps-fichier <fichier>` (ou la variable `CORPS`), avec le corps
+  de l'issue, sur les fichiers modifiés depuis `origin/main`, copie de travail comprise (#349). De
+  l'issue, la garde ne lit que le corps, jamais ses commentaires.
 - **La garde qui juge une PR est celle de `main`.** Le job « Validation » exécute la garde et le
   workflow de `main`, la branche par défaut, quelle que soit la base de la PR ; il juge le contenu de la PR : ce
   registre, les documents et les fichiers modifiés, tels que la PR les porte, et la section de
