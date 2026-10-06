@@ -32,8 +32,9 @@
  *   seuil), et la sortie de l'exécuteur — s'écrit dans `<dossier git>/tirelire-detail/<paquet>.txt`,
  *   réécrit au lancement suivant ; un crochet passe `--detail <fichier>`, garde la sortie de
  *   l'exécuteur dans son journal, et conserve les deux jusqu'à son passage suivant. En CI —
- *   couverture écrite par elle (`ready`, `main`, `nuit`), ou GitHub Actions —, tout se dit, fichier
- *   par fichier, comme avant (D83). L'empreinte d'un fichier attesté est celle de ce qu'il lit (D83, #304,
+ *   couverture écrite par elle (`ready`, `main`, `nuit`), ou `--complet` qu'elle passe —, tout se dit,
+ *   fichier par fichier, comme avant (D83). Rien de ce comportement ne se lit de l'environnement
+ *   (`CI`, `GITHUB_ACTIONS`) : qui lance le sert en option ou en fichier (#352, point 9). L'empreinte d'un fichier attesté est celle de ce qu'il lit (D83, #304,
  *   `empreintesDesFichiers`), calculée sur le contenu joué, copie de travail comprise
  *   (`attestation-git.mjs`, `arbreDeLaCopie`).
  * - `--attestation <fichier>`, que passent la CI et la livraison : ce qui couvre ce lancement, écrit
@@ -85,11 +86,13 @@ const navigateur = lu.reste.includes('--navigateur');
 let fichierAttestation = null;
 let fichierBilan = null;
 let fichierDetail = null;
+let complet = false;
 const reste = [];
 for (let i = 0; i < lu.reste.length; i++) {
   const a = lu.reste[i];
   if (a === '--navigateur') continue;
-  if (a === '--attestation') fichierAttestation = lu.reste[++i] ?? '';
+  if (a === '--complet') complet = true;
+  else if (a === '--attestation') fichierAttestation = lu.reste[++i] ?? '';
   else if (a.startsWith('--attestation=')) fichierAttestation = a.slice('--attestation='.length);
   else if (a === '--bilan') fichierBilan = lu.reste[++i] ?? '';
   else if (a.startsWith('--bilan=')) fichierBilan = a.slice('--bilan='.length);
@@ -181,10 +184,11 @@ if (nomme) annonces.push("appel nommé : il se joue en entier, quel que soit l'a
 /** Ce que chaque fichier a donné se lit pour attester, ou pour le bilan que demande la livraison (`--bilan`). */
 /**
  * Hors CI, la sortie est courte (#352) : une ligne par ensemble, sans nom de fichier de test, et le
- * détail dans un fichier. La CI se reconnaît à ce qui couvre le lancement, écrit par elle (`ready`,
- * `main`, `nuit`), ou, sans lui, à GitHub Actions ; son journal dit tout, fichier par fichier (D83).
+ * détail dans un fichier. La sortie complète, fichier par fichier, que demande la CI (D83), se demande
+ * par ce qu'elle sert : `--complet`, ou ce qui couvre le lancement, écrit par elle (`ready`, `main`,
+ * `nuit`) ; jamais par l'environnement (#352, point 9).
  */
-const enCI = ['ready', 'main', 'nuit'].includes(couverture?.origine) || process.env.GITHUB_ACTIONS === 'true';
+const enCI = complet || ['ready', 'main', 'nuit'].includes(couverture?.origine);
 const court = !enCI;
 /** Ce que chaque fichier a donné se lit pour attester, pour le bilan que demande la livraison (`--bilan`), ou pour la sortie courte. */
 const parFichier = Boolean(attester || (fichierBilan && !nomme) || court);
@@ -381,7 +385,7 @@ if (vitest && parFichier) env.TIRELIRE_FICHIERS = rapportVitest;
 const rapportNode = join(travail, 'fichiers.jsonl');
 const rapportEchecs = join(travail, 'echecs.jsonl');
 delete env.TIRELIRE_ECHECS;
-if (court) env.TIRELIRE_ECHECS = rapportEchecs;
+env.TIRELIRE_ECHECS = rapportEchecs;
 
 let commande;
 let args;
@@ -392,7 +396,7 @@ if (vitest) {
   // Le rapporteur des fichiers dit ce que chacun a donné : il ne s'ajoute que pour attester, ou pour le bilan.
   if ((filtre || parFichier) && !reste.some((a) => /^--reporter(?:=|$)/.test(a))) args.push('--reporter=default');
   if (parFichier) args.push(`--reporter=${resolve(ici, 'fichiers-vitest-rapport.mjs')}`);
-  if (court) args.push(`--reporter=${resolve(ici, 'echecs-vitest-rapport.mjs')}`);
+  args.push(`--reporter=${resolve(ici, 'echecs-vitest-rapport.mjs')}`);
   if (filtre) args.push(`--reporter=${resolve(ici, 'niveaux-vitest-rapport.mjs')}`, '-t', motifDuSeuil(seuil));
 } else {
   commande = process.execPath;
@@ -406,7 +410,14 @@ if (vitest) {
     if (!reste.some((a) => /^--test-reporter(?:=|$)/.test(a))) rapporteurs.push(`--test-reporter=${process.stdout.isTTY ? 'spec' : 'tap'}`, '--test-reporter-destination=stdout');
     rapporteurs.push(`--test-reporter=${resolve(ici, 'rapport-fichiers.mjs')}`, `--test-reporter-destination=${rapportNode}`);
   }
-  if (court) rapporteurs.push(`--test-reporter=${resolve(ici, 'echecs-node-rapport.mjs')}`, `--test-reporter-destination=${rapportEchecs}`);
+  // Le rapporteur des échecs et des sauts, en CI comme hors CI (#352, point 8) ; node apparie ses rapporteurs
+  // et leurs destinations : à des rapporteurs donnés sans destination, il ne s'ajoute pas.
+  const sansDestination = reste.filter((a) => /^--test-reporter(?:=|$)/.test(a)).length > reste.filter((a) => /^--test-reporter-destination(?:=|$)/.test(a)).length;
+  if (court || !sansDestination) {
+    // Un rapporteur ajouté remplace celui que node prend par défaut : il se redit sur la sortie.
+    if (!rapporteurs.length && !reste.some((a) => /^--test-reporter(?:=|$)/.test(a))) rapporteurs.push(`--test-reporter=${process.stdout.isTTY ? 'spec' : 'tap'}`, '--test-reporter-destination=stdout');
+    rapporteurs.push(`--test-reporter=${resolve(ici, 'echecs-node-rapport.mjs')}`, `--test-reporter-destination=${rapportEchecs}`);
+  }
   args = [
     ...(filtre ? ['--import', resolve(ici, 'niveaux-node.mjs')] : []),
     ...argv.slice(1, fin + 1),
@@ -444,11 +455,15 @@ enfant.on('close', async (code, signal) => {
   }
   const sortie = signal ? 1 : (code ?? 1);
   // Hors CI : chaque test en échec, avec son message et son endroit (#352, point 4), puis une ligne par ensemble.
-  const lus = court ? (essaie(() => readFileSync(rapportEchecs, 'utf8')) ?? '').split('\n').filter(Boolean).map((l) => essaie(() => JSON.parse(l))).filter(Boolean) : [];
+  const lus = (essaie(() => readFileSync(rapportEchecs, 'utf8')) ?? '').split('\n').filter(Boolean).map((l) => essaie(() => JSON.parse(l))).filter(Boolean);
   const echecs = lus.filter((x) => !x.saute);
   /** La raison réelle des tests sautés d'un fichier, s'il en a une (« lftp absent »). */
   const raisonsDuSaut = new Map();
   for (const x of lus.filter((y) => y.saute)) raisonsDuSaut.set(x.fichier, [...new Set([...(raisonsDuSaut.get(x.fichier) ?? []), x.raison])]);
+  raisonDuSaut = (a) => {
+    const raisons = raisonsDuSaut.get(a);
+    return raisons ? `test(s) sauté(s) : ${raisons.join(' ; ')}` : "un test s'est sauté, faute d'outil par exemple";
+  };
   const resultats = parFichier && !signal ? lireResultats(sortie, ecartesParFichier) : null;
   if (court) {
     for (const l of lignesDesEchecs(echecs)) console.log(l);
@@ -476,8 +491,7 @@ enfant.on('close', async (code, signal) => {
     if (resultats) {
       for (const [a, r] of resultats) {
         if (r.etat !== 'sauté') continue;
-        const raisons = raisonsDuSaut.get(a);
-        dire(`${raccourci(racine ? relatif(racine, a) : a)} : non attesté — ${raisons ? `test(s) sauté(s) : ${raisons.join(' ; ')}` : "un test s'est sauté, faute d'outil par exemple"}.`);
+        dire(`${raccourci(racine ? relatif(racine, a) : a)} : non attesté — ${raisonDuSaut(a)}.`);
       }
     }
   }
@@ -494,6 +508,9 @@ enfant.on('close', async (code, signal) => {
   rmSync(travail, { recursive: true, force: true });
   process.exit(sortie);
 });
+
+/** La raison d'un fichier non attesté parce qu'un test s'y est sauté : la réelle si elle est donnée (#352, point 8). */
+let raisonDuSaut = () => "un test s'est sauté, faute d'outil par exemple";
 
 /** Ce que chaque fichier a donné, `null` s'il ne se lit pas (`fichiersDuLancement`). */
 function lireResultats(code, ecartesParFichier) {
@@ -535,7 +552,7 @@ function attesterLeLancement(resultats) {
     }
     if (r.etat !== 'vert') {
       // Hors CI, un fichier sauté faute d'outil est déjà dit ; un fichier rouge l'est avec ses échecs.
-      if (!court) refuses.set(fichier, r.etat === 'rouge' ? 'rouge' : "un test s'est sauté, faute d'outil par exemple");
+      if (!court) refuses.set(fichier, r.etat === 'rouge' ? 'rouge' : raisonDuSaut(absolu));
       else if (r.etat === 'rouge') refuses.set(fichier, 'rouge');
       continue;
     }
