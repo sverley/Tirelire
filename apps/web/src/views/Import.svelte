@@ -295,7 +295,7 @@
   {/if}
   {#if prep.counts.probable}
     <h2>Doublons probables</h2>
-    <p class="small muted">Même compte, même montant, à trois jours près, libellé proche. Coche celles qui sont bien de nouvelles opérations.</p>
+    <p class="small muted">Même compte, même montant, à trois jours près, libellé proche. Cochez celles qui sont bien de nouvelles opérations.</p>
     <div class="card">
       {#each prep.candidates.filter((c) => c.probable) as c (c.row.line)}
         <div class="row">
