@@ -106,7 +106,7 @@
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(profile.accountMap)) if (v) cleaned[k] = v;
     const p = { ...profile, accountMap: cleaned };
-    if (!p.columns.account && !p.accountId) return void (error = 'Choisis le compte cible.');
+    if (!p.columns.account && !p.accountId) return void (error = 'Choisissez le compte cible.');
     prep = prepareImport(app.ledger, parsed.rows, p);
     decisions = {};
     for (const c of prep.candidates) if (c.probable) decisions[c.row.line] = (c.similarity ?? 0) < 0.5;
@@ -241,7 +241,7 @@
     </div>
     <h3>Comptes</h3>
     {#if profile.columns.account}
-      <p class="small muted">Valeurs trouvées dans la colonne compte ; laisse vide pour ignorer un compte.</p>
+      <p class="small muted">Valeurs trouvées dans la colonne compte ; laissez vide pour ignorer un compte.</p>
       <div class="grid">
         {#each accountKeys as k (k)}
           <label class="f">{k}

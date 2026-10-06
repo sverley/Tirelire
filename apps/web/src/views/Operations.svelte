@@ -399,7 +399,7 @@
    */
   function saveAutomation() {
     if (!selectionActive) {
-      error = 'Renseigne au moins un critère de recherche avant d’enregistrer.';
+      error = 'Renseignez au moins un critère de recherche avant d’enregistrer.';
       return;
     }
     const automation: Automation = {
@@ -603,7 +603,7 @@
       <button class="btn" type="button" onclick={() => (bulkOpen = false)}>Fermer</button>
     </div>
     {#if !selectionActive}
-      <p class="sub">Pour enregistrer un automatisme, renseigne au moins un critère de recherche : c’est lui qui dira à quelles opérations futures ces actions s’appliquent.</p>
+      <p class="sub">Pour enregistrer un automatisme, renseignez au moins un critère de recherche : c’est lui qui dira à quelles opérations futures ces actions s’appliquent.</p>
     {/if}
   </form>
 {/if}
@@ -748,7 +748,7 @@
     <div class="muted">
       Rien à afficher{filter === 'untreated' ? ' : tout est traité.' : '.'}
       {#if matching.length === 0}
-        <span class="sub">Le dépôt contient {totalOps} opération(s) : élargis la recherche ou passe le filtre d'affichage sur « Toutes ».</span>
+        <span class="sub">Le dépôt contient {totalOps} opération(s) : élargissez la recherche ou passez le filtre d'affichage sur « Toutes ».</span>
       {/if}
     </div>
   {/each}

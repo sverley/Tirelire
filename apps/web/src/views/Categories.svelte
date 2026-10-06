@@ -93,7 +93,7 @@
 
   function remove(c: Category) {
     const children = categories.filter((x) => x.parentId === c.id);
-    if (children.length) return void alert(`« ${c.name} » a ${children.length} sous-catégorie(s) : détache-les ou supprime-les d'abord.`);
+    if (children.length) return void alert(`« ${c.name} » a ${children.length} sous-catégorie(s) : détachez-les ou supprimez-les d'abord.`);
     if (confirm(`Supprimer la catégorie « ${c.name} » ?\nLes opérations déjà classées avec elle gardent leur ventilation.`)) app.remove('categories', c.id);
   }
 </script>
