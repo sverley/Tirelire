@@ -1,12 +1,15 @@
 /**
- * Tests du codeur de #199 — « Le format du fichier est documenté, et un test tient la documentation
- * à jour (D58) ». Tous de niveau 4 (D83).
+ * Harnais d'audit de #199 — « Le format du fichier est documenté, et un test tient la documentation
+ * à jour (D58) ». Côté document ; le refus d'une table `meta` sans colonne (point 11) est dans
+ * `meta-sans-colonne-harnais.test.ts`.
  *
- * `docs/format-depot-sqlite.md` décrit le format ; ces tests le confrontent au format que porte le
- * cœur (`TABLES`, `SYSTEM_SQL`, `CLES_REGLAGES`, `FORMAT_VERSION`, les formes JSON), jouent le script de
- * l'exemple minimal tel qu'il est écrit, recalculent la clé d'exemple et rejouent la commande
- * `verifier-fichier` sur les deux exemples dont le document montre la sortie. Ce que le document dit
- * en prose (points 1 à 6) se vérifie en relisant (principe 10) ; ici, ce qu'un test tranche.
+ * Composé après le codage (auditeur.md, étape 2) parmi les tests du codeur, repris tels quels :
+ * point 8 (le document et le format ne divergent pas) et point 9 (l'exemple minimal s'ouvre et donne son
+ * plan ; la clé d'exemple est celle de l'application) sont de niveau 2 — une règle dite par le document
+ * que le code ne tiendrait plus donnerait un fichier fabriqué faux ou refusé, l'usage restant possible,
+ * sans décision ni invariant en jeu. Restent au niveau 4, diagnostics du texte du document : l'horodatage,
+ * le texte de l'exemple minimal, la sortie de `verifier-fichier` qu'il montre. Ce que le document dit en
+ * prose (points 1 à 6) se vérifie en relisant (principe 10).
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -127,7 +130,7 @@ const TOUTES = Object.values(TABLES);
 // 8. Le document et le format ne divergent pas
 // ---------------------------------------------------------------------------
 
-describe('[niveau 4] #199 · 8. les tables et les colonnes du document sont celles du format', () => {
+describe('[niveau 2] #199 · 8. les tables et les colonnes du document sont celles du format', () => {
   it('chaque table du format a sa section, et le document n’en décrit aucune autre', () => {
     const titres = [...DOC.matchAll(/^### Table `([^`]+)`$/gm)].map((m) => m[1]!);
     expect(titres.sort()).toEqual([...TOUTES.map((t) => t.name), 'settings', 'meta'].sort());
@@ -207,7 +210,7 @@ describe('[niveau 4] #199 · 8. les tables et les colonnes du document sont cell
     db.close();
   });
 
-  it('seules deux colonnes portent un horodatage, et le document le dit', () => {
+  it('[niveau 4] seules deux colonnes portent un horodatage, et le document le dit', () => {
     const colonnes = TOUTES.flatMap((t) => t.columns.filter((c) => c.form === 'instant').map((c) => `${t.name}.${c.col}`));
     expect(colonnes.every((c) => /\.(deleted_at|last_seen)$/.test(c))).toBe(true);
     expect(DOC).toContain('`deleted_at` et `devices.last_seen`');
@@ -240,7 +243,7 @@ function lireBaseDe(octets: Uint8Array): ReturnType<typeof lireBase> {
   }
 }
 
-describe('[niveau 4] #199 · 8. les réglages, les clés de meta et la version du document sont ceux du format', () => {
+describe('[niveau 2] #199 · 8. les réglages, les clés de meta et la version du document sont ceux du format', () => {
   it('les réglages : les mêmes clés que le format, chacun avec son défaut', () => {
     const rangees = tableau(section('## Les réglages'));
     const doc = new Map(rangees.map((r) => [codes(r['Réglage']!)[0]!, r]));
@@ -338,7 +341,7 @@ function aplatir(d: Description, prefixe: string): Champ1[] {
   return out;
 }
 
-describe('[niveau 4] #199 · 8. les formes JSON du document sont celles du format, et leurs exemples s’écrivent', () => {
+describe('[niveau 2] #199 · 8. les formes JSON du document sont celles du format, et leurs exemples s’écrivent', () => {
   it('chaque forme du format a sa section, et le document n’en décrit aucune autre', () => {
     const titres = [...DOC.matchAll(/^### Forme « ([^»]+) »$/gm)].map((m) => m[1]!);
     expect(titres.sort()).toEqual([...NOMMEES.keys()].sort());
@@ -391,7 +394,7 @@ function fichierDeLExemple(apres = ''): Uint8Array {
   return octets;
 }
 
-describe('[niveau 4] #199 · 9. l’exemple minimal du document', () => {
+describe('[niveau 2] #199 · 9. l’exemple minimal du document', () => {
   it('collé dans une base vide, il donne un fichier que l’application ouvre', async () => {
     const verdict = await verifierFichier(fichierDeLExemple(), { sqlJs: SQL });
     expect(verdict, 'l’exemple minimal s’ouvre').toMatchObject({ ouvre: true });
@@ -410,14 +413,14 @@ describe('[niveau 4] #199 · 9. l’exemple minimal du document', () => {
     expect(virement!.orders.map((o) => o.tirelireId)).toEqual(['tir-vacances']);
   });
 
-  it('il ne porte que ce que son plan demande : le texte du document dit 50,00 € et le plan en demande autant', () => {
+  it('[niveau 4] il ne porte que ce que son plan demande : le texte du document dit 50,00 € et le plan en demande autant', () => {
     expect(DOC).toContain('virement permanent de 50,00 €');
     expect(DOC).toContain('« Livret A »');
     expect(DOC).toContain('« Vacances »');
   });
 });
 
-describe('[niveau 4] #199 · 9. la clé d’exemple du document est celle que l’application calcule', () => {
+describe('[niveau 2] #199 · 9. la clé d’exemple du document est celle que l’application calcule', () => {
   const section5 = section('## La clé d\'une opération importée');
   const releve = blocs(section5, 'csv')[0]!;
   const dit = (mot: string): string => new RegExp(`^- ${mot} : \`([^\`]+)\``, 'm').exec(section5.join('\n'))![1]!;

@@ -1,7 +1,11 @@
 /**
- * Tests du codeur de #199, point 11 : une table `meta` à laquelle manque `key` ou `value` fait refuser
- * le fichier en le disant, à l'ouverture comme par la vérification du cœur et par `verifier-fichier`.
- * Tous de niveau 4 (D83).
+ * Harnais d'audit de #199 — point 11 : une table `meta` à laquelle manque `key` ou `value` fait refuser
+ * le fichier en le disant, à l'ouverture comme par la vérification du cœur et par `verifier-fichier`
+ * (D30, D58).
+ *
+ * Tests du codeur repris tels quels, de niveau 2 : la règle de refus de D58 donnerait un résultat faux
+ * — une erreur SQL brute au lieu du refus nommé —, l'usage restant possible ; rien n'est perdu ni
+ * écrit, le fichier ne remplaçant rien (C5).
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -28,7 +32,7 @@ for (const [manque, ddl] of [
   ['value', `CREATE TABLE meta (key TEXT); INSERT INTO meta VALUES ('format');`],
   ['key', `CREATE TABLE meta (value TEXT); INSERT INTO meta VALUES ('tirelire');`],
 ] as const) {
-  describe(`[niveau 4] #199 · 11. une table meta sans sa colonne « ${manque} »`, () => {
+  describe(`[niveau 2] #199 · 11. une table meta sans sa colonne « ${manque} »`, () => {
     let octets!: Uint8Array;
     beforeAll(() => {
       octets = fichier(ddl);
