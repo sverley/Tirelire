@@ -1,5 +1,19 @@
 /**
- * Tests du codeur de #366 — le budget JSON, sa lecture tout ou rien par le cœur, sa documentation.
+ * Harnais d'audit de #366 — le budget JSON, sa lecture tout ou rien par le cœur, sa documentation.
+ *
+ * Composé après le codage (auditeur.md, étape 2) : les tests du codeur, tous retenus, repris de
+ * `budget-json.test.ts`, qui n'a plus lieu d'être ; chaque `describe` reprend un point du « Fait
+ * quand » sous son numéro. Sont de moi : l'import n'écrit rien d'un budget refusé, par la voie
+ * qu'emprunte l'application (lire, puis écrire si la lecture passe) ; une ligne du projet absente du
+ * JSON reste après l'import, toutes tables ; un identifiant du compte principal du JSON repris par
+ * une ligne d'une autre table (l'identifiant n'est unique que dans sa table, point 3). Le point 8, la
+ * décision, est relu.
+ *
+ * Niveaux (D83), par le besoin couvert :
+ * - 0 · l'irréparable : rien d'un budget refusé n'est retenu (point 4) ; une ligne du projet absente
+ *   du JSON reste (point 5) — sinon le projet de l'utilisateur serait altéré ou amputé.
+ * - 2 · un cas est faux : le contenu, le format, les références, chaque refus, le réimport, la
+ *   documentation et l'exemple.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -57,7 +71,7 @@ function lirePlans(l: Ledger, jour: string) {
   });
 }
 
-describe('[niveau 4] #366 · 7 — l’exemple de la documentation, lu sur un projet vierge, donne le plan de l’exemple privé de ses opérations', () => {
+describe('[niveau 2] #366 · 7 — l’exemple de la documentation, lu sur un projet vierge, donne le plan de l’exemple privé de ses opérations', () => {
   it('au centime, au 6 septembre 2026, sur la période en cours et les douze suivantes', async () => {
     const projet = (await importer(exempleDeLaDoc())).load();
     const ref = exampleLedger();
@@ -68,7 +82,7 @@ describe('[niveau 4] #366 · 7 — l’exemple de la documentation, lu sur un pr
   });
 });
 
-describe('[niveau 4] #366 · 1 — le contenu : le budget sans les opérations', () => {
+describe('[niveau 2] #366 · 1 — le contenu : le budget sans les opérations', () => {
   it('les tables acceptées sont celles du budget, et les réglages ceux du format', () => {
     expect(Object.keys(COLONNES_BUDGET_JSON).sort()).toEqual(['accounts', 'categories', 'needs', 'planned_flows', 'settings', 'tirelires']);
     expect(COLONNES_BUDGET_JSON['settings']!.sort()).toEqual(['orderRounding', 'periodStartDay', 'principalCushion', 'transferThreshold']);
@@ -92,7 +106,7 @@ describe('[niveau 4] #366 · 1 — le contenu : le budget sans les opérations',
   });
 });
 
-describe('[niveau 4] #366 · 2 — le format se dit', () => {
+describe('[niveau 2] #366 · 2 — le format se dit', () => {
   it('une autre version est refusée en le disant', () => {
     const j = copie();
     j['version'] = BUDGET_JSON_VERSION + 1;
@@ -108,7 +122,7 @@ describe('[niveau 4] #366 · 2 — le format se dit', () => {
   });
 });
 
-describe('[niveau 4] #366 · 3 — les références', () => {
+describe('[niveau 2] #366 · 3 — les références', () => {
   it('le compte principal du JSON renseigne celui du projet, et ce qui le désigne le désigne', async () => {
     const j = copie();
     const comptes = j['accounts'] as Array<Record<string, unknown>>;
@@ -130,6 +144,19 @@ describe('[niveau 4] #366 · 3 — les références', () => {
     s.upsert('tirelires', { id: 'env-absente', name: 'Déjà là', placement: [{ accountId: MAIN_ACCOUNT_ID, share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28' });
     expect(lireBudgetJson(j, s.load()).ok).toBe(true);
   });
+  it('l’identifiant du compte principal du JSON peut nommer une ligne d’une autre table : elle garde le sien', async () => {
+    const j = copie();
+    const tirelire = (j['tirelires'] as Array<Record<string, unknown>>)[0]!;
+    const commun = tirelire['id'] as string;
+    (j['accounts'] as Array<Record<string, unknown>>).find((a) => a['kind'] === 'principal')!['id'] = commun;
+    for (const f of j['planned_flows'] as Array<Record<string, unknown>>) if (f['account_id'] === MAIN_ACCOUNT_ID) f['account_id'] = commun;
+    for (const t of j['tirelires'] as Array<Record<string, unknown>>)
+      for (const p of t['placement'] as Array<Record<string, unknown>>) if (p['accountId'] === MAIN_ACCOUNT_ID) p['accountId'] = commun;
+    const l = (await importer(j)).load();
+    expect(l.tirelires.some((t) => t.id === commun)).toBe(true);
+    expect(l.needs.filter((n) => n.tirelireId === commun).length).toBeGreaterThan(0);
+    expect(l.accounts.some((a) => a.id === commun)).toBe(false);
+  });
   it('deux comptes principaux sont refusés', () => {
     const j = copie();
     (j['accounts'] as unknown[]).push({ id: 'autre', name: 'Autre', kind: 'principal', opening_balance: 0, opening_date: '2026-08-27' });
@@ -137,7 +164,20 @@ describe('[niveau 4] #366 · 3 — les références', () => {
   });
 });
 
-describe('[niveau 4] #366 · 4 — la lecture, tout ou rien', () => {
+describe('[niveau 0] #366 · 4 — rien d’un budget refusé n’est retenu', () => {
+  it('lire puis écrire si la lecture passe : un budget fautif laisse le projet tel quel, octet pour octet', async () => {
+    const s = await importer(exempleDeLaDoc());
+    s.upsert('categories', { id: 'cat-a-moi', name: 'À moi', nature: 'expense' });
+    const avant = s.export();
+    const j = copie();
+    (j['categories'] as Array<Record<string, unknown>>).find((c) => c['id'] === 'cat-alim')!['name'] = 'Courses';
+    (j['planned_flows'] as Array<Record<string, unknown>>)[0]!['amount'] = 10.5;
+    await expect(importer(j, s)).rejects.toThrow(/planned_flows/);
+    expect(s.export()).toEqual(avant);
+  });
+});
+
+describe('[niveau 2] #366 · 4 — la lecture, tout ou rien', () => {
   it('une faute refuse le tout, nomme la table, la ligne, la colonne, et compte les autres', async () => {
     const j = copie();
     const comptes = j['accounts'] as Array<Record<string, unknown>>;
@@ -177,7 +217,21 @@ describe('[niveau 4] #366 · 4 — la lecture, tout ou rien', () => {
   });
 });
 
-describe('[niveau 4] #366 · 5 — réimporter', () => {
+describe('[niveau 0] #366 · 5 — une ligne du projet absente du JSON reste', () => {
+  it('dans chaque table du budget, et les opérations du projet aussi', async () => {
+    const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
+    const ref = exampleLedger();
+    for (const k of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations'] as const)
+      for (const r of ref[k]) s.upsert(k, r as never);
+    const avant = s.load();
+    await importer({ format: BUDGET_JSON_FORMAT, version: BUDGET_JSON_VERSION, categories: [{ id: 'cat-neuve', name: 'Neuve', nature: 'expense' }] }, s);
+    const apres = s.load();
+    for (const k of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations'] as const)
+      for (const r of avant[k]) expect(apres[k].find((x) => x.id === r.id)).toEqual(r);
+  });
+});
+
+describe('[niveau 2] #366 · 5 — réimporter', () => {
   it('deux imports donnent le même projet qu’un seul ; une ligne du projet absente du JSON reste', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     s.upsert('categories', { id: 'cat-a-moi', name: 'À moi', nature: 'expense' });
@@ -196,7 +250,7 @@ describe('[niveau 4] #366 · 5 — réimporter', () => {
   });
 });
 
-describe('[niveau 4] #366 · 6 — la documentation nomme exactement ce que la lecture accepte', () => {
+describe('[niveau 2] #366 · 6 — la documentation nomme exactement ce que la lecture accepte', () => {
   const nommees = new Map<string, Set<string>>();
   for (const m of DOC.matchAll(/^### `(\w+)`\n([\s\S]*?)(?=^##)/gm)) nommees.set(m[1]!, new Set([...m[2]!.matchAll(/^\| `(\w+)` \|/gm)].map((x) => x[1]!)));
   it('les mêmes tables', () => expect([...nommees.keys()].sort()).toEqual(Object.keys(COLONNES_BUDGET_JSON).sort()));
