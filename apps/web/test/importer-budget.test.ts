@@ -102,3 +102,12 @@ describe('[niveau 4] #367 · 1 — l’entrée de Configuration', () => {
     expect(ecran).toMatch(/app\.assistantPrepare[\s\S]*les remplace/);
   });
 });
+
+describe('[niveau 4] #367 · 4 — par une adresse, avec un brouillon non vide, l’import attend l’accord', () => {
+  it('l’état garde le budget en attente, l’écran demande, et refuser n’importe rien', () => {
+    const etat = lire('src/lib/state.svelte.ts');
+    expect(etat).toMatch(/this\.assistantPrepare\) \{[\s\S]*?this\.importEnAttente = lue\.texte;[\s\S]*?return;/);
+    expect(etat).toMatch(/if \(accepte && texte !== undefined\) this\.lireImportDeLAdresse/);
+    expect(lire('src/App.svelte')).toMatch(/app\.importEnAttente !== undefined[\s\S]*repondreImportEnAttente\(true\)[\s\S]*repondreImportEnAttente\(false\)/);
+  });
+});

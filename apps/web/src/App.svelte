@@ -97,6 +97,17 @@
   {:else if !app.ready}
     <p class="muted">Ouverture de la base…</p>
   {:else}
+    {#if app.importEnAttente !== undefined}
+      <!-- Une adresse porte un budget alors que l'assistant a des changements non validés (#367) : rien ne les remplace sans accord. -->
+      <div class="card warn" role="alert">
+        <h2 style="margin-top:0">Importer le budget de l'adresse ?</h2>
+        <p>L'assistant a déjà préparé des changements que vous n'avez pas validés. Importer ce budget les remplace : ils seront perdus. Rien d'enregistré dans votre budget n'est effacé.</p>
+        <div class="actions" style="margin-bottom:0">
+          <button class="btn primary" onclick={() => app.repondreImportEnAttente(true)}>Remplacer par ce budget</button>
+          <button class="btn" onclick={() => app.repondreImportEnAttente(false)}>Garder mes changements</button>
+        </div>
+      </div>
+    {/if}
     {#if app.refusAdresse}
       <!-- Un budget JSON porté par l'adresse d'ouverture, refusé (#367) : l'assistant ne s'est pas ouvert et rien n'a changé. -->
       <div class="card warn" role="alert">

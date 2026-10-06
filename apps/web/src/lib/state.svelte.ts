@@ -137,7 +137,26 @@ class AppState {
     if (typeof window === 'undefined' || !adressePorteUnBudget(window.location.hash)) return;
     const lue = budgetDeLAdresse(window.location.hash);
     window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
-    const r = 'texte' in lue ? this.importerBudget(lue.texte) : { ok: false as const, message: lue.refus };
+    if ('texte' in lue && this.assistantPrepare) {
+      // Un brouillon non vide : l'import le remplace, il ne se fait qu'avec l'accord de l'utilisateur.
+      this.importEnAttente = lue.texte;
+      return;
+    }
+    this.lireImportDeLAdresse('texte' in lue ? lue.texte : undefined, 'refus' in lue ? lue.refus : '');
+  }
+
+  /** Un budget porté par l'adresse attend l'accord de l'utilisateur : le brouillon non validé serait remplacé (#367). */
+  importEnAttente = $state<string | undefined>(undefined);
+
+  /** L'utilisateur accepte (ou non) que le budget de l'adresse remplace ce que l'assistant avait préparé. */
+  repondreImportEnAttente(accepte: boolean): void {
+    const texte = this.importEnAttente;
+    this.importEnAttente = undefined;
+    if (accepte && texte !== undefined) this.lireImportDeLAdresse(texte, '');
+  }
+
+  private lireImportDeLAdresse(texte: string | undefined, refusDeLecture: string): void {
+    const r = texte !== undefined ? this.importerBudget(texte) : { ok: false as const, message: refusDeLecture };
     if (r.ok) {
       this.refusAdresse = undefined;
       this.switchTab('more');
