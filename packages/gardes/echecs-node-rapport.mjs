@@ -10,7 +10,10 @@ import { endroitDans, messageDe } from './echecs.mjs';
 export default async function* rapport(source) {
   let enAttente = [];
   for await (const { type, data } of source) {
-    if (type === 'test:fail') {
+    if (type === 'test:skip' && data.file && typeof data.skip === 'string') {
+      // La raison d'un test sauté (#352, point 5) : le lanceur la donne sur la ligne de son fichier.
+      yield `${JSON.stringify({ saute: true, fichier: resolve(data.file), raison: data.skip })}\n`;
+    } else if (type === 'test:fail') {
       const erreur = data.details?.error;
       if (erreur?.failureType === 'subtestsFailed') continue;
       const cause = erreur?.cause ?? erreur;

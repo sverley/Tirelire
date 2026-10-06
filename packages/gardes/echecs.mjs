@@ -49,3 +49,15 @@ export function lignesDesEchecs(echecs, base = process.cwd()) {
   }
   return lignes;
 }
+
+/**
+ * La ligne d'un ensemble au bilan d'un crochet : 160 caractères au plus quand les comptes du lanceur
+ * la suivent (#352, point 1) ; au-delà, le verdict se coupe, jamais les comptes.
+ */
+export function ligneDEnsemble(moment, nom, verdict, comptes) {
+  if (!comptes) return `${moment} : ${nom} : ${verdict}.`;
+  const fin = ` — ${comptes}.`;
+  let tete = `${moment} : ${nom} : ${verdict}`;
+  if (tete.length + fin.length > 160) tete = `${tete.slice(0, Math.max(0, 160 - fin.length - 1))}…`;
+  return `${tete}${fin}`.slice(0, 160);
+}

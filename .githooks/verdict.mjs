@@ -188,7 +188,10 @@ for (const lance of lances) {
   nomCourant = nom;
   joues.push({ nom, dossier });
   const journal = lire(join(journaux, `${nom}.log`)) ?? '';
+  // Le lanceur nomme déjà chaque fichier sauté faute d'outil, avec sa raison, sur une ligne (#352, point 5).
+  const ditParLeLanceur = /^attestation : .+ : non attesté — /m.test(journal);
   for (const l of journal.split('\n')) {
+    if (/# SKIP/.test(l) && ditParLeLanceur) continue;
     if (/# SKIP/.test(l)) console.log(`${niveau} : test sauté (${nom}) : ${l.trim()}`);
     // Ce que le seuil écarte se dit (#232) : la ligne du lanceur.
     else if (/^seuil .* écarté\(s\)/.test(l) && !/ 0 test\(s\) écarté/.test(l)) console.log(`${niveau} : ${nom}, ${l.trim()}`);

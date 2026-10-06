@@ -48,6 +48,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ligneDEnsemble } from '../packages/gardes/echecs.mjs';
 import {
   couvertureApresFusion,
   couvertureAuReady,
@@ -204,20 +205,28 @@ if (commande === 'verts') {
     const dits = siens.flatMap(([, nom]) => lire(join(journaux, `${nom}.log`)).split('\n').filter((l) => l.startsWith('attestation : ')));
     const toutSaute = siens.length > 0 && siens.every(([, nom]) => /^attestation : sauté, seuil/m.test(lire(join(journaux, `${nom}.log`))));
     let texte;
+    // Le verdict court, quand les comptes du lanceur suivent (#352, point 1) : ils disent le reste.
+    let court = null;
     let vert = false;
     if (!verdicts.length) texte = `non joué — ${retenu || 'aucun test à lancer'}`;
     else if (verdicts.some((v) => v.etat === 'retenu')) texte = `non joué en entier — ${verdicts.find((v) => v.etat === 'retenu').retenu}`;
     else if (verdicts.some((v) => v.etat === 'rouge')) texte = `joué au seuil ${p.seuil} : rouge`;
-    else if (verdicts.some((v) => v.etat === 'sauté')) texte = `joué au seuil ${p.seuil} : ${verdicts.reduce((s, v) => s + (v.sautes ?? 0), 0)} test(s) sauté(s) faute d'outil, donc pas vert sur son empreinte`;
-    else if (verdicts.some((v) => v.etat === 'illisible')) texte = `joué au seuil ${p.seuil} : vert, mais son rapport ne se lit pas, donc pas compté vert sur son empreinte`;
-    else {
+    else if (verdicts.some((v) => v.etat === 'sauté')) {
+      const n = verdicts.reduce((s, v) => s + (v.sautes ?? 0), 0);
+      texte = `joué au seuil ${p.seuil} : ${n} test(s) sauté(s) faute d'outil, donc pas vert sur son empreinte`;
+      court = `joué au seuil ${p.seuil} : pas vert, ${n} test(s) sauté(s) faute d'outil`;
+    } else if (verdicts.some((v) => v.etat === 'illisible')) {
+      texte = `joué au seuil ${p.seuil} : vert, mais son rapport ne se lit pas, donc pas compté vert sur son empreinte`;
+      court = `joué au seuil ${p.seuil} : rapport illisible, pas compté vert`;
+    } else {
       texte = toutSaute ? `non rejoué au seuil ${p.seuil} — chaque fichier est vert sur son empreinte : vert` : `joué au seuil ${p.seuil} : vert`;
+      court = toutSaute ? `non rejoué au seuil ${p.seuil} : vert` : texte;
       vert = true;
     }
     // Le lanceur dit chaque ensemble en une ligne, avec ses comptes (#352, point 1) : ils rejoignent
     // celle du bilan, et le détail, fichier par fichier, est au détail du crochet.
     const { comptes, autres } = comptesDesDits(dits);
-    console.log(`${moment} : ${nomDe(p.id)} : ${texte}${comptes ? ` — ${comptes}` : ''}.`);
+    console.log(ligneDEnsemble(moment, nomDe(p.id), comptes ? (court ?? texte) : texte, comptes));
     for (const l of autres) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
     if (vert && p.empreinte !== '-') nouveaux.push({ ensemble: p.id, empreinte: p.empreinte, seuil: p.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
     // L'ensemble n'est pas vert : ses fichiers joués verts s'attestent un à un, chacun sur
@@ -237,7 +246,7 @@ if (commande === 'verts') {
     else if (verdicts.some((v) => v.etat === 'sauté')) texte = "joués en entier : des tests se sont sautés faute d'outil, leurs fichiers ne sont pas attestés";
     else texte = 'joués en entier, sauf fichier vert sur son empreinte : vert';
     const { comptes, autres } = comptesDesDits(dits);
-    console.log(`${moment} : tests navigateur de l'issue : ${texte}${comptes ? ` — ${comptes}` : ''}.`);
+    console.log(ligneDEnsemble(moment, "tests navigateur de l'issue", texte, comptes));
     for (const l of autres) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
     if (verdicts.length) nouveaux.push(...fichiersVerts(issue));
   }

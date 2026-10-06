@@ -305,8 +305,8 @@ function sorteDuSaut(raison) {
   if (raison.startsWith('harnais du besoin')) return 'harnais vert sur son empreinte';
   if (raison.startsWith('fichier attesté vert')) return 'attesté(s) vert(s)';
   if (raison.startsWith('empreinte trouvée verte')) return 'ensemble vert sur son empreinte';
-  if (raison.includes('depuis main')) return 'couvert(s) par la base commune avec main';
-  if (raison.includes('premier parent')) return 'couvert(s) par le premier parent';
+  if (raison.includes('depuis main')) return 'base commune avec main';
+  if (raison.includes('premier parent')) return 'premier parent';
   return 'couvert(s) autrement';
 }
 /** Les comptes d'un ensemble : « X joué(s), Y sauté(s) (n raison, …) ». */
@@ -444,7 +444,11 @@ enfant.on('close', async (code, signal) => {
   }
   const sortie = signal ? 1 : (code ?? 1);
   // Hors CI : chaque test en échec, avec son message et son endroit (#352, point 4), puis une ligne par ensemble.
-  const echecs = court ? (essaie(() => readFileSync(rapportEchecs, 'utf8')) ?? '').split('\n').filter(Boolean).map((l) => essaie(() => JSON.parse(l))).filter(Boolean) : [];
+  const lus = court ? (essaie(() => readFileSync(rapportEchecs, 'utf8')) ?? '').split('\n').filter(Boolean).map((l) => essaie(() => JSON.parse(l))).filter(Boolean) : [];
+  const echecs = lus.filter((x) => !x.saute);
+  /** La raison réelle des tests sautés d'un fichier, s'il en a une (« lftp absent »). */
+  const raisonsDuSaut = new Map();
+  for (const x of lus.filter((y) => y.saute)) raisonsDuSaut.set(x.fichier, [...new Set([...(raisonsDuSaut.get(x.fichier) ?? []), x.raison])]);
   const resultats = parFichier && !signal ? lireResultats(sortie, ecartesParFichier) : null;
   if (court) {
     for (const l of lignesDesEchecs(echecs)) console.log(l);
@@ -469,7 +473,13 @@ enfant.on('close', async (code, signal) => {
       dire(ligneEnsemble(id, verdict));
     }
     if (!parEnsemble.size) dire(`${dossier ?? 'lancement'}, seuil ${seuil} : ${sortie === 0 ? 'vert' : 'rouge'}.`);
-    if (resultats) for (const [a, r] of resultats) if (r.etat === 'sauté') dire(`${raccourci(racine ? relatif(racine, a) : a)} : non attesté — un test s'est sauté, faute d'outil par exemple.`);
+    if (resultats) {
+      for (const [a, r] of resultats) {
+        if (r.etat !== 'sauté') continue;
+        const raisons = raisonsDuSaut.get(a);
+        dire(`${raccourci(racine ? relatif(racine, a) : a)} : non attesté — ${raisons ? `test(s) sauté(s) : ${raisons.join(' ; ')}` : "un test s'est sauté, faute d'outil par exemple"}.`);
+      }
+    }
   }
   console.log(ligneEcartes(seuil, ecartes, nomme));
   if (sansNavigateur !== null) {

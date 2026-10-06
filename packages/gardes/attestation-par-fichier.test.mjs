@@ -345,7 +345,7 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     const push = await lancer('sh', ['.githooks/livraison.sh', 'push', `refs/heads/${B}`, sha, `refs/heads/${B}`, '0'.repeat(40), 'origin'], { cwd: f.dépôt, env: f.env });
     assert.equal(push.code, 0, push.sortie);
     assert.deepEqual(f.joués(), ['h', 'h4'], `seul le harnais du besoin, joué au seuil 2 sans son test de niveau 4, se rejoue en entier\n${push.sortie}`);
-    assert.match(push.sortie, /pré-push : cœur : non rejoué au seuil 2 — chaque fichier est vert sur son empreinte : vert(?: — [^\n]*)?\./, push.sortie);
+    assert.match(push.sortie, /pré-push : cœur : non rejoué au seuil 2(?: — chaque fichier est vert sur son empreinte)? : vert(?: — [^\n]*)?\./, push.sortie);
     f.git('push', '-q', '--no-verify', 'origin', `HEAD:refs/heads/${B}`);
 
     // La CI au Ready, sur la tête poussée : un clone du distant, ce qui couvre l'arbre, les tests navigateur au seuil 2.

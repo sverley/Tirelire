@@ -184,7 +184,7 @@ describe('#314 · une documentation seule, dans un dépôt inventé', { concurre
     for (const [où, r] of [['branche', s.branche.coeur], ['tête détachée', s.d.coeur]]) {
       assert.equal(r.code, 0, r.sortie);
       assert.deepEqual(r.joués, [], `${où}\n${r.sortie}`);
-      assert.match(r.sortie, /cœur, seuil 2 : vert — 0 joué\(s\), 1 sauté\(s\) \(1 couvert\(s\) par la base commune avec main\)\./, `${où}\n${r.sortie}`);
+      assert.match(r.sortie, /cœur, seuil 2 : vert — 0 joué\(s\), 1 sauté\(s\) \(1 base commune avec main\)\./, `${où}\n${r.sortie}`);
     }
     assert.match(s.d.coeur.sortie, /aucune branche extraite : seul se saute ce que couvre la base commune avec main/, s.d.coeur.sortie);
   });
