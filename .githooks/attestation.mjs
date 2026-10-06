@@ -48,6 +48,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ligneDEnsemble } from '../packages/gardes/echecs.mjs';
 import {
   couvertureApresFusion,
   couvertureAuReady,
@@ -104,6 +105,35 @@ function verdictDans(journaux, nom, sorte, seuil) {
   if (code === 'retenu') return { etat: 'retenu', retenu: lire(join(journaux, `${nom}.retenu`)).trim() };
   const rapport = sorte === 'vitest' ? essaie(() => JSON.parse(lire(join(journaux, `${nom}.rapport`)))) : null;
   return verdictDuLancement({ code, sorte, journal: lire(join(journaux, `${nom}.log`)), rapport, seuil });
+}
+
+/**
+ * Les comptes que le lanceur donne, ensemble par ensemble, en une ligne (« X joué(s), Y sauté(s)
+ * (…) », #352) : additionnés sur les lancements d'un même ensemble ; les autres lignes restent.
+ * La ligne « sauté, seuil … — chaque fichier est vert », que le bilan dit déjà, ne se redit pas.
+ */
+function comptesDesDits(dits) {
+  let joues = 0;
+  let sautes = 0;
+  let vus = false;
+  const parSorte = new Map();
+  const autres = [];
+  for (const l of dits) {
+    const m = l.match(/^attestation : .+?, seuil \d+ : [^—]+ — (\d+) joué\(s\), (\d+) sauté\(s\)(?: \((.*)\))?\.$/);
+    if (!m) {
+      if (!/^attestation : sauté, seuil /.test(l)) autres.push(l);
+      continue;
+    }
+    vus = true;
+    joues += Number(m[1]);
+    sautes += Number(m[2]);
+    for (const x of (m[3] ?? '').split(', ').filter(Boolean)) {
+      const n = x.match(/^(\d+) (.*)$/);
+      if (n) parSorte.set(n[2], (parSorte.get(n[2]) ?? 0) + Number(n[1]));
+    }
+  }
+  const comptes = vus ? `${joues} joué(s), ${sautes} sauté(s)${parSorte.size ? ` (${[...parSorte].map(([r, n]) => `${n} ${r}`).join(', ')})` : ''}` : '';
+  return { comptes, autres };
 }
 
 const [commande, ...args] = process.argv.slice(2);
@@ -175,18 +205,29 @@ if (commande === 'verts') {
     const dits = siens.flatMap(([, nom]) => lire(join(journaux, `${nom}.log`)).split('\n').filter((l) => l.startsWith('attestation : ')));
     const toutSaute = siens.length > 0 && siens.every(([, nom]) => /^attestation : sauté, seuil/m.test(lire(join(journaux, `${nom}.log`))));
     let texte;
+    // Le verdict court, quand les comptes du lanceur suivent (#352, point 1) : ils disent le reste.
+    let court = null;
     let vert = false;
     if (!verdicts.length) texte = `non joué — ${retenu || 'aucun test à lancer'}`;
     else if (verdicts.some((v) => v.etat === 'retenu')) texte = `non joué en entier — ${verdicts.find((v) => v.etat === 'retenu').retenu}`;
     else if (verdicts.some((v) => v.etat === 'rouge')) texte = `joué au seuil ${p.seuil} : rouge`;
-    else if (verdicts.some((v) => v.etat === 'sauté')) texte = `joué au seuil ${p.seuil} : ${verdicts.reduce((s, v) => s + (v.sautes ?? 0), 0)} test(s) sauté(s) faute d'outil, donc pas vert sur son empreinte`;
-    else if (verdicts.some((v) => v.etat === 'illisible')) texte = `joué au seuil ${p.seuil} : vert, mais son rapport ne se lit pas, donc pas compté vert sur son empreinte`;
-    else {
+    else if (verdicts.some((v) => v.etat === 'sauté')) {
+      const n = verdicts.reduce((s, v) => s + (v.sautes ?? 0), 0);
+      texte = `joué au seuil ${p.seuil} : ${n} test(s) sauté(s) faute d'outil, donc pas vert sur son empreinte`;
+      court = `joué au seuil ${p.seuil} : pas vert, ${n} test(s) sauté(s) faute d'outil`;
+    } else if (verdicts.some((v) => v.etat === 'illisible')) {
+      texte = `joué au seuil ${p.seuil} : vert, mais son rapport ne se lit pas, donc pas compté vert sur son empreinte`;
+      court = `joué au seuil ${p.seuil} : rapport illisible, pas compté vert`;
+    } else {
       texte = toutSaute ? `non rejoué au seuil ${p.seuil} — chaque fichier est vert sur son empreinte : vert` : `joué au seuil ${p.seuil} : vert`;
+      court = toutSaute ? `non rejoué au seuil ${p.seuil} : vert` : texte;
       vert = true;
     }
-    console.log(`${moment} : ${nomDe(p.id)} : ${texte}.`);
-    for (const l of dits) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
+    // Le lanceur dit chaque ensemble en une ligne, avec ses comptes (#352, point 1) : ils rejoignent
+    // celle du bilan, et le détail, fichier par fichier, est au détail du crochet.
+    const { comptes, autres } = comptesDesDits(dits);
+    console.log(ligneDEnsemble(moment, nomDe(p.id), comptes ? (court ?? texte) : texte, comptes));
+    for (const l of autres) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
     if (vert && p.empreinte !== '-') nouveaux.push({ ensemble: p.id, empreinte: p.empreinte, seuil: p.seuil, par: moment, commit: commit === '-' ? null : commit, arbre, date });
     // L'ensemble n'est pas vert : ses fichiers joués verts s'attestent un à un, chacun sur
     // l'empreinte de ce qu'il lit dans l'arbre jugé (#304).
@@ -204,8 +245,9 @@ if (commande === 'verts') {
     else if (verdicts.some((v) => v.etat === 'rouge')) texte = 'joués en entier : rouge';
     else if (verdicts.some((v) => v.etat === 'sauté')) texte = "joués en entier : des tests se sont sautés faute d'outil, leurs fichiers ne sont pas attestés";
     else texte = 'joués en entier, sauf fichier vert sur son empreinte : vert';
-    console.log(`${moment} : tests navigateur de l'issue : ${texte}.`);
-    for (const l of dits) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
+    const { comptes, autres } = comptesDesDits(dits);
+    console.log(ligneDEnsemble(moment, "tests navigateur de l'issue", texte, comptes));
+    for (const l of autres) console.log(`${moment} : ${l.slice('attestation : '.length)}`);
     if (verdicts.length) nouveaux.push(...fichiersVerts(issue));
   }
   if (option === '--enregistrer' && nouveaux.length) {

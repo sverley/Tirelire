@@ -29,8 +29,9 @@ proportionné (D92).
    Chaque ensemble de tests a son empreinte, l'état des chemins qu'il lit, et chaque fichier de test
    ne se rejoue pas sur une empreinte déjà trouvée verte, ni à tes lancements suivants, ni aux
    crochets, dans cette session ou une autre, ni en CI (D83, « Les empreintes »). Tout lancement de
-   l'outil de test, les tiens compris, atteste les fichiers qu'il joue verts, et dit ce qu'il joue et
-   ce qu'il saute ; un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
+   l'outil de test, les tiens compris, atteste les fichiers qu'il joue verts, et dit, pour chaque
+   ensemble, combien de fichiers il joue et combien il saute, et pourquoi ; le détail, fichier par
+   fichier, se lit à la demande, et le lancement dit où (#352). Un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
    n'atteste rien. La livraison (pré-push) joue le typecheck avant les tests, sans les tests
    navigateur de non-régression mais avec ceux de l'issue — les fichiers de tests navigateur que ta
    branche ajoute ou modifie —, en entier, dit chaque ensemble — joué, à quel seuil, avec quel

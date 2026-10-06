@@ -21,9 +21,19 @@
  *
  * L'attestation, fichier par fichier (#237, #266, #302) :
  * - Tout lancement saute chaque fichier de test vert sur la même empreinte à un seuil au moins égal
- *   — attesté vert lui-même, ou couvert avec tout son ensemble —, et dit, pour chaque ensemble, les
- *   fichiers joués et les fichiers sautés, avec ce qui les couvre : par qui, sur quel arbre ou quel
- *   commit, à quel seuil. L'empreinte d'un fichier attesté est celle de ce qu'il lit (D83, #304,
+ *   — attesté vert lui-même, ou couvert avec tout son ensemble —, atteste les fichiers qu'il joue
+ *   verts, et dit, pour chaque ensemble, combien de fichiers il joue et combien il saute, et
+ *   pourquoi ; le détail, fichier par fichier, se lit à la demande, et le lancement dit où (#352).
+ *   Hors CI, chaque ensemble tient en une ligne de 160 caractères au plus — nom, seuil, verdict,
+ *   fichiers joués, fichiers sautés comptés par raison —, sans nom de fichier de test ; un fichier
+ *   rouge est nommé, avec chaque test en échec, son message et son endroit (`echecs.mjs`) ; un
+ *   fichier qui a tourné sans être attesté est nommé, avec la raison. Le détail — chaque fichier joué
+ *   ou sauté, ce qui couvre chaque fichier sauté (par qui, sur quel arbre ou quel commit, à quel
+ *   seuil), et la sortie de l'exécuteur — s'écrit dans `<dossier git>/tirelire-detail/<paquet>.txt`,
+ *   réécrit au lancement suivant ; un crochet passe `--detail <fichier>`, garde la sortie de
+ *   l'exécuteur dans son journal, et conserve les deux jusqu'à son passage suivant. En CI —
+ *   couverture écrite par elle (`ready`, `main`, `nuit`), ou GitHub Actions —, tout se dit, fichier
+ *   par fichier, comme avant (D83). L'empreinte d'un fichier attesté est celle de ce qu'il lit (D83, #304,
  *   `empreintesDesFichiers`), calculée sur le contenu joué, copie de travail comprise
  *   (`attestation-git.mjs`, `arbreDeLaCopie`).
  * - `--attestation <fichier>`, que passent la CI et la livraison : ce qui couvre ce lancement, écrit
@@ -51,13 +61,14 @@
  *   joués sont nommés, et un rapporteur de plus (`rapport-fichiers.mjs`) dit ce que chacun a donné.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, createWriteStream, existsSync, globSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ciblesDesArguments, couvertureLocale, separerLesCibles, empreintes, empreintesDesFichiers, estUnFichierDeTest, ensembleDuFichier, fichiersCouverts, fichiersDuLancement, nomDe } from './attestation.mjs';
 import { ajouterALAttestation, arbreDeLaCopie, baseAvecMain, brancheAttestable, entreesDe, essaie, harnaisDuBesoin, racineGit, vertsConnus } from './attestation-git.mjs';
 import { appelsDeTests } from './gardes.mjs';
+import { lignesDesEchecs } from './echecs.mjs';
 import { NIVEAU_MAX, ligneEcartes, lireSeuil, motifDuSeuil } from './niveaux.mjs';
 
 const ici = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +84,7 @@ const { seuil } = lu;
 const navigateur = lu.reste.includes('--navigateur');
 let fichierAttestation = null;
 let fichierBilan = null;
+let fichierDetail = null;
 const reste = [];
 for (let i = 0; i < lu.reste.length; i++) {
   const a = lu.reste[i];
@@ -81,6 +93,8 @@ for (let i = 0; i < lu.reste.length; i++) {
   else if (a.startsWith('--attestation=')) fichierAttestation = a.slice('--attestation='.length);
   else if (a === '--bilan') fichierBilan = lu.reste[++i] ?? '';
   else if (a.startsWith('--bilan=')) fichierBilan = a.slice('--bilan='.length);
+  else if (a === '--detail') fichierDetail = lu.reste[++i] ?? '';
+  else if (a.startsWith('--detail=')) fichierDetail = a.slice('--detail='.length);
   else reste.push(a);
 }
 const nomme = reste.some((a) => (vitest ? /^(?:-t|--testNamePattern|--test-name-pattern)(?:=|$)/ : /^--test-name-pattern(?:=|$)/).test(a));
@@ -88,6 +102,8 @@ const filtre = !nomme && seuil < NIVEAU_MAX;
 
 const travail = mkdtempSync(join(tmpdir(), 'tirelire-seuil-'));
 const dire = (texte) => console.log(`attestation : ${texte}`);
+/** Le détail du lancement (#352, point 3) : chaque fichier joué ou sauté, et pourquoi, puis la sortie de l'exécuteur. */
+const detail = [];
 const relatif = (racine, f) => relative(racine, f).split('\\').join('/');
 
 // ─── Le contenu joué, et ce qui le couvre (#302) ────────────────────────────────────────────────
@@ -163,7 +179,15 @@ if (fichierAttestation !== null) {
 } else if (!depotGit) annonces.push("hors de tout dépôt git : rien ne se saute ni ne s'atteste");
 if (nomme) annonces.push("appel nommé : il se joue en entier, quel que soit l'attestation, et n'atteste rien");
 /** Ce que chaque fichier a donné se lit pour attester, ou pour le bilan que demande la livraison (`--bilan`). */
-const parFichier = Boolean(attester || (fichierBilan && !nomme));
+/**
+ * Hors CI, la sortie est courte (#352) : une ligne par ensemble, sans nom de fichier de test, et le
+ * détail dans un fichier. La CI se reconnaît à ce qui couvre le lancement, écrit par elle (`ready`,
+ * `main`, `nuit`), ou, sans lui, à GitHub Actions ; son journal dit tout, fichier par fichier (D83).
+ */
+const enCI = ['ready', 'main', 'nuit'].includes(couverture?.origine) || process.env.GITHUB_ACTIONS === 'true';
+const court = !enCI;
+/** Ce que chaque fichier a donné se lit pour attester, pour le bilan que demande la livraison (`--bilan`), ou pour la sortie courte. */
+const parFichier = Boolean(attester || (fichierBilan && !nomme) || court);
 
 // ─── Les fichiers que le lancement jouerait ─────────────────────────────────────────────────────
 
@@ -254,22 +278,65 @@ if (couverture && !nomme && racine) {
 
 for (const a of annonces) dire(`${a}.`);
 const sautes = decisions.filter((d) => d.couvert);
+// L'emplacement du détail : `--detail`, que passent les crochets, sinon un fichier par paquet dans le
+// dossier de git, réécrit à chaque lancement (#352, point 3).
+// Un crochet passe `--detail` : son journal garde la sortie de l'exécuteur, qu'il lit, et le détail
+// ne reçoit que les fichiers joués et sautés.
+const detailDuCrochet = fichierDetail !== null;
+if (court && !fichierDetail) {
+  const g = depotGit ? spawnSync('git', ['rev-parse', '--absolute-git-dir'], { cwd: depotGit, encoding: 'utf8' }) : null;
+  const base = g?.status === 0 ? join(g.stdout.trim(), 'tirelire-detail') : join(tmpdir(), 'tirelire-detail');
+  fichierDetail = join(base, `${(dossier ?? 'hors-depot').replace(/[\\/]/g, '_')}.txt`);
+}
+if (court) {
+  essaie(() => mkdirSync(dirname(resolve(fichierDetail)), { recursive: true }));
+  essaie(() => writeFileSync(fichierDetail, `Détail du lancement « test ${seuil}${navigateur ? ' --navigateur' : ''} » dans ${dossier}, ${new Date().toISOString()} (#352)\n`));
+}
+const auDetail = (texte) => court && essaie(() => appendFileSync(fichierDetail, `${texte}\n`));
 const parEnsemble = new Map();
 for (const d of decisions) {
   const id = d.ensemble ?? '-';
   if (!parEnsemble.has(id)) parEnsemble.set(id, []);
   parEnsemble.get(id).push(d);
 }
-const court = (f) => f.slice((dossier === '.' ? '' : `${dossier}/`).length);
+const raccourci = (f) => f.slice((dossier === '.' ? '' : `${dossier}/`).length);
+/** Ce qui couvre un fichier sauté, en quelques mots (#352, point 1). */
+function sorteDuSaut(raison) {
+  if (raison.startsWith('harnais du besoin')) return 'harnais vert sur son empreinte';
+  if (raison.startsWith('fichier attesté vert')) return 'attesté(s) vert(s)';
+  if (raison.startsWith('empreinte trouvée verte')) return 'ensemble vert sur son empreinte';
+  if (raison.includes('depuis main')) return 'base commune avec main';
+  if (raison.includes('premier parent')) return 'premier parent';
+  return 'couvert(s) autrement';
+}
+/** Les comptes d'un ensemble : « X joué(s), Y sauté(s) (n raison, …) ». */
+function comptes(ds) {
+  const joues = ds.filter((d) => !d.couvert).length;
+  const parSorte = new Map();
+  for (const d of ds.filter((x) => x.couvert)) parSorte.set(sorteDuSaut(d.raison), (parSorte.get(sorteDuSaut(d.raison)) ?? 0) + 1);
+  const sautesIci = ds.length - joues;
+  return `${joues} joué(s), ${sautesIci} sauté(s)${parSorte.size ? ` (${[...parSorte].map(([r, n]) => `${n} ${r}`).join(', ')})` : ''}`;
+}
+const nomEnsemble = (id) => (id === '-' ? 'hors ensemble' : nomDe(id));
+/** Une ligne par ensemble, de 160 caractères au plus (#352, point 1). */
+function ligneEnsemble(id, verdict) {
+  const l = `${nomEnsemble(id)}, seuil ${seuil} : ${verdict} — ${comptes(parEnsemble.get(id))}.`;
+  return l.length > 160 - 'attestation : '.length ? `${l.slice(0, 160 - 'attestation : '.length - 2)}….` : l;
+}
 for (const [id, ds] of parEnsemble) {
-  const nom = id === '-' ? 'hors ensemble' : nomDe(id);
+  const nom = nomEnsemble(id);
   const joues = ds.filter((d) => !d.couvert);
   const sautesIci = ds.filter((d) => d.couvert);
-  dire(`${nom}, seuil ${seuil} : ${joues.length} fichier(s) joué(s), ${sautesIci.length} sauté(s)${jouees?.[id] ? ` (empreinte ${jouees[id].slice(0, 10)})` : ''}.`);
   const parRaison = new Map();
-  for (const d of sautesIci) parRaison.set(d.raison, [...(parRaison.get(d.raison) ?? []), court(d.fichier)]);
-  for (const [raison, fs] of parRaison) dire(`${nom} : sauté(s) — ${raison} : ${fs.join(', ')}.`);
-  if (joues.length && sautesIci.length) dire(`${nom} : joué(s) : ${joues.map((d) => court(d.fichier)).join(', ')}.`);
+  for (const d of sautesIci) parRaison.set(d.raison, [...(parRaison.get(d.raison) ?? []), raccourci(d.fichier)]);
+  const lignes = [
+    `${nom}, seuil ${seuil} : ${joues.length} fichier(s) joué(s), ${sautesIci.length} sauté(s)${jouees?.[id] ? ` (empreinte ${jouees[id].slice(0, 10)})` : ''}.`,
+    ...[...parRaison].map(([raison, fs]) => `${nom} : sauté(s) — ${raison} : ${fs.join(', ')}.`),
+    ...(joues.length ? [`${nom} : joué(s) : ${joues.map((d) => raccourci(d.fichier)).join(', ')}.`] : []),
+  ];
+  // En CI, tout se dit, fichier par fichier ; hors CI, au détail, et l'ensemble se dit après le verdict.
+  if (court) for (const l of lignes) auDetail(l);
+  else for (const l of lignes) if (!(l.includes(' : joué(s) : ') && !sautesIci.length)) dire(l);
 }
 
 /** Un fichier de rapport demandé par l'appelant est écrit même quand rien ne se joue. */
@@ -291,6 +358,10 @@ function rapportsVides() {
 
 if (candidats?.length && sautes.length === decisions.length && decisions.length === candidats.length) {
   dire(`sauté, seuil ${seuil}${navigateur ? ', tests navigateur' : ''}, ${dossier} — chaque fichier est vert sur son empreinte, à un seuil au moins égal.`);
+  if (court) {
+    for (const id of parEnsemble.keys()) dire(ligneEnsemble(id, 'vert'));
+    if (!detailDuCrochet) dire(`détail : ${fichierDetail}`);
+  }
   rapportsVides();
   if (fichierBilan) writeFileSync(fichierBilan, `${JSON.stringify({ lisible: true, fichiers: [] })}\n`);
   rmSync(travail, { recursive: true, force: true });
@@ -308,6 +379,9 @@ const rapportVitest = join(travail, 'fichiers.json');
 delete env.TIRELIRE_FICHIERS;
 if (vitest && parFichier) env.TIRELIRE_FICHIERS = rapportVitest;
 const rapportNode = join(travail, 'fichiers.jsonl');
+const rapportEchecs = join(travail, 'echecs.jsonl');
+delete env.TIRELIRE_ECHECS;
+if (court) env.TIRELIRE_ECHECS = rapportEchecs;
 
 let commande;
 let args;
@@ -318,6 +392,7 @@ if (vitest) {
   // Le rapporteur des fichiers dit ce que chacun a donné : il ne s'ajoute que pour attester, ou pour le bilan.
   if ((filtre || parFichier) && !reste.some((a) => /^--reporter(?:=|$)/.test(a))) args.push('--reporter=default');
   if (parFichier) args.push(`--reporter=${resolve(ici, 'fichiers-vitest-rapport.mjs')}`);
+  if (court) args.push(`--reporter=${resolve(ici, 'echecs-vitest-rapport.mjs')}`);
   if (filtre) args.push(`--reporter=${resolve(ici, 'niveaux-vitest-rapport.mjs')}`, '-t', motifDuSeuil(seuil));
 } else {
   commande = process.execPath;
@@ -331,6 +406,7 @@ if (vitest) {
     if (!reste.some((a) => /^--test-reporter(?:=|$)/.test(a))) rapporteurs.push(`--test-reporter=${process.stdout.isTTY ? 'spec' : 'tap'}`, '--test-reporter-destination=stdout');
     rapporteurs.push(`--test-reporter=${resolve(ici, 'rapport-fichiers.mjs')}`, `--test-reporter-destination=${rapportNode}`);
   }
+  if (court) rapporteurs.push(`--test-reporter=${resolve(ici, 'echecs-node-rapport.mjs')}`, `--test-reporter-destination=${rapportEchecs}`);
   args = [
     ...(filtre ? ['--import', resolve(ici, 'niveaux-node.mjs')] : []),
     ...argv.slice(1, fin + 1),
@@ -341,20 +417,69 @@ if (vitest) {
 }
 
 const avant = Date.now();
-const enfant = spawn(commande, args, { stdio: 'inherit', env });
+// Hors CI, la sortie de l'exécuteur va au détail (#352, point 3).
+const versDetail = court && !detailDuCrochet ? essaie(() => createWriteStream(fichierDetail, { flags: 'a' })) : null;
+if (versDetail) versDetail.write("\n─── Sortie de l'exécuteur ───\n");
+const enfant = spawn(commande, args, { stdio: versDetail ? ['inherit', 'pipe', 'pipe'] : 'inherit', env });
+if (versDetail) {
+  enfant.stdout.pipe(versDetail, { end: false });
+  enfant.stderr.pipe(versDetail, { end: false });
+}
+/** Attend que la sortie de l'exécuteur soit écrite au détail. */
+const detailEcrit = () => new Promise((r) => (versDetail ? versDetail.end(r) : r()));
 for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => enfant.kill(s));
 enfant.on('error', (e) => {
   console.error(`lanceur : ${commande} ne se lance pas (${e.message}).`);
   rmSync(travail, { recursive: true, force: true });
   process.exit(1);
 });
-enfant.on('exit', (code, signal) => {
+enfant.on('close', async (code, signal) => {
+  await detailEcrit();
   let ecartes = 0;
   const ecartesParFichier = new Map();
   for (const l of (essaie(() => readFileSync(compte, 'utf8')) ?? '').split('\n').filter(Boolean)) {
     const [n, f] = l.split('\t');
     ecartes += Number(n) || 0;
     if (f) ecartesParFichier.set(resolve(f), (ecartesParFichier.get(resolve(f)) ?? 0) + (Number(n) || 0));
+  }
+  const sortie = signal ? 1 : (code ?? 1);
+  // Hors CI : chaque test en échec, avec son message et son endroit (#352, point 4), puis une ligne par ensemble.
+  const lus = court ? (essaie(() => readFileSync(rapportEchecs, 'utf8')) ?? '').split('\n').filter(Boolean).map((l) => essaie(() => JSON.parse(l))).filter(Boolean) : [];
+  const echecs = lus.filter((x) => !x.saute);
+  /** La raison réelle des tests sautés d'un fichier, s'il en a une (« lftp absent »). */
+  const raisonsDuSaut = new Map();
+  for (const x of lus.filter((y) => y.saute)) raisonsDuSaut.set(x.fichier, [...new Set([...(raisonsDuSaut.get(x.fichier) ?? []), x.raison])]);
+  const resultats = parFichier && !signal ? lireResultats(sortie, ecartesParFichier) : null;
+  if (court) {
+    for (const l of lignesDesEchecs(echecs)) console.log(l);
+    const rougesParEnsemble = new Map();
+    for (const e of echecs) {
+      const id = racine && e.fichier.startsWith('/') ? (ensembleDuFichier(relatif(racine, e.fichier)) ?? '-') : '-';
+      rougesParEnsemble.set(id, new Set([...(rougesParEnsemble.get(id) ?? []), e.fichier]));
+    }
+    // Sans décision (rien n'est couvert ni lu), les fichiers joués se comptent sur ce qu'ils ont donné.
+    if (!parEnsemble.size && resultats) {
+      for (const [absolu] of resultats) {
+        const f = racine ? relatif(racine, absolu) : absolu;
+        const id = racine ? (ensembleDuFichier(f) ?? '-') : '-';
+        if (!parEnsemble.has(id)) parEnsemble.set(id, []);
+        parEnsemble.get(id).push({ fichier: f, ensemble: id, couvert: false });
+      }
+    }
+    for (const [id, ds] of parEnsemble) {
+      const rouges = rougesParEnsemble.get(id)?.size ?? 0;
+      const sautesFauteDOutil = resultats ? ds.filter((d) => !d.couvert && [...resultats].some(([a, r]) => racine && relatif(racine, a) === d.fichier && r.etat === 'sauté')).length : 0;
+      const verdict = rouges ? `rouge (${rouges} fichier(s) rouge(s), ${ds.filter((d) => !d.couvert).length - rouges} vert(s))` : sortie !== 0 ? 'rouge' : sautesFauteDOutil ? "vert, des tests sautés faute d'outil" : 'vert';
+      dire(ligneEnsemble(id, verdict));
+    }
+    if (!parEnsemble.size) dire(`${dossier ?? 'lancement'}, seuil ${seuil} : ${sortie === 0 ? 'vert' : 'rouge'}.`);
+    if (resultats) {
+      for (const [a, r] of resultats) {
+        if (r.etat !== 'sauté') continue;
+        const raisons = raisonsDuSaut.get(a);
+        dire(`${raccourci(racine ? relatif(racine, a) : a)} : non attesté — ${raisons ? `test(s) sauté(s) : ${raisons.join(' ; ')}` : "un test s'est sauté, faute d'outil par exemple"}.`);
+      }
+    }
   }
   console.log(ligneEcartes(seuil, ecartes, nomme));
   if (sansNavigateur !== null) {
@@ -364,17 +489,21 @@ enfant.on('exit', (code, signal) => {
         `lus sans être exécutés (un test écrit dans une boucle compte pour un) ; l'option --navigateur les active.`,
     );
   }
-  const sortie = signal ? 1 : (code ?? 1);
-  if (parFichier && !signal) attesterLeLancement(sortie, ecartesParFichier);
+  if (parFichier && !signal) attesterLeLancement(resultats);
+  if (court && !detailDuCrochet) dire(`détail : ${fichierDetail}`);
   rmSync(travail, { recursive: true, force: true });
   process.exit(sortie);
 });
 
-/** Ajoute à l'attestation locale les fichiers joués verts sur le contenu, s'il n'a pas changé (#302, points 1 et 2). */
-function attesterLeLancement(code, ecartesParFichier) {
+/** Ce que chaque fichier a donné, `null` s'il ne se lit pas (`fichiersDuLancement`). */
+function lireResultats(code, ecartesParFichier) {
   const lignes = vitest ? [] : (essaie(() => readFileSync(rapportNode, 'utf8')) ?? '').split('\n').filter(Boolean).map((l) => essaie(() => JSON.parse(l))).filter(Boolean);
   const rapport = vitest ? essaie(() => JSON.parse(readFileSync(rapportVitest, 'utf8'))) : null;
-  const resultats = fichiersDuLancement({ code, sorte: vitest ? 'vitest' : 'node', rapport, lignes, ecartes: ecartesParFichier, seuil });
+  return fichiersDuLancement({ code, sorte: vitest ? 'vitest' : 'node', rapport, lignes, ecartes: ecartesParFichier, seuil });
+}
+
+/** Ajoute à l'attestation locale les fichiers joués verts sur le contenu, s'il n'a pas changé (#302, points 1 et 2). */
+function attesterLeLancement(resultats) {
   if (fichierBilan) {
     const fichiers = resultats && racine ? [...resultats].map(([f, r]) => ({ fichier: relatif(racine, f), ensemble: ensembleDuFichier(relatif(racine, f)), ...r })) : [];
     essaie(() => writeFileSync(fichierBilan, `${JSON.stringify({ lisible: Boolean(resultats), fichiers })}\n`));
@@ -382,6 +511,8 @@ function attesterLeLancement(code, ecartesParFichier) {
   if (!attester) return;
   if (!resultats) {
     dire("le lancement ne se lit pas fichier par fichier : rien n'est attesté.");
+    // Hors CI, chaque fichier joué est nommé, avec la raison (#352, point 5).
+    if (court) for (const d of decisions.filter((x) => !x.couvert)) dire(`${raccourci(d.fichier)} : non attesté — le rapport du lancement ne se lit pas.`);
     return;
   }
   const apres = arbreDeLaCopie(depotGit);
@@ -399,19 +530,25 @@ function attesterLeLancement(code, ecartesParFichier) {
     // Ce qu'il lit a changé pendant le lancement : il n'est pas attesté (#302, point 2 ; #304).
     if (!fichiersJoues?.[fichier] || !fichiersApres || fichiersApres[fichier] !== fichiersJoues[fichier]) {
       changes.add(nomDe(ensemble));
+      if (court && r.etat === 'vert') refuses.set(fichier, "un fichier qu'il lit a changé pendant le lancement");
       continue;
     }
     if (r.etat !== 'vert') {
-      refuses.set(fichier, r.etat === 'rouge' ? 'rouge' : "un test s'est sauté, faute d'outil par exemple");
+      // Hors CI, un fichier sauté faute d'outil est déjà dit ; un fichier rouge l'est avec ses échecs.
+      if (!court) refuses.set(fichier, r.etat === 'rouge' ? 'rouge' : "un test s'est sauté, faute d'outil par exemple");
+      else if (r.etat === 'rouge') refuses.set(fichier, 'rouge');
       continue;
     }
     nouveaux.push({ ensemble, fichier, empreinte: fichiersJoues[fichier], seuil: r.seuil, par, arbre: copie.arbre, date });
   }
   if (changes.size) dire(`${[...changes].join(', ')} : un fichier qu'il lit a changé pendant le lancement, rien n'en est attesté.`);
-  for (const [f, pourquoi] of refuses) dire(`${court(f)} : non attesté — ${pourquoi}.`);
+  for (const [f, pourquoi] of refuses) dire(`${raccourci(f)} : non attesté — ${pourquoi}.`);
   if (!nouveaux.length) return;
   const ecrit = ajouterALAttestation({ branche: attester.branche, nouveaux, cwd: depotGit });
   const seuils = [...new Set(nouveaux.map((v) => v.seuil))].sort().join(' ou ');
   if (ecrit) dire(`${nouveaux.length} fichier(s) attesté(s) vert(s) au seuil ${seuils}, sur l'arbre ${copie.arbre.slice(0, 10)} (attestation locale de ${attester.branche}, envoyée au prochain push).`);
-  else dire(`l'attestation locale de ${attester.branche} ne s'écrit pas : rien n'est attesté.`);
+  else {
+    dire(`l'attestation locale de ${attester.branche} ne s'écrit pas : rien n'est attesté.`);
+    if (court) for (const v of nouveaux) dire(`${raccourci(v.fichier)} : non attesté — l'attestation ne s'écrit pas.`);
+  }
 }
