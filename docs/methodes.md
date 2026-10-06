@@ -98,9 +98,11 @@ choses, et rien de plus :
 3. chaque vérification manuelle des entrées déclarées figure dans cette section, sa consigne
    recopiée, sans case : la fusion vaut validation.
 
-Il tourne en CI au passage en Ready de chaque PR, et à la demande en local
-(`node packages/gardes/cli.mjs pr --issue <n>`, sur les fichiers modifiés depuis `origin/main`). En
-CI, la garde qui juge est celle de `main`, avec le workflow de `main` ; ce qu'elle juge est le contenu
+Il tourne en CI au passage en Ready de chaque PR, et à la demande en local, hors ligne, sur le corps
+de l'issue donné en fichier ou en texte (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`,
+ou la variable `CORPS`), sur les fichiers modifiés depuis `origin/main` (#349). De l'issue, il ne lit
+que le corps, jamais ses commentaires. En CI, la garde qui juge est celle de `main`, avec le workflow
+de `main` ; ce qu'elle juge est le contenu
 de la PR — registre, documents, fichiers modifiés —, qu'elle lit par git sans rien exécuter de la PR,
 et la section de l'issue, lue par l'API avec le jeton du job, en lecture. Une PR qui modifie la garde
 ne change donc pas son propre verdict ; ses tests, eux, jouent la garde qu'elle propose. Pas de
@@ -348,7 +350,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   `pnpm crochets` active les crochets suivis de `.githooks/` et pose `merge.ff false` ; les
   crochets joués sont ceux de la branche extraite, et `pnpm install` n'y touche pas.
 - **En brouillon**, le codeur ne joue lui-même que `pnpm typecheck`, ses propres tests, à la main,
-  le harnais du besoin s'il existe, au plus la garde, et, s'il modifie une fonction de la garde, ses
+  le harnais du besoin s'il existe, la garde à chaque tour, avant son compte rendu (#349), et, s'il
+  modifie une fonction de la garde, ses
   tests de développement (D81) — pas la suite : l'auditeur déplacera et modifiera ses tests en
   composant le harnais (#316) ; l'auditeur vérifie en local ce qu'il relit, au seuil 2 avant le Ready, hors
   tests navigateur sauf sa demande. Aucune CI ne tourne en brouillon. Les crochets
@@ -503,3 +506,29 @@ un jalon du même nom que la version regroupe ces tâches ; son architecte les o
 Français partout dans le travail : code, commentaires, commits, documents ; ce que l'outil dit à
 l'utilisateur suit D85. Le porteur lit surtout sur téléphone : réponses courtes, en prose, une
 question à la fois.
+
+### D92 · Économie des sessions
+
+Une session coûte ce qu'elle lit et ce qu'elle rejoue ; le compromis entre le coût et la stabilité
+que le principe 10.1 demande à la CI vaut pour elle (#351).
+
+- **Lire par extraits.** Le code, les diffs, les fils de l'issue et de la PR se lisent par extraits,
+  en cherchant ce que la tâche demande, comme les documents fondateurs (#333). D'un tour à l'autre,
+  une session ne lit que ce qui a changé depuis son dernier passage : les nouveaux commentaires, le
+  diff depuis le dernier commit qu'elle a vu.
+- **Les sorties longues dans un fichier.** Les sorties longues — installation, tests, crochets —
+  s'écrivent dans un fichier, dont la session ne lit que le verdict et ce qui échoue.
+- **L'audit d'un besoin sans code.** Pour un besoin sans code, l'audit est la relecture et la garde
+  hors ligne, sans `pnpm test 2` (D81). Ce que la livraison a attesté ne se rejoue pas : le lanceur
+  dit ce qu'il saute (D83, « Les empreintes »).
+- **La documentation de l'architecte.** Une documentation codée en direct par l'architecte reste
+  chez lui : il reprend lui-même les retours de l'auditeur, sans session de codeur. L'auditeur la
+  vérifie : celui qui vérifie n'est pas celui qui code (principe 11).
+- **Des écrits proportionnés.** Le compte rendu du codeur et la vérification de l'auditeur se
+  proportionnent : le relevé phrase par phrase du « Fait quand » pour ce qu'un test tranche ; pour
+  une documentation, quelques lignes.
+
+L'hypothèse écartée, tout lire en entier et tout rejouer pour ne rien manquer, ne tenait pas : le
+tour de #349, une modification de documentation, a coûté environ 340 000 tokens à trois sessions,
+qui relisaient fils et sorties en entier et rejouaient `pnpm test 2`, puis un second tour de deux
+sessions pour deux phrases.

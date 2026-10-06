@@ -549,14 +549,14 @@ describe('[niveau 4] #266, points 2 et 4 à 6 · ce qui a tourné ne se rejoue p
 describe('[niveau 4] #266, point 7 · chaque moment dit, pour chaque ensemble, ce qu’il a joué ou pourquoi il ne l’a pas joué', () => {
   test('[niveau 3] la livraison dit chaque ensemble : joué, à quel seuil, avec quel verdict ; ou non joué, et pourquoi', async () => {
     const { premier, doc, demande: d } = await parcoursDuCoeur();
-    for (const nom of ['cœur', 'interface sans navigateur']) assert.match(premier.sortie, new RegExp(`pré-push : ${nom} : joué au seuil 2 : vert\\.`), `${nom}\n${premier.sortie}`);
+    for (const nom of ['cœur', 'interface sans navigateur']) assert.match(premier.sortie, new RegExp(`pré-push : ${nom} : joué au seuil 2 : vert(?: — [^\\n]*)?\\.`), `${nom}\n${premier.sortie}`);
     assert.match(premier.sortie, /pré-push : relais : non joué — rien de ce qu'il lit n'a changé depuis main \([0-9a-f]{10}\)\./, premier.sortie);
     assert.match(premier.sortie, /pré-push : garde : non joué — ce qui arrive ne le fait pas jouer à la livraison \(packages\/gardes\/chemins-ignores\) ; au Ready, la CI le joue s'il n'est pas vert sur son empreinte\./, premier.sortie);
-    assert.match(doc.sortie, /pré-push : garde : joué au seuil 2 : vert\./, doc.sortie);
+    assert.match(doc.sortie, /pré-push : garde : joué au seuil 2 : vert(?: — [^\n]*)?\./, doc.sortie);
     assert.ok(premier.sortie.includes(`pré-push : interface dans le navigateur : non joué — ${SANS_DEMANDE}.`), premier.sortie);
     assert.match(premier.sortie, /pré-push : harnais du besoin : non joué — aucun harnais du besoin\./);
     assert.match(doc.sortie, /pré-push : cœur : non joué — empreinte trouvée verte par pré-push, sur le commit [0-9a-f]{10}, au seuil 2\./, doc.sortie);
-    assert.match(d.sortie, /demande : interface dans le navigateur : joué au seuil 2 : vert\./, d.sortie);
+    assert.match(d.sortie, /demande : interface dans le navigateur : joué au seuil 2 : vert(?: — [^\n]*)?\./, d.sortie);
   });
 
   test('[niveau 3] le pré-commit dit chaque ensemble, et qu’il ne joue jamais l’interface', async () => {
@@ -566,7 +566,7 @@ describe('[niveau 4] #266, point 7 · chaque moment dit, pour chaque ensemble, c
     f.git('add', '-A');
     const r = await lancer('sh', ['.githooks/pre-commit'], { cwd: f.dépôt, env: f.env });
     assert.equal(r.code, 0, r.sortie);
-    assert.match(r.sortie, /pré-commit : garde : joué au seuil 0 : vert\./, r.sortie);
+    assert.match(r.sortie, /pré-commit : garde : joué au seuil 0 : vert(?: — [^\n]*)?\./, r.sortie);
     assert.match(r.sortie, /pré-commit : cœur : non joué — /, r.sortie);
     assert.match(r.sortie, /pré-commit : interface sans navigateur : non joué — /, r.sortie);
     assert.match(r.sortie, /pré-commit : interface dans le navigateur : non joué — /, r.sortie);
