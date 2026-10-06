@@ -8,6 +8,7 @@ import {
   emptyLedger,
   exampleLedger,
   LEDGER_KEYS,
+  lireBudgetJson,
   marqueDesDonnees,
   refusalAnswer,
   sauvegardeARappeler,
@@ -27,6 +28,7 @@ import {
 import type { LedgerKey } from '@tirelire/core';
 import { lireSauvegarde, lireSynchronisation, noterSauvegarde, noterSynchronisation, type DerniereSynchronisation, type Moyen } from './sauvegarde';
 import {
+  brouillonDImport,
   brouillonIntact,
   ecrire as ecrireDansLeBrouillon,
   montrer,
@@ -39,8 +41,9 @@ import {
 import { eraseStore, openStore, OuvertureRefusee, type OpenedStore } from './db';
 import { demanderPersistance, type EtatPersistance } from './persistance';
 import { saveFile } from './platform';
+import { adressePorteUnBudget, budgetDeLAdresse } from './importBudget';
 
-export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'tirelires' | 'categories' | 'flows' | 'entries' | 'settings' | 'sync' | 'wizard';
+export type View = 'plan' | 'operations' | 'import' | 'review' | 'more' | 'accounts' | 'tirelires' | 'categories' | 'flows' | 'entries' | 'settings' | 'sync' | 'wizard' | 'importBudget';
 
 class AppState {
   ledger = $state<Ledger>(emptyLedger());
@@ -105,6 +108,45 @@ class AppState {
    */
   assistant = $state<Brouillon | undefined>(undefined);
 
+  /** Ce que l'assistant a préparé sans le valider : un import le remplacerait (#367). */
+  get assistantPrepare(): boolean {
+    return !!this.assistant && !brouillonIntact(this.assistant);
+  }
+
+  /** Le refus d'un budget JSON porté par l'adresse d'ouverture (#367) : il se montre à l'ouverture, jusqu'à ce qu'on le ferme. */
+  refusAdresse = $state<string | undefined>(undefined);
+
+  /**
+   * Lit un budget JSON (#366) sur le projet : accepté, il ouvre l'assistant sur son résumé, avec le
+   * budget posé sur le projet, dans le brouillon — rien n'est écrit dans le projet avant la
+   * validation, et ce que l'assistant avait préparé est remplacé. Refusé, rien ne change.
+   */
+  importerBudget(texte: string): { ok: true } | { ok: false; message: string } {
+    const lu = lireBudgetJson(texte, this.ledger);
+    if (!lu.ok) return { ok: false, message: lu.message };
+    this.assistant = brouillonDImport(this.ledger, lu.budget);
+    return { ok: true };
+  }
+
+  /**
+   * L'adresse porte un budget (`#budget=` et le JSON encodé pour une adresse) : elle est lue, retirée
+   * de l'adresse sans recharger la page — recharger ou revenir en arrière ne refait pas l'import —, et
+   * le budget entre par l'assistant comme depuis Configuration. Rien n'est envoyé nulle part (I7).
+   */
+  ouvrirParAdresse(): void {
+    if (typeof window === 'undefined' || !adressePorteUnBudget(window.location.hash)) return;
+    const lue = budgetDeLAdresse(window.location.hash);
+    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+    const r = 'texte' in lue ? this.importerBudget(lue.texte) : { ok: false as const, message: lue.refus };
+    if (r.ok) {
+      this.refusAdresse = undefined;
+      this.switchTab('more');
+      this.go('wizard');
+    } else {
+      this.refusAdresse = r.message;
+    }
+  }
+
   /** Le projet tel que l'assistant le montre : le projet, avec son brouillon dessus. Sans brouillon, le projet. */
   assistantLedger: Ledger = $derived(this.assistant ? montrer(this.ledger, this.assistant) : this.ledger);
 
@@ -140,11 +182,16 @@ class AppState {
 
   async init(): Promise<void> {
     void this.demanderPersistance();
-    if (typeof window !== 'undefined') window.addEventListener('appinstalled', () => void this.demanderPersistance());
+    if (typeof window !== 'undefined') {
+      window.addEventListener('appinstalled', () => void this.demanderPersistance());
+      // Une adresse qui ne change que sa partie après « # » ne recharge pas la page.
+      window.addEventListener('hashchange', () => this.ready && this.ouvrirParAdresse());
+    }
     try {
       this.opened = await openStore();
       this.reload();
       this.ready = true;
+      this.ouvrirParAdresse();
     } catch (err) {
       if (err instanceof OuvertureRefusee) this.refused = { message: err.message, bytes: err.bytes };
       else this.error = err instanceof Error ? err.message : String(err);

@@ -25,13 +25,14 @@
   import Review from './views/Review.svelte';
   import Wizard from './views/Wizard.svelte';
   import Sync from './views/Sync.svelte';
+  import ImportBudget from './views/ImportBudget.svelte';
 
   const tabs: Array<{ id: View; label: string; ico: string; group: View[] }> = [
     { id: 'plan', label: 'Plan', ico: '▤', group: ['plan'] },
     { id: 'operations', label: 'Opérations', ico: '☰', group: ['operations'] },
     { id: 'import', label: 'Import', ico: '⇩', group: ['import'] },
     { id: 'review', label: 'Bilan', ico: '◔', group: ['review'] },
-    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'tirelires', 'categories', 'flows', 'entries', 'settings', 'sync', 'wizard'] },
+    { id: 'more', label: 'Plus', ico: '⋯', group: ['more', 'accounts', 'tirelires', 'categories', 'flows', 'entries', 'settings', 'sync', 'wizard', 'importBudget'] },
   ];
 
   // Geste « retour » Android : revient à l'écran précédent au lieu de quitter l'appli
@@ -96,6 +97,17 @@
   {:else if !app.ready}
     <p class="muted">Ouverture de la base…</p>
   {:else}
+    {#if app.refusAdresse}
+      <!-- Un budget JSON porté par l'adresse d'ouverture, refusé (#367) : l'assistant ne s'est pas ouvert et rien n'a changé. -->
+      <div class="card warn" role="alert">
+        <h2 style="margin-top:0">Le budget de l'adresse n'a pas été importé</h2>
+        <p>{app.refusAdresse}</p>
+        <p class="small">Rien n'a changé dans vos données.</p>
+        <div class="actions" style="margin-bottom:0">
+          <button class="btn small" onclick={() => (app.refusAdresse = undefined)}>Fermer</button>
+        </div>
+      </div>
+    {/if}
     {#if app.staleDays > JOURS_AVANT_ALERTE && app.lastOperationDate}
       <div class="card warn">
         <div class="row">
@@ -217,6 +229,8 @@
       <Entries />
     {:else if app.view === 'sync'}
       <Sync />
+    {:else if app.view === 'importBudget'}
+      <ImportBudget />
     {:else}
       <Settings />
     {/if}
