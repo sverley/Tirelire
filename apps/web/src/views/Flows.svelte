@@ -2,7 +2,7 @@
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
   import FiltreEtat from '../lib/FiltreEtat.svelte';
-  import { money, shortDate, centsToInput, inputToCents, openAccounts, FLOW_KINDS, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
+  import { money, shortDate, centsToInput, inputToCents, openAccounts, FLOW_KINDS, FLOW_GROUP_TITLES, periodicityLabel, UNITS, validityLabel, validityBadge } from '../lib/format';
   import { aidesDeFluxPrevu } from '../lib/aides';
   import {
     addMonths,
@@ -119,10 +119,10 @@
     if (!editing) return;
     if (!form.name.trim()) return void (error = 'Le nom est obligatoire.');
     const abs = inputToCents(form.amount);
-    if (abs === undefined || abs < 0) return void (error = 'Montant invalide (saisis-le en positif, le sens dépend du type).');
-    if (!form.accountId) return void (error = 'Choisis le compte.');
-    if (form.kind === 'dueDate' && !form.tirelireId) return void (error = 'Choisis la tirelire qui paie l’échéance.');
-    if (form.kind === 'transfer' && !form.counterpartAccountId) return void (error = 'Choisis le compte de contrepartie.');
+    if (abs === undefined || abs < 0) return void (error = 'Montant invalide (saisissez-le en positif, le sens dépend du type).');
+    if (!form.accountId) return void (error = 'Choisissez le compte.');
+    if (form.kind === 'dueDate' && !form.tirelireId) return void (error = 'Choisissez la tirelire qui paie l’échéance.');
+    if (form.kind === 'transfer' && !form.counterpartAccountId) return void (error = 'Choisissez le compte de contrepartie.');
     if (form.labelPattern.trim()) {
       try {
         new RegExp(form.labelPattern, 'i');
@@ -242,7 +242,7 @@
 {/if}
 
 {#each groups as g (g.kind)}
-  <h2>{FLOW_KINDS[g.kind]}s</h2>
+  <h2>{FLOW_GROUP_TITLES[g.kind]}</h2>
   <div class="card">
     {#each g.flows as f (f.id)}
       {@const badge = validityBadge(f, app.asOf)}
@@ -284,7 +284,7 @@
   </div>
 {/each}
 {#if flows.length === 0}
-  <div class="empty">Aucun flux prévu. Commence par les revenus, puis les charges fixes.</div>
+  <div class="empty">Aucun flux prévu. Commencez par les revenus, puis les charges fixes.</div>
 {:else if visibles.length === 0}
   <div class="empty">Tout est masqué par le filtre : {masqués} flux rangé(s).</div>
 {/if}
