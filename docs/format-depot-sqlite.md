@@ -324,12 +324,13 @@ tables du format. Sa colonne `hlc` suit la même convention.
 
 Le marqueur et la version du format. Elle ne se synchronise pas et ne porte que les deux clés
 ci-dessous. Elle ne peut pas manquer : sans elle, le fichier n'est pas reconnu comme un fichier
-Tirelire.
+Tirelire. Ses deux colonnes, `key` et `value`, doivent y être : une table `meta` à laquelle l'une manque
+fait refuser le fichier, la colonne nommée.
 
 | Colonne | Type | Obligatoire | Peut manquer | Origine | Valeurs admises | Désigne | Sens |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `key` | TEXT | oui | non | établie | `format`, `format_version` | — | Le nom de la clé ; unique dans la table. |
-| `value` | TEXT | non | oui | établie | texte | — | Sa valeur : sans elle, la clé ne dit rien et le fichier n'est pas reconnu. |
+| `value` | TEXT | non | non | établie | texte | — | Sa valeur : sans elle, la clé ne dit rien et le fichier n'est pas reconnu. |
 
 | Clé de `meta` | Valeur | Sens |
 | --- | --- | --- |

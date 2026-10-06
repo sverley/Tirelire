@@ -183,7 +183,8 @@ describe('[niveau 4] #199 · 8. les tables et les colonnes du document sont cell
         expect(r, `${nom}.${c.col} : absente du document`).toBeDefined();
         expect(r['Type'], `${nom}.${c.col} : type`).toBe(c.type);
         expect(oui(r['Obligatoire']), `${nom}.${c.col} : obligatoire`).toBe(c.notnull);
-        expect(oui(r['Peut manquer']), `${nom}.${c.col} : peut manquer`).toBe(!c.notnull);
+        // Une colonne de `meta` ne peut jamais manquer : le fichier est alors refusé (#199, point 11).
+        expect(oui(r['Peut manquer']), `${nom}.${c.col} : peut manquer`).toBe(nom === 'meta' ? false : !c.notnull);
       }
       if (nom === 'settings') expect(doc.find((r) => codes(r['Colonne']!)[0] === 'hlc'), 'settings.hlc').toBeDefined();
     }
