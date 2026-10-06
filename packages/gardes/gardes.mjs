@@ -418,8 +418,8 @@ export function etapeTestsStricte(yaml) {
     }
     return false;
   };
-  // `pnpm test`, ou `pnpm test N` : les tests jusqu'au niveau N, de 0 à 4 (#238) ; `--complet`, que la
-  // CI passe au lanceur pour qu'il dise tout, fichier par fichier (#352, point 9).
+  // `pnpm test`, ou `pnpm test N` : les tests jusqu'au niveau N, de 0 à 4 (#238) ; l'une ou l'autre
+  // peut être suivie de `--complet` (#352), rien d'autre.
   const etape = lignes.findIndex((l) => /^\s*(?:-\s+)?run:\s*pnpm\s+(?:-r\s+)?test(?:\s+[0-4])?(?:\s+--complet)?$/.test(l));
   if (etape < 0) return false;
   let tiret = etape;
