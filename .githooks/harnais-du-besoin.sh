@@ -20,11 +20,24 @@
 # rougit : c'est l'étape de la CI au Ready. Sans harnais du besoin, il le dit et sort en succès.
 # `--jouer --attestation <fichier>` passe le fichier à `pnpm test` (#237, #302) : un fichier du
 # harnais vert sur son empreinte, au seuil 4, avec tout le harnais ou attesté lui-même, n'est pas
-# rejoué, et le lanceur le dit.
+# rejoué, et le lanceur le dit. `--branche <nom>` sert le nom de la branche sur une tête détachée,
+# celle de la PR en CI : rien ne se lit de l'environnement (#352, point 9).
 
-# Nom de la branche : celle qui est extraite, sinon celle de la PR en CI.
+# Nom de la branche : celle qui est extraite, sinon celle que sert l'appelant (`hdb_branche`).
 branche_du_besoin() {
-  git symbolic-ref --short -q HEAD 2>/dev/null || printf '%s\n' "${GITHUB_HEAD_REF:-}"
+  git symbolic-ref --short -q HEAD 2>/dev/null || printf '%s\n' "${hdb_branche:-}"
+}
+
+# Les options de `--jouer` : `--attestation <fichier>`, `--branche <nom>`.
+options_du_jeu() {
+  hdb_attestation=''
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --attestation) hdb_attestation=${2:-}; shift ;;
+      --branche) hdb_branche=${2:-}; shift ;;
+    esac
+    shift
+  done
 }
 
 # Numéro d'issue d'un nom de branche : le premier nombre qui ouvre un de ses segments.
@@ -68,8 +81,8 @@ harnais_du_besoin() {
 
 if [ "${1:-}" = --jouer ]; then
   set -u
-  hdb_attestation=''
-  [ "${2:-}" = --attestation ] && hdb_attestation=${3:-}
+  shift
+  options_du_jeu "$@"
   hdb_racine=$(git rev-parse --show-toplevel) || exit 1
   cd "$hdb_racine" || exit 1
   hdb_liste=$(mktemp) || exit 1

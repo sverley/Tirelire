@@ -130,9 +130,8 @@ export function harnaisDuBesoin(branche, racine) {
   const dossier = mkdtempSync(join(tmpdir(), 'tirelire-harnais-'));
   const liste = join(dossier, 'liste');
   try {
-    execFileSync('sh', ['-c', '. "$1" && harnais_du_besoin "$2" >/dev/null', 'harnais', script, liste], {
+    execFileSync('sh', ['-c', '. "$1" && hdb_branche="$3" && harnais_du_besoin "$2" >/dev/null', 'harnais', script, liste, branche], {
       cwd: racine,
-      env: { ...process.env, GITHUB_HEAD_REF: branche },
       stdio: ['ignore', 'ignore', 'ignore'],
     });
     return (essaie(() => readFileSync(liste, 'utf8')) ?? '').split('\n').filter(Boolean);

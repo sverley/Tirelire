@@ -116,7 +116,8 @@ describe('#352 · le lanceur parle peu quand tout est vert', { concurrency: true
   test('[niveau 2] point 6 · en CI, le lanceur dit encore, fichier par fichier, ce qu’il joue et ce qu’il saute', async () => {
     const f = dépôtInventé('ci');
     await f.tester('packages/core', '2');
-    const ci = await lancer('pnpm', ['--dir', join(f.dépôt, 'packages/core'), 'run', 'test', '2'], { cwd: f.dépôt, env: { ...f.env, GITHUB_ACTIONS: 'true' } });
+    // La CI sert `--complet` au lanceur ; rien ne se lit de l'environnement (#352, point 9).
+    const ci = await lancer('pnpm', ['--dir', join(f.dépôt, 'packages/core'), 'run', 'test', '2', '--complet'], { cwd: f.dépôt, env: f.env });
     assert.equal(ci.code, 0, ci.sortie);
     assert.match(ci.sortie, /attestation : cœur : sauté\(s\) — fichier attesté vert .*: alpha-fichier\.test\.mjs, beta-fichier\.test\.mjs, gamma-fichier\.test\.mjs\./, ci.sortie);
     assert.doesNotMatch(ci.sortie, /attestation : détail : /, ci.sortie);

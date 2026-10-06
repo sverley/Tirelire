@@ -179,7 +179,7 @@ jobs:
       - name: Harnais du besoin, en entier
         id: harnais
         if: github.event_name == 'pull_request'
-        run: sh .githooks/harnais-du-besoin.sh --jouer --attestation "$RUNNER_TEMP/attestation.json"
+        run: sh .githooks/harnais-du-besoin.sh --jouer --attestation "$RUNNER_TEMP/attestation.json" --branche "$GITHUB_HEAD_REF"
         env:
           TIRELIRE_STRICT: '1'
       # Les tests navigateur de l'issue (#307) : les fichiers de tests navigateur que la PR ajoute ou
@@ -188,24 +188,24 @@ jobs:
       - name: Tests navigateur de l'issue, en entier
         id: navigateur
         if: github.event_name == 'pull_request'
-        run: sh .githooks/tests-de-l-issue.sh --jouer --attestation "$RUNNER_TEMP/attestation.json"
+        run: sh .githooks/tests-de-l-issue.sh --jouer --attestation "$RUNNER_TEMP/attestation.json" --branche "$GITHUB_HEAD_REF"
         env:
           TIRELIRE_STRICT: '1'
       # Avant de publier une version, poussée à la main ou forcée (#274) : les tests jusqu'au niveau 3,
       # le dégradé compris, tests navigateur activés (D87), le moins cher d'abord : les tests
       # navigateur ne partent que si le reste est vert (#264). Rien ne se saute (#266, point 4 ; #302) :
       # sans fichier d'empreintes, sur une tête détachée ou sur `main`, le lanceur ne lit aucune
-      # attestation.
+      # attestation. `--complet` : le lanceur dit tout, fichier par fichier (D83 ; #352, point 9).
       - name: Tests au seuil 3, avant de publier
         id: seuil3
         if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
-        run: pnpm test 3
+        run: pnpm test 3 --complet
         env:
           TIRELIRE_STRICT: '1'
       - name: Tests navigateur au seuil 3, avant de publier
         id: navigateur3
         if: startsWith(github.ref, 'refs/tags/v') || inputs.version_forcee
-        run: pnpm --dir apps/web run test 3 --navigateur test/navigateur
+        run: pnpm --dir apps/web run test 3 --navigateur test/navigateur --complet
         env:
           TIRELIRE_STRICT: '1'
       # Ce que ce passage a joué, étape par étape (#264, point 9 ; #266, point 7) ; ce qui s'est sauté,
