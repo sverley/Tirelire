@@ -979,8 +979,9 @@
   {#if !valide && brouillon.budgetImporte}
     <div class="card accent">
       <p style="margin:0">
-        <strong>Ce budget vient d’un import.</strong> Chaque étape montre les lignes du fichier : vous
-        pouvez les corriger comme d’habitude avant de valider.
+        <strong>Ce budget vient d’un import.</strong> Rien n’est enregistré avant que vous le validiez
+        ci-dessous. Chaque étape montre les lignes importées : vous pouvez les corriger comme d’habitude
+        avant de valider.
       </p>
     </div>
   {/if}

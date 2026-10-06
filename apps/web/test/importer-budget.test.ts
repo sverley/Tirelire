@@ -118,3 +118,11 @@ describe('[niveau 4] #367 · 2 — l’assistant déjà affiché passe au brouil
     expect(lire('src/App.svelte')).toMatch(/\{#key app\.versionAssistant\}<Wizard \/>\{\/key\}/);
   });
 });
+
+describe('[niveau 4] #367 · 3 — le résumé d’un budget importé dit d’où il vient et que rien n’est enregistré avant la validation', () => {
+  it('l’encart d’import du résumé porte les deux phrases', () => {
+    const ecran = lire('src/views/Wizard.svelte');
+    const encart = ecran.slice(ecran.indexOf('Ce budget vient d’un import.'), ecran.indexOf('Ce budget vient d’un import.') + 400);
+    expect(encart).toMatch(/Rien n’est enregistré avant que vous le validiez/);
+  });
+});
