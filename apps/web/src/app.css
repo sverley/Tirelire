@@ -230,3 +230,12 @@ details.explication > p { margin: 0 0 8px; }
 .ligne-tirelire .garde, .card.tirelire .prelevement { min-height: 44px; }
 .card.tirelire .ligne { row-gap: 12px; column-gap: 12px; }
 .card.tirelire .ligne input:not([type="checkbox"]), .card.tirelire .ligne-tirelire input:not([type="checkbox"]), .card.tirelire .ajout-besoin input { min-height: 44px; box-sizing: border-box; }
+/* La dernière colonne d'une ligne de besoin porte « × » : 44 px, la cible tactile (C9). */
+.card.tirelire .ligne-courant { grid-template-columns: minmax(0, 1fr) 96px 74px 44px; }
+.card.tirelire .ligne-echeance { grid-template-columns: minmax(0, 1fr) 96px 140px 44px; }
+.card.tirelire .ligne-epargne { grid-template-columns: minmax(0, 1fr) 96px 96px 44px; }
+@media (max-width: 640px) {
+  .card.tirelire .ligne { grid-template-columns: minmax(0, 1fr) 96px 44px; }
+}
+/* Deux lignes se touchent à 12 px au moins : le « × » de l'une ne tombe pas sur le « Modifier » de la suivante (C9). */
+.card.tirelire .ligne { margin-bottom: 8px; }

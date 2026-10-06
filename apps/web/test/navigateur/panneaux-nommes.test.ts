@@ -688,8 +688,9 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
           const at = o.attendus(b, noms);
           return o.texte(b) === 'Réviser' && at.conteneur === 'ligne' && at.requis.join() === a;
         });
-        const ligne = réviser?.closest('.row');
-        const modifier = ligne ? o.ouvreursPossibles().find((b) => b.closest('.row') === ligne) : undefined;
+        // La ligne d'un besoin est celle de la carte de l'assistant (#369) : « Réviser » et « Modifier » y sont côte à côte.
+        const ligne = réviser?.closest('.ligne');
+        const modifier = ligne ? o.ouvreursPossibles().find((b) => b.closest('.ligne') === ligne) : undefined;
         if (!réviser || !modifier) return { trouvé: false, modification: '', révision: '' };
         modifier.click();
         await o.attendre();
