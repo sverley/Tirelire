@@ -22,6 +22,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
 import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLeSite, type Site } from '../harnais.js';
 
+/**
+ * Le texte de l'écran Tirelires, noms compris : sa carte est celle de l'assistant (#369), dont le nom de la
+ * tirelire et celui d'un besoin se lisent dans des champs.
+ */
+const texteDesTirelires = (page: Page) =>
+  page.evaluate(() => {
+    const m = document.querySelector('main')!.cloneNode(true) as HTMLElement;
+    for (const i of [...m.querySelectorAll('input.nom, input.besoin')] as HTMLInputElement[]) i.replaceWith(document.createTextNode(` ${i.value} `));
+    return m.textContent ?? '';
+  });
+
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 const espaces = (t: string) => t.replace(/[\s  ]+/g, ' ').trim();
 
@@ -239,13 +250,13 @@ describe.skipIf(!navigateur)('#336 — l’assistant propose les tirelires, leur
       await allerÀ(page, 'Plus');
       expect(await cliquer(page, 'Tirelires')).toBe(true);
       await pause(300);
-      const texte = espaces(await page.evaluate(() => document.querySelector('main')?.textContent ?? ''));
+      const texte = espaces(await texteDesTirelires(page));
       for (const nom of ['Taxe foncière', 'Assurance auto', 'Vacances', 'Épargne de précaution', 'Alimentation', 'Essence', 'Divers et sorties', 'Enfants et loisirs', 'Santé', 'Cours de piano']) {
         expect(texte, nom).toContain(nom);
       }
       // Le piano est un besoin d'« Enfants et loisirs », pas une tirelire à part (point 2, D28).
-      expect(texte).toMatch(/Enfants et loisirs voulu : [^]*?Cours de piano[^]*?Ajouter un besoin Modifier Supprimer/);
-      expect(texte).not.toMatch(/Cours de piano voulu :/);
+      expect(texte).toMatch(/Enfants et loisirs Déjà de côté[^]*?voulu : [^]*?Cours de piano[^]*?Ajouter un besoin Modifier/);
+      expect(texte).not.toMatch(/Cours de piano Déjà de côté/);
 
       // Le prélèvement et l'ordre se retrouvent dans Flux prévus (I11) : le prélèvement s'y modifie ;
       // l'ordre, dérivé du budget, y renvoie au Plan, où il se corrige (#183, D60).
@@ -319,9 +330,9 @@ describe.skipIf(!navigateur)('#336 — l’assistant propose les tirelires, leur
       await allerÀ(page, 'Plus');
       expect(await cliquer(page, 'Tirelires')).toBe(true);
       await pause(300);
-      const texte = espaces(await page.evaluate(() => document.querySelector('main')?.textContent ?? ''));
-      expect(texte).toMatch(/Vacances voulu : le reste sur Livret A réel : 500,00 € sur Livret A/);
-      expect(texte).toMatch(/Santé voulu : le reste sur Livret A/);
+      const texte = espaces(await texteDesTirelires(page));
+      expect(texte).toMatch(/Vacances Déjà de côté[^]*?voulu : le reste sur Livret A réel : 500,00 € sur Livret A/);
+      expect(texte).toMatch(/Santé Déjà de côté[^]*?voulu : le reste sur Livret A/);
     });
   });
 

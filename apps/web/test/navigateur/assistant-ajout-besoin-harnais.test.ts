@@ -265,10 +265,11 @@ describe.skipIf(!navigateur)('#344 — ajouter un besoin à une tirelire de l’
       await allerÀ(page, 'Plus');
       expect(await cliquer(page, 'Tirelires')).toBe(true);
       await pause(300);
+      // La carte de l'écran Tirelires est celle de l'assistant (#369) : le nom est dans son champ, et la ligne du besoin porte son nom propre dans le sien.
       return page.evaluate((t: string) => {
-        const c = ([...document.querySelectorAll('main .card')] as HTMLElement[]).find((x) => (x.querySelector('.label strong')?.textContent ?? '').trim() === t);
-        const l = c ? ([...c.querySelectorAll('.row .label')] as HTMLElement[]).find((x) => (x.textContent ?? '').includes('Solfège')) : undefined;
-        return { carte: !!c, ligne: (l?.textContent ?? '').replace(/\s+/g, ' ').trim() };
+        const c = ([...document.querySelectorAll('main .card.tirelire')] as HTMLElement[]).find((x) => ((x.querySelector('input.nom') as HTMLInputElement | null)?.value ?? '').trim() === t);
+        const l = c ? ([...c.querySelectorAll('.ligne')] as HTMLElement[]).find((x) => ((x.querySelector('input.besoin') as HTMLInputElement | null)?.value ?? '').includes('Solfège')) : undefined;
+        return { carte: !!c, ligne: l ? `${(l.querySelector('input.besoin') as HTMLInputElement).value} ${(l.querySelector('input.mt') as HTMLInputElement).value} ${l.textContent ?? ''}`.replace(/\s+/g, ' ').trim() : '' };
       }, TIRELIRE);
     }
 
@@ -292,7 +293,7 @@ describe.skipIf(!navigateur)('#344 — ajouter un besoin à une tirelire de l’
       const { ligne } = await ligneDansTirelires();
       expect(ligne, 'le besoin ajouté ne se retrouve pas dans Tirelires').toContain('Solfège');
       const ouvert = await page.evaluate(() => {
-        const l = ([...document.querySelectorAll('main .row')] as HTMLElement[]).find((x) => (x.querySelector('.label')?.textContent ?? '').includes('Solfège'));
+        const l = ([...document.querySelectorAll('main .ligne')] as HTMLElement[]).find((x) => ((x.querySelector('input.besoin') as HTMLInputElement | null)?.value ?? '').includes('Solfège'));
         const b = ([...(l?.querySelectorAll('button') ?? [])] as HTMLButtonElement[]).find((x) => (x.textContent ?? '').trim() === 'Modifier');
         b?.click();
         return !!b;
@@ -309,7 +310,7 @@ describe.skipIf(!navigateur)('#344 — ajouter un besoin à une tirelire de l’
         (f.querySelector('button[type=submit]') as HTMLButtonElement).click();
       });
       await pause(300);
-      expect(await texteDe(page)).toMatch(/Solfège[^]*?25,00/);
+      expect((await ligneDansTirelires()).ligne).toMatch(/^Solfège 25,00/);
     });
   });
 });

@@ -29,9 +29,10 @@ import { allerÀ, navigateur, nouvellePage, ouvrirLeSite, type Site } from '../h
 
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 
-/** Une carte de l'écran Tirelires : sa rubrique (le h2 qui la précède), son texte, ses boutons, son alerte. */
+/** Une carte de l'écran Tirelires : sa rubrique (le h2 qui la précède), son nom (dans son champ, #369), son texte, ses boutons, son alerte. */
 interface CarteTirelire {
   rubrique: string;
+  nom: string;
   texte: string;
   boutons: string[];
   alerte: boolean;
@@ -47,7 +48,8 @@ async function geste(page: Page, libellé: string, dansLaCarte?: string): Promis
   const fait = await page.evaluate(
     (l: string, carte: string | null) => {
       const t = (e?: Element | null) => (e?.textContent ?? '').trim().replace(/\s+/g, ' ');
-      const portée = carte ? [...document.querySelectorAll('main .card')].find((c) => t(c.querySelector('strong, .label')).includes(carte)) : document;
+      const nomDe = (c: Element) => (c.querySelector('input.nom') as HTMLInputElement | null)?.value ?? t(c.querySelector('strong, .label'));
+      const portée = carte ? [...document.querySelectorAll('main .card')].find((c) => nomDe(c).includes(carte)) : document;
       const b = portée && ([...portée.querySelectorAll(carte ? 'button' : 'main button, .tabbar button')] as HTMLButtonElement[]).find((x) => t(x).includes(l));
       b?.click();
       return !!b;
@@ -82,6 +84,29 @@ async function remplir(page: Page, étiquette: string, valeur: string): Promise<
   return fait;
 }
 
+/** Ouvre le panneau « Modifier » de la tirelire (le bouton du pied de sa carte, non celui d'une ligne de besoin, #369). */
+async function modifierLaTirelire(page: Page, nom: string): Promise<boolean> {
+  const fait = await page.evaluate((n: string) => {
+    const c = ([...document.querySelectorAll('main .card.tirelire')] as HTMLElement[]).find((x) => ((x.querySelector('input.nom') as HTMLInputElement | null)?.value ?? '') === n);
+    const b = ([...(c?.querySelectorAll(':scope > .actions button') ?? [])] as HTMLButtonElement[]).find((x) => (x.textContent ?? '').trim() === 'Modifier');
+    b?.click();
+    return !!b;
+  }, nom);
+  await pause(200);
+  return fait;
+}
+
+/** Envoie le formulaire d'ajout ouvert (#369 : celui de la section, dont le bouton se nomme « Ajouter », comme le bouton qui l'ouvre). */
+async function envoyer(page: Page): Promise<boolean> {
+  const fait = await page.evaluate(() => {
+    const b = document.querySelector('main form.edit button[type="submit"]') as HTMLButtonElement | null;
+    b?.click();
+    return !!b;
+  });
+  await pause(200);
+  return fait;
+}
+
 /** Ouvre un écran de Configuration par son nom. */
 async function écran(page: Page, nom: string): Promise<void> {
   await allerÀ(page, 'Plus');
@@ -95,7 +120,14 @@ const lireLesTirelires = (page: Page): Promise<CarteTirelire[]> =>
     const cartes: CarteTirelire[] = [];
     for (const e of document.querySelectorAll('main h2, main > .card')) {
       if (e.tagName === 'H2') rubrique = t(e);
-      else cartes.push({ rubrique, texte: t(e), boutons: [...e.querySelectorAll(':scope > .actions button, :scope > .row button')].map((b) => t(b)), alerte: e.classList.contains('warn') });
+      else
+        cartes.push({
+          rubrique,
+          nom: (e.querySelector('input.nom') as HTMLInputElement | null)?.value ?? '',
+          texte: t(e),
+          boutons: [...e.querySelectorAll(':scope > .actions button, :scope > .ajout-besoin button, :scope > .ligne-tirelire button')].map((b) => t(b)),
+          alerte: e.classList.contains('warn'),
+        });
     }
     return cartes;
   });
@@ -243,23 +275,22 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
         expect(c.texte, `${c.texte} · point 4 · vouvoiement`).not.toMatch(TUTOIEMENT);
         expect(c.texte, `${c.texte} · son solde`).toMatch(/\d\s?,\d{2}\s?€/);
         expect(c.texte, `${c.texte} · ses besoins`).toMatch(/priorité \d|Aucun besoin/);
-        for (const b of ['Ajouter un besoin', 'Modifier', 'Supprimer']) expect(c.boutons, c.texte).toContain(b);
+        // « × » retire la tirelire (#369 : l'en-tête de la carte est celui de l'assistant).
+        for (const b of ['Ajouter un besoin', 'Modifier', '×']) expect(c.boutons, c.texte).toContain(b);
       }
       expect(await texteDuMain(page)).not.toContain('Sans compte de placement');
     });
 
     it('[niveau 1] point 1 · une échéance en manque, ajoutée à une tirelire sans placement, s’annonce aussitôt, avec son montant', async () => {
       await écran(page, 'Tirelires');
-      // « Essence », la tirelire que ce test prenait en premier avant #336 : l'assistant suit
-      // désormais l'ordre des tirelires de l'exemple, et la première, « Alimentation », reçoit
-      // assez de ses 900 € par période pour que 1 200 € au 15 octobre ne manquent pas (auditeur de #336).
-      const nom = 'Essence';
-      expect((await lireLesTirelires(page)).some((c) => c.texte.startsWith(`${nom} voulu : libre`)), await texteDuMain(page)).toBe(true);
-      expect(await geste(page, 'Ajouter un besoin', nom)).toBe(true);
-      expect(await remplir(page, 'Type', 'dueDate')).toBe(true);
+      // L'échéance s'ajoute par le formulaire de la section, « Dépense à échéance » (#369) : le panneau d'ajout
+      // d'un besoin n'existe plus ; « Essence », que ce test prenait avant #336, n'est plus nécessaire.
+      expect(await geste(page, 'Ajouter une tirelire')).toBe(true);
+      expect(await remplir(page, 'Quelle sorte', 'Dépense à échéance')).toBe(true);
+      expect(await remplir(page, 'Quoi', 'Contrôle technique')).toBe(true);
       expect(await remplir(page, 'Montant de l', '1 200,00')).toBe(true);
-      expect(await remplir(page, 'Première échéance', '2026-10-15')).toBe(true);
-      expect(await geste(page, 'Enregistrer')).toBe(true);
+      expect(await remplir(page, 'Prochaine échéance', '2026-10-15')).toBe(true);
+      expect(await envoyer(page)).toBe(true);
       const annonce = await page.evaluate(() => (document.querySelector('main .card .card.warn[role="status"]')?.textContent ?? '').replace(/\s+/g, ' '));
       expect(annonce, await texteDuMain(page)).toMatch(/manquera\s+\d[\d\s]*,\d{2}\s?€/);
     });
@@ -271,7 +302,12 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
       await geste(page, 'Enregistrer');
       await écran(page, 'Tirelires');
       await geste(page, 'Ajouter une tirelire');
-      await remplir(page, 'Nom', 'Orpheline');
+      await remplir(page, 'Quoi', 'Orpheline');
+      await remplir(page, 'Combien par période', '10,00');
+      await envoyer(page);
+      // Le placement ne se dit pas à l'ajout : il se dit dans le panneau « Modifier » de la carte (#369, D59).
+      expect(await modifierLaTirelire(page, 'Orpheline')).toBe(true);
+      await geste(page, 'Ajouter un compte');
       expect(await remplir(page, 'Compte', 'Livret Témoin')).toBe(true);
       await geste(page, 'Enregistrer');
       await écran(page, 'Comptes');
@@ -280,14 +316,14 @@ describe.skipIf(!navigateur)('#322 · Tirelires et Comptes sans opération, sur 
 
       const cartes = await lireLesTirelires(page);
       const àPart = cartes.filter((c) => c.rubrique === 'Sans compte de placement');
-      expect(àPart.map((c) => c.texte.startsWith('Orpheline'))).toEqual([true]);
+      expect(àPart.map((c) => c.nom === 'Orpheline')).toEqual([true]);
       expect(àPart[0]!.alerte).toBe(true);
       expect(àPart[0]!.texte).toMatch(/n.existe plus|supprimé|introuvable|disparu/i);
       expect(àPart[0]!.texte, 'point 4 · vouvoiement').not.toMatch(TUTOIEMENT);
       expect(àPart[0]!.boutons).toContain('Modifier');
       expect(cartes.filter((c) => c.alerte && c.rubrique !== 'Sans compte de placement')).toEqual([]);
 
-      expect(await geste(page, 'Modifier', 'Orpheline')).toBe(true);
+      expect(await modifierLaTirelire(page, 'Orpheline')).toBe(true);
       expect(await texteDuMain(page)).toContain('Placement voulu');
       await geste(page, 'Annuler');
     });
