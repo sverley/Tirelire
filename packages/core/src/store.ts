@@ -680,6 +680,15 @@ function openChecked(SQL: SqlJsStatic, bytes: Uint8Array): Database {
   } catch {
     throw refused('illisible');
   }
+  if (tables.has('meta')) {
+    // Une table `meta` à laquelle manque `key` ou `value` est hors du format : refusée en le disant, pas sur une erreur SQL (D30, D58, #199).
+    const presentes = new Set((db.exec(`PRAGMA table_info(meta)`)[0]?.values ?? []).map((r) => r[1] as string));
+    const manquantes = ['key', 'value'].filter((c) => !presentes.has(c));
+    if (manquantes.length) {
+      db.close();
+      throw new FichierRefuse(manquantes.map((colonne) => ({ table: 'meta', colonne, message: `La table « meta » n’a pas sa colonne « ${colonne} » : elle porte « key » et « value ».` })));
+    }
+  }
   const meta = tables.has('meta') ? new Map((db.exec(`SELECT key, value FROM meta`)[0]?.values ?? []).map((v) => [v[0] as string, v[1] as string])) : new Map<string, string>();
   const format = meta.get('format');
   if (format !== FILE_FORMAT) {
@@ -741,7 +750,7 @@ export async function verifierFichier(bytes: Uint8Array, opts: { sqlJs?: SqlJsSt
   try {
     db = openChecked(SQL, bytes);
   } catch (err) {
-    if (err instanceof FormatRefused) return { ouvre: false, message: err.message, reason: err.reason, problemes: [] };
+    if (err instanceof FormatRefused) return { ouvre: false, message: err.message, reason: err.reason, problemes: err instanceof FichierRefuse ? err.problemes : [] };
     throw err;
   }
   let lecture: Lecture;
