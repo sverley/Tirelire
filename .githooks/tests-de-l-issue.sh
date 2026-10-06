@@ -16,7 +16,7 @@
 #
 # Exécuté (`sh .githooks/tests-de-l-issue.sh --jouer [--attestation <fichier>]`), il les joue dans
 # `apps/web`, au seuil 4, tests navigateur activés, et sort en échec si l'un rougit : c'est l'étape de
-# la CI au Ready. `--attestation` passe le fichier au lanceur (#302) : un fichier vert sur son
+# la CI au Ready, qui sert aussi `--branche <nom>` sur sa tête détachée. `--attestation` passe le fichier au lanceur (#302) : un fichier vert sur son
 # empreinte n'est pas rejoué, et le lanceur le dit. Sans test navigateur de l'issue, il le dit et sort
 # en succès.
 
@@ -49,8 +49,9 @@ tests_de_l_issue() {
 
 if [ "${1:-}" = --jouer ]; then
   set -u
-  tdi_attestation=''
-  [ "${2:-}" = --attestation ] && tdi_attestation=${3:-}
+  shift
+  options_du_jeu "$@"
+  tdi_attestation=$hdb_attestation
   tdi_racine=$(git rev-parse --show-toplevel) || exit 1
   cd "$tdi_racine" || exit 1
   tdi_liste=$(mktemp) || exit 1

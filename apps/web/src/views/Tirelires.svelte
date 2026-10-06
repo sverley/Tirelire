@@ -342,7 +342,7 @@
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter une tirelire</button>
 </div>
-{#if accounts.length === 0}<div class="empty">Crée d'abord un compte.</div>{/if}
+{#if accounts.length === 0}<div class="empty">Créez d'abord un compte.</div>{/if}
 
 <FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les tirelires" />
 

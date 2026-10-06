@@ -126,7 +126,7 @@
       await navigator.clipboard.writeText(myCode);
       msg = 'Code copié.';
     } catch {
-      msg = 'Copie impossible : sélectionne le texte.';
+      msg = 'Copie impossible : sélectionnez le texte.';
     }
   }
 
@@ -241,11 +241,11 @@
   {:else if phase === 'offering'}
     <p class="muted">Préparation de l'offre…</p>
   {:else if phase === 'waitAnswer' || phase === 'answered'}
-    <p class="small">{phase === 'waitAnswer' ? '1. Fais scanner ce code par l’autre appareil (« Rejoindre »).' : 'Fais scanner ce code par l’appareil qui a proposé.'}</p>
+    <p class="small">{phase === 'waitAnswer' ? '1. Faites scanner ce code par l’autre appareil (« Rejoindre »).' : 'Faites scanner ce code par l’appareil qui a proposé.'}</p>
     {#if myQr}<img src={myQr} alt="QR code" style="width:min(320px,100%);image-rendering:pixelated;background:#fff;padding:6px;border-radius:8px" />{/if}
     <div class="actions"><button class="btn small" onclick={copyCode}>Copier le code texte</button></div>
     {#if phase === 'waitAnswer'}
-      <p class="small">2. Puis scanne (ou colle) la réponse de l'autre appareil :</p>
+      <p class="small">2. Puis scannez (ou collez) la réponse de l'autre appareil :</p>
       {#if canScan}<div class="actions"><button class="btn" onclick={scanning ? stopScan : startScan}>{scanning ? 'Arrêter la caméra' : 'Scanner la réponse'}</button></div>{/if}
       {#if scanning}<video bind:this={video} muted playsinline style="width:100%;max-height:320px;border-radius:8px"></video>{/if}
       <label class="f">Réponse (code texte) <textarea bind:value={theirCode} rows="3" style="width:100%"></textarea></label>
@@ -257,7 +257,7 @@
       <p class="muted">En attente de la connexion…</p>
     {/if}
   {:else if phase === 'joining'}
-    <p class="small">Scanne (ou colle) le code de l'appareil qui propose :</p>
+    <p class="small">Scannez (ou collez) le code de l'appareil qui propose :</p>
     {#if canScan}<div class="actions"><button class="btn" onclick={scanning ? stopScan : startScan}>{scanning ? 'Arrêter la caméra' : 'Scanner le code'}</button></div>{/if}
     {#if scanning}<video bind:this={video} muted playsinline style="width:100%;max-height:320px;border-radius:8px"></video>{/if}
     <label class="f">Code (texte) <textarea bind:value={theirCode} rows="3" style="width:100%"></textarea></label>
@@ -285,7 +285,7 @@
 
 <h2>Par un serveur privé (relais)</h2>
 <div class="card">
-  <p class="small muted">Un serveur à toi stocke des paquets chiffrés sans pouvoir les lire : soit le petit serveur Node (dossier <span class="num">apps/relay</span>), soit ce site lui-même quand il est installé sur un hébergement web (dossier <span class="num">apps/hebergement</span>, adresse proposée d'office). Même salon et même phrase sur tous les appareils du foyer.</p>
+  <p class="small muted">Un serveur à vous stocke des paquets chiffrés sans pouvoir les lire : soit le petit serveur Node (dossier <span class="num">apps/relay</span>), soit ce site lui-même quand il est installé sur un hébergement web (dossier <span class="num">apps/hebergement</span>, adresse proposée d'office). Même salon et même phrase sur tous les appareils du foyer.</p>
   <div class="grid" style="display:grid;gap:10px">
     <label class="f">Adresse du relais <input bind:value={relay.url} placeholder="https://maison.exemple.fr/tirelire" /></label>
     <label class="f">Salon <span style="display:flex;gap:6px"><input bind:value={relay.room} placeholder="identifiant secret" /><button class="btn small" type="button" onclick={() => (relay.room = newRoomId())}>Générer</button></span></label>

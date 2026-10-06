@@ -18,6 +18,11 @@
  * le dépôt du répertoire courant, puis dans celui de la garde, où il est récupéré s'il manque. Sans
  * `--tete`, `pr` juge la copie de travail, fichiers non commis compris : l'oubli se voit en local
  * avant le passage en Ready.
+ *
+ * Rien de son comportement ne se lit de l'environnement d'exécution (#352, point 9) : la CI sert
+ * `--resume <fichier>`, où le bilan s'ajoute (son résumé), et `--annotations`, qui écrit chaque point à
+ * corriger en annotation de GitHub Actions. Seul `gh`, pour `--pr` et `--issue`, lit son jeton et son
+ * dépôt de l'environnement, faute de pouvoir les servir autrement sans les exposer.
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -78,8 +83,8 @@ function demander() {
 function rendre(resultat) {
   const bilan = resumePr(resultat);
   console.log(bilan);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${bilan}\n`);
-  if (process.env.GITHUB_ACTIONS) {
+  if (option('resume')) appendFileSync(option('resume'), `${bilan}\n`);
+  if (args.includes('--annotations')) {
     for (const p of resultat.aCorriger) console.log(`::error title=À corriger::${annotation(p)}`);
   }
   process.exit(resultat.aCorriger.length ? 1 : 0);
@@ -171,7 +176,7 @@ Promise.resolve()
   // Rouge, et dit pourquoi : sur une PR, la garde de la base qui ne sait pas juger ce que la PR propose (#159).
   const message = `La garde ne sait pas juger : ${e?.message ?? e}`;
   console.error(message);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
-  if (process.env.GITHUB_ACTIONS) console.log(`::error title=La garde ne sait pas juger::${annotation(message)}`);
+  if (option('resume')) appendFileSync(option('resume'), `${message}\n`);
+  if (args.includes('--annotations')) console.log(`::error title=La garde ne sait pas juger::${annotation(message)}`);
   process.exit(1);
 });

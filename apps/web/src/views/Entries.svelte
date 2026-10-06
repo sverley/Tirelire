@@ -98,10 +98,10 @@
   function save(e: Event) {
     e.preventDefault();
     const abs = inputToCents(form.amount);
-    if (!form.accountId) return void (error = 'Choisis le compte.');
+    if (!form.accountId) return void (error = 'Choisissez le compte.');
     if (!form.label.trim()) return void (error = 'Le libellé est obligatoire.');
     if (abs === undefined || abs <= 0) return void (error = 'Montant invalide (en positif).');
-    if (form.nature === 'transfer' && !form.transferAccountId) return void (error = 'Choisis le compte de contrepartie.');
+    if (form.nature === 'transfer' && !form.transferAccountId) return void (error = 'Choisissez le compte de contrepartie.');
 
     let categoryId = form.categoryId;
     if (form.newCategory.trim()) {
