@@ -10,14 +10,16 @@ cite — ses décisions, ses invariants et contraintes, leurs entrées du regist
 plutôt qu'en lisant les documents en entier : l'architecte a confronté le besoin à tous, et son
 « Comparé » nomme ce qui compte (porteur, #333). Pour vérifier qu'un ajout ou le
 travail ne contredit pas un catalogue (étapes 1 et 3), cherche-y les notions qu'il touche. Le codeur
-crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteur, #283).
+crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteur, #283). Tes sessions sont
+économes, ta vérification proportionnée (D92).
 
 1. Lis le « Fait quand » de ton côté (principe 11.1), avant les tests du codeur : c'est lui, et non
    ces tests, qui dit ce que le harnais doit trancher. Si une de ses phrases ne peut se trancher ni
    par un test ni par une vérification manuelle, dis-le dans l'issue et arrête-toi. Si ta lecture
    révèle ce que l'architecte a manqué — une phrase du « Fait quand », une entrée du registre touchée
    avec sa vérification manuelle (`node packages/gardes/cli.mjs demander --ids <id>` en prépare la
-   consigne), une ligne « Usages » —, ajoute-le dans l'issue, signé (« ajouté par l'auditeur »), sans
+   consigne), une ligne « Usages » —, ajoute-le dans le corps de l'issue, que la garde lit seul (#349),
+   signé (« ajouté par l'auditeur »), sans
    retirer ni réécrire ce qu'a écrit l'architecte (porteur, #286). Vérifie que l'ajout ne contredit
    ni les autres entrées de son catalogue ni les documents fondateurs (principe 9.1) : une
    contradiction devient une question au porteur, dans l'issue. Tu ne prends jamais d'hypothèse sur
@@ -45,15 +47,18 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    quand il est du registre, qui n'en accueille jamais (D81), mets-les dans le second fichier : le
    codeur n'en voit que le verdict. Un besoin que la relecture suffit à vérifier — par défaut la
    documentation et la garde (D81) — n'a pas de harnais.
-3. Vérifie le travail en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
+3. Pour un besoin sans code, ta vérification est la relecture et la garde hors ligne, sans
+   `pnpm test 2` ; ce que la livraison a attesté ne se rejoue pas (D92). Sinon, vérifie le travail
+   en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
-   un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **À chaque tour,
-   joue aussi la garde**, l'outil, que `pnpm test 2` ne joue pas : `node packages/gardes/cli.mjs pr
-   --issue <n>`, ou `--corps-fichier` avec le corps de l'issue. Elle seule dit les entrées du
+   un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **Dans les deux cas,
+   à chaque tour, joue la garde**, l'outil, que `pnpm test 2` ne joue pas, hors ligne, sur le corps de l'issue tel qu'il est sur GitHub, en entier, jamais un commentaire, donné en fichier (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`) ou en texte (variable `CORPS`) ; si ce corps n'a pas
+   de section « Invariants et contraintes », dis-le dans l'issue, sans la chercher ailleurs (#349).
+   Elle seule dit les entrées du
    registre que les fichiers modifiés imposent, et leurs vérifications manuelles : ajoute-les dans
    l'issue, signées (étape 1). Une tête détachée reste permise quand tu en as
    besoin : elle saute ce que couvre la base commune avec `main`, mais n'atteste rien (D83, « Les
-   empreintes »). Avant de relancer, lis ce que le lanceur dit jouer et sauter, et pourquoi (D83).
+   empreintes »). Avant de relancer, lis ce que le lanceur dit jouer et sauter, et pourquoi, et son détail s'il le faut (D83, #352).
    Les tests navigateur de l'issue — les fichiers
    de tests navigateur que la PR ajoute ou modifie — se jouent à chaque livraison et au Ready, en
    entier ; la non-régression dans le navigateur se joue la nuit, sur `main`, et ne décide pas de la

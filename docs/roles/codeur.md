@@ -7,7 +7,8 @@ travailles en français.
 Avant tout, lis l'issue, le glossaire (`docs/glossaire.md`) et, des documents fondateurs (D77), ce que l'issue
 cite — ses décisions, ses invariants et contraintes, leurs entrées du registre —, en les cherchant
 plutôt qu'en lisant les documents en entier : l'architecte a confronté le besoin à tous, et son
-« Comparé » nomme ce qui compte (porteur, #333).
+« Comparé » nomme ce qui compte (porteur, #333). Tes sessions sont économes, ton compte rendu
+proportionné (D92).
 
 0. Si aucune PR n'existe : crée la branche, son nom portant le numéro de l'issue (`codage/<n>-…`),
    indique-la dans l'issue, et ouvre la PR en brouillon avec le corps du modèle
@@ -20,16 +21,17 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
    non-régression navigateur) : l'auditeur va déplacer et modifier tes tests en composant le harnais,
    et ce que tu aurais joué de plus serait à rejouer (porteur, 02/10). En brouillon, ton verdict est
    local : `pnpm typecheck`, tes propres tests, joués à la main (`pnpm --dir <paquet> run test 4
-   <fichiers>`), le harnais du besoin s'il existe, au plus la garde (`node packages/gardes/cli.mjs pr
-   --issue <n>`, ou `--corps-fichier`, D81) et, si tu modifies une fonction de la garde, ses tests de
-   développement (D81) : `pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'` ; rien d'autre
-   (D83). La livraison du push joue d'elle-même ce que D83 prévoit.
+   <fichiers>`), le harnais du besoin s'il existe, la garde, à chaque tour avant ton compte rendu,
+   hors ligne, sur le corps de l'issue tel qu'il est sur GitHub, en entier, jamais un commentaire, donné en fichier (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`) ou en texte (variable `CORPS`) — si ce corps n'a pas de section « Invariants et contraintes », dis-le dans
+   l'issue, sans la chercher ailleurs (D81 ; porteur, #349) — et, si tu modifies une fonction de la garde, ses tests de développement
+   (D81) : `pnpm --dir packages/gardes run test 4 'dev/*.dev.mjs'` ; rien d'autre (D83). La livraison du push joue d'elle-même ce que D83 prévoit.
 
    Chaque ensemble de tests a son empreinte, l'état des chemins qu'il lit, et chaque fichier de test
    ne se rejoue pas sur une empreinte déjà trouvée verte, ni à tes lancements suivants, ni aux
    crochets, dans cette session ou une autre, ni en CI (D83, « Les empreintes »). Tout lancement de
-   l'outil de test, les tiens compris, atteste les fichiers qu'il joue verts, et dit ce qu'il joue et
-   ce qu'il saute ; un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
+   l'outil de test, les tiens compris, atteste les fichiers qu'il joue verts, et dit, pour chaque
+   ensemble, combien de fichiers il joue et combien il saute, et pourquoi ; le détail, fichier par
+   fichier, se lit à la demande, et le lancement dit où (#352). Un lancement par nom de test (`-t`, `--test-name-pattern`) se joue toujours, et
    n'atteste rien. La livraison (pré-push) joue le typecheck avant les tests, sans les tests
    navigateur de non-régression mais avec ceux de l'issue — les fichiers de tests navigateur que ta
    branche ajoute ou modifie —, en entier, dit chaque ensemble — joué, à quel seuil, avec quel
@@ -69,8 +71,9 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
    du « Fait quand » qu'il vérifie, s'il en vérifie une, et les tests existants que tu as adaptés,
    avec la raison ; ce qui appelle une validation humaine — pour chaque vérification manuelle
    demandée, ce que tes modifications changent et ce qui reste à constater —, si tu as
-   demandé les tests navigateur, et pourquoi, et, si tu changes le comportement de la garde, ce
-   qu'en demande D81. Honnête et court. Ce que tu rends en fin de session — à qui t'a lancé, s'il
+   demandé les tests navigateur, et pourquoi ; ce que la garde demande encore à l'issue — une entrée
+   à déclarer, une vérification manuelle à recopier —, que l'auditeur y ajoutera, signé (#286) ;
+   et, si tu changes le comportement de la garde, ce qu'en demande D81. Honnête et court. Ce que tu rends en fin de session — à qui t'a lancé, s'il
    y en a un — renvoie à ce compte rendu, sans le reprendre (D80). Puis arrête-toi.
 
 Tu ne passes jamais la PR en Ready et ne la fusionnes jamais. Tu n'ouvres pas d'issue. Tu ne

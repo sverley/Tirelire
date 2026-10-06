@@ -167,6 +167,10 @@ function nature(texte) {
 
 function extrait(journal) {
   const lignes = journal.split('\n');
+  // Le lanceur nomme chaque fichier rouge et chaque test en échec, avec son message et son endroit
+  // (#352, point 4) : ce sont eux qui se disent, sans les tests verts ; le reste est au détail.
+  const echecs = lignes.filter((l, i) => /^✗ .+ :$/.test(l) || (/^  « /.test(l) && lignes.slice(0, i).some((x) => /^✗ .+ :$/.test(x))));
+  if (echecs.length) return echecs.join('\n');
   const utiles = lignes.filter((l) => /^\s*not ok|FAIL|✗|×|AssertionError|ERR_PNPM|error TS\d|^Error/.test(l)).slice(0, 40);
   return [...utiles, '  … fin du journal :', ...lignes.slice(-30)].join('\n');
 }
@@ -184,7 +188,10 @@ for (const lance of lances) {
   nomCourant = nom;
   joues.push({ nom, dossier });
   const journal = lire(join(journaux, `${nom}.log`)) ?? '';
+  // Le lanceur nomme déjà chaque fichier sauté faute d'outil, avec sa raison, sur une ligne (#352, point 5).
+  const ditParLeLanceur = /^attestation : .+ : non attesté — /m.test(journal);
   for (const l of journal.split('\n')) {
+    if (/# SKIP/.test(l) && ditParLeLanceur) continue;
     if (/# SKIP/.test(l)) console.log(`${niveau} : test sauté (${nom}) : ${l.trim()}`);
     // Ce que le seuil écarte se dit (#232) : la ligne du lanceur.
     else if (/^seuil .* écarté\(s\)/.test(l) && !/ 0 test\(s\) écarté/.test(l)) console.log(`${niveau} : ${nom}, ${l.trim()}`);

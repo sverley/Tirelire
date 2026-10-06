@@ -75,7 +75,10 @@ nul() { case $1 in '' | *[!0]*) return 1 ;; *) return 0 ;; esac; }
 dit() { echo "$niveau : $*"; }
 
 travail=$(mktemp -d) || exit 1
-trap 'rm -rf "$travail"' EXIT
+# Le détail du lancement (#352, point 3) reste lisible jusqu'à la livraison suivante, dans le dossier de git.
+detail="$(git rev-parse --absolute-git-dir)/tirelire-detail/$niveau"
+conserver() { [ -d "$travail/journaux" ] && rm -rf "$detail" && mkdir -p "$(dirname "$detail")" && cp -R "$travail/journaux" "$detail" 2>/dev/null; rm -rf "$travail"; }
+trap conserver EXIT
 trap 'exit 130' INT TERM
 journaux="$travail/journaux"
 mkdir -p "$journaux" || exit 1
@@ -202,7 +205,7 @@ if [ -z "$sous" ] && [ -z "$surmain" ] && [ -n "$branche" ]; then
 fi
 node "$crochets/attestation.mjs" plan "$arbre" 2 "$travail/verts" "$journaux/harnais.txt" "${hbase:--}" "$demande_nav" "$travail/plan" "$niveau" || exit 1
 # Ce qui couvre chaque lancement, fichier par fichier (#302) : le lanceur y saute ce qui est vert sur
-# son empreinte, et dit ce qu'il joue et ce qu'il saute.
+# son empreinte, et dit, pour chaque ensemble, combien il en joue et en saute, et pourquoi ; le détail est conservé (#352).
 node "$crochets/attestation.mjs" couverture "$arbre" "$travail/verts" "$journaux/harnais.txt" "${hbase:--}" "$travail/couverture" || exit 1
 joue() { awk -F '\t' -v id="$1" '$1 == id && $2 == 1 { ok = 1 } END { exit !ok }' "$travail/plan"; }
 
@@ -270,7 +273,7 @@ lance() { # nom dossier commande…
 rapports_node() { echo "--test-reporter=tap" "--test-reporter-destination=stdout" "--test-reporter=$crochets/rapport-node.mjs" "--test-reporter-destination=$journaux/$1.rapport"; }
 rapports_vitest() { echo "--reporter=default" "--reporter=json" "--outputFile.json=$journaux/$1.rapport"; }
 # Ce qui couvre le lancement, et le bilan de ses fichiers, que lit `attestation.mjs bilan` (#302).
-couvert() { echo "--attestation" "$travail/couverture" "--bilan" "$journaux/$1.bilan"; }
+couvert() { echo "--attestation" "$travail/couverture" "--bilan" "$journaux/$1.bilan" "--detail" "$journaux/$1.detail"; }
 lances=''
 ajoute() { # ensemble nom dossier lanceur : pour le verdict, et pour le bilan de l'ensemble
   lances="$lances $2:$3:$4"
@@ -439,6 +442,7 @@ fi
 TIRELIRE_NIVEAU=$niveau TIRELIRE_HARNAIS=$bloque node "$crochets/verdict.mjs" "$juge" "$journaux" "$debut" $lances
 verdict=$?
 node "$crochets/attestation.mjs" bilan "$travail/plan" "$journaux" "$niveau" "$arbre" "$commit" "${branche:-?}" "$travail/verts" ${attester:+--enregistrer}
+dit "détail — chaque fichier joué ou sauté, et la sortie de chaque lancement : $detail/ (*.detail, *.log)"
 if [ "$verdict" -eq 0 ] && [ -n "$attester" ] && [ -n "$depot" ] && [ "$mode" != fusion ]; then
   dit "$(node "$crochets/attestation.mjs" envoyer "$depot" "$branche" 2>&1)"
 fi

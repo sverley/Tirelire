@@ -1,7 +1,7 @@
 # Porteur
 
 Le porteur du projet. Ses paroles font foi (principe 7) ; il valide, et la fusion vaut validation
-(principe 11, D82).
+(principe 11, D82). Les sessions des rôles sont économes (D92).
 
 Il lit le compte rendu du codeur et la vérification de l'auditeur, et passe la PR en Ready. La CI y
 joue le seuil 1, puis le harnais du besoin et les tests navigateur de l'issue, en entier, qui ne

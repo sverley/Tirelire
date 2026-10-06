@@ -21,7 +21,7 @@
 # `attestation.mjs plan`). Dans ce qui se joue, le lanceur saute chaque fichier de test vert sur son
 # empreinte, l'état de ce qu'il lit (D83, #304), et atteste ceux qu'il joue verts, empreinte calculée
 # sur la copie de travail (#302). Il dit, pour chaque ensemble, s'il l'a joué, à quel seuil, avec quel verdict, ou
-# pourquoi il ne l'a pas joué, et les fichiers joués et sautés (`attestation.mjs bilan`).
+# pourquoi il ne l'a pas joué, combien de fichiers il a joués et sautés (`attestation.mjs bilan`) ; le détail est conservé (#352).
 # `verdict.mjs` trie les échecs par fichier :
 #   - un échec de la non-régression refuse le commit ;
 #   - le harnais du besoin est affiché sans bloquer (la livraison le bloque, #121), sauf une erreur de
@@ -63,7 +63,11 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 journaux=$(mktemp -d) || exit 1
-trap 'rm -rf "$journaux"' EXIT
+# Le détail du lancement (#352, point 3) — ce que chaque lancement a joué ou sauté, et la sortie de
+# chaque exécuteur — reste lisible jusqu'au pré-commit suivant, dans le dossier de git.
+detail="$(git rev-parse --absolute-git-dir)/tirelire-detail/pré-commit"
+conserver() { rm -rf "$detail" && mkdir -p "$(dirname "$detail")" && cp -R "$journaux" "$detail" 2>/dev/null; rm -rf "$journaux"; }
+trap conserver EXIT
 trap 'exit 130' INT TERM
 debut=$(date +%s)
 
@@ -115,7 +119,7 @@ dans() { grep -E "^$1/" "$journaux/harnais.txt" | sed "s#^$1/##"; }
 lance() {
   nom=$1 dossier=$2
   shift 2
-  (pnpm --dir "$dossier" run test "$@" >"$journaux/$nom.log" 2>&1; echo $? >"$journaux/$nom.code") &
+  (pnpm --dir "$dossier" run test "$@" --detail "$journaux/$nom.detail" >"$journaux/$nom.log" 2>&1; echo $? >"$journaux/$nom.code") &
   case $nom in harnais-*) id=harnais ;; cœur) id=coeur ;; hébergement) id=hebergement ;; *) id=$nom ;; esac
   case $nom in cœur | harnais-cœur | harnais-interface) sorte=vitest ;; *) sorte=node ;; esac
   printf '%s\t%s\t%s\n' "$id" "$nom" "$sorte" >>"$journaux/lances"
@@ -188,4 +192,5 @@ fi
 node "$racine/.githooks/verdict.mjs" "$racine" "$journaux" "$debut" $lances
 verdict=$?
 node "$racine/.githooks/attestation.mjs" bilan "$journaux/plan" "$journaux" pré-commit "$arbre" - "${branche:-?}" "$journaux/verts"
+echo "pré-commit : détail — chaque fichier joué ou sauté, et la sortie de chaque lancement : $detail/ (*.detail, *.log)."
 exit $verdict
