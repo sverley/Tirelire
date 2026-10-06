@@ -12,7 +12,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, describe, test } from 'node:test';
-import { endroitDans, lignesDesEchecs } from './echecs.mjs';
+import { endroitDans, ligneDEnsemble, lignesDesEchecs } from './echecs.mjs';
 import { RACINE } from './gardes.mjs';
 
 let dossierTemporaire;
@@ -109,7 +109,7 @@ describe('#352 · le lanceur parle peu quand tout est vert', { concurrency: true
     f.écrire('packages/core/outil.test.mjs', "import { test } from 'node:test';\ntest('o [niveau 1]', { skip: 'outil absent' }, () => {});\n");
     const r = await f.tester('packages/core', '2');
     assert.equal(r.code, 0, r.sortie);
-    assert.match(r.sortie, /^attestation : outil\.test\.mjs : non attesté — un test s'est sauté, faute d'outil par exemple\.$/m, r.sortie);
+    assert.match(r.sortie, /^attestation : outil\.test\.mjs : non attesté — test\(s\) sauté\(s\) : outil absent\.$/m, r.sortie);
     assert.equal((r.sortie.match(/outil\.test\.mjs/g) ?? []).length, 1, `une ligne, une fois\n${r.sortie}`);
   });
 
@@ -156,6 +156,15 @@ describe('#352 · le lanceur parle peu quand tout est vert', { concurrency: true
     assert.match(r.sortie, /^ {2}« rv \[niveau 1\] » — .*\(test\/r\.test\.mjs:3:\d+\)$/m, r.sortie);
     assert.match(r.sortie, /^✗ test\/s\.test\.mjs :$/m, r.sortie);
     assert.doesNotMatch(r.sortie, /w\.test\.mjs/, `des fichiers verts, seulement leur nombre\n${r.sortie}`);
+  });
+});
+
+describe('#352 · la ligne d’un ensemble au bilan d’un crochet', () => {
+  test('[niveau 3] point 1 · un cas long tient en 160 caractères, comptes entiers (ajouté par l’auditeur)', () => {
+    const comptes = '12 joué(s), 30 sauté(s) (18 attesté(s) vert(s), 12 base commune avec main)';
+    const l = ligneDEnsemble('pré-fusion', 'interface sans navigateur', 'joué au seuil 2 : vert, mais son rapport ne se lit pas, donc pas compté vert sur son empreinte', comptes);
+    assert.ok(l.length <= 160, `${l.length} : ${l}`);
+    assert.ok(l.endsWith(` — ${comptes}.`), l);
   });
 });
 

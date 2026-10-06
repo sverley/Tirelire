@@ -265,7 +265,7 @@ describe('[niveau 4] #302 · le lanceur atteste ce qu’il joue vert, et saute c
     const r = await f.tester('packages/core', '1');
     assert.notEqual(r.code, 0, r.sortie);
     assert.match(r.sortie, /attestation : r\.test\.mjs : non attesté — rouge\./, r.sortie);
-    assert.match(r.sortie, /attestation : s\.test\.mjs : non attesté — un test s'est sauté/, r.sortie);
+    assert.match(r.sortie, /attestation : s\.test\.mjs : non attesté — test\(s\) sauté\(s\) : faute d’outil\./, r.sortie);
     const a = f.attestation('codage/996-rouge');
     assert.deepEqual(a.verts.map((v) => `${v.fichier}:${v.seuil}`).sort(), ['packages/core/a.test.mjs:4', 'packages/core/b.test.mjs:1'], `b, de niveau 2, écarté au seuil 1 : attesté au seuil 1\n${r.sortie}`);
     // Sous vitest (ajouté par l'auditeur) : un fichier dont un test est écarté par le seuil n'est attesté qu'à ce seuil.
