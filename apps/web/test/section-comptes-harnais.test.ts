@@ -1,9 +1,11 @@
 /**
- * Tests du codeur de #362 — la section Comptes, écrite une fois, sert l'étape de l'assistant et l'écran Comptes.
+ * Harnais d'audit de #362 — la section Comptes, écrite une fois, sert l'étape de l'assistant et l'écran Comptes.
  *
- * Sans navigateur, sur le texte des sources (la section est un `.svelte.ts` que Vitest ne compile pas ici) et sur
- * les propositions de l'exemple. Le comportement de l'étape et de l'écran se joue dans le navigateur, par les tests
- * que l'issue nomme (adaptés là où l'écran change).
+ * Sans navigateur, sur le texte des sources (tests du codeur, repris). Point 1, niveau 1 : le principe 13 et
+ * I11 (« la section le rend vrai par construction », issue) ; vu rouge sur le `Wizard.svelte` de `main` et sur
+ * une mutation de l'écran. Points 2 à 5, niveau 2 : D43, D45, D46, D40, D56, D59 (cas de règle). Point 6, la
+ * réplique de l'explication : niveau 3 (même résultat, moins lisible). Le comportement se joue dans les tests
+ * navigateur que l'issue nomme (points 2, 3, 7), adaptés par le codeur et relus.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -16,7 +18,7 @@ const ecran = lire('src/views/Accounts.svelte');
 const composant = lire('src/lib/SectionComptes.svelte');
 const section = lire('src/lib/sectionComptes.svelte.ts');
 
-describe('[niveau 4] #362 · 1 — une section Comptes, que l’étape de l’assistant et l’écran Comptes emploient', () => {
+describe('[niveau 1] #362 · 1 — une section Comptes, que l’étape de l’assistant et l’écran Comptes emploient', () => {
   it('l’étape et l’écran emploient le même composant, sur leur propre section', () => {
     expect(wizard).toMatch(/<SectionComptes s=\{sectionComptes\} \/>/);
     expect(ecran).toMatch(/<SectionComptes s=\{section\} [^>]*carte[^>]*\/>/);
@@ -30,14 +32,14 @@ describe('[niveau 4] #362 · 1 — une section Comptes, que l’étape de l’as
     expect(ecran).not.toMatch(/Banque|FR76|Nom du compte|Ajouter en un geste/);
   });
   it('la ligne, le retrait, les raccourcis, le formulaire d’ajout, le coussin et l’explication sont dans la section', () => {
-    for (const mot of ['Banque', 'FR76 …', 'Retirer ce compte', 'Ajouter en un geste', 'Ajouter un compte', 'Coussin du compte principal', 'Uniquement des comptes bancaires réels']) {
+    for (const mot of ['placeholder="Banque"', 'placeholder="FR76 …"', 'title="Retirer ce compte"', 'Ajouter en un geste', 'Ajouter un compte', 'Coussin du compte principal', 'Uniquement des comptes bancaires réels']) {
       expect(composant, mot).toContain(mot);
     }
     for (const mot of ['editAccount', 'editAccountBalance', 'editCoussin', 'retirer', 'appliquer', 'garnir', 'ajouter']) expect(section, mot).toContain(mot);
   });
 });
 
-describe('[niveau 4] #362 · 2 — dans l’assistant, rien ne change : même texte, même garnissage d’office, même brouillon', () => {
+describe('[niveau 2] #362 · 2 — dans l’assistant, rien ne change : même texte, même garnissage d’office, même brouillon', () => {
   it('le texte de l’étape est celui de D43, affiché', () => {
     expect(composant).toMatch(/Uniquement des comptes bancaires réels — ceux dont vous recevez un relevé\. Le compte principal\s+est celui par lequel tout transite ; les autres sont facultatifs\./);
     expect(composant).toMatch(/\{:else\}\s*<p class="muted small">/);
@@ -48,7 +50,7 @@ describe('[niveau 4] #362 · 2 — dans l’assistant, rien ne change : même te
   });
 });
 
-describe('[niveau 4] #362 · 3 — l’écran écrit dans le projet, et dit « tiers » d’après le solde à régler (D45)', () => {
+describe('[niveau 2] #362 · 3 — l’écran écrit dans le projet, et dit « tiers » d’après le solde à régler (D45)', () => {
   it('l’écran construit la section sur le projet, avec le coussin de Réglages', () => {
     expect(ecran).toMatch(/new SectionDesComptes\(\{[\s\S]*?app\.ledger[\s\S]*?app\.upsert[\s\S]*?app\.remove[\s\S]*?app\.setSetting\('principalCushion'/);
     expect(lire('src/views/Settings.svelte')).toMatch(/app\.setSetting\('principalCushion'/);
@@ -65,7 +67,7 @@ describe('[niveau 4] #362 · 3 — l’écran écrit dans le projet, et dit « t
   });
 });
 
-describe('[niveau 4] #362 · 4 — ce que l’écran garde en propre', () => {
+describe('[niveau 2] #362 · 4 — ce que l’écran garde en propre', () => {
   it('le filtre d’état, les soldes, ce qui désigne un compte clos, la suppression confirmée sans supprimer le principal', () => {
     expect(ecran).toMatch(/<FiltreEtat/);
     expect(ecran).toContain('Solde reconstruit au');
@@ -82,7 +84,7 @@ describe('[niveau 4] #362 · 4 — ce que l’écran garde en propre', () => {
   });
 });
 
-describe('[niveau 4] #362 · 5 et 6 — raccourcis et explication dans l’écran', () => {
+describe('[niveau 2] #362 · 5 — raccourcis dans l’écran', () => {
   it('l’écran n’appelle jamais le garnissage d’office : rien n’est créé sans geste', () => {
     expect(ecran).not.toMatch(/garnir|appliquerPrincipal/);
   });
@@ -92,6 +94,9 @@ describe('[niveau 4] #362 · 5 et 6 — raccourcis et explication dans l’écra
     expect(accounts.some((a) => (a.kind as string) === 'principal')).toBe(false);
     expect(section).toMatch(/restantes\(\)[\s\S]*?!this\.accounts\.some\(\(a\) => a\.name === x\.name\)/);
   });
+});
+
+describe('[niveau 3] #362 · 6 — l’explication se replie dans l’écran', () => {
   it('l’explication se replie sous « Comment ça marche ? » dans l’écran, et reste affichée dans l’assistant', () => {
     expect(composant).toMatch(/\{#if explicationRepliee\}\s*<details class="explication[^>]*><summary>Comment ça marche \?<\/summary>/);
     expect(ecran).toMatch(/<SectionComptes [^>]*\bexplicationRepliee\b/);
