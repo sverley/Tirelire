@@ -21,6 +21,7 @@ import {
   budgetSuggestions,
   rowProblem,
   settingProblem,
+  type BudgetLu,
   type ColumnDef,
   type Ledger,
   type LedgerKey,
@@ -49,6 +50,11 @@ export interface Brouillon {
    * comptent pas comme préparés : un brouillon qui n'a que eux est intact.
    */
   reglagesProposes: Partial<Settings>;
+  /**
+   * Le brouillon vient d'un budget JSON importé (#367) : ses lignes sont celles du JSON, et l'assistant
+   * n'y ajoute aucune proposition de l'exemple d'office (D46) ; les raccourcis restent offerts.
+   */
+  budgetImporte?: true;
 }
 
 /**
@@ -98,6 +104,7 @@ export function nouveauBrouillon(projet: Ledger): Brouillon {
  */
 export function brouillonIntact(b: Brouillon): boolean {
   return (
+    !b.budgetImporte &&
     b.semees.length === 0 &&
     Object.keys(b.reglages).length === 0 &&
     Object.values(b.lignes).every((table) => !table || Object.keys(table).length === 0)
@@ -245,4 +252,19 @@ export function valider(store: LedgerStore, projet: Ledger, b: Brouillon): void 
     ecritures.push(() => store.setSetting(key, reglages[key] as never));
   }
   for (const ecriture of ecritures) ecriture();
+}
+
+/**
+ * Le brouillon d'un budget JSON lu (#366, #367) : le projet et le budget posé dessus, ouvert sur le
+ * résumé. Les lignes du JSON remplacent celles du projet de même identifiant ; aucune proposition de
+ * l'exemple ne s'y ajoute, ni lignes ni réglages. Le budget a été vérifié sur ce projet par
+ * `lireBudgetJson` : l'écrire dans le brouillon ne refuse rien.
+ */
+export function brouillonDImport(projet: Ledger, budget: BudgetLu): Brouillon {
+  const b: Brouillon = { ...nouveauBrouillon(projet), reglagesProposes: {}, etape: 'summary', budgetImporte: true };
+  for (const key of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows'] as const) {
+    for (const ligne of budget[key]) ecrire(b, key, ligne as never);
+  }
+  for (const [cle, valeur] of Object.entries(budget.settings)) reglage(b, cle as keyof Settings, valeur as never);
+  return b;
 }

@@ -471,7 +471,7 @@
    * La mémoire est celle du brouillon : elle se retrouve en revenant dans l'assistant.
    */
   function semer(etape: Step) {
-    if (!projetVierge || brouillon.semees.includes(etape)) return;
+    if (!projetVierge || brouillon.budgetImporte || brouillon.semees.includes(etape)) return;
     brouillon.semees.push(etape);
     if (etape === 'accounts') {
       appliquerPrincipal(propositions.mainAccount);
@@ -634,7 +634,7 @@
    */
   function valider() {
     try {
-      recalerLesClotures();
+      if (!brouillon.budgetImporte) recalerLesClotures(); // un budget importé garde ses clôtures telles que le JSON les dit
       app.validerAssistant();
       valide = true;
       erreurValidation = '';
@@ -976,6 +976,15 @@
 
 {:else if step === 'summary'}
   <h2>{valide ? 'Votre budget est enregistré' : 'Votre budget'}</h2>
+  {#if !valide && brouillon.budgetImporte}
+    <div class="card accent">
+      <p style="margin:0">
+        <strong>Ce budget vient d’un import.</strong> Rien n’est enregistré avant que vous le validiez
+        ci-dessous. Chaque étape montre les lignes importées : vous pouvez les corriger comme d’habitude
+        avant de valider.
+      </p>
+    </div>
+  {/if}
   {#if !valide}
     <div class="card">
       <p style="margin:0">
