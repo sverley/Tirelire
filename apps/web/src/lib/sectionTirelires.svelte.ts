@@ -1,5 +1,5 @@
 /**
- * La section Tirelires (#361, règle des sections) : la carte d'une tirelire et ses lignes de besoin,
+ * La section Tirelires (#361, règle des sections, D94) : la carte d'une tirelire et ses lignes de besoin,
  * leur correction sur place, l'ajout d'un besoin à une tirelire, le formulaire d'ajout d'une
  * tirelire avec ses aides (#214), les raccourcis de l'exemple (D46) et le garnissage d'un projet
  * vierge — écrits une fois, ici, pour chaque endroit qui les emploie.

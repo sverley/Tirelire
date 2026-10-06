@@ -3,8 +3,8 @@
  *
  * Sans navigateur, sur le texte des sources (tests du codeur, repris). Point 1, niveau 1 : le principe 13 et
  * I11 (« la section le rend vrai par construction », issue) ; vu rouge sur le `Wizard.svelte` de `main`.
- * Point 2, niveau 2 : D93 et D46 (où la section écrit, le garnissage d'office laissé à l'endroit).
- * Point 3 : les tests que l'issue nomme, inchangés ; point 4 : relecture de D93 et D40.
+ * Point 2, niveau 2 : D94 et D46 (où la section écrit, le garnissage d'office laissé à l'endroit).
+ * Point 3 : les tests que l'issue nomme, inchangés ; point 4 : relecture de D94 et D40.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';

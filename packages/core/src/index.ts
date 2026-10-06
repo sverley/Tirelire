@@ -24,3 +24,4 @@ export * from './review.js';
 export * from './lecture-budget.js';
 export * from './sync.js';
 export * from './sauvegarde.js';
+export * from './budget-json.js';

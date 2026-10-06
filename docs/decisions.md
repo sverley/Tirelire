@@ -441,7 +441,7 @@ S'ils existent, l'assistant demande où dort chaque tirelire, ce qui remplit le 
 sans exposer les parts.
 
 L'assistant ne remplace pas les écrans de configuration ; l'un et l'autre emploient les mêmes
-sections, écrites une fois (D93) : une fois validé, il amène à un budget qui se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations).
+sections, écrites une fois (D94) : une fois validé, il amène à un budget qui se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations).
 Il propose les besoins multiples d'une tirelire et les priorités de l'exemple, qui se modifient
 ensuite dans Configuration, et les catégories de l'exemple, avec leur tirelire par défaut (D32) et les
 flux qui les portent : une catégorie se garde sans tirelire (I3). Il permet d'ajouter des besoins par
@@ -1428,7 +1428,23 @@ mette de vraies données (C4, C5). `v1` est la **première version publique** : 
 rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été exercé : son entrée dans
 `docs/versions.md` le nomme.
 
-### D93 · Une section par partie du budget, écrite une fois
+### D93 · Un seul stockage ; le budget JSON, un format d'échange
+
+Le porteur voulait reprendre un budget tenu ailleurs sans refaire l'assistant ni fabriquer un
+fichier SQLite (#366). Séparer le stockage — le budget en JSON, les opérations en SQLite — a été
+examiné et écarté : deux fichiers à sauvegarder ensemble (C5), des références d'une sous-opération ou
+d'une reprise qui franchiraient la frontière, deux mécanismes de synchronisation (I8) et deux
+formats à versionner (D30).
+
+Il n'y a donc qu'**un seul stockage, le fichier SQLite** (D08, D58). Le **budget JSON** est un format
+d'échange du budget sans ses opérations, aux mots des tables (D42), décrit dans
+`docs/format-budget-json.md`. Le cœur le lit tout ou rien, par la même vérification qu'un fichier
+ouvert (D58), et il **entre par l'assistant** (#367) : il n'est ni une sauvegarde ni un second
+fichier. Son format porte son nom et sa version ; une version que l'application ne lit pas est
+refusée en le disant, et le format est libre de changer jusqu'à `v1`, comme celui du fichier (D30,
+D87, D91).
+
+### D94 · Une section par partie du budget, écrite une fois
 
 Chaque partie du budget — comptes, revenus et charges fixes, tirelires, catégories, et plus tard les
 ordres permanents — est une **section** : ses lignes, leur correction sur place, le formulaire
