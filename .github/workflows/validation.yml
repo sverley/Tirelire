@@ -48,4 +48,4 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: node packages/gardes/cli.mjs pr --base ${{ github.event.pull_request.base.sha }} --tete ${{ github.event.pull_request.head.sha }} --pr ${{ github.event.pull_request.number }}
+        run: node packages/gardes/cli.mjs pr --base ${{ github.event.pull_request.base.sha }} --tete ${{ github.event.pull_request.head.sha }} --pr ${{ github.event.pull_request.number }} --resume "$GITHUB_STEP_SUMMARY" --annotations
