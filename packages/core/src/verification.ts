@@ -154,7 +154,7 @@ export function lireBase(db: Database): Lecture {
   // Le compte principal naît s'il manque (D40).
   if (!lignes.get('accounts')!.some((l) => l.id === MAIN_ACCOUNT_ID)) completion.comptePrincipal = true;
 
-  liens(lignes, problemes);
+  verifierLiens(lignes, problemes);
   return { problemes, lignes, completion };
 }
 
@@ -199,7 +199,7 @@ function colonneDe(t: TableDef, message: string): { colonne?: string } {
 }
 
 /** Ce qui lie les lignes entre elles : références, ventilations, niveaux (D27, D88). */
-function liens(lignes: Map<string, LigneLue[]>, problemes: Probleme[]): void {
+export function verifierLiens(lignes: Map<string, LigneLue[]>, problemes: Probleme[]): void {
   const ids = new Map<string, Set<string>>();
   for (const [nom, l] of lignes) ids.set(nom, new Set(l.map((x) => x.id)));
   ids.get('accounts')!.add(MAIN_ACCOUNT_ID); // il naît s'il manque (D40)
