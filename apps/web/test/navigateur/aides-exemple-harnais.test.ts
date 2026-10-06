@@ -218,6 +218,20 @@ async function retirerElement(page: Page, element: string, identifiant: string, 
 }
 
 /** Retire un élément de l'étape, recopie les aides de son formulaire, ajoute : l'élément doit être, à l'écran, ce qu'il était. */
+/**
+ * Clique le bouton dont le texte est exactement celui-ci : à l'étape Budgets, les « Ajouter un besoin »
+ * des cartes précèdent le « Ajouter » d'une nouvelle tirelire (#344).
+ */
+async function cliquerExactement(page: Page, texte: string): Promise<boolean> {
+  const trouvé = await page.evaluate((t: string) => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.trim() === t) as HTMLButtonElement | undefined;
+    b?.click();
+    return !!b;
+  }, texte);
+  if (trouvé) await new Promise((r) => setTimeout(r, 150));
+  return trouvé;
+}
+
 async function retirerPuisRecopier(
   page: Page,
   quoi: { element: string; identifiant: string; retrait: string; nom: string; libelles: string[]; ajouter: string; contient: string },
@@ -229,7 +243,7 @@ async function retirerPuisRecopier(
   expect(await etatDe(page, quoi.element, quoi.identifiant, quoi.nom), `« ${quoi.nom} » n’est pas retiré`).toEqual([]);
   expect((await champ(page, quoi.libelles[0]!)).aide, `« ${quoi.nom} » retiré, ses aides sont les siennes`).toBe(quoi.nom);
   await recopierLesAides(page, quoi.libelles);
-  expect(await cliquer(page, quoi.ajouter), `pas de bouton « ${quoi.ajouter} »`).toBe(true);
+  expect(await cliquerExactement(page, quoi.ajouter), `pas de bouton « ${quoi.ajouter} »`).toBe(true);
   await pause(300);
   expect(await etatDe(page, quoi.element, quoi.identifiant, quoi.nom), `« ${quoi.nom} » rajouté en recopiant ses aides n’est pas celui de son raccourci`).toEqual(avant);
 }

@@ -120,6 +120,24 @@ export function aideCourant(restantes: readonly TirelireSuggestion[], toutes: re
 export const recopieCourant = (s: { name: string; amount: Cents | undefined; keep: boolean }, a: AideCourant): boolean =>
   s.name === a.name && s.amount === a.amount && s.keep === a.keep;
 
+/**
+ * Ajouter un besoin à une tirelire de l'étape Budgets : le nom et le montant par période d'un besoin
+ * par période de l'exemple qui porte son propre nom (« Cours de piano », 45,00), toujours du même
+ * besoin. Recopier ces deux champs ajoute ce que le raccourci de ce besoin apporterait, date de
+ * début comprise (#344, #214).
+ */
+export interface AideBesoin {
+  ligne: NeedSuggestion;
+  name: string;
+  amount: Cents;
+}
+export function aideBesoin(): AideBesoin | undefined {
+  const besoins = budgetSuggestions().tirelires.flatMap((t) => t.needs).filter((n) => n.kind === 'recurring' && n.name !== undefined && n.amount !== undefined);
+  const n = besoins[0];
+  return n ? { ligne: n, name: n.name!, amount: n.amount! } : undefined;
+}
+export const recopieBesoin = (s: { name: string; amount: Cents | undefined }, a: AideBesoin): boolean => s.name === a.name && s.amount === a.amount;
+
 /** Dépenses à échéance : le nom, le montant de la facture, son rythme, sa prochaine échéance, le compte et le prélèvement attendu. */
 export interface AidePeriodique {
   ligne: TirelireSuggestion;
