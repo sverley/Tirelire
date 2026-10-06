@@ -3,7 +3,7 @@
  *
  * Sans navigateur, sur le texte des sources : la section est écrite une fois, et l'écran la donne à
  * construire sur le projet, sans réécrire ce qu'elle porte (D94). Le parcours sur le site construit est
- * dans `navigateur/ecran-tirelires-section.test.ts`.
+ * dans `navigateur/ecran-tirelires-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';

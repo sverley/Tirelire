@@ -1,8 +1,7 @@
 /**
- * Tests du codeur de #369 — l'écran Tirelires emploie la section Tirelires de l'assistant (#361).
- *
- * Sur le site construit, à 375 px, projet vierge. Chaque test se rapporte à une phrase du « Fait quand »
- * de l'issue ; tous sont de niveau 4 (le codeur n'en donne pas d'autre).
+ * Harnais d'audit de #369 — l'écran Tirelires emploie la section Tirelires de l'assistant (#361).
+ * Reprend les tests du codeur (niveaux marqués par l'auditeur, D83) et les complète : sur le site
+ * construit, à 375 px, projet vierge ; les tests se suivent, chacun repart de l'écran Tirelires rouvert.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -10,7 +9,7 @@ import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLeSite, type Site } f
 
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 
-describe.skipIf(!navigateur)('[niveau 4] #369 · l’écran Tirelires emploie la section Tirelires', () => {
+describe.skipIf(!navigateur)('#369 · l’écran Tirelires emploie la section Tirelires', () => {
   let site: Site;
   let page: Page;
 
@@ -57,11 +56,19 @@ describe.skipIf(!navigateur)('[niveau 4] #369 · l’écran Tirelires emploie la
       valeur,
     );
 
-  it('points 3 et 4 — sur une base vide, rien n’est créé d’office, l’écran porte les raccourcis de l’exemple, et l’explication est repliée', async () => {
+  it('[niveau 1] point 3 (I5, I10, D46) — sur une base vide, rien n’est créé d’office', async () => {
     await ouvrir();
     expect(await cartes(), 'rien n’est créé d’office').toEqual([]);
+  });
+
+  it('[niveau 1] point 3 (I5) — sur une base vide, l’écran porte les raccourcis de l’exemple, sous « Ajouter en un geste »', async () => {
+    await ouvrir();
     expect((await raccourcis()).length, 'l’écran vide doit porter ce qui le remplirait').toBeGreaterThan(0);
     expect(await page.evaluate(() => document.body.textContent?.includes('Ajouter en un geste'))).toBe(true);
+  });
+
+  it('[niveau 3] point 4 — l’explication est celle des étapes de l’assistant, repliée sous « Comment ça marche ? », et s’ouvre d’un geste', async () => {
+    await ouvrir();
     const repliee = await page.evaluate(() => {
       const d = document.querySelector('main details.explication') as HTMLDetailsElement | null;
       return d ? { ouverte: d.open, titre: (d.querySelector('summary')?.textContent ?? '').trim(), texte: d.textContent ?? '' } : null;
@@ -72,13 +79,12 @@ describe.skipIf(!navigateur)('[niveau 4] #369 · l’écran Tirelires emploie la
     await page.evaluate(() => (document.querySelector('main details.explication > summary') as HTMLElement).click());
     await pause(100);
     expect(await page.evaluate(() => (document.querySelector('main details.explication') as HTMLDetailsElement).open)).toBe(true);
-    // Le texte est celui des étapes de l'assistant : une phrase par genre de besoin.
     for (const début of ['Courses, essence', 'C’est ici que les tirelires servent', 'Une épargne sans date']) {
       expect(repliee!.texte.replace(/'/g, '’')).toContain(début);
     }
   });
 
-  it('point 3 — un raccourci crée dans le projet la tirelire de l’exemple, puis disparaît', async () => {
+  it('[niveau 2] point 3 (D46) — un raccourci crée dans le projet la tirelire de l’exemple, puis disparaît', async () => {
     await ouvrir();
     const avant = await raccourcis();
     const nom = avant[0]!;
@@ -92,21 +98,69 @@ describe.skipIf(!navigateur)('[niveau 4] #369 · l’écran Tirelires emploie la
     expect(await cartes()).toContain(nom);
   });
 
-  it('point 1 — une carte se corrige sur place, et la correction s’écrit aussitôt dans le projet', async () => {
+  it('[niveau 1] point 1 (U1) — la carte se corrige sur place — nom, déjà de côté, montant du besoin, son nom — et chaque correction s’écrit aussitôt dans le projet', async () => {
     await ouvrir();
-    await page.evaluate(() => {
-      const c = document.querySelector('main .card.tirelire') as HTMLElement;
-      const i = c.querySelector('.ligne input.mt') as HTMLInputElement;
-      i.value = '123,00';
-      i.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await pause(250);
+    const avant = (await cartes())[0]!;
+    // Une correction à la fois, comme au doigt : la carte se redessine entre deux champs.
+    const corriger = async (selecteur: string, valeur: string) => {
+      await page.evaluate(
+        (sel: string, v: string) => {
+          const i = document.querySelector(`main .card.tirelire ${sel}`) as HTMLInputElement | null;
+          if (!i) return;
+          i.value = v;
+          i.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+        selecteur,
+        valeur,
+      );
+      await pause(200);
+    };
+    await corriger('.deja input.mt', '45,00');
+    await corriger('.ligne input.mt', '123,00');
+    await corriger('.ligne input.besoin', 'Besoin renommé');
+    await corriger('input.nom', 'Renommée en place');
     await allerÀ(page, 'Plan');
     await ouvrir();
-    expect(await page.evaluate(() => (document.querySelector('main .card.tirelire .ligne input.mt') as HTMLInputElement).value)).toBe('123,00');
+    const lu = await page.evaluate(() => {
+      const c = ([...document.querySelectorAll('main .card.tirelire')] as HTMLElement[]).find((x) => (x.querySelector('input.nom') as HTMLInputElement).value === 'Renommée en place');
+      return c
+        ? {
+            deja: (c.querySelector('.deja input.mt') as HTMLInputElement).value,
+            montant: (c.querySelector('.ligne input.mt') as HTMLInputElement).value,
+            besoin: (c.querySelector('.ligne input.besoin') as HTMLInputElement | null)?.value ?? null,
+          }
+        : null;
+    });
+    expect(lu, `la tirelire « ${avant} » renommée sur la carte doit se retrouver`).not.toBeNull();
+    expect(lu!.deja).toBe('45,00');
+    expect(lu!.montant).toBe('123,00');
+    if (lu!.besoin !== null) expect(lu!.besoin).toBe('Besoin renommé');
   });
 
-  it('points 1 et 2 — la carte garde « Réviser », « Modifier » et la priorité ; le panneau nommé porte les champs avancés', async () => {
+  it('[niveau 2] point 1 — la carte ajoute un besoin avec un nom et un montant par période, écrit dans le projet', async () => {
+    await ouvrir();
+    const lignes = () => page.evaluate(() => document.querySelectorAll('main .card.tirelire .ligne').length);
+    const avant = await lignes();
+    await page.evaluate(() => {
+      const f = document.querySelector('main .card.tirelire form.ajout-besoin') as HTMLElement;
+      const mettre = (i: HTMLInputElement, v: string) => {
+        i.value = v;
+        i.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      mettre(f.querySelector('input.besoin-nom') as HTMLInputElement, 'Besoin ajouté sur la carte');
+      mettre(f.querySelector('input.mt') as HTMLInputElement, '12,00');
+    });
+    await pause(100);
+    await page.evaluate(() => (document.querySelector('main .card.tirelire form.ajout-besoin button[type="submit"]') as HTMLButtonElement).click());
+    await pause(300);
+    expect(await lignes()).toBe(avant + 1);
+    await allerÀ(page, 'Plan');
+    await ouvrir();
+    expect(await lignes()).toBe(avant + 1);
+    expect(await page.evaluate(() => [...document.querySelectorAll('main .card.tirelire .ligne input.besoin')].some((i) => (i as HTMLInputElement).value === 'Besoin ajouté sur la carte'))).toBe(true);
+  });
+
+  it('[niveau 2] point 2 (D51, D59) — la carte garde « Réviser », « Modifier » et la priorité ; le panneau nommé porte les champs avancés', async () => {
     await ouvrir();
     const ligne = await page.evaluate(() => {
       const l = document.querySelector('main .card.tirelire .ligne .par-besoin') as HTMLElement;
@@ -135,7 +189,7 @@ describe.skipIf(!navigateur)('[niveau 4] #369 · l’écran Tirelires emploie la
     await cliquer(page, 'Annuler');
   });
 
-  it('point 2 — l’écran garde l’ajout d’un besoin de tout type sur une tirelire existante, par un panneau nommé', async () => {
+  it('[niveau 2] point 2 (D59) — l’écran garde l’ajout d’un besoin de tout type sur une tirelire existante, par un panneau nommé', async () => {
     await ouvrir();
     await page.evaluate(() => {
       const b = [...document.querySelectorAll('main .card.tirelire > .actions button')].find((x) => (x.textContent ?? '').includes('autre type')) as HTMLButtonElement;
@@ -153,7 +207,7 @@ describe.skipIf(!navigateur)('[niveau 4] #369 · l’écran Tirelires emploie la
     await cliquer(page, 'Annuler');
   });
 
-  it('points 1 et 5 — le formulaire d’ajout est celui de la section, avec ses aides ; une échéance ajoute sa ligne et son prélèvement attendu', async () => {
+  it('[niveau 2] points 1 et 5 (#214) — le formulaire d’ajout est celui de la section, avec ses aides ; une échéance ajoute sa ligne et son prélèvement attendu', async () => {
     await ouvrir();
     expect(await cliquer(page, 'Ajouter une tirelire')).toBe(true);
     await pause(200);
