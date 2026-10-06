@@ -22,7 +22,7 @@ Tirelire/
 │   ├── src/edit.ts         édition manuelle : verrouillage, division à parts d'un niveau, à tout niveau
 │   ├── src/review.ts       bilan par catégorie, calibrage, provisions prévu vs payé
 │   ├── src/hlc.ts          horloge logique hybride
-│   ├── src/schema.ts       définition des tables aux noms du domaine, colonnes obligatoires et énumérées (une source pour SQL, lecture, écriture, échange), format du fichier
+│   ├── src/schema.ts       définition des tables aux noms du domaine, colonnes obligatoires et énumérées (une source pour SQL, lecture, écriture, échange), format du fichier, décrit pour qui le fabrique dans `docs/format-depot-sqlite.md`
 │   ├── src/store.ts        dépôt sql.js : état daté par ligne, refus d'une ligne incohérente, réception et conflits, refus d'un autre format
 │   ├── src/sync.ts         synchronisation par delta d'état, paquets par fichier et par relais
 │   └── src/example.ts      jeu de données de l'analyse
@@ -35,7 +35,7 @@ Tirelire/
 │   └── android/            projet Capacitor (icônes, signature, versions par variables d'environnement)
 ├── apps/relay/             relais HTTP minimal (Node), paquets chiffrés
 ├── apps/hebergement/       site pour hébergement mutualisé : PWA + relais PHP, .htaccess, .ovhconfig, assembleur, dépôt FTP
-├── docs/                   analyse, décisions, formats d'import, synchronisation, hébergement web, reprise
+├── docs/                   analyse, décisions, formats d'import, format du fichier SQLite (`format-depot-sqlite.md`), synchronisation, hébergement web, reprise
 └── .github/workflows/ci.yml  tests, build web, APK, releases
 ```
 
