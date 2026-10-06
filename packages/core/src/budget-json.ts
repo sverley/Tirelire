@@ -249,7 +249,8 @@ function lireLigne(t: TableDef, ligne: unknown, rang: number, versProjet: (id: u
     v[c.col] = toSql(c, x);
   }
   if (typeof idJson !== 'string' || !idJson) return undefined;
-  const id = versProjet(idJson) as string;
+  // Seule la ligne du compte principal prend son identité : un identifiant n'est unique que dans sa table.
+  const id = (t.name === 'accounts' ? versProjet(idJson) : idJson) as string;
   // Une ligne fautive reste lue, pour que ce qui la désigne ne soit pas compté en plus.
   if (problemes.length > nombre) return { id, hlc: '', v };
   const pb = rowProblem(t, id, v);
