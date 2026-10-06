@@ -484,13 +484,20 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await ecran(page, 'Tirelires');
       expect(await cliquer(page, 'Ajouter une tirelire')).toBe(true);
       await pause(200);
-      expect(alive(exemple.tirelires).map((t) => t.name)).toContain((await champ(page, 'Nom')).aide);
+      // Le formulaire d'ajout est celui de la section (#369) : son premier champ demande « Quoi ? ».
+      expect(alive(exemple.tirelires).map((t) => t.name)).toContain((await champ(page, 'Quoi ?')).aide);
       await cliquer(page, 'Annuler');
     }, 120_000);
 
     it('[niveau 2] point 3 — Tirelires, besoin : les aides sont les valeurs d’un besoin de l’exemple du type choisi, et le « montant à reverser » d’un versement n’en a aucune', async () => {
       await ecran(page, 'Tirelires');
-      expect(await cliquer(page, 'Ajouter un besoin')).toBe(true);
+      // Le panneau d'un besoin s'ouvre par le « Modifier » de sa ligne (#369) ; ses aides restent celles du type choisi.
+      const ouvert = await page.evaluate(() => {
+        const b = ([...document.querySelectorAll('main .par-besoin button')] as HTMLButtonElement[]).find((x) => (x.textContent ?? '').trim() === 'Modifier');
+        b?.click();
+        return !!b;
+      });
+      expect(ouvert, 'pas de « Modifier » sur une ligne de besoin').toBe(true);
       await pause(200);
       const attendu: Array<[string, Record<string, string>]> = [
         ['dueDate', { 'Montant de l\'échéance': euros(120000) }],

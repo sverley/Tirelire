@@ -149,6 +149,16 @@ describe('[niveau 1] I11 · harnais du registre', () => {
         }
         return texte.trim();
       };
+      // Une tirelire est une carte de l'assistant (#369) : son nom est dans son champ, et son « Modifier » est au pied de la carte.
+      const carteDeTirelire = ([...document.querySelectorAll('.card.tirelire')] as HTMLElement[]).find(
+        (c) => ((c.querySelector(':scope > .ligne-tirelire > input.nom') as HTMLInputElement | null)?.value ?? '').trim() === nom,
+      );
+      if (carteDeTirelire) {
+        const b = ([...carteDeTirelire.querySelectorAll(':scope > .actions button')] as HTMLButtonElement[]).find((x) => (x.textContent ?? '').trim() === 'Modifier');
+        if (!b) return { trouvé: true, bouton: false };
+        b.click();
+        return { trouvé: true, bouton: true };
+      }
       const label = [...document.querySelectorAll('.label')].find((l) => propre(l) === nom);
       if (!label) return { trouvé: false, bouton: false };
       const boutonParmi = (bloc: Element | null, sélecteur: string) =>

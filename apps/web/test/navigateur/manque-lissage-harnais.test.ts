@@ -138,7 +138,7 @@ describe.skipIf(!navigateur)('#184 · le manque d’une échéance à l’écran
       expect(await cliquer(page, 'Tirelires')).toBe(true);
       await page.waitForFunction(() => document.querySelector('h1')?.textContent === 'Tirelires');
 
-      // Une tirelire neuve, puis une échéance de 120 € tous les 24 mois, au 10 novembre : trop proche.
+      // Une tirelire neuve, avec une échéance de 120 € tous les 24 mois, au 10 novembre : trop proche.
       await page.evaluate(async () => {
         const t = (e?: Element | null) => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
         const attendre = () => new Promise((r) => setTimeout(r, 150));
@@ -162,21 +162,15 @@ describe.skipIf(!navigateur)('#184 · le manque d’une échéance à l’écran
           if (!b) throw new Error(`bouton « ${libelle} » introuvable`);
           return b;
         };
+        // Le formulaire d'ajout est celui de la section (#369) : on choisit « Dépense à échéance », qui crée la tirelire et son échéance.
         bouton(document, 'Ajouter une tirelire').click();
         await attendre();
-        let f = document.querySelector('form.edit') as HTMLFormElement;
-        await remplir(f, 'Nom', 'Contrôle technique');
-        f.requestSubmit();
-        await attendre();
-        const carte = [...document.querySelectorAll('.card')].find((c) => t(c.querySelector(':scope > .row > .label strong')) === 'Contrôle technique');
-        if (!carte) throw new Error('carte « Contrôle technique » introuvable');
-        bouton(carte, 'Ajouter un besoin').click();
-        await attendre();
-        f = document.querySelector('form.edit') as HTMLFormElement;
-        await remplir(f, 'Type', 'Échéance');
+        await remplir(document.querySelector('form.edit')!, 'Quelle sorte', 'Dépense à échéance');
+        const f = document.querySelector('form.edit') as HTMLFormElement;
+        await remplir(f, 'Quoi', 'Contrôle technique');
         await remplir(f, 'Montant de l', '120,00');
-        await remplir(f, 'Tous les', '24');
-        await remplir(f, 'Première échéance', '2026-11-10');
+        await remplir(f, 'Elle revient tous les', '24');
+        await remplir(f, 'Prochaine échéance', '2026-11-10');
         f.requestSubmit();
         await attendre();
       });

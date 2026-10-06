@@ -219,3 +219,23 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .card.tirelire .ajout-besoin .besoin-nom { flex: 1 1 140px; }
 .card.tirelire .ajout-besoin .mt { width: 96px; font-family: var(--mono); text-align: right; }
 .card.tirelire .ajout-besoin .err { flex: 1 0 100%; }
+/* Ce que l'écran Tirelires ajoute à une ligne de besoin de la carte : genre, priorité, réviser, modifier (#369). */
+.card.tirelire .ligne > .par-besoin { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.card.tirelire .ligne > .par-besoin .actions { margin-left: auto; }
+/* Le texte qui explique la tirelire, replié ; son titre se touche au pouce (C9). */
+details.explication > summary { cursor: pointer; padding: 10px 0; min-height: 44px; box-sizing: border-box; }
+details.explication > p { margin: 0 0 8px; }
+/* La carte d'une tirelire se manie au doigt (C9) : champs et cases de 44 px, un geste destructif à 12 px de ses voisins. */
+.ligne-tirelire { gap: 6px 12px; margin-bottom: 12px; }
+.ligne-tirelire .garde, .card.tirelire .prelevement { min-height: 44px; }
+.card.tirelire .ligne { row-gap: 12px; column-gap: 12px; }
+.card.tirelire .ligne input:not([type="checkbox"]), .card.tirelire .ligne-tirelire input:not([type="checkbox"]), .card.tirelire .ajout-besoin input { min-height: 44px; box-sizing: border-box; }
+/* La dernière colonne d'une ligne de besoin porte « × » : 44 px, la cible tactile (C9). */
+.card.tirelire .ligne-courant { grid-template-columns: minmax(0, 1fr) 96px 74px 44px; }
+.card.tirelire .ligne-echeance { grid-template-columns: minmax(0, 1fr) 96px 140px 44px; }
+.card.tirelire .ligne-epargne { grid-template-columns: minmax(0, 1fr) 96px 96px 44px; }
+@media (max-width: 640px) {
+  .card.tirelire .ligne { grid-template-columns: minmax(0, 1fr) 96px 44px; }
+}
+/* Deux lignes se touchent à 12 px au moins : le « × » de l'une ne tombe pas sur le « Modifier » de la suivante (C9). */
+.card.tirelire .ligne { margin-bottom: 8px; }
