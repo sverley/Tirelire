@@ -11,7 +11,9 @@ plutôt qu'en lisant les documents en entier : l'architecte a confronté le beso
 « Comparé » nomme ce qui compte (porteur, #333). Pour vérifier qu'un ajout ou le
 travail ne contredit pas un catalogue (étapes 1 et 3), cherche-y les notions qu'il touche. Le codeur
 crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteur, #283). Tes sessions sont
-économes, ta vérification proportionnée (D92).
+économes, ta vérification proportionnée (D92). Dans un clone ou un worktree neuf, active les
+crochets (`pnpm crochets`) avant ton premier commit ; un commit passé sans eux se dit dans ta
+vérification (#355).
 
 1. Lis le « Fait quand » de ton côté (principe 11.1), avant les tests du codeur : c'est lui, et non
    ces tests, qui dit ce que le harnais doit trancher. Si une de ses phrases ne peut se trancher ni
@@ -81,6 +83,11 @@ crée la branche et ouvre la PR ; ton audit commence à son compte rendu (porteu
    garde d'un push et d'une session à l'autre, et tout lancement, en local comme en CI, saute ce qui
    y est vert sur son empreinte ; tu ne l'écris jamais (D83, « Les empreintes »). Une mutation du
    code a une autre empreinte : ce qu'elle doit faire rougir se rejoue.
+   Avant d'écrire que la PR peut passer en Ready, vérifie que la branche contient le dernier `main`
+   d'`origin`, que la CI exige (D83). Sinon, fusionnes-y `main`, sans réécrire l'historique de la
+   branche, rejoue ta vérification sur le commit de fusion et pousse ; un conflit qui touche le code
+   du besoin devient un retour au codeur (étape 5). Ta vérification dit sur quel `main` la branche est
+   à jour (#355).
    Écris ta vérification dans la PR, sans rapport à part : le compte rendu est celui du codeur. Elle
    dit, pour chaque phrase du « Fait quand », le test du harnais qui la tranche et, s'il est de
    niveau 0 ou 1, comment tu l'as vu rouge ; ou la vérification manuelle qui la couvre. Tes retours,
