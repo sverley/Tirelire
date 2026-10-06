@@ -55,6 +55,7 @@ const INVENTAIRE: Fonction[] = [
   { vue: 'categories', nom: 'Catégories', par: 'Configuration', point: 'Catégories', marque: 'Catégories', amorce: 'Ajouter une catégorie de dépenses' },
   { vue: 'flows', nom: 'Flux prévus', par: 'Configuration', point: 'Flux prévus', marque: 'Flux prévus', amorce: 'Ajouter un flux' },
   { vue: 'entries', nom: 'Saisie manuelle', par: 'Configuration', point: 'Saisie manuelle', marque: 'Saisie', amorce: 'Saisir une opération' },
+  { vue: 'importBudget', nom: 'Importer un budget (JSON)', par: 'Configuration', point: 'Importer un budget (JSON)', marque: 'Importer un budget (JSON)', amorce: 'Importer ce texte' },
   { vue: 'sync', nom: 'Synchronisation', par: 'Configuration', point: 'Synchronisation', marque: 'Synchronisation', amorce: 'Proposer' },
   { vue: 'settings', nom: 'Réglages', par: 'Configuration', point: 'Réglages', marque: 'Réglages', amorce: 'Exporter le fichier SQLite' },
 ];
@@ -82,7 +83,7 @@ interface Relevé {
 export function vuesDuShell(source: string): string[] {
   const m = source.match(/export type View\s*=\s*([^;]+);/);
   if (!m) throw new Error('le type View est introuvable dans src/lib/state.svelte.ts');
-  return [...m[1]!.matchAll(/'([a-z]+)'/g)].map((x) => x[1]!);
+  return [...m[1]!.matchAll(/'([A-Za-z]+)'/g)].map((x) => x[1]!); // un nom d'écran peut porter une majuscule (`importBudget`, #367)
 }
 
 // ---------------------------------------------------------------------------
