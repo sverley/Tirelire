@@ -440,8 +440,8 @@ un budget entier tient sans eux (une tirelire sans placement déclaré ne produi
 S'ils existent, l'assistant demande où dort chaque tirelire, ce qui remplit le placement de D38
 sans exposer les parts.
 
-L'assistant ne remplace pas les écrans de configuration : une fois validé, il amène à un budget qui
-se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations).
+L'assistant ne remplace pas les écrans de configuration ; l'un et l'autre emploient les mêmes
+sections, écrites une fois (D93) : une fois validé, il amène à un budget qui se lit dans le plan, puis renvoie vers Configuration pour ce qu'il ne couvre pas volontairement (ventilations).
 Il propose les besoins multiples d'une tirelire et les priorités de l'exemple, qui se modifient
 ensuite dans Configuration, et les catégories de l'exemple, avec leur tirelire par défaut (D32) et les
 flux qui les portent : une catégorie se garde sans tirelire (I3). Il permet d'ajouter des besoins par
@@ -1427,3 +1427,26 @@ mette de vraies données (C4, C5). `v1` est la **première version publique** : 
 **verrou** du format — à partir d'elle, tout changement de format fournit une migration ou reste
 rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été exercé : son entrée dans
 `docs/versions.md` le nomme.
+
+### D93 · Une section par partie du budget, écrite une fois
+
+Chaque partie du budget — comptes, revenus et charges fixes, tirelires, catégories, et plus tard les
+ordres permanents — est une **section** : ses lignes, leur correction sur place, le formulaire
+d'ajout et ses aides (#214), les raccourcis de l'exemple (D46) et le texte qui explique le concept.
+Elle est écrite une fois, et sert à deux endroits : l'étape de l'assistant et l'écran de
+Configuration. D'un endroit à l'autre ne changent que :
+
+- **où elle écrit** : le brouillon de l'assistant (D40, #210), ou le projet ;
+- **le garnissage d'office** : sur un projet vierge, dans l'assistant seulement (D46) ;
+- **les champs montrés** : les simples dans l'assistant (I4) ; dans un écran, en plus, le panneau
+  des champs avancés (D59) ;
+- **le texte d'explication** : affiché dans l'assistant, replié dans un écran ;
+- **le rangement des cartes et ce qu'une carte montre**, quand la partie en a : pour les tirelires,
+  par genre de besoin, une étape chacun, dans l'assistant, chaque carte avec les besoins du genre de
+  l'étape ; par compte de placement dans l'écran Tirelires, chaque carte avec tous ses besoins.
+
+Rien d'autre ne diffère : ce que l'assistant fait se fait hors de lui par construction (I11), et ce
+qui est proche partage le même code (principe 13). Ce qui se calcule sur les données de
+l'utilisateur — le lissage proposé, l'évolution d'un ordre, l'adaptation du train de vie — ne passe
+pas par une section. La section Tirelires est la première (#361) ; l'écran Tirelires l'emploie
+(#369), les autres parties suivent.
