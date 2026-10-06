@@ -465,19 +465,14 @@ describe.skipIf(!navigateur)('#214 · les aides des champs viennent de l’exemp
       await page?.close().catch(() => {});
     });
 
-    it('[niveau 2] point 3 — Comptes : l’aide du nom est celle d’un compte de l’exemple du type choisi ; le numéro n’a qu’un texte indicatif', async () => {
+    it('[niveau 2] point 3 — Comptes : l’aide du nom est celle d’un compte de l’exemple du type choisi (le formulaire d’ajout de la section, #362)', async () => {
       await ecran(page, 'Comptes');
-      expect(await cliquer(page, 'Ajouter un compte')).toBe(true);
-      await pause(200);
       const epargne = alive(exemple.accounts).find((a) => a.kind === 'epargne')!;
       const courant = alive(exemple.accounts).find((a) => a.kind === 'courant')!;
       expect((await champ(page, 'Type')).valeur).toBe('epargne');
-      expect((await champ(page, 'Nom')).aide).toBe(epargne.name);
+      expect((await champ(page, 'Nom du compte')).aide).toBe(epargne.name);
       await saisirChamp(page, 'Type', 'courant');
-      expect((await champ(page, 'Nom')).aide).toBe(courant.name);
-      expect((await champ(page, 'Numéro de compte ou IBAN')).aide, 'point 4 : un texte indicatif, sans valeur').toBe('FR76 …');
-      expect((await champ(page, 'Banque')).aide, 'l’exemple ne dit aucune banque : aucune aide inventée').toBe('');
-      await cliquer(page, 'Annuler');
+      expect((await champ(page, 'Nom du compte')).aide).toBe(courant.name);
     }, 120_000);
 
     it('[niveau 2] point 3 — Tirelires : l’aide du nom de la tirelire est celle d’une tirelire de l’exemple', async () => {

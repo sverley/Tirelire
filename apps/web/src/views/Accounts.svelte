@@ -2,8 +2,9 @@
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
   import FiltreEtat from '../lib/FiltreEtat.svelte';
-  import { money, moneyClass, shortDate, centsToInput, inputToCents, validityBadge, validityLabel, ACCOUNT_KINDS } from '../lib/format';
-  import { aidesDeCompte } from '../lib/aides';
+  import SectionComptes from '../lib/SectionComptes.svelte';
+  import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
+  import { money, moneyClass, shortDate, centsToInput, inputToCents } from '../lib/format';
   import {
     accountBalance,
     budgetPeriodContaining,
@@ -16,21 +17,42 @@
     validityState,
     DEFAULT_MAIN_ACCOUNT,
     DEFAULT_VISIBILITY,
+    MAIN_ACCOUNT_ID,
     type Account,
-    type AccountKind,
     type SettlementDirection,
     type StateVisibility,
   } from '@tirelire/core';
 
+  /**
+   * Les lignes des comptes, leur correction sur place, les raccourcis de l'exemple, le formulaire
+   * d'ajout et l'explication sont la section Comptes (#362), la même que celle de l'assistant : elle
+   * écrit ici dans le projet. L'écran garde ce qui lui est propre — le filtre d'état, les soldes
+   * reconstruits, ce qui désigne encore un compte clos, le panneau des champs avancés et la
+   * suppression confirmée.
+   */
+  const section = new SectionDesComptes({
+    get ledger() {
+      return app.ledger;
+    },
+    upsert: (key, row) => app.upsert(key, row),
+    remove: (key, id) => app.remove(key, id),
+    newId: () => app.newId(),
+    get asOf() {
+      return app.asOf;
+    },
+    periodStart: () => budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay).start,
+    mainAccountId: () => alive(app.ledger.accounts).find((a) => a.kind === 'principal')?.id ?? MAIN_ACCOUNT_ID,
+    get coussin() {
+      return app.ledger.settings.principalCushion;
+    },
+    setCoussin: (c) => app.setSetting('principalCushion', c),
+  });
+
   let editing = $state<Account | undefined>(undefined);
   /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
   let titre = $state('');
+  /** Les champs avancés : le nom, la banque, le numéro, le solde et le type se corrigent sur la ligne (D59). */
   let form = $state({
-    name: '',
-    kind: 'epargne' as AccountKind,
-    bank: '',
-    accountNumber: '',
-    openingBalance: '',
     openingDate: app.asOf,
     tracksSettlement: false,
     settlementThreshold: '10,00',
@@ -40,8 +62,6 @@
   });
   let error = $state('');
   let etatsVisibles = $state<StateVisibility>({ ...DEFAULT_VISIBILITY });
-  /** L'aide du nom : celui d'un compte de l'exemple du type choisi (D43). Le numéro n'a aucune valeur dans l'exemple : « FR76 … » n'en propose pas. */
-  const aides = $derived(aidesDeCompte(form.kind));
 
   const accounts = $derived(alive(app.ledger.accounts));
   const idx = $derived(indexLedger(app.ledger));
@@ -49,7 +69,7 @@
   const isMain = (a: Account) => a.kind === 'principal';
   /**
    * Le compte principal tel qu'il naît avec la base : sa date d'ouverture dit « à renseigner »
-   * (`DEFAULT_MAIN_ACCOUNT`). L'assistant comme ce formulaire la renseignent avec le solde.
+   * (`DEFAULT_MAIN_ACCOUNT`). L'assistant comme ce panneau la renseignent avec le solde.
    */
   const aRenseigner = (a: Account) => isMain(a) && a.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate;
 
@@ -75,21 +95,9 @@
     return [...new Set(noms)];
   }
 
-  function startNew() {
-    editing = { id: app.newId(), name: '', kind: 'epargne', openingBalance: 0, openingDate: app.asOf };
-    form = { name: '', kind: editing.kind, bank: '', accountNumber: '', openingBalance: '0,00', openingDate: app.asOf, tracksSettlement: false, settlementThreshold: '10,00', settlementDirection: 'both', activeFrom: '', activeTo: '' };
-    titre = 'Ajouter un compte';
-    error = '';
-  }
-
   function startEdit(a: Account) {
     editing = a;
     form = {
-      name: a.name,
-      kind: a.kind,
-      bank: a.bank ?? '',
-      accountNumber: a.accountNumber ?? '',
-      openingBalance: centsToInput(a.openingBalance),
       // Pas encore renseigné : le solde à saisir est celui du début de la période, comme dans l'assistant.
       openingDate: aRenseigner(a) ? budgetPeriodContaining(app.asOf, app.ledger.settings.periodStartDay).start : a.openingDate,
       tracksSettlement: !!a.tracksSettlement,
@@ -105,22 +113,14 @@
   function save(e: Event) {
     e.preventDefault();
     if (!editing) return;
-    const openingBalance = inputToCents(form.openingBalance);
-    if (!form.name.trim()) return void (error = 'Le nom est obligatoire.');
-    if (openingBalance === undefined) return void (error = 'Solde initial invalide.');
-    if (form.kind === 'principal' && !isMain(editing))
-      return void (error = 'Il ne peut y avoir qu’un seul compte principal : il existe déjà.');
-    if (form.kind !== 'principal' && isMain(editing)) return void (error = 'Le compte principal reste le compte principal.');
     if (form.activeFrom && form.activeTo && form.activeFrom > form.activeTo)
       return void (error = 'La clôture est avant l’ouverture.');
+    // Le compte tel qu'il est maintenant : une correction faite sur la ligne, panneau ouvert, ne se perd pas.
+    const courant = accounts.find((a) => a.id === editing?.id) ?? editing;
+    const { activeFrom: _o, activeTo: _c, tracksSettlement: _t, settlementThreshold: _s, settlementDirection: _d, ...base } = courant;
     const row: Account = {
-      id: editing.id,
-      name: form.name.trim(),
-      kind: form.kind,
-      openingBalance,
+      ...base,
       openingDate: form.openingDate,
-      ...(form.bank.trim() ? { bank: form.bank.trim() } : {}),
-      ...(form.accountNumber.trim() ? { accountNumber: form.accountNumber.trim() } : {}),
       ...(form.activeFrom ? { activeFrom: form.activeFrom } : {}),
       ...(form.activeTo ? { activeTo: form.activeTo } : {}),
       ...(form.tracksSettlement
@@ -147,31 +147,15 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Comptes</h1>
-<p class="muted small">Le compte principal est le compte réel par lequel tout transite. Les comptes d'accueil hébergent des tirelires ; les comptes tiers ne sont pas importés, on y saisit à la main ce qui concerne le plan.</p>
 
-<div class="actions">
-  <button class="btn primary" onclick={startNew}>Ajouter un compte</button>
-</div>
-
-<FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les comptes" />
+{#snippet filtre()}
+  <FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les comptes" />
+{/snippet}
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
     <p class="titre-panneau">{titre}</p>
     <div class="grid">
-      <label class="f">Nom <input bind:value={form.name} placeholder={aides.name} /></label>
-      <label class="f">Type
-        {#if editing && isMain(editing)}
-          <input value={ACCOUNT_KINDS.principal} disabled />
-        {:else}
-          <select bind:value={form.kind}>
-            {#each Object.entries(ACCOUNT_KINDS) as [k, label]}{#if k !== 'principal'}<option value={k}>{label}</option>{/if}{/each}
-          </select>
-        {/if}
-      </label>
-      <label class="f">Banque (facultatif) <input bind:value={form.bank} /></label>
-      <label class="f">Numéro de compte ou IBAN (facultatif) <input bind:value={form.accountNumber} placeholder="FR76 …" /></label>
-      <label class="f">Solde initial <input bind:value={form.openingBalance} inputmode="decimal" /></label>
       <label class="f">Date du solde initial <input type="date" bind:value={form.openingDate} /></label>
       <p class="muted small" style="grid-column:1/-1;margin:0">
         Clore un compte ne le supprime pas : ses opérations restent, donc son passé dans les soldes
@@ -179,7 +163,7 @@
       </p>
       <label class="f">Compte ouvert à partir du <input type="date" bind:value={form.activeFrom} /></label>
       <label class="f">Compte clos le <input type="date" bind:value={form.activeTo} /></label>
-      {#if form.kind !== 'principal'}
+      {#if editing && !isMain(editing)}
         <label class="f check" style="grid-column:1/-1">
           <input type="checkbox" bind:checked={form.tracksSettlement} />
           Suivre un solde à régler avec le compte principal
@@ -204,45 +188,40 @@
   </form>
 {/snippet}
 
-<!-- Un compte qu'on crée n'a pas encore de ligne : son formulaire suit le bouton qui l'ouvre. -->
-{#if editing && !accounts.some((a) => a.id === editing?.id)}
-  {@render editeur()}
-{/if}
-
-{#each visibles as a (a.id)}
-  {@const badge = validityBadge(a, app.asOf)}
-  {@const validite = validityLabel(a)}
+{#snippet suiteCompte(a: Account)}
   {@const retenues = stillUsed(a)}
-  <div class="card" class:accent={a.kind === 'principal'} class:editing={editing?.id === a.id} class:dormant={!!badge}>
-    <div class="row">
-      <div class="label">
-        <strong>{a.name}</strong> <span class="pill">{a.kind === 'principal' ? 'principal' : a.kind === 'epargne' ? 'accueil' : 'tiers'}</span>
-        {#if badge}<span class="pill dim">{badge}</span>{/if}
-        <span class="sub">{a.bank ? a.bank + ' · ' : ''}{aRenseigner(a) ? 'solde initial à renseigner' : `solde initial ${money(a.openingBalance)} au ${shortDate(a.openingDate)}`}{a.accountNumber ? ` · n° ${a.accountNumber}` : ''}</span>
-        {#if validite}<span class="sub">{validite}</span>{/if}
-        {#if retenues.length}<span class="sub">⚠ compte clos, encore désigné par : {retenues.join(', ')}</span>{/if}
-      </div>
-      <div class="actions" style="margin:0">
-        <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>
-        {#if !isMain(a)}<button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>{/if}
-      </div>
+  <div class="row">
+    <div class="label">
+      <span class="sub">{aRenseigner(a) ? 'solde initial à renseigner' : `solde initial ${money(a.openingBalance)} au ${shortDate(a.openingDate)}`}</span>
+      {#if retenues.length}<span class="sub">⚠ compte clos, encore désigné par : {retenues.join(', ')}</span>{/if}
     </div>
-    {#if a.kind === 'courant'}
-      {@const owes = settlementBalance(a, app.ledger, idx, app.asOf)}
-      <div class="row">
-        <div class="label">{owes >= 0 ? 'Le compte principal lui doit' : 'Il doit au compte principal'}</div>
-        <div class="num">{money(Math.abs(owes))}</div>
-      </div>
-    {:else}
-      <div class="row"><div class="label">Solde reconstruit au {shortDate(app.asOf)}</div><div class="num">{money(accountBalance(a, app.ledger, app.asOf))}</div></div>
-      <div class="row"><div class="label">Non affecté (solde − tirelires hébergées)</div><div class="{moneyClass(unallocated(a, app.ledger, idx, app.asOf))}">{money(unallocated(a, app.ledger, idx, app.asOf))}</div></div>
-    {/if}
+    <div class="actions" style="margin:0">
+      <button class="btn small" onclick={() => startEdit(a)}>Modifier</button>
+      {#if !isMain(a)}<button class="btn small danger" onclick={() => remove(a)}>Supprimer</button>{/if}
+    </div>
   </div>
+  {#if section.estTiers(a)}
+    {@const owes = settlementBalance(a, app.ledger, idx, app.asOf)}
+    <div class="row">
+      <div class="label">{owes >= 0 ? 'Le compte principal lui doit' : 'Il doit au compte principal'}</div>
+      <div class="num">{money(Math.abs(owes))}</div>
+    </div>
+  {:else}
+    <div class="row"><div class="label">Solde reconstruit au {shortDate(app.asOf)}</div><div class="num">{money(accountBalance(a, app.ledger, app.asOf))}</div></div>
+    <div class="row"><div class="label">Non affecté (solde − tirelires hébergées)</div><div class="{moneyClass(unallocated(a, app.ledger, idx, app.asOf))}">{money(unallocated(a, app.ledger, idx, app.asOf))}</div></div>
+  {/if}
+{/snippet}
+
+{#snippet apresCompte(a: Account)}
   {#if editing?.id === a.id}
     {@render editeur()}
   {/if}
-{:else}
+{/snippet}
+
+{#snippet vide()}
   <div class="empty">
     {#if masqués > 0}Tout est masqué par le filtre : {masqués} compte(s) rangé(s).{:else}Aucun compte.{/if}
   </div>
-{/each}
+{/snippet}
+
+<SectionComptes s={section} comptes={visibles} explicationRepliee carte retrait={false} enEdition={editing?.id} entete={filtre} {suiteCompte} {apresCompte} {vide} />

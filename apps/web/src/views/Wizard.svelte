@@ -13,8 +13,10 @@
   import { app } from '../lib/state.svelte';
   import Manque from '../lib/Manque.svelte';
   import SectionTirelires from '../lib/SectionTirelires.svelte';
+  import SectionComptes from '../lib/SectionComptes.svelte';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
-  import { ACCOUNT_KINDS, UNITS, money, periodicityLabel, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
+  import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
+  import { UNITS, money, periodicityLabel, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
   import {
     activeAt,
     alive,
@@ -34,12 +36,8 @@
     suggestedCategory,
     suggestedFlow,
     suggestedOrder,
-    DEFAULT_MAIN_ACCOUNT,
     MAIN_ACCOUNT_ID,
-    type Account,
     type PeriodUnit,
-    type AccountKind,
-    type SettlementDirection,
     type Category,
     type CategoryNature,
     type CategorySuggestion,
@@ -51,12 +49,10 @@
   } from '@tirelire/core';
   import {
     aideCategorie,
-    aideCompte,
     aideFlux,
     montantAide,
     parNom,
     recopieCategorie,
-    recopieCompte,
     recopieFlux,
     versionMontree,
     type FluxPropose,
@@ -94,7 +90,6 @@
   const flows = $derived(alive(app.assistantLedger.plannedFlows));
   const categories = $derived(alive(app.assistantLedger.categories));
   const principal = $derived(accounts.find((a) => a.kind === 'principal'));
-  const otherAccounts = $derived(accounts.filter((a) => a.kind !== 'principal'));
   /** Les comptes des menus : un compte clos n'en fait plus partie (D56) ; il reste listé à l'étape Comptes. */
   const comptesOuverts = $derived(openAccounts(accounts, app.asOf));
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
@@ -254,60 +249,31 @@
     mainAccountId,
   });
 
-  // --- Comptes complémentaires (facultatif) et placement des réserves ---
-  /** Natures proposées, hors compte principal. Typée : un genre renommé casse la compilation. */
-  const NATURES: Array<Exclude<AccountKind, 'principal'>> = ['courant', 'epargne'];
-  /** Le sens autorisé des virements de règlement d'un compte tiers, en clair. */
-  const SENS_DE_REGLEMENT: Record<SettlementDirection, string> = {
-    both: 'dans les deux sens',
-    toThird: 'du compte principal vers ce compte seulement',
-    fromThird: 'de ce compte vers le compte principal seulement',
-  };
-  /** Le type se choisit ; tant qu'on n'y a pas touché (`undefined`), il est celui de la ligne d'aide (#214). Un solde laissé vide est un solde nul. */
-  let acc = $state<{ name: string; kind?: Exclude<AccountKind, 'principal'> | undefined; balance: string }>({ name: '', balance: '' });
-  let accError = $state('');
-  function addAccount() {
-    if (!acc.name.trim()) return void (accError = 'Donnez un nom à ce compte.');
-    const openingBalance = acc.balance.trim() ? inputToCents(acc.balance) : 0;
-    if (openingBalance === undefined) return void (accError = 'Solde invalide.');
-    const ligne = aideDeCompte;
-    if (ligne && recopieCompte({ name: acc.name.trim(), kind: typeDeCompte, balance: openingBalance }, ligne)) {
-      appliquerCompte(ligne.ligne);
-    } else {
-      const row: Account = {
-        id: app.newId(),
-        name: acc.name.trim(),
-        kind: typeDeCompte,
-        openingBalance,
-        openingDate: todayISO(),
-      };
-      app.assistantUpsert('accounts', row);
-    }
-    acc = { name: '', balance: '' };
-    accError = '';
-  }
+  // --- Comptes : la section, écrite une fois (#362), qui écrit ici dans le brouillon (#210) ---
+  const sectionComptes = new SectionDesComptes({
+    get ledger() {
+      return app.assistantLedger;
+    },
+    upsert: (key, row) => app.assistantUpsert(key, row),
+    remove: (key, id) => app.assistantRemove(key, id),
+    newId: () => app.newId(),
+    get asOf() {
+      return app.asOf;
+    },
+    periodStart,
+    mainAccountId,
+    get coussin() {
+      return app.assistantLedger.settings.principalCushion;
+    },
+    setCoussin: (c) => app.assistantSetSetting('principalCushion', c),
+  });
+
+  // --- Placement des réserves ---
   /** Placement voulu d'une tirelire (D38) : tout sur un compte, ou rien de déclaré. */
   function setPlacement(e: Tirelire, accountId: string) {
     const placement = accountId ? [{ accountId, share: { kind: 'variable' as const } }] : [];
     app.assistantUpsert('tirelires', { ...e, placement });
   }
-  /**
-   * Retire un compte de l'assistant, et ce qui ne tient que par lui : la part du placement d'une
-   * tirelire qui y dort — elle n'a plus de placement, et ne produit aucun écart (D38) — et l'ordre
-   * permanent qui en part ou y arrive.
-   */
-  function retirerCompte(a: Account) {
-    app.assistantRemove('accounts', a.id);
-    for (const t of tirelires) {
-      if (t.placement.some((p) => p.accountId === a.id)) {
-        app.assistantUpsert('tirelires', { ...t, placement: t.placement.filter((p) => p.accountId !== a.id) });
-      }
-    }
-    for (const f of ordres) {
-      if (f.accountId === a.id || f.counterpartAccountId === a.id) app.assistantRemove('plannedFlows', f.id);
-    }
-  }
-
   // --- Ordres permanents déjà posés chez la banque (D60) : ce qu'ils exécutent est un fait, le seul montant qui s'enregistre ---
   const ordres = $derived(flows.filter((f) => f.kind === 'transfer' && f.origin === 'derived'));
   const nomDuCompte = (id?: string) => accounts.find((a) => a.id === id)?.name ?? '';
@@ -341,8 +307,6 @@
   const restantsOrdres = $derived(
     propositions.orders.filter((o) => !dejaPris(o.name) && suggestedOrder(o, { id: '', principalId: mainAccountId(), compte: compteNomme }) !== undefined),
   );
-  /** Un compte dont le nom existe déjà n'est plus proposé : les comptes se reconnaissent à leur nom (D46). */
-  const restantsComptes = $derived(propositions.accounts.filter((x) => !accounts.some((a) => a.name === x.name)));
   /** Une catégorie de même nature et de même nom n'est plus proposée : une catégorie se reconnaît à sa nature et à son nom (D46, D61). */
   const restantesCategories = $derived(propositions.categories.filter((p) => !findCategoryByName(categories, p.name, p.nature)));
 
@@ -355,7 +319,6 @@
   const aideRevenu = $derived(aideFlux(restantsRevenus, parNom(propositions.incomes), app.asOf));
   const aideCharge = $derived(aideFlux(restantsCharges, parNom(propositions.charges), app.asOf));
   const aideDeCategorie = $derived(aideCategorie(restantesCategories, propositions.categories));
-  const aideDeCompte = $derived(aideCompte(restantsComptes, propositions.accounts));
   /** Le compte que l'exemple donne à une ligne, ici : celui du même nom, à défaut le compte principal (D40). */
   const compteNommeOuPrincipal = (nom?: string) => (nom ? compteNomme(nom) : undefined) ?? mainAccountId();
   /** Ce que montrent les champs sans texte indicatif d'un flux : ce qu'on y a posé, sinon la valeur de la ligne d'aide. */
@@ -372,7 +335,6 @@
     accountId: fix.accountId ?? compteNommeOuPrincipal(aideCharge?.version.accountName),
   });
   const natureDeCategorie = $derived.by((): CategoryNature => cat.nature ?? aideDeCategorie?.nature ?? 'expense');
-  const typeDeCompte = $derived<Exclude<AccountKind, 'principal'>>(acc.kind ?? aideDeCompte?.kind ?? 'courant');
 
   // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
   /**
@@ -408,12 +370,6 @@
     }
   }
   /**
-   * La clôture d'un compte clos de l'exemple : la veille du premier jour de la période en cours, de
-   * sorte qu'il ne pèse rien sur le plan (D56). La période commence au jour que l'assistant retient
-   * — il se choisit à l'étape des revenus, après l'étape Comptes qui sème le compte.
-   */
-  const clotureDeLExemple = () => addDays(periodStart(), -1);
-  /**
    * Recale la clôture des comptes clos que l'assistant a lui-même créés sur le début de période qu'il
    * retient maintenant : à chaque changement de ce jour, et à la validation, de sorte que ce qui entre
    * dans le projet est la veille du premier jour de la période retenue, quel que soit le moment où le
@@ -421,7 +377,7 @@
    * absent du projet, porte celle de l'exemple ; un compte clos du projet n'est jamais touché.
    */
   function recalerLesClotures() {
-    const veille = clotureDeLExemple();
+    const veille = sectionComptes.clotureDeLExemple();
     const duProjet = new Set(app.ledger.accounts.map((a) => a.id));
     for (const a of accounts) {
       if (a.activeTo !== undefined && !duProjet.has(a.id) && a.activeTo !== veille) {
@@ -429,41 +385,6 @@
       }
     }
   }
-  /**
-   * Un compte de l'exemple, avec ce que l'exemple en dit : son solde, le suivi de son solde à régler
-   * s'il est tiers, sa clôture s'il est clos. Les réglages se modifient ensuite depuis Comptes (I11).
-   */
-  const appliquerCompte = (p: (typeof propositions.accounts)[number]) => {
-    const debut = periodStart();
-    app.assistantUpsert('accounts', {
-      id: app.newId(),
-      name: p.name,
-      kind: p.kind,
-      openingBalance: p.balance,
-      openingDate: debut,
-      ...(p.settlement
-        ? { tracksSettlement: true, settlementThreshold: p.settlement.threshold, settlementDirection: p.settlement.direction }
-        : {}),
-      ...(p.closed ? { activeTo: clotureDeLExemple() } : {}),
-    } satisfies Account);
-  };
-  /**
-   * Le compte principal arrive avec ce que l'exemple en dit, là où il reste à renseigner : un nom ou
-   * un solde que l'utilisateur a déjà posés ne sont pas remplacés (D43 : rouvrir l'assistant ne doit
-   * rien casser). Même règle que le solde saisi : « à renseigner » se lit à la date d'ouverture.
-   */
-  const appliquerPrincipal = (p: typeof propositions.mainAccount) => {
-    if (!principal) return;
-    const nomAFaire = principal.name === DEFAULT_MAIN_ACCOUNT.name;
-    const soldeAFaire = principal.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate;
-    if (!nomAFaire && !soldeAFaire) return;
-    app.assistantUpsert('accounts', {
-      ...principal,
-      ...(nomAFaire ? { name: p.name } : {}),
-      ...(soldeAFaire ? { openingBalance: p.balance, openingDate: periodStart() } : {}),
-    });
-  };
-
   /**
    * Projet vierge : on présente d'office tous les raccourcis de l'étape, dans l'assistant — comme si
    * l'utilisateur les avait touchés un par un —, il n'a plus qu'à corriger et retrancher. Une seule
@@ -474,8 +395,7 @@
     if (!projetVierge || brouillon.budgetImporte || brouillon.semees.includes(etape)) return;
     brouillon.semees.push(etape);
     if (etape === 'accounts') {
-      appliquerPrincipal(propositions.mainAccount);
-      restantsComptes.forEach(appliquerCompte);
+      sectionComptes.garnir();
     }
     if (etape === 'income') restantsRevenus.forEach(appliquerRevenu);
     if (etape === 'fixed') restantsCharges.forEach(appliquerCharge);
@@ -521,38 +441,6 @@
       app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate } });
     }
   }
-  /** Modification d'un compte, champ par champ, enregistrée à la volée. */
-  function editAccount(a: Account, champ: 'name' | 'bank' | 'accountNumber', v: string) {
-    const valeur = v.trim();
-    if (valeur === (a[champ] ?? '')) return;
-    app.assistantUpsert('accounts', { ...a, [champ]: valeur || undefined });
-  }
-  function editAccountKind(a: Account, v: string) {
-    if (v !== a.kind) app.assistantUpsert('accounts', { ...a, kind: v as AccountKind });
-  }
-  /**
-   * Le solde saisi est celui du début de la période. La date d'ouverture n'est jamais retouchée —
-   * elle cale les soldes d'un compte déjà importé —, sauf celle que le compte principal porte à sa
-   * naissance, qui dit « à renseigner » : le solde saisi la renseigne au début de la période.
-   */
-  function editAccountBalance(a: Account, v: string) {
-    const c = inputToCents(v);
-    if (c === undefined || c === a.openingBalance) return;
-    const openingDate = a.id === MAIN_ACCOUNT_ID && a.openingDate === DEFAULT_MAIN_ACCOUNT.openingDate ? periodStart() : a.openingDate;
-    app.assistantUpsert('accounts', { ...a, openingBalance: c, openingDate });
-  }
-  /**
-   * Le coussin du compte principal (D41) : un réglage du foyer, préparé dans le brouillon comme le
-   * début de période — l'assistant le propose avec celui de l'exemple sur un projet vierge, et il
-   * n'entre dans le projet qu'à la validation, où Réglages le montre.
-   */
-  const coussin = $derived(app.assistantLedger.settings.principalCushion);
-  function editCoussin(v: string) {
-    const c = inputToCents(v);
-    if (c === undefined || c < 0 || c === coussin) return;
-    app.assistantSetSetting('principalCushion', c);
-  }
-
   function removeFlow(f: PlannedFlow) {
     app.assistantRemove('plannedFlows', f.id);
   }
@@ -904,75 +792,7 @@
   </form>
 {:else if step === 'accounts'}
   <h2>Vos comptes en banque</h2>
-  <p class="muted small">
-    Uniquement des comptes bancaires réels — ceux dont vous recevez un relevé. Le compte principal
-    est celui par lequel tout transite ; les autres sont facultatifs.
-  </p>
-
-  <div class="tete tete-compte"><span>Nom du compte</span><span>Banque</span><span>Numéro ou IBAN</span><span class="d">Solde actuel</span><span>Type</span><span></span></div>
-
-  {#if principal}
-    <div class="ligne-compte principal">
-      <input value={principal.name} onchange={(e) => editAccount(principal, 'name', e.currentTarget.value)} />
-      <input value={principal.bank ?? ''} placeholder="Banque" onchange={(e) => editAccount(principal, 'bank', e.currentTarget.value)} />
-      <input value={principal.accountNumber ?? ''} placeholder="FR76 …" onchange={(e) => editAccount(principal, 'accountNumber', e.currentTarget.value)} />
-      <input class="mt" value={centsToInput(principal.openingBalance)} inputmode="decimal" onchange={(e) => editAccountBalance(principal, e.currentTarget.value)} />
-      <span class="pill">principal</span>
-      <span></span>
-      <label class="coussin">
-        <span class="muted small">Coussin : montant minimum à laisser en non affecté ; le plan avertit si la marge passe en dessous.</span>
-        <input class="mt" value={centsToInput(coussin)} inputmode="decimal" aria-label="Coussin du compte principal" onchange={(e) => editCoussin(e.currentTarget.value)} />
-      </label>
-    </div>
-  {/if}
-
-  {#each otherAccounts as a (a.id)}
-    <div class="ligne-compte">
-      <input value={a.name} placeholder="Nom du compte" onchange={(e) => editAccount(a, 'name', e.currentTarget.value)} />
-      <input value={a.bank ?? ''} placeholder="Banque" onchange={(e) => editAccount(a, 'bank', e.currentTarget.value)} />
-      <input value={a.accountNumber ?? ''} placeholder="FR76 …" onchange={(e) => editAccount(a, 'accountNumber', e.currentTarget.value)} />
-      <input class="mt" value={centsToInput(a.openingBalance)} inputmode="decimal" onchange={(e) => editAccountBalance(a, e.currentTarget.value)} />
-      <select value={a.kind} onchange={(e) => editAccountKind(a, e.currentTarget.value)}>
-        {#each NATURES as k}<option value={k}>{ACCOUNT_KINDS[k]}</option>{/each}
-      </select>
-      <button class="btn small danger" title="Retirer ce compte" onclick={() => retirerCompte(a)}>×</button>
-      <!-- Ce que l'étape dit du compte : tiers (suivi d'un solde à régler) ou clos. Ces réglages se modifient depuis Comptes (I11). -->
-      {#if a.tracksSettlement || validityBadge(a, app.asOf)}
-        <p class="muted small suite">
-          {#if a.tracksSettlement}
-            <span class="pill">tiers</span> Solde à régler avec le compte principal{a.settlementThreshold ? ` dès ${money(a.settlementThreshold)}` : ''}, {SENS_DE_REGLEMENT[a.settlementDirection ?? 'both']}.
-          {/if}
-          {#if validityBadge(a, app.asOf)}
-            <span class="pill dim">{validityBadge(a, app.asOf)}</span> {validityLabel(a)}
-          {/if}
-        </p>
-      {/if}
-    </div>
-  {/each}
-
-  {#if restantsComptes.length}
-    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
-    <div class="propositions">
-      {#each restantsComptes as p (p.name)}
-        <button class="prop" onclick={() => appliquerCompte(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(p.balance)}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-  <form class="edit" onsubmit={(e) => { e.preventDefault(); addAccount(); }}>
-    <div class="grid">
-      <label class="f">Nom du compte <input bind:value={acc.name} placeholder={aideDeCompte?.name} /></label>
-      <label class="f">Type
-        <select value={typeDeCompte} onchange={(e) => (acc.kind = e.currentTarget.value as Exclude<AccountKind, 'principal'>)}>
-          {#each NATURES as k}<option value={k}>{ACCOUNT_KINDS[k]}</option>{/each}
-        </select>
-      </label>
-      <label class="f">Solde actuel <input bind:value={acc.balance} inputmode="decimal" placeholder={aideDeCompte ? montantAide(aideDeCompte.balance) : undefined} /></label>
-    </div>
-    {#if accError}<div class="err">{accError}</div>{/if}
-    <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter un compte</button></div>
-  </form>
+  <SectionComptes s={sectionComptes} />
 
 {:else if step === 'summary'}
   <h2>{valide ? 'Votre budget est enregistré' : 'Votre budget'}</h2>

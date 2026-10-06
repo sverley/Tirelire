@@ -73,7 +73,7 @@ const SAISIE = { menu: 'Saisie manuelle', titre: 'Saisie' };
 
 /** Les panneaux que chaque écran doit avoir ouverts, sur les éléments que le harnais a créés. */
 const ÉCRANS: Array<{ menu: string; titre: string; couverture: Couverture[] }> = [
-  { ...COMPTES, couverture: [{ requis: [NOMS.compteA] }, { requis: [NOMS.compteB] }, { requis: [NOMS.compteLong] }, { requis: [] }] },
+  { ...COMPTES, couverture: [{ requis: [NOMS.compteA] }, { requis: [NOMS.compteB] }, { requis: [NOMS.compteLong] }] },
   {
     ...TIRELIRES,
     couverture: [
@@ -147,7 +147,8 @@ function installer() {
     await pause(30);
     await new Promise((fin) => requestAnimationFrame(() => requestAnimationFrame(fin)));
   };
-  const panneaux = () => [...document.querySelectorAll('form.edit')] as HTMLFormElement[];
+  // Un panneau est un formulaire attaché à sa ligne (D52) : le formulaire d'ajout de la section Comptes, toujours là (#362), n'en est pas un.
+  const panneaux = () => [...document.querySelectorAll('form.edit.attached')] as HTMLFormElement[];
   /** Ce que le panneau annonce : sa ligne de titre, ou à défaut un intitulé ; rien sinon. */
   const titreDe = (f: Element) => f.querySelector('.titre-panneau, h1, h2, h3, h4, legend');
 
@@ -202,7 +203,7 @@ function installer() {
   /** Tout bouton hors panneau, ni destructif, ni filtre, ni « Réviser » (qui écrit une révision). */
   const ouvreursPossibles = () =>
     ([...document.querySelectorAll('main button')] as HTMLButtonElement[]).filter(
-      (b) => !b.closest('form.edit') && !b.disabled && !b.classList.contains('danger') && !b.classList.contains('filtre') && texte(b) !== 'Réviser',
+      (b) => !b.closest('form.edit') && !b.disabled && !b.classList.contains('danger') && !b.classList.contains('filtre') && !b.classList.contains('prop') && texte(b) !== 'Réviser',
     );
 
   const nomsDans = (el: Element | null | undefined, noms: string[]) => {
@@ -213,6 +214,9 @@ function installer() {
   const attendus = (b: Element, noms: string[]) => {
     const ligne = b.closest('.row');
     const carte = b.closest('.card');
+    // Une carte de compte porte son nom dans le champ de sa ligne (la section Comptes, #362).
+    const nomDuCompte = carte?.querySelector(':scope > .ligne-compte > input') as HTMLInputElement | null | undefined;
+    if (nomDuCompte) return { requis: noms.filter((n) => nomDuCompte.value.includes(n)).sort(), conteneur: (ligne ? 'ligne' : 'carte') as Conteneur };
     const enTête = carte?.querySelector(':scope > .row') ?? null;
     const étiquette = (r: Element | null) => r?.querySelector(':scope > .label') ?? null;
     if (ligne) {
@@ -225,7 +229,10 @@ function installer() {
     return { requis: [] as string[], conteneur: 'libre' as Conteneur };
   };
 
-  const carte = (nom: string) => [...document.querySelectorAll('.card')].find((c) => propre(c.querySelector(':scope > .row > .label')) === nom);
+  const carte = (nom: string) =>
+    [...document.querySelectorAll('.card')].find(
+      (c) => propre(c.querySelector(':scope > .row > .label')) === nom || (c.querySelector(':scope > .ligne-compte > input') as HTMLInputElement | null)?.value === nom,
+    );
   const bouton = (racine: ParentNode, libellé: string) => {
     const b = ([...racine.querySelectorAll('button')] as HTMLButtonElement[]).find(
       (x) => texte(x) === libellé && (racine instanceof HTMLFormElement || !x.closest('form.edit')),
@@ -387,11 +394,11 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
       await page.evaluate(async (n: Noms) => {
         const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
         for (const nom of [n.compteA, n.compteB, n.compteLong, n.compteSupprimé]) {
-          o.bouton(document, 'Ajouter un compte').click();
+          // Un compte s'ajoute par le formulaire de la section, toujours présent : il n'ouvre pas de panneau (#362).
+          const f = document.querySelector('main form.edit:not(.attached)') as HTMLFormElement;
+          await o.remplir(f, 'Nom du compte', nom);
+          f.requestSubmit();
           await o.attendre();
-          const f = o.panneaux()[0]!;
-          await o.remplir(f, 'Nom', nom);
-          await o.soumettre(f);
         }
       }, NOMS);
 

@@ -106,7 +106,8 @@ const lireLesCartes = (page: Page) =>
     return [...document.querySelectorAll('main .card')]
       .filter((c) => c.querySelector('.pill'))
       .map((c) => ({
-        nom: t(c.querySelector('strong')),
+        // Le nom se corrige sur la ligne de la carte (la section Comptes, #362) : il est dans son champ.
+        nom: (c.querySelector('.ligne-compte input') as HTMLInputElement | null)?.value.trim() ?? t(c.querySelector('strong')),
         genre: t(c.querySelector('.pill')),
         boutons: [...c.querySelectorAll('button')].map((b) => t(b)),
       }));

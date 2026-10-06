@@ -45,10 +45,11 @@ async function clotureDansComptes(page: Page): Promise<string> {
   });
   await pause(200);
   const ouvert = await page.evaluate(() => {
-    const label = [...document.querySelectorAll('.label')].find(
-      (l) => (l.querySelector(':scope > strong')?.textContent ?? '').trim() === 'Livret jeune',
+    // Le nom d'un compte est dans le champ de sa ligne, dans sa carte (la section Comptes, #362).
+    const carte = [...document.querySelectorAll('main .card')].find(
+      (c) => ((c.querySelector(':scope > .ligne-compte > input') as HTMLInputElement | null)?.value ?? '').trim() === 'Livret jeune',
     );
-    const boutons = [...(label?.closest('.row')?.querySelectorAll(':scope > button, :scope > .actions button') ?? [])] as HTMLButtonElement[];
+    const boutons = [...(carte?.querySelectorAll(':scope > .row > .actions button') ?? [])] as HTMLButtonElement[];
     const modifier = boutons.find((b) => (b.textContent ?? '').trim() === 'Modifier');
     modifier?.click();
     return !!modifier;
