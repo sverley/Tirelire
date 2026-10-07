@@ -114,7 +114,8 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
    ni position lue, ni virement supposé fait.
 5. Virements : un par couple de comptes (D21), détaillé par tirelire, plus règlements des tiers
    et surplus des comptes d'accueil dans la période où l'on lit ; avec suivi des opérations, les
-   occurrences de l'ordre permanent dans la période, lues sur son flux (`flowOccurrences`, D12).
+   occurrences des ordres permanents du compte dans la période, chacune lue sur son flux et nommée
+   par lui (`flowOccurrences`, D12).
    Dès que le budget a une tirelire, les ordres permanents d'un compte (`standingOrderFlows`)
    se comparent à ce qu'il demande, montant et parts fixes, au-delà du pas d'arrondi
    (`PlanTransfer.bankOrder`, D60) ; le plan propose l'ordre et sa ventilation

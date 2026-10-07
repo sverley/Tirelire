@@ -252,17 +252,17 @@ const virementLivret = (l: Ledger, asOf: string) => computePlan(l, asOf, LECTURE
 describe('[niveau 1] point 5 — le virement permanent se lit sur son flux, le plan de sa période le montre (D12)', () => {
   it('pointée : une opération rapprochée de l’ordre, dans sa fenêtre', () => {
     const l = avecLignes(ligneDeRelevé('o1', '2026-08-29', -euros(600), { plannedFlowId: 'flow-vir-livret', plannedDate: '2026-08-28' }));
-    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'pointee', operationId: 'o1' }]);
+    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'pointee', operationId: 'o1', flowId: 'flow-vir-livret', flowName: 'Virement Livret A' }]);
   });
 
   it('attendue non reçue : la fenêtre est close sans opération, et le plan de sa période le montre', () => {
     const l = avecLignes(ligneDeRelevé('o2', '2026-09-01', -euros(40)));
-    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'nonRecue' }]);
+    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'nonRecue', flowId: 'flow-vir-livret', flowName: 'Virement Livret A' }]);
   });
 
   it('attendue : une période à venir montre l’occurrence à venir, sans rien en supposer', () => {
     const l = avecLignes(ligneDeRelevé('o2', '2026-09-01', -euros(40)));
-    expect(virementLivret(l, OCTOBRE).occurrences).toEqual([{ date: '2026-09-28', windowEnd: '2026-10-03', status: 'attendue' }]);
+    expect(virementLivret(l, OCTOBRE).occurrences).toEqual([{ date: '2026-09-28', windowEnd: '2026-10-03', status: 'attendue', flowId: 'flow-vir-livret', flowName: 'Virement Livret A' }]);
   });
 });
 

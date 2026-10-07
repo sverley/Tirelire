@@ -145,6 +145,22 @@ describe('[niveau 4] #393 · 2 et 3. les parts, à la reprise, à la correction 
   });
 });
 
+describe('[niveau 4] #393 · 2 et 3. la ligne de contrepartie ne prend pas les parts (hypothèse 4, tranchée)', () => {
+  it('au solde prévu, seule l’opération sur le compte du flux porte la ventilation ; à l’import, seule celle que reconnaît sa sélection', () => {
+    const action = { allocation: [{ tirelireId: 'vac', share: { kind: 'fixed' as const, amount: -euros(300) } }] };
+    const l = avec(budget(), ordre({ id: 'o', amount: -euros(300), action, periodicity: mensuel('2026-09-28') }));
+    const prevu = withPlannedOperations(l, LECTURE, '2026-09-30').ledger;
+    const ops = prevu.operations.filter((o) => o.plannedFlowId === 'o');
+    expect(ops.map((o) => [o.accountId, prevu.subOperations.filter((s) => s.operationId === o.id).length])).toEqual([[CC, 1], [LIVRET, 0]]);
+
+    const entrée: Operation = { ...ligne(euros(300)), id: 'op-entree', accountId: LIVRET, amount: euros(300) };
+    let i = { ...l, operations: [ligne(euros(300)), entrée] };
+    runPipeline(i, '2026-09-01', '2026-10-31', (p) => (i = applyPatchToLedger(i, p)));
+    expect(i.subOperations.filter((s) => s.operationId === 'op-vir').length).toBe(1);
+    expect(i.subOperations.filter((s) => s.operationId === 'op-entree')).toEqual([]);
+  });
+});
+
 describe('[niveau 4] #393 · 4. un virement reconnu par son libellé, puis par un ordre, dans les deux ordres', () => {
   it('reconnu d’abord par le libellé puis repris par l’ordre, ou l’inverse : la même ventilation, celle de l’ordre', () => {
     const l = { ...avec(budget(), ordre({ id: 'o', amount: -euros(300), action: { allocation: [{ tirelireId: 'vac', share: { kind: 'fixed', amount: -euros(300) } }] } })), operations: [ligne(euros(300))] };
@@ -285,6 +301,16 @@ describe('[niveau 4] #393 · 10. enregistrer l’ordre', () => {
     const plan = computePlan(l, LECTURE);
     const f = standingTransferFlow(plan, plan.transfers.find((x) => x.accountId === LIVRET)!, CC, 'x', euros(300), existant)!;
     expect([f.accountId, f.amount, f.action?.allocation?.map((p) => p.share)]).toEqual([LIVRET, euros(300), [{ kind: 'fixed', amount: euros(100) }, { kind: 'fixed', amount: euros(200) }]]);
+  });
+
+  it('un compte qui a plusieurs ordres montre les occurrences de chacun, nommées par leur flux (hypothèse 5, tranchée)', () => {
+    const l = avec(budget(), ordre({ id: 'a', name: 'Ordre A', amount: -euros(100) }), ordre({ id: 'b', name: 'Ordre B', amount: -euros(200), periodicity: mensuel('2026-09-01') }));
+    // Un relevé importé sur le compte principal : le suivi des opérations (U1 sinon).
+    const suivi = { ...l, operations: [{ ...ligne(euros(100), '2026-08-29', 'op-a'), plannedFlowId: 'a', plannedDate: '2026-08-28' }] };
+    expect(livret(suivi)!.occurrences!.map((o) => [o.flowName, o.date, o.status])).toEqual([
+      ['Ordre A', '2026-08-28', 'pointee'],
+      ['Ordre B', '2026-09-01', 'attendue'],
+    ]);
   });
 
   it('un compte qui a plusieurs ordres ne se voit proposer aucun enregistrement', () => {

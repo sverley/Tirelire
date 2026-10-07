@@ -892,8 +892,9 @@ marge reste inférieure au demandé — au-delà, l'ordre de financement de D06 
 
 **Le rattachement ne se voyait pas.** Une échéance a deux faces : le besoin qui la provisionne, sur
 une tirelire, et le flux qui la paie le jour venu, sur un compte. Le modèle les relie depuis
-toujours (`flowTirelire`), mais l'écran Flux taisait la tirelire et l'écran Tirelires
-ignorait le flux, si bien qu'une échéance sans provision se lisait comme une échéance provisionnée.
+toujours (~~`PlannedFlow.tirelireId`~~ — amendé le 7 octobre 2026 : la tirelire de son action,
+D24), mais l'écran Flux taisait la tirelire et l'écran Tirelires ignorait le flux, si bien qu'une
+échéance sans provision se lisait comme une échéance provisionnée.
 `needForDueDateFlow` et `dueDateFlowForNeed` font les deux lectures dans le cœur — par la tirelire,
 sans identifiant supplémentaire, en retenant la version en vigueur à la date lue puisqu'une tirelire
 porte plusieurs besoins (D28) et plusieurs versions du même (D50). Les deux écrans les affichent, et

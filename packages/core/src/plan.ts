@@ -154,11 +154,13 @@ export interface PlanTransfer {
    */
   proposal?: { amount: Cents; allocation: AllocationLine[] };
   /**
-   * Les occurrences de l'ordre enregistré dans la période, lues sur son flux (D12, #183) : pointée,
-   * attendue dans sa fenêtre, ou attendue non reçue. Absentes sans suivi des opérations (U1) : rien
-   * ne s'y pointe, le plan n'y suppose ni réception ni manquement.
+   * Les occurrences des ordres enregistrés vers ce compte dans la période, chacune lue sur son flux
+   * et nommée par lui (D12, #183, #393) : pointée, attendue dans sa fenêtre, ou attendue non reçue.
+   * Toutes, quel que soit le nombre d'ordres : seul l'enregistrement depuis le plan est réservé au
+   * compte qui en a exactement un. Absentes sans suivi des opérations (U1) : rien ne s'y pointe, le
+   * plan n'y suppose ni réception ni manquement.
    */
-  occurrences?: FlowOccurrence[];
+  occurrences?: Array<FlowOccurrence & { flowId: Id; flowName: string }>;
 }
 
 /** Les ordres permanents enregistrés vers un compte, comparés à ce que le budget demande (D60, I10). */
@@ -491,8 +493,12 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     const proposal = permanent > 0 ? { amount: montantPropose, allocation: orderAllocation(breakdown, lines, montantPropose, -1) } : undefined;
     const net = standing + exceptional + settlement - surplus;
     if (orders.length === 0 && settlement === 0 && surplus === 0 && !bankOrder) continue;
-    const flux = ordres.length === 1 ? ordres[0]! : undefined;
-    const occurrences = flux && tracksOperations(ledger, flux.accountId) ? flowOccurrences(ledger, flux, period.start, period.end, today) : undefined;
+    const suivis = ordres.filter((f) => tracksOperations(ledger, f.accountId));
+    const occurrences = suivis.length
+      ? suivis
+          .flatMap((f) => flowOccurrences(ledger, f, period.start, period.end, today).map((o) => ({ ...o, flowId: f.id, flowName: f.name })))
+          .sort((x, y) => x.date.localeCompare(y.date) || x.flowName.localeCompare(y.flowName, 'fr') || x.flowId.localeCompare(y.flowId))
+      : undefined;
     transfers.push({
       accountId: a.id,
       accountName: a.name,

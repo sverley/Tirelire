@@ -379,11 +379,11 @@
           </div>
         {/if}
         {#if t.occurrences}
-          <!-- Chaque occurrence de l'ordre, lue sur son flux (D12, #183) : seulement avec suivi des
-               opérations ; sans suivi, rien ne se pointe et le plan n'en dit rien. -->
-          {#each t.occurrences as o (o.date)}
+          <!-- Chaque occurrence de chaque ordre, lue sur son flux et nommée par lui (D12, #183, #393) :
+               seulement avec suivi des opérations ; sans suivi, rien ne se pointe et le plan n'en dit rien. -->
+          {#each t.occurrences as o (`${o.flowId}|${o.date}`)}
             <div class="row">
-              <div class="label">Virement du {shortDate(o.date)}
+              <div class="label">{o.flowName} du {shortDate(o.date)}
                 <span class="sub">{o.status === 'pointee'
                   ? 'pointé sur le relevé'
                   : o.status === 'attendue'
