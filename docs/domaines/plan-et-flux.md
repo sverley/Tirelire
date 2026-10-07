@@ -67,8 +67,10 @@ Propres au domaine :
    pour exact.
 2. L'ordre enregistré porte sa ventilation sur les tirelires qu'il sert, en parts librement choisies
    (D27, D60) : fixes, un montant, ou flottantes, un pourcentage ou la part variable, qui prend le
-   reste. Les parts flottantes se recalculent sur le montant constaté ; l'écart d'une part fixe avec
-   ce que le budget demande se propose comme toute évolution. 24 septembre 2026, à la question de ce
+   reste. Elle s'écrit comme l'action d'un automatisme (D24) ; à l'import comme au solde prévu,
+   l'opération prend ses parts, et ce qu'elles n'absorbent pas reste non affecté (D21). Les parts
+   flottantes se recalculent sur le montant constaté ; l'écart d'une part fixe avec ce que le budget
+   demande se propose comme toute évolution. 24 septembre 2026, à la question de ce
    qu'« enregistrés avec leur ventilation » demande :
 
    > H2 : les ventilations sont assez libres. Elles peuvent être fixes ou flottantes. Quand elles sont flottantes, elles peuvent être en pourcentage ou la part "restante"
@@ -90,10 +92,13 @@ Propres au domaine :
    de l'assistant, dont la piste du porteur est d'ouvrir la partie concernée de l'assistant.
 6. Sans ordre enregistré, le plan qui change n'est pas une action cachée : c'est un résultat
    recalculé (I10). Le signaler reste à évaluer.
-7. Deux sources proposent un ordre : le plan, qui propose ce que le budget demande ; l'assistant,
-   qui propose l'ordre de l'exemple (domaine assistant et exemple). Suivre l'exemple jusqu'au bout enregistre l'ordre
-   de l'exemple, écart compris, et le plan en propose aussitôt l'évolution : c'est la démonstration
-   que l'exemple porte (D53, D60).
+7. Trois sources proposent un ordre : le plan, qui propose ce que le budget demande ; l'assistant,
+   qui propose l'ordre de l'exemple (domaine assistant et exemple) ; un virement importé qu'aucun
+   flux ne reprend, dont on fait un flux (#16, U3, U4), prérempli par ce que le plan demande quand
+   un budget existe, par la ventilation de l'opération sinon (D21, D24). Un ordre est un flux de
+   virement du principal vers un compte d'accueil, quelle que soit sa source (D57). Suivre l'exemple
+   jusqu'au bout enregistre l'ordre de l'exemple, écart compris, et le plan en propose aussitôt
+   l'évolution : c'est la démonstration que l'exemple porte (D53, D60).
 
 ## Cibles
 
@@ -111,6 +116,10 @@ Propres au domaine :
   évolutions proposées quand le budget change.
 - **U1** : partage la proposition du plan de virements, le virement à faire du parcours U1 ; le
   domaine ne lui ajoute aucune étape.
-- **U3** : s'appuie sur la ventilation d'un plan non validé ; le rapprochement relève du domaine rapprochement et bilan.
-- **U4** : un plan tiré des opérations (intention ci-dessus : le plan à partir des opérations) garde le même lien au budget.
+- **U3** : le virement importé qu'aucun flux ne reprend devient un ordre par le geste de U4,
+  prérempli par ce que le plan demande (hypothèse 7, D21) ; le rapprochement relève du domaine
+  rapprochement et bilan.
+- **U4** : un plan tiré des opérations (intention ci-dessus : le plan à partir des opérations) garde
+  le même lien au budget ; un flux créé depuis une opération en prend la ventilation (D24), et vers
+  un compte d'accueil, c'est un ordre (D57).
 - **U5** : sans objet, ni tirelire ni budget.

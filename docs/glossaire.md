@@ -76,7 +76,9 @@ interne, échéance de provision. Décrit par un montant, une périodicité, une
 Sa récurrence produit les **opérations prévues**, sa représentation concrète, calculées à chaque
 lecture ; sa sélection, la seule — son compte, son motif de libellé, sa tolérance de montant et la
 fenêtre de ses occurrences —, reconnaît l'opération bancaire qui réalise chacune, qui la **reprend**
-(D12, D24, D88).
+(D12, D24, D88) ; son action, de la forme de celle d'un automatisme, la ventile et la classe (D24).
+Un flux de virement du compte principal vers un compte d'accueil est un **ordre permanent** (D57,
+D60).
 
 ## Opération
 

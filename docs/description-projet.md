@@ -910,3 +910,28 @@ Ce qui en est tiré : `docs/methodes.md`, qui reçoit D77 à D84, D86 et D87 ; D
 reste dans `docs/decisions.md` et sa part du travail devient D90 ; la part produit de D84, l'exemple
 inventé compris, devient D89 ; celle de D87, D91 ; D80 ; les rôles du codeur, de l'auditeur et de
 l'architecte ; les deux passages barrés le 5 octobre.
+
+## 7 octobre 2026 · l'ordre permanent, un flux comme les autres
+
+Paroles du porteur, en suivant la version v0.2, à la proposition de l'architecte de faire enregistrer
+sa ventilation à l'ordre permanent par un champ nouveau du format :
+
+> un virement est une opération. Le nouveau concept des opérations est qu'elles peuvent porter des sous opérations de manières récursives, ce qui permet de gérer la ventilation, en catégorie/tirelire/compte/personne
+
+Puis, à la proposition de faire porter au flux une ventilation en parts, à la façon d'un automatisme :
+
+> relis en détail les concepts et les décisions. Le principe est d'essayer de garder le code le plus simple possible, donc de mutualiser les concepts. MAis il ne faut pas non plus créer un monstre. Challenge les concepts et décisions prises pour les amender si besoin pour répondre à cet objectif
+
+Puis, sur quatre propositions de l'architecte — l'action d'un flux a la forme de celle d'un
+automatisme, et l'ordre en est le premier usage ; les parts, puis le non affecté, l'ordre de
+financement n'étant plus qu'une proposition (D21) ; plus de flux « dérivé », tout virement du
+principal vers un compte d'accueil est un ordre (D57) ; #204 fondue dans #203 — :
+
+> Meme si ce n'est pas pour cette version, prend en compte qu'on aura à reconstruire un budget à partir des opérations importées. Il faut que les propositions, mêmes si elles ne doivent pas tout tester, ne rentrent pas en contradiction évidente avec des contraintes qui vont arriver ensuite. Sinon ton analyse me semble bien elle pourra, une fois validée pleinement être consigner meme pour ce qui déborde de v0.2
+
+Puis, après la confrontation des quatre propositions à U4 :
+
+> On consigne en documentation et on peut ouvrir des tickets pour les versions suivantes si besoin.
+
+Ce qui en est tiré : D21, D24, D57 et D60 amendées ; le glossaire (flux prévu) ; les domaines plan
+et flux, rapprochement et bilan, opérations.

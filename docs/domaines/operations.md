@@ -17,3 +17,10 @@ La classification des opérations s'automatise, et l'exemple embarqué porte ses
 > 10. l'app doit proposer des classifications intelligentes basées sur un apprentissage (l'apprentissage initial se fait sur l'exemple). L'application des automatismes (prioritaires) et de la classification intelligente par defaut doit permettre de reconstruire les classifications de l'exemple.
 
 L'application propose des classifications apprises, à partir de l'exemple. Les automatismes d'abord, puis la classification apprise, retrouvent les classifications de l'exemple.
+
+## Hypothèses
+
+1. Un flux créé depuis une opération (#16) prend sa sélection et sa ventilation : l'action d'un flux a
+   la forme de celle d'un automatisme, une ligne de ventilation étant une sous-opération sans
+   identifiant (D24, D88) ; les axes qui s'ajouteront aux sous-opérations — la personne (#298) —
+   s'ajoutent là une seule fois. Vers un compte d'accueil, ce flux est un ordre permanent (D57, D60).
