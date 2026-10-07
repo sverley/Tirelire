@@ -1062,8 +1062,9 @@ utile sans jamais importer un relevé. Le lien avec la banque vient ensuite, et 
 budget au réel. Les deux sens de lecture sont de premier rang, aucun n'est un mode dégradé :
 
 - **Sens descendant** — on décrit ce qu'on veut : des tirelires, leurs besoins, où leur argent doit
-  dormir. L'application en **déduit** les flux, les dotations et les virements. Rien de tout cela ne
-  se saisit à la main : ce sont des conséquences, recalculées quand le budget change.
+  dormir. L'application en **déduit** les dotations, les virements à faire et l'ordre permanent
+  qu'il faudrait. Rien de tout cela ne se saisit à la main : ce sont des conséquences, recalculées
+  quand le budget change ; l'ordre posé chez la banque, lui, est un flux, un fait (ci-dessous).
 - **Sens ascendant** — on importe ses opérations et on reconstruit le budget après coup, par
   analyse et constat : ce qu'on dépense vraiment, à quel rythme, sur quoi. L'application propose,
   l'utilisateur arbitre — les propositions ne deviennent jamais des décisions toutes seules.
@@ -1228,7 +1229,8 @@ liste remonte, et on ne la regardait pas. Il n'y a rien à corriger de ce côté
 
 ### D60 · Deux montants pour un virement permanent, un seul se stocke
 
-Applique D57 au virement permanent, le seul flux dérivé du budget.
+Applique D57 au virement permanent, ~~le seul flux dérivé du budget~~ (amendé le 7 octobre 2026 : un
+flux de virement du principal vers un compte d'accueil, quelle que soit sa source, D57).
 
 Un ordre permanent porte deux montants de nature différente, et les confondre casse quelque chose
 dans les deux sens :
@@ -1239,8 +1241,8 @@ dans les deux sens :
   priorité changée se voient au tour suivant sans autre geste.
 - **Ce que l'ordre exécute chez la banque** est un fait du monde réel. L'application ne peut ni le
   connaître ni le changer, et elle en a pourtant besoin — avec sa tolérance — pour reconnaître la
-  ligne à l'import. C'est le seul des deux qui s'enregistre : le montant du flux de virement vers ce compte
-  (D57).
+  ligne à l'import. C'est le seul des deux qui s'enregistre : le `amount` ~~d'un `PlannedFlow` dont
+  `origin` vaut `derived`~~ du flux de virement vers ce compte (amendé le 7 octobre 2026, D57).
 
 Faire suivre le montant enregistré au budget aurait cassé la reconnaissance dès le mois où le budget
 bouge, alors que l'ordre bancaire, lui, n'avait pas changé. Le bouton de l'écran Plan ne disparaît
@@ -1259,19 +1261,23 @@ une part **fixe** est un montant ; une part **flottante** est un pourcentage du 
 part variable, qui prend le reste, au plus une. L'application en propose une à la validation, que
 l'utilisateur modifie librement. Les parts flottantes se recalculent sur le montant constaté ; une
 part fixe ne suit pas le budget, et son écart avec ce que le budget demande pour sa tirelire se
-propose comme celui du montant, au-delà du même pas, sans être réécrit (I10). À l'import, ce que les
+propose comme celui du montant, au-delà du même pas, sans être réécrit (I10). ~~À l'import, ce que les
 parts n'absorbent pas se répartit par l'ordre de financement au jour de l'opération (D06, D21),
-planchers d'abord, ~~(`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée
-se répartit ainsi en entier~~ — amendé le 7 octobre 2026 : l'opération prend les parts de l'ordre,
+planchers d'abord (`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée se
+répartit ainsi en entier~~ — amendé le 7 octobre 2026 : l'opération prend les parts de l'ordre,
 à l'import comme au solde prévu (D24, D88), et ce qu'elles n'absorbent pas reste non affecté sur le
 compte d'accueil, dit par le plan (D21, D29). La ventilation s'écrit comme l'action d'un automatisme
 (D24). Le flux ne fige pas de montants tirés du plan au moment de l'enregistrement : la ventilation
 proposée à la validation, l'utilisateur la fait sienne en la validant.
 
-Tout flux de virement du compte principal vers un compte d'accueil est un ordre permanent (D57) :
-le plan compare leur somme à ce que le budget demande pour ce compte, et ne compare rien pour un
-compte où aucune tirelire n'est placée (D38) — sans budget, le budget ne parle d'aucun compte (U4,
-U5). Un virement saisi comme opération n'est pas un flux : rien ne le compare ni ne le réécrit.
+~~Un virement saisi à la main est un flux déclaré comme un autre : il n'est pas pris pour l'ordre
+permanent, que le plan ne compare qu'à un flux dérivé, et rien ne le réécrit (D57).~~ Amendé le
+7 octobre 2026 : tout flux de virement du compte principal vers un compte d'accueil est un ordre
+permanent (D57). Dès que le budget a une tirelire, le plan compare la somme de ces flux, compte par
+compte, à ce que le budget demande ; un ordre vers un compte où plus aucune tirelire n'est placée
+(D38) est signalé comme plus demandé, à tout montant, puisqu'il continue de virer. Sans aucune
+tirelire (U5), le budget ne parle d'aucun compte et le plan ne compare rien. Un virement saisi comme
+opération n'est pas un flux : rien ne le compare ni ne le réécrit.
 
 Ce que le budget demande comme ordre permanent est **la somme des dotations mensuelles** des
 tirelires placées sur ce compte, depuis le compte principal où naissent les dotations (D29), quoi
