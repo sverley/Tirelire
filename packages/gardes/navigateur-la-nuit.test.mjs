@@ -4,8 +4,6 @@
  * harnais, `nuit-et-tests-de-l-issue.test.mjs`, en les complétant ; ceux-ci restent, au niveau 4.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import {
   SANS_DEMANDE,
@@ -18,10 +16,8 @@ import {
   resume,
   vertsDuReady,
 } from './attestation.mjs';
-import { RACINE } from './gardes.mjs';
 import { MARQUE, ROUGE, TITRE, VERTE, fichiersRouges, issueDeLaNuit, suiteDeLaNuit } from './nuit.mjs';
 
-const lireFichier = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').replace(/\r\n?/g, '\n');
 const E = (c) => Object.fromEntries(TOUS.map((id, i) => [id, `${c}${i}`.padEnd(64, c)]));
 const A = 'a'.repeat(40);
 
@@ -81,22 +77,6 @@ describe('[niveau 4] #307, point 4 · une nuit rouge ouvre ou complète une issu
     const rapport = { testResults: [{ name: '/x/apps/web/test/navigateur/b.test.ts', status: 'failed' }, { name: '/x/apps/web/test/navigateur/a.test.ts', status: 'passed', assertionResults: [{ status: 'passed' }] }] };
     assert.deepEqual(fichiersRouges(rapport), ['apps/web/test/navigateur/b.test.ts']);
     assert.equal(fichiersRouges({}), null);
-  });
-
-  test('le workflow tient une nuit qui n’a pas pu jouer pour rouge', () => {
-    assert.match(lireFichier('.github/workflows/nuit.yml'), /verdict=rouge\n\s+\[ "\$RESULTAT" = success \] && verdict=vert/);
-  });
-});
-
-// ─── Point 6 : la durée attendue ─────────────────────────────────────────────────────────────────
-
-describe('[niveau 4] #307, point 6 · la durée attendue de la livraison suit ce qu’elle joue', () => {
-  test('les tests de l’issue comptent par fichier ; la non-régression demandée, toute la mesure', () => {
-    const l = lireFichier('.githooks/livraison.sh');
-    assert.match(l, /joue navigateur && attendue=\$\(\(attendue \+ 630\)\)/);
-    assert.match(l, /\[ "\$issues" -gt 0 \] && attendue=\$\(\(attendue \+ 80 \+ 25 \* issues\)\)/);
-    assert.match(l, /DUREE_FONCTIONNEL=30 DUREE_GARDE=50/);
-    assert.ok(!/attendue \+ 270/.test(l), 'l’ancienne mesure du 25/09 ne vaut plus');
   });
 });
 

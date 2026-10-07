@@ -3,7 +3,7 @@
  * 375 px. Les points 1 à 4, 6 et 7 du « Fait quand ». Le point 5 (« le test des propositions échoue si une catégorie
  * ou un lien proposé n'est pas dans l'exemple, ou si l'un de ceux de l'exemple n'est pas proposé ») est tranché par
  * `packages/core/test/suggestions.test.ts`, que le codeur a étendu aux catégories ; les points 8 (D40) et 9
- * (D61, que l'auditeur ajoute), par `packages/gardes/assistant-categories-decision-harnais.test.mjs`. La lecture des catégories dans l'exemple, côté
+ * (D61, que l'auditeur ajoute) se vérifient à la relecture (#382). La lecture des catégories dans l'exemple, côté
  * cœur, reste dans ses `suggestions-categories.test.ts`, au niveau 4 : ce que ce fichier-ci observe à l'écran la couvre.
  *
  * Retenus parmi les tests du codeur (`navigateur/assistant-categories-exemple.test.ts`, d'où ils sont déplacés, ce

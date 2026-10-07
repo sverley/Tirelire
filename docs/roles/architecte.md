@@ -28,7 +28,13 @@ reprends toi-même les retours de l'auditeur, sans session de codeur.
    partie du besoin. Borne le « Fait quand » aux cibles actives
    (`docs/cibles.md`). Ajoute une ligne « Usages » : ce que la tâche fait à chaque usage de la
    description, U1 à U8 — sert, indifférent, ou à surveiller (D86) —, et l'étiquette de son ou de ses
-   domaines.
+   domaines. Un besoin d'outillage qui ne change qu'un réglage ou un texte — une heure, un
+   déclenchement, une condition, un message, un nom — se vérifie comme la documentation : dis-le,
+   après la ligne « Usages », par « Vérification : relecture », et ton « Fait quand » ne demande
+   alors aucun test ; le codeur n'en écrit pas, l'auditeur ne compose pas de harnais, et rien ne
+   s'ajoute aux tests de la garde (D81, #382). Un test qui recopie un réglage ne vérifie que la
+   recopie : il est une seconde place pour la même valeur (D78), et rougit à chaque changement voulu
+   (05ede00).
 4. Écris dans l'issue la section « Invariants et contraintes » : les entrées du registre touchées,
    et pour chacune la vérification manuelle attendue, sans case (`node packages/gardes/cli.mjs
    demander` la prépare).

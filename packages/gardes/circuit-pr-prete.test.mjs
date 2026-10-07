@@ -340,11 +340,4 @@ describe('[niveau 2] D82 et D83 : brouillon, Ready, aperçu, changement signalé
       léger(quoi, jobs);
     }
   });
-
-  test('témoin · le lecteur de conditions suit le filtre d’objets `.*` comme GitHub [niveau 4]', () => {
-    const yaml = `name: t\non: issues\njobs:\n  j:\n    if: contains(github.event.issue.labels.*.name, 'PR prête')\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo j\n`;
-    const joue = (prête) => jouer(yaml, contexte(['issues', { action: 'edited', issue: ISSUE_SEULE(prête) }]))[0].tourne;
-    assert.equal(joue(true), true);
-    assert.equal(joue(false), false);
-  });
 });

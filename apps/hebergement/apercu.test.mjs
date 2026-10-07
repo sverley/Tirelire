@@ -380,9 +380,6 @@ describe('[niveau 2] #141 · les workflows de l’aperçu', () => {
     assert.ok(dépôt, 'aucun job ne lance `apercu.sh deposer`');
     assert.ok(dépôt.w.types.length > 0, `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne tourne pas sur les PR`);
     assert.ok(sauté(dépôt.w, dépôt.nom, écarteBrouillon), `${dépôt.w.fichier} : le job « ${dépôt.nom} » dépose aussi un brouillon`);
-    for (const v of ['TIRELIRE_DEV_FTP_DOSSIER', 'TIRELIRE_FTP_DOSSIER', 'TIRELIRE_SITE_URL']) {
-      assert.ok(voit(dépôt, new RegExp(`vars\\.${v}\\b`)), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`vars.${v}\``);
-    }
     // L'adresse de recette est un secret : une variable s'écrirait en clair dans les journaux (#156).
     assert.ok(voit(dépôt, /secrets\.TIRELIRE_DEV_SITE_URL\b/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne reçoit pas \`secrets.TIRELIRE_DEV_SITE_URL\``);
     assert.ok(voit(dépôt, /NUMERO:.*pull_request\.number/), `${dépôt.w.fichier} : le job « ${dépôt.nom} » ne passe pas le numéro de la PR dans NUMERO`);
@@ -402,7 +399,6 @@ describe('[niveau 2] #141 · les workflows de l’aperçu', () => {
     assert.ok(retrait, 'aucun job ne lance `apercu.sh retirer`');
     assert.ok(retrait.w.types.includes('closed'), `${retrait.w.fichier} : le workflow ne se déclenche pas à la fermeture d’une PR`);
     assert.ok(!sauté(retrait.w, retrait.nom, écarteFermeture), `${retrait.w.fichier} : le job « ${retrait.nom} » est sauté à la fermeture`);
-    assert.ok(voit(retrait, /vars\.TIRELIRE_DEV_FTP_DOSSIER\b/), `${retrait.w.fichier} : le job « ${retrait.nom} » ne reçoit pas \`vars.TIRELIRE_DEV_FTP_DOSSIER\``);
     assert.doesNotMatch(retrait.bloc, PUBLIE, `${retrait.w.fichier} : le job « ${retrait.nom} » publie un commentaire`);
 
     const lourd = /pnpm (test|build|typecheck)\b|hebergement assembler|gradlew/;

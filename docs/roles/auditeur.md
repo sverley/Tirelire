@@ -49,9 +49,16 @@ vérification (#355).
    (« Harnais : chemins »). Tu peux garder des tests de niveau 4 (diagnostic) dans ton harnais ;
    quand il est du registre, qui n'en accueille jamais (D81), mets-les dans le second fichier : le
    codeur n'en voit que le verdict. Un besoin que la relecture suffit à vérifier — par défaut la
-   documentation et la garde (D81) — n'a pas de harnais.
-3. Pour un besoin sans code, ta vérification est la relecture et la garde hors ligne, sans
-   `pnpm test 2` ; ce que la livraison a attesté ne se rejoue pas (D92). Sinon, vérifie le travail
+   documentation et la garde (D81) — n'a pas de harnais. De même, un besoin d'outillage qui ne
+   change qu'un réglage ou un texte — une heure, un déclenchement, une condition, un message, un
+   nom —, que l'issue dit par « Vérification : relecture », n'a pas de harnais, et rien ne s'ajoute
+   aux tests de la garde : tu relis le diff et joues la garde hors ligne (étape 3 ; D81, #382). Un
+   test qui recopie un réglage ne vérifie que la recopie : il est une seconde place pour la même
+   valeur (D78), et rougit à chaque changement voulu (05ede00). Si tu juges qu'un test le mérite,
+   dis-le dans la PR : le porteur tranche.
+3. Pour un besoin sans code, ou que l'issue dit « Vérification : relecture », ta vérification est
+   la relecture du diff et la garde hors ligne, sans `pnpm test 2` ; ce que la livraison a attesté
+   ne se rejoue pas (D92). Sinon, vérifie le travail
    en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
    un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **Dans les deux cas,

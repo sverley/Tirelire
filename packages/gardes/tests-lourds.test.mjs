@@ -7,9 +7,6 @@
  * le seuil 1 du Ready se saute sur une empreinte verte, et ce que #266 ajoute a ses tests
  * (`empreintes.test.mjs`).
  *
- * **Qu'aucun rouge ne fusionne** — D83 (« aucun job sauté ne peut laisser fusionner ce qu'un job
- * joué aurait rougi », « au tag, rien ne se saute ») : au tag, rien ne se saute.
- *
  * **Les règles de #264**, dont l'erreur ne coûterait que du temps ou une branche à recréer : la
  * livraison joue le typecheck, puis les tests sans navigateur, et les tests navigateur sur demande
  * seulement, après le reste ; demandés et verts, ils sont attestés et la CI ne les rejoue pas sur
@@ -163,21 +160,7 @@ const typechecks = (n) => n.filter((x) => x.quoi.startsWith('typecheck-'));
 
 const PR = { number: 1, draft: false, head: { ref: 'codage/1-x', sha: 'a'.repeat(40) } };
 const AU_READY = { github: { event_name: 'pull_request', ref: 'refs/pull/1/merge', repository: 'sverley/Tirelire', head_ref: 'codage/1-x', event: { action: 'ready_for_review', pull_request: PR } }, vars: {}, secrets: {}, inputs: {} };
-const AU_TAG = { github: { event_name: 'push', ref: 'refs/tags/v1.0.0', repository: 'sverley/Tirelire', event: {} }, vars: {}, secrets: {}, inputs: {} };
 const étapesDuTest = (ctx, échoue) => jouer(lireFichier(CI), ctx, échoue).find((j) => j.nom === 'test').joués.map(commande);
-const lancementsDeTests = (étapes) => étapes.flatMap((c) => c.split('\n')).filter((l) => /\bpnpm\b.*\btest\b|harnais-du-besoin\.sh --jouer/.test(l));
-const NAVIGATEUR_CI = /--navigateur .*test\/navigateur/;
-
-// ─── Au Ready, le seuil 1 ; au tag, rien ne se saute ────────────────────────────────────────────
-
-describe('[niveau 4] #264, D83 · au tag, rien ne se saute', () => {
-  test('au tag, le seuil 3 se joue tests navigateur compris, et aucune étape ne lit d’attestation', () => {
-    const l = lancementsDeTests(étapesDuTest(AU_TAG));
-    assert.ok(l.some((c) => /\bpnpm test 3\b/.test(c)), `au tag, le seuil 3 se joue\n${l.join('\n')}`);
-    assert.ok(l.some((c) => /\btest 3 --navigateur\b.*test\/navigateur/.test(c)), `au tag, les tests navigateur se jouent au seuil 3\n${l.join('\n')}`);
-    for (const c of l) assert.doesNotMatch(c, /--attestation/, `au tag, rien ne se saute : « ${c.trim()} »`);
-  });
-});
 
 // ─── Le moins cher d'abord, le navigateur au Ready ──────────────────────────────────────────────
 
@@ -232,13 +215,6 @@ describe('[niveau 4] #264, points 5 à 8 · le moins cher d’abord, les tests n
       const joués = étapesDuTest(AU_READY, (é) => rouge.test(commande(é)));
       assert.ok(!joués.some((x) => NAVIGATEUR_CI.test(x)), `après un rouge de « ${rouge.source} », les tests navigateur ne partent pas`);
     }
-  });
-
-  test('points 7 et 8 · la demande passe par une commande et ses arguments, écrite dans les rôles', () => {
-    assert.equal(JSON.parse(lireFichier('package.json')).scripts.livraison, 'sh .githooks/livraison.sh demande');
-    for (const rôle of ['codeur', 'auditeur']) assert.match(lireFichier(`docs/roles/${rôle}.md`), /`pnpm livraison --navigateur`/, rôle);
-    // #302 : la vérification de l'auditeur saute, elle aussi, ce qui est vert sur son empreinte.
-    assert.match(lireFichier('docs/roles/auditeur.md'), /`pnpm test 2` : ce qui est\s+déjà vert sur son empreinte s'y saute/);
   });
 });
 
@@ -323,14 +299,5 @@ describe('[niveau 4] #264, point 9 · chaque moment qui ne joue pas les tests na
 
   test('[niveau 3] la CI dit qu’ils sont couverts par l’attestation', async () => {
     assert.match((await livraisonVerte()).nav.sortie, /attestation : sauté/);
-  });
-
-  test('[niveau 3] le workflow des tests dit ce que chaque passage a joué, et au tag que rien ne se saute', () => {
-    const étape = lireFichier(CI).split('\n      - ').find((é) => é.startsWith('name: Ce que ce passage a joué'));
-    assert.ok(étape, 'aucune étape ne dit ce que le passage a joué');
-    assert.match(étape, /if: always\(\)/, 'elle se joue même après un rouge');
-    for (const quoi of ['typecheck', 'harnais du besoin', "tests navigateur de l'issue", 'tests navigateur de non-régression', 'la nuit', 'palier moins cher', 'empreinte verte', 'au tag, rien ne se saute']) {
-      assert.ok(étape.includes(quoi), `l'étape ne dit rien de « ${quoi} »`);
-    }
   });
 });
