@@ -54,7 +54,7 @@ export const COLONNES_BUDGET_JSON: Record<string, string[]> = {
 
 /** Une ligne du budget, aux valeurs du fichier (SQL), sans sa suppression logique. */
 type Valeurs = Record<string, string | number | null>;
-interface LigneBudget {
+export interface LigneBudget {
   id: string;
   v: Valeurs;
 }
@@ -343,7 +343,14 @@ export function etatDuProjet(projet: Ledger, parties: readonly PartieBudget[] = 
  * prête à `JSON.stringify`. Une colonne vide n'est pas écrite. Relu, il redonne les mêmes lignes.
  */
 export function ecrireBudgetJson(projet: Ledger, parties: readonly PartieBudget[] = TOUTES_PARTIES): Record<string, unknown> {
-  const etat = etatDuProjet(projet, parties);
+  return budgetDefiniEnJson(etatDuProjet(projet, parties));
+}
+
+/**
+ * Le budget JSON, en version 2, d'un budget défini — ses parties, et elles seules : une valeur JSON,
+ * prête à `JSON.stringify` (#379 : le brouillon de l'assistant s'enregistre ainsi).
+ */
+export function budgetDefiniEnJson(etat: BudgetDefini): Record<string, unknown> {
   const out: Record<string, unknown> = { format: BUDGET_JSON_FORMAT, version: BUDGET_JSON_VERSION };
   for (const k of CLES_TABLES) {
     const lignes = etat.tables[k];
@@ -638,3 +645,18 @@ function fromRow(t: TableDef, v: Record<string, string | number | null>): Record
   return out;
 }
 
+
+/** Une ligne du modèle, en ligne du budget (valeurs du fichier, sans sa suppression logique) : ce que le brouillon de l'assistant garde (#379). */
+export function ligneBudgetDuModele(cle: CleTable, r: Record<string, unknown> & { id: string }): LigneBudget {
+  return { id: r.id, v: enValeurs(TABLES[cle]!, r) };
+}
+
+/** Une ligne du budget, rendue au modèle (#379). */
+export function ligneBudgetVersModele(cle: CleTable, l: LigneBudget): LigneModele {
+  return versModele(TABLES[cle]!, l);
+}
+
+/** Deux lignes du budget portent-elles les mêmes valeurs (#379) ? */
+export function memesLignesBudget(a: LigneBudget, b: LigneBudget): boolean {
+  return memesValeurs(a.v, b.v);
+}

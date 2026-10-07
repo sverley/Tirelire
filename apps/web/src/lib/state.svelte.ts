@@ -9,6 +9,7 @@ import {
   exampleLedger,
   LEDGER_KEYS,
   importerBudgetJson,
+  lireBudgetJson,
   marqueDesDonnees,
   refusalAnswer,
   sauvegardeARappeler,
@@ -28,7 +29,7 @@ import {
 import type { LedgerKey } from '@tirelire/core';
 import { lireSauvegarde, lireSynchronisation, noterSauvegarde, noterSynchronisation, type DerniereSynchronisation, type Moyen } from './sauvegarde';
 import {
-  brouillonDImport,
+  brouillonDuFichier,
   brouillonIntact,
   ecrire as ecrireDansLeBrouillon,
   montrer,
@@ -130,7 +131,9 @@ class AppState {
   importerBudget(texte: string): { ok: true } | { ok: false; message: string } {
     const lu = importerBudgetJson(texte, this.ledger);
     if (!lu.ok) return { ok: false, message: lu.message };
-    this.assistant = brouillonDImport(this.ledger, lu.application);
+    const budget = lireBudgetJson(texte);
+    if (!budget.ok) return { ok: false, message: budget.message };
+    this.assistant = brouillonDuFichier(this.ledger, budget.budget);
     this.versionAssistant++;
     return { ok: true };
   }
