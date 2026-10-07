@@ -181,7 +181,7 @@ async function ecran(page: Page, nom: string) {
 
 interface LigneEcran {
   nom: string;
-  /** Le titre du groupe de l'écran où la ligne se range : « Revenus », « Charge fixes »… */
+  /** Le titre du groupe de l'écran où la ligne se range : « Revenus », « Charges fixes »… */
   genre: string;
   sous: string;
   pastilles: string[];
@@ -202,7 +202,7 @@ const fluxPrevus = (page: Page): Promise<LigneEcran[]> =>
   });
 
 /** Les revenus et les charges fixes de l'écran : l'assistant sème aussi des flux d'échéance (« Pas tous les mois »), qui ne sont pas de #213. */
-const revenusEtCharges = (l: LigneEcran[]) => l.filter((x) => /^(Revenu|Charge fixe)/.test(x.genre));
+const revenusEtCharges = (l: LigneEcran[]) => l.filter((x) => /^(Revenus|Charges fixes)/.test(x.genre));
 
 /** Ouvre le formulaire du flux de Flux prévus dont la ligne dit ceci sous son nom. */
 async function modifier(page: Page, nom: string, sousContient: RegExp) {
@@ -283,7 +283,7 @@ const formulairesDesFlux = (page: Page): Promise<FluxLu[]> =>
     const attendre = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
     const lignes = () =>
       ([...document.querySelectorAll('main .row')] as HTMLElement[]).filter(
-        (r) => r.querySelector('.label strong') && /^(Revenu|Charge fixe)/.test(t(r.closest('.card')?.previousElementSibling)),
+        (r) => r.querySelector('.label strong') && /^(Revenus|Charges fixes)/.test(t(r.closest('.card')?.previousElementSibling)),
       );
     const bouton = (parent: ParentNode, texte: string) => ([...parent.querySelectorAll('button')] as HTMLButtonElement[]).find((b) => t(b) === texte);
     const champ = (libelle: string) => ([...document.querySelectorAll('form.edit label.f')] as HTMLElement[]).find((l) => t(l).startsWith(libelle));
