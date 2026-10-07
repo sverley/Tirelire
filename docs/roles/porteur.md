@@ -7,9 +7,10 @@ Il lit le compte rendu du codeur et la vérification de l'auditeur, et passe la 
 joue le seuil 1, puis le harnais du besoin et les tests navigateur de l'issue, en entier, qui ne
 partent que si le reste est vert ; le seuil 2 hors navigateur a été joué avant, par la livraison et
 par l'auditeur, dont la vérification dit s'il a demandé les tests navigateur, et pourquoi (D83). Les
-tests navigateur de non-régression ne se jouent ni avant la fusion ni après : chaque nuit,
-sur `main` ; une nuit rouge ouvre une issue, ou complète celle d'une nuit précédente encore ouverte,
-sans bloquer aucune fusion (#307). Une branche qui ne
+tests navigateur de non-régression ne se jouent ni avant la fusion ni après : chaque nuit, la suite
+entière au seuil 2, tests navigateur compris, se joue sur `main`, sauf ce qu'une nuit a trouvé vert
+sur son empreinte ; une nuit rouge ouvre une issue, ou complète celle d'une nuit précédente encore
+ouverte, sans bloquer aucune fusion (#307, #383). Une branche qui ne
 contient pas le dernier `main` y est dite à mettre à jour, et rien d'autre ne se joue. Chaque
 ensemble de tests a son empreinte, l'état des chemins qu'il lit, et chaque fichier de test la
 sienne, l'état de ce qu'il lit (D83). La CI

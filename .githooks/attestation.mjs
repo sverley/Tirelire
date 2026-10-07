@@ -34,11 +34,12 @@
  *       La CI sur `main` : un ensemble se saute si son empreinte est celle d'une tête de PR verte au
  *       Ready, ou celle du premier parent.
  *   node attestation.mjs nuit <dossier> [<résumé>]
- *       La nuit (#307), sur le commit extrait de `main` : lit l'attestation de la nuit
- *       (`attestation-de-la-nuit` sur `origin`) et écrit dans `<dossier>` `verts.json`, `plan` (la
- *       ligne de l'interface dans le navigateur, au seuil 2, que lit `bilan`), `jouer` (`oui` ou `non` :
- *       non, son empreinte est déjà trouvée verte, rien de ce qu'ils lisent n'a changé) et
- *       `couverture.json`, que la nuit passe au lanceur (`--attestation`). Dit ce qui se joue.
+ *       La nuit (#307, #383), sur le commit extrait de `main` : lit l'attestation de la nuit
+ *       (`attestation-de-la-nuit` sur `origin`) et écrit dans `<dossier>` `verts.json`, `plan` (une
+ *       ligne par ensemble de la suite, au seuil 2, que lit `bilan`), `lancer` (les ensembles à jouer :
+ *       `id<TAB>dossier<TAB>vitest|node`), `jouer` (`oui` ou `non` : non, chaque ensemble est déjà
+ *       trouvé vert sur son empreinte, rien de ce que lit la suite n'a changé) et `couverture.json`,
+ *       que la nuit passe au lanceur (`--attestation`). Dit, pour chaque ensemble, ce qui se joue.
  *       `bilan … nuit <verts> --enregistrer`, puis `envoyer origin nuit attestation-de-la-nuit`,
  *       gardent ce qu'elle trouve vert pour les nuits suivantes.
  *
@@ -60,6 +61,7 @@ import {
   fusionner,
   lireLesEntrees,
   nomDe,
+  planDeLaNuit,
   planifier,
   resume,
   SEUIL_DE_MAIN,
@@ -327,8 +329,9 @@ if (commande === 'verts') {
   const couverture = couvertureApresFusion({ arbre, empreintes: empreintesDe(commit), tetes, parent: premier ? { commit: premier, empreintes: empreintesDe(premier) } : null });
   conclure(couverture, sortie, fichierResume, 'Empreintes vertes après la fusion');
 } else if (commande === 'nuit') {
-  // La nuit (#307) : la non-régression dans le navigateur, sur le commit extrait de `main`, au seuil 2,
-  // sauf ce que les nuits précédentes ont trouvé vert sur la même empreinte, ensemble ou fichier.
+  // La nuit (#307, #383) : la suite entière, chaque ensemble, sur le commit extrait de `main`, au
+  // seuil 2, sauf ce que les nuits précédentes ont trouvé vert sur la même empreinte, ensemble ou
+  // fichier.
   const [dossier, fichierResume] = args;
   mkdirSync(dossier, { recursive: true });
   const commit = git(['rev-parse', 'HEAD']);
@@ -344,21 +347,27 @@ if (commande === 'verts') {
   }
   writeFileSync(join(dossier, 'verts.json'), `${JSON.stringify(verts)}\n`);
   const e = empreintesDe(commit);
-  const [p] = planifier({ empreintes: e, seuil: SEUIL_DE_LA_NUIT, verts, navigateur: true }).filter((x) => x.id === 'navigateur');
-  writeFileSync(join(dossier, 'plan'), `${[p.id, p.jouer ? 1 : 0, p.seuil, p.empreinte ?? '-', p.raison].join('\t')}\n`);
-  writeFileSync(join(dossier, 'jouer'), p.jouer ? 'oui\n' : 'non\n');
+  const plan = planDeLaNuit({ empreintes: e, verts });
+  writeFileSync(join(dossier, 'plan'), `${plan.map((p) => [p.id, p.jouer ? 1 : 0, p.seuil, p.empreinte ?? '-', p.raison].join('\t')).join('\n')}\n`);
+  // Ce que la nuit lance : `id<TAB>dossier<TAB>vitest|node`, un ensemble par ligne.
+  const sorteDe = (d) => (/vitest/.test(essaie(() => JSON.parse(lire(join(d, 'package.json'))).scripts?.test) ?? '') ? 'vitest' : 'node');
+  const lances = plan.filter((p) => p.jouer).map((p) => [p.id, p.dossier, sorteDe(p.dossier)].join('\t'));
+  writeFileSync(join(dossier, 'lancer'), lances.length ? `${lances.join('\n')}\n` : '');
+  writeFileSync(join(dossier, 'jouer'), lances.length ? 'oui\n' : 'non\n');
   const couverture = couvertureLocale({ origine: 'nuit', arbre, empreintes: e, fichiers: fichiersDe(commit), verts });
   writeFileSync(join(dossier, 'couverture.json'), `${JSON.stringify(couverture, null, 2)}\n`);
-  const attestes = Object.values(couverture.fichiers).filter((f) => f.ensemble === 'navigateur' && f.seuil >= SEUIL_DE_LA_NUIT).length;
-  const lignes = [
-    `- Commit de main jugé : ${commit.slice(0, 10)}.`,
-    `- ${lu.charAt(0).toUpperCase()}${lu.slice(1)}.`,
-    p.jouer
-      ? `- ${nomDe(p.id)}, seuil ${p.seuil} : se joue${attestes ? ` ; ${attestes} fichier(s) attesté(s) vert(s) sur leur empreinte, que le lanceur saute en les nommant` : ''}.`
-      : `- ${nomDe(p.id)}, seuil ${p.seuil} : rien ne se joue cette nuit — ${p.raison} ; rien de ce qu'ils lisent n'a changé.`,
-  ];
+  const lignes = [`- Commit de main jugé : ${commit.slice(0, 10)}.`, `- ${lu.charAt(0).toUpperCase()}${lu.slice(1)}.`];
+  for (const p of plan) {
+    const attestes = Object.values(couverture.fichiers).filter((f) => f.ensemble === p.id && f.seuil >= SEUIL_DE_LA_NUIT).length;
+    lignes.push(
+      p.jouer
+        ? `- ${nomDe(p.id)}, seuil ${p.seuil} : se joue${attestes ? ` ; ${attestes} fichier(s) attesté(s) vert(s) sur leur empreinte, que le lanceur saute en les nommant` : ''}.`
+        : `- ${nomDe(p.id)}, seuil ${p.seuil} : sauté — ${p.raison} ; rien de ce qu'il lit n'a changé.`,
+    );
+  }
+  if (!lances.length) lignes.push("- Rien ne se joue cette nuit : rien de ce que lit la suite n'a changé depuis qu'une nuit l'a trouvée verte.");
   for (const l of lignes) console.log(l);
-  if (fichierResume) appendFileSync(fichierResume, `### Tests navigateur de la nuit\n\n${lignes.join('\n')}\n`);
+  if (fichierResume) appendFileSync(fichierResume, `### La suite de la nuit\n\n${lignes.join('\n')}\n`);
 } else {
   console.error('usage : attestation.mjs verts | plan | couverture | bilan | envoyer | ready | apres-fusion | nuit …');
   process.exit(2);

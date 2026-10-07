@@ -263,21 +263,30 @@ describe('[niveau 1] #307, point 3 · chaque nuit, les tests navigateur sur main
       assert.equal(r.status, 0, r.stderr);
       return { sortie: r.stdout, jouer: readFileSync(join(d(n), 'jouer'), 'utf8').trim(), couverture: JSON.parse(readFileSync(join(d(n), 'couverture.json'), 'utf8')) };
     };
-    /** Un lancement simulé : les fichiers verts ou rouges, puis le bilan et l'envoi, comme dans `nuit.yml`. */
+    /**
+     * Un lancement simulé de chaque ensemble que la nuit lance (`lancer`, #383) : les autres ensembles
+     * verts, les tests navigateur verts ou rouges selon `états` ; puis le bilan et l'envoi, comme dans
+     * `nuit.yml`.
+     */
     const jouée = (n, états) => {
       const j = join(d(n), 'journaux');
       mkdirSync(j, { recursive: true });
-      const rouge = Object.values(états).includes('rouge');
-      writeFileSync(join(j, 'lances'), 'navigateur\tnavigateur\tvitest\n');
-      writeFileSync(join(j, 'navigateur.code'), rouge ? '1\n' : '0\n');
-      writeFileSync(join(j, 'navigateur.log'), '');
-      writeFileSync(join(j, 'navigateur.rapport'), JSON.stringify({ testResults: Object.entries(états).map(([x, e]) => ({ name: join(f.dépôt, `apps/web/test/navigateur/${x}.test.ts`), status: e === 'vert' ? 'passed' : 'failed', assertionResults: [] })) }));
-      writeFileSync(join(j, 'navigateur.bilan'), JSON.stringify({ lisible: true, fichiers: Object.entries(états).map(([x, e]) => ({ fichier: `apps/web/test/navigateur/${x}.test.ts`, ensemble: 'navigateur', etat: e, seuil: 2 })) }));
+      const lancer = readFileSync(join(d(n), 'lancer'), 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t'));
+      writeFileSync(join(j, 'lances'), lancer.map(([id, , sorte]) => `${id}\t${id}\t${sorte}\n`).join(''));
+      for (const [id, , sorte] of lancer) {
+        const nav = id === 'navigateur';
+        const rouge = nav && Object.values(états).includes('rouge');
+        writeFileSync(join(j, `${id}.code`), rouge ? '1\n' : '0\n');
+        writeFileSync(join(j, `${id}.log`), '');
+        if (sorte === 'vitest') writeFileSync(join(j, `${id}.rapport`), JSON.stringify({ testResults: nav ? Object.entries(états).map(([x, e]) => ({ name: join(f.dépôt, `apps/web/test/navigateur/${x}.test.ts`), status: e === 'vert' ? 'passed' : 'failed', assertionResults: [] })) : [] }));
+        if (nav) writeFileSync(join(j, `${id}.bilan`), JSON.stringify({ lisible: true, fichiers: Object.entries(états).map(([x, e]) => ({ fichier: `apps/web/test/navigateur/${x}.test.ts`, ensemble: 'navigateur', etat: e, seuil: 2 })) }));
+      }
       const b = spawnSync('node', ['.githooks/attestation.mjs', 'bilan', join(d(n), 'plan'), j, 'la nuit', f.git('rev-parse', 'HEAD^{tree}'), f.git('rev-parse', 'HEAD'), 'nuit', join(d(n), 'verts.json'), '--enregistrer'], { cwd: f.dépôt, env: f.env, encoding: 'utf8' });
       assert.equal(b.status, 0, b.stderr);
       const e = spawnSync('node', ['.githooks/attestation.mjs', 'envoyer', 'origin', 'nuit', 'attestation-de-la-nuit'], { cwd: f.dépôt, env: f.env, encoding: 'utf8' });
       assert.match(e.stdout, /envoyée \(attestation-de-la-nuit\)/, e.stdout + e.stderr);
     };
+    const lancés = (n) => readFileSync(join(d(n), 'lancer'), 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t')[0]);
 
     const première = nuit(1);
     assert.equal(première.jouer, 'oui', première.sortie);
@@ -291,11 +300,13 @@ describe('[niveau 1] #307, point 3 · chaque nuit, les tests navigateur sur main
 
     const troisième = nuit(3);
     assert.equal(troisième.jouer, 'non', troisième.sortie);
-    assert.match(troisième.sortie, /rien ne se joue cette nuit — empreinte trouvée verte par la nuit, sur le commit [0-9a-f]{10}, au seuil 2 ; rien de ce qu'ils lisent n'a changé/);
+    assert.match(troisième.sortie, /interface dans le navigateur, seuil 2 : sauté — empreinte trouvée verte par la nuit, sur le commit [0-9a-f]{10}, au seuil 2/);
+    assert.match(troisième.sortie, /Rien ne se joue cette nuit/);
 
     f.écrire('docs/note.md', 'rien que de la documentation\n');
     f.commettre('docs');
-    assert.equal(nuit(4).jouer, 'non', 'la documentation : les tests navigateur ne la lisent pas');
+    nuit(4);
+    assert.ok(!lancés(4).includes('navigateur'), 'la documentation : les tests navigateur ne la lisent pas');
     f.écrire('apps/web/src/x.ts', 'export const x = 2;\n');
     f.commettre('code');
     const cinquième = nuit(5);
@@ -397,9 +408,10 @@ describe('[niveau 1] #307, point 4 · une nuit rouge — même sans avoir pu jou
       assert.equal(r.status, 0, r.stderr + r.stdout);
       return JSON.parse(readFileSync(join(d, 'appels'), 'utf8').trim());
     };
-    assert.deepEqual(jouée('failure', '/n'), ['signaler', 'rouge', COMMIT, '/n/journaux/navigateur.rapport', EXECUTION]);
-    assert.deepEqual(jouée('success', '/n'), ['signaler', 'vert', COMMIT, '/n/journaux/navigateur.rapport', EXECUTION], 'tests verts : la nuit est verte');
-    assert.deepEqual(jouée('skipped', null), ['signaler', 'rouge', COMMIT, `${d}/nuit/journaux/navigateur.rapport`, EXECUTION], 'tests sautés : rouge ; sans le dossier de la nuit, celui que le plan lui aurait donné');
+    // #383 : les journaux de tous les ensembles joués, et non plus le seul rapport des tests navigateur.
+    assert.deepEqual(jouée('failure', '/n'), ['signaler', 'rouge', COMMIT, '/n/journaux', EXECUTION]);
+    assert.deepEqual(jouée('success', '/n'), ['signaler', 'vert', COMMIT, '/n/journaux', EXECUTION], 'tests verts : la nuit est verte');
+    assert.deepEqual(jouée('skipped', null), ['signaler', 'rouge', COMMIT, `${d}/nuit/journaux`, EXECUTION], 'tests sautés : rouge ; sans le dossier de la nuit, celui que le plan lui aurait donné');
     assert.equal(existsSync(join(d, 'appels-gh')), false, 'gh ne sert que sans le dépôt');
   });
 
