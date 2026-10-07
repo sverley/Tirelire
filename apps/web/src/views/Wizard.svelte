@@ -16,6 +16,10 @@
   import SectionComptes from '../lib/SectionComptes.svelte';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
+  import { fichierAEnregistrer, preparerValidation } from '../lib/brouillon';
+  import { direDifference } from '../lib/differenceAssistant';
+  import { saveFile } from '../lib/platform';
+  import { budgetDefiniEnJson } from '@tirelire/core';
   import { UNITS, money, periodicityLabel, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
   import {
     activeAt,
@@ -516,9 +520,39 @@
     catError = '';
   }
   /**
-   * La validation : seul geste qui écrit dans le projet, et il y écrit tout ce que l'assistant montre
-   * (D40). Refusée en cours de route, elle le dit et garde le brouillon : valider de nouveau écrit ce
-   * qui manque.
+   * Ce que la validation va changer au projet du moment (#379, point 3) : la différence entre le
+   * brouillon et ce que l'assistant a lu, dite partie par partie, et les lignes changées des deux côtés.
+   */
+  const aValider = $derived.by(() => {
+    const { difference, preparation } = preparerValidation(app.ledger, brouillon);
+    const montre = app.assistantLedger;
+    const nommer = (prop: string, id: string): string | undefined => {
+      const table = prop === 'tirelireId' ? montre.tirelires : prop === 'categoryId' || prop === 'parentId' ? montre.categories : montre.accounts;
+      return (table as Array<{ id: string; name?: string }>).find((l) => l.id === id)?.name;
+    };
+    return direDifference(difference, preparation.ok ? preparation.conflits : [], nommer);
+  });
+
+  /**
+   * Enregistre le brouillon sur l'appareil, en budget JSON version 2, nommé avec la date (#379,
+   * point 5) : rien n'est validé, rien ne quitte l'appareil (I7).
+   */
+  let enregistrement = $state('');
+  async function enregistrerBrouillon() {
+    const json = budgetDefiniEnJson(fichierAEnregistrer(app.ledger, $state.snapshot(brouillon)));
+    const nom = `tirelire-budget-${todayISO()}.json`;
+    try {
+      await saveFile(nom, new TextEncoder().encode(JSON.stringify(json, null, 2) + '\n'), 'application/json');
+      enregistrement = `Brouillon enregistré sur cet appareil : ${nom}. Rien n’est validé.`;
+    } catch {
+      enregistrement = 'Le brouillon n’a pas pu être enregistré sur cet appareil.';
+    }
+  }
+
+  /**
+   * La validation : seul geste qui écrit dans le projet, et il n'y applique que la différence entre le
+   * brouillon et ce que l'assistant a lu, tout en une fois (D40, #379). Refusée, elle n'écrit rien, dit
+   * le premier problème et le nombre des autres, et garde le brouillon.
    */
   function valider() {
     try {
@@ -527,7 +561,7 @@
       valide = true;
       erreurValidation = '';
     } catch (err) {
-      erreurValidation = `L’enregistrement s’est arrêté : ${err instanceof Error ? err.message : String(err)} Vos réponses sont toujours là : validez de nouveau pour enregistrer ce qui manque.`;
+      erreurValidation = `Votre budget n’a pas été validé : ${err instanceof Error ? err.message : String(err)} Vos réponses sont toujours là : corrigez-les, puis validez de nouveau.`;
     }
   }
 </script>
@@ -576,6 +610,10 @@
       <button class="btn primary" onclick={next}>Commencer</button>
     </div>
   </div>
+  <p class="muted small">
+    Vous avez enregistré un budget (JSON) ?
+    <button class="btn small" onclick={() => app.go('importBudget')}>Reprendre un budget (JSON)</button>
+  </p>
 {:else if step === 'income'}
   <h2>Qu'est-ce qui rentre, et quand ?</h2>
   <p class="muted small">
@@ -932,11 +970,45 @@
       <button class="btn" onclick={() => app.switchTab('import')}>Importer un relevé</button>
     </div>
   {:else}
+    <h3>Ce que la validation va changer</h3>
+    {#if aValider.vide}
+      <p class="muted small">Aucun changement : votre budget est déjà celui que l’assistant montre.</p>
+    {:else}
+      <div class="card difference">
+        {#each aValider.parties as partie (partie.nom)}
+          <h4>{partie.nom}</h4>
+          <ul>
+            {#each partie.ajouts as l, i (i)}<li><span class="pill">Ajouté</span> {l.texte}</li>{/each}
+            {#each partie.modifications as l, i (i)}<li><span class="pill">Modifié</span> {l.texte}{#if l.detail}<span class="muted small"> — {l.detail}</span>{/if}</li>{/each}
+            {#each partie.retraits as l, i (i)}<li><span class="pill neg">Retiré</span> {l.texte}</li>{/each}
+          </ul>
+        {/each}
+        {#if aValider.reglages.length}
+          <h4>Réglages</h4>
+          <ul>
+            {#each aValider.reglages as l (l.texte)}<li><span class="pill">Modifié</span> {l.texte}<span class="muted small"> — {l.detail}</span></li>{/each}
+          </ul>
+        {/if}
+      </div>
+    {/if}
+    {#if aValider.conflits.length}
+      <div class="card warn" role="status">
+        <p style="margin:0 0 6px"><strong>Changé aussi ailleurs.</strong> Ces lignes ont été modifiées hors de l’assistant depuis son ouverture : la version de l’assistant sera retenue.</p>
+        <ul style="margin:0">
+          {#each aValider.conflits as l, i (i)}<li>{l.texte}<span class="muted small"> — {l.detail}</span></li>{/each}
+        </ul>
+      </div>
+    {/if}
     {#if erreurValidation}<div class="err">{erreurValidation}</div>{/if}
     <div class="actions">
       <button class="btn" onclick={prev}>‹ Précédent</button>
       <button class="btn primary" onclick={valider}>Valider mon budget</button>
     </div>
+    <p class="muted small">
+      Pour le reprendre plus tard ou sur un autre appareil, sans rien valider :
+      <button class="btn small" onclick={enregistrerBrouillon}>Enregistrer ce brouillon (JSON)</button>
+    </p>
+    {#if enregistrement}<p class="small" role="status">{enregistrement}</p>{/if}
   {/if}
 {/if}
 

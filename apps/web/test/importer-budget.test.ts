@@ -8,8 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import initSqlJs from 'sql.js';
-import { LedgerStore, computePlan, exampleLedger, importerBudgetJson, type Ledger } from '@tirelire/core';
-import { brouillonDImport, brouillonIntact, montrer, valider } from '../src/lib/brouillon';
+import { LedgerStore, computePlan, exampleLedger, importerBudgetJson, lireBudgetJson, type Ledger } from '@tirelire/core';
+import { brouillonDuFichier, brouillonIntact, montrer, valider } from '../src/lib/brouillon';
 import { ADRESSE_BUDGET, adressePorteUnBudget, budgetDeLAdresse } from '../src/lib/importBudget';
 
 const SQL = await initSqlJs();
@@ -29,7 +29,9 @@ async function importe() {
   const projet = store.load();
   const lu = importerBudgetJson(EXEMPLE, projet);
   if (!lu.ok) throw new Error(lu.message);
-  return { store, projet, brouillon: brouillonDImport(projet, lu.application) };
+  const budget = lireBudgetJson(EXEMPLE);
+  if (!budget.ok) throw new Error(budget.message);
+  return { store, projet, brouillon: brouillonDuFichier(projet, budget.budget) };
 }
 
 describe('[niveau 4] #367 · 3 — un JSON accepté ouvre l’assistant sur son résumé, le budget posé sur le projet', () => {
@@ -114,7 +116,7 @@ describe('[niveau 4] #367 · 4 — par une adresse, avec un brouillon non vide, 
 
 describe('[niveau 4] #367 · 2 — l’assistant déjà affiché passe au brouillon importé', () => {
   it('un import change la version de l’assistant, et l’écran se remonte sur elle', () => {
-    expect(lire('src/lib/state.svelte.ts')).toMatch(/this\.assistant = brouillonDImport\([^)]*\);\s*this\.versionAssistant\+\+;/);
+    expect(lire('src/lib/state.svelte.ts')).toMatch(/this\.assistant = brouillonDuFichier\([^)]*\);\s*this\.versionAssistant\+\+;/);
     expect(lire('src/App.svelte')).toMatch(/\{#key app\.versionAssistant\}<Wizard \/>\{\/key\}/);
   });
 });

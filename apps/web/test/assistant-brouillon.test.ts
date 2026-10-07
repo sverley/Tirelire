@@ -181,15 +181,17 @@ describe('[niveau 4] #210 · 2 — le budget entre en entier ou pas du tout, mê
     const projet = store.load();
     const b = preparer(projet);
     const avant = JSON.stringify([store.load(), store.readSettings()]);
-    // Un brouillon rempli autrement que par `retirer` : la validation ne s'y fie pas.
-    b.lignes.accounts![MAIN_ACCOUNT_ID] = { ...projet.accounts.find((a) => a.id === MAIN_ACCOUNT_ID)!, deletedAt: '2026-10-03T08:00:00.000Z' } as never;
+    // Un brouillon rempli autrement que par `retirer` : la validation ne s'y fie pas (#379 : le fichier
+    // porte un compte au genre « principal » sous un autre identifiant, que le dépôt refuse).
+    const intrus = { id: 'acc-intrus', v: { ...b.fichier.tables.accounts!.find((l) => l.id === MAIN_ACCOUNT_ID)!.v } };
+    b.fichier.tables.accounts!.push(intrus);
 
     expect(() => valider(store, projet, b)).toThrow(RowRefused);
     expect(ecritures.n).toBe(0);
     expect(JSON.stringify([store.load(), store.readSettings()])).toBe(avant);
 
     // Le brouillon n'a rien perdu : sans le retrait refusé, il entre en entier.
-    delete b.lignes.accounts![MAIN_ACCOUNT_ID];
+    b.fichier.tables.accounts!.splice(b.fichier.tables.accounts!.indexOf(intrus), 1);
     ecrire(b, 'accounts', { ...projet.accounts.find((a) => a.id === MAIN_ACCOUNT_ID)!, name: 'Compte courant', openingBalance: 150000 });
     valider(store, projet, b);
     expect([...vivantes(store.load(), 'tirelires').keys()].sort()).toEqual(['t-loyer', 't-vacances']);
