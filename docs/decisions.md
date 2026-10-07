@@ -170,15 +170,21 @@ blocage. Laisser un écart est légitime — un revenu arrive, on provisionnera 
 doit pouvoir présenter un écart comme « à surveiller » plutôt que « à faire ». Le compte principal est un lieu
 de stockage comme un autre, à durée de séjour courte : aucune règle particulière ne lui est attachée.
 
-### D21 · Virement groupé à ventilation prévue
+### D21 · Virement groupé, ventilé par ses parts
 
-Les écarts vers un même compte cible donnent un **virement permanent unique**, enregistré comme flux
-attendu avec la ventilation que l'utilisateur a validée (D60). À l'import, la ligne bancaire est
-reconnue par montant et libellé (D11), et sa ventilation proposée. Ce que les parts de cette
-ventilation n'absorbent pas — montant constaté différent du prévu, permanent posé il y a six mois,
-besoins qui ont bougé — se répartit par l'ordre de financement de D06, planchers d'abord puis
-priorités, plutôt qu'un prorata qui saupoudrerait. L'écart retourne dans les positions de tirelires
-et se représente au tour suivant.
+Les écarts vers un même compte d'accueil donnent un **virement permanent unique**, enregistré comme
+flux de virement avec la ventilation que l'utilisateur a validée (D60) ; le diviser en plusieurs
+ordres est une souplesse sur demande (#25), et plusieurs flux de virement vers le même compte
+s'additionnent. À l'import, la ligne bancaire est reconnue par montant et libellé (D11, D12), et
+l'opération qui reprend l'occurrence prend les parts du flux, comme pour tout automatisme (D24,
+D88). Ce que les parts n'absorbent pas — montant constaté différent, parts fixes qui n'ont pas
+suivi le budget — reste **non affecté** sur le compte d'accueil (D29), visible, et le plan le dit ;
+rien ne se répartit d'office. L'ordre de financement de D06 n'est pas une répartition rejouée sur
+l'opération : il est le contenu de ce que le plan **propose** — la ventilation d'un ordre à sa
+validation (U2), celle d'un virement importé qu'aucun flux ne reprend et dont on fait un flux (U3,
+#16) —, que l'utilisateur garde, corrige ou refuse (principe 4.4). Une ventilation calculée depuis
+l'état du plan au jour de l'opération serait une ventilation supposée, ce que U4 interdit ; D27 la
+range parmi les aides, dont le résultat se fige sur l'opération quand il est accepté.
 
 ### D22 · Trois états d'une opération, la vérité est ce qui est verrouillé
 
@@ -222,7 +228,10 @@ sa ventilation, que l'opération prend si elle n'en a pas, et le verrouillage, s
 automatisme n'est engendré à part d'un flux : une opération que sa sélection ne reconnaît pas n'est
 ni reprise ni classée par lui. Modifier le flux ne réécrit aucune opération déjà reprise : elle a
 pris, en le reprenant, ce que le flux lui donnait, et le moteur d'automatismes repart de ce que la
-reprise a établi (D33).
+reprise a établi (D33). L'action d'un flux a la forme de celle d'un automatisme (D23) : une
+ventilation en parts, chacune une sous-opération sans identifiant — tirelire, catégorie, et les axes
+qui viendront (D88) —, et l'état ; une seule forme et un seul code pour les automatismes et les flux,
+l'ordre permanent compris (D60). Un flux créé depuis une opération (#16) en prend la ventilation.
 
 ### D25 · Abandon de l'année budgétaire
 
@@ -1059,13 +1068,16 @@ budget au réel. Les deux sens de lecture sont de premier rang, aucun n'est un m
   analyse et constat : ce qu'on dépense vraiment, à quel rythme, sur quoi. L'application propose,
   l'utilisateur arbitre — les propositions ne deviennent jamais des décisions toutes seules.
 
-Conséquence sur ce qui est stocké. Un flux **déclaré** (un salaire, un loyer, une échéance connue)
-est un fait : il appartient à l'utilisateur, rien ne le réécrit. Un flux **dérivé** du budget (un
-virement permanent) naît d'un calcul : ce que le budget demande se recalcule à chaque changement du
-budget, et l'application signale ce qui a bougé, plutôt que d'attendre qu'on pense à appuyer sur un
-bouton. Une fois sa mise en place validée, ce que l'utilisateur a posé chez sa banque et la
-ventilation qu'il a choisie sont à lui : rien ne les réécrit, l'application en propose l'évolution
-(D60, I10). Les deux sortes de flux doivent être distinguables dans le modèle comme à l'écran.
+Conséquence sur ce qui est stocké. Un flux est un fait — un salaire, un loyer, une échéance connue,
+un ordre permanent posé chez la banque avec la ventilation choisie — : ce que l'utilisateur déclare
+ou valide, et rien ne le réécrit. Ce que le budget demande — l'ordre permanent qu'il faudrait, les
+dotations, les virements à faire — se recalcule à chaque changement du budget et ne se stocke pas ;
+l'application signale ce qui a bougé, plutôt que d'attendre qu'on pense à appuyer sur un bouton, et
+en propose l'évolution (D60, I10). Il n'y a donc pas deux sortes de flux : un flux de virement du
+compte principal vers un compte d'accueil est un ordre permanent, que le plan compare à ce que le
+budget demande dès qu'une tirelire est placée sur ce compte (D60), qu'il ait été validé depuis le
+plan ou l'assistant, ou créé depuis une opération importée (U4, #16). Ce qui distinguait un flux
+« dérivé » — une ventilation rejouée, un montant qui suivait le budget — n'existe plus depuis D60.
 
 Ce qui se fige, c'est ce que la banque a fait — les opérations — et ce que l'utilisateur a validé,
 jamais une photo de ce que le budget prévoit : une photo cesse d'être vraie sans que rien ne le
@@ -1227,8 +1239,8 @@ dans les deux sens :
   priorité changée se voient au tour suivant sans autre geste.
 - **Ce que l'ordre exécute chez la banque** est un fait du monde réel. L'application ne peut ni le
   connaître ni le changer, et elle en a pourtant besoin — avec sa tolérance — pour reconnaître la
-  ligne à l'import. C'est le seul des deux qui s'enregistre : le `amount` d'un `PlannedFlow` dont
-  `origin` vaut `derived`.
+  ligne à l'import. C'est le seul des deux qui s'enregistre : le montant du flux de virement vers ce compte
+  (D57).
 
 Faire suivre le montant enregistré au budget aurait cassé la reconnaissance dès le mois où le budget
 bouge, alors que l'ordre bancaire, lui, n'avait pas changé. Le bouton de l'écran Plan ne disparaît
@@ -1249,15 +1261,21 @@ l'utilisateur modifie librement. Les parts flottantes se recalculent sur le mont
 part fixe ne suit pas le budget, et son écart avec ce que le budget demande pour sa tirelire se
 propose comme celui du montant, au-delà du même pas, sans être réécrit (I10). À l'import, ce que les
 parts n'absorbent pas se répartit par l'ordre de financement au jour de l'opération (D06, D21),
-planchers d'abord (`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée se
-répartit ainsi en entier. Le flux ne fige pas de montants tirés du plan au moment de
-l'enregistrement : ce ne serait pas une ventilation choisie.
+planchers d'abord, ~~(`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée
+se répartit ainsi en entier~~ — amendé le 7 octobre 2026 : l'opération prend les parts de l'ordre,
+à l'import comme au solde prévu (D24, D88), et ce qu'elles n'absorbent pas reste non affecté sur le
+compte d'accueil, dit par le plan (D21, D29). La ventilation s'écrit comme l'action d'un automatisme
+(D24). Le flux ne fige pas de montants tirés du plan au moment de l'enregistrement : la ventilation
+proposée à la validation, l'utilisateur la fait sienne en la validant.
 
-Un virement saisi à la main est un flux déclaré comme un autre : il n'est pas pris pour l'ordre
-permanent, que le plan ne compare qu'à un flux dérivé, et rien ne le réécrit (D57).
+Tout flux de virement du compte principal vers un compte d'accueil est un ordre permanent (D57) :
+le plan compare leur somme à ce que le budget demande pour ce compte, et ne compare rien pour un
+compte où aucune tirelire n'est placée (D38) — sans budget, le budget ne parle d'aucun compte (U4,
+U5). Un virement saisi comme opération n'est pas un flux : rien ne le compare ni ne le réécrit.
 
 Ce que le budget demande comme ordre permanent est **la somme des dotations mensuelles** des
-tirelires placées sur ce compte, quoi qu'il ait déjà été viré dans la période — c'est un régime, pas
+tirelires placées sur ce compte, depuis le compte principal où naissent les dotations (D29), quoi
+qu'il ait déjà été viré dans la période — c'est un régime, pas
 un reste à faire. Comparer l'ordre au reste à virer (`PlanTransfer.standing`) allumait l'alerte le
 lendemain de chaque virement. Quatre cas s'en déduisent, et sont tenus par le harnais : un objectif
 atteint sort de la somme (il ne demande plus rien, D06) ; une échéance déjà provisionnée y reste
