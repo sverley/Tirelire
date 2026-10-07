@@ -116,6 +116,15 @@ dans la garde. Un changement de comportement de la garde est expliqué et justif
 rendu du codeur : il nomme les tests de la garde de `main` qui rougissent avec la garde proposée, et
 ceux qu'il modifie ; la validation du porteur le couvre.
 
+Un besoin d'outillage qui ne change qu'un réglage ou un texte — une heure, un déclenchement, une
+condition, un message, un nom — se vérifie comme la documentation (#382) : l'architecte le dit dans
+l'issue, après la ligne « Usages », par « Vérification : relecture », et son « Fait quand » ne
+demande alors aucun test ; le codeur n'écrit pas de test, l'auditeur pas de harnais, et rien ne
+s'ajoute aux tests de la garde ; l'auditeur relit le diff et joue la garde hors ligne, sans
+`pnpm test 2` (D92). Un auditeur qui juge qu'un test le mérite le dit dans la PR, et le porteur
+tranche. Un test qui recopie un réglage ne vérifie que la recopie : il est une seconde place pour la
+même valeur (D78), et rougit à chaque changement voulu (05ede00, qui a changé l'heure de la nuit).
+
 Les tests de la garde sont ceux qui vérifient la garde elle-même : ses trois vérifications et la
 règle des harnais ; ils vivent dans `packages/gardes/gardes.test.mjs`. Eux et les harnais du registre
 servent le même but — que les principes et les règles ne soient pas enfreints — et se traitent de la
@@ -225,7 +234,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; sauf ce qui est vert sur son empreinte |
   | CI au Ready | 1, plus le harnais du besoin et les tests navigateur de l'issue, en entier ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
   | CI après la fusion, sur `main` | 1, sans tests navigateur ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
-  | Nuit, sur le dernier commit de `main` (vers 3 h UTC) | 2, les tests navigateur seuls ; sauf ce qu'une nuit a trouvé vert sur son empreinte |
+  | Chaque nuit, sur le dernier commit de `main` | 2, les tests navigateur seuls ; sauf ce qu'une nuit a trouvé vert sur son empreinte |
   | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option ; sauf ce qui est vert sur son empreinte |
 
@@ -319,8 +328,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   navigateur de non-régression — tout fichier de `apps/web/test/navigateur/` qui n'est pas un test de
   l'issue, harnais du registre compris — ne se jouent ni avant la fusion ni à la CI d'une fusion sur
   `main` : ni à la livraison, ni au Ready, ni après la fusion ; ils ne décident d'aucune fusion
-  (porteur, #307 : « main ne part pas en prod, mais en preview »). Chaque nuit, vers 3 h UTC,
-  `nuit.yml` les joue sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur
+  (porteur, #307 : « main ne part pas en prod, mais en preview »). Chaque nuit, `nuit.yml` les
+  joue sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur
   son empreinte : une nuit où rien de ce qu'ils lisent n'a changé ne joue rien, et le dit ; ce qu'une
   nuit trouve vert vaut pour les nuits suivantes, tant que ce qu'il lit ne change pas (l'attestation
   de la nuit, sur la branche `attestation-de-la-nuit`, écrite par l'outillage). Une nuit rouge se
@@ -519,8 +528,13 @@ que le principe 10.1 demande à la CI vaut pour elle (#351).
 - **Les sorties longues dans un fichier.** Les sorties longues — installation, tests, crochets —
   s'écrivent dans un fichier, dont la session ne lit que le verdict et ce qui échoue.
 - **L'audit d'un besoin sans code.** Pour un besoin sans code, l'audit est la relecture et la garde
-  hors ligne, sans `pnpm test 2` (D81). Ce que la livraison a attesté ne se rejoue pas : le lanceur
-  dit ce qu'il saute (D83, « Les empreintes »).
+  hors ligne, sans `pnpm test 2` (D81). Il en va de même d'un besoin d'outillage qui ne change qu'un
+  réglage ou un texte — une heure, un déclenchement, une condition, un message, un nom —, que
+  l'issue dit par « Vérification : relecture » : l'auditeur relit le diff et joue la garde hors
+  ligne ; le codeur n'y écrit pas de test, l'auditeur pas de harnais, et rien ne s'ajoute aux tests
+  de la garde (D81, #382). Un test qui recopie un réglage ne vérifie que la recopie : il est une
+  seconde place pour la même valeur (D78), et rougit à chaque changement voulu (05ede00). Ce que la
+  livraison a attesté ne se rejoue pas : le lanceur dit ce qu'il saute (D83, « Les empreintes »).
 - **La documentation de l'architecte.** Une documentation codée en direct par l'architecte reste
   chez lui : il reprend lui-même les retours de l'auditeur, sans session de codeur. L'auditeur la
   vérifie : celui qui vérifie n'est pas celui qui code (principe 11).

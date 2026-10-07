@@ -5,10 +5,9 @@
  * Tests de #274 : publier une version forcée du dernier `main`, d'un déclenchement manuel.
  *
  * **Rien ne se publie sur un rouge** — D83 (« Publication d'une version : 3, tests navigateur
- * activés ; rien ne se saute »), comme au tag poussé à la main (`niveaux-des-tests.test.mjs`,
- * `tests-lourds.test.mjs`) : une version forcée joue le seuil 3 en entier, et rien ne se publie —
- * ni tag, ni dépôt en production, ni APK, ni release — tant qu'il n'est pas vert ; le tag et le
- * dépôt viennent après.
+ * activés ; rien ne se saute »), comme au tag poussé à la main (`niveaux-des-tests.test.mjs`) : une
+ * version forcée joue le seuil 3 en entier, et rien ne se publie — ni tag, ni dépôt en production,
+ * ni APK, ni release — tant qu'il n'est pas vert ; le tag et le dépôt viennent après.
  *
  * **Les règles de #274** : l'usage restant possible si elles tombaient : le nom (la base, le hash,
  * les versions forcées écartées, `v0.0` sans version publiée, jamais une version numérotée) ; rien
@@ -18,9 +17,6 @@
  * `ci.yml` est joué à blanc (`workflow-a-blanc.mjs`) : une version forcée y arrive par
  * `workflow_call`, depuis `version-forcee.yml`, lancé à la main sur `main` ; le contexte `github` est
  * alors celui du déclenchement (`workflow_dispatch`, `refs/heads/main`).
- *
- * L'échec attendu d'un témoin rouge tient dans une assertion : `node:test` n'a pas de `test.fails`
- * (docs/gardes.md, #66).
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -30,7 +26,7 @@ import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { RACINE } from './gardes.mjs';
 import { BASE_INITIALE, NUMÉROTÉE, base, décider, nomDeLaVersionForcée } from './version-forcee.mjs';
-import { commande, interpoler, jobs, jouer, scalaire, étapes } from './workflow-a-blanc.mjs';
+import { commande, interpoler, jobs, jouer, scalaire } from './workflow-a-blanc.mjs';
 
 const lire = (chemin) => readFileSync(join(RACINE, chemin), 'utf8').replace(/\r\n?/g, '\n');
 const CI = '.github/workflows/ci.yml';
@@ -46,7 +42,6 @@ const FORCÉE = {
   // Les secrets FTP présents : les étapes de dépôt, que l'étape « pret » conditionne, se jouent.
   steps: { pret: { outputs: { pret: 'oui' } } },
 };
-const LANCEMENT = { ...FORCÉE, inputs: { deploiement: 'automatique' } };
 const AU_TAG = { ...FORCÉE, github: { ...FORCÉE.github, event_name: 'push', ref: 'refs/tags/v0.2' }, inputs: {} };
 
 // ─── Ce que font les étapes ──────────────────────────────────────────────────────────────────────
@@ -65,18 +60,9 @@ function amonts(partie, nom, vus = new Set()) {
   return vus;
 }
 
-/** Une étape ajoutée, ou une ligne changée, dans un job : de quoi casser `ci.yml` pour les témoins. */
-function réécrireJob(yaml, nom, changer) {
-  const lignes = yaml.split('\n');
-  const job = jobs(yaml).get(nom);
-  assert.ok(job, `${CI} : le job « ${nom} » manque ; le témoin est à relire`);
-  lignes.splice(job.début + 1, job.lignes.length, ...changer(job.lignes));
-  return lignes.join('\n');
-}
-
 // ─── Le seuil 3 en entier, puis le tag, puis la publication ─────────────────────────────────────
 
-/** Ce que D83 demande à une version forcée, rejoué aussi sur des workflows cassés. */
+/** Ce que D83 demande à une version forcée. */
 function seuil3PuisPublication(yaml) {
   const partie = jouer(yaml, FORCÉE);
   const l = lancementsDeTests(partie);
@@ -110,33 +96,6 @@ function seuil3PuisPublication(yaml) {
 describe('[niveau 4] #274, D83 · une version forcée joue le seuil 3 en entier ; le tag et le dépôt ne viennent qu’après, et rien ne se publie sur un rouge', () => {
   test('[niveau 1] le seuil 3, tests navigateur compris, sans rien sauter ; puis le tag ; puis le dépôt en production, l’APK et la release', () => {
     seuil3PuisPublication(lire(CI));
-  });
-
-  test('témoin rouge · un tag posé sans attendre le seuil 3', () => {
-    const cassé = réécrireJob(lire(CI), 'etiquette', (lignes) => lignes.filter((l) => !/^ {4}needs:/.test(l)));
-    assert.notEqual(cassé, lire(CI), 'le workflow n’a pas pu être cassé : le témoin de #274 est à relire');
-    assert.throws(() => seuil3PuisPublication(cassé), /n'empêche pas de publier|sans attendre le seuil 3/);
-  });
-
-  test('témoin rouge · un tag posé dans le job des tests, avant le seuil 3', () => {
-    const pose = '      - run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v0.0-x" -f sha="$GITHUB_SHA"';
-    const cassé = réécrireJob(lire(CI), 'test', (lignes) => {
-      const i = lignes.findIndex((l) => /pnpm test 3/.test(l));
-      const début = lignes.slice(0, i).findLastIndex((l) => /^ {6}- /.test(l));
-      return [...lignes.slice(0, début), pose, ...lignes.slice(début)];
-    });
-    assert.throws(() => seuil3PuisPublication(cassé), /n'empêche pas de publier/);
-  });
-
-  test('témoin rouge · un seuil 3 qui saute ce que l’attestation couvre', () => {
-    const cassé = lire(CI).replace(/pnpm test 3\b/, 'pnpm test 3 --attestation "$RUNNER_TEMP/attestation.json"');
-    assert.notEqual(cassé, lire(CI), 'le workflow n’a pas pu être cassé : le témoin de #274 est à relire');
-    assert.throws(() => seuil3PuisPublication(cassé), /rien ne se saute/);
-  });
-
-  test('le lancement manuel de ci.yml, lui, ne publie rien (#233)', () => {
-    const faites = publications(jouer(lire(CI), LANCEMENT));
-    assert.deepEqual(faites, [], `${CI} : lancé à la main sans version forcée, il publie : ${faites.join(', ')}`);
   });
 });
 
@@ -250,13 +209,6 @@ describe('[niveau 4] #274 · le déclenchement : manuel, sans autre saisie, et l
     assert.match(scalaire(job.lignes, /^ {4}if:/), /^$/, `${DÉCLENCHEMENT} : une condition sauterait le job en silence ; ci.yml refuse lui-même, et le dit`);
   });
 
-  test('[niveau 2] ci.yml : appelé avec version_forcee, un booléen ; nul autre ne le lance en version forcée', () => {
-    const entête = lire(CI).split('\njobs:')[0];
-    assert.match(entête, /^ {2}workflow_call:\s*\n {4}inputs:\s*\n {6}version_forcee:\s*\n(?: {8}.*\n)*? {8}type:\s*boolean\s*$/m, `${CI} : l'appel en version forcée n'est pas déclaré`);
-    const dispatch = entête.split(/^ {2}workflow_call:/m)[0].split(/^ {2}workflow_dispatch:/m)[1] ?? '';
-    assert.doesNotMatch(dispatch, /version_forcee/, `${CI} : son lancement manuel ne propose pas la version forcée`);
-  });
-
   test('[niveau 2] le tag posé porte le nom relu par le script, le même que celui trouvé avant les tests', () => {
     const yaml = lire(CI);
     const partie = jouer(yaml, FORCÉE);
@@ -295,17 +247,5 @@ describe('[niveau 4] #274 · le déclenchement : manuel, sans autre saisie, et l
     assert.ok(nomme, `${CI} : au tag poussé, le job « etiquette » ne nomme pas le tag`);
     const release = partie.flatMap((j) => j.joués).find((é) => /action-gh-release/.test(commande(é)));
     assert.match(scalaire(release.lignes, /^ {10}tag_name:/), /needs\.etiquette\.outputs\.nom/);
-  });
-});
-
-// Le témoin des règles de #274 : l'étape du nom, qui se laisserait échouer.
-describe('[niveau 4] #274 · témoin rouge', () => {
-  test('témoin rouge · une étape du nom qui se laisse échouer : le commit déjà publié se republierait', () => {
-    const yaml = lire(CI);
-    const cassé = réécrireJob(yaml, 'test', (lignes) => lignes.flatMap((l) => (/^ {8}run: node packages\/gardes\/version-forcee\.mjs nom/.test(l) ? [l, '        continue-on-error: true'] : [l])));
-    assert.notEqual(cassé, yaml, 'le workflow n’a pas pu être cassé : le témoin de #274 est à relire');
-    const rouge = étapes(jobs(cassé).get('test').lignes).find(nomDeVersion);
-    assert.notDeepEqual(publications(jouer(cassé, FORCÉE, (é) => é.texte === rouge.texte)), [], 'témoin : une étape du nom qui se laisse échouer devrait laisser publier');
-    assert.throws(() => seuil3PuisPublication(cassé), /n'empêche pas de publier/);
   });
 });

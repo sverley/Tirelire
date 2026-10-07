@@ -46,7 +46,12 @@ dans ton compte rendu (#355).
    ils sont attestés, et l'attestation part sur `origin`. Joués autrement — sur une tête détachée,
    dans un autre clone, par l'exécuteur lancé sans l'outil de test —, rien n'en est attesté, et ils
    se rejoueront : ceux de l'issue au Ready, les autres la nuit (#304, #307).
-3. Écris les tests dont tu as besoin, tous : ceux qui vérifient le besoin, parmi lesquels
+3. Si l'issue dit « Vérification : relecture » — un besoin d'outillage qui ne change qu'un réglage
+   ou un texte : une heure, un déclenchement, une condition, un message, un nom —, n'écris pas de
+   test, et n'ajoute rien aux tests de la garde : l'auditeur relit le diff et joue la garde hors
+   ligne (D81, #382). Un test qui recopie un réglage ne vérifie que la recopie : il est une seconde
+   place pour la même valeur (D78), et rougit à chaque changement voulu (05ede00). Sinon, écris
+   les tests dont tu as besoin, tous : ceux qui vérifient le besoin, parmi lesquels
    l'auditeur choisira le harnais, et ceux qui ne servent qu'à toi — un diagnostic, une analyse.
    Écris-les dans tes propres fichiers, jamais dans celui du harnais, et marque-les tous de niveau 4
    (`[niveau 4]`) : un codeur ne fait pas de test de niveau inférieur ; seul l'auditeur donne un

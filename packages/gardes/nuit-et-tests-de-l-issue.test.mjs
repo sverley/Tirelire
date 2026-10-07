@@ -249,24 +249,7 @@ describe('[niveau 2] #307, point 2 · les tests navigateur de l’issue : ce que
 
 // ─── Point 3 : la nuit ───────────────────────────────────────────────────────────────────────────
 
-describe('[niveau 1] #307, point 3 · chaque nuit, vers 3 h UTC, les tests navigateur sur main, sauf fichier vert sur son empreinte', () => {
-  test('le workflow de la nuit : sur main, au seuil 2, avec l’attestation de la nuit', () => {
-    const w = lireFichier('.github/workflows/nuit.yml');
-    assert.match(w, /ref: main/);
-    assert.match(w, /node \.githooks\/attestation\.mjs nuit "\$NUIT"/);
-    assert.match(w, /pnpm run test 2 --navigateur --attestation "\$NUIT\/couverture\.json" --bilan/);
-    assert.match(w, /TIRELIRE_STRICT: '1'/);
-    assert.match(w, /attestation\.mjs envoyer origin nuit attestation-de-la-nuit/);
-    assert.match(w, /node packages\/gardes\/nuit\.mjs signaler/);
-  });
-
-  test('un seul déclenchement planifié, à 3 h 00 UTC, toute l’année, sans condition d’heure ni de fuseau (#348)', () => {
-    const w = lireFichier('.github/workflows/nuit.yml');
-    assert.deepEqual([...w.matchAll(/^\s+- cron: '([^']*)'/gm)].map((m) => m[1]), ['0 3 * * *'], 'un seul déclenchement, à 3 h 00 UTC');
-    assert.match(w, /^\s+workflow_dispatch:/m, 'le lancement manuel demeure');
-    assert.doesNotMatch(w, /github\.event\.schedule|TZ=|Europe\//, 'aucune exécution ne dépend du déclenchement ni d’un fuseau');
-  });
-
+describe('[niveau 1] #307, point 3 · chaque nuit, les tests navigateur sur main, sauf fichier vert sur son empreinte', () => {
   test('ce qu’une nuit trouve vert vaut pour les suivantes ; une nuit sans changement ne joue rien et le dit ; un fichier rouge se rejoue', () => {
     const f = dépôtGit('nuit');
     f.écrire('apps/web/src/x.ts', 'export const x = 1;\n');

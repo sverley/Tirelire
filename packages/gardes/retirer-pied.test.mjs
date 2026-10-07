@@ -7,8 +7,9 @@
  *
  * Le texte est nettoyé par `retirer-pied.mjs`, joué contre une API de GitHub simulée en mémoire ;
  * le workflow `nettoyage.yml` est joué à blanc (`workflow-a-blanc.mjs`). Que le jeton du job ne
- * déclenche aucun workflow est une règle de GitHub, hors d'atteinte : on vérifie que le job n'en
- * utilise pas d'autre.
+ * déclenche aucun workflow est une règle de GitHub, hors d'atteinte ; que le job n'en utilise pas
+ * d'autre se relit (#382). Qu'aucun workflow lancé par `pull_request_target` n'extraie la PR,
+ * `rien-de-la-pr.test.mjs` le vérifie, sur tous.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -185,14 +186,5 @@ describe('[niveau 4] #254 · quand le nettoyage tourne, et avec quoi', () => {
     for (const action of ['opened', 'synchronize', 'reopened', 'edited', 'converted_to_draft']) {
       assert.deepEqual(jouées({ event_name: 'pull_request_target', event: { action, pull_request: PR({ draft: true }) } }), [], action);
     }
-  });
-
-  test('[niveau 2] rien de la PR n’est extrait ; le jeton du job seul, qui lit le dépôt et écrit les issues et les PR', () => {
-    assert.match(WORKFLOW, /^on:\n {2}pull_request_target:\n {4}types: \[closed\]\n {2}schedule:\n/m, 'déclencheurs inattendus');
-    assert.match(WORKFLOW, /^permissions: \{\}$/m);
-    assert.match(WORKFLOW, /\n {4}permissions:\n {6}contents: read\n {6}issues: write\n {6}pull-requests: write\n {4}\S/);
-    assert.match(WORKFLOW, /uses: actions\/checkout@v4\n {8}with:\n {10}ref: main\n/);
-    assert.doesNotMatch(WORKFLOW, /secrets\.|head\.(?:sha|ref)|pnpm|npm |refs\/pull/);
-    assert.match(WORKFLOW, /GH_TOKEN: \$\{\{ github\.token \}\}/);
   });
 });

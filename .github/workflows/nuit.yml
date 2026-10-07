@@ -1,6 +1,6 @@
 name: Tests navigateur de la nuit
 
-# Chaque nuit, vers 3 h UTC (#307, #348) : les tests navigateur de non-régression
+# Chaque nuit (#307) : les tests navigateur de non-régression
 # (`apps/web/test/navigateur/`) se jouent sur le dernier commit de `main`, au seuil 2, sauf chaque
 # fichier vert sur son empreinte. Ils ne se jouent plus ni avant la fusion ni à la CI d'une fusion sur
 # `main` (`ci.yml`) : ils ne décident d'aucune fusion. `main` ne part qu'en recette ; la production ne
@@ -18,8 +18,9 @@ name: Tests navigateur de la nuit
 # et qui échoue avant de savoir ce qu'elle joue — extraction, outil de la nuit — est une nuit rouge :
 # elle se signale de même, sans fichier rouge à nommer ; sans le dépôt extrait, par `gh`.
 #
-# L'heure : un seul déclenchement planifié, à 3 h 00 UTC, toute l'année (#348) ; aucun fuseau
-# n'entre en compte. Le lancement manuel, sur `main`, joue toujours.
+# L'heure : un seul déclenchement planifié, toute l'année (#348) ; elle ne se lit qu'à lui, dans
+# `on.schedule` ci-dessous, et aucun test ne la recopie (#382). Aucun fuseau n'entre en compte. Le
+# lancement manuel, sur `main`, joue toujours.
 #
 # Place des jobs sur le second axe des harnais (#113) :
 # - `navigateur` lit des fichiers suivis : il joue les tests navigateur sur `main`, en mode strict

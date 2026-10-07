@@ -582,13 +582,4 @@ describe('[niveau 4] #266, point 7 · chaque moment dit, pour chaque ensemble, c
     const main = resume(couvertureApresFusion({ arbre: A, empreintes: e, parent: { commit: 'p'.repeat(40), empreintes: e } }));
     assert.ok(main.some((l) => /garde : sauté jusqu'au seuil 2 — rien de ce qu'il lit n'a changé depuis le premier parent/.test(l)), main.join('\n'));
   });
-
-  test('[niveau 3] le workflow des tests dit ce que chaque passage a joué, et au tag que rien ne se saute', () => {
-    const étape = lireFichier(CI).split('\n      - ').find((é) => é.startsWith('name: Ce que ce passage a joué'));
-    assert.ok(étape, 'aucune étape ne dit ce que le passage a joué');
-    assert.match(étape, /if: always\(\)/, 'elle se joue même après un rouge');
-    for (const quoi of ['typecheck', 'garde, cœur, relais, hébergement, interface sans navigateur', 'harnais du besoin', "tests navigateur de l'issue", 'tests navigateur de non-régression', 'la nuit', 'empreinte verte', 'au tag, rien ne se saute']) {
-      assert.ok(étape.includes(quoi), `l'étape ne dit rien de « ${quoi} »`);
-    }
-  });
 });

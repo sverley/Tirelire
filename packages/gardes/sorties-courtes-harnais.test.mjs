@@ -177,13 +177,4 @@ describe('[niveau 4] #352 · les échecs, dits court', () => {
     assert.equal(endroitDans('sans pile'), null);
     assert.deepEqual(lignesDesEchecs([{ fichier: '/d/t.test.mjs', test: 'a', message: 'm', endroit: '/d/t.test.mjs:1:2' }, { fichier: '/d/t.test.mjs', test: 'b', message: '', endroit: null }], '/d'), ['✗ t.test.mjs :', '  « a » — m (t.test.mjs:1:2)', '  « b » — échec sans message']);
   });
-
-  test('[niveau 3] point 7 · la règle de #302 amendée est écrite dans les rôles et suivie par l’en-tête du lanceur', () => {
-    const codeur = readFileSync(join(RACINE, 'docs/roles/codeur.md'), 'utf8').replace(/\s+/g, ' ');
-    assert.ok(codeur.includes("Tout lancement de l'outil de test, les tiens compris, atteste les fichiers qu'il joue verts, et dit, pour chaque ensemble, combien de fichiers il joue et combien il saute, et pourquoi ; le détail, fichier par fichier, se lit à la demande, et le lancement dit où"));
-    const auditeur = readFileSync(join(RACINE, 'docs/roles/auditeur.md'), 'utf8').replace(/\s+/g, ' ');
-    assert.ok(auditeur.includes("lis ce que le lanceur dit jouer et sauter, et pourquoi, et son détail s'il le faut"));
-    const lanceur = readFileSync(join(RACINE, 'packages/gardes/lanceur.mjs'), 'utf8').replace(/\s*\n\s*\*\s*/g, ' ');
-    assert.ok(lanceur.includes('dit, pour chaque ensemble, combien de fichiers il joue et combien il saute, et pourquoi ; le détail, fichier par fichier, se lit à la demande, et le lancement dit où'));
-  });
 });
