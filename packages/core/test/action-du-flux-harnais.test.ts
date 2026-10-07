@@ -1,9 +1,26 @@
 /**
- * Tests du codeur de #393 : le flux porte une action d'automatisme ; l'ordre permanent en est le
- * premier usage (D21, D24, D57, D60 amendées). Chaque `describe` nomme le point du « Fait quand »
- * qu'il vérifie. Les points 2, 3, 15 et 17 sont aussi tenus par les fichiers adaptés
- * (`flux-derives-besoin.test.ts`, `parcours-u2.test.ts`, `plan-solde-prevu.test.ts`,
- * `import.test.ts`) ; ceux-ci ne vérifient que ce qu'aucun autre ne vérifie.
+ * Harnais d'audit de #393 — « Le flux porte une action d'automatisme ; l'ordre permanent en est le
+ * premier usage » (D21, D24, D57, D60 amendées). Côté cœur ; ce que l'écran Flux garde d'une action
+ * est dans `apps/web/test/navigateur/action-du-flux-harnais.test.ts`.
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur (`action-du-flux.test.ts`,
+ * déplacé ici en entier) : chaque `describe` nomme le point du « Fait quand » qu'il tranche. Est de
+ * moi : l'ordre de financement à l'intérieur d'un groupe, priorité, échéance puis nom (point 9). Les
+ * points 2, 3, 4, 6, 15 et 17 sont aussi tenus par les harnais du registre que le codeur a adaptés
+ * (`flux-derives-besoin.test.ts`, `parcours-u2.test.ts`, `import.test.ts`) ; les points 11 et 16, par
+ * l'écran et par la relecture.
+ *
+ * Niveaux (D83), par le besoin que couvre chaque phrase :
+ * - 0 · ce que l'utilisateur a enregistré n'est pas réécrit : calculer le plan ne touche ni au montant
+ *   ni aux parts d'un ordre (point 8, I10) ; enregistrer un ordre garde son ancrage, son nom et sa
+ *   sélection, ne réécrit pas un autre flux, et ne touche à aucun ordre d'un compte qui en a
+ *   plusieurs (point 10) ; un paquet d'un autre format ne fait perdre ni dédoubler aucune action
+ *   (point 14, C8) — une donnée écrasée ne se rétablit pas en corrigeant le code.
+ * - 1 · C8 et D30 : un fichier au format 6 est refusé en le disant (point 12), comme dans
+ *   `reprise-harnais.test.ts`, qui garde le même besoin.
+ * - 2 · les règles de D21, D23, D24, D27, D32, D47, D53, D57, D58, D60 et D93 que ces phrases
+ *   appliquent, nominales comme limites.
+ * - 3 · ce que dit le signal : le compte, les montants, quoi faire (point 8, D85).
  *
  * Données inventées : un compte courant, un livret, deux tirelires placées sur le livret.
  */
@@ -25,6 +42,7 @@ import {
   lireBudgetJson,
   matchTirelireTransfers,
   normalizeLabel,
+  proposedOrderAllocation,
   proposeMatches,
   runPipeline,
   standingOrderFlows,
@@ -86,7 +104,7 @@ function ligne(montant: number, date = '2026-09-28', id = 'op-vir'): Operation {
   return { id, accountId: CC, origin: 'imported', date, label: libellé, normalizedLabel: normalizeLabel(libellé), amount: -montant, state: 'untreated' };
 }
 
-describe('[niveau 4] #393 · 1. l’action d’un flux', () => {
+describe('[niveau 2] #393 · 1. l’action d’un flux', () => {
   it('une catégorie seule classe comme aujourd’hui : une part variable, la tirelire par défaut de la catégorie (D32)', () => {
     const l = avec(budget(), ordre({ id: 'o', amount: -euros(300), action: { categoryId: 'cat-vir' } }));
     const op = ligne(euros(300));
@@ -115,7 +133,7 @@ describe('[niveau 4] #393 · 1. l’action d’un flux', () => {
   });
 });
 
-describe('[niveau 4] #393 · 2 et 3. les parts, à la reprise, à la correction et au solde prévu', () => {
+describe('[niveau 2] #393 · 2 et 3. les parts, à la reprise, à la correction et au solde prévu', () => {
   const parts = { allocation: [{ tirelireId: 'taxe', share: { kind: 'fixed' as const, amount: -euros(100) } }, { tirelireId: 'vac', share: { kind: 'percent' as const, pct: 50 } }] };
 
   it('une part fixe vaut son montant, une part en pourcentage se calcule sur le montant de l’opération, le reste est non affecté', () => {
@@ -145,7 +163,7 @@ describe('[niveau 4] #393 · 2 et 3. les parts, à la reprise, à la correction 
   });
 });
 
-describe('[niveau 4] #393 · 2 et 3. la ligne de contrepartie ne prend pas les parts (hypothèse 4, tranchée)', () => {
+describe('[niveau 2] #393 · 2 et 3. la ligne de contrepartie ne prend pas les parts (hypothèse 4, tranchée)', () => {
   it('au solde prévu, seule l’opération sur le compte du flux porte la ventilation ; à l’import, seule celle que reconnaît sa sélection', () => {
     const action = { allocation: [{ tirelireId: 'vac', share: { kind: 'fixed' as const, amount: -euros(300) } }] };
     const l = avec(budget(), ordre({ id: 'o', amount: -euros(300), action, periodicity: mensuel('2026-09-28') }));
@@ -161,7 +179,7 @@ describe('[niveau 4] #393 · 2 et 3. la ligne de contrepartie ne prend pas les p
   });
 });
 
-describe('[niveau 4] #393 · 4. un virement reconnu par son libellé, puis par un ordre, dans les deux ordres', () => {
+describe('[niveau 2] #393 · 4. un virement reconnu par son libellé, puis par un ordre, dans les deux ordres', () => {
   it('reconnu d’abord par le libellé puis repris par l’ordre, ou l’inverse : la même ventilation, celle de l’ordre', () => {
     const l = { ...avec(budget(), ordre({ id: 'o', amount: -euros(300), action: { allocation: [{ tirelireId: 'vac', share: { kind: 'fixed', amount: -euros(300) } }] } })), operations: [ligne(euros(300))] };
     // Le pipeline : le libellé d'abord, l'ordre ensuite.
@@ -178,7 +196,7 @@ describe('[niveau 4] #393 · 4. un virement reconnu par son libellé, puis par u
   });
 });
 
-describe('[niveau 4] #393 · 5. les ordres permanents d’un compte', () => {
+describe('[niveau 2] #393 · 5. les ordres permanents d’un compte', () => {
   it('décrit sur le principal ou sur le compte d’accueil, tout virement du principal vers ce compte est un ordre ; le sens inverse n’en est pas un', () => {
     const l = avec(
       budget(),
@@ -205,7 +223,7 @@ describe('[niveau 4] #393 · 5. les ordres permanents d’un compte', () => {
   });
 });
 
-describe('[niveau 4] #393 · 6. l’écart du montant', () => {
+describe('[niveau 2] #393 · 6. l’écart du montant', () => {
   it('sans aucune tirelire (U5), aucun compte n’est comparé et rien n’est signalé', () => {
     const l = budget();
     const sans: Ledger = { ...avec(l, ordre({ id: 'o', amount: -euros(300) })), tirelires: [], needs: [] };
@@ -220,13 +238,13 @@ describe('[niveau 4] #393 · 6. l’écart du montant', () => {
     expect(alertes(l2).map((w) => [w.accountId, /plus demandé/.test(w.message)])).toEqual([['marie', true]]);
   });
 
-  it('le message nomme le compte, le montant enregistré et celui que le budget demande, et dit quoi faire', () => {
+  it('[niveau 3] le message nomme le compte, le montant enregistré et celui que le budget demande, et dit quoi faire', () => {
     const [w] = alertes(avec(budget(), ordre({ id: 'o', amount: -euros(250) })));
     expect(w!.message).toBe(`L'ordre permanent vers « Livret » est enregistré à ${formatCents(euros(250))}, le budget en demande ${formatCents(euros(300))} : à modifier chez votre banque, puis à confirmer ici.`);
   });
 });
 
-describe('[niveau 4] #393 · 7. l’écart d’une part fixe', () => {
+describe('[niveau 2] #393 · 7. l’écart d’une part fixe', () => {
   const avecParts = (taxe: number, vac: number, pas = euros(10)) =>
     avec(budget(pas), ordre({ id: 'o', amount: -euros(300), action: { allocation: [{ tirelireId: 'taxe', share: { kind: 'fixed', amount: -taxe } }, { tirelireId: 'vac', share: { kind: 'fixed', amount: -vac } }] } }));
 
@@ -252,7 +270,7 @@ describe('[niveau 4] #393 · 7. l’écart d’une part fixe', () => {
   });
 });
 
-describe('[niveau 4] #393 · 8. calculer le plan ne réécrit aucun ordre', () => {
+describe('[niveau 0] #393 · 8. calculer le plan ne réécrit aucun ordre', () => {
   it('ni son montant ni ses parts', () => {
     const l = avec(budget(), ordre({ id: 'o', amount: -euros(250), action: { allocation: [{ tirelireId: 'vac', share: { kind: 'fixed', amount: -euros(10) } }] } }));
     const avant = JSON.stringify(l);
@@ -261,7 +279,7 @@ describe('[niveau 4] #393 · 8. calculer le plan ne réécrit aucun ordre', () =
   });
 });
 
-describe('[niveau 4] #393 · 9. ce que le plan propose', () => {
+describe('[niveau 2] #393 · 9. ce que le plan propose', () => {
   it('le multiple du pas au-dessus, et une part fixe sans catégorie par tirelire, échéances d’abord ; l’arrondi reste sans part', () => {
     const l = budget(euros(50));
     l.needs.push({ id: 'n-vac2', tirelireId: 'vac', kind: 'recurring', amount: euros(15), periodicity: mensuel('2026-08-28'), priority: 20 });
@@ -281,9 +299,36 @@ describe('[niveau 4] #393 · 9. ce que le plan propose', () => {
     const t = plan.transfers.find((x) => x.accountId === LIVRET)!;
     expect(standingTransferFlow(plan, t, CC, 'n', euros(80))!.action).toEqual({ allocation: [{ tirelireId: 'taxe', share: { kind: 'fixed', amount: -euros(80) } }] });
   });
+
+  // De l'auditeur : dans chaque groupe, la priorité du besoin le plus prioritaire, puis l'échéance la
+  // plus proche, puis le nom ; un montant court s'arrête là où l'ordre le dit.
+  it('dans chaque groupe, par priorité, puis échéance la plus proche, puis nom ; un montant court s’épuise dans cet ordre', () => {
+    const l = budget();
+    const sur = (id: string, name: string) => ({ id, name, placement: [{ accountId: LIVRET, share: { kind: 'variable' as const } }], openingBalance: 0, openingDate: '2026-08-28' });
+    l.tirelires.push(sur('impot', 'Impôt'), sur('auto', 'Auto'), sur('bateau', 'Bateau'));
+    l.needs.push(
+      // Même priorité que la taxe, échéance plus proche : avant elle.
+      { id: 'n-impot', tirelireId: 'impot', kind: 'dueDate', amount: euros(600), periodicity: { interval: 12, unit: 'month', anchorDate: '2027-02-15' }, priority: 10 },
+      // Hors échéance : la priorité 5 passe avant les Vacances (30) ; le Bateau, à 30, avant les Vacances par son nom.
+      { id: 'n-auto', tirelireId: 'auto', kind: 'goal', amount: euros(5000), monthlyAmount: euros(40), priority: 5 },
+      { id: 'n-bateau', tirelireId: 'bateau', kind: 'goal', amount: euros(5000), monthlyAmount: euros(60), priority: 30 },
+    );
+    const plan = computePlan(l, LECTURE);
+    const t = plan.transfers.find((x) => x.accountId === LIVRET)!;
+    const parts = (montant: number) => proposedOrderAllocation(plan, t, montant).map((p) => [p.tirelireId, -(p.share as { amount: number }).amount]);
+    const détail = Object.fromEntries(t.breakdown.map((b) => [b.tirelireId, b.cruise]));
+    expect(parts(t.permanent)).toEqual(['impot', 'taxe', 'auto', 'bateau', 'vac'].map((id) => [id, détail[id]]));
+    const court = détail['impot']! + détail['taxe']! + détail['auto']! + 1000;
+    expect(parts(court)).toEqual([
+      ['impot', détail['impot']],
+      ['taxe', détail['taxe']],
+      ['auto', détail['auto']],
+      ['bateau', 1000],
+    ]);
+  });
 });
 
-describe('[niveau 4] #393 · 10. enregistrer l’ordre', () => {
+describe('[niveau 0] #393 · 10. enregistrer l’ordre', () => {
   it('vers un compte qui a un ordre : montant et ventilation remplacés, ancrage, nom et sélection gardés', () => {
     const existant = ordre({ id: 'o', name: 'Mon virement', amount: -euros(250), labelPattern: 'MON MOTIF', amountTolerance: { abs: 500 }, dateWindowDays: 9, periodicity: mensuel('2026-07-03') });
     const l = avec(budget(), existant);
@@ -303,7 +348,7 @@ describe('[niveau 4] #393 · 10. enregistrer l’ordre', () => {
     expect([f.accountId, f.amount, f.action?.allocation?.map((p) => p.share)]).toEqual([LIVRET, euros(300), [{ kind: 'fixed', amount: euros(100) }, { kind: 'fixed', amount: euros(200) }]]);
   });
 
-  it('un compte qui a plusieurs ordres montre les occurrences de chacun, nommées par leur flux (hypothèse 5, tranchée)', () => {
+  it('[niveau 2] un compte qui a plusieurs ordres montre les occurrences de chacun, nommées par leur flux (hypothèse 5, tranchée)', () => {
     const l = avec(budget(), ordre({ id: 'a', name: 'Ordre A', amount: -euros(100) }), ordre({ id: 'b', name: 'Ordre B', amount: -euros(200), periodicity: mensuel('2026-09-01') }));
     // Un relevé importé sur le compte principal : le suivi des opérations (U1 sinon).
     const suivi = { ...l, operations: [{ ...ligne(euros(100), '2026-08-29', 'op-a'), plannedFlowId: 'a', plannedDate: '2026-08-28' }] };
@@ -322,7 +367,7 @@ describe('[niveau 4] #393 · 10. enregistrer l’ordre', () => {
   });
 });
 
-describe('[niveau 4] #393 · 12. le dépôt SQLite au format 7', () => {
+describe('[niveau 2] #393 · 12. le dépôt SQLite au format 7', () => {
   async function fichier(action: unknown, version = String(FORMAT_VERSION)): Promise<Uint8Array> {
     const s = await LedgerStore.create({ sqlJs: SQL });
     const db = new SQL.Database(s.export());
@@ -359,12 +404,12 @@ describe('[niveau 4] #393 · 12. le dépôt SQLite au format 7', () => {
     if (!v.ouvre) expect(v.problemes.some((p) => p.table === 'planned_flows' && p.id === 'f' && p.colonne === 'action')).toBe(true);
   });
 
-  it('un fichier au format 6 est refusé en le disant', async () => {
+  it('[niveau 1] un fichier au format 6 est refusé en le disant', async () => {
     await expect(LedgerStore.create({ sqlJs: SQL, bytes: await fichier({}, '6') })).rejects.toMatchObject({ reason: 'ancien' });
   });
 });
 
-describe('[niveau 4] #393 · 13. le budget JSON en version 3', () => {
+describe('[niveau 2] #393 · 13. le budget JSON en version 3', () => {
   it('l’action s’écrit en JSON natif ; ses références et ses refus sont ceux du fichier', () => {
     const base = { format: BUDGET_JSON_FORMAT, version: BUDGET_JSON_VERSION, categories: [{ id: 'c', name: 'C', nature: 'expense' }] };
     const flux = (action: unknown) => ({ ...base, planned_flows: [{ name: 'F', kind: 'fixedCharge', amount: -100, account_id: 'acc-principal', periodicity: mensuel('2026-09-01'), date_window_days: 3, action }] });
@@ -376,7 +421,7 @@ describe('[niveau 4] #393 · 13. le budget JSON en version 3', () => {
   });
 });
 
-describe('[niveau 4] #393 · 14. deux instances de formats différents (C8)', () => {
+describe('[niveau 0] #393 · 14. deux instances de formats différents (C8)', () => {
   it('un paquet d’une instance au format 6 est refusé par une instance au format 7, et inversement, sans rien écrire', async () => {
     const a = await LedgerStore.create({ sqlJs: SQL, siteId: 'a' });
     const b = await LedgerStore.create({ sqlJs: SQL, siteId: 'b' });
