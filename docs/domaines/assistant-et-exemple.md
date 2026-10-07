@@ -97,8 +97,10 @@ en vigueur se propose). L'avertissement de D41 sur l'absence de compte principal
 3. Les objets se proposent avec leurs liens : une catégorie avec sa tirelire, une échéance avec son
    flux, une tirelire avec son placement. Le sens d'« équivalente » — identifiants, dates décalées
    au jour du parcours — et la place des automatismes relèvent de la reproduction de l'exemple (intention ci-dessus).
-4. Hors de l'assistant, la façon de proposer n'est pas tranchée. Piste du porteur, 24 septembre
-   2026 :
+4. Hors de l'assistant, une proposition se fait par la section de sa partie du budget, écrite une
+   fois, qui sert l'étape de l'assistant et l'écran de Configuration (D94) ; depuis un écran,
+   l'assistant s'ouvre sur sa seule section (#363). La question, posée par #215, est tranchée.
+   Piste du porteur, 24 septembre 2026 :
 
    > Je dirais a priori que l'appli pourrait ouvrir l'assistant (peut-etre que la partie
    > concernée) pour proposer des évolutions.
