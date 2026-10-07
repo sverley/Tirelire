@@ -118,7 +118,7 @@ partout (il sert I8).
 | Usage | Webapp · Chromium sur Android | Webapp · Chromium sur ordinateur | Relais PHP seul |
 |---|---|---|---|
 | U1 · Budget seul | **prioritaire** | **prioritaire** | sans objet |
-| U2 · Budget et virements permanents | à venir | à venir | sans objet |
+| U2 · Budget et virements permanents | **prioritaire** | **prioritaire** | sans objet |
 | U3 · Budget sans virements validés, puis import | à venir | à venir | sans objet |
 | U4 · Budget reconstruit depuis l'historique | à venir | à venir | sans objet |
 | U5 · Import seul | à venir | à venir | sans objet |
