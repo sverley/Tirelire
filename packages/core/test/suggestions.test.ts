@@ -69,13 +69,13 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     });
     // Les prélèvements attendus : chacun sous sa tirelire, ni plus ni moins que les flux d'échéance de l'exemple.
     expect(s.tirelires.flatMap((t) => t.payments.map((f) => fluxCle(f, t.name))).sort()).toEqual(
-      alive(l.plannedFlows).filter((f) => f.kind === 'dueDate').map((f) => fluxCle(versFlux(f), tirelireDe(f.tirelireId!))).sort(),
+      alive(l.plannedFlows).filter((f) => f.kind === 'dueDate').map((f) => fluxCle(versFlux(f), tirelireDe(f.action!.tirelireId!))).sort(),
     );
-    // Les ordres : les virements dérivés de l'exemple, avec leur compte d'arrivée.
-    expect(s.orders.map((o) => fluxCle(o, [o.toAccountName, o.origin ?? null])).sort()).toEqual(
+    // Les ordres : les virements du compte principal vers un autre compte, avec leur compte d'arrivée (D57).
+    expect(s.orders.map((o) => fluxCle(o, o.toAccountName)).sort()).toEqual(
       alive(l.plannedFlows)
-        .filter((f) => f.kind === 'transfer' && f.origin === 'derived')
-        .map((f) => fluxCle(versFlux(f), [nomDe(f.counterpartAccountId), f.origin])).sort(),
+        .filter((f) => f.kind === 'transfer' && f.accountId === 'acc-principal' && f.amount < 0)
+        .map((f) => fluxCle(versFlux(f), nomDe(f.counterpartAccountId))).sort(),
     );
   });
 
@@ -84,7 +84,7 @@ describe("[niveau 2] propositions de l'assistant (D43)", () => {
     // seraient pas, ou une catégorie ou un lien de l'exemple qui ne seraient pas proposés, font échouer
     // ce test dans les deux sens (D43).
     const tirelireDe = (id?: string) => alive(l.tirelires).find((t) => t.id === id)?.name ?? null;
-    const portes = (id: string) => [...new Set(alive(l.plannedFlows).filter((f) => f.categoryId === id).map((f) => `${f.kind}|${f.name}`))].sort();
+    const portes = (id: string) => [...new Set(alive(l.plannedFlows).filter((f) => f.action?.categoryId === id).map((f) => `${f.kind}|${f.name}`))].sort();
     const categorie = (nature: string, nom: string, tirelire: string | null, flux: string[]) => JSON.stringify([nature, nom, tirelire, flux]);
     expect(
       s.categories.map((c) => categorie(c.nature, c.name, c.tirelireName ?? null, c.flows.map((f) => `${f.kind}|${f.name}`).sort())).sort(),

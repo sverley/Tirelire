@@ -40,6 +40,7 @@
     suggestedCategory,
     suggestedFlow,
     suggestedOrder,
+    standingOrderTarget,
     MAIN_ACCOUNT_ID,
     type PeriodUnit,
     type Category,
@@ -279,7 +280,7 @@
     app.assistantUpsert('tirelires', { ...e, placement });
   }
   // --- Ordres permanents déjà posés chez la banque (D60) : ce qu'ils exécutent est un fait, le seul montant qui s'enregistre ---
-  const ordres = $derived(flows.filter((f) => f.kind === 'transfer' && f.origin === 'derived'));
+  const ordres = $derived(flows.filter((f) => standingOrderTarget(f, mainAccountId()) !== undefined));
   const nomDuCompte = (id?: string) => accounts.find((a) => a.id === id)?.name ?? '';
   /** Ce que le budget de l'assistant demande comme ordre permanent vers ce compte (D60) : un calcul, relu à chaque lecture. */
   const demandeVers = (accountId?: string) => app.assistantPlan.transfers.find((t) => t.accountId === accountId)?.permanent ?? 0;
@@ -368,8 +369,8 @@
     const tirelire = p.tirelireName === undefined ? undefined : tirelires.find((t) => t.name === p.tirelireName);
     app.assistantUpsert('categories', suggestedCategory(p, { id, ...(tirelire ? { tirelireId: tirelire.id } : {}) }));
     for (const lie of p.flows) {
-      for (const f of flows.filter((x) => x.name === lie.name && x.kind === lie.kind && x.categoryId === undefined)) {
-        app.assistantUpsert('plannedFlows', { ...f, categoryId: id });
+      for (const f of flows.filter((x) => x.name === lie.name && x.kind === lie.kind && x.action?.categoryId === undefined)) {
+        app.assistantUpsert('plannedFlows', { ...f, action: { ...f.action, categoryId: id } });
       }
     }
   }
@@ -473,7 +474,7 @@
     if (parent) parties.push(`Dans « ${parent} »`);
     const tirelire = c.tirelireId ? tirelireById(c.tirelireId)?.name : undefined;
     if (tirelire) parties.push(`Tirelire par défaut : ${tirelire}`);
-    const portes = [...new Set(flows.filter((f) => f.categoryId === c.id).map((f) => f.name))];
+    const portes = [...new Set(flows.filter((f) => f.action?.categoryId === c.id).map((f) => f.name))];
     if (portes.length) parties.push(`Flux : ${portes.join(', ')}`);
     return parties.join(' · ');
   }
@@ -495,9 +496,10 @@
     catError = '';
     const enfants = categories.filter((x) => x.parentId === c.id).length;
     if (enfants) return void (catLigneError = `« ${c.name} » a ${enfants} sous-catégorie(s) : détachez-les ou retirez-les d’abord.`);
-    for (const f of flows.filter((f) => f.categoryId === c.id)) {
-      const { categoryId: _retiree, ...sans } = f;
-      app.assistantUpsert('plannedFlows', sans);
+    for (const f of flows.filter((f) => f.action?.categoryId === c.id)) {
+      const { categoryId: _retiree, ...action } = f.action!;
+      const { action: _avant, ...sans } = f;
+      app.assistantUpsert('plannedFlows', Object.keys(action).length ? { ...sans, action } : sans);
     }
     app.assistantRemove('categories', c.id);
     catLigneError = '';

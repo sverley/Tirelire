@@ -19,6 +19,8 @@ import { exampleLedger } from './example.js';
 import { liveSubOperations } from './suboperations.js';
 import {
   alive,
+  flowTirelire,
+  standingOrderTarget,
   type Account,
   type AccountKind,
   type AmountTolerance,
@@ -27,7 +29,6 @@ import {
   type Cents,
   type Id,
   type ISODate,
-  type FlowOrigin,
   type Ledger,
   type Need,
   type NeedKind,
@@ -67,8 +68,6 @@ export interface FlowSuggestion {
   activeTo?: ISODate;
   /** Le compte du flux, par son nom, quand l'exemple ne le met pas sur le compte principal. */
   accountName?: string;
-  /** L'origine du flux, quand l'exemple la dit : `derived` pour un ordre permanent, ce que la banque exécute (D57, D60). */
-  origin?: FlowOrigin;
 }
 
 export type IncomeSuggestion = FlowSuggestion;
@@ -193,7 +192,6 @@ function flowSuggestion(f: PlannedFlow, comptes: Account[]): FlowSuggestion {
     ...(f.activeFrom !== undefined ? { activeFrom: f.activeFrom } : {}),
     ...(f.activeTo !== undefined ? { activeTo: f.activeTo } : {}),
     ...(compte && compte.kind !== 'principal' ? { accountName: compte.name } : {}),
-    ...(f.origin !== undefined ? { origin: f.origin } : {}),
   };
 }
 
@@ -233,16 +231,17 @@ function tirelireSuggestions(l: Ledger): TirelireSuggestion[] {
     placement: t.placement.map((p) => ({ ...nomDuCompte(p.accountId), share: { ...p.share } })),
     needs: alive(l.needs).filter((n) => n.tirelireId === t.id).map(needSuggestion),
     payments: alive(l.plannedFlows)
-      .filter((f) => f.kind === 'dueDate' && f.tirelireId === t.id)
+      .filter((f) => f.kind === 'dueDate' && flowTirelire(f) === t.id)
       .map((f) => flowSuggestion(f, comptes)),
   }));
 }
 
-/** Les ordres permanents de l'exemple : ses virements dérivés, enregistrés comme ce que la banque exécute (D60). */
+/** Les ordres permanents de l'exemple (D57, D60) : ses virements du compte principal vers un autre compte, enregistrés comme ce que la banque exécute. */
 function orderSuggestions(l: Ledger): OrderSuggestion[] {
   const comptes = alive(l.accounts);
+  const principal = comptes.find((a) => a.kind === 'principal');
   return alive(l.plannedFlows)
-    .filter((f) => f.kind === 'transfer' && f.origin === 'derived')
+    .filter((f) => !!principal && standingOrderTarget(f, principal.id) !== undefined)
     .flatMap((f) => {
       const vers = comptes.find((a) => a.id === f.counterpartAccountId);
       return vers ? [{ ...flowSuggestion(f, comptes), toAccountName: vers.name }] : [];
@@ -261,7 +260,7 @@ function categorySuggestions(l: Ledger): CategorySuggestion[] {
     const tirelire = c.tirelireId === undefined ? undefined : tirelires.find((t) => t.id === c.tirelireId);
     const portes: CategorySuggestion['flows'] = [];
     for (const f of flux) {
-      if (f.categoryId === c.id && !portes.some((p) => p.name === f.name && p.kind === f.kind)) portes.push({ name: f.name, kind: f.kind });
+      if (f.action?.categoryId === c.id && !portes.some((p) => p.name === f.name && p.kind === f.kind)) portes.push({ name: f.name, kind: f.kind });
     }
     return { name: c.name, nature: c.nature, ...(tirelire ? { tirelireName: tirelire.name } : {}), flows: portes };
   });
@@ -284,10 +283,9 @@ export function suggestedFlow(
     id: ids.id,
     name: p.name,
     kind,
-    ...(p.origin !== undefined ? { origin: p.origin } : {}),
     amount: kind === 'income' ? p.amount : -p.amount,
     accountId: ids.accountId,
-    ...(ids.tirelireId !== undefined ? { tirelireId: ids.tirelireId } : {}),
+    ...(ids.tirelireId !== undefined ? { action: { tirelireId: ids.tirelireId } } : {}),
     ...(ids.counterpartAccountId !== undefined ? { counterpartAccountId: ids.counterpartAccountId } : {}),
     periodicity: { interval: p.interval, unit: p.unit, anchorDate: p.anchorDate },
     dateWindowDays: p.dateWindowDays,

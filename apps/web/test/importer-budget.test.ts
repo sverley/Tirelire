@@ -66,7 +66,7 @@ describe('[niveau 4] #367 · 4 — la validation fait entrer le budget, tout en 
 
 describe('[niveau 4] #367 · 2 — l’adresse porte le JSON après « # »', () => {
   it('le JSON encodé pour une adresse se retrouve tel quel, accents compris', () => {
-    const json = JSON.stringify({ format: 'tirelire-budget', version: 2, accounts: [{ name: 'Épargne & « livret » 100 %' }] });
+    const json = JSON.stringify({ format: 'tirelire-budget', version: 3, accounts: [{ name: 'Épargne & « livret » 100 %' }] });
     const hash = ADRESSE_BUDGET + encodeURIComponent(json);
     expect(adressePorteUnBudget(hash)).toBe(true);
     expect(budgetDeLAdresse(hash)).toEqual({ texte: json });

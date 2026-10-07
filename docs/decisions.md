@@ -110,7 +110,9 @@ alimentation, vêtements et cadeau ; un virement à un livret alimente trois pro
 Le plan propose un ordre permanent du compte principal vers chaque compte d'accueil qui héberge des
 tirelires (D21), avec un libellé à recopier chez la banque, dérivé du nom du compte cible
 (`transferLabel`). À l'import, une opération dont le libellé contient ce libellé est reconnue comme
-un virement vers ce compte (`matchTirelireTransfers`), puis ventilée sur ses tirelires (D60).
+un virement vers ce compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ —
+amendé le 7 octobre 2026 : ventilée par les parts de l'ordre qui la reprend (D12, D60), et non
+affectée sur ce compte sinon (D21).
 
 ### D12 · Pointage prudent
 
@@ -890,7 +892,7 @@ marge reste inférieure au demandé — au-delà, l'ordre de financement de D06 
 
 **Le rattachement ne se voyait pas.** Une échéance a deux faces : le besoin qui la provisionne, sur
 une tirelire, et le flux qui la paie le jour venu, sur un compte. Le modèle les relie depuis
-toujours (`PlannedFlow.tirelireId`), mais l'écran Flux taisait la tirelire et l'écran Tirelires
+toujours (`flowTirelire`), mais l'écran Flux taisait la tirelire et l'écran Tirelires
 ignorait le flux, si bien qu'une échéance sans provision se lisait comme une échéance provisionnée.
 `needForDueDateFlow` et `dueDateFlowForNeed` font les deux lectures dans le cœur — par la tirelire,
 sans identifiant supplémentaire, en retenant la version en vigueur à la date lue puisqu'une tirelire

@@ -194,7 +194,8 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
 
     it('un flux qui verrouille fait verrouiller ce qu’il reprend : il porte toute la classification', () => {
       const l = withOps(échéance());
-      l.plannedFlows.find((f) => f.id === 'flow-credit')!.locks = true;
+      const credit = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
+      credit.action = { ...credit.action, state: 'lock' };
       const m = proposeMatches(l, '2026-09-01', '2026-09-30').find((p) => p.operationId === 'o-credit')!;
       expect(m.flowId).toBe('flow-credit');
       const après = applyPatchToLedger(l, applyMatch(l, m)).operations.find((o) => o.id === 'o-credit')!;
@@ -210,7 +211,7 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
         expect(avant.subs.map((s) => s.categoryId)).toEqual(['cat-logement']);
 
         // Le flux change de montant et de catégorie : ce qu'il a repris garde ce qu'il a pris.
-        l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'flow-credit' ? { ...f, amount: euros(-1000), categoryId: 'cat-alim' } : f));
+        l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'flow-credit' ? { ...f, amount: euros(-1000), action: { categoryId: 'cat-alim' } } : f));
         l = applyPatchToLedger(l, applyAutomations(l));
         expect(l.operations.find((o) => o.id === 'o-credit')).toEqual(avant.op);
         expect(l.subOperations.filter((s) => s.operationId === 'o-credit')).toEqual(avant.subs);
@@ -226,9 +227,10 @@ describe('[niveau 1] harnais du registre · I3 (U5), I6', () => {
 
     it('retirer le verrouillage du flux ne déverrouille pas ce qu’il a déjà repris', () => {
       let l = withOps(échéance());
-      l.plannedFlows.find((f) => f.id === 'flow-credit')!.locks = true;
+      const credit = l.plannedFlows.find((f) => f.id === 'flow-credit')!;
+      credit.action = { ...credit.action, state: 'lock' };
       l = applyPatchToLedger(l, applyMatch(l, proposeMatches(l, '2026-09-01', '2026-09-30').find((p) => p.operationId === 'o-credit')!));
-      l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'flow-credit' ? { ...f, locks: false } : f));
+      l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'flow-credit' ? { ...f, action: { ...f.action, state: 'reconcile' } } : f));
       l = applyPatchToLedger(l, applyAutomations(l));
       expect(l.operations.find((o) => o.id === 'o-credit')!.state).toBe('locked');
     });

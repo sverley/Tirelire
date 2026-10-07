@@ -12,7 +12,7 @@
  * laissant en place. Il n'y a pas de détection de conflit ; le rang tranche.
  */
 import { liveSubOperations } from './suboperations.js';
-import type { SubOperation, Category, Id, Ledger, Operation, OperationState, Automation, AutomationAction, AutomationSelection, AutomationStateAction, Share } from './model.js';
+import type { SubOperation, Category, Id, Ledger, Operation, OperationState, Automation, AutomationAction, AutomationSelection, AutomationStateAction, AllocationLine, FlowAction } from './model.js';
 import { alive, isLocked } from './model.js';
 import { emptyPatch, type Patch } from './matching.js';
 import { uuidv7 } from './ids.js';
@@ -111,7 +111,7 @@ export interface Outcome {
    * Ventilation résultante, une seule division sans identifiants : ils sont attribués à
    * l'écriture, et elle remplace la ventilation à tous ses niveaux.
    */
-  allocation: Array<{ categoryId?: Id; tirelireId?: Id; share: Share }>;
+  allocation: AllocationLine[];
   /**
    * Aucune règle n'a écrit la ventilation d'une opération que l'import a établie (D33) : elle
    * reste telle qu'elle est, à tous ses niveaux.
@@ -135,7 +135,7 @@ function stateAfter(current: OperationState, action: AutomationStateAction | und
 }
 
 /** Ventilation à une seule ligne, celle que pose une action qui ne fixe qu'une catégorie. */
-function singleLine(action: AutomationAction, categories: Map<Id, Category>): Outcome['allocation'] {
+function singleLine(action: AutomationAction | FlowAction, categories: Map<Id, Category>): Outcome['allocation'] {
   const tirelireId = action.tirelireId ?? (action.categoryId ? categories.get(action.categoryId)?.tirelireId : undefined);
   if (!action.categoryId && !tirelireId) return [];
   return [
@@ -145,6 +145,19 @@ function singleLine(action: AutomationAction, categories: Map<Id, Category>): Ou
       share: { kind: 'variable' },
     },
   ];
+}
+
+/**
+ * La ventilation que pose une action, d'un automatisme ou d'un flux (D23, D24) : sa division en
+ * parts, si elle en a une ; sinon, sa catégorie et sa tirelire en une seule part variable, la
+ * tirelire par défaut de la catégorie à défaut de tirelire (D32) ; `undefined` si elle ne ventile
+ * rien. Un seul calcul pour les automatismes et les flux, l'ordre permanent compris (D24, D60).
+ */
+export function actionAllocation(action: AutomationAction | FlowAction | undefined, categories: Map<Id, Category>): AllocationLine[] | undefined {
+  if (!action) return undefined;
+  if (action.allocation) return action.allocation.map((l) => ({ ...l, share: { ...l.share } }));
+  if (action.categoryId || action.tirelireId) return singleLine(action, categories);
+  return undefined;
 }
 
 /**
@@ -171,12 +184,9 @@ export function outcomeFor(op: Operation, automations: Automation[], categories:
     if (!automationApplies(rule, op)) continue;
     const a = rule.action;
     let wrote = false;
-    if (a.allocation) {
-      out.allocation = a.allocation.map((l) => ({ ...l }));
-      out.keepsVentilation = false;
-      wrote = true;
-    } else if (a.categoryId || a.tirelireId) {
-      out.allocation = singleLine(a, categories);
+    const lines = actionAllocation(a, categories);
+    if (lines) {
+      out.allocation = lines;
       out.keepsVentilation = false;
       wrote = true;
     }
@@ -309,7 +319,7 @@ export function applyBulkAction(ledger: Ledger, operationIds: Id[], action: Auto
       else delete next.oneOff;
     }
     patch.operations.push(next);
-    const lines = action.allocation ?? (action.categoryId || action.tirelireId ? singleLine(action, categories) : undefined);
+    const lines = actionAllocation(action, categories);
     if (!lines) continue;
     replaceVentilation(patch, op.id, subsByOp.get(op.id) ?? [], lines);
   }

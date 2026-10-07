@@ -204,6 +204,17 @@ interface Violation {
   chemin?: string;
 }
 const AUTO = (selection: string, action: string): Ligne => ({ id: 'a-1', selection, action, rank: 'a' });
+/** Un flux prévu, d'action `action` (#393, point 12). */
+const FLUX = (action: string): Ligne => ({
+  id: 'f-1',
+  name: 'Loyer',
+  kind: 'fixedCharge',
+  amount: -70000,
+  account_id: 'acc-principal',
+  periodicity: '{"interval":1,"unit":"month","anchorDate":"2026-09-05"}',
+  date_window_days: 3,
+  action,
+});
 const PROFIL = (accountMap: string): Ligne => ({
   id: 'p-1',
   name: 'Banque',
@@ -251,6 +262,10 @@ const VIOLATIONS: Violation[] = [
       ['automations.action.tirelireId', 'automations', 'a-1', 'action', AUTO('{}', '{"tirelireId":"env-absente"}')],
       ['automations.action.allocation[].categoryId', 'automations', 'a-1', 'action', AUTO('{}', '{"allocation":[{"categoryId":"cat-absente","share":{"kind":"variable"}}]}')],
       ['automations.action.allocation[].tirelireId', 'automations', 'a-1', 'action', AUTO('{}', '{"allocation":[{"tirelireId":"env-absente","share":{"kind":"variable"}}]}')],
+      ['planned_flows.action.categoryId', 'planned_flows', 'f-1', 'action', FLUX('{"categoryId":"cat-absente"}')],
+      ['planned_flows.action.tirelireId', 'planned_flows', 'f-1', 'action', FLUX('{"tirelireId":"env-absente"}')],
+      ['planned_flows.action.allocation[].categoryId', 'planned_flows', 'f-1', 'action', FLUX('{"allocation":[{"categoryId":"cat-absente","share":{"kind":"variable"}}]}')],
+      ['planned_flows.action.allocation[].tirelireId', 'planned_flows', 'f-1', 'action', FLUX('{"allocation":[{"tirelireId":"env-absente","share":{"kind":"variable"}}]}')],
       ['import_profiles.account_map{}', 'import_profiles', 'p-1', 'account_map', PROFIL('{"FR76 0001":"acc-absent"}')],
     ] as const
   ).map(([chemin, table, id, colonne, ligne]): Violation => ({ cas: `${chemin} vers une ligne absente`, tables: { [table]: [ligne] }, table, id, colonne, lie: true, chemin })),

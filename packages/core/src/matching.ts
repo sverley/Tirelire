@@ -1,18 +1,17 @@
 /**
  * Après import : virements internes, rapprochement de flux prévus, virements vers
- * les tirelires (par libellé), règles de catégorisation, flux attendus non reçus.
+ * un compte reconnus par leur libellé, règles de catégorisation, flux attendus non reçus.
  *
  * Toutes les fonctions sont pures : elles reçoivent le grand livre et rendent
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
  */
 import type { SubOperation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
-import { alive, isDerivedFlow, isLocked, resumedOperationIds } from './model.js';
+import { alive, isLocked, resumedOperationIds } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
-import { fundByPriority, transferLabel } from './plan.js';
-import { tirelireComponents, indexLedger, periodSnapshot } from './balances.js';
+import { transferLabel } from './plan.js';
 import { uuidv7, normalizeLabel } from './ids.js';
-import { applyAutomations } from './automations.js';
+import { actionAllocation, applyAutomations } from './automations.js';
 import { liveSubOperations } from './suboperations.js';
 
 export interface Patch {
@@ -71,68 +70,25 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
 // ---------------------------------------------------------------------------
 
 /**
- * Répartit un virement constaté du compte principal vers `accountId` entre les tirelires placées sur ce
- * compte, par l'ordre de financement de D06 : les planchers (ce que demandent les échéances, lissage décidé compris) d'abord,
- * puis les écarts de placement par priorité ; le reste, s'il y en a, va à la première tirelire.
- * Rend, par tirelire, la part (positive) à ventiler.
- */
-export function distributeTransfer(ledger: Ledger, accountId: Id, amount: Cents, asOf: ISODate): Array<{ tirelireId: Id; amount: Cents }> {
-  const idx = indexLedger(ledger);
-  const principal = idx.principal;
-  const lines: Array<{ tirelireId: Id; name: string; priority: number; dueDate: string; floor: Cents; requested: Cents; funded: Cents }> = [];
-  for (const e of idx.tireliresById.values()) {
-    // Tirelires qui veulent de l'argent sur ce compte (D38).
-    if (!e.placement.some((p) => p.accountId === accountId)) continue;
-    const comps = tirelireComponents(e, idx, asOf);
-    const gap = principal ? (comps.get(principal.id) ?? 0) : 0;
-    if (gap <= 0) continue;
-    const snap = periodSnapshot(e, idx, asOf);
-    const floor = Math.min(gap, snap?.needs.reduce((s, n) => s + n.floor, 0) ?? 0);
-    const priority = Math.min(...(idx.needsByTirelire.get(e.id) ?? []).map((n) => n.priority), 1000);
-    const dueDate = (snap?.needs.map((n) => n.dueDate).filter((d): d is string => !!d).sort()[0]) ?? '9999-12-31';
-    lines.push({ tirelireId: e.id, name: e.name, priority, dueDate, floor, requested: gap, funded: 0 });
-  }
-  // À priorité égale, l'échéance la plus proche d'abord.
-  lines.sort((a, b) => a.priority - b.priority || a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, 'fr'));
-  const rest = fundByPriority(lines, Math.abs(amount));
-  const out = lines.filter((l) => l.funded > 0).map((l) => ({ tirelireId: l.tirelireId, amount: l.funded }));
-  if (rest > 0) {
-    if (out.length > 0) out[0]!.amount += rest;
-    else if (lines.length > 0) out.push({ tirelireId: lines[0]!.tirelireId, amount: rest });
-  }
-  return out;
-}
-
-/**
- * Une opération importée dont le libellé contient le libellé de virement d'un autre compte suivi
- * est un virement interne vers ce compte ; son montant est ventilé sur les tirelires qui y sont
- * placées (`distributeTransfer`). Sans tirelire placée là, le virement est reconnu sans ventilation.
+ * Une opération importée dont le libellé contient le libellé de virement d'un autre compte (D11)
+ * est un virement interne vers ce compte. Elle n'est pas ventilée d'office : son montant y reste
+ * non affecté (D21 ; domaine rapprochement et bilan, hypothèse 1). Quand un ordre vers ce compte la
+ * reconnaît (D12), c'est lui qui la reprend et la ventile par son action (`applyMatch`), qu'il
+ * passe avant ou après cette reconnaissance : elle ne pose aucune sous-opération, et ne touche pas à
+ * une opération qu'un flux reprend déjà.
  */
 export function matchTirelireTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
   const accounts = alive(ledger.accounts).map((a) => ({ a, label: transferLabel(a.name).replace(/^TIRELIRE /, '') }));
-  const transferCategory = alive(ledger.categories).find((c) => /^virement/i.test(c.name));
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
-    if (isLocked(op)) continue;
-    if (op.transferAccountId && subOperationsOf(ledger, op.id).length > 0) continue;
+    if (isLocked(op) || op.transferAccountId || resumesSomething(op)) continue;
     if (!/TIRELIRE/.test(op.normalizedLabel)) continue;
     const hit = accounts
       .filter(({ a, label }) => a.id !== op.accountId && label.length > 0 && op.normalizedLabel.includes(label))
       .sort((a, b) => b.label.length - a.label.length)[0];
     if (!hit) continue;
-    const target = op.transferAccountId ?? hit.a.id;
-    patch.operations.push({ ...op, state: 'reconciled', transferAccountId: target });
-    if (op.amount >= 0) continue;
-    for (const part of distributeTransfer(ledger, target, op.amount, op.date)) {
-      patch.subOperations.push({
-        id: uuidv7(),
-        operationId: op.id,
-        tirelireId: part.tirelireId,
-        share: { kind: 'fixed', amount: -part.amount },
-        ...(transferCategory ? { categoryId: transferCategory.id } : {}),
-      });
-    }
+    patch.operations.push({ ...op, state: 'reconciled', transferAccountId: hit.a.id });
   }
   return patch;
 }
@@ -265,47 +221,27 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
 }
 
 /**
- * La ventilation d'un flux pour l'opération qui reprend une de ses occurrences (D88) : celle d'un
- * virement permanent **dérivé** se rejoue par l'ordre de financement (D06, D21, D60) sur le montant
- * réel, au jour de l'opération ; sinon, la catégorie et la tirelire du flux, en part variable.
+ * La ventilation d'un flux pour l'opération qui reprend une de ses occurrences, ou la saisie qui la
+ * corrige (D24, D88) : celle de son action, par le même calcul que l'action d'un automatisme sur une
+ * opération qu'il retient (`actionAllocation`), tirelire par défaut de la catégorie comprise (D32).
+ * Les parts en pourcentage et la part variable se calculent sur le montant de l'opération ; ce que
+ * les parts n'absorbent pas reste sans tirelire, le non affecté du compte (D21, D29). Aucune
+ * ventilation ne se calcule depuis l'état du plan ou des tirelires au jour de l'opération (D27).
  */
-function flowVentilation(ledger: Ledger, f: PlannedFlow, operationId: Id, amount: Cents, date: ISODate, target: Id | undefined): SubOperation[] {
-  /*
-   * Virement permanent **dérivé** (D21, D57) : sa ventilation ne se lit pas dans le flux, elle se
-   * **rejoue** par l'ordre de financement (D06) sur le montant réellement viré, au jour de
-   * l'opération. Une ventilation mémorisée redeviendrait fausse au premier changement de budget —
-   * et le pire cas était le montant resté identique, où l'ancienne photo s'appliquait sans que rien
-   * ne le dise.
-   *
-   * Un virement **déclaré**, lui, n'est pas un calcul : il garde la tirelire et la catégorie qu'on
-   * lui a données, avec la part variable qui suit le montant du jour. Le rejouer reviendrait à
-   * réécrire un fait de l'utilisateur, ce que D57 interdit.
-   */
-  const parts = f.kind === 'transfer' && isDerivedFlow(f) && target ? distributeTransfer(ledger, target, amount, date) : [];
-  if (parts.length > 0)
-    return parts.map((part) => ({
-      id: uuidv7(),
-      operationId,
-      tirelireId: part.tirelireId,
-      share: { kind: 'fixed' as const, amount: amount < 0 ? -part.amount : part.amount },
-      ...(f.categoryId ? { categoryId: f.categoryId } : {}),
-    }));
-  if (!f.categoryId && !f.tirelireId) return [];
-  return [
-    {
-      id: uuidv7(),
-      operationId,
-      // Part variable : la ventilation d'un flux à montant variable reste rejouable (D27).
-      share: { kind: 'variable' },
-      ...(f.categoryId ? { categoryId: f.categoryId } : {}),
-      ...(f.tirelireId ? { tirelireId: f.tirelireId } : {}),
-    },
-  ];
+export function flowVentilation(ledger: Ledger, f: PlannedFlow, operationId: Id): SubOperation[] {
+  const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
+  return (actionAllocation(f.action, categories) ?? []).map((l) => ({
+    id: uuidv7(),
+    operationId,
+    share: l.share,
+    ...(l.categoryId ? { categoryId: l.categoryId } : {}),
+    ...(l.tirelireId ? { tirelireId: l.tirelireId } : {}),
+  }));
 }
 
 /** Ce qu'un flux reprend devient rapproché (D22), verrouillé s'il le demande ; verrouillé, il le reste. */
 function stateOnResumption(op: Operation, f: PlannedFlow | undefined): Operation['state'] {
-  return isLocked(op) || f?.locks ? 'locked' : 'reconciled';
+  return isLocked(op) || f?.action?.state === 'lock' ? 'locked' : 'reconciled';
 }
 
 /**
@@ -324,8 +260,7 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   delete next.resumedOperationId;
   if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
   patch.operations.push(next);
-  if (subOperationsOf(ledger, op.id).length === 0)
-    patch.subOperations.push(...flowVentilation(ledger, f, op.id, op.amount, op.date, f.counterpartAccountId ?? op.transferAccountId));
+  if (subOperationsOf(ledger, op.id).length === 0) patch.subOperations.push(...flowVentilation(ledger, f, op.id));
   return patch;
 }
 
@@ -382,13 +317,8 @@ function resumeEntryWith(ledger: Ledger, op: Operation, entryId: Id, flow: Plann
   if (target && !next.transferAccountId) next.transferAccountId = target;
   patch.operations.push(next);
   if (subOperationsOf(ledger, op.id).length > 0) return patch;
-  // La saisie corrige un virement permanent dérivé : la ventilation se rejoue sur le montant réel (D21, D60).
-  const entryFlow = entry.plannedFlowId ? alive(ledger.plannedFlows).find((f) => f.id === entry.plannedFlowId) : undefined;
-  if (entryFlow && entryFlow.kind === 'transfer' && isDerivedFlow(entryFlow)) {
-    patch.subOperations.push(...flowVentilation(ledger, entryFlow, op.id, op.amount, op.date, entryFlow.counterpartAccountId ?? next.transferAccountId));
-    return patch;
-  }
-  // Sinon, la ventilation de la saisie, à tous ses niveaux, recopiée sur l'opération qui la reprend.
+  // La ventilation de la saisie, à tous ses niveaux, recopiée sur l'opération qui la reprend (D88) :
+  // celle qu'une saisie qui corrige une occurrence a prise du flux à sa création compris.
   const subs = subOperationsOf(ledger, entry.id);
   const ids = new Map(subs.map((s) => [s.id, uuidv7()]));
   for (const s of subs) {
@@ -470,8 +400,8 @@ export function removalBlockers(ledger: Ledger, operationIds: Id[]): Operation[]
 /**
  * Corriger une opération prévue, ou la masquer (D88, porteur, 30/09) : une saisie qui la reprend —
  * elle vaudra `amount`, à `date` ; zéro, elle n'aura pas lieu. La saisie est un fait de l'utilisateur,
- * verrouillée (D22), et prend la ventilation du flux, rejouée sur son montant pour un virement
- * permanent dérivé. Un virement corrigé garde ses deux côtés, comme l'opération prévue qu'il
+ * verrouillée (D22), et prend à sa création la ventilation de l'action du flux, calculée sur son
+ * montant (`flowVentilation`). Un virement corrigé garde ses deux côtés, comme l'opération prévue qu'il
  * remplace (`withPlannedOperations`) ; masqué, il n'en a pas. La retirer fait compter de nouveau
  * l'opération prévue.
  */
@@ -502,7 +432,7 @@ export function correctPlannedOperation(ledger: Ledger, flowId: Id, occurrenceDa
     op.transferOperationId = twin.id;
     patch.operations.push(twin);
   }
-  patch.subOperations.push(...flowVentilation(ledger, f, op.id, amount, date, counterpart));
+  patch.subOperations.push(...flowVentilation(ledger, f, op.id));
   return patch;
 }
 

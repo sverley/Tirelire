@@ -89,9 +89,9 @@ function budget(): Ledger {
     { id: 'cat-logement', name: 'Logement', nature: 'expense' },
     { id: 'cat-courses', name: 'Courses', nature: 'expense' },
   );
-  l.plannedFlows.push(flux({ id: 'f-salaire', name: 'Salaire', kind: 'income', amount: euros(2000), categoryId: 'cat-salaire', amountTolerance: { pct: 10 }, labelPattern: 'SALAIRE' }));
+  l.plannedFlows.push(flux({ id: 'f-salaire', name: 'Salaire', kind: 'income', amount: euros(2000), action: { categoryId: 'cat-salaire' }, amountTolerance: { pct: 10 }, labelPattern: 'SALAIRE' }));
   l.plannedFlows.push(
-    flux({ id: 'f-loyer', name: 'Loyer', kind: 'fixedCharge', amount: -euros(700), categoryId: 'cat-logement', amountTolerance: { abs: euros(20) }, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-05' } }),
+    flux({ id: 'f-loyer', name: 'Loyer', kind: 'fixedCharge', amount: -euros(700), action: { categoryId: 'cat-logement' }, amountTolerance: { abs: euros(20) }, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-05' } }),
   );
   return l;
 }
@@ -228,7 +228,7 @@ describe('[niveau 1] #306 · 2. U1 · corriger une opération prévue, ou la mas
 describe('[niveau 2] #306 · 2. un virement corrigé garde ses deux côtés, comme l’opération prévue qu’il remplace ; masqué, il n’en a aucun (D88)', () => {
   it('le livret et le compte courant bougent de l’écart, ou de tout le virement', () => {
     const base = budget();
-    base.plannedFlows.push(flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', amount: -euros(150), counterpartAccountId: LIVRET, tirelireId: 'vac', periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-28' } }));
+    base.plannedFlows.push(flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', amount: -euros(150), counterpartAccountId: LIVRET, action: { tirelireId: 'vac' }, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-28' } }));
     const livret = (l: Ledger) => prévu(l).accounts.find((a) => a.id === LIVRET)!.end;
     const corrigé = appliquer(base, correctPlannedOperation(base, 'f-vir', '2026-09-28', -euros(120), '2026-09-28'));
     expect(livret(corrigé)).toBe(livret(base) - euros(30));
@@ -341,7 +341,7 @@ describe('[niveau 0] #306 · 4. l’opération qui reprend garde ce qui a été 
   });
 });
 
-describe('[niveau 2] #306 · 4. sinon, elle prend la ventilation de l’opération reprise, rejouée par l’ordre de financement pour un virement permanent dérivé (D21, D60)', () => {
+describe('[niveau 2] #306 · 4. sinon, elle prend la ventilation de l’opération reprise ; une saisie qui corrige une occurrence a pris celle de l’action du flux (D24, D88, #393)', () => {
   it('une saisie : sa ventilation, à tous ses niveaux', () => {
     let l = budget();
     l.operations.push(saisie({ id: 'annonce', date: '2026-09-08', amount: -euros(100) }));
@@ -359,20 +359,20 @@ describe('[niveau 2] #306 · 4. sinon, elle prend la ventilation de l’opérati
     expect(copies.find((s) => s.categoryId === 'cat-courses')?.share).toEqual({ kind: 'fixed', amount: -euros(60) });
   });
 
-  it('une occurrence : celle du flux ; un virement permanent dérivé, corrigé puis réalisé, se rejoue sur le montant réel', () => {
+  it('une occurrence : celle du flux ; un ordre permanent corrigé puis réalisé prend, par la saisie, la ventilation de son action', () => {
     let l = budget();
     l.operations.push(opération({ id: 'loyer-relevé', date: '2026-09-05', amount: -euros(700), label: 'PRLV LOYER', normalizedLabel: 'PRLV LOYER' }));
     l = appliquer(l, applyMatch(l, proposeMatches(l, '2026-09-01', '2026-09-30')[0]!));
     expect(l.subOperations.find((s) => s.operationId === 'loyer-relevé')?.categoryId).toBe('cat-logement');
 
     let v = budget();
-    v.plannedFlows.push(flux({ id: 'f-vir', name: 'Ordre', kind: 'transfer', origin: 'derived', amount: -euros(100), counterpartAccountId: LIVRET, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-01' } }));
+    v.plannedFlows.push(flux({ id: 'f-vir', name: 'Ordre', kind: 'transfer', amount: -euros(100), counterpartAccountId: LIVRET, action: { tirelireId: 'vac' }, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-01' } }));
     v = appliquer(v, correctPlannedOperation(v, 'f-vir', '2026-10-01', -euros(80), '2026-10-01'));
     const correction = v.operations.find((o) => o.plannedFlowId === 'f-vir')!;
-    expect(v.subOperations.filter((s) => s.operationId === correction.id).map((s) => s.share)).toEqual([{ kind: 'fixed', amount: -euros(80) }]);
+    expect(v.subOperations.filter((s) => s.operationId === correction.id).map((s) => [s.tirelireId, s.share])).toEqual([['vac', { kind: 'variable' }]]);
     v.operations.push(opération({ id: 'vir-relevé', date: '2026-10-01', amount: -euros(90) }));
     v = appliquer(v, resumeEntry(v, 'vir-relevé', correction.id));
-    expect(v.subOperations.filter((s) => s.operationId === 'vir-relevé').map((s) => [s.tirelireId, s.share])).toEqual([['vac', { kind: 'fixed', amount: -euros(90) }]]);
+    expect(v.subOperations.filter((s) => s.operationId === 'vir-relevé').map((s) => [s.tirelireId, s.share])).toEqual([['vac', { kind: 'variable' }]]);
   });
 });
 
@@ -453,7 +453,7 @@ describe('[niveau 2] #306 · 5. la sélection du flux, la seule, reconnaît l’
 
   it('aucun automatisme n’est engendré à part d’un flux : l’import n’en ajoute aucun, qu’un flux verrouille ou non', () => {
     const l = budget();
-    l.plannedFlows = l.plannedFlows.map((f) => ({ ...f, locks: true }));
+    l.plannedFlows = l.plannedFlows.map((f) => ({ ...f, action: { ...f.action, state: 'lock' as const } }));
     l.operations.push(opération({ id: 'loyer', date: '2026-09-06', amount: -euros(700) }));
     expect(importer(l).automations).toEqual([]);
     const exemple = exampleLedger();
@@ -474,7 +474,7 @@ describe('[niveau 2] #306 · 6. ce qu’un flux reprend devient rapproché, verr
     expect(l.subOperations.find((s) => s.operationId === 'loyer')?.categoryId).toBe('cat-logement');
 
     let v = budget();
-    v.plannedFlows = v.plannedFlows.map((f) => ({ ...f, locks: true }));
+    v.plannedFlows = v.plannedFlows.map((f) => ({ ...f, action: { ...f.action, state: 'lock' as const } }));
     v.operations.push(opération({ id: 'loyer', date: '2026-09-06', amount: -euros(700) }));
     v = importer(v);
     expect(lire(v, 'loyer').state).toBe('locked');
@@ -502,7 +502,7 @@ describe('[niveau 0] #306 · 6. modifier un flux ne réécrit aucune opération 
 
     // Le flux change de classement et se met à verrouiller ; son montant et sa tolérance restent ceux
     // qui reconnaissent encore l'opération de septembre.
-    l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'f-loyer' ? { ...f, categoryId: 'cat-courses', tirelireId: 'vac', locks: true } : f));
+    l.plannedFlows = l.plannedFlows.map((f) => (f.id === 'f-loyer' ? { ...f, action: { categoryId: 'cat-courses', tirelireId: 'vac', state: 'lock' as const } } : f));
     l.operations.push(opération({ id: 'loyer-oct', date: '2026-10-06', amount: -euros(700) }));
     l = importer(l);
 
@@ -519,11 +519,11 @@ describe('[niveau 0] #306 · 6. modifier un flux ne réécrit aucune opération 
 // ---------------------------------------------------------------------------
 
 describe('[niveau 1] #306 · 7. le format change de version, et la précédente est refusée en le disant (D30, C8)', () => {
-  it('la version du format est la 6 ; un fichier de la version 5 est refusé, sans rien ouvrir', async () => {
-    expect(FORMAT_VERSION).toBe(6);
+  it('la version du format est la 7 ; un fichier de la version 6 est refusé, sans rien ouvrir', async () => {
+    expect(FORMAT_VERSION).toBe(7);
     const s = await LedgerStore.create({ sqlJs: SQL });
     const db = new SQL.Database(s.export());
-    db.run(`UPDATE meta SET value = '5' WHERE key = 'format_version'`);
+    db.run(`UPDATE meta SET value = '6' WHERE key = 'format_version'`);
     await expect(LedgerStore.create({ sqlJs: SQL, bytes: db.export() })).rejects.toMatchObject({ reason: 'ancien' });
   });
 });

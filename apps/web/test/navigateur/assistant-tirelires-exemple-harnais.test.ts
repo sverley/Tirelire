@@ -259,7 +259,7 @@ describe.skipIf(!navigateur)('#336 — l’assistant propose les tirelires, leur
       expect(texte).not.toMatch(/Cours de piano Déjà de côté/);
 
       // Le prélèvement et l'ordre se retrouvent dans Flux prévus (I11) : le prélèvement s'y modifie ;
-      // l'ordre, dérivé du budget, y renvoie au Plan, où il se corrige (#183, D60).
+      // l'ordre permanent s'y modifie aussi, et renvoie au Plan, où il se compare (#183, D60, #393).
       await allerÀ(page, 'Plus');
       expect(await cliquer(page, 'Flux prévus')).toBe(true);
       await pause(300);
@@ -270,7 +270,7 @@ describe.skipIf(!navigateur)('#336 — l’assistant propose les tirelires, leur
           .map((r) => [t(r.querySelector('.label strong')), [...r.querySelectorAll('button')].map(t).filter((b) => b !== 'Supprimer').join(' / ')] as const);
       });
       expect(flux.filter(([n]) => n === 'Taxe foncière (prélèvement)')).toEqual([['Taxe foncière (prélèvement)', 'Modifier']]);
-      expect(flux.filter(([n]) => n === 'Virement Livret A')).toEqual([['Virement Livret A', 'Voir dans le Plan']]);
+      expect(flux.filter(([n]) => n === 'Virement Livret A')).toEqual([['Virement Livret A', 'Voir dans le Plan / Modifier']]);
     });
   });
 

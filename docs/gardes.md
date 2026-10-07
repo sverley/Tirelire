@@ -113,16 +113,19 @@ de son test.
   plan se lit. Sinon, et notamment si elle ne touche que des tests, de l'outillage ou de la
   documentation : dire dans le compte rendu du codeur pourquoi l'application n'est pas atteinte.
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — (U2) le virement permanent
-  enregistre le montant de l'ordre chez la banque ; sa ventilation se recalcule, et un écart avec le
-  budget se signale sans rien réécrire (#14, D60).
-  Témoin rouge : « témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer »
+  enregistre le montant de l'ordre chez la banque et la ventilation proposée pour ce montant ;
+  l'opération qui le reprend prend ses parts, que le budget ait bougé ou non, et ce qu'elles
+  n'absorbent pas reste non affecté ; un écart avec le budget se signale au-delà du pas d'arrondi,
+  sans rien réécrire (#14, #393, D21, D60).
+  Témoin rouge : « témoin rouge · une reprise ventilée par le budget du jour au lieu des parts de l’ordre »
 - **Harnais** · `apps/web/test/navigateur/flux-derives-plan.test.ts` — (U2) à 375 px, l'écran Plan
   enregistre l'ordre, qui survit au rechargement.
   Témoin rouge : « témoin rouge · un Plan qui réécrit l’ordre au lieu d’enregistrer le fait bancaire »
 - **Harnais** · `packages/core/test/parcours-u2.test.ts` — « parcours U2 · du budget aux ordres permanents enregistrés avec leur ventilation » :
   d'une base vide au plan, l'ordre proposé n'est écrit que si l'utilisateur le valide (I10), puis il
-  survit au redémarrage comme fait bancaire — un par couple de comptes, libellé à recopier — et le
-  plan lit sa ventilation sans jamais la figer.
+  survit au redémarrage comme fait bancaire — un par couple de comptes, libellé à recopier — avec la
+  ventilation proposée pour son montant, et l'opération prévue de son occurrence place l'argent dans
+  les tirelires de ses parts (#393).
   Témoin rouge : « témoin rouge · un ordre validé qui ne laisse aucune trace dans la base »
 - **Vérification manuelle** · `VM-I3-u2-ordres` — Si la PR touche l'application, ou à la fin d'une
   version (`docs/versions.md`) : (U2) Construire un budget, puis valider la mise en place des
@@ -130,9 +133,9 @@ de son test.
   se lit dans le plan. Sinon, et notamment si elle ne touche que des tests, de l'outillage ou de la
   documentation : dire dans le compte rendu du codeur pourquoi l'application n'est pas atteinte.
 - **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » (U3) : virements
-  « TIRELIRE … » reconnus et répartis par l'ordre de financement (D21), flux rapprochés quand
-  libellé et montant concordent.
-  Témoin rouge : « témoin rouge · un virement reconnu versé en entier à une seule tirelire »
+  « TIRELIRE … » reconnus par compte, sans ventilation d'office faute de flux qui les reprenne —
+  leur montant reste non affecté (D11, D21) —, flux rapprochés quand libellé et montant concordent.
+  Témoin rouge : « témoin rouge · un virement reconnu par son seul libellé, ventilé d’office »
 - **Vérification manuelle** · `VM-I3-u3-rapprochement` — Si la PR touche l'application, ou à la fin
   d'une version (`docs/versions.md`) : (U3) Construire un budget sans valider les virements, puis
   importer un relevé inventé qui les contient : l'application propose de les rapprocher et reprend
@@ -320,8 +323,9 @@ Chemins : `packages/core/src/plan.ts`, `packages/core/src/forecast.ts`
   relue à l'identique ensuite.
   Témoin rouge : « témoin rouge · un plan qui réécrit un besoin en se calculant »
 - **Harnais** · `packages/core/test/flux-derives-besoin.test.ts` — un budget qui monte ou baisse
-  fait dire au plan l'ancien montant de l'ordre et le nouveau ; un ordre qui diverge est signalé,
-  jamais réécrit.
+  fait dire au plan l'ancien montant de l'ordre et le nouveau ; un écart se signale au-delà du pas
+  d'arrondi, dans un sens comme dans l'autre, et un ordre plus demandé à tout montant ; un ordre qui
+  diverge est signalé, jamais réécrit (#204, #393).
   Témoin rouge : « témoin rouge · un plan qui réécrit l’ordre chez la banque au lieu de le signaler »
 - **Vérification manuelle** · `VM-I10-propositions` — Faire évoluer le budget (monter, baisser,
   retirer un besoin) : le plan propose chaque évolution d'ordre qui en découle, et aucun ordre

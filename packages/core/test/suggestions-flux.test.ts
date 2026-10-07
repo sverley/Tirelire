@@ -58,7 +58,7 @@ describe('[niveau 4] #213 · 2 — chaque flux arrive avec ce que l’exemple en
       const dans = fluxDeLExemple.find((f) => f.name === p.name && f.periodicity.anchorDate === p.anchorDate)!;
       expect(dans, `${p.name} : pas de flux de l’exemple à cette date`).toBeDefined();
       const attendu = { ...dans };
-      delete attendu.categoryId;
+      delete attendu.action;
       expect(suggestedFlow(p, genre, { id: dans.id, accountId: dans.accountId }), `${p.name} (${p.anchorDate})`).toEqual(attendu);
     }
   });
@@ -112,7 +112,7 @@ describe('[niveau 4] #213 · 2 — chaque flux arrive avec ce que l’exemple en
   });
 
   it('la catégorie n’est pas une proposition : le flux créé n’en porte pas (#212)', () => {
-    for (const [p, genre] of propositions) expect(suggestedFlow(p, genre, { id: 'x', accountId: 'cpt' }).categoryId, p.name).toBeUndefined();
+    for (const [p, genre] of propositions) expect(suggestedFlow(p, genre, { id: 'x', accountId: 'cpt' }).action?.categoryId, p.name).toBeUndefined();
   });
 
   it('une proposition ne partage rien avec l’exemple : corriger le flux créé ne touche pas la proposition suivante', () => {

@@ -17,6 +17,7 @@ import {
   addDays,
   alive,
   budgetSuggestions,
+  standingOrderTarget,
   type Account,
   type AccountKind,
   type Cents,
@@ -207,7 +208,7 @@ export class SectionComptes {
       }
     }
     for (const f of alive(this.#d.ledger.plannedFlows)) {
-      if (f.kind === 'transfer' && f.origin === 'derived' && (f.accountId === a.id || f.counterpartAccountId === a.id)) this.#d.remove('plannedFlows', f.id);
+      if (standingOrderTarget(f, MAIN_ACCOUNT_ID) === a.id) this.#d.remove('plannedFlows', f.id);
     }
   }
 }

@@ -280,7 +280,7 @@ export function needName(n: Need, e: Tirelire | undefined): string {
 /**
  * Une échéance a deux faces : le **besoin** qui la provisionne, porté par une tirelire, et le
  * **flux** qui la paiera le jour venu, porté par un compte. Le lien existe déjà dans le modèle —
- * un flux d'échéance désigne sa tirelire (`PlannedFlow.tirelireId`) — mais rien ne le rendait
+ * un flux d'échéance désigne sa tirelire par son action (`flowTirelire`) — mais rien ne le rendait
  * lisible : l'écran Flux taisait la tirelire, l'écran Tirelires ignorait le flux, et une échéance
  * sans provision se lisait comme une échéance provisionnée.
  *
@@ -290,15 +290,16 @@ export function needName(n: Need, e: Tirelire | undefined): string {
  * pour que l'interface montre quelque chose plutôt que rien.
  */
 export function needForDueDateFlow(flow: PlannedFlow, needs: Need[], date: ISODate): Need | undefined {
-  if (flow.kind !== 'dueDate' || !flow.tirelireId) return undefined;
-  const candidats = alive(needs).filter((n) => n.tirelireId === flow.tirelireId && n.kind === 'dueDate');
+  const tirelireId = flowTirelire(flow);
+  if (flow.kind !== 'dueDate' || !tirelireId) return undefined;
+  const candidats = alive(needs).filter((n) => n.tirelireId === tirelireId && n.kind === 'dueDate');
   return candidats.find((n) => activeAt(n, date)) ?? candidats[0];
 }
 
 /** L'autre sens : le flux qui paiera ce besoin d'échéance, s'il en existe un. */
 export function dueDateFlowForNeed(need: Need, flows: PlannedFlow[], date: ISODate): PlannedFlow | undefined {
   if (need.kind !== 'dueDate') return undefined;
-  const candidats = alive(flows).filter((f) => f.kind === 'dueDate' && f.tirelireId === need.tirelireId);
+  const candidats = alive(flows).filter((f) => f.kind === 'dueDate' && flowTirelire(f) === need.tirelireId);
   return candidats.find((f) => activeAt(f, date)) ?? candidats[0];
 }
 
@@ -353,16 +354,6 @@ export function findCategoryByName(categories: Category[], name: string, nature:
 export const PLANNED_FLOW_KINDS = ['income', 'fixedCharge', 'dueDate', 'transfer'] as const;
 export type PlannedFlowKind = (typeof PLANNED_FLOW_KINDS)[number];
 
-/**
- * D'où vient un flux (D57), et donc qui a le droit de l'écrire :
- * - `declared` : un fait de l'utilisateur — salaire, loyer, échéance connue. Rien ne le réécrit.
- * - `derived`  : une conséquence du budget — le virement permanent. Sa ventilation et le montant
- *   qu'il devrait porter sont des calculs, refaits à chaque changement du budget ; seul le montant
- *   que l'ordre exécute réellement chez la banque s'y enregistre, faute de pouvoir le deviner.
- */
-export const FLOW_ORIGINS = ['declared', 'derived'] as const;
-export type FlowOrigin = (typeof FLOW_ORIGINS)[number];
-
 export interface AmountTolerance {
   abs?: Cents;
   pct?: number;
@@ -375,17 +366,15 @@ export interface PlannedFlow {
   /**
    * Signé : positif = crédit sur `accountId`, négatif = débit.
    *
-   * Sur un flux dérivé (D60), c'est ce que l'**ordre permanent exécute chez la banque** : un fait
-   * du monde réel, que seul l'utilisateur peut apprendre à l'application, et qui sert à reconnaître
-   * la ligne à l'import. Ce que le budget demande, lui, ne se stocke pas : c'est
+   * Sur un ordre permanent (D57, D60, `standingOrderTarget`), c'est ce que l'**ordre exécute chez la
+   * banque** : un fait du monde réel, que seul l'utilisateur peut apprendre à l'application, et qui
+   * sert à reconnaître la ligne à l'import. Ce que le budget demande, lui, ne se stocke pas : c'est
    * `PlanTransfer.permanent`, recalculé à chaque lecture du plan.
    */
   amount: Cents;
   accountId: Id;
-  /** dueDate : tirelire vidée ; transfer : compte de contrepartie via `counterpartAccountId`. */
-  tirelireId?: Id;
+  /** transfer : le compte de contrepartie. */
   counterpartAccountId?: Id;
-  categoryId?: Id;
   periodicity: Periodicity;
   /*
    * La sélection du flux, la seule (D24) : son compte (`accountId`), son motif de libellé, sa
@@ -402,21 +391,57 @@ export interface PlannedFlow {
   activeFrom?: ISODate;
   activeTo?: ISODate;
   /**
-   * Action du flux sur ce qu'il reprend (D22, D24) : le verrouiller. Sans elle, l'opération reprise
-   * est rapprochée ; avec ou sans, elle prend la ventilation du flux si elle n'en a pas.
+   * L'action du flux sur l'opération qui reprend une de ses occurrences (D23, D24) : la forme de
+   * celle d'un automatisme — catégorie, tirelire, ventilation en parts, état —, chaque champ
+   * facultatif. L'opération la prend par le même calcul (`actionAllocation`) ; absente, elle ne
+   * classe rien, et l'opération reprise est rapprochée.
    */
-  locks?: boolean;
-  /** D57 : absent vaut `declared`, si bien qu'aucun flux déjà écrit n'est à réécrire. */
-  origin?: FlowOrigin;
+  action?: FlowAction;
   deletedAt?: string;
 }
 
 /**
- * Flux dérivé du budget (D57) : il ne se modifie pas à la main, il se recalcule. L'interface le
- * signale plutôt que d'en ouvrir l'éditeur, et sa ventilation ne se lit jamais dans le flux.
+ * L'état que l'action d'un flux donne à ce qu'il reprend (D22, D23) : *Rapprocher*, le défaut, ou
+ * *Verrouiller*. *Ne rien faire* et *Déverrouiller* n'existent pas pour un flux.
  */
-export function isDerivedFlow(f: PlannedFlow): boolean {
-  return f.origin === 'derived';
+export const FLOW_STATE_ACTIONS = ['reconcile', 'lock'] as const;
+export type FlowStateAction = (typeof FLOW_STATE_ACTIONS)[number];
+
+/** L'action d'un flux (D24) : celle d'un automatisme, sans `oneOff`, et d'un état restreint. */
+export interface FlowAction {
+  categoryId?: Id;
+  tirelireId?: Id;
+  allocation?: AllocationLine[];
+  state?: FlowStateAction;
+}
+
+/**
+ * Un ordre permanent (D57, D60) : un flux de virement dont l'argent va du compte principal vers un
+ * autre compte — décrit sur le principal, de montant négatif, avec ce compte pour contrepartie, ou
+ * décrit sur ce compte, de montant positif, avec le principal pour contrepartie —, quelle que soit
+ * la façon dont il a été créé. Rend le compte d'accueil, `undefined` si ce n'en est pas un.
+ */
+export function standingOrderTarget(f: PlannedFlow, principalId: Id): Id | undefined {
+  if (f.kind !== 'transfer' || !f.counterpartAccountId) return undefined;
+  if (f.accountId === principalId && f.amount < 0 && f.counterpartAccountId !== principalId) return f.counterpartAccountId;
+  if (f.counterpartAccountId === principalId && f.amount > 0 && f.accountId !== principalId) return f.accountId;
+  return undefined;
+}
+
+/** Les tirelires que nomme l'action d'un flux : la sienne et celles de ses parts, sans doublon. */
+export function flowTirelireIds(f: PlannedFlow): Id[] {
+  const a = f.action;
+  if (!a) return [];
+  return [...new Set([a.tirelireId, ...(a.allocation ?? []).map((l) => l.tirelireId)].filter((x): x is Id => !!x))];
+}
+
+/**
+ * La tirelire d'un flux, quand son action en nomme exactement une (D53) : celle qu'une échéance
+ * vide, celle à laquelle les écrans Flux et Tirelires la relient. Aucune, ou plusieurs : aucune.
+ */
+export function flowTirelire(f: PlannedFlow): Id | undefined {
+  const ids = flowTirelireIds(f);
+  return ids.length === 1 ? ids[0] : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -651,10 +676,17 @@ export type AutomationStateAction = 'lock' | 'reconcile' | 'none' | 'unlock';
  * niveaux, par une seule division ; une part
  * variable la rend rejouable à montant inconnu d'avance (D27).
  */
+/** Une part de la ventilation d'une action (D27) : une sous-opération sans identifiant. */
+export interface AllocationLine {
+  categoryId?: Id;
+  tirelireId?: Id;
+  share: Share;
+}
+
 export interface AutomationAction {
   categoryId?: Id;
   tirelireId?: Id;
-  allocation?: Array<{ categoryId?: Id; tirelireId?: Id; share: Share }>;
+  allocation?: AllocationLine[];
   oneOff?: boolean;
   state?: AutomationStateAction;
 }

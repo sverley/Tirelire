@@ -90,7 +90,7 @@ describe('[niveau 2] une échéance et sa provision se répondent (D53)', () => 
   });
 
   it('les deux lectures s’ignorent quand la tirelire n’est pas désignée', () => {
-    const { tirelireId: _sansTirelire, ...orphelin } = alive(l.plannedFlows).find((f) => f.kind === 'dueDate')!;
+    const { action: _sansTirelire, ...orphelin } = alive(l.plannedFlows).find((f) => f.kind === 'dueDate')!;
     expect(needForDueDateFlow(orphelin, l.needs, asOf)).toBeUndefined();
   });
 });

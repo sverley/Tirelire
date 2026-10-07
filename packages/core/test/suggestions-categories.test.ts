@@ -106,7 +106,7 @@ describe('[niveau 4] #212 · 5 — ces propositions viennent de l’exemple et d
   it('les flux proposés sont ceux que l’exemple lie à chaque catégorie, ni plus ni moins', () => {
     const liens = (nom: string) => {
       const id = categories.find((c) => c.name === nom)!.id;
-      const noms = flux.filter((f) => f.categoryId === id).map((f) => `${f.kind}|${f.name}`);
+      const noms = flux.filter((f) => f.action?.categoryId === id).map((f) => `${f.kind}|${f.name}`);
       return [...new Set(noms)].sort();
     };
     for (const p of s.categories) expect(p.flows.map((f) => `${f.kind}|${f.name}`).sort(), p.name).toEqual(liens(p.name));

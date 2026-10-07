@@ -46,8 +46,7 @@ const CHAMPS: Record<string, string> = {
   amountTolerance: 'tolérance de montant',
   labelPattern: 'libellé reconnu',
   variable: 'montant variable',
-  locks: 'verrouillage',
-  origin: 'origine',
+  action: 'action',
 };
 
 /** Les réglages, par clé. */

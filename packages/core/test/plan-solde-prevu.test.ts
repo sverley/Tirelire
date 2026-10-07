@@ -83,7 +83,7 @@ function petitBudget(): Ledger {
   l.needs.push({ id: 'n-tf', tirelireId: 'tf', kind: 'dueDate', amount: euros(1200), periodicity: { interval: 12, unit: 'month', anchorDate: '2026-11-15' }, priority: 10 });
   l.plannedFlows.push(flux({ id: 'f-salaire', name: 'Salaire', kind: 'income', amount: euros(2000) }));
   l.plannedFlows.push(
-    flux({ id: 'f-tf', name: 'Taxe foncière (prélèvement)', kind: 'dueDate', amount: -euros(1200), tirelireId: 'tf', periodicity: { interval: 12, unit: 'month', anchorDate: '2026-11-15' } }),
+    flux({ id: 'f-tf', name: 'Taxe foncière (prélèvement)', kind: 'dueDate', amount: -euros(1200), action: { tirelireId: 'tf' }, periodicity: { interval: 12, unit: 'month', anchorDate: '2026-11-15' } }),
   );
   return l;
 }
@@ -236,7 +236,16 @@ describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () =>
   it('un virement permanent enregistré compte à sa date, des deux côtés, sans changer le solde des tirelires (D29)', () => {
     const l = petitBudget();
     l.plannedFlows.push(
-      flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', origin: 'derived', amount: -euros(150), counterpartAccountId: LIVRET, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-28' } }),
+      flux({
+        id: 'f-vir',
+        name: 'Virement Livret',
+        kind: 'transfer',
+        amount: -euros(150),
+        counterpartAccountId: LIVRET,
+        // Sa ventilation, l'action du flux (#393) : une part fixe sur la taxe foncière, placée au livret.
+        action: { allocation: [{ tirelireId: 'tf', share: { kind: 'fixed', amount: -euros(150) } }] },
+        periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-28' },
+      }),
     );
     const sans = planDe(petitBudget(), '2026-10-01');
     const avec = planDe(l, '2026-10-01');
@@ -247,7 +256,7 @@ describe('[niveau 2] point 2 — ce qui compte, et ce qui ne compte plus', () =>
       ['2026-10-28', 'flux', euros(150)],
     ]);
     expect(tirelire(avec, 'tf').end).toBe(tirelire(sans, 'tf').end);
-    // La composante se déplace vers le livret, où la tirelire est placée.
+    // La composante se déplace vers le livret, où la tirelire est placée, par la part de l'ordre.
     expect(compte(avec, LIVRET).hosted.find((h) => h.tirelireId === 'tf')?.amount).toBe(euros(300) + (compte(sans, LIVRET).hosted.find((h) => h.tirelireId === 'tf')?.amount ?? 0));
   });
 
@@ -348,7 +357,7 @@ describe('[niveau 1] point 5 — le solde prévu d’un compte est la somme des 
       'le petit budget, avec un virement permanent',
       () => {
         const l = petitBudget();
-        l.plannedFlows.push(flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', origin: 'derived', amount: -euros(150), counterpartAccountId: LIVRET }));
+        l.plannedFlows.push(flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', amount: -euros(150), counterpartAccountId: LIVRET }));
         return l;
       },
       LECTURE,
@@ -400,7 +409,7 @@ describe('[niveau 2] point 6 — la période où l’on lit se lit sur le réel 
 describe('[niveau 0] point 7 — calculer le solde prévu ne modifie rien, et aucune opération prévue ne s’enregistre (I10)', () => {
   it('le grand livre est le même avant et après, sans opération prévue', () => {
     const l = petitBudget();
-    l.plannedFlows.push(flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', origin: 'derived', amount: -euros(150), counterpartAccountId: LIVRET }));
+    l.plannedFlows.push(flux({ id: 'f-vir', name: 'Virement Livret', kind: 'transfer', amount: -euros(150), counterpartAccountId: LIVRET }));
     const avant = JSON.stringify(l);
     for (const p of àVenir(l, LECTURE)) expect(p.forecast).toBeDefined();
     expect(JSON.stringify(l)).toBe(avant);

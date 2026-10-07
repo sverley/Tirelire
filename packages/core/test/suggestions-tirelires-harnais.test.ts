@@ -154,8 +154,8 @@ describe('[niveau 2] #336 · 4 — le prélèvement attendu, et lui seul', () =>
     const l = valideTelQuel();
     const f = alive(l.plannedFlows).find((x) => x.name === 'Taxe foncière (prélèvement)')!;
     const dans = alive(exemple.plannedFlows).find((x) => x.id === 'flow-tf')!;
-    expect({ ...f, id: dans.id, accountId: dans.accountId, tirelireId: dans.tirelireId }).toEqual(dans);
-    expect([nomDuCompte(l, f.accountId), nomDeLaTirelire(l, f.tirelireId)]).toEqual(['principal', 'Taxe foncière']);
+    expect({ ...f, id: dans.id, accountId: dans.accountId, action: dans.action }).toEqual(dans);
+    expect([nomDuCompte(l, f.accountId), nomDeLaTirelire(l, f.action?.tirelireId)]).toEqual(['principal', 'Taxe foncière']);
   });
 });
 
@@ -217,11 +217,11 @@ describe('#336 · 7 et 10 — validé tel quel, le plan montre l’ordre et son 
       besoins: alive(x.needs).map(({ id: _i, tirelireId, ...n }) => ({ ...n, tirelire: nomDeLaTirelire(x, tirelireId) })),
       flux: alive(x.plannedFlows)
         .filter((f) => f.kind === 'dueDate' || f.kind === 'transfer')
-        .map(({ id: _i, accountId, counterpartAccountId, tirelireId, ...f }) => ({
+        .map(({ id: _i, accountId, counterpartAccountId, action, ...f }) => ({
           ...f,
           compte: nomDuCompte(x, accountId),
           vers: nomDuCompte(x, counterpartAccountId) ?? null,
-          tirelire: nomDeLaTirelire(x, tirelireId) ?? null,
+          tirelire: nomDeLaTirelire(x, action?.tirelireId) ?? null,
         })),
     });
     // Une empreinte par objet, aux clés triées : l'ordre où un champ s'écrit ne dit rien de lui.

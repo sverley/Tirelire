@@ -20,7 +20,7 @@ Un objet JSON, encodé en UTF-8 :
 | Clé | Obligatoire | Forme |
 | --- | --- | --- |
 | `format` | oui | `"tirelire-budget"` |
-| `version` | oui | `2`, la seule version lue aujourd'hui ; la version 1 est refusée |
+| `version` | oui | `3`, la seule version lue aujourd'hui ; les versions 1 et 2 sont refusées |
 | `accounts`, `tirelires`, `needs`, `categories`, `planned_flows` | non | une liste de lignes : présente, la table entière ; absente, la table n'est pas définie |
 | `settings` | non | un objet, une clé par réglage : présente, le réglage est défini ; absente, il ne l'est pas |
 
@@ -30,10 +30,9 @@ Aucune autre clé n'est acceptée. Les noms de tables et de colonnes sont ceux d
 - **montant** : un nombre entier de centimes, signé (`-60000` pour −600,00 €) ;
 - **date** : un texte `AAAA-MM-JJ` qui existe au calendrier ;
 - **booléen** : `true` ou `false` ;
-- **objet JSON** (placement, report, rythme, tolérance) : un objet ou une liste, pas un texte ;
+- **objet JSON** (placement, report, rythme, tolérance, action) : un objet ou une liste, pas un texte ;
 - une colonne facultative absente ou `null` prend sa valeur par défaut : vide, sauf ce que dit sa
-  ligne dans les tables ci-dessous (un report absent vaut illimité, une origine absente vaut
-  déclaré).
+  ligne dans les tables ci-dessous (un report absent vaut illimité).
 
 ## Les parties, chacune définie entièrement
 
@@ -58,8 +57,9 @@ toujours le même identifiant ; deux lignes de même nom sans identifiant dans u
 refusées. Une ligne sans identifiant ni nom est refusée.
 
 Les lignes se désignent par ces identifiants : le besoin sa tirelire (`tirelire_id`), le flux son
-compte (`account_id`), sa tirelire, son compte de contrepartie et sa catégorie, le placement ses
-comptes (`accountId`), la catégorie sa parente et sa tirelire par défaut. Une référence vers une
+compte (`account_id`), son compte de contrepartie, et, dans son action, ses catégories
+(`categoryId`) et ses tirelires (`tirelireId`), le placement ses comptes (`accountId`), la catégorie
+sa parente et sa tirelire par défaut. Une référence vers une
 table que le fichier définit désigne une de ses lignes ; vers une table qu'il ne définit pas, une
 ligne du projet.
 
@@ -96,7 +96,7 @@ qu'une autre ligne, une opération comprise, désigne encore —, identifiants r
 principal. Une seule faute refuse le tout ; le refus nomme le premier problème — la partie, la
 ligne, la colonne — et dit combien d'autres il y a. Rien n'est écrit.
 
-**Écrire un état.** Le cœur écrit en version 2 les parties choisies d'un projet, toutes par défaut :
+**Écrire un état.** Le cœur écrit en version 3 les parties choisies d'un projet, toutes par défaut :
 ses lignes vivantes, sans les colonnes vides, et ses réglages. Relire ce qu'il a écrit redonne les
 mêmes lignes, colonne pour colonne.
 
@@ -171,9 +171,7 @@ enregistrés.
 | `kind` | oui | `income`, `fixedCharge`, `dueDate` ou `transfer` |
 | `amount` | oui | montant signé : positif crédite `account_id`, négatif le débite ; pour un ordre permanent, ce que la banque exécute (D60) |
 | `account_id` | oui | le compte du flux |
-| `tirelire_id` | non | la tirelire qu'une échéance vide |
 | `counterpart_account_id` | non | le compte de contrepartie d'un virement |
-| `category_id` | non | la catégorie du flux |
 | `periodicity` | oui | rythme, comme pour `needs` |
 | `date_window_days` | oui | entier : la fenêtre, en jours, autour de la date attendue (D12) |
 | `amount_tolerance` | non | objet `{ "abs": <montant>, "pct": <nombre> }`, chaque clé facultative |
@@ -181,8 +179,7 @@ enregistrés.
 | `variable` | non | booléen : un montant variable, jamais repris sans confirmation (D12) |
 | `active_from` | non | date : début de validité |
 | `active_to` | non | date : fin de validité |
-| `locks` | non | booléen : verrouiller l'opération reprise (D22, D24) |
-| `origin` | non | `declared` (absent vaut déclaré) ou `derived` : un ordre permanent enregistré, dérivé du budget (D57, D60) |
+| `action` | non | objet : ce que le flux fait de l'opération qui reprend une occurrence (D24), la forme « action » des automatismes du fichier SQLite (`docs/format-depot-sqlite.md`) — `categoryId`, `tirelireId` (celle qu'une échéance vide), `allocation` (une liste de parts, une seule variable, D27) et `state`, `reconcile` (le défaut) ou `lock` (D22, D23), chacun facultatif |
 
 ### `settings`
 
@@ -203,7 +200,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
 ```json
 {
   "format": "tirelire-budget",
-  "version": 2,
+  "version": 3,
   "accounts": [
     {
       "id": "acc-principal",
@@ -611,7 +608,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "income",
       "amount": 340000,
       "account_id": "acc-principal",
-      "category_id": "cat-salaire",
+      "action": { "categoryId": "cat-salaire" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -631,7 +628,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "income",
       "amount": 355000,
       "account_id": "acc-principal",
-      "category_id": "cat-salaire",
+      "action": { "categoryId": "cat-salaire" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -651,7 +648,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "income",
       "amount": 70000,
       "account_id": "acc-principal",
-      "category_id": "cat-loyer",
+      "action": { "categoryId": "cat-loyer" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -666,7 +663,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "income",
       "amount": 10000,
       "account_id": "acc-principal",
-      "category_id": "cat-alloc",
+      "action": { "categoryId": "cat-alloc" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -681,7 +678,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "fixedCharge",
       "amount": -95000,
       "account_id": "acc-principal",
-      "category_id": "cat-logement",
+      "action": { "categoryId": "cat-logement" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -697,7 +694,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "fixedCharge",
       "amount": -4500,
       "account_id": "acc-principal",
-      "category_id": "cat-assurance",
+      "action": { "categoryId": "cat-assurance" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -711,7 +708,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "fixedCharge",
       "amount": -7500,
       "account_id": "acc-principal",
-      "category_id": "cat-abos",
+      "action": { "categoryId": "cat-abos" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -725,7 +722,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "fixedCharge",
       "amount": -15000,
       "account_id": "acc-principal",
-      "category_id": "cat-logement",
+      "action": { "categoryId": "cat-logement" },
       "periodicity": {
         "interval": 1,
         "unit": "month",
@@ -753,8 +750,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "amount_tolerance": {
         "pct": 20
       },
-      "label_pattern": "TIRELIRE LIVRET A",
-      "origin": "derived"
+      "label_pattern": "TIRELIRE LIVRET A"
     },
     {
       "id": "flow-tf",
@@ -762,7 +758,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "kind": "dueDate",
       "amount": -120000,
       "account_id": "acc-principal",
-      "tirelire_id": "env-tf",
+      "action": { "tirelireId": "env-tf" },
       "periodicity": {
         "interval": 12,
         "unit": "month",
