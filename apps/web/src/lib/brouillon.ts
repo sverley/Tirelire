@@ -21,7 +21,7 @@ import {
   budgetSuggestions,
   rowProblem,
   settingProblem,
-  type BudgetLu,
+  type ApplicationBudget,
   type ColumnDef,
   type Ledger,
   type LedgerKey,
@@ -255,16 +255,16 @@ export function valider(store: LedgerStore, projet: Ledger, b: Brouillon): void 
 }
 
 /**
- * Le brouillon d'un budget JSON lu (#366, #367) : le projet et le budget posé dessus, ouvert sur le
- * résumé. Les lignes du JSON remplacent celles du projet de même identifiant ; aucune proposition de
- * l'exemple ne s'y ajoute, ni lignes ni réglages. Le budget a été vérifié sur ce projet par
- * `lireBudgetJson` : l'écrire dans le brouillon ne refuse rien.
+ * Le brouillon d'un budget JSON importé (#366, #367, #378) : le projet et l'application préparée par
+ * `importerBudgetJson` posée dessus, ouvert sur le résumé — les lignes écrites, les lignes retirées
+ * (une partie définie par le fichier n'a que ses lignes) et les réglages. Aucune proposition de
+ * l'exemple ne s'y ajoute, ni lignes ni réglages. L'application a été vérifiée sur ce projet : l'écrire
+ * dans le brouillon ne refuse rien.
  */
-export function brouillonDImport(projet: Ledger, budget: BudgetLu): Brouillon {
+export function brouillonDImport(projet: Ledger, application: ApplicationBudget): Brouillon {
   const b: Brouillon = { ...nouveauBrouillon(projet), reglagesProposes: {}, etape: 'summary', budgetImporte: true };
-  for (const key of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows'] as const) {
-    for (const ligne of budget[key]) ecrire(b, key, ligne as never);
-  }
-  for (const [cle, valeur] of Object.entries(budget.settings)) reglage(b, cle as keyof Settings, valeur as never);
+  for (const { cle, ligne } of application.ecritures) ecrire(b, cle, ligne as never);
+  for (const { cle, id } of application.retraits) retirer(b, projet, cle, id);
+  for (const [cle, valeur] of Object.entries(application.reglages)) reglage(b, cle as keyof Settings, valeur as never);
   return b;
 }

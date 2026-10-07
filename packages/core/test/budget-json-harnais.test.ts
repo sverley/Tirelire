@@ -24,11 +24,11 @@ import {
   COLONNES_BUDGET_JSON,
   computePlan,
   dueDateShortfalls,
-  ecrireBudget,
+  appliquerBudget,
   emptyLedger,
   exampleLedger,
   LedgerStore,
-  lireBudgetJson,
+  importerBudgetJson,
   MAIN_ACCOUNT_ID,
   periodReadingDate,
   periodsAround,
@@ -50,9 +50,9 @@ const copie = () => structuredClone(exempleDeLaDoc());
 
 async function importer(json: unknown, store?: LedgerStore): Promise<LedgerStore> {
   const s = store ?? (await LedgerStore.create({ sqlJs: SQL, siteId: 'test' }));
-  const lu = lireBudgetJson(json, s.load());
+  const lu = importerBudgetJson(json, s.load());
   if (!lu.ok) throw new Error(lu.message);
-  ecrireBudget(s, lu.budget);
+  appliquerBudget(s, lu.application);
   return s;
 }
 
@@ -90,13 +90,13 @@ describe('[niveau 2] #366 · 1 — le contenu : le budget sans les opérations',
   it.each(['operations', 'sub_operations', 'shortfall_answers', 'automations', 'import_profiles', 'devices'])('la table %s est refusée', (t) => {
     const j = copie();
     j[t] = [];
-    const lu = lireBudgetJson(j, emptyLedger());
+    const lu = importerBudgetJson(j, emptyLedger());
     expect(lu.ok).toBe(false);
   });
   it('siteId est refusé : il décrit l’instance', () => {
     const j = copie();
     (j['settings'] as Record<string, unknown>)['siteId'] = 'x';
-    expect(lireBudgetJson(j, emptyLedger()).ok).toBe(false);
+    expect(importerBudgetJson(j, emptyLedger()).ok).toBe(false);
   });
   it('l’ordre permanent enregistré se reprend avec son montant', async () => {
     const l = (await importer(exempleDeLaDoc())).load();
@@ -110,15 +110,15 @@ describe('[niveau 2] #366 · 2 — le format se dit', () => {
   it('une autre version est refusée en le disant', () => {
     const j = copie();
     j['version'] = BUDGET_JSON_VERSION + 1;
-    const lu = lireBudgetJson(j, emptyLedger());
+    const lu = importerBudgetJson(j, emptyLedger());
     expect(lu.ok).toBe(false);
     if (!lu.ok) expect(lu.message).toMatch(/version/);
   });
   it('un autre format est refusé', () => {
     const j = copie();
     j['format'] = 'tirelire';
-    expect(lireBudgetJson(j, emptyLedger()).ok).toBe(false);
-    expect(lireBudgetJson('pas du json', emptyLedger()).ok).toBe(false);
+    expect(importerBudgetJson(j, emptyLedger()).ok).toBe(false);
+    expect(importerBudgetJson('pas du json', emptyLedger()).ok).toBe(false);
   });
 });
 
@@ -137,12 +137,16 @@ describe('[niveau 2] #366 · 3 — les références', () => {
     expect(l.tirelires.find((t) => t.id === 'env-alim')!.placement[0]!.accountId).toBe(MAIN_ACCOUNT_ID);
   });
   it('une référence vers une ligne absente du JSON et du projet est refusée ; présente dans le projet, elle passe', async () => {
+    // #378 : une référence vers une table que le JSON définit ne vise que ses lignes ; vers une table qu'il ne définit pas, le projet.
     const j = copie();
-    (j['needs'] as Array<Record<string, unknown>>)[0]!['tirelire_id'] = 'env-absente';
-    expect(lireBudgetJson(j, emptyLedger()).ok).toBe(false);
+    delete j['tirelires'];
+    delete j['categories'];
+    j['planned_flows'] = [];
+    j['needs'] = [{ ...(j['needs'] as Array<Record<string, unknown>>)[0]!, tirelire_id: 'env-absente' }];
+    expect(importerBudgetJson(j, emptyLedger()).ok).toBe(false);
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     s.upsert('tirelires', { id: 'env-absente', name: 'Déjà là', placement: [{ accountId: MAIN_ACCOUNT_ID, share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-08-28' });
-    expect(lireBudgetJson(j, s.load()).ok).toBe(true);
+    expect(importerBudgetJson(j, s.load()).ok).toBe(true);
   });
   it('l’identifiant du compte principal du JSON peut nommer une ligne d’une autre table : elle garde le sien', async () => {
     const j = copie();
@@ -160,7 +164,7 @@ describe('[niveau 2] #366 · 3 — les références', () => {
   it('deux comptes principaux sont refusés', () => {
     const j = copie();
     (j['accounts'] as unknown[]).push({ id: 'autre', name: 'Autre', kind: 'principal', opening_balance: 0, opening_date: '2026-08-27' });
-    expect(lireBudgetJson(j, emptyLedger()).ok).toBe(false);
+    expect(importerBudgetJson(j, emptyLedger()).ok).toBe(false);
   });
 });
 
@@ -186,7 +190,7 @@ describe('[niveau 2] #366 · 4 — la lecture, tout ou rien', () => {
     (j['needs'] as Array<Record<string, unknown>>)[0]!['active_from'] = '2026-13-01';
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     const avant = s.export();
-    const lu = lireBudgetJson(j, s.load());
+    const lu = importerBudgetJson(j, s.load());
     expect(lu.ok).toBe(false);
     if (lu.ok) return;
     expect(lu.problemes[0]).toMatchObject({ table: 'accounts', id: 'acc-livret', colonne: 'opening_balance' });
@@ -200,31 +204,31 @@ describe('[niveau 2] #366 · 4 — la lecture, tout ou rien', () => {
       { accountId: 'acc-livret', share: { kind: 'variable' } },
       { accountId: MAIN_ACCOUNT_ID, share: { kind: 'variable' } },
     ];
-    expect(lireBudgetJson(j, emptyLedger()).ok).toBe(false);
+    expect(importerBudgetJson(j, emptyLedger()).ok).toBe(false);
   });
   it('un identifiant répété est refusé', () => {
     const j = copie();
     const c = j['categories'] as unknown[];
     c.push(structuredClone(c[0]));
-    const lu = lireBudgetJson(j, emptyLedger());
+    const lu = importerBudgetJson(j, emptyLedger());
     expect(lu.ok).toBe(false);
     if (!lu.ok) expect(lu.problemes[0]!.message).toMatch(/se répète/);
   });
   it('une colonne hors du format est refusée', () => {
     const j = copie();
     (j['accounts'] as Array<Record<string, unknown>>)[0]!['deleted_at'] = '2026-01-01T00:00:00.000Z';
-    expect(lireBudgetJson(j, emptyLedger()).ok).toBe(false);
+    expect(importerBudgetJson(j, emptyLedger()).ok).toBe(false);
   });
 });
 
-describe('[niveau 0] #366 · 5 — une ligne du projet absente du JSON reste', () => {
+describe('[niveau 0] #366 · 5, adapté par #378 · 2 — une table que le JSON ne définit pas reste', () => {
   it('dans chaque table du budget, et les opérations du projet aussi', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     const ref = exampleLedger();
     for (const k of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations'] as const)
       for (const r of ref[k]) s.upsert(k, r as never);
     const avant = s.load();
-    await importer({ format: BUDGET_JSON_FORMAT, version: BUDGET_JSON_VERSION, categories: [{ id: 'cat-neuve', name: 'Neuve', nature: 'expense' }] }, s);
+    await importer({ format: BUDGET_JSON_FORMAT, version: BUDGET_JSON_VERSION, settings: { periodStartDay: 5 } }, s);
     const apres = s.load();
     for (const k of ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows', 'operations'] as const)
       for (const r of avant[k]) expect(apres[k].find((x) => x.id === r.id)).toEqual(r);
@@ -232,14 +236,14 @@ describe('[niveau 0] #366 · 5 — une ligne du projet absente du JSON reste', (
 });
 
 describe('[niveau 2] #366 · 5 — réimporter', () => {
-  it('deux imports donnent le même projet qu’un seul ; une ligne du projet absente du JSON reste', async () => {
+  it('deux imports donnent le même projet qu’un seul ; une ligne du projet absente d’une table définie est retirée (#378 · 2)', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     s.upsert('categories', { id: 'cat-a-moi', name: 'À moi', nature: 'expense' });
     await importer(exempleDeLaDoc(), s);
     const une = s.load();
     await importer(exempleDeLaDoc(), s);
     expect(s.load()).toEqual(une);
-    expect(une.categories.some((c) => c.id === 'cat-a-moi')).toBe(true);
+    expect(une.categories.find((c) => c.id === 'cat-a-moi')?.deletedAt).toBeTruthy();
   });
   it('une ligne dont l’identifiant existe le remplace', async () => {
     const s = await importer(exempleDeLaDoc());
