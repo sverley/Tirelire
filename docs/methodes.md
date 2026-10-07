@@ -234,7 +234,7 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   | Vérification de l'auditeur, avant le Ready | 2, sans les tests navigateur sauf sa demande ; sauf ce qui est vert sur son empreinte |
   | CI au Ready | 1, plus le harnais du besoin et les tests navigateur de l'issue, en entier ; sauf ce qui est vert sur son empreinte, seuil 1 compris |
   | CI après la fusion, sur `main` | 1, sans tests navigateur ; sauf ce qui est vert au Ready sur la même empreinte, ou inchangé depuis le premier parent |
-  | Chaque nuit, sur le dernier commit de `main` | 2, les tests navigateur seuls ; sauf ce qu'une nuit a trouvé vert sur son empreinte |
+  | Chaque nuit, sur le dernier commit de `main` | 2, la suite entière, tests navigateur compris ; sauf ce qu'une nuit a trouvé vert sur son empreinte |
   | Publication d'une version (tag `v*`, poussé ou d'une version forcée) | 3, tests navigateur activés ; rien ne se saute |
   | Demande explicite (`pnpm test 4`) | 4, avec ou sans tests navigateur selon l'option ; sauf ce qui est vert sur son empreinte |
 
@@ -324,16 +324,19 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   branche vertes au Ready et l'empreinte de `main`, et saute ce qui est vert sur son empreinte ; sans
   attestation — une PR rouverte, dont l'attestation a disparu, par exemple —, ce que la table prévoit,
   hors ce qui est inchangé depuis `main` ou vert au Ready sur une tête précédente.
-- **Les tests navigateur la nuit ; ceux de l'issue, pendant toute la PR** (#264, #307). Les tests
+- **Les tests navigateur la nuit ; ceux de l'issue, pendant toute la PR** (#264, #307, #383). Les tests
   navigateur de non-régression — tout fichier de `apps/web/test/navigateur/` qui n'est pas un test de
   l'issue, harnais du registre compris — ne se jouent ni avant la fusion ni à la CI d'une fusion sur
   `main` : ni à la livraison, ni au Ready, ni après la fusion ; ils ne décident d'aucune fusion
-  (porteur, #307 : « main ne part pas en prod, mais en preview »). Chaque nuit, `nuit.yml` les
-  joue sur le dernier commit de `main`, au seuil 2, sauf chaque fichier vert sur
-  son empreinte : une nuit où rien de ce qu'ils lisent n'a changé ne joue rien, et le dit ; ce qu'une
-  nuit trouve vert vaut pour les nuits suivantes, tant que ce qu'il lit ne change pas (l'attestation
-  de la nuit, sur la branche `attestation-de-la-nuit`, écrite par l'outillage). Une nuit rouge se
-  signale sans qu'on la cherche : une issue s'ouvre, ou se complète si celle d'une nuit précédente
+  (porteur, #307 : « main ne part pas en prod, mais en preview »). Chaque nuit, `nuit.yml` joue la
+  suite entière au seuil 2 — chaque ensemble : garde, cœur, relais, hébergement, interface sans
+  navigateur, interface dans le navigateur — sur le dernier commit de `main`, sauf chaque ensemble ou
+  fichier vert sur son empreinte (#383) : le résumé de l'exécution dit, pour chaque ensemble, ce qui
+  s'est joué et ce qui s'est sauté, et pourquoi ; une nuit où rien de ce que lit la suite n'a changé
+  ne joue rien, et le dit ; ce qu'une nuit trouve vert vaut pour les nuits suivantes, tant que ce
+  qu'il lit ne change pas (l'attestation de la nuit, sur la branche `attestation-de-la-nuit`, écrite
+  par l'outillage). Une nuit rouge se signale sans qu'on la cherche, quel que soit l'ensemble où elle
+  rougit : une issue s'ouvre, ou se complète si celle d'une nuit précédente
   est encore ouverte ; elle nomme les fichiers rouges et le commit de `main` jugé ; la nuit verte qui
   suit le dit dans cette issue. Une nuit rouge ne bloque aucune fusion ; une régression peut rester
   sur la recette jusqu'à la nuit et sa correction, et la production reste gardée par le tag, qui
@@ -390,8 +393,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   vert sur son empreinte se saute, seuil 1 compris, et elle dit ce qu'elle saute et pourquoi. Avant
   toute fusion, les niveaux 0 à 2 ont donc été joués, par la livraison et par l'auditeur — hors tests
   navigateur de non-régression, joués la nuit, sauf demande —, et chaque ensemble sans navigateur a été
-  trouvé vert au seuil 1 au moins sur son empreinte finale. Onze workflows : `nuit.yml` (les tests
-  navigateur de non-régression, chaque nuit, sur `main`, et l'issue d'une nuit rouge), `ci.yml` (tests, version de dev, livraison), `version-forcee.yml` (la version forcée, que le porteur déclenche à la main ; elle appelle `ci.yml`), `validation.yml` (la
+  trouvé vert au seuil 1 au moins sur son empreinte finale. Onze workflows : `nuit.yml` (la suite
+  entière au seuil 2, chaque nuit, sur `main`, et l'issue d'une nuit rouge), `ci.yml` (tests, version de dev, livraison), `version-forcee.yml` (la version forcée, que le porteur déclenche à la main ; elle appelle `ci.yml`), `validation.yml` (la
   garde), `apercu.yml` (attente et statut de toute la CI au Ready, retrait de l'aperçu),
   `depot-apercu.yml` (dépôt de l'aperçu quand le porteur coche sa case), `pret.yml` (les repères
   d'une PR prête, case de l'aperçu et étiquette « touche un workflow » comprises), `suivi.yml` (un

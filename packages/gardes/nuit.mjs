@@ -1,6 +1,7 @@
 /**
- * La nuit rouge se signale sans qu'on la cherche (#307, point 4). Chaque nuit, `nuit.yml` joue les
- * tests navigateur de non-régression sur le dernier commit de `main` ; ce module dit la suite :
+ * La nuit rouge se signale sans qu'on la cherche (#307, point 4 ; #383, point 4). Chaque nuit,
+ * `nuit.yml` joue la suite entière au seuil 2 sur le dernier commit de `main` ; ce module dit la
+ * suite, quel que soit l'ensemble où elle rougit :
  *
  * - une nuit rouge ouvre une issue, ou complète, d'un commentaire, celle d'une nuit précédente encore
  *   ouverte ; elle nomme les fichiers rouges et le commit de `main` jugé ;
@@ -9,14 +10,21 @@
  *
  * Une nuit rouge ne bloque aucune fusion : rien d'autre que cette issue ne la porte.
  *
- *   node nuit.mjs signaler <vert|rouge> <commit> <rapport vitest JSON|-> <adresse de l'exécution>
+ *   node nuit.mjs signaler <vert|rouge> <commit> <journaux|rapport vitest JSON|-> <adresse de l'exécution>
+ *
+ * `<journaux>` : le dossier des lancements de la nuit (`lances` : `id<TAB>nom<TAB>vitest|node`, et
+ * `<nom>.rapport` de chacun) ; les fichiers rouges s'y lisent depuis la racine du dépôt, le dossier
+ * courant.
  *
  * Lit `GH_TOKEN` et `GH_REPO` (propriétaire/dépôt) ; n'appelle que l'API de GitHub.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const TITRE = 'Tests navigateur rouges la nuit, sur main';
+export const TITRE = 'Suite rouge la nuit, sur main';
+/** Le titre de l'issue de la nuit avant #383 : une issue encore ouverte sous ce titre se complète. */
+export const ANCIEN_TITRE = 'Tests navigateur rouges la nuit, sur main';
 /** La marque de l'issue de la nuit, dans son corps : elle la retrouve sans étiquette. */
 export const MARQUE = '<!-- nuit : tests navigateur -->';
 export const ROUGE = '<!-- nuit : rouge -->';
@@ -38,12 +46,61 @@ export function fichiersRouges(rapport) {
     .sort();
 }
 
+/**
+ * Les fichiers rouges d'un rapport du rapporteur `node --test` (`.githooks/rapport-node.mjs`, une
+ * ligne JSON par événement), en chemins absolus ; `null` s'il ne se lit pas.
+ */
+export function fichiersRougesNode(texte) {
+  const r = new Set();
+  for (const l of String(texte).split('\n').filter(Boolean)) {
+    let x;
+    try {
+      x = JSON.parse(l);
+    } catch {
+      return null;
+    }
+    if (x.type === 'echec' && x.file) r.add(x.file);
+  }
+  return [...r].sort();
+}
+
+/**
+ * Les fichiers rouges de tous les lancements d'une nuit (#383), depuis `racine` : `null` si l'un
+ * d'eux, rouge, n'a pas rendu de rapport lisible. `lire(chemin)` rend le texte d'un fichier, ou `null`.
+ */
+export function fichiersRougesDesJournaux(journaux, racine, lire) {
+  const lances = (lire(join(journaux, 'lances')) ?? '').split('\n').filter(Boolean).map((l) => l.split('\t'));
+  const tous = new Set();
+  let illisible = false;
+  for (const [, nom, sorte] of lances) {
+    const code = (lire(join(journaux, `${nom}.code`)) ?? '').trim();
+    const texte = lire(join(journaux, `${nom}.rapport`));
+    let rouges = null;
+    if (texte !== null) {
+      if (sorte === 'node') rouges = fichiersRougesNode(texte);
+      else {
+        try {
+          rouges = fichiersRouges(JSON.parse(texte));
+        } catch {
+          rouges = null;
+        }
+      }
+    }
+    if (rouges === null) {
+      if (code !== '0') illisible = true;
+      continue;
+    }
+    for (const f of rouges) tous.add(isAbsolute(f) ? relative(racine, f).split('\\').join('/') : f);
+  }
+  return illisible && !tous.size ? null : [...tous].sort();
+}
+
 /** Ce que dit une nuit rouge : le commit jugé, les fichiers rouges, l'exécution. */
 export function texteRouge({ commit, rouges, execution }) {
   const liste = rouges === null ? ["- les fichiers rouges ne se lisent pas : le lancement n'a pas rendu son rapport, voir le journal de l'exécution"] : rouges.length ? rouges.map((f) => `- \`${f}\``) : ["- aucun fichier rouge dans le rapport : le lancement a échoué hors de tout test, voir le journal de l'exécution"];
   return [
     ROUGE,
-    `Nuit rouge : les tests navigateur de non-régression rougissent sur le commit \`${commit}\` de \`main\`.`,
+    `Nuit rouge : la suite rougit sur le commit \`${commit}\` de \`main\`.`,
     '',
     'Fichiers rouges :',
     ...liste,
@@ -56,7 +113,7 @@ export function texteRouge({ commit, rouges, execution }) {
 
 /** Ce que dit la nuit verte qui suit une nuit rouge. */
 export function texteVert({ commit, execution }) {
-  return [VERTE, `Nuit verte : les tests navigateur de non-régression sont verts sur le commit \`${commit}\` de \`main\`.`, '', `Exécution : ${execution}`].join('\n');
+  return [VERTE, `Nuit verte : la suite est verte sur le commit \`${commit}\` de \`main\`.`, '', `Exécution : ${execution}`].join('\n');
 }
 
 /**
@@ -75,7 +132,7 @@ export function suiteDeLaNuit({ verdict, commit, rouges = null, execution, issue
 
 /** L'issue de la nuit encore ouverte parmi des issues de l'API, ou `null` : la plus ancienne. */
 export function issueDeLaNuit(issues) {
-  return (issues ?? []).filter((i) => !i.pull_request && i.title === TITRE && String(i.body ?? '').includes(MARQUE)).sort((a, b) => a.number - b.number)[0] ?? null;
+  return (issues ?? []).filter((i) => !i.pull_request && [TITRE, ANCIEN_TITRE].includes(i.title) && String(i.body ?? '').includes(MARQUE)).sort((a, b) => a.number - b.number)[0] ?? null;
 }
 
 async function signaler([verdict, commit, fichierRapport, execution]) {
@@ -94,7 +151,11 @@ async function signaler([verdict, commit, fichierRapport, execution]) {
     return r.json();
   };
   let rouges = null;
-  if (fichierRapport && fichierRapport !== '-') {
+  const dossier = fichierRapport && fichierRapport !== '-' ? (() => { try { return statSync(fichierRapport).isDirectory(); } catch { return false; } })() : false;
+  if (dossier) {
+    const lire = (f) => { try { return readFileSync(f, 'utf8'); } catch { return null; } };
+    rouges = fichiersRougesDesJournaux(fichierRapport, resolve('.'), lire);
+  } else if (fichierRapport && fichierRapport !== '-') {
     try {
       rouges = fichiersRouges(JSON.parse(readFileSync(fichierRapport, 'utf8')));
     } catch {

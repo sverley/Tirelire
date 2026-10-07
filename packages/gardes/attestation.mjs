@@ -429,11 +429,22 @@ export const SEUILS_DU_READY = Object.freeze({ garde: 1, coeur: 1, relais: 1, he
  */
 export const SEUIL_DE_MAIN = 2;
 /**
- * Le seuil de la nuit (#307) : chaque nuit, une CI joue les tests navigateur de non-régression sur le
- * dernier commit de `main`, au seuil 2, sauf ce qu'une nuit précédente a trouvé vert sur la même
- * empreinte (`nuit.yml`).
+ * Le seuil de la nuit (#307, #383) : chaque nuit, une CI joue la suite entière — chaque ensemble, tests
+ * navigateur compris — sur le dernier commit de `main`, au seuil 2, sauf ce qu'une nuit précédente a
+ * trouvé vert sur la même empreinte (`nuit.yml`).
  */
 export const SEUIL_DE_LA_NUIT = 2;
+
+/**
+ * Ce que joue la nuit (#383) : chaque ensemble de la suite, tests navigateur compris, hors harnais du
+ * besoin, au seuil de la nuit, sauf celui dont l'empreinte est trouvée verte par une nuit précédente à
+ * un seuil au moins égal. Aucune référence : ce que `main` couvre ne vaut pas pour la nuit. Rend
+ * `[{ id, nom, dossier, jouer, seuil, empreinte, raison }]`, dans l'ordre de `ENSEMBLES`.
+ */
+export function planDeLaNuit({ empreintes: e, verts = [] }) {
+  const plan = planifier({ empreintes: e, seuil: SEUIL_DE_LA_NUIT, verts, navigateur: true });
+  return ENSEMBLES.map((x) => ({ ...plan.find((p) => p.id === x.id), dossier: x.dossier }));
+}
 
 /**
  * Les empreintes vertes qu'apporte une tête dont toute la CI a fini verte au Ready : chaque ensemble

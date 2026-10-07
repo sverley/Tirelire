@@ -1,31 +1,34 @@
-name: Tests navigateur de la nuit
+name: La suite de la nuit
 
-# Chaque nuit (#307) : les tests navigateur de non-régression
-# (`apps/web/test/navigateur/`) se jouent sur le dernier commit de `main`, au seuil 2, sauf chaque
-# fichier vert sur son empreinte. Ils ne se jouent plus ni avant la fusion ni à la CI d'une fusion sur
-# `main` (`ci.yml`) : ils ne décident d'aucune fusion. `main` ne part qu'en recette ; la production ne
-# se dépose qu'au tag d'une version, ou d'une version forcée, qui rejoue tout au seuil 3, tests
-# navigateur compris, sans rien sauter (D83).
+# Chaque nuit (#307, #383) : la suite entière au seuil 2 — chaque ensemble : garde, cœur, relais,
+# hébergement, interface sans navigateur, interface dans le navigateur (`apps/web/test/navigateur/`) —
+# se joue sur le dernier commit de `main`, sauf chaque ensemble ou fichier vert sur son empreinte. Les
+# tests navigateur de non-régression ne se jouent ni avant la fusion ni à la CI d'une fusion sur
+# `main` (`ci.yml`) : ils ne décident d'aucune fusion, et la nuit non plus. `main` ne part qu'en
+# recette ; la production ne se dépose qu'au tag d'une version, ou d'une version forcée, qui rejoue
+# tout au seuil 3, tests navigateur compris, sans rien sauter (D83).
 #
-# Ce qu'une nuit trouve vert vaut pour les nuits suivantes, tant que ce qu'il lit ne change pas :
-# l'attestation de la nuit vit sur la branche `attestation-de-la-nuit`, écrite par l'outillage
-# (`.githooks/attestation.mjs nuit`, `bilan`, `envoyer`). Une nuit où rien de ce qu'ils lisent n'a
-# changé ne joue rien, et le dit dans le résumé de l'exécution.
+# Ce qu'une nuit trouve vert vaut pour les nuits suivantes, tant que ce qu'il lit ne change pas, pour
+# chaque ensemble : l'attestation de la nuit vit sur la branche `attestation-de-la-nuit`, écrite par
+# l'outillage (`.githooks/attestation.mjs nuit`, `bilan`, `envoyer`). Le résumé de l'exécution dit,
+# pour chaque ensemble, ce qui s'est joué et ce qui s'est sauté, et pourquoi ; une nuit où rien de ce
+# que lit la suite n'a changé ne joue rien, et le dit.
 #
-# Une nuit rouge se signale sans qu'on la cherche (`packages/gardes/nuit.mjs`) : une issue s'ouvre, ou
-# se complète si celle d'une nuit précédente est encore ouverte ; elle nomme les fichiers rouges et le
-# commit de `main` jugé. La nuit verte qui suit le dit dans cette issue. Une nuit qui devait jouer
-# et qui échoue avant de savoir ce qu'elle joue — extraction, outil de la nuit — est une nuit rouge :
-# elle se signale de même, sans fichier rouge à nommer ; sans le dépôt extrait, par `gh`.
+# Une nuit rouge se signale sans qu'on la cherche (`packages/gardes/nuit.mjs`), quel que soit
+# l'ensemble où elle rougit : une issue s'ouvre, ou se complète si celle d'une nuit précédente est
+# encore ouverte ; elle nomme les fichiers rouges et le commit de `main` jugé. La nuit verte qui suit
+# le dit dans cette issue. Une nuit qui devait jouer et qui échoue avant de savoir ce qu'elle joue —
+# extraction, outil de la nuit — est une nuit rouge : elle se signale de même, sans fichier rouge à
+# nommer ; sans le dépôt extrait, par `gh`.
 #
 # L'heure : un seul déclenchement planifié, toute l'année (#348) ; elle ne se lit qu'à lui, dans
 # `on.schedule` ci-dessous, et aucun test ne la recopie (#382). Aucun fuseau n'entre en compte. Le
 # lancement manuel, sur `main`, joue toujours.
 #
 # Place des jobs sur le second axe des harnais (#113) :
-# - `navigateur` lit des fichiers suivis : il joue les tests navigateur sur `main`, en mode strict
-#   (`TIRELIRE_STRICT`, un outil manquant fait échouer le job) ; il écrit l'attestation de la nuit sur
-#   sa branche et signale une nuit rouge par une issue, par l'API.
+# - `suite` lit des fichiers suivis : il joue la suite sur `main`, en mode strict (`TIRELIRE_STRICT`,
+#   un outil manquant fait échouer le job) ; il écrit l'attestation de la nuit sur sa branche et
+#   signale une nuit rouge par une issue, par l'API.
 
 on:
   schedule:
@@ -40,8 +43,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  navigateur:
-    name: Tests navigateur sur main
+  suite:
+    name: La suite sur main
     runs-on: ubuntu-latest
     permissions:
       contents: write # l'attestation de la nuit, sur sa branche
@@ -66,22 +69,49 @@ jobs:
         if: steps.plan.outputs.jouer == 'oui'
       - if: steps.plan.outputs.jouer == 'oui'
         run: pnpm install --frozen-lockfile
-      # Au seuil 2, sauf chaque fichier vert sur son empreinte (`--attestation`) ; le lanceur dit les
-      # fichiers qu'il joue et ceux qu'il saute. L'image GitHub fournit Chrome.
-      - name: Tests navigateur au seuil 2, sauf empreinte verte
+      # Outils des tests, comme à la CI (`ci.yml`) : sans eux, en mode strict, un test rougit au lieu
+      # de se sauter. L'image GitHub fournit Chrome et PHP ; le reste s'installe.
+      - name: Outils des tests
+        if: steps.plan.outputs.jouer == 'oui'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lftp python3-pyftpdlib
+          command -v php > /dev/null || sudo apt-get install -y -qq php-cli
+      # Chaque ensemble que le plan dit de jouer (`$NUIT/lancer`), au seuil 2, sauf chaque fichier vert
+      # sur son empreinte (`--attestation`) ; le lanceur dit les fichiers qu'il joue et ceux qu'il
+      # saute. Un ensemble rouge n'arrête pas les suivants.
+      - name: La suite au seuil 2, sauf empreinte verte
         id: tests
         if: steps.plan.outputs.jouer == 'oui'
         env:
           TIRELIRE_STRICT: '1'
         run: |
-          mkdir -p "$NUIT/journaux"
-          printf 'navigateur\tnavigateur\tvitest\n' > "$NUIT/journaux/lances"
-          set +e
-          (cd apps/web && pnpm run test 2 --navigateur --attestation "$NUIT/couverture.json" --bilan "$NUIT/journaux/navigateur.bilan" --reporter=default --reporter=json --outputFile.json="$NUIT/journaux/navigateur.rapport" test/navigateur) 2>&1 | tee "$NUIT/journaux/navigateur.log"
-          code=${PIPESTATUS[0]}
-          echo "$code" > "$NUIT/journaux/navigateur.code"
-          exit "$code"
-      # Ce qu'elle a trouvé vert — tout l'ensemble, ou ses fichiers un à un — vaut pour les nuits
+          J="$NUIT/journaux"
+          mkdir -p "$J"
+          : > "$J/lances"
+          racine=$PWD
+          rouge=0
+          while IFS="$(printf '\t')" read -r id dossier sorte; do
+            [ -n "$id" ] || continue
+            printf '%s\t%s\t%s\n' "$id" "$id" "$sorte" >> "$J/lances"
+            echo "::group::$id ($dossier)"
+            if [ "$sorte" = vitest ]; then
+              set -- --reporter=default --reporter=json "--outputFile.json=$J/$id.rapport"
+              [ "$id" = coeur ] && set -- "$@" --no-isolate
+              [ "$id" = navigateur ] && set -- "$@" --navigateur test/navigateur
+            else
+              set -- --test-reporter=tap --test-reporter-destination=stdout "--test-reporter=$racine/.githooks/rapport-node.mjs" "--test-reporter-destination=$J/$id.rapport"
+            fi
+            set +e
+            (cd "$dossier" && pnpm run test 2 --attestation "$NUIT/couverture.json" --bilan "$J/$id.bilan" "$@") 2>&1 | tee "$J/$id.log"
+            code=${PIPESTATUS[0]}
+            set -e
+            echo "$code" > "$J/$id.code"
+            [ "$code" = 0 ] || rouge=1
+            echo "::endgroup::"
+          done < "$NUIT/lancer"
+          exit "$rouge"
+      # Ce qu'elle a trouvé vert — chaque ensemble, ou ses fichiers un à un — vaut pour les nuits
       # suivantes : l'attestation part sur `attestation-de-la-nuit`, même rouge.
       - name: Bilan et attestation de la nuit
         if: always() && steps.plan.outputs.jouer == 'oui' && steps.tests.outcome != 'skipped'
@@ -110,17 +140,18 @@ jobs:
           verdict=rouge
           [ "$RESULTAT" = success ] && verdict=vert
           if [ -f packages/gardes/nuit.mjs ] && command -v node > /dev/null; then
-            node packages/gardes/nuit.mjs signaler "$verdict" "$COMMIT" "${NUIT:-$RUNNER_TEMP/nuit}/journaux/navigateur.rapport" "$EXECUTION"
+            node packages/gardes/nuit.mjs signaler "$verdict" "$COMMIT" "${NUIT:-$RUNNER_TEMP/nuit}/journaux" "$EXECUTION"
             exit
           fi
           # Sans le dépôt extrait, ni l'outil de la nuit : la même issue, par `gh` — même titre, même
           # marque que `packages/gardes/nuit.mjs`.
-          titre='Tests navigateur rouges la nuit, sur main'
+          titre='Suite rouge la nuit, sur main'
+          ancien='Tests navigateur rouges la nuit, sur main'
           texte="<!-- nuit : rouge -->
-          Nuit rouge : la nuit n'a pas pu jouer les tests navigateur sur le commit \`$COMMIT\` de \`main\` — elle a échoué avant de savoir ce qu'elle joue (extraction, outil de la nuit). Aucun fichier rouge à nommer : voir le journal de l'exécution.
+          Nuit rouge : la nuit n'a pas pu jouer la suite sur le commit \`$COMMIT\` de \`main\` — elle a échoué avant de savoir ce qu'elle joue (extraction, outil de la nuit). Aucun fichier rouge à nommer : voir le journal de l'exécution.
 
           Exécution : $EXECUTION"
-          numero=$(gh issue list --state open --limit 100 --json number,title,body --jq "[.[] | select(.title == \"$titre\" and (.body | contains(\"<!-- nuit : tests navigateur -->\")))] | sort_by(.number) | .[0].number // empty")
+          numero=$(gh issue list --state open --limit 100 --json number,title,body --jq "[.[] | select((.title == \"$titre\" or .title == \"$ancien\") and (.body | contains(\"<!-- nuit : tests navigateur -->\")))] | sort_by(.number) | .[0].number // empty")
           if [ -n "$numero" ]; then
             gh issue comment "$numero" --body "$texte"
           else
