@@ -240,6 +240,19 @@ describe('[niveau 2] #379 · 5 et 6 — enregistrer, puis reprendre', () => {
     const json = budgetDefiniEnJson(fichierAEnregistrer(projet, brouillonDuFichier(projet, lu.budget)));
     expect(Object.keys(json).filter((k) => k !== 'format' && k !== 'version')).toEqual(['tirelires']);
   });
+
+  it('une étape qui change une partie absente du fichier repris l’y fait entrer, sans autre différence (ajouté par l’auditeur)', async () => {
+    const store = await projetBudgete();
+    const projet = store.load();
+    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 2, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
+    if (!lu.ok) throw new Error(lu.message);
+    const b = brouillonDuFichier(projet, lu.budget);
+    ecrire(b, 'plannedFlows', { ...flux('f-salaire', 'Salaire'), amount: 210000 });
+    const json = budgetDefiniEnJson(fichierAEnregistrer(projet, b));
+    expect(Object.keys(json).filter((k) => k !== 'format' && k !== 'version').sort()).toEqual(['planned_flows', 'tirelires'].sort());
+    const flux_ = preparerValidation(projet, b).difference.tables.plannedFlows!;
+    expect([flux_.ajouts.length, flux_.modifications.map((m) => m.avant.id), flux_.retraits.length]).toEqual([0, ['f-salaire'], 0]);
+  });
 });
 
 describe('[niveau 1] #379 · 7 (I4) — les nouveaux gestes de l’écran sont secondaires', () => {
