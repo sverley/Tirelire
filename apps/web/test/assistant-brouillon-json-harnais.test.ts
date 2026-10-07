@@ -1,7 +1,13 @@
 /**
- * Tests du codeur de #379 — « Le brouillon de l'assistant est le budget JSON » : le brouillon
+ * Harnais d'audit de #379 — « Le brouillon de l'assistant est le budget JSON » : le brouillon
  * (`src/lib/brouillon.ts`) et sa différence dite (`src/lib/differenceAssistant.ts`), sans navigateur,
- * sur un vrai dépôt (`LedgerStore`). Chaque titre dit le point du « Fait quand » qu'il vérifie.
+ * sur un vrai dépôt (`LedgerStore`). Chaque titre dit le point du « Fait quand » qu'il tranche.
+ *
+ * Les tests sont ceux du codeur (`assistant-brouillon-json.test.ts`, d'où ils sont déplacés), classés
+ * par la suite de questions de D83 ; l'auditeur a séparé la validation qui garde le changement fait
+ * ailleurs (niveau 0 : perdu, il ne revient pas), et ajouté le fichier partiel enregistré (point 6,
+ * direction C : une partie absente n'est pas définie). Le point 2, « rien n'entre dans le projet avant
+ * la validation », reste tranché par les harnais de #210, inchangés.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -50,7 +56,7 @@ async function projetBudgete() {
 const nommer = (l: Ledger) => (prop: string, id: string) =>
   ((prop === 'tirelireId' ? l.tirelires : prop === 'categoryId' ? l.categories : l.accounts) as Array<{ id: string; name: string }>).find((x) => x.id === id)?.name;
 
-describe('[niveau 4] #379 · 1 — le brouillon est le fichier', () => {
+describe('[niveau 2] #379 · 1 — le brouillon est le fichier', () => {
   it('à l’ouverture, le fichier porte les parties de l’assistant telles que le projet les porte, et l’état lu est le même', async () => {
     const store = await projetBudgete();
     const b = nouveauBrouillon(store.load());
@@ -82,23 +88,30 @@ describe('[niveau 4] #379 · 1 — le brouillon est le fichier', () => {
   });
 });
 
-describe('[niveau 4] #379 · 2 et 4 — le projet qui change pendant que l’assistant attend', () => {
-  it('se montre à jour, avec le brouillon dessus ; la validation n’applique que la différence et garde ce qui a changé ailleurs', async () => {
+describe('[niveau 2] #379 · 2 — le projet qui change pendant que l’assistant attend', () => {
+  it('se montre à jour, avec le brouillon dessus', async () => {
     const store = await projetBudgete();
     const b = nouveauBrouillon(store.load());
     ecrire(b, 'plannedFlows', { ...flux('f-salaire', 'Salaire'), amount: 210000 });
-    // Ailleurs, pendant que l'assistant attend : le loyer change, une tirelire s'ajoute.
     store.upsert('plannedFlows', { ...flux('f-loyer', 'Loyer', -85000), kind: 'fixedCharge' } as PlannedFlow);
     store.upsert('tirelires', { ...vacances(), id: 't-noel', name: 'Noël' });
-    const projet = store.load();
-
-    const montre = montrer(projet, b);
+    const montre = montrer(store.load(), b);
     expect(alive(montre.plannedFlows).map((f) => [f.id, f.amount])).toEqual([
       ['f-salaire', 210000],
       ['f-loyer', -85000],
     ]);
     expect(alive(montre.tirelires).map((t) => t.id)).toContain('t-noel');
+  });
+});
 
+describe('[niveau 0] #379 · 4 — la validation n’applique que la différence : ce qui a changé ailleurs reste', () => {
+  it('une ligne changée et une ligne ajoutée hors de l’assistant pendant qu’il attend survivent à sa validation', async () => {
+    const store = await projetBudgete();
+    const b = nouveauBrouillon(store.load());
+    ecrire(b, 'plannedFlows', { ...flux('f-salaire', 'Salaire'), amount: 210000 });
+    store.upsert('plannedFlows', { ...flux('f-loyer', 'Loyer', -85000), kind: 'fixedCharge' } as PlannedFlow);
+    store.upsert('tirelires', { ...vacances(), id: 't-noel', name: 'Noël' });
+    const projet = store.load();
     valider(store, projet, b);
     const apres = store.load();
     expect(alive(apres.plannedFlows).map((f) => [f.id, f.amount])).toEqual([
@@ -107,7 +120,9 @@ describe('[niveau 4] #379 · 2 et 4 — le projet qui change pendant que l’ass
     ]);
     expect(alive(apres.tirelires).map((t) => t.id).sort()).toEqual(['t-noel', 't-vacances']);
   });
+});
 
+describe('[niveau 2] #379 · 4 — un refus', () => {
   it('un refus — une ligne retirée encore désignée — dit le premier problème, n’écrit rien, et le brouillon reste', async () => {
     const store = await projetBudgete();
     const projet = store.load();
@@ -129,7 +144,7 @@ describe('[niveau 4] #379 · 2 et 4 — le projet qui change pendant que l’ass
   });
 });
 
-describe('[niveau 4] #379 · 3 — le résumé dit la différence', () => {
+describe('[niveau 1] #379 · 3 (I10) — le résumé dit la différence, retraits compris', () => {
   it('partie par partie, ajouts, modifications et retraits, dans les mots de l’utilisateur, avec les réglages', async () => {
     const store = await projetBudgete();
     const projet = store.load();
@@ -151,6 +166,9 @@ describe('[niveau 4] #379 · 3 — le résumé dit la différence', () => {
     expect(dite.conflits).toEqual([]);
   });
 
+});
+
+describe('[niveau 2] #379 · 3 — sans différence, et les lignes changées des deux côtés', () => {
   it('sans différence, le résumé le sait', async () => {
     const store = await projetBudgete();
     const projet = store.load();
@@ -175,7 +193,7 @@ describe('[niveau 4] #379 · 3 — le résumé dit la différence', () => {
   });
 });
 
-describe('[niveau 4] #379 · 5 et 6 — enregistrer, puis reprendre', () => {
+describe('[niveau 2] #379 · 5 et 6 — enregistrer, puis reprendre', () => {
   it('le fichier enregistré est un budget JSON version 2, sans étape ; repris sur le même projet, il redonne la même différence', async () => {
     const store = await projetBudgete();
     const projet = store.load();
@@ -213,9 +231,18 @@ describe('[niveau 4] #379 · 5 et 6 — enregistrer, puis reprendre', () => {
     const { difference } = preparerValidation(projet, b);
     expect(difference.tables.plannedFlows).toEqual({ ajouts: [], modifications: [], retraits: [] });
   });
+
+  it('enregistré sans qu’une étape les change, un fichier partiel repris ne définit toujours que ses parties (ajouté par l’auditeur)', async () => {
+    const store = await projetBudgete();
+    const projet = store.load();
+    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 2, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
+    if (!lu.ok) throw new Error(lu.message);
+    const json = budgetDefiniEnJson(fichierAEnregistrer(projet, brouillonDuFichier(projet, lu.budget)));
+    expect(Object.keys(json).filter((k) => k !== 'format' && k !== 'version')).toEqual(['tirelires']);
+  });
 });
 
-describe('[niveau 4] #379 · 5, 6 et 7 — les gestes de l’écran', () => {
+describe('[niveau 1] #379 · 7 (I4) — les nouveaux gestes de l’écran sont secondaires', () => {
   const ecran = source('views/Wizard.svelte');
   it('la première page offre « Reprendre un budget (JSON) », vers l’écran d’import, en geste secondaire', () => {
     expect(ecran).toMatch(/<button class="btn small" onclick=\{\(\) => app\.go\('importBudget'\)\}>Reprendre un budget \(JSON\)<\/button>/);
