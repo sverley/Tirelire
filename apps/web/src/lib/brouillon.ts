@@ -71,6 +71,28 @@ export interface Brouillon {
    * proposition de l'exemple d'office (D46) ; les raccourcis restent offerts.
    */
   budgetImporte?: true;
+  /**
+   * Les parties de l'assistant qu'un fichier repris ne définit pas, telles que le projet les portait à
+   * la reprise (#379) : hors du fichier, elles ne s'enregistrent pas. La première étape qui en change
+   * une l'y fait entrer, avec cet état lu.
+   */
+  horsFichier?: BudgetDefini;
+}
+
+/** Fait entrer dans le fichier une partie qu'il ne définit pas encore, telle qu'elle a été lue. */
+function definir(b: Brouillon, partie: string): void {
+  const h = b.horsFichier;
+  if (!h) return;
+  const tables = h.tables as Record<string, unknown[] | undefined>;
+  const settings = h.settings as Record<string, unknown>;
+  if (tables[partie]) {
+    (b.fichier.tables as Record<string, unknown>)[partie] = JSON.parse(JSON.stringify(tables[partie]));
+    (b.etatLu.tables as Record<string, unknown>)[partie] = tables[partie];
+    delete tables[partie];
+  } else if (partie in settings) {
+    (b.etatLu.settings as Record<string, unknown>)[partie] = settings[partie];
+    delete settings[partie];
+  }
 }
 
 /**
@@ -157,6 +179,7 @@ const estTableDuBudget = (key: LedgerKey): key is CleTableBudget => (CLES_TABLES
 /** Les lignes du fichier pour `key` : une table que l'assistant ne couvre pas ne s'y écrit pas. */
 function lignesDuFichier(b: Brouillon, key: LedgerKey) {
   if (!estTableDuBudget(key)) throw new Error(`L’assistant n’écrit pas la table « ${key} » : elle n’est pas dans son brouillon.`);
+  if (!b.fichier.tables[key]) definir(b, key);
   return (b.fichier.tables[key] ??= []);
 }
 
@@ -200,6 +223,7 @@ export function retirer(
 export function reglage<K extends keyof Settings>(b: Brouillon, key: K, value: Settings[K]): void {
   if (key === 'siteId') return; // l'identité de l'instance n'est pas un réglage du foyer, le dépôt l'ignore aussi
   verifierReglage(key, value);
+  if (!(key in b.fichier.settings)) definir(b, key);
   (b.fichier.settings as Record<string, unknown>)[key] = value;
 }
 
@@ -245,8 +269,12 @@ export function montrer(projet: Ledger, b: Brouillon): Ledger {
  * préparée par le cœur (#378) — ce qui s'écrira, se retirera, les conflits —, ou son refus.
  */
 export function preparerValidation(projet: Ledger, b: Brouillon) {
-  const difference = differenceBudget(b.fichier, b.etatLu);
-  return { difference, preparation: preparerApplication(difference, b.etatLu, projet) };
+  // Les parties hors du fichier comptent, sans différence : lues des deux côtés telles quelles.
+  const h = b.horsFichier ?? { tables: {}, settings: {} };
+  const fichier: BudgetDefini = { tables: { ...h.tables, ...b.fichier.tables }, settings: { ...h.settings, ...b.fichier.settings } };
+  const etatLu: BudgetDefini = { tables: { ...h.tables, ...b.etatLu.tables }, settings: { ...h.settings, ...b.etatLu.settings } };
+  const difference = differenceBudget(fichier, etatLu);
+  return { difference, preparation: preparerApplication(difference, etatLu, projet) };
 }
 
 /**
@@ -275,13 +303,7 @@ export function brouillonDuFichier(projet: Ledger, budget: BudgetDefini): Brouil
   const manquantes = PARTIES_ASSISTANT.filter((p) => !definies.includes(p));
   const fichier = copie(budget);
   const etatLu = etatDuProjet(projet, definies);
-  const lu = etatDuProjet(projet, manquantes);
-  for (const [k, lignes] of Object.entries(lu.tables)) {
-    (fichier.tables as Record<string, unknown>)[k] = JSON.parse(JSON.stringify(lignes));
-    (etatLu.tables as Record<string, unknown>)[k] = lignes;
-  }
-  Object.assign(fichier.settings, lu.settings);
-  Object.assign(etatLu.settings, lu.settings);
+  const horsFichier = etatDuProjet(projet, manquantes);
   return {
     fichier,
     etatLu,
@@ -291,6 +313,7 @@ export function brouillonDuFichier(projet: Ledger, budget: BudgetDefini): Brouil
     projetVierge: projetEstVierge(projet),
     reglagesProposes: {},
     budgetImporte: true,
+    horsFichier,
   };
 }
 

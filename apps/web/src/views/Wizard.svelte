@@ -520,11 +520,6 @@
     catError = '';
   }
   /**
-   * La validation : seul geste qui écrit dans le projet, et il y écrit tout ce que l'assistant montre
-   * (D40). Refusée en cours de route, elle le dit et garde le brouillon : valider de nouveau écrit ce
-   * qui manque.
-   */
-  /**
    * Ce que la validation va changer au projet du moment (#379, point 3) : la différence entre le
    * brouillon et ce que l'assistant a lu, dite partie par partie, et les lignes changées des deux côtés.
    */
@@ -554,6 +549,11 @@
     }
   }
 
+  /**
+   * La validation : seul geste qui écrit dans le projet, et il n'y applique que la différence entre le
+   * brouillon et ce que l'assistant a lu, tout en une fois (D40, #379). Refusée, elle n'écrit rien, dit
+   * le premier problème et le nombre des autres, et garde le brouillon.
+   */
   function valider() {
     try {
       if (!brouillon.budgetImporte) recalerLesClotures(); // un budget importé garde ses clôtures telles que le JSON les dit
