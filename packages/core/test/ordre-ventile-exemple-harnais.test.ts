@@ -1,9 +1,9 @@
 /**
- * Tests du codeur de #395 — « L'exemple porte un ordre permanent ventilé, que l'assistant propose ».
- * Côté cœur : l'ordre de l'exemple et sa ventilation (point 1), ce que le plan du 6 septembre en
+ * Harnais d'audit de #395 — « L'exemple porte un ordre permanent ventilé, que l'assistant propose ».
+ * Composé des tests du codeur. Côté cœur : l'ordre de l'exemple et sa ventilation (point 1), ce que le plan du 6 septembre en
  * signale (point 2), ce que montrent ses parts quand le montant change (point 4), les parts dont la
  * tirelire manque (point 5) et l'ordre que reproduit la proposition (point 7). Ce que l'écran en dit
- * est dans `apps/web/test/navigateur/ordre-ventile-assistant.test.ts`.
+ * est dans `apps/web/test/navigateur/ordre-ventile-assistant-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { alive, budgetSuggestions, computePlan, euros, exampleLedger, orderPartsShown, suggestedOrder, type Ledger, type PlannedFlow } from '../src/index.js';
@@ -16,7 +16,7 @@ const sansAction = ({ action: _a, ...f }: PlannedFlow): PlannedFlow => f;
 const proposition = () => budgetSuggestions().orders.find((o) => o.name === 'Virement Livret A')!;
 
 describe('point 1 : l’ordre de l’exemple porte sa ventilation', () => {
-  it('[niveau 4] 600 € du principal vers le Livret A, quatre parts de tirelire sans catégorie, une seule variable', () => {
+  it('[niveau 2] 600 € du principal vers le Livret A, quatre parts de tirelire sans catégorie, une seule variable', () => {
     const l = exampleLedger();
     const f = ordreDe(l);
     expect(f).toMatchObject({ kind: 'transfer', amount: euros(-600), accountId: 'acc-principal', counterpartAccountId: 'acc-livret', labelPattern: 'TIRELIRE LIVRET A', dateWindowDays: 5, amountTolerance: { pct: 20 } });
@@ -34,7 +34,7 @@ describe('point 1 : l’ordre de l’exemple porte sa ventilation', () => {
 });
 
 describe('point 2 : le plan du 6 septembre signale l’écart du montant et celui de la part de Vacances', () => {
-  it('[niveau 4] 650 € demandés, détail 100/50/200/300 ; ordre et Vacances signalés, rien d’autre', () => {
+  it('[niveau 1] 650 € demandés, détail 100/50/200/300 ; ordre et Vacances signalés, rien d’autre', () => {
     const l = exampleLedger();
     const t = virementLivret(l);
     expect(t.permanent).toBe(euros(650));
@@ -46,7 +46,7 @@ describe('point 2 : le plan du 6 septembre signale l’écart du montant et celu
     expect(signalees).toEqual([['Vacances', euros(150), euros(200)]]);
     expect(t.bankOrder!.parts.map((p) => p.tirelireName).sort()).toEqual(['Assurance auto', 'Taxe foncière', 'Vacances']);
   });
-  it('[niveau 4] hors de ces signalements, le plan du 6 septembre est celui de l’exemple sans ventilation', () => {
+  it('[niveau 2] hors de ces signalements, le plan du 6 septembre est celui de l’exemple sans ventilation', () => {
     const avec = exampleLedger();
     const sans: Ledger = { ...avec, plannedFlows: avec.plannedFlows.map((f) => (f.id === 'flow-vir-livret' ? sansAction(f) : f)) };
     const efface = (l: Ledger) => {
@@ -63,7 +63,7 @@ describe('point 2 : le plan du 6 septembre signale l’écart du montant et celu
 });
 
 describe('point 4 : corriger le montant ne touche pas les parts fixes', () => {
-  it.each([[800, 500], [600, 300], [250, 0]])('[niveau 4] à %i €, les parts fixes restent, la variable vaut %i €', (montant, reste) => {
+  it.each([[800, 500], [600, 300], [250, 0]])('[niveau 2] à %i €, les parts fixes restent, la variable vaut %i €', (montant, reste) => {
     const l = exampleLedger();
     const f = { ...ordreDe(l), amount: euros(-montant) };
     expect(orderPartsShown(f, l).map((p) => p.amount)).toEqual([euros(100), euros(50), euros(150), euros(reste)]);
@@ -72,7 +72,7 @@ describe('point 4 : corriger le montant ne touche pas les parts fixes', () => {
 
 describe('points 5 et 7 : l’ordre que crée la proposition', () => {
   const compte = (n: string) => ({ 'Livret A': 'liv' })[n];
-  it('[niveau 4] avec les quatre tirelires, il reproduit l’ordre de l’exemple sur les tirelires de même nom', () => {
+  it('[niveau 1] avec les quatre tirelires, il reproduit l’ordre de l’exemple sur les tirelires de même nom', () => {
     const ids: Record<string, string> = { 'Taxe foncière': 't1', 'Assurance auto': 't2', Vacances: 't3', 'Épargne de précaution': 't4' };
     const f = suggestedOrder(proposition(), { id: 'o', principalId: 'pr', compte, tirelire: (n) => ids[n] })!;
     expect(f.amount).toBe(euros(-600));
@@ -83,18 +83,18 @@ describe('points 5 et 7 : l’ordre que crée la proposition', () => {
       { tirelireId: 't4', share: { kind: 'variable' } },
     ]);
   });
-  it('[niveau 4] une tirelire absente : sa part n’est pas posée, les autres restent, le montant ne change pas', () => {
+  it('[niveau 2] une tirelire absente : sa part n’est pas posée, les autres restent, le montant ne change pas', () => {
     const ids: Record<string, string> = { 'Taxe foncière': 't1', 'Épargne de précaution': 't4' };
     const f = suggestedOrder(proposition(), { id: 'o', principalId: 'pr', compte, tirelire: (n) => ids[n] })!;
     expect(f.amount).toBe(euros(-600));
     expect(f.action!.allocation!.map((a) => a.tirelireId)).toEqual(['t1', 't4']);
   });
-  it('[niveau 4] sans tirelire, l’ordre se propose sans part ; sans son compte d’arrivée, il ne se propose pas', () => {
+  it('[niveau 2] sans tirelire, l’ordre se propose sans part ; sans son compte d’arrivée, il ne se propose pas', () => {
     const f = suggestedOrder(proposition(), { id: 'o', principalId: 'pr', compte, tirelire: () => undefined })!;
     expect(f.action).toBeUndefined();
     expect(suggestedOrder(proposition(), { id: 'o', principalId: 'pr', compte: () => undefined, tirelire: () => 'x' })).toBeUndefined();
   });
-  it('[niveau 4] une part montrée dont la tirelire a été retirée n’est pas montrée', () => {
+  it('[niveau 2] une part montrée dont la tirelire a été retirée n’est pas montrée', () => {
     const l = exampleLedger();
     const sansVac: Ledger = { ...l, tirelires: l.tirelires.filter((t) => t.id !== 'env-vac') };
     expect(orderPartsShown(ordreDe(l), sansVac).map((p) => [p.tirelireName, p.amount])).toEqual([

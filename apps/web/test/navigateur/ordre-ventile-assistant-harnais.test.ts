@@ -1,6 +1,6 @@
 /**
- * Tests du codeur de #395 — ce que l'assistant montre et enregistre de la ventilation de l'ordre
- * « Virement Livret A » de l'exemple (points 3 à 7). Côté cœur : `packages/core/test/ordre-ventile-exemple.test.ts`.
+ * Harnais d'audit de #395 — composé des tests du codeur : ce que l'assistant montre et enregistre de la ventilation de l'ordre
+ * « Virement Livret A » de l'exemple (points 3 à 7). Côté cœur : `packages/core/test/ordre-ventile-exemple-harnais.test.ts`.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
@@ -98,7 +98,7 @@ describe.skipIf(!navigateur)('#395 — l’assistant propose l’ordre de l’ex
       await page?.close();
     });
 
-    it('[niveau 4] point 3 : la carte de l’ordre dit chaque part, la variable comme le reste, lisible à 375 px', async () => {
+    it('[niveau 1] point 3 : la carte de l’ordre dit chaque part, la variable comme le reste, lisible à 375 px', async () => {
       expect(await parts(page)).toEqual([
         ['Taxe foncière', '100,00 €'],
         ['Assurance auto', '50,00 €'],
@@ -108,11 +108,11 @@ describe.skipIf(!navigateur)('#395 — l’assistant propose l’ordre de l’ex
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     });
 
-    it('[niveau 4] point 6 : rien n’est enregistré avant la validation', async () => {
+    it('[niveau 1] point 6 : rien n’est enregistré avant la validation', async () => {
       expect(ordreEnregistre(await projetConserve(page))).toBeNull();
     });
 
-    it('[niveau 4] points 6 et 7 : validé, l’ordre s’enregistre avec ses parts, et le plan signale le montant et Vacances', async () => {
+    it('[niveau 1] points 6 et 7 : validé, l’ordre s’enregistre avec ses parts, et le plan signale le montant et Vacances', async () => {
       expect(await cliquer(page, 'Valider mon budget')).toBe(true);
       await pause(400);
       const l = await projetConserve(page);
@@ -143,7 +143,7 @@ describe.skipIf(!navigateur)('#395 — l’assistant propose l’ordre de l’ex
       await page?.close();
     });
 
-    it('[niveau 4] points 4 et 5 : la part de Vacances disparaît, les parts fixes gardent leur montant, la variable prend le reste', async () => {
+    it('[niveau 2] points 4 et 5 : la part de Vacances disparaît, les parts fixes gardent leur montant, la variable prend le reste', async () => {
       await etape(page, 'Pas tous les mois');
       const fait = await page.evaluate(() => {
         const champ = ([...document.querySelectorAll('main .card.tirelire input.nom')] as HTMLInputElement[]).find((i) => i.value.trim() === 'Vacances');
