@@ -119,6 +119,9 @@ export const RYTHME: Description = {
 /** La tolérance de montant d'un flux. */
 export const TOLERANCE: Description = { genre: 'objet', champs: { abs: facultatif(centimes), pct: facultatif(nombre) } };
 
+/** Le choix de garder un ordre tel quel (#205) : ce que le budget demandait au geste. */
+export const GARDE: Description = { genre: 'objet', champs: { amount: requis(centimes), parts: facultatif({ genre: 'table', de: centimes }) } };
+
 /** La sélection d'un automatisme (D23, D36). */
 export const SELECTION: Description = {
   genre: 'objet',

@@ -20,7 +20,7 @@ Un objet JSON, encodé en UTF-8 :
 | Clé | Obligatoire | Forme |
 | --- | --- | --- |
 | `format` | oui | `"tirelire-budget"` |
-| `version` | oui | `3`, la seule version lue aujourd'hui ; les versions 1 et 2 sont refusées |
+| `version` | oui | `4`, la seule version lue aujourd'hui ; les versions 1 à 3 sont refusées |
 | `accounts`, `tirelires`, `needs`, `categories`, `planned_flows` | non | une liste de lignes : présente, la table entière ; absente, la table n'est pas définie |
 | `settings` | non | un objet, une clé par réglage : présente, le réglage est défini ; absente, il ne l'est pas |
 
@@ -96,7 +96,7 @@ qu'une autre ligne, une opération comprise, désigne encore —, identifiants r
 principal. Une seule faute refuse le tout ; le refus nomme le premier problème — la partie, la
 ligne, la colonne — et dit combien d'autres il y a. Rien n'est écrit.
 
-**Écrire un état.** Le cœur écrit en version 3 les parties choisies d'un projet, toutes par défaut :
+**Écrire un état.** Le cœur écrit en version 4 les parties choisies d'un projet, toutes par défaut :
 ses lignes vivantes, sans les colonnes vides, et ses réglages. Relire ce qu'il a écrit redonne les
 mêmes lignes, colonne pour colonne.
 
@@ -180,6 +180,7 @@ enregistrés.
 | `active_from` | non | date : début de validité |
 | `active_to` | non | date : fin de validité |
 | `action` | non | objet : ce que le flux fait de l'opération qui reprend une occurrence (D24), la forme « action » des automatismes du fichier SQLite (`docs/format-depot-sqlite.md`) — `categoryId`, `tirelireId` (celle qu'une échéance vide), `allocation` (une liste de parts, une seule variable, D27) et `state`, `reconcile` (le défaut) ou `lock` (D22, D23), chacun facultatif |
+| `kept` | non | objet `{ "amount": <montant>, "parts": { <tirelire>: <montant> } }`, `parts` facultatif : l'ordre permanent gardé tel quel, et ce que le budget demandait alors (#205) |
 
 ### `settings`
 
@@ -200,7 +201,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
 ```json
 {
   "format": "tirelire-budget",
-  "version": 3,
+  "version": 4,
   "accounts": [
     {
       "id": "acc-principal",

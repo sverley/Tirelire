@@ -397,7 +397,22 @@ export interface PlannedFlow {
    * classe rien, et l'opération reprise est rapprochée.
    */
   action?: FlowAction;
+  /**
+   * Sur un ordre permanent, le choix de le garder tel quel (#205, D20, I10) : ce que le budget
+   * demandait au moment du geste — le montant, et la part de chaque tirelire qui a une part fixe dans
+   * l'ordre. L'écart se lit alors « à surveiller », sans avertissement, tant que ce que le budget
+   * demande reste dans le pas d'arrondi de ces valeurs (`computePlan`). Absent : l'écart est à faire.
+   */
+  kept?: KeptOrder;
   deletedAt?: string;
+}
+
+/** Ce que le budget demandait quand l'utilisateur a gardé son ordre tel quel (#205). */
+export interface KeptOrder {
+  /** Le montant mensuel demandé ; 0 pour un ordre que le budget ne demandait plus. */
+  amount: Cents;
+  /** Par tirelire qui a une part fixe dans l'ordre : la part demandée. */
+  parts?: Record<Id, Cents>;
 }
 
 /**

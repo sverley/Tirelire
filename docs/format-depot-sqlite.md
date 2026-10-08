@@ -33,10 +33,10 @@ est refusé ; l'application n'en écarte jamais une partie.
 
 ### La version du format
 
-La version du format décrite ici est **7** : `meta` la porte sous la clé `format_version`, écrite
-comme le texte `7`, avec le marqueur `format` valant `tirelire` (table `meta`). Avant `v1`, le
+La version du format décrite ici est **8** : `meta` la porte sous la clé `format_version`, écrite
+comme le texte `8`, avec le marqueur `format` valant `tirelire` (table `meta`). Avant `v1`, le
 format peut changer d'une version à la suivante sans migration, et un fichier d'une autre version est
-refusé en le disant (D30, D91) : ce document décrit la version 7, et un test le tient juste.
+refusé en le disant (D30, D91) : ce document décrit la version 8, et un test le tient juste.
 
 ## Les conventions
 
@@ -182,6 +182,7 @@ permanent (D57, D60). Une contrainte de la table, `planned_flows.action` : l'ét
 | `active_from` | TEXT | non | oui | saisie | date `AAAA-MM-JJ` | — | Premier jour de validité du flux. |
 | `active_to` | TEXT | non | oui | saisie | date `AAAA-MM-JJ` | — | Dernier jour de validité du flux. |
 | `action` | TEXT | non | oui | saisie | JSON, forme « action » | — | Ce que le flux fait de l'opération qui reprend une occurrence (D24) : sa catégorie, sa tirelire — celle qu'une échéance vide —, sa ventilation, son état. |
+| `kept` | TEXT | non | oui | saisie | JSON, forme « garde » | — | Sur un ordre permanent gardé tel quel (#205, D20) : ce que le budget demandait au geste. Absent : l'écart de l'ordre est à faire. |
 | `deleted_at` | TEXT | non | oui | établie | horodatage `AAAA-MM-JJTHH:MM:SS.mmmZ` | — | Suppression logique. |
 | `hlc` | TEXT | non | oui | établie | horloge | — | L'horloge de la ligne. |
 
@@ -334,7 +335,7 @@ fait refuser le fichier, la colonne nommée.
 | Clé de `meta` | Valeur | Sens |
 | --- | --- | --- |
 | `format` | `tirelire` | Le marqueur : ce qui distingue un dépôt Tirelire de toute autre base. |
-| `format_version` | `7` | La version du format que ce document décrit, écrite comme le texte `7`. |
+| `format_version` | `8` | La version du format que ce document décrit, écrite comme le texte `8`. |
 
 ## Les formes JSON
 
@@ -451,6 +452,21 @@ Colonne : `automations.selection`. L'objet vide retient toute opération.
 
 ```json
 { "labelPattern": "CARREFOUR", "accountId": "acc-principal", "amountMax": -1 }
+```
+
+### Forme « garde »
+
+Le choix de garder un ordre permanent tel quel (#205, D20) : ce que le budget demandait au moment du
+geste. Colonne : `planned_flows.kept`.
+
+| Champ | Obligatoire | Forme | Désigne | Seulement si |
+| --- | --- | --- | --- | --- |
+| `amount` | oui | montant entier en centimes : le montant mensuel demandé, `0` pour un ordre que le budget ne demandait plus | — | — |
+| `parts` | non | objet : par tirelire qui a une part fixe dans l'ordre, la part demandée | — | — |
+| `parts{}` | oui | montant entier en centimes | — | — |
+
+```json
+{ "amount": 30000, "parts": { "tirelire-taxe": 10000 } }
 ```
 
 ### Forme « action »
@@ -596,7 +612,7 @@ l'instance qui ouvre date les lignes. Le plan se lit à une date postérieure à
 
 ```sql
 CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT);
-INSERT INTO meta (key, value) VALUES ('format', 'tirelire'), ('format_version', '7');
+INSERT INTO meta (key, value) VALUES ('format', 'tirelire'), ('format_version', '8');
 
 CREATE TABLE accounts (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, opening_balance INTEGER NOT NULL, opening_date TEXT NOT NULL);
 INSERT INTO accounts (id, name, kind, opening_balance, opening_date) VALUES ('acc-livret', 'Livret A', 'epargne', 0, '2026-10-01');

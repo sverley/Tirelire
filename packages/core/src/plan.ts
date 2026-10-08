@@ -179,6 +179,11 @@ export interface BankOrder {
   signaled: boolean;
   /** Par tirelire qui a au moins une part fixe dans ces ordres : leur somme mensuelle, ce que le budget lui demande ici, l'écart. */
   parts: Array<{ tirelireId: Id; tirelireName: string; amount: Cents; requested: Cents; drift: Cents; signaled: boolean }>;
+  /**
+   * L'ordre est gardé tel quel (#205) : son écart se signale encore (`signaled`, `parts`), mais à
+   * surveiller, sans avertissement ni proposition, tant que le choix tient (`keptOrderHolds`).
+   */
+  kept?: boolean;
 }
 
 export interface PlanWarning {
@@ -472,7 +477,9 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     const permanent = Math.max(0, breakdown.reduce((s, b) => s + b.cruise, 0));
     const ordres = principal ? standingOrderFlows(ledger.plannedFlows, principal.id, a.id, asOf) : [];
     const bankOrder = aDesTirelires && ordres.length > 0 ? compareOrders(ordres, permanent, breakdown, ledger, ledger.settings.orderRounding) : undefined;
-    if (bankOrder?.signaled)
+    // Un ordre gardé tel quel reste lisible, à surveiller : il ne compte plus parmi les avertissements (#205, D20).
+    if (bankOrder && ordres.length === 1 && keptOrderHolds(ordres[0]!, bankOrder, permanent, ledger.settings.orderRounding)) bankOrder.kept = true;
+    if (bankOrder?.signaled && !bankOrder.kept)
       warnings.push({
         code: 'bankOrderDrift',
         message:
@@ -481,7 +488,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
             : `L'ordre permanent vers « ${a.name} » est enregistré à ${formatCents(bankOrder.amount)}, le budget en demande ${formatCents(permanent)} : à modifier chez votre banque, puis à confirmer ici.`,
         accountId: a.id,
       });
-    for (const part of bankOrder?.parts ?? [])
+    for (const part of bankOrder?.kept ? [] : (bankOrder?.parts ?? []))
       if (part.signaled)
         warnings.push({
           code: 'bankOrderPartDrift',
@@ -655,6 +662,56 @@ function driftSignaled(drift: Cents, step: Cents): boolean {
   return Math.abs(drift) > Math.max(0, step);
 }
 
+/** L'écart de l'ordre — montant ou part fixe — se signale-t-il ? */
+function ecartSignale(b: BankOrder): boolean {
+  return b.signaled || b.parts.some((p) => p.signaled);
+}
+
+/**
+ * Le choix de garder l'ordre `flow` tel quel tient-il encore (#205, points 6 et 7) ? Il faut un choix,
+ * un écart qui se signale, et que ce que le budget demande n'ait pas bougé de plus du pas d'arrondi
+ * depuis le geste, ni pour le montant ni pour une part fixe ; pour un ordre que le budget ne
+ * demandait plus, qu'il n'en demande toujours aucun.
+ */
+export function keptOrderHolds(flow: PlannedFlow, bankOrder: BankOrder, permanent: Cents, step: Cents): boolean {
+  const k = flow.kept;
+  if (!k || !ecartSignale(bankOrder)) return false;
+  if (k.amount === 0 || permanent === 0) return k.amount === 0 && permanent === 0;
+  if (driftSignaled(permanent - k.amount, step)) return false;
+  return bankOrder.parts.every((p) => !driftSignaled(p.requested - (k.parts?.[p.tirelireId] ?? 0), step));
+}
+
+/**
+ * L'ordre du compte de `transfer` gardé tel quel (#205, point 1) : montant et ventilation inchangés
+ * (I10), avec ce que le budget demande aujourd'hui. `undefined` si le compte n'a pas exactement cet
+ * ordre, ou que son écart ne se signale pas.
+ */
+export function keepStandingOrder(transfer: PlanTransfer, flow: PlannedFlow): PlannedFlow | undefined {
+  const b = transfer.bankOrder;
+  if (!b || b.flowId !== flow.id || !ecartSignale(b)) return undefined;
+  const parts = Object.fromEntries(b.parts.map((p) => [p.tirelireId, p.requested]));
+  return { ...flow, kept: { amount: transfer.permanent, ...(b.parts.length ? { parts } : {}) } };
+}
+
+/** L'ordre rendu à sa proposition (#205, point 5) : rien d'autre ne change. */
+export function resumeStandingOrderProposal(flow: PlannedFlow): PlannedFlow {
+  const next = { ...flow };
+  delete next.kept;
+  return next;
+}
+
+/**
+ * Les ordres dont le choix de les garder tel quel a cessé, lus au plan de `asOf` (#205, points 6
+ * et 7) : rendus sans le choix, à enregistrer, pour qu'un écart qui reviendrait se propose de nouveau.
+ */
+export function lapsedKeptOrders(ledger: Ledger, asOf: ISODate): PlannedFlow[] {
+  const gardes = alive(ledger.plannedFlows).filter((f) => f.kept);
+  if (!gardes.length) return [];
+  const plan = computePlan(ledger, asOf);
+  const tenus = new Set(plan.transfers.filter((t) => t.bankOrder?.kept).map((t) => t.bankOrder!.flowId));
+  return gardes.filter((f) => !tenus.has(f.id)).map(resumeStandingOrderProposal);
+}
+
 /**
  * Les ordres d'un compte comparés à ce que le budget y demande, montant et parts fixes (D60, I10).
  * Une part nomme sa tirelire par le grand livre, celles qui ont été retirées comprises : un ordre
@@ -754,6 +811,7 @@ export function standingTransferFlow(
     const state = existing.action?.state;
     const action = { ...(allocation.length ? { allocation } : {}), ...(state ? { state } : {}) };
     const next: PlannedFlow = { ...existing, amount: sign * amount };
+    delete next.kept; // confirmer l'ordre met fin au choix de le garder (#205, point 7)
     if (Object.keys(action).length) next.action = action;
     else delete next.action;
     return next;

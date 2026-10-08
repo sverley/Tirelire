@@ -4,6 +4,7 @@
  */
 import {
   computePlan,
+  lapsedKeptOrders,
   diffDays,
   emptyLedger,
   exampleLedger,
@@ -249,6 +250,12 @@ class AppState {
 
   reload(): void {
     this.ledger = this.store.load();
+    // Un ordre gardé tel quel dont le choix a cessé le perd : un écart qui reviendrait se propose de nouveau (#205, points 6 et 7).
+    const cesses = lapsedKeptOrders(this.ledger, this.asOf);
+    if (cesses.length) {
+      for (const f of cesses) this.store.upsert('plannedFlows', f);
+      this.ledger = this.store.load();
+    }
     this.lireDates();
   }
 

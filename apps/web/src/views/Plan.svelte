@@ -9,7 +9,7 @@
   import { avecVentilation } from '../lib/ventilationOrdre';
   import Manque from '../lib/Manque.svelte';
   import { supprimerOperations } from '../lib/suppression';
-  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, proposedOrderAllocation, type ForecastMovement, type Operation, type Period, type PlanTransfer, type AllocationLine } from '@tirelire/core';
+  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, proposedOrderAllocation, keepStandingOrder, resumeStandingOrderProposal, type ForecastMovement, type Operation, type Period, type PlanTransfer, type AllocationLine } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -118,7 +118,22 @@
   }
   /** L'écart du montant ou d'une part fixe se signale, et le budget demande encore un ordre (point 5). */
   function ecartPropose(t: PlanTransfer): boolean {
-    return !!t.proposal && t.permanent > 0 && !!t.bankOrder?.flowId && (t.bankOrder.signaled || t.bankOrder.parts.some((p) => p.signaled));
+    return !!t.proposal && t.permanent > 0 && !!t.bankOrder?.flowId && !t.bankOrder.kept && (t.bankOrder.signaled || t.bankOrder.parts.some((p) => p.signaled));
+  }
+  /** Un ordre au compte seul, dont l'écart se signale et n'est pas gardé : il peut se garder tel quel (#205, point 1). */
+  function gardable(t: PlanTransfer): boolean {
+    return !!t.bankOrder?.flowId && !t.bankOrder.kept && (t.bankOrder.signaled || t.bankOrder.parts.some((p) => p.signaled));
+  }
+  /** Garde l'ordre tel quel, en un geste : rien de son montant ni de sa ventilation ne change (#205, points 1 et 2, I10). */
+  function garderOrdre(t: PlanTransfer) {
+    const f = ordreSeul(t);
+    const garde = f && keepStandingOrder(t, f);
+    if (garde) app.upsert('plannedFlows', garde);
+  }
+  /** Rend l'écart à faire, avec sa proposition (#205, point 5). */
+  function reprendreProposition(t: PlanTransfer) {
+    const f = ordreSeul(t);
+    if (f?.kept) app.upsert('plannedFlows', resumeStandingOrderProposal(f));
   }
 
   /** Enregistre l'ordre proposé tel qu'il est montré, en un geste (points 2 et 5) ; rien ne s'écrit avant (I10). */
@@ -422,7 +437,11 @@
           <div class="row">
             <div class="label">Ordre permanent chez la banque
               <span class="sub">
-                {t.permanent === 0
+                {t.bankOrder.kept
+                  ? (t.permanent === 0
+                    ? 'gardé tel quel, à surveiller : le budget ne le demande plus'
+                    : `gardé tel quel, à surveiller : le budget demande ${money(t.permanent)}`)
+                  : t.permanent === 0
                   ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
                   : t.bankOrder.drift === 0
                     ? 'au montant du budget'
@@ -431,7 +450,7 @@
                       : `à passer à ${money(roundOrderUp(t.permanent, pasArrondi))} chez la banque, puis à confirmer ici`}
               </span>
             </div>
-            <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
+            <div class="num {t.bankOrder.drift === 0 || t.bankOrder.kept ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
           </div>
           <!-- Chaque ordre enregistré, son nom, son montant et sa ventilation telle qu'elle est enregistrée (#394, point 3). -->
           {#each ordresDe(t) as f (f.id)}
@@ -456,6 +475,11 @@
             {:else if ecartPropose(t)}
               <button class="btn primary" onclick={() => validerProposition(t)}>Confirmer mon nouvel ordre</button>
             {/if}
+          {/if}
+          {#if gardable(t) && ordreEdite !== t.accountId}
+            <button class="btn small" onclick={() => garderOrdre(t)}>Garder mon ordre tel quel</button>
+          {:else if t.bankOrder?.kept}
+            <button class="btn small" onclick={() => reprendreProposition(t)}>Reprendre la proposition</button>
           {/if}
           {#if t.breakdown.length}
             <button class="btn small" onclick={() => basculerDetail(t)}>{detaille.includes(t.accountId) ? 'Masquer le détail' : 'Détail'}</button>
