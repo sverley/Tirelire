@@ -1,9 +1,12 @@
 /**
- * Tests du codeur de #363, côté écran — depuis les écrans Comptes et Tirelires, l'assistant s'ouvre
+ * Harnais d'audit de #363, côté écran — depuis les écrans Comptes et Tirelires, l'assistant s'ouvre
  * sur leur seule section : sur le site construit, à 375 px, base vide. Le brouillon lui-même est
- * vérifié sans navigateur dans `../assistant-section.test.ts`.
+ * vérifié sans navigateur dans `../assistant-section-harnais.test.ts`.
  *
- * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
+ * Les tests sont ceux du codeur (d'où ils sont déplacés), classés par la suite de questions de D83.
+ * Niveau 1 : le point d'entrée de chaque écran, sur une base vide (I5), lisible à 375 px (C9), et rien
+ * d'écrit sans validation — « ‹ Retour », un autre assistant, l'abandon (D40, I10). Vus rouges sur le
+ * code de `main`. Chaque test dit, dans son titre, les points du « Fait quand » qu'il tranche.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -58,7 +61,7 @@ const jourDeDebut = (page: Page) =>
     return (h?.nextElementSibling?.querySelector('input') as HTMLInputElement | null)?.value ?? null;
   });
 
-describe.skipIf(!navigateur)('[niveau 4] #363 · l’assistant ouvert sur la section d’un écran', () => {
+describe.skipIf(!navigateur)('[niveau 1] #363 · l’assistant ouvert sur la section d’un écran', () => {
   let site: Site;
 
   beforeAll(async () => {
