@@ -55,8 +55,8 @@ describe.skipIf(!navigateur)('[niveau 1] #206 · 6. le libellé enregistré se l
     const r = await page.evaluate(() => {
       const de = document.documentElement;
       const carte = [...document.querySelectorAll('.card')].find((c) => c.querySelector('.row .label strong')?.textContent?.trim() === 'Livret A');
-      const sub = carte?.querySelector('.row .label .sub');
-      const spans = sub ? [...sub.querySelectorAll('.num')] : [];
+      // Le libellé se lit avec l'ordre, à côté de son geste « Copier » (#13, point 6).
+      const spans = carte ? [...carte.querySelectorAll('.libelle-a-copier .libelle')] : [];
       const bord = carte?.getBoundingClientRect().right ?? de.clientWidth;
       return {
         scrollWidth: de.scrollWidth,

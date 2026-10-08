@@ -16,6 +16,9 @@
   import SectionComptes from '../lib/SectionComptes.svelte';
   import VentilationOrdre from '../lib/VentilationOrdre.svelte';
   import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
+  import ConsigneOrdre from '../lib/ConsigneOrdre.svelte';
+  import ExplicationSuite from '../lib/ExplicationSuite.svelte';
+  import { ordreAPoser } from '../lib/consigneOrdre';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
   import { fichierAEnregistrer, preparerValidation } from '../lib/brouillon';
@@ -286,6 +289,20 @@
   const nomDuCompte = (id?: string) => accounts.find((a) => a.id === id)?.name ?? '';
   /** Ce que le budget de l'assistant demande comme ordre permanent vers ce compte (D60) : un calcul, relu à chaque lecture. */
   const demandeVers = (accountId?: string) => app.assistantPlan.transfers.find((t) => t.accountId === accountId)?.permanent ?? 0;
+  /**
+   * Les ordres à poser chez la banque (#13, points 1 à 4) : pour chaque compte d'accueil vers lequel
+   * le budget que l'assistant montre demande un ordre, et vers lequel aucun ordre n'est montré, l'ordre
+   * que l'écran Plan proposera une fois l'assistant validé — son montant, sa ventilation, son libellé
+   * et son jour, lus sur le même calcul (`ordreAPoser`). Rien ne s'enregistre ici (D43, D60, I10) :
+   * l'ordre s'enregistre sur l'écran Plan, une fois posé chez la banque (#394).
+   */
+  const aPoser = $derived(
+    app.assistantPlan.transfers.flatMap((t) => {
+      if (t.permanent <= 0 || !t.proposal || t.bankOrder || ordres.some((f) => standingOrderTarget(f, mainAccountId()) === t.accountId)) return [];
+      const ordre = ordreAPoser(app.assistantPlan, t, mainAccountId());
+      return ordre ? [{ t, proposal: t.proposal, ordre }] : [];
+    }),
+  );
 
   /**
    * Les propositions ne s'offrent que sur un projet vierge (D43), tel qu'il était à l'ouverture de
@@ -933,7 +950,8 @@
       <div class="card">
         <div class="row">
           <div class="label"><strong>{e.name}</strong></div>
-          <select onchange={(ev) => setPlacement(e, (ev.currentTarget as HTMLSelectElement).value)}>
+          <!-- Borné à sa ligne : un nom de compte long ne fait pas déborder le résumé à 375 px (C9, #13). -->
+          <select style="max-width:55%;min-width:0" onchange={(ev) => setPlacement(e, (ev.currentTarget as HTMLSelectElement).value)}>
             <option value="" selected={e.placement.length === 0}>Peu importe</option>
             {#each openAccounts(accounts, app.asOf, e.placement[0]?.accountId) as a}
               <option value={a.id} selected={e.placement[0]?.accountId === a.id}>{a.name}</option>
@@ -982,8 +1000,43 @@
     {/if}
   {/if}
 
+  {#if !valide && tirelires.length}
+    {#if aPoser.length}
+      <h3>Vos ordres permanents à poser</h3>
+      <p class="muted small">
+        Votre budget demande un virement permanent du compte principal vers {aPoser.length > 1 ? 'ces comptes' : 'ce compte'}.
+        L’application n’a pas accès à votre banque : posez-y l’ordre vous-même, avec ce montant, ce libellé et ce jour.
+        Rien n’est enregistré ici : une fois votre budget validé et l’ordre posé, enregistrez-le sur l’écran Plan, qui le propose tel quel.
+      </p>
+      {#if !(ordres.length || restantsOrdres.length)}<ExplicationVentilation />{/if}
+      {#each aPoser as o (o.t.accountId)}
+        <div class="card ordre-a-poser">
+          <div class="row">
+            <div class="label"><strong>{o.t.accountName}</strong><span class="sub">ordre permanent à poser, chaque mois</span></div>
+            <div class="num">{money(o.proposal.amount)}</div>
+          </div>
+          <VentilationOrdre montant={o.proposal.amount} allocation={o.proposal.allocation} compte={o.t.accountName} noms={{ tirelires, categories }} />
+          <ConsigneOrdre ordre={o.ordre} />
+        </div>
+      {/each}
+      <ExplicationSuite />
+    {:else}
+      <p class="muted small rien-a-poser">
+        {ordres.length
+          ? 'Aucun autre ordre permanent à poser chez votre banque : votre budget ne demande de virement permanent que vers les comptes qui en ont déjà un.'
+          : 'Aucun ordre permanent à poser chez votre banque : votre budget ne demande aucun virement permanent du compte principal vers un autre compte.'}
+      </p>
+    {/if}
+  {/if}
+
   {#if valide}
     <h3>Et maintenant</h3>
+    {#if aPoser.length}
+      <p class="small ordres-sur-le-plan">
+        <strong>Vos ordres permanents se mettent en place sur l’écran Plan.</strong> Posez chacun chez votre banque,
+        puis enregistrez-le sur le Plan, qui le propose avec son montant, sa ventilation, son libellé et son jour.
+      </p>
+    {/if}
     <p class="muted small">
       Le Plan détaille période par période ce qu'il faut mettre de côté et les virements à faire.
       Dans Configuration, vous pouvez affiner ce que l'assistant a créé : les besoins de chaque
