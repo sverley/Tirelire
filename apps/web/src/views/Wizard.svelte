@@ -40,6 +40,7 @@
     suggestedCategory,
     suggestedFlow,
     suggestedOrder,
+    orderPartsShown,
     standingOrderTarget,
     MAIN_ACCOUNT_ID,
     type PeriodUnit,
@@ -308,6 +309,8 @@
   const restantsCharges = $derived(parNom(propositions.charges).filter((g) => !dejaPris(g.name)));
   /** Le compte du même nom, ici ; le compte principal se désigne par l'absence de nom. */
   const compteNomme = (nom: string) => accounts.find((a) => a.name === nom)?.id;
+  /** La tirelire du même nom, ici : celle où se lie une part d'un ordre proposé (#395). */
+  const tirelireNommee = (nom: string) => tirelires.find((t) => t.name === nom)?.id;
   /** Un ordre de l'exemple ne se propose que si ses deux comptes sont ici, et qu'aucun flux ne porte déjà son nom (D46). */
   const restantsOrdres = $derived(
     propositions.orders.filter((o) => !dejaPris(o.name) && suggestedOrder(o, { id: '', principalId: mainAccountId(), compte: compteNomme }) !== undefined),
@@ -355,8 +358,23 @@
   const appliquerCharge = (g: FluxPropose) => g.versions.forEach((p) => appliquerVersion(p, 'fixedCharge'));
   /** L'ordre de l'exemple, déjà posé chez la banque : il s'enregistre à la validation, comme ce que la banque exécute (D60). */
   function appliquerOrdre(p: OrderSuggestion) {
-    const f = suggestedOrder(p, { id: app.newId(), principalId: mainAccountId(), compte: compteNomme });
+    const f = suggestedOrder(p, { id: app.newId(), principalId: mainAccountId(), compte: compteNomme, tirelire: tirelireNommee });
     if (f) app.assistantUpsert('plannedFlows', f);
+  }
+  /**
+   * Une part d'ordre dont la tirelire n'est plus dans le brouillon ne s'enregistre pas (#395) : à la
+   * validation, chaque ordre ne garde que les parts de ses tirelires présentes ; son montant ne change
+   * pas, et ce que ses parts n'absorbent pas reste non affecté sur le compte d'accueil (D21).
+   */
+  function elaguerLesParts() {
+    for (const f of ordres) {
+      const parts = f.action?.allocation;
+      if (!parts?.length) continue;
+      const gardees = parts.filter((a) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId));
+      if (gardees.length === parts.length) continue;
+      const { allocation: _retirees, ...action } = f.action!;
+      app.assistantUpsert('plannedFlows', { ...f, action: gardees.length ? { ...action, allocation: gardees } : action });
+    }
   }
   /**
    * Une catégorie de l'exemple, avec ses liens vers ce qui existe ici, par noms (D46) : sa tirelire
@@ -559,6 +577,7 @@
   function valider() {
     try {
       if (!brouillon.budgetImporte) recalerLesClotures(); // un budget importé garde ses clôtures telles que le JSON les dit
+      elaguerLesParts();
       app.validerAssistant();
       valide = true;
       erreurValidation = '';
@@ -941,6 +960,16 @@
           <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
           <button class="btn small danger" title="Retirer ce virement" onclick={() => removeFlow(f)}>×</button>
         </div>
+        {#if orderPartsShown(f, app.assistantLedger).length}
+          <ul class="parts-ordre small">
+            {#each orderPartsShown(f, app.assistantLedger) as part (part.tirelireId)}
+              <li>
+                <span class="n">{part.tirelireName}</span>
+                <span class="num">{part.share.kind === 'variable' ? `le reste, soit ${money(part.amount)}` : money(part.amount)}</span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
         <p class="muted small" style="margin:4px 0 0">
           Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {nomDuCompte(f.counterpartAccountId)}.
         </p>

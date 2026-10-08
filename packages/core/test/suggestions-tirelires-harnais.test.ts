@@ -55,7 +55,8 @@ function valideTelQuel(sans: string[] = []): Ledger {
     l.plannedFlows.push(...t.flows);
   }
   for (const o of s.orders) {
-    const f = suggestedOrder(o, { id: `o-${o.name}`, principalId: MAIN_ACCOUNT_ID, compte });
+    const tirelire = (nom: string) => l.tirelires.find((t) => t.name === nom)?.id;
+    const f = suggestedOrder(o, { id: `o-${o.name}`, principalId: MAIN_ACCOUNT_ID, compte, tirelire });
     if (f) l.plannedFlows.push(f);
   }
   return l;
@@ -191,7 +192,10 @@ describe('[niveau 2] #336 · 6 — l’ordre permanent de l’exemple, et aucun 
     const l = valideTelQuel();
     const f = alive(l.plannedFlows).find((x) => x.kind === 'transfer')!;
     const dans = alive(exemple.plannedFlows).find((x) => x.id === 'flow-vir-livret')!;
-    expect({ ...f, id: dans.id, accountId: dans.accountId, counterpartAccountId: dans.counterpartAccountId }).toEqual(dans);
+    // Ses parts se lient aux tirelires de même nom (#395) : comparées par le nom de leur tirelire.
+    const parNom = (g: Ledger, x: typeof f) => x.action?.allocation?.map((a) => ({ ...a, tirelireId: g.tirelires.find((t) => t.id === a.tirelireId)?.name }));
+    expect(parNom(l, f)).toEqual(parNom(exemple, dans));
+    expect({ ...f, id: dans.id, accountId: dans.accountId, counterpartAccountId: dans.counterpartAccountId, action: dans.action }).toEqual(dans);
     expect([nomDuCompte(l, f.accountId), nomDuCompte(l, f.counterpartAccountId)]).toEqual(['principal', 'Livret A']);
   });
 

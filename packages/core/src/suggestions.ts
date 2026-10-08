@@ -22,6 +22,7 @@ import {
   flowTirelire,
   standingOrderTarget,
   type Account,
+  type AllocationLine,
   type AccountKind,
   type AmountTolerance,
   type Category,
@@ -118,6 +119,17 @@ export interface TirelireSuggestion {
 export interface OrderSuggestion extends FlowSuggestion {
   /** Le compte où arrive l'ordre, par son nom. */
   toAccountName: string;
+  /**
+   * Sa ventilation, telle que l'exemple la pose (D24, D27, #395) : une part par tirelire, nommée,
+   * sans catégorie ; une part fixe a un montant positif, le signe appartenant au genre du flux.
+   */
+  parts: OrderPartSuggestion[];
+}
+
+/** Une part de la ventilation d'un ordre de l'exemple : sa tirelire, par son nom, et sa part. */
+export interface OrderPartSuggestion {
+  tirelireName: string;
+  share: Share;
 }
 
 /** Ce que l'exemple dit du compte principal. L'assistant le renseigne, il ne le crée pas (D40). */
@@ -244,7 +256,13 @@ function orderSuggestions(l: Ledger): OrderSuggestion[] {
     .filter((f) => !!principal && standingOrderTarget(f, principal.id) !== undefined)
     .flatMap((f) => {
       const vers = comptes.find((a) => a.id === f.counterpartAccountId);
-      return vers ? [{ ...flowSuggestion(f, comptes), toAccountName: vers.name }] : [];
+      if (!vers) return [];
+      const parts = (f.action?.allocation ?? []).flatMap((a): OrderPartSuggestion[] => {
+        const t = l.tirelires.find((x) => x.id === a.tirelireId);
+        if (!t) return [];
+        return [{ tirelireName: t.name, share: a.share.kind === 'fixed' ? { kind: 'fixed', amount: Math.abs(a.share.amount) } : { ...a.share } }];
+      });
+      return [{ ...flowSuggestion(f, comptes), toAccountName: vers.name, parts }];
     });
 }
 
@@ -347,16 +365,42 @@ export function suggestedTirelire(
 
 /**
  * L'ordre que crée une proposition, ou rien s'il manque l'un de ses deux comptes chez qui l'écrit :
- * un ordre vers un compte retiré ne se propose pas.
+ * un ordre vers un compte retiré ne se propose pas. Ses parts se lient aux tirelires du même nom chez
+ * qui l'écrit (`tirelire`) ; une part dont la tirelire n'y est pas est laissée de côté, les autres
+ * restent, et ce qu'elles n'absorbent pas reste non affecté sur le compte d'accueil (D21, #395).
  */
 export function suggestedOrder(
   p: OrderSuggestion,
-  ids: { id: Id; principalId: Id; compte: (name: string) => Id | undefined },
+  ids: { id: Id; principalId: Id; compte: (name: string) => Id | undefined; tirelire?: (name: string) => Id | undefined },
 ): PlannedFlow | undefined {
   const depuis = p.accountName === undefined ? ids.principalId : ids.compte(p.accountName);
   const vers = ids.compte(p.toAccountName);
   if (depuis === undefined || vers === undefined) return undefined;
-  return suggestedFlow(p, 'transfer', { id: ids.id, accountId: depuis, counterpartAccountId: vers });
+  const f = suggestedFlow(p, 'transfer', { id: ids.id, accountId: depuis, counterpartAccountId: vers });
+  const allocation = p.parts.flatMap((part): AllocationLine[] => {
+    const tirelireId = ids.tirelire?.(part.tirelireName);
+    if (tirelireId === undefined) return [];
+    return [{ tirelireId, share: part.share.kind === 'fixed' ? { kind: 'fixed', amount: -Math.abs(part.share.amount) } : { ...part.share } }];
+  });
+  return allocation.length ? { ...f, action: { allocation } } : f;
+}
+
+/**
+ * Ce que montre la ventilation d'un ordre (#395) : chacune de ses parts de tirelire présente dans
+ * `ledger`, avec ce qu'elle vaut pour le montant de l'ordre, en positif. Une part fixe vaut son
+ * montant ; une part en pourcentage, sa part du montant ; la part variable, ce que les autres laissent,
+ * jamais moins de 0 (D27). Une part dont la tirelire n'est pas là n'est pas montrée.
+ */
+export function orderPartsShown(f: PlannedFlow, ledger: Ledger): Array<{ tirelireId: Id; tirelireName: string; share: Share; amount: Cents }> {
+  const presentes = alive(ledger.tirelires);
+  const montant = Math.abs(f.amount);
+  const lignes = (f.action?.allocation ?? []).flatMap((a) => {
+    const t = presentes.find((x) => x.id === a.tirelireId);
+    return t ? [{ tirelireId: t.id, tirelireName: t.name, share: a.share }] : [];
+  });
+  const valeur = (sh: Share): Cents => (sh.kind === 'fixed' ? Math.abs(sh.amount) : sh.kind === 'percent' ? Math.round((montant * sh.pct) / 100) : 0);
+  const autres = lignes.reduce((s, l) => s + valeur(l.share), 0);
+  return lignes.map((l) => ({ ...l, amount: l.share.kind === 'variable' ? Math.max(0, montant - autres) : valeur(l.share) }));
 }
 
 /**
