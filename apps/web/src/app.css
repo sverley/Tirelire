@@ -213,9 +213,6 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .card.tirelire .prelevement { display: flex; align-items: center; gap: 6px; margin: 4px 0 0 12px; color: var(--muted); }
 .card.ordre .row { gap: 8px; align-items: center; }
 .card.ordre .row .mt { width: 110px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font-family: var(--mono); text-align: right; font-size: 14px; }
-.card.ordre .parts-ordre { list-style: none; margin: 6px 0 0; padding: 0; }
-.card.ordre .parts-ordre li { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-width: 0; }
-.card.ordre .parts-ordre .n { overflow-wrap: anywhere; }
 @media (max-width: 640px) {
   .ligne > .vide { display: none; }
 }

@@ -75,8 +75,8 @@ describe.skipIf(!navigateur)('[niveau 0] #393 · 11. modifier un ordre à l’é
   });
 
   it('enregistré depuis le Plan avec ses parts, modifié et verrouillé à l’écran Flux : ses parts restent', async () => {
-    expect(await cliquerDansLaCarte(page, 'Corriger mon ordre'), 'bouton « Corriger mon ordre » absent').toBe(true);
-    expect(await cliquerDansLaCarte(page, 'Enregistrer'), 'bouton « Enregistrer » absent').toBe(true);
+    // Depuis #394 (point 5), l'ordre que le plan propose, avec sa ventilation, se confirme en un geste.
+    expect(await cliquerDansLaCarte(page, 'Confirmer mon nouvel ordre'), 'bouton « Confirmer mon nouvel ordre » absent').toBe(true);
     const enregistré = await ordreConservé(page);
     const parts = enregistré?.action?.allocation;
     expect(parts?.length, 'l’ordre enregistré depuis le Plan ne porte pas de parts').toBeGreaterThan(0);

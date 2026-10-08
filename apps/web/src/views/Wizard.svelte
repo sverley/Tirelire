@@ -14,6 +14,8 @@
   import Manque from '../lib/Manque.svelte';
   import SectionTirelires from '../lib/SectionTirelires.svelte';
   import SectionComptes from '../lib/SectionComptes.svelte';
+  import VentilationOrdre from '../lib/VentilationOrdre.svelte';
+  import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
   import { fichierAEnregistrer, preparerValidation } from '../lib/brouillon';
@@ -40,7 +42,6 @@
     suggestedCategory,
     suggestedFlow,
     suggestedOrder,
-    orderPartsShown,
     standingOrderTarget,
     MAIN_ACCOUNT_ID,
     type PeriodUnit,
@@ -366,6 +367,8 @@
    * validation, chaque ordre ne garde que les parts de ses tirelires présentes ; son montant ne change
    * pas, et ce que ses parts n'absorbent pas reste non affecté sur le compte d'accueil (D21).
    */
+  /** Les parts de l'ordre dont la tirelire est dans le brouillon : seules elles se montrent et s'enregistrent (#395, point 5). */
+  const partsPresentes = (f: PlannedFlow) => f.action?.allocation?.filter((a) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId));
   function elaguerLesParts() {
     for (const f of ordres) {
       const parts = f.action?.allocation;
@@ -947,6 +950,7 @@
       Un virement que vous avez déjà programmé chez votre banque. Indiquez ce qu'il vire vraiment : le
       plan le compare à ce que votre budget demande, et vous dit quand le modifier.
     </p>
+    <ExplicationVentilation />
     {#each ordres as f (f.id)}
       <div class="card ordre">
         <div class="row">
@@ -960,16 +964,7 @@
           <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
           <button class="btn small danger" title="Retirer ce virement" onclick={() => removeFlow(f)}>×</button>
         </div>
-        {#if orderPartsShown(f, app.assistantLedger).length}
-          <ul class="parts-ordre small">
-            {#each orderPartsShown(f, app.assistantLedger) as part (part.tirelireId)}
-              <li>
-                <span class="n">{part.tirelireName}</span>
-                <span class="num">{part.share.kind === 'variable' ? `le reste, soit ${money(part.amount)}` : money(part.amount)}</span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
+        <VentilationOrdre montant={Math.abs(f.amount)} allocation={partsPresentes(f)} compte={nomDuCompte(standingOrderTarget(f, mainAccountId()))} noms={{ tirelires, categories }} />
         <p class="muted small" style="margin:4px 0 0">
           Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {nomDuCompte(f.counterpartAccountId)}.
         </p>
