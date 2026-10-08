@@ -19,6 +19,7 @@ import initSqlJs, { type SqlJsStatic } from 'sql.js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   ACTION,
+  GARDE,
   CLES_REGLAGES,
   COLONNES_IMPORT,
   computePlan,
@@ -292,6 +293,7 @@ const NOMMEES = new Map<string, Description>([
   ['tolérance', TOLERANCE],
   ['sélection', SELECTION],
   ['action', ACTION],
+  ['garde', GARDE],
   ['colonnes', COLONNES_IMPORT],
   ['comptes', TABLE_COMPTES],
 ]);

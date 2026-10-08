@@ -25,6 +25,7 @@ import {
 import { IMPORT_DATE_FORMATS, IMPORT_DELIMITERS, IMPORT_ENCODINGS, IMPORT_SOURCES } from './importer.js';
 import {
   ACTION,
+  GARDE,
   COLONNES_IMPORT,
   estDate,
   estHorodatage,
@@ -186,6 +187,7 @@ export const TABLES: Record<string, TableDef> = {
       date('activeFrom'),
       date('activeTo'),
       json('action', ACTION), // D24 : l'action du flux, de la forme de celle d'un automatisme
+      json('kept', GARDE), // #205 : l'ordre gardé tel quel, et ce que le budget demandait alors
       DELETED_AT,
     ],
     constraints: [
@@ -398,9 +400,9 @@ export const FILE_FORMAT = 'tirelire';
  * l'opération prévue reprise par son flux et sa date, ajoute la reprise d'une saisie, et donne au flux
  * sa seule sélection, sans automatisme engendré à part (#306) ; la version 7 porte l'action d'un flux
  * dans la forme « action » des automatismes, et ne distingue plus un flux déclaré d'un flux dérivé
- * (#393). Aucune version antérieure n'est plus lue.
+ * (#393) ; la version 8 porte sur le flux le choix de garder un ordre tel quel (#205). Aucune version antérieure n'est plus lue.
  */
-export const FORMAT_VERSION = 7;
+export const FORMAT_VERSION = 8;
 
 export const SYSTEM_SQL = [
   // Réglages : une ligne par clé, valeur JSON, horloge de la dernière écriture ; synchronisés.

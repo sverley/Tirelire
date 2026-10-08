@@ -520,7 +520,7 @@ describe('[niveau 0] #306 · 6. modifier un flux ne réécrit aucune opération 
 
 describe('[niveau 1] #306 · 7. le format change de version, et la précédente est refusée en le disant (D30, C8)', () => {
   it('la version du format est la 7 ; un fichier de la version 6 est refusé, sans rien ouvrir', async () => {
-    expect(FORMAT_VERSION).toBe(7);
+    expect(FORMAT_VERSION).toBe(8);
     const s = await LedgerStore.create({ sqlJs: SQL });
     const db = new SQL.Database(s.export());
     db.run(`UPDATE meta SET value = '6' WHERE key = 'format_version'`);
