@@ -125,6 +125,14 @@ describe('[niveau 1] #13 · 7 — ce qui se passera ensuite', () => {
     expect(EXPLICATION_SUITE).toMatch(/^Importer vos relevés n’est pas nécessaire/);
     expect(EXPLICATION_SUITE).not.toMatch(/\b(tu|te|ton|ta|tes)\b/i);
   });
+  // Repris du test du codeur, second tour (`ordres-a-poser-suite.test.ts`) : point 7, précisé le 08/10.
+  it('sans import, l’ordre compte à sa date, il n’est ni tenu pour exécuté ni dit manquant (D52)', () => {
+    const premiere = EXPLICATION_SUITE.split('. ')[0]!;
+    expect(premiere).toMatch(/^Importer vos relevés n’est pas nécessaire : sans import, /);
+    expect(premiere).toMatch(/le plan compte l’ordre à sa date, parce qu’il est enregistré/);
+    expect(premiere).toMatch(/ne le dit jamais manquant/);
+    expect(EXPLICATION_SUITE).not.toMatch(/exécuté/);
+  });
   it('[niveau 4] affiché dans l’assistant, replié sur l’écran Plan (lecture du source)', () => {
     expect(lire('src/views/Wizard.svelte')).toMatch(/<ExplicationSuite \/>/);
     expect(lire('src/views/Plan.svelte')).toMatch(/<ExplicationSuite repliee \/>/);
