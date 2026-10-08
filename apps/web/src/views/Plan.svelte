@@ -6,6 +6,10 @@
   import VentilationOrdre from '../lib/VentilationOrdre.svelte';
   import PanneauVentilation from '../lib/PanneauVentilation.svelte';
   import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
+  import ConsigneOrdre from '../lib/ConsigneOrdre.svelte';
+  import LibelleACopier from '../lib/LibelleACopier.svelte';
+  import ExplicationSuite from '../lib/ExplicationSuite.svelte';
+  import { ordreAPoser } from '../lib/consigneOrdre';
   import { avecVentilation } from '../lib/ventilationOrdre';
   import Manque from '../lib/Manque.svelte';
   import { supprimerOperations } from '../lib/suppression';
@@ -141,6 +145,18 @@
     if (!principalId || !t.proposal) return;
     const flow = standingTransferFlow(plan, t, principalId, app.newId(), t.proposal.amount, ordreSeul(t));
     if (flow) app.upsert('plannedFlows', flow);
+  }
+
+  /**
+   * L'ordre proposé tel qu'il s'enregistrera (#13, point 5) : son libellé et son jour sont ceux que
+   * « Enregistrer mon ordre permanent » ou « Confirmer mon nouvel ordre » écriront.
+   */
+  function ordrePropose(t: PlanTransfer) {
+    return principalId ? ordreAPoser(plan, t, principalId, ordreSeul(t)) : undefined;
+  }
+  /** La carte dit, pour un ordre, son libellé, son jour et la suite (#13, points 5 à 7). */
+  function aUneConsigne(t: PlanTransfer): boolean {
+    return (t.permanent > 0 || t.exceptional > 0 || !!t.bankOrder) && (ordresDe(t).length > 0 || (!!t.proposal && t.permanent > 0 && (!t.bankOrder || ecartPropose(t))));
   }
 
   /** Ce que montre le panneau, exactement (point 4). */
@@ -398,10 +414,14 @@
       <div class="row">
         <div class="label">
           <strong>{t.accountName}</strong>
-          <span class="sub">{ACCOUNT_KINDS[t.accountKind]}{t.labels.length ? (t.labels.length > 1 ? ' · libellés : ' : ' · libellé : ') : ''}{#each t.labels as l, i (l)}{i ? ', ' : ''}<span class="num">{l}</span>{/each}</span>
+          <span class="sub">{ACCOUNT_KINDS[t.accountKind]}</span>
         </div>
         <div class="{moneyClass(-t.net)}" style="font-size:18px">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
       </div>
+      <!-- Le libellé se lit avec chaque ordre, sa copie et son jour (#13, points 5 et 6) ; une carte sans ordre ni proposition le dit ici. -->
+      {#if !aUneConsigne(t)}
+        {#each t.labels as l (l)}<LibelleACopier libelle={l} />{/each}
+      {/if}
       {#if t.permanent > 0 || t.exceptional > 0 || t.bankOrder}
         <div class="row">
           <div class="label">Virement permanent<span class="sub">somme des dotations des tirelires placées là, recalculée</span></div>
@@ -457,6 +477,7 @@
             <div class="ordre-enregistre">
               <div class="row"><div class="label">{f.name}<span class="sub">enregistré</span></div><div class="num">{money(Math.abs(f.amount))}</div></div>
               <VentilationOrdre montant={Math.abs(f.amount)} allocation={f.action?.allocation} compte={t.accountName} {noms} ecarts={ecartsDesParts(t)} />
+              <ConsigneOrdre ordre={f} />
             </div>
           {/each}
         {/if}
@@ -465,6 +486,7 @@
           <div class="proposition">
             <div class="row"><div class="label">{t.bankOrder ? 'Ordre que le plan propose' : 'Ordre permanent proposé'}<span class="sub">arrondi au pas au-dessus de {money(t.permanent)}</span></div><div class="num">{money(t.proposal.amount)}</div></div>
             <VentilationOrdre montant={t.proposal.amount} allocation={t.proposal.allocation} compte={t.accountName} {noms} />
+            {#each [ordrePropose(t)].filter((x) => !!x) as aPoser (aPoser.id)}<ConsigneOrdre ordre={aPoser} libelleDejaDit={!!ordreSeul(t) && ordreSeul(t)?.labelPattern === aPoser.labelPattern} />{/each}
           </div>
         {/if}
         <div class="actions" style="margin:6px 0 0">
@@ -491,6 +513,7 @@
           {/if}
         </div>
         {#if t.bankOrder || t.proposal}<ExplicationVentilation repliee />{/if}
+        {#if aUneConsigne(t)}<ExplicationSuite repliee />{/if}
         {#if ordreEdite === t.accountId}
           {@const existant = surProposition ? undefined : ordreSeul(t)}
           <PanneauVentilation
