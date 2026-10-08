@@ -114,7 +114,8 @@ enregistré, un libellé tiré du nom du compte cible (`transferLabel`) ; une fo
 son libellé est celui enregistré avec lui (D60), que le plan affiche et que l'import reconnaît, et
 renommer le compte ne change ni l'un ni l'autre (domaine plan et flux, hypothèse 3). À l'import, une
 opération ~~dont le libellé contient ce libellé~~ — amendé le 8 octobre 2026 : que le libellé d'un
-ordre enregistré vers ce compte reconnaît, comme la sélection de l'ordre le ferait (D12, D24), ou,
+ordre enregistré vers ce compte reconnaît, comme la sélection de l'ordre le ferait (D12, D24) —
+seulement un débit du compte principal, d'où part l'ordre (D57) —, ou,
 vers un compte sans ordre enregistré, dont le libellé contient celui tiré de son nom — est reconnue
 comme un virement vers ce compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ —
 amendé le 7 octobre 2026 : ventilée par les parts de l'ordre qui la reprend (D12, D60), et non

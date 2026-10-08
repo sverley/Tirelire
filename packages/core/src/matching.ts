@@ -73,7 +73,8 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
  * Une opération importée qui ne reprend rien, non verrouillée et pas encore reconnue comme virement,
  * est un virement interne vers un compte d'accueil (D11) :
  * - quand le motif de libellé d'un ordre enregistré vers ce compte (D57, D60) la reconnaît, comme la
- *   sélection de l'ordre le ferait (D12, D24), que l'ordre soit en cours ou terminé à sa date ;
+ *   sélection de l'ordre le ferait (D12, D24), que l'ordre soit en cours, terminé ou à venir à sa date :
+ *   seulement un débit du compte d'où part l'ordre, le compte principal (D24, D57) ;
  * - vers un compte sans ordre enregistré, quand elle contient le libellé tiré de son nom actuel
  *   (`transferLabel`). Celui d'un compte qui a un ordre ne reconnaît rien : renommer le compte ne
  *   change pas ce qui est reconnu (domaine plan et flux, hypothèse 3).
@@ -102,9 +103,11 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
     if (isLocked(op) || op.transferAccountId || resumesSomething(op)) continue;
     const parOrdre: Array<{ id: Id; length: number }> = [];
     const parNom: Array<{ id: Id; length: number }> = [];
+    const dansLeSensDeLOrdre = !!principal && op.accountId === principal.id && op.amount < 0;
     for (const { a, patterns, name } of accounts) {
       if (a.id === op.accountId) continue;
       if (patterns) {
+        if (!dansLeSensDeLOrdre) continue;
         const longest = Math.max(-1, ...patterns.filter((p) => labelRecognized(p, op)).map((p) => p.length));
         if (longest >= 0) parOrdre.push({ id: a.id, length: longest });
       } else if (name.length > 0 && /TIRELIRE/.test(op.normalizedLabel) && op.normalizedLabel.includes(name)) parNom.push({ id: a.id, length: name.length });
