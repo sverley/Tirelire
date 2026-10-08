@@ -1,10 +1,21 @@
 /**
- * #206 — Le lien entre un ordre enregistré et son budget survit au renommage d'un compte (domaine
- * plan et flux, hypothèse 3 ; D11 amendée le 8 octobre 2026). Le plan affiche le libellé enregistré
- * avec l'ordre, l'import le reconnaît, et renommer le compte ne change ni l'un ni l'autre ; sans
- * ordre, le libellé tiré du nom actuel reste celui d'aujourd'hui.
+ * Harnais d'audit de #206 — « Le lien entre un ordre enregistré et son budget survit au renommage
+ * d'un compte » (domaine plan et flux, hypothèse 3 ; D11 amendée le 8 octobre 2026). Côté cœur ; ce
+ * qui se lit à l'écran (point 6) est dans `apps/web/test/navigateur/libelle-ordre-renommage-harnais.test.ts`.
  *
- * Tests du codeur, tous de niveau 4 : l'auditeur y choisit le harnais.
+ * Composé après le codage (auditeur.md, étape 2) : les tests du codeur, repris de
+ * `libelle-ordre-renommage.test.ts`, qu'ils couvraient en entier. Sont de moi, dans ses tests : un
+ * ordre à venir qui compte (point 4, précisions), un ordre sans libellé qui ne laisse rien
+ * reconnaître vers son compte (point 4, précisions), et un libellé tiré d'un nom qui ne reconnaît
+ * rien sans « TIRELIRE » (point 4, précisions). Données inventées (D84) : l'exemple, lu au
+ * 6 septembre 2026, et des opérations écrites ici. Le point 7 est de la documentation, relue.
+ *
+ * Niveaux (D83), par le besoin que couvre chaque phrase :
+ * - 0 · la reconnaissance ne touche ni une opération verrouillée, ni une qui reprend, ni une déjà
+ *   reconnue, renommage compris (points 4 et 5) : une décision écrasée ne se rétablit pas en
+ *   corrigeant le code.
+ * - 2 · les règles de D11 amendée, D12, D24 et D60 que les points 1 à 5 appliquent, nominales comme
+ *   limites.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -56,7 +67,7 @@ function importer(l: Ledger, ...ops: Operation[]) {
   return { patch, vers: (id: string) => patch.operations.find((o) => o.id === id)?.transferAccountId };
 }
 
-describe('[niveau 4] #206 · le plan donne le libellé enregistré (point 1)', () => {
+describe('[niveau 2] #206 · 1. le plan donne le libellé enregistré (point 1)', () => {
   it('le libellé de l’ordre comparé, et non celui tiré du nom', () => {
     const l = avecOrdre(exampleLedger(), { id: ORDRE, labelPattern: 'VIR MAISON EPARGNE' });
     expect(virement(l)!.labels).toEqual(['VIR MAISON EPARGNE']);
@@ -77,7 +88,7 @@ describe('[niveau 4] #206 · le plan donne le libellé enregistré (point 1)', (
   });
 });
 
-describe('[niveau 4] #206 · renommer le compte ne change pas ce libellé (point 2)', () => {
+describe('[niveau 2] #206 · 2. renommer le compte ne change pas ce libellé (point 2)', () => {
   it('le plan affiche le libellé enregistré, nomme le compte par son nom actuel, et compare la même chose', () => {
     const avant = exampleLedger();
     const après = renommer(avant, LIVRET, 'Livret Bleu');
@@ -93,7 +104,7 @@ describe('[niveau 4] #206 · renommer le compte ne change pas ce libellé (point
   });
 });
 
-describe('[niveau 4] #206 · enregistrer garde le libellé (point 3)', () => {
+describe('[niveau 2] #206 · 3. enregistrer garde le libellé (point 3)', () => {
   it('un ordre enregistré depuis le plan prend le libellé que le plan affiche', () => {
     const l = renommer(sansOrdre(exampleLedger()), LIVRET, 'Livret Bleu');
     const plan = computePlan(l, LECTURE);
@@ -117,7 +128,7 @@ describe('[niveau 4] #206 · enregistrer garde le libellé (point 3)', () => {
     });
 });
 
-describe('[niveau 4] #206 · l’import reconnaît le libellé enregistré (point 4)', () => {
+describe('[niveau 2] #206 · 4. l’import reconnaît le libellé enregistré (point 4)', () => {
   it('le libellé d’un ordre la reconnaît comme sa sélection, même sans « TIRELIRE »', () => {
     const l = avecOrdre(exampleLedger(), { id: ORDRE, labelPattern: 'VIR(EMENT)? MAISON' });
     const { patch, vers } = importer(l, ligne('op-1', 'VIREMENT MAISON 09'));
@@ -129,16 +140,25 @@ describe('[niveau 4] #206 · l’import reconnaît le libellé enregistré (poin
   it('un ordre terminé à la date de l’opération la reconnaît encore (relevé ancien)', () => {
     const l = avecOrdre(exampleLedger(), { id: ORDRE, labelPattern: 'VIR MAISON', activeTo: '2026-08-31' });
     expect(importer(l, ligne('op-1', 'VIR MAISON', euros(600), '2026-09-29')).vers('op-1')).toBe(LIVRET);
+    // Précisions tranchées : un ordre à venir compte aussi (ajouté par l'auditeur).
+    const àVenir = avecOrdre(exampleLedger(), { id: ORDRE, labelPattern: 'VIR MAISON', activeFrom: '2026-12-01' });
+    expect(importer(àVenir, ligne('op-1', 'VIR MAISON', euros(600), '2026-09-29')).vers('op-1')).toBe(LIVRET);
+    expect(importer(àVenir, ligne('op-2', 'VIR PERMANENT TIRELIRE LIVRET A')).vers('op-2')).toBeUndefined();
   });
 
   it('le libellé tiré du nom d’un compte qui a un ordre ne reconnaît rien pour lui', () => {
     const l = avecOrdre(exampleLedger(), { id: ORDRE, labelPattern: 'VIR MAISON' });
     expect(importer(l, ligne('op-1', 'VIR PERMANENT TIRELIRE LIVRET A')).vers('op-1')).toBeUndefined();
+    // Précisions tranchées : un ordre sans libellé ne laisse rien reconnaître vers son compte (D12 ; ajouté par l'auditeur).
+    const sansLibellé = avecOrdre(exampleLedger(), { id: ORDRE, labelPattern: undefined });
+    expect(importer(sansLibellé, ligne('op-1', 'VIR PERMANENT TIRELIRE LIVRET A')).vers('op-1')).toBeUndefined();
   });
 
   it('un compte sans ordre se reconnaît par le libellé tiré de son nom actuel', () => {
     const l = sansOrdre(exampleLedger());
     expect(importer(l, ligne('op-1', 'VIR PERMANENT TIRELIRE LIVRET A')).vers('op-1')).toBe(LIVRET);
+    // Comme aujourd'hui, sans « TIRELIRE » le nom seul ne reconnaît rien (précisions ; ajouté par l'auditeur).
+    expect(importer(l, ligne('op-2', 'VIR PERMANENT LIVRET A')).vers('op-2')).toBeUndefined();
   });
 
   it('le libellé d’un ordre l’emporte sur un libellé tiré d’un nom, même plus long', () => {
@@ -160,17 +180,9 @@ describe('[niveau 4] #206 · l’import reconnaît le libellé enregistré (poin
     expect(r.vers('op-2')).toBeUndefined();
     expect(r.patch.operations.map((o) => o.id)).not.toContain('op-2');
   });
-
-  it('ne touche ni une opération verrouillée, ni une qui reprend, ni une déjà reconnue', () => {
-    const l = exampleLedger();
-    const verrouillée = { ...ligne('op-v', 'VIR TIRELIRE LIVRET A'), state: 'locked' as const };
-    const reprend = { ...ligne('op-r', 'VIR TIRELIRE LIVRET A'), plannedFlowId: ORDRE, plannedDate: '2026-09-28' };
-    const reconnue = { ...ligne('op-d', 'VIR TIRELIRE LIVRET A'), transferAccountId: 'acc-enfants' };
-    expect(importer(l, verrouillée, reprend, reconnue).patch.operations).toEqual([]);
-  });
 });
 
-describe('[niveau 4] #206 · renommer ne change pas ce qui est reconnu (point 5)', () => {
+describe('[niveau 2] #206 · 5. renommer ne change pas ce qui est reconnu (point 5)', () => {
   it('après renommage, le libellé enregistré se reconnaît, celui du nouveau nom non, et une opération reconnue garde son compte', () => {
     const avant = exampleLedger();
     const déjà = { ...ligne('op-0', 'VIR PERMANENT TIRELIRE LIVRET A', euros(600), '2026-08-29'), state: 'reconciled' as const, transferAccountId: LIVRET };
@@ -179,5 +191,22 @@ describe('[niveau 4] #206 · renommer ne change pas ce qui est reconnu (point 5)
     expect(r.vers('op-1')).toBe(LIVRET);
     expect(r.vers('op-2')).toBeUndefined();
     expect(r.patch.operations.map((o) => o.id)).not.toContain('op-0');
+  });
+});
+
+describe('[niveau 0] #206 · 4 et 5. la reconnaissance n’écrase rien', () => {
+  it('point 4 — ne touche ni une opération verrouillée, ni une qui reprend, ni une déjà reconnue', () => {
+    const l = exampleLedger();
+    const verrouillée = { ...ligne('op-v', 'VIR TIRELIRE LIVRET A'), state: 'locked' as const };
+    const reprend = { ...ligne('op-r', 'VIR TIRELIRE LIVRET A'), plannedFlowId: ORDRE, plannedDate: '2026-09-28' };
+    const reconnue = { ...ligne('op-d', 'VIR TIRELIRE LIVRET A'), transferAccountId: 'acc-enfants' };
+    expect(importer(l, verrouillée, reprend, reconnue).patch.operations).toEqual([]);
+  });
+
+  it('point 5 — après un renommage, une opération reconnue avant garde son compte, même vers un autre compte que celui de l’ordre', () => {
+    const avant = exampleLedger();
+    const déjà = { ...ligne('op-0', 'VIR PERMANENT TIRELIRE LIVRET A', euros(600), '2026-08-29'), state: 'reconciled' as const, transferAccountId: 'acc-enfants' };
+    const après = renommer({ ...avant, operations: [...avant.operations, déjà] }, LIVRET, 'Livret Bleu');
+    expect(importer(après).patch.operations).toEqual([]);
   });
 });
