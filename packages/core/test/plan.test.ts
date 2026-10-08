@@ -184,7 +184,7 @@ describe('[niveau 2] plan de période, sur l’exemple de l’analyse (D02, D28,
 
   it('virements par compte : un ordre par couple de comptes, détaillé par tirelire (D21)', () => {
     const livret = plan.transfers.find((t) => t.accountId === 'acc-livret')!;
-    expect(livret.label).toBe('TIRELIRE LIVRET A');
+    expect(livret.labels).toEqual(['TIRELIRE LIVRET A']);
     expect(livret.standing).toBe(euros(100 + 50 + 200 + 300));
     expect(livret.exceptional).toBe(euros(50));
     expect(livret.orders.map((o) => o.tirelireName)).toContain('Taxe foncière');
