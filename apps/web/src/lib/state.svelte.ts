@@ -172,7 +172,8 @@ class AppState {
     const budget = lireBudgetJson(texte);
     if (!budget.ok) return { ok: false, message: budget.message };
     this.assistant = brouillonDuFichier(this.ledger, budget.budget);
-    this.assistantDemande = undefined; // un budget importé s'ouvre dans l'assistant complet (#367)
+    // Un budget importé arrive dans l'assistant complet (#367).
+    this.assistantDemande = undefined;
     this.versionAssistant++;
     return { ok: true };
   }
