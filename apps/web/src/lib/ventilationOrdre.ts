@@ -153,6 +153,7 @@ export function avecVentilation(flow: PlannedFlow, montant: Cents, allocation: A
   const state = flow.action?.state;
   const action = { ...(allocation.length ? { allocation: ventilationSignee(allocation, sign) } : {}), ...(state ? { state } : {}) };
   const next: PlannedFlow = { ...flow, amount: sign * montant };
+  delete next.kept; // corriger l'ordre met fin au choix de le garder tel quel (#205, point 7)
   if (Object.keys(action).length) next.action = action;
   else delete next.action;
   return next;

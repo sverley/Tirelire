@@ -27,7 +27,7 @@ import { messageDeRefus, verifierLiens, type LigneLue, type Probleme } from './v
 /** Le nom du format, que porte la clé `format` du JSON. */
 export const BUDGET_JSON_FORMAT = 'tirelire-budget';
 /** La version du format que cette application lit et écrit, que porte la clé `version` (D30). */
-export const BUDGET_JSON_VERSION = 3;
+export const BUDGET_JSON_VERSION = 4;
 
 /** Les tables du budget, dans l'ordre où elles se lisent, par clé de `Ledger`. */
 export const CLES_TABLES_BUDGET = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows'] as const;
@@ -339,7 +339,7 @@ export function etatDuProjet(projet: Ledger, parties: readonly PartieBudget[] = 
 }
 
 /**
- * Le budget JSON, en version 3, des parties choisies d'un projet — toutes par défaut : une valeur JSON,
+ * Le budget JSON, en version 4, des parties choisies d'un projet — toutes par défaut : une valeur JSON,
  * prête à `JSON.stringify`. Une colonne vide n'est pas écrite. Relu, il redonne les mêmes lignes.
  */
 export function ecrireBudgetJson(projet: Ledger, parties: readonly PartieBudget[] = TOUTES_PARTIES): Record<string, unknown> {
@@ -347,7 +347,7 @@ export function ecrireBudgetJson(projet: Ledger, parties: readonly PartieBudget[
 }
 
 /**
- * Le budget JSON, en version 3, d'un budget défini — ses parties, et elles seules : une valeur JSON,
+ * Le budget JSON, en version 4, d'un budget défini — ses parties, et elles seules : une valeur JSON,
  * prête à `JSON.stringify` (#379 : le brouillon de l'assistant s'enregistre ainsi).
  */
 export function budgetDefiniEnJson(etat: BudgetDefini): Record<string, unknown> {

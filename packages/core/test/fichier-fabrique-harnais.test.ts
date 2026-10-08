@@ -266,6 +266,7 @@ const VIOLATIONS: Violation[] = [
       ['planned_flows.action.tirelireId', 'planned_flows', 'f-1', 'action', FLUX('{"tirelireId":"env-absente"}')],
       ['planned_flows.action.allocation[].categoryId', 'planned_flows', 'f-1', 'action', FLUX('{"allocation":[{"categoryId":"cat-absente","share":{"kind":"variable"}}]}')],
       ['planned_flows.action.allocation[].tirelireId', 'planned_flows', 'f-1', 'action', FLUX('{"allocation":[{"tirelireId":"env-absente","share":{"kind":"variable"}}]}')],
+      ['planned_flows.kept.parts[].tirelireId', 'planned_flows', 'f-1', 'kept', { ...FLUX('{}'), action: null, kept: '{"amount":30000,"parts":[{"tirelireId":"env-absente","amount":10000}]}' }],
       ['import_profiles.account_map{}', 'import_profiles', 'p-1', 'account_map', PROFIL('{"FR76 0001":"acc-absent"}')],
     ] as const
   ).map(([chemin, table, id, colonne, ligne]): Violation => ({ cas: `${chemin} vers une ligne absente`, tables: { [table]: [ligne] }, table, id, colonne, lie: true, chemin })),
