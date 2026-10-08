@@ -471,7 +471,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     const breakdown = wantedByAccount.get(a.id) ?? [];
     const permanent = Math.max(0, breakdown.reduce((s, b) => s + b.cruise, 0));
     const ordres = principal ? standingOrderFlows(ledger.plannedFlows, principal.id, a.id, asOf) : [];
-    const bankOrder = aDesTirelires && ordres.length > 0 ? compareOrders(ordres, permanent, breakdown, idx, ledger.settings.orderRounding) : undefined;
+    const bankOrder = aDesTirelires && ordres.length > 0 ? compareOrders(ordres, permanent, breakdown, ledger, ledger.settings.orderRounding) : undefined;
     if (bankOrder?.signaled)
       warnings.push({
         code: 'bankOrderDrift',
@@ -655,8 +655,12 @@ function driftSignaled(drift: Cents, step: Cents): boolean {
   return Math.abs(drift) > Math.max(0, step);
 }
 
-/** Les ordres d'un compte comparés à ce que le budget y demande, montant et parts fixes (D60, I10). */
-function compareOrders(ordres: PlannedFlow[], permanent: Cents, breakdown: PlanTransfer['breakdown'], idx: LedgerIndex, step: Cents): BankOrder {
+/**
+ * Les ordres d'un compte comparés à ce que le budget y demande, montant et parts fixes (D60, I10).
+ * Une part nomme sa tirelire par le grand livre, celles qui ont été retirées comprises : un ordre
+ * garde ses parts quand une tirelire disparaît, et le signal la nomme encore.
+ */
+function compareOrders(ordres: PlannedFlow[], permanent: Cents, breakdown: PlanTransfer['breakdown'], ledger: Ledger, step: Cents): BankOrder {
   const amount = ordres.reduce((s, f) => s + monthlyEquivalent(f.amount, f), 0);
   const drift = permanent - amount;
   const fixes = new Map<Id, Cents>();
@@ -666,7 +670,7 @@ function compareOrders(ordres: PlannedFlow[], permanent: Cents, breakdown: PlanT
   const parts: BankOrder['parts'] = [...fixes].map(([tirelireId, montant]) => {
     const requested = breakdown.find((b) => b.tirelireId === tirelireId)?.cruise ?? 0;
     const d = requested - montant;
-    return { tirelireId, tirelireName: idx.tireliresById.get(tirelireId)?.name ?? tirelireId, amount: montant, requested, drift: d, signaled: driftSignaled(d, step) };
+    return { tirelireId, tirelireName: ledger.tirelires.find((t) => t.id === tirelireId)?.name ?? tirelireId, amount: montant, requested, drift: d, signaled: driftSignaled(d, step) };
   });
   const seul = ordres.length === 1 ? ordres[0]! : undefined;
   return {
