@@ -383,7 +383,7 @@
       <div class="row">
         <div class="label">
           <strong>{t.accountName}</strong>
-          <span class="sub">{ACCOUNT_KINDS[t.accountKind]}{t.label ? ' · libellé : ' : ''}{#if t.label}<span class="num">{t.label}</span>{/if}</span>
+          <span class="sub">{ACCOUNT_KINDS[t.accountKind]}{t.labels.length ? (t.labels.length > 1 ? ' · libellés : ' : ' · libellé : ') : ''}{#each t.labels as l, i (l)}{i ? ', ' : ''}<span class="num">{l}</span>{/each}</span>
         </div>
         <div class="{moneyClass(-t.net)}" style="font-size:18px">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
       </div>

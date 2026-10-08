@@ -108,9 +108,15 @@ alimentation, vêtements et cadeau ; un virement à un livret alimente trois pro
 ### D11 · Un virement permanent par couple de comptes, libellé « TIRELIRE … »
 
 Le plan propose un ordre permanent du compte principal vers chaque compte d'accueil qui héberge des
-tirelires (D21), avec un libellé à recopier chez la banque, dérivé du nom du compte cible
-(`transferLabel`). À l'import, une opération dont le libellé contient ce libellé est reconnue comme
-un virement vers ce compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ —
+tirelires (D21), avec un libellé à recopier chez la banque, ~~dérivé du nom du compte cible
+(`transferLabel`)~~ — amendé le 8 octobre 2026 : pour un compte vers lequel aucun ordre n'est
+enregistré, un libellé tiré du nom du compte cible (`transferLabel`) ; une fois l'ordre enregistré,
+son libellé est celui enregistré avec lui (D60), que le plan affiche et que l'import reconnaît, et
+renommer le compte ne change ni l'un ni l'autre (domaine plan et flux, hypothèse 3). À l'import, une
+opération ~~dont le libellé contient ce libellé~~ — amendé le 8 octobre 2026 : que le libellé d'un
+ordre enregistré vers ce compte reconnaît, comme la sélection de l'ordre le ferait (D12, D24), ou,
+vers un compte sans ordre enregistré, dont le libellé contient celui tiré de son nom — est reconnue
+comme un virement vers ce compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ —
 amendé le 7 octobre 2026 : ventilée par les parts de l'ordre qui la reprend (D12, D60), et non
 affectée sur ce compte sinon (D21).
 

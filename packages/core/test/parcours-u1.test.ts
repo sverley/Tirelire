@@ -53,7 +53,7 @@ function leParcoursSeLit(plan: Plan): void {
   expect(autres).toEqual([]);
   expect(virement, 'aucun virement proposé vers le livret').toBeDefined();
   expect(virement!.accountName).toBe('Livret A');
-  expect(virement!.label).toBe('TIRELIRE LIVRET A');
+  expect(virement!.labels).toEqual(['TIRELIRE LIVRET A']);
   expect(virement!.permanent).toBeGreaterThan(0);
   expect(virement!.breakdown.map((b) => b.tirelireName).sort()).toEqual(['Taxe foncière', 'Vacances']);
   expect(virement!.breakdown.reduce((s, b) => s + b.cruise, 0)).toBe(virement!.permanent);

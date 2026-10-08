@@ -6,7 +6,7 @@
  * les lignes à écrire (`Patch`). L'application les enregistre dans le dépôt.
  */
 import type { SubOperation, Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
-import { alive, isLocked, resumedOperationIds } from './model.js';
+import { alive, isLocked, resumedOperationIds, standingOrderTarget } from './model.js';
 import { diffDays, addDays } from './dates.js';
 import { occurrencesBetween } from './periods.js';
 import { transferLabel } from './plan.js';
@@ -66,31 +66,61 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
 }
 
 // ---------------------------------------------------------------------------
-// Virements vers un compte, reconnus par leur libellé « TIRELIRE <COMPTE> » (D21)
+// Virements vers un compte, reconnus par le libellé de leur ordre ou « TIRELIRE <COMPTE> » (D11, D21)
 // ---------------------------------------------------------------------------
 
 /**
- * Une opération importée dont le libellé contient le libellé de virement d'un autre compte (D11)
- * est un virement interne vers ce compte. Elle n'est pas ventilée d'office : son montant y reste
- * non affecté (D21 ; domaine rapprochement et bilan, hypothèse 1). Quand un ordre vers ce compte la
- * reconnaît (D12), c'est lui qui la reprend et la ventile par son action (`applyMatch`), qu'il
- * passe avant ou après cette reconnaissance : elle ne pose aucune sous-opération, et ne touche pas à
- * une opération qu'un flux reprend déjà.
+ * Une opération importée qui ne reprend rien, non verrouillée et pas encore reconnue comme virement,
+ * est un virement interne vers un compte d'accueil (D11) :
+ * - quand le motif de libellé d'un ordre enregistré vers ce compte (D57, D60) la reconnaît, comme la
+ *   sélection de l'ordre le ferait (D12, D24), que l'ordre soit en cours ou terminé à sa date ;
+ * - vers un compte sans ordre enregistré, quand elle contient le libellé tiré de son nom actuel
+ *   (`transferLabel`). Celui d'un compte qui a un ordre ne reconnaît rien : renommer le compte ne
+ *   change pas ce qui est reconnu (domaine plan et flux, hypothèse 3).
+ * Entre plusieurs comptes, le libellé d'un ordre l'emporte sur un libellé tiré d'un nom ; entre
+ * libellés de même sorte, le plus long ; à égalité, aucun compte. Elle n'est pas ventilée d'office :
+ * son montant y reste non affecté (D21 ; domaine rapprochement et bilan, hypothèse 1). Quand un ordre
+ * vers ce compte la reprend (D12), c'est lui qui la ventile par son action (`applyMatch`), qu'il passe
+ * avant ou après cette reconnaissance : elle ne pose aucune sous-opération.
  */
 export function matchTirelireTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
-  const accounts = alive(ledger.accounts).map((a) => ({ a, label: transferLabel(a.name).replace(/^TIRELIRE /, '') }));
+  const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
+  const ordres = new Map<Id, string[]>();
+  for (const f of alive(ledger.plannedFlows)) {
+    const vers = principal ? standingOrderTarget(f, principal.id) : undefined;
+    if (vers === undefined) continue;
+    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(f.labelPattern ? [f.labelPattern] : [])]);
+  }
+  const accounts = alive(ledger.accounts).map((a) => ({
+    a,
+    patterns: ordres.get(a.id),
+    name: transferLabel(a.name).replace(/^TIRELIRE /, ''),
+  }));
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
     if (isLocked(op) || op.transferAccountId || resumesSomething(op)) continue;
-    if (!/TIRELIRE/.test(op.normalizedLabel)) continue;
-    const hit = accounts
-      .filter(({ a, label }) => a.id !== op.accountId && label.length > 0 && op.normalizedLabel.includes(label))
-      .sort((a, b) => b.label.length - a.label.length)[0];
+    const parOrdre: Array<{ id: Id; length: number }> = [];
+    const parNom: Array<{ id: Id; length: number }> = [];
+    for (const { a, patterns, name } of accounts) {
+      if (a.id === op.accountId) continue;
+      if (patterns) {
+        const longest = Math.max(-1, ...patterns.filter((p) => labelRecognized(p, op)).map((p) => p.length));
+        if (longest >= 0) parOrdre.push({ id: a.id, length: longest });
+      } else if (name.length > 0 && /TIRELIRE/.test(op.normalizedLabel) && op.normalizedLabel.includes(name)) parNom.push({ id: a.id, length: name.length });
+    }
+    const hit = longestAlone(parOrdre.length ? parOrdre : parNom);
     if (!hit) continue;
-    patch.operations.push({ ...op, state: 'reconciled', transferAccountId: hit.a.id });
+    patch.operations.push({ ...op, state: 'reconciled', transferAccountId: hit });
   }
   return patch;
+}
+
+/** Le compte au libellé le plus long, s'il est seul à cette longueur. */
+function longestAlone(hits: Array<{ id: Id; length: number }>): Id | undefined {
+  const max = Math.max(-1, ...hits.map((h) => h.length));
+  const best = hits.filter((h) => h.length === max);
+  return best.length === 1 ? best[0]!.id : undefined;
 }
 
 // ---------------------------------------------------------------------------
