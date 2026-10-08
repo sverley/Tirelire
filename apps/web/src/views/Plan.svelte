@@ -3,9 +3,13 @@
   import { ACCOUNT_KINDS, money, moneyClass, shortDate, STATUS_LABELS, NEED_KINDS_SHORT } from '../lib/format';
   import { revealed } from '../lib/actions';
   import { centsToInput, inputToCents } from '../lib/format';
+  import VentilationOrdre from '../lib/VentilationOrdre.svelte';
+  import PanneauVentilation from '../lib/PanneauVentilation.svelte';
+  import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
+  import { avecVentilation } from '../lib/ventilationOrdre';
   import Manque from '../lib/Manque.svelte';
   import { supprimerOperations } from '../lib/suppression';
-  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, type ForecastMovement, type Operation, type Period, type PlanTransfer } from '@tirelire/core';
+  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, proposedOrderAllocation, type ForecastMovement, type Operation, type Period, type PlanTransfer, type AllocationLine } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -65,8 +69,6 @@
    * enregistrement (#393, point 10).
    */
   let ordreEdite = $state<string | undefined>(undefined);
-  let montantOrdre = $state('');
-  let erreurOrdre = $state('');
   /** Ce qu'annonce le panneau (D59) : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
   let titreOrdre = $state('');
 
@@ -91,18 +93,51 @@
     return `à virer : ${money(reste)}${o.status === 'watch' ? ' · petit écart, à surveiller' : ''}`;
   }
 
-  function ouvrirOrdre(t: PlanTransfer) {
+  /** L'ordre ouvert dans le panneau de correction : sur la proposition, ou l'ordre enregistré du compte. */
+  let surProposition = $state(false);
+  const noms = $derived({ tirelires: alive(app.ledger.tirelires), categories: alive(app.ledger.categories) });
+
+  function ouvrirOrdre(t: PlanTransfer, proposition: boolean) {
     ordreEdite = t.accountId;
-    titreOrdre = `${t.bankOrder ? 'Corriger' : 'Enregistrer'} mon ordre permanent — ${t.accountName}`;
-    montantOrdre = centsToInput(t.proposal?.amount ?? roundOrderUp(t.permanent, pasArrondi));
-    erreurOrdre = '';
+    surProposition = proposition;
+    const existant = ordreSeul(t);
+    titreOrdre = proposition ? `Enregistrer mon ordre permanent — ${t.accountName}` : `Corriger mon ordre — ${existant?.name ?? t.accountName}`;
   }
 
-  /**
-   * Le seul cas où l'ordre enregistré n'a plus lieu d'être : le budget ne demande plus rien vers ce
-   * compte. Le bouton n'apparaît que là, et il y remplace « Corriger mon ordre » — la carte n'en
-   * porte jamais deux. Supprimer ici n'arrête rien chez la banque : c'est le sens de la question.
-   */
+  /** L'ordre enregistré d'un compte qui en a exactement un. */
+  function ordreSeul(t: PlanTransfer) {
+    const id = t.bankOrder?.flowId;
+    return id ? app.ledger.plannedFlows.find((f) => f.id === id) : undefined;
+  }
+  function ordresDe(t: PlanTransfer) {
+    return (t.bankOrder?.flowIds ?? []).map((id) => app.ledger.plannedFlows.find((f) => f.id === id)).filter((f) => !!f);
+  }
+  /** Les parts fixes dont l'écart se signale, avec ce que le budget demande pour leur tirelire (point 6). */
+  function ecartsDesParts(t: PlanTransfer): Map<string, number> {
+    return new Map((t.bankOrder?.parts ?? []).filter((p) => p.signaled).map((p) => [p.tirelireId, p.requested]));
+  }
+  /** L'écart du montant ou d'une part fixe se signale, et le budget demande encore un ordre (point 5). */
+  function ecartPropose(t: PlanTransfer): boolean {
+    return !!t.proposal && t.permanent > 0 && !!t.bankOrder?.flowId && (t.bankOrder.signaled || t.bankOrder.parts.some((p) => p.signaled));
+  }
+
+  /** Enregistre l'ordre proposé tel qu'il est montré, en un geste (points 2 et 5) ; rien ne s'écrit avant (I10). */
+  function validerProposition(t: PlanTransfer) {
+    if (!principalId || !t.proposal) return;
+    const flow = standingTransferFlow(plan, t, principalId, app.newId(), t.proposal.amount, ordreSeul(t));
+    if (flow) app.upsert('plannedFlows', flow);
+  }
+
+  /** Ce que montre le panneau, exactement (point 4). */
+  function enregistrerPanneau(t: PlanTransfer, montant: number, allocation: AllocationLine[]) {
+    if (!principalId) return;
+    const existant = ordreSeul(t);
+    const base = existant ?? standingTransferFlow(plan, t, principalId, app.newId(), montant);
+    if (!base) return;
+    app.upsert('plannedFlows', avecVentilation(base, montant, allocation));
+    ordreEdite = undefined;
+  }
+
   function supprimerOrdre(t: PlanTransfer) {
     const id = t.bankOrder?.flowId;
     if (!id) return;
@@ -110,17 +145,6 @@
     app.remove('plannedFlows', id);
   }
 
-  function enregistrerOrdre(e: Event, t: PlanTransfer) {
-    e.preventDefault();
-    if (!principalId) return;
-    const montant = inputToCents(montantOrdre);
-    if (montant === undefined || montant <= 0) return void (erreurOrdre = 'Montant invalide (le montant que vire votre ordre, en positif).');
-    const existant = t.bankOrder?.flowId ? app.ledger.plannedFlows.find((f) => f.id === t.bankOrder?.flowId) : undefined;
-    const flow = standingTransferFlow(plan, t, principalId, app.newId(), montant, existant);
-    if (!flow) return;
-    app.upsert('plannedFlows', flow);
-    ordreEdite = undefined;
-  }
   /*
    * Le solde prévu d'une période à venir (D52, D88) : un chiffre par compte et par tirelire, et,
    * sur demande seulement, les opérations qui le font — repliées par défaut, sans quoi quatre mois
@@ -409,33 +433,59 @@
             </div>
             <div class="num {t.bankOrder.drift === 0 ? '' : 'neg'}">{money(t.bankOrder.amount)}</div>
           </div>
+          <!-- Chaque ordre enregistré, son nom, son montant et sa ventilation telle qu'elle est enregistrée (#394, point 3). -->
+          {#each ordresDe(t) as f (f.id)}
+            <div class="ordre-enregistre">
+              <div class="row"><div class="label">{f.name}<span class="sub">enregistré</span></div><div class="num">{money(Math.abs(f.amount))}</div></div>
+              <VentilationOrdre montant={Math.abs(f.amount)} allocation={f.action?.allocation} compte={t.accountName} {noms} ecarts={ecartsDesParts(t)} />
+            </div>
+          {/each}
+        {/if}
+        {#if t.proposal && t.permanent > 0 && (!t.bankOrder || ecartPropose(t))}
+          <!-- L'ordre que le plan propose (#394, points 2 et 5) : rien ne s'écrit avant le geste (I10). -->
+          <div class="proposition">
+            <div class="row"><div class="label">{t.bankOrder ? 'Ordre que le plan propose' : 'Ordre permanent proposé'}<span class="sub">arrondi au pas au-dessus de {money(t.permanent)}</span></div><div class="num">{money(t.proposal.amount)}</div></div>
+            <VentilationOrdre montant={t.proposal.amount} allocation={t.proposal.allocation} compte={t.accountName} {noms} />
+          </div>
         {/if}
         <div class="actions" style="margin:6px 0 0">
+          {#if t.proposal && t.permanent > 0 && ordreEdite !== t.accountId}
+            {#if !t.bankOrder}
+              <button class="btn primary" onclick={() => validerProposition(t)}>Enregistrer mon ordre permanent</button>
+              <button class="btn small" onclick={() => ouvrirOrdre(t, true)}>Modifier avant d’enregistrer</button>
+            {:else if ecartPropose(t)}
+              <button class="btn primary" onclick={() => validerProposition(t)}>Confirmer mon nouvel ordre</button>
+            {/if}
+          {/if}
           {#if t.breakdown.length}
             <button class="btn small" onclick={() => basculerDetail(t)}>{detaille.includes(t.accountId) ? 'Masquer le détail' : 'Détail'}</button>
           {/if}
-          {#if t.permanent > 0 && ordreEdite !== t.accountId && (!t.bankOrder || t.bankOrder.flowId)}
-            <button class="btn small" onclick={() => ouvrirOrdre(t)}>{t.bankOrder ? 'Corriger mon ordre' : 'Enregistrer mon ordre permanent'}</button>
+          {#if t.permanent > 0 && ordreEdite !== t.accountId && t.bankOrder?.flowId}
+            <button class="btn small" onclick={() => ouvrirOrdre(t, false)}>Corriger mon ordre</button>
           {:else if t.permanent === 0 && t.bankOrder?.flowId}
             <button class="btn small danger" onclick={() => supprimerOrdre(t)}>Supprimer l’ordre enregistré</button>
           {/if}
         </div>
+        {#if t.bankOrder || t.proposal}<ExplicationVentilation repliee />{/if}
         {#if ordreEdite === t.accountId}
-          <form class="edit attached" use:revealed onsubmit={(e) => enregistrerOrdre(e, t)}>
-            <p class="titre-panneau">{titreOrdre}</p>
-            <p class="muted small" style="margin:0">
-              Le montant que <strong>votre ordre exécute chez votre banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
-              Proposé arrondi au-dessus de {money(t.permanent)} ; corrigez-le pour coller à ce que vous avez réellement posé.
-            </p>
-            <div class="grid">
-              <label class="f">Montant de l’ordre permanent (€) <input bind:value={montantOrdre} inputmode="decimal" /></label>
-            </div>
-            {#if erreurOrdre}<div class="err">{erreurOrdre}</div>{/if}
-            <div class="actions" style="margin:0">
-              <button class="btn primary" type="submit">Enregistrer</button>
-              <button class="btn" type="button" onclick={() => (ordreEdite = undefined)}>Annuler</button>
-            </div>
-          </form>
+          {@const existant = surProposition ? undefined : ordreSeul(t)}
+          <PanneauVentilation
+            titre={titreOrdre}
+            montant={existant ? Math.abs(existant.amount) : (t.proposal?.amount ?? roundOrderUp(t.permanent, pasArrondi))}
+            allocation={existant ? existant.action?.allocation : t.proposal?.allocation}
+            compte={t.accountName}
+            {noms}
+            suivre={surProposition ? (m) => proposedOrderAllocation(plan, t, m) : undefined}
+            onenregistrer={(m, al) => enregistrerPanneau(t, m, al)}
+            onannuler={() => (ordreEdite = undefined)}
+          >
+            {#snippet aide()}
+              <p class="muted small" style="margin:0">
+                Le montant que <strong>votre ordre exécute chez votre banque</strong> — pas ce que le budget demande, qui se recalcule tout seul.
+                Proposé arrondi au-dessus de {money(t.permanent)} ; corrigez-le pour coller à ce que vous avez réellement posé.
+              </p>
+            {/snippet}
+          </PanneauVentilation>
         {/if}
       {/if}
       {#if t.exceptional > 0}
