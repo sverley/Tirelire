@@ -462,11 +462,12 @@ geste. Colonne : `planned_flows.kept`.
 | Champ | Obligatoire | Forme | Désigne | Seulement si |
 | --- | --- | --- | --- | --- |
 | `amount` | oui | montant entier en centimes : le montant mensuel demandé, `0` pour un ordre que le budget ne demandait plus | — | — |
-| `parts` | non | objet : par tirelire qui a une part fixe dans l'ordre, la part demandée | — | — |
-| `parts{}` | oui | montant entier en centimes | — | — |
+| `parts` | non | liste : une entrée par tirelire qui a une part fixe dans l'ordre | — | — |
+| `parts[].tirelireId` | oui | identifiant d'une tirelire | `tirelires` | — |
+| `parts[].amount` | oui | montant entier en centimes : la part demandée | — | — |
 
 ```json
-{ "amount": 30000, "parts": { "tirelire-taxe": 10000 } }
+{ "amount": 30000, "parts": [{ "tirelireId": "tirelire-taxe", "amount": 10000 }] }
 ```
 
 ### Forme « action »

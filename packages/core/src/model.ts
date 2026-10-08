@@ -412,7 +412,7 @@ export interface KeptOrder {
   /** Le montant mensuel demandé ; 0 pour un ordre que le budget ne demandait plus. */
   amount: Cents;
   /** Par tirelire qui a une part fixe dans l'ordre : la part demandée. */
-  parts?: Record<Id, Cents>;
+  parts?: Array<{ tirelireId: Id; amount: Cents }>;
 }
 
 /**

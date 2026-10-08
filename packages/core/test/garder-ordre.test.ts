@@ -73,7 +73,7 @@ describe('[niveau 4] #205 · 1 et 2. garder l’ordre tel quel ne réécrit rien
     const g = garder(budget());
     expect(g.amount).toBe(ORDRE.amount);
     expect(g.action).toEqual(ORDRE.action);
-    expect(g.kept).toEqual({ amount: euros(300), parts: { taxe: euros(100) } });
+    expect(g.kept).toEqual({ amount: euros(300), parts: [{ tirelireId: 'taxe', amount: euros(100) }] });
   });
 });
 
@@ -128,7 +128,7 @@ describe('[niveau 4] #205 · 6. le choix vaut pour l’écart tel qu’il était
 
   it('une part fixe demandée qui s’éloigne de plus du pas met fin au choix', () => {
     const l = budget();
-    const g = { ...garder(l), kept: { amount: euros(300), parts: { taxe: euros(80) } } };
+    const g = { ...garder(l), kept: { amount: euros(300), parts: [{ tirelireId: 'taxe', amount: euros(80) }] } };
     expect(livret(avec(l, g)).bankOrder!.kept).toBeUndefined();
   });
 

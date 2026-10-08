@@ -180,7 +180,7 @@ enregistrés.
 | `active_from` | non | date : début de validité |
 | `active_to` | non | date : fin de validité |
 | `action` | non | objet : ce que le flux fait de l'opération qui reprend une occurrence (D24), la forme « action » des automatismes du fichier SQLite (`docs/format-depot-sqlite.md`) — `categoryId`, `tirelireId` (celle qu'une échéance vide), `allocation` (une liste de parts, une seule variable, D27) et `state`, `reconcile` (le défaut) ou `lock` (D22, D23), chacun facultatif |
-| `kept` | non | objet `{ "amount": <montant>, "parts": { <tirelire>: <montant> } }`, `parts` facultatif : l'ordre permanent gardé tel quel, et ce que le budget demandait alors (#205) |
+| `kept` | non | objet `{ "amount": <montant>, "parts": [{ "tirelireId": <tirelire>, "amount": <montant> }] }`, `parts` facultatif : l'ordre permanent gardé tel quel, et ce que le budget demandait alors (#205) |
 
 ### `settings`
 

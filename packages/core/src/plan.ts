@@ -678,7 +678,7 @@ export function keptOrderHolds(flow: PlannedFlow, bankOrder: BankOrder, permanen
   if (!k || !ecartSignale(bankOrder)) return false;
   if (k.amount === 0 || permanent === 0) return k.amount === 0 && permanent === 0;
   if (driftSignaled(permanent - k.amount, step)) return false;
-  return bankOrder.parts.every((p) => !driftSignaled(p.requested - (k.parts?.[p.tirelireId] ?? 0), step));
+  return bankOrder.parts.every((p) => !driftSignaled(p.requested - (k.parts?.find((x) => x.tirelireId === p.tirelireId)?.amount ?? 0), step));
 }
 
 /**
@@ -689,7 +689,7 @@ export function keptOrderHolds(flow: PlannedFlow, bankOrder: BankOrder, permanen
 export function keepStandingOrder(transfer: PlanTransfer, flow: PlannedFlow): PlannedFlow | undefined {
   const b = transfer.bankOrder;
   if (!b || b.flowId !== flow.id || !ecartSignale(b)) return undefined;
-  const parts = Object.fromEntries(b.parts.map((p) => [p.tirelireId, p.requested]));
+  const parts = b.parts.map((p) => ({ tirelireId: p.tirelireId, amount: p.requested }));
   return { ...flow, kept: { amount: transfer.permanent, ...(b.parts.length ? { parts } : {}) } };
 }
 
