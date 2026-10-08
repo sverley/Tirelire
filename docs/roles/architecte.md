@@ -55,8 +55,11 @@ reprends toi-même les retours de l'auditeur, sans session de codeur.
    que tu as manqué (principe 11.1, D80 ; porteur, 05/10). Les hypothèses que le codeur te soumet
    dans l'issue avant d'avoir rendu, tranche-les dans l'issue, comme une spécification (D80).
 8. En fin de cycle, vérifie, avec les retours du codeur et de l'auditeur et un diff, que le besoin a
-   bien été codé, puis passe la PR en Ready ; cette vérification ne refait pas l'audit. Le porteur
-   fusionne au vert, et la fusion vaut validation (principe 11, D82 ; porteur, #401).
+   bien été codé, puis passe la PR en Ready ; cette vérification ne refait pas l'audit. Ne la passe
+   pas en Ready tant que le travail n'est pas terminé : une question ouverte, un nouveau tour. Après
+   un commit poussé sur une PR prête, c'est toi qui la repasses en brouillon puis en Ready, aux
+   mêmes conditions. Le porteur fusionne au vert, et la fusion vaut validation (principe 11, D82 ;
+   porteur, #401).
 
 ## Suivre une version
 

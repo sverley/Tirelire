@@ -66,8 +66,8 @@ on:
     branches: [main]
     tags: ['v*']
   # Le passage en Ready : `ready_for_review`, ou une PR ouverte ou rouverte hors brouillon (#150). Un
-  # commit sur une PR prête ne rejoue rien ici : le porteur la repasse en brouillon puis en Ready, ce
-  # que `suivi.yml` lui rappelle en commentaire, avec le statut « Toute la CI sur ce commit » en échec
+  # commit sur une PR prête ne rejoue rien ici : l'architecte la repasse en brouillon puis en Ready
+  # (#401), ce que `suivi.yml` rappelle en commentaire, avec le statut « Toute la CI sur ce commit » en échec
   # (#168). Le retrait
   # de l'aperçu, à la fermeture, est dans `apercu.yml` (#155).
   pull_request:
