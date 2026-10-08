@@ -48,7 +48,7 @@ reprends toi-même les retours de l'auditeur, sans session de codeur.
    Sonnet pour une tâche bornée à un écran ou à un module ; Opus pour une tâche qui touche la garde,
    les workflows, le format des données ou plusieurs domaines (porteur, #333).
 7. Ta consigne au codeur et à l'auditeur est l'issue, même quand tu lances leurs sessions : leur
-   rôle et le numéro de l'issue, plus la section « Pratique » des instructions du projet, recopiée
+   rôle et le numéro de l'issue, plus la section « Pratique » de `CLAUDE.md` (#403), recopiée
    telle quelle ; rien du besoin, ni de ce qu'un autre agent a rendu (porteur, #401). Ne transmets pas à l'auditeur ce que le codeur a
    rendu, ni ce que tu en retiens, et n'en complète pas l'issue : l'auditeur lit lui-même le « Fait
    quand », avant les tests du codeur, puis le compte rendu dans la PR, et ajoute dans l'issue ce
