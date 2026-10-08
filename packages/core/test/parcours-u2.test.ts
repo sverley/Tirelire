@@ -83,8 +83,8 @@ describe('[niveau 1] harnais du registre · I3 (U2)', () => {
       const avant = computePlan(store.load(), AS_OF);
       const virement = virementDuLivret(avant);
       expect(virement, 'aucun virement permanent proposé').toBeDefined();
-      expect(virement!.label).toBe(transferLabel('Livret A'));
-      expect(virement!.label.length).toBeLessThanOrEqual(35);
+      expect(virement!.labels).toEqual([transferLabel('Livret A')]);
+      expect(virement!.labels[0]!.length).toBeLessThanOrEqual(35);
       const permanent = virement!.permanent;
       expect(permanent).toBe(euros(300));
 

@@ -17,7 +17,8 @@
  * adapté encore par #393 (l'ordre permanent du plan porte ses ordres, son signalement et ses parts,
  * le plan propose l'ordre et sa ventilation, le message dit « enregistré » ; le virement
  * « TIRELIRE LIVRET A » du relevé, que l'ordre de l'exemple reprend, prend ses parts, qu'il n'a pas
- * encore (#395), et reste non affecté, D21), rien d'autre ne changeant.
+ * encore (#395), et reste non affecté, D21) ; adapté par #206 (le libellé du plan, `label`, devient la
+ * liste `labels`, ici d'un seul libellé, le même), rien d'autre ne changeant.
  *
  * Niveaux (D83) : 2 — un résultat faux, l'usage restant possible.
  */

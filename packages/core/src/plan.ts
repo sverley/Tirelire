@@ -112,8 +112,14 @@ export interface PlanTransfer {
   accountId: Id;
   accountName: string;
   accountKind: Account['kind'];
-  /** Libellé suggéré pour le virement permanent (D21 : un par couple de comptes). */
-  label: string;
+  /**
+   * Les libellés du virement permanent vers ce compte (D11, D21 ; domaine plan et flux, hypothèse 3) :
+   * ceux des ordres enregistrés que le plan compare, chacun une fois, dans l'ordre des ordres — un
+   * ordre sans motif de libellé n'en donne aucun ; sans ordre comparé, le libellé tiré du nom actuel
+   * du compte (`transferLabel`), celui que le plan propose de recopier chez la banque. Renommer le
+   * compte ne change pas le libellé d'un ordre enregistré.
+   */
+  labels: string[];
   /** Détail par tirelire. */
   orders: StandingOrder[];
   /** Somme des parts permanentes restant à virer cette période. */
@@ -510,7 +516,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       accountId: a.id,
       accountName: a.name,
       accountKind: a.kind,
-      label: transferLabel(a.name),
+      labels: bankOrder ? [...new Set(ordres.flatMap((f) => (f.labelPattern ? [f.labelPattern] : [])))] : [transferLabel(a.name)],
       orders,
       standing,
       permanent,
@@ -826,7 +832,8 @@ export function standingTransferFlow(
     counterpartAccountId: transfer.accountId,
     periodicity: { interval: 1, unit: 'month' as const, anchorDate: standingAnchor(plan) },
     dateWindowDays: 5,
-    labelPattern: transfer.label,
+    // Sans ordre enregistré, le plan affiche le libellé tiré du nom : c'est celui que l'ordre prend.
+    labelPattern: transfer.labels[0] ?? transferLabel(transfer.accountName),
     amountTolerance: { pct: 20 },
     ...(allocation.length ? { action: { allocation } } : {}),
   };
