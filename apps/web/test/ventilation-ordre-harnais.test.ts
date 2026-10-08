@@ -1,6 +1,7 @@
 /**
- * Tests du codeur de #394 — la ventilation d'un ordre, sa lecture et sa correction (points 1, 4 et 7),
- * sans navigateur : la logique partagée et le texte des sources.
+ * Harnais d'audit de #394 — la ventilation d'un ordre, sa lecture et sa correction (points 1, 4 et 7),
+ * sans navigateur. Composé par l'auditeur parmi les tests du codeur ; l'écran est gardé par
+ * `navigateur/ventilation-ordre-harnais.test.ts`. Niveau 2 : les règles de D21, D27, D85 et D94.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -11,7 +12,7 @@ import { avecVentilation, enSaisie, ligneNonAffecte, lireVentilation, validerCor
 const noms = { tirelires: [{ id: 't1', name: 'Vacances' }, { id: 't2', name: 'Taxe' }], categories: [{ id: 'c1', name: 'Loisirs' }] };
 const lire = (chemin: string) => readFileSync(resolve(__dirname, '..', chemin), 'utf8');
 
-describe('[niveau 4] #394 · 1 — lire une ventilation', () => {
+describe('[niveau 2] #394 · 1 — lire une ventilation', () => {
   it('une ligne par part, sa forme et son montant, par le calcul de l’opération ; le non affecté', () => {
     const l = lireVentilation(-50000, [
       { tirelireId: 't1', share: { kind: 'fixed', amount: -20000 } },
@@ -38,7 +39,7 @@ describe('[niveau 4] #394 · 1 — lire une ventilation', () => {
   });
 });
 
-describe('[niveau 4] #394 · 4 — les refus du panneau, et ce qu’il écrit', () => {
+describe('[niveau 2] #394 · 4 — les refus du panneau, et ce qu’il écrit', () => {
   const p = (x: Partial<PartEnSaisie>): PartEnSaisie => ({ tirelireId: 't1', categoryId: '', forme: 'fixed', valeur: '10', ...x });
   it.each([
     ['', [], /montant de l’ordre/],
@@ -78,7 +79,7 @@ describe('[niveau 4] #394 · 4 — les refus du panneau, et ce qu’il écrit', 
   });
 });
 
-describe('[niveau 4] #394 · 7 — une ventilation écrite une fois, pour le Plan et l’assistant', () => {
+describe('[niveau 2] #394 · 7 — une ventilation écrite une fois, pour le Plan et l’assistant', () => {
   const plan = lire('src/views/Plan.svelte');
   const wizard = lire('src/views/Wizard.svelte');
   it('le Plan et l’assistant emploient la même lecture et la même explication ; seul le Plan la replie et corrige les parts', () => {
