@@ -87,8 +87,9 @@ Propres au domaine :
    ventilation une fois l'ordre modifié chez la banque ; ne pas accepter est légitime (D20), l'écart
    reste lisible sans bloquer. Une évolution d'ordre se calcule sur les données de l'utilisateur :
    ce n'est pas une proposition au sens du domaine assistant et exemple, qui vient de l'exemple (son
-   hypothèse 1). Elle ne passe donc pas par une section (D94) ; sa forme hors de l'écran Plan reste
-   à trancher.
+   hypothèse 1). Elle ne passe donc pas par une section (D94) ; hors de l'écran Plan, l'assistant ne
+   propose ni n'enregistre l'ordre que le plan calcule — premier ordre ou évolution — ; il dit les
+   ordres à poser (U2) et renvoie à l'écran Plan, où l'utilisateur les enregistre (D94, #13).
 6. Sans ordre enregistré, le plan qui change n'est pas une action cachée : c'est un résultat
    recalculé (I10). Le signaler reste à évaluer.
 7. Trois sources proposent un ordre : le plan, qui propose ce que le budget demande ; l'assistant,
