@@ -114,7 +114,13 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
    ni position lue, ni virement supposé fait.
 5. Virements : un par couple de comptes (D21), détaillé par tirelire, plus règlements des tiers
    et surplus des comptes d'accueil dans la période où l'on lit ; avec suivi des opérations, les
-   occurrences de l'ordre permanent dans la période, lues sur son flux (`flowOccurrences`, D12).
+   occurrences des ordres permanents du compte dans la période, chacune lue sur son flux et nommée
+   par lui (`flowOccurrences`, D12).
+   Dès que le budget a une tirelire, les ordres permanents d'un compte (`standingOrderFlows`)
+   se comparent à ce qu'il demande, montant et parts fixes, au-delà du pas d'arrondi
+   (`PlanTransfer.bankOrder`, D60) ; le plan propose l'ordre et sa ventilation
+   (`PlanTransfer.proposal`, `proposedOrderAllocation`), que `standingTransferFlow` enregistre à la
+   validation. L'opération prévue d'une occurrence prend la ventilation de l'action du flux.
 6. Marge = revenus − charges fixes − financé ; avertissements (coussin, réductions, règlements bloqués).
 
 ## États d'une opération (D22)
@@ -154,8 +160,9 @@ occurrence reprise sort du solde prévu et d'« Attendus, non reçus » (`flowOc
   montant, fenêtre de ses occurrences ; automatique selon D12, proposée sinon. Une occurrence
   qu'une saisie corrige ou masque se reprend par cette saisie.
 - `applyMatch` : la reprise d'une occurrence (ou de la saisie qui la corrige), rapprochée,
-  verrouillée si le flux le demande (`PlannedFlow.locks`), avec la ventilation du flux si
-  l'opération n'en a pas — rejouée par l'ordre de financement pour un virement permanent dérivé.
+  verrouillée si l'action du flux le demande (`PlannedFlow.action`), avec la ventilation de cette
+  action si l'opération n'en a pas (`flowVentilation`, par `actionAllocation`, le calcul des
+  automatismes) ; ce que ses parts n'absorbent pas reste non affecté.
 - `entryCandidates`, `resumeEntry` : les saisies non reprises du même compte et du même sens, les
   plus proches en date puis en montant, reprises sur validation, avec leur ventilation.
 - `correctPlannedOperation` : corriger une opération prévue, ou la masquer (montant nul), par une
@@ -168,7 +175,7 @@ occurrence reprise sort du solde prévu et d'« Attendus, non reçus » (`flowOc
 ## Pipeline d'import (`runPipeline`)
 
 lecture (profil) → clés et doublons (`prepareImport`) → insertion → virements internes appariés
-→ virements par compte (libellé TIRELIRE, ventilés par l'ordre de financement) → reprise
+→ virements par compte (libellé TIRELIRE, reconnus sans ventilation) → reprise
 automatique des occurrences sûres (D12) → moteur de règles → file de tri (interface).
 
 ## Dépôt et synchronisation

@@ -26,6 +26,7 @@ import {
   runPipeline,
   suggestPattern,
   unallocated,
+  unallocatedAmount,
   type Account,
   type Ledger,
   type Patch,
@@ -146,25 +147,26 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
       return { ...ledger, operations: [...lissage, ...prep.candidates.filter((c) => !c.exact).map((c) => c.operation)] };
     }
 
-    it('virements « TIRELIRE <COMPTE> » reconnus par compte et répartis par l’ordre de financement (D21)', () => {
+    it('virements « TIRELIRE <COMPTE> » reconnus par compte, sans ventilation d’office : leur montant reste non affecté (D11, D21)', () => {
       const l = imported();
       const patch = matchTirelireTransfers(l);
       expect(patch.operations.length).toBe(2);
+      expect(patch.subOperations).toEqual([]);
       const l2 = applyPatchToLedger(l, patch);
+      const avant = indexLedger(l);
       const idx = indexLedger(l2);
-      // 100 € vers le livret : le plancher de la taxe foncière (rattrapage 150) passe avant tout ; le solde ne bouge pas.
-      const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, '2026-09-06');
-      expect(tf.get('acc-livret')).toBe(euros(1000));
-      expect(tf.get('acc-principal')).toBe(euros(50));
-      expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
-      // 200 € vers la carte enfants : dotation déplacée là (aucune dépense saisie dans ce test)
-      const enfants = tirelireComponents(idx.tireliresById.get('env-enfants')!, idx, '2026-09-06');
-      expect(enfants.get('acc-enfants')).toBe(euros(200));
-      expect(tirelireBalance(idx.tireliresById.get('env-enfants')!, idx, '2026-09-06')).toBe(euros(200));
+      // Aucun flux ne reprend ces virements : aucune tirelire ne bouge (domaine rapprochement et bilan, hypothèse 1).
+      for (const id of ['env-tf', 'env-enfants', 'env-vac', 'env-precaution'])
+        expect(Object.fromEntries(tirelireComponents(idx.tireliresById.get(id)!, idx, '2026-09-06')), id).toEqual(
+          Object.fromEntries(tirelireComponents(avant.tireliresById.get(id)!, avant, '2026-09-06')),
+        );
       const op = l2.operations.find((o) => o.normalizedLabel.includes('LIVRET A'))!;
       expect(op.state).toBe('reconciled');
-      expect(op.transferAccountId).toBeDefined();
       expect(op.transferAccountId).toBe('acc-livret');
+      expect(unallocatedAmount(op, idx)).toBe(-euros(100));
+      const enfants = l2.operations.find((o) => o.normalizedLabel.includes('CARTE ENFANTS'))!;
+      expect(enfants.transferAccountId).toBe('acc-enfants');
+      expect(unallocatedAmount(enfants, idx)).toBe(-euros(200));
     });
 
     it('rapprochement de flux : automatique quand libellé et montant concordent', () => {
@@ -221,11 +223,12 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
       expect(missing.map((m) => m.flowId)).toContain('flow-loyer');
       expect(missing.map((m) => m.flowId)).not.toContain('flow-credit');
       // Non affecté du compte principal : solde bancaire − composantes portées, dotations non encore virées comprises
-      // (taxe foncière 150 − 100 virés, assurance auto 50, vacances 200, précaution 300, budgets du compte principal).
+      // (taxe foncière 150, assurance auto 50, vacances 200, précaution 300, enfants 200, budgets du compte
+      // principal) : les deux virements « TIRELIRE » ne sont repris par aucun flux, et ne ventilent rien (D21).
       const idx = indexLedger(l);
       const principal = idx.accountsById.get('acc-principal')!;
       const bank = 2340 + 3400 - 100 - 200 - 950 + 100 - 170.8 - 76;
-      const reserved = 50 + 50 + 200 + 300 + (900 - 170.8) + 200 + 250 + 100;
+      const reserved = 150 + 50 + 200 + 300 + 200 + (900 - 170.8) + 200 + 250 + 100;
       expect(unallocated(principal, l, idx, '2026-09-20')).toBe(euros(bank - reserved));
     });
 
@@ -244,12 +247,13 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
       const patch = pairInternalTransfers(l);
       expect(patch.operations.length).toBe(2);
       expect(patch.operations.every((o) => o.state === 'reconciled' && o.transferAccountId)).toBe(true);
-      // Puis le virement est ventilé côté principal, sans double compte côté livret.
+      // Puis le virement n'est pas ventilé d'office, ni côté principal ni côté livret (D21) : la taxe
+      // foncière garde ce qu'elle avait, sans double compte.
       let l2 = applyPatchToLedger(l, patch);
       l2 = applyPatchToLedger(l2, matchTirelireTransfers(l2));
       const idx = indexLedger(l2);
       const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, '2026-09-06');
-      expect(tf.get('acc-livret')).toBe(euros(1000));
+      expect(tf.get('acc-livret')).toBe(euros(900));
       expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
     });
   });
@@ -295,18 +299,16 @@ describe('[niveau 1] harnais du registre · I3 (U3, U5)', () => {
     return { ...ledger, operations: prep.candidates.filter((c) => !c.exact).map((c) => c.operation) };
   }
 
-  it.fails('témoin rouge · un virement reconnu versé en entier à une seule tirelire', () => {
+  it.fails('témoin rouge · un virement reconnu par son seul libellé, ventilé d’office', () => {
     const l = importé();
     const patch = matchTirelireTransfers(l);
-    // Version cassée : le libellé est bien reconnu, mais le virement n'est pas réparti par l'ordre
-    // de financement (D21) — tout tombe dans la première tirelire venue.
-    const cassé: Patch = { ...patch, subOperations: patch.subOperations.map((a) => ({ ...a, tirelireId: 'env-vac' })) };
+    // Version cassée : le libellé est bien reconnu, et le virement est versé d'office à une tirelire du
+    // compte, sans qu'aucun flux le reprenne — une ventilation supposée (D21, U4).
+    const op = patch.operations.find((o) => o.normalizedLabel.includes('LIVRET A'))!;
+    const cassé: Patch = { ...patch, subOperations: [{ id: 'cassé', operationId: op.id, tirelireId: 'env-vac', share: { kind: 'variable' } }] };
     const idx = indexLedger(applyPatchToLedger(l, cassé));
 
-    const tf = tirelireComponents(idx.tireliresById.get('env-tf')!, idx, '2026-09-06');
-    expect(tf.get('acc-livret')).toBe(euros(1000));
-    expect(tf.get('acc-principal')).toBe(euros(50));
-    expect(tirelireBalance(idx.tireliresById.get('env-tf')!, idx, '2026-09-06')).toBe(euros(1050));
+    expect(unallocatedAmount(op, idx)).toBe(-euros(100));
   });
 
   describe('[niveau 0] témoin de la préparation de l’import (D09)', () => {

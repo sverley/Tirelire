@@ -60,7 +60,9 @@
    * exécute vraiment. L'application ne peut ni le connaître ni le changer là-bas, d'où la saisie —
    * proposée à la dizaine au-dessus de ce que le budget demande, parce qu'un ordre se pose rond,
    * puis corrigeable pour coller à ce qui a réellement été posé. Ce que le budget demande, lui, se
-   * recalcule seul, et la ventilation du virement se rejouera au jour de l'opération.
+   * recalcule seul. L'ordre s'enregistre avec la ventilation que le plan propose pour le montant
+   * validé (D21, D60, #393) ; un compte qui a plusieurs ordres ne se voit proposer aucun
+   * enregistrement (#393, point 10).
    */
   let ordreEdite = $state<string | undefined>(undefined);
   let montantOrdre = $state('');
@@ -92,7 +94,7 @@
   function ouvrirOrdre(t: PlanTransfer) {
     ordreEdite = t.accountId;
     titreOrdre = `${t.bankOrder ? 'Corriger' : 'Enregistrer'} mon ordre permanent — ${t.accountName}`;
-    montantOrdre = centsToInput(roundOrderUp(t.permanent, pasArrondi));
+    montantOrdre = centsToInput(t.proposal?.amount ?? roundOrderUp(t.permanent, pasArrondi));
     erreurOrdre = '';
   }
 
@@ -113,7 +115,8 @@
     if (!principalId) return;
     const montant = inputToCents(montantOrdre);
     if (montant === undefined || montant <= 0) return void (erreurOrdre = 'Montant invalide (le montant que vire votre ordre, en positif).');
-    const flow = standingTransferFlow(plan, t, principalId, t.bankOrder?.flowId ?? app.newId(), montant);
+    const existant = t.bankOrder?.flowId ? app.ledger.plannedFlows.find((f) => f.id === t.bankOrder?.flowId) : undefined;
+    const flow = standingTransferFlow(plan, t, principalId, app.newId(), montant, existant);
     if (!flow) return;
     app.upsert('plannedFlows', flow);
     ordreEdite = undefined;
@@ -376,11 +379,11 @@
           </div>
         {/if}
         {#if t.occurrences}
-          <!-- Chaque occurrence de l'ordre, lue sur son flux (D12, #183) : seulement avec suivi des
-               opérations ; sans suivi, rien ne se pointe et le plan n'en dit rien. -->
-          {#each t.occurrences as o (o.date)}
+          <!-- Chaque occurrence de chaque ordre, lue sur son flux et nommée par lui (D12, #183, #393) :
+               seulement avec suivi des opérations ; sans suivi, rien ne se pointe et le plan n'en dit rien. -->
+          {#each t.occurrences as o (`${o.flowId}|${o.date}`)}
             <div class="row">
-              <div class="label">Virement du {shortDate(o.date)}
+              <div class="label">{o.flowName} du {shortDate(o.date)}
                 <span class="sub">{o.status === 'pointee'
                   ? 'pointé sur le relevé'
                   : o.status === 'attendue'
@@ -399,8 +402,8 @@
                   ? 'plus demandé par le budget : à supprimer chez la banque, puis ici'
                   : t.bankOrder.drift === 0
                     ? 'au montant du budget'
-                    : t.bankOrder.drift < 0 && t.bankOrder.drift >= -pasArrondi
-                      ? 'arrondi au-dessus du budget : il couvre ce qui est demandé'
+                    : !t.bankOrder.signaled
+                      ? 'dans le pas d’arrondi du budget : rien à changer'
                       : `à passer à ${money(roundOrderUp(t.permanent, pasArrondi))} chez la banque, puis à confirmer ici`}
               </span>
             </div>
@@ -411,9 +414,9 @@
           {#if t.breakdown.length}
             <button class="btn small" onclick={() => basculerDetail(t)}>{detaille.includes(t.accountId) ? 'Masquer le détail' : 'Détail'}</button>
           {/if}
-          {#if t.permanent > 0 && ordreEdite !== t.accountId}
+          {#if t.permanent > 0 && ordreEdite !== t.accountId && (!t.bankOrder || t.bankOrder.flowId)}
             <button class="btn small" onclick={() => ouvrirOrdre(t)}>{t.bankOrder ? 'Corriger mon ordre' : 'Enregistrer mon ordre permanent'}</button>
-          {:else if t.permanent === 0 && t.bankOrder}
+          {:else if t.permanent === 0 && t.bankOrder?.flowId}
             <button class="btn small danger" onclick={() => supprimerOrdre(t)}>Supprimer l’ordre enregistré</button>
           {/if}
         </div>

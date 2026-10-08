@@ -136,7 +136,7 @@ export function exampleLedger(): Ledger {
       kind: 'income',
       amount: euros(3400),
       accountId: 'acc-principal',
-      categoryId: 'cat-salaire',
+      action: { categoryId: 'cat-salaire' },
       periodicity: monthly('2026-08-28'),
       dateWindowDays: 3,
       amountTolerance: { pct: 10 },
@@ -152,7 +152,7 @@ export function exampleLedger(): Ledger {
       kind: 'income',
       amount: euros(3550),
       accountId: 'acc-principal',
-      categoryId: 'cat-salaire',
+      action: { categoryId: 'cat-salaire' },
       periodicity: monthly('2026-10-28'),
       dateWindowDays: 3,
       amountTolerance: { pct: 10 },
@@ -166,7 +166,7 @@ export function exampleLedger(): Ledger {
       kind: 'income',
       amount: euros(700),
       accountId: 'acc-principal',
-      categoryId: 'cat-loyer',
+      action: { categoryId: 'cat-loyer' },
       periodicity: monthly('2026-09-05'),
       dateWindowDays: 5,
       labelPattern: 'LOYER',
@@ -177,7 +177,7 @@ export function exampleLedger(): Ledger {
       kind: 'income',
       amount: euros(100),
       accountId: 'acc-principal',
-      categoryId: 'cat-alloc',
+      action: { categoryId: 'cat-alloc' },
       periodicity: monthly('2026-09-05'),
       dateWindowDays: 5,
       labelPattern: 'CAF',
@@ -188,7 +188,7 @@ export function exampleLedger(): Ledger {
       kind: 'fixedCharge',
       amount: euros(-950),
       accountId: 'acc-principal',
-      categoryId: 'cat-logement',
+      action: { categoryId: 'cat-logement' },
       periodicity: monthly('2026-09-05'),
       dateWindowDays: 3,
       labelPattern: 'ECHEANCE PRET',
@@ -202,7 +202,7 @@ export function exampleLedger(): Ledger {
       kind: 'fixedCharge',
       amount: euros(-45),
       accountId: 'acc-principal',
-      categoryId: 'cat-assurance',
+      action: { categoryId: 'cat-assurance' },
       periodicity: monthly('2026-09-10'),
       dateWindowDays: 3,
     },
@@ -212,7 +212,7 @@ export function exampleLedger(): Ledger {
       kind: 'fixedCharge',
       amount: euros(-75),
       accountId: 'acc-principal',
-      categoryId: 'cat-abos',
+      action: { categoryId: 'cat-abos' },
       periodicity: monthly('2026-09-12'),
       dateWindowDays: 3,
     },
@@ -222,7 +222,7 @@ export function exampleLedger(): Ledger {
       kind: 'fixedCharge',
       amount: euros(-150),
       accountId: 'acc-principal',
-      categoryId: 'cat-logement',
+      action: { categoryId: 'cat-logement' },
       periodicity: monthly('2026-09-15'),
       dateWindowDays: 4,
       amountTolerance: { pct: 30 },
@@ -230,8 +230,9 @@ export function exampleLedger(): Ledger {
     },
     {
       /*
-       * L'ordre permanent vers le Livret A : le seul flux **dérivé** du budget (D57), et le seul
-       * dont le montant écrit n'est pas une décision mais un constat — ce que la banque exécute.
+       * L'ordre permanent vers le Livret A (D57, D60) : le seul flux dont le montant écrit n'est pas
+       * une décision mais un constat — ce que la banque exécute. Il ne porte pas encore de parts
+       * (#395) : son montant va au non affecté du Livret A (D21).
        * Il est volontairement **décalé** : la banque vire 600 €, le budget en demande 650 (les
        * dotations des quatre tirelires du livret : 100 + 50 + 200 + 300). Le plan affiche donc les
        * deux montants côte à côte et dit d'aller modifier l'ordre — c'est ce qu'on vient voir, et
@@ -246,7 +247,6 @@ export function exampleLedger(): Ledger {
       id: 'flow-vir-livret',
       name: 'Virement Livret A',
       kind: 'transfer',
-      origin: 'derived',
       amount: euros(-600),
       accountId: 'acc-principal',
       counterpartAccountId: 'acc-livret',
@@ -261,7 +261,7 @@ export function exampleLedger(): Ledger {
       kind: 'dueDate',
       amount: euros(-1200),
       accountId: 'acc-principal',
-      tirelireId: 'env-tf',
+      action: { tirelireId: 'env-tf' },
       periodicity: { interval: 12, unit: 'month' as const, anchorDate: '2026-10-15' },
       dateWindowDays: 5,
       labelPattern: 'DGFIP|TAXE FONC',

@@ -9,13 +9,15 @@
     alive,
     countStates,
     flowOccurrences,
+    flowTirelire,
     tracksOperations,
-    isDerivedFlow,
+    standingOrderTarget,
     needForDueDateFlow,
     nextOccurrence,
     stateShown,
     validityState,
     DEFAULT_VISIBILITY,
+    type FlowAction,
     type PlannedFlow,
     type PlannedFlowKind,
     type PeriodUnit,
@@ -54,6 +56,9 @@
   const tirelires = $derived(alive(app.ledger.tirelires));
   const categories = $derived(alive(app.ledger.categories));
   const flows = $derived(alive(app.ledger.plannedFlows));
+  const principalId = $derived(accounts.find((a) => a.kind === 'principal')?.id ?? '');
+  /** Un ordre permanent : un flux de virement du compte principal vers un autre compte (D57, D60). */
+  const estOrdre = (f: PlannedFlow) => standingOrderTarget(f, principalId) !== undefined;
   const états = $derived(countStates(flows, (f) => validityState(f, app.asOf)));
   const visibles = $derived(flows.filter((f) => stateShown(etatsVisibles, validityState(f, app.asOf))));
   const masqués = $derived(flows.length - visibles.length);
@@ -73,7 +78,7 @@
    */
   function provisionText(f: PlannedFlow): string {
     if (f.kind !== 'dueDate') return '';
-    const nom = tirelires.find((e) => e.id === f.tirelireId)?.name;
+    const nom = tirelires.find((e) => e.id === flowTirelire(f))?.name;
     if (!nom) return '⚠ aucune tirelire ne la provisionne';
     return needForDueDateFlow(f, app.ledger.needs, app.asOf)
       ? `provisionnée par « ${nom} »`
@@ -95,8 +100,8 @@
       kind: f.kind,
       amount: centsToInput(Math.abs(f.amount)),
       accountId: f.accountId,
-      tirelireId: f.tirelireId ?? '',
-      categoryId: f.categoryId ?? '',
+      tirelireId: flowTirelire(f) ?? '',
+      categoryId: f.action?.categoryId ?? '',
       counterpartAccountId: f.counterpartAccountId ?? '',
       interval: String(f.periodicity.interval),
       unit: f.periodicity.unit,
@@ -106,7 +111,7 @@
       tolerancePct: f.amountTolerance?.pct !== undefined ? String(f.amountTolerance.pct) : '',
       labelPattern: f.labelPattern ?? '',
       variable: !!f.variable,
-      locks: !!f.locks,
+      locks: f.action?.state === 'lock',
       activeFrom: f.activeFrom ?? '',
       activeTo: f.activeTo ?? '',
     };
@@ -132,6 +137,19 @@
     }
     const tolAbs = inputToCents(form.toleranceAbs);
     const tolPct = form.tolerancePct.trim() ? Number(form.tolerancePct) : undefined;
+    /*
+     * L'action du flux (D24) : ce que l'écran règle — catégorie, tirelire d'une échéance, verrouillage —
+     * s'y écrit ; ses parts, que l'écran ne montre pas, restent telles qu'elles sont (#393, point 11).
+     */
+    const action: FlowAction = { ...editing.action };
+    if (form.categoryId) action.categoryId = form.categoryId;
+    else delete action.categoryId;
+    if (form.kind === 'dueDate' && form.tirelireId !== (flowTirelire(editing) ?? '')) {
+      if (form.tirelireId) action.tirelireId = form.tirelireId;
+      else delete action.tirelireId;
+    } else if (form.kind !== 'dueDate' && editing.kind === 'dueDate') delete action.tirelireId;
+    if (form.locks) action.state = 'lock';
+    else delete action.state;
     const row: PlannedFlow = {
       id: editing.id,
       name: form.name.trim(),
@@ -140,15 +158,13 @@
       accountId: form.accountId,
       periodicity: { interval: Math.max(1, Number(form.interval) || 1), unit: form.unit, anchorDate: form.anchorDate },
       dateWindowDays: Math.max(0, Number(form.dateWindowDays) || 0),
-      ...(form.tirelireId && form.kind === 'dueDate' ? { tirelireId: form.tirelireId } : {}),
-      ...(form.categoryId ? { categoryId: form.categoryId } : {}),
       ...(form.counterpartAccountId && form.kind === 'transfer' ? { counterpartAccountId: form.counterpartAccountId } : {}),
       ...(tolAbs !== undefined || tolPct !== undefined
         ? { amountTolerance: { ...(tolAbs !== undefined ? { abs: tolAbs } : {}), ...(tolPct !== undefined ? { pct: tolPct } : {}) } }
         : {}),
       ...(form.labelPattern.trim() ? { labelPattern: form.labelPattern.trim() } : {}),
       ...(form.variable ? { variable: true } : {}),
-      ...(form.locks ? { locks: true } : {}),
+      ...(Object.keys(action).length ? { action } : {}),
       ...(form.activeFrom ? { activeFrom: form.activeFrom } : {}),
       ...(form.activeTo ? { activeTo: form.activeTo } : {}),
     };
@@ -166,7 +182,7 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Flux prévus</h1>
-<p class="muted small">Revenus, charges fixes, échéances payées par une tirelire. Le montant se saisit en positif. Le compte, le motif de libellé, la tolérance de montant et la fenêtre de dates sont les critères du flux : eux seuls reconnaissent l’opération du relevé qui réalise chaque échéance, qu’elle reprend et classe. Les virements permanents, eux, sont <strong>dérivés du budget</strong> (D57) : ils se confirment depuis le Plan et ne se modifient pas ici.</p>
+<p class="muted small">Revenus, charges fixes, échéances payées par une tirelire. Le montant se saisit en positif. Le compte, le motif de libellé, la tolérance de montant et la fenêtre de dates sont les critères du flux : eux seuls reconnaissent l’opération du relevé qui réalise chaque échéance, qu’elle reprend et classe. Un virement du compte principal vers un autre compte est un <strong>ordre permanent</strong> : le Plan le compare à ce que le budget demande, et propose de l’enregistrer avec sa ventilation.</p>
 
 <div class="actions">
   <button class="btn primary" onclick={startNew} disabled={accounts.length === 0}>Ajouter un flux</button>
@@ -250,13 +266,13 @@
       {@const provision = provisionText(f)}
       <div class="row {badge ? 'dormant' : ''}" class:editing={editing?.id === f.id}>
         <div class="label">
-          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.locks ? ' · verrouille' : ''}
+          <strong>{f.name}</strong>{f.variable ? ' (variable)' : ''}{f.action?.state === 'lock' ? ' · verrouille' : ''}
           {#if badge}<span class="pill dim">{badge}</span>{/if}
-          {#if isDerivedFlow(f)}<span class="pill dim">dérivé du budget</span>{/if}
+          {#if estOrdre(f)}<span class="pill dim">ordre permanent</span>{/if}
           <span class="sub">{accountName(f.accountId)} · {periodicityLabel(f.periodicity)} · prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}{validite ? ` · ${validite}` : ''}</span>
           {#if provision}<span class="sub">{provision}</span>{/if}
-          {#if isDerivedFlow(f)}<span class="sub">montant de l’ordre permanent chez la banque ; la ventilation se recalcule à l’import</span>{/if}
-          {#if isDerivedFlow(f) && tracksOperations(app.ledger, f.accountId)}
+          {#if estOrdre(f)}<span class="sub">montant de l’ordre permanent chez la banque</span>{/if}
+          {#if estOrdre(f) && tracksOperations(app.ledger, f.accountId)}
             <!-- Les dernières occurrences de l'ordre, au pointage (D12, #183) ; sans suivi des
                  opérations, rien ne se pointe et rien ne se dit. -->
             {@const occurrences = flowOccurrences(app.ledger, f, addMonths(app.asOf, -3), app.asOf, app.asOf).slice(-3)}
@@ -269,11 +285,10 @@
         </div>
         <div class="num {f.amount < 0 ? '' : 'pos'}">{money(f.amount)}</div>
         <div class="actions" style="margin:0">
-          {#if isDerivedFlow(f)}
+          {#if estOrdre(f)}
             <button class="btn small" onclick={() => app.switchTab('plan')}>Voir dans le Plan</button>
-          {:else}
-            <button class="btn small" onclick={() => startEdit(f)}>Modifier</button>
           {/if}
+          <button class="btn small" onclick={() => startEdit(f)}>Modifier</button>
           <button class="btn small danger" onclick={() => remove(f)}>Supprimer</button>
         </div>
       </div>

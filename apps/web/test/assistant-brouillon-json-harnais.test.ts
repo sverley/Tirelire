@@ -222,7 +222,7 @@ describe('[niveau 2] #379 · 5 et 6 — enregistrer, puis reprendre', () => {
   it('un fichier qui ne définit qu’une partie laisse les autres telles que le projet les porte', async () => {
     const store = await projetBudgete();
     const projet = store.load();
-    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 2, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
+    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 3, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
     if (!lu.ok) throw new Error(lu.message);
     const b = brouillonDuFichier(projet, lu.budget);
     const montre = montrer(projet, b);
@@ -235,7 +235,7 @@ describe('[niveau 2] #379 · 5 et 6 — enregistrer, puis reprendre', () => {
   it('enregistré sans qu’une étape les change, un fichier partiel repris ne définit toujours que ses parties (ajouté par l’auditeur)', async () => {
     const store = await projetBudgete();
     const projet = store.load();
-    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 2, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
+    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 3, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
     if (!lu.ok) throw new Error(lu.message);
     const json = budgetDefiniEnJson(fichierAEnregistrer(projet, brouillonDuFichier(projet, lu.budget)));
     expect(Object.keys(json).filter((k) => k !== 'format' && k !== 'version')).toEqual(['tirelires']);
@@ -244,7 +244,7 @@ describe('[niveau 2] #379 · 5 et 6 — enregistrer, puis reprendre', () => {
   it('une étape qui change une partie absente du fichier repris l’y fait entrer, sans autre différence (ajouté par l’auditeur)', async () => {
     const store = await projetBudgete();
     const projet = store.load();
-    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 2, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
+    const lu = lireBudgetJson({ format: 'tirelire-budget', version: 3, tirelires: [{ name: 'Noël', placement: [], opening_balance: 0, opening_date: '2026-09-01' }] });
     if (!lu.ok) throw new Error(lu.message);
     const b = brouillonDuFichier(projet, lu.budget);
     ecrire(b, 'plannedFlows', { ...flux('f-salaire', 'Salaire'), amount: 210000 });

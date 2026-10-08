@@ -467,7 +467,7 @@ describe('#297 · 5. une règle remplace la ventilation à tous ses niveaux ; un
         kind: 'fixedCharge',
         amount: euros(-50),
         accountId: PRINCIPAL,
-        categoryId: 'cat-assurance',
+        action: { categoryId: 'cat-assurance' },
         periodicity: { interval: 1, unit: 'month', anchorDate: '2026-09-03' },
         dateWindowDays: 3,
         labelPattern: 'MUTUELLE',

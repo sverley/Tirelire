@@ -33,10 +33,10 @@ est refusé ; l'application n'en écarte jamais une partie.
 
 ### La version du format
 
-La version du format décrite ici est **6** : `meta` la porte sous la clé `format_version`, écrite
-comme le texte `6`, avec le marqueur `format` valant `tirelire` (table `meta`). Avant `v1`, le
+La version du format décrite ici est **7** : `meta` la porte sous la clé `format_version`, écrite
+comme le texte `7`, avec le marqueur `format` valant `tirelire` (table `meta`). Avant `v1`, le
 format peut changer d'une version à la suivante sans migration, et un fichier d'une autre version est
-refusé en le disant (D30, D91) : ce document décrit la version 6, et un test le tient juste.
+refusé en le disant (D30, D91) : ce document décrit la version 7, et un test le tient juste.
 
 ## Les conventions
 
@@ -161,19 +161,19 @@ Les catégories qui classent les sous-opérations, en arbre.
 
 Les flux prévus (glossaire) : des opérations attendues — salaire, charge fixe, échéance de provision,
 virement interne —, décrites par un montant, un rythme et une sélection qui reconnaît l'opération
-bancaire qui réalise chaque occurrence (D12, D24). Le virement permanent que le plan propose vers un
-compte d'accueil en est un, d'`origin` `derived` (D57, D60).
+bancaire qui réalise chaque occurrence (D12, D24), et une action, celle d'un automatisme, qui la
+classe (D24). Un flux de virement du compte principal vers un compte d'accueil est un ordre
+permanent (D57, D60). Une contrainte de la table, `planned_flows.action` : l'état de l'action vaut
+`reconcile` ou `lock`, jamais `none` ni `unlock`, et l'action ne porte pas `oneOff` (D22, D23).
 
 | Colonne | Type | Obligatoire | Peut manquer | Origine | Valeurs admises | Désigne | Sens |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | TEXT | oui | non | établie | texte | — | Identifiant du flux. |
 | `name` | TEXT | oui | non | saisie | texte | — | Nom du flux. |
 | `kind` | TEXT | oui | non | saisie | `income`, `fixedCharge`, `dueDate`, `transfer` | — | `income` : un revenu attendu ; `fixedCharge` : un prélèvement ou virement fixe, non couvert par une tirelire ; `dueDate` : une échéance payée depuis une tirelire ; `transfer` : un virement interne attendu entre deux comptes suivis. |
-| `amount` | INTEGER | oui | non | saisie | entier | — | Montant signé, en centimes : positif = crédit sur `account_id`, négatif = débit. Sur un flux dérivé, ce que l'ordre permanent exécute chez la banque. |
+| `amount` | INTEGER | oui | non | saisie | entier | — | Montant signé, en centimes : positif = crédit sur `account_id`, négatif = débit. Sur un ordre permanent, ce qu'il exécute chez la banque. |
 | `account_id` | TEXT | oui | non | saisie | texte | `accounts` | Le compte du flux. |
-| `tirelire_id` | TEXT | non | oui | saisie | texte | `tirelires` | `dueDate` : la tirelire vidée à l'échéance. |
 | `counterpart_account_id` | TEXT | non | oui | saisie | texte | `accounts` | `transfer` : le compte de contrepartie. |
-| `category_id` | TEXT | non | oui | saisie | texte | `categories` | La catégorie du flux. |
 | `periodicity` | TEXT | oui | non | saisie | JSON, forme « rythme » | — | Le rythme des occurrences (D47). |
 | `date_window_days` | INTEGER | oui | non | saisie | entier | — | Fenêtre de ses occurrences, en jours autour de la date attendue (D12). |
 | `amount_tolerance` | TEXT | non | oui | saisie | JSON, forme « tolérance » | — | Tolérance sur le montant de l'opération qui réalise une occurrence. |
@@ -181,8 +181,7 @@ compte d'accueil en est un, d'`origin` `derived` (D57, D60).
 | `variable` | INTEGER | non | oui | saisie | `0`, `1` | — | Montant variable : tolérance large, jamais repris sans confirmation (D12). |
 | `active_from` | TEXT | non | oui | saisie | date `AAAA-MM-JJ` | — | Premier jour de validité du flux. |
 | `active_to` | TEXT | non | oui | saisie | date `AAAA-MM-JJ` | — | Dernier jour de validité du flux. |
-| `locks` | INTEGER | non | oui | saisie | `0`, `1` | — | Verrouiller ce que le flux reprend (D22, D24). |
-| `origin` | TEXT | non | oui | établie | `declared`, `derived` | — | `declared` : un fait de l'utilisateur ; `derived` : une conséquence du budget, le virement permanent (D57). Absent vaut `declared`. |
+| `action` | TEXT | non | oui | saisie | JSON, forme « action » | — | Ce que le flux fait de l'opération qui reprend une occurrence (D24) : sa catégorie, sa tirelire — celle qu'une échéance vide —, sa ventilation, son état. |
 | `deleted_at` | TEXT | non | oui | établie | horodatage `AAAA-MM-JJTHH:MM:SS.mmmZ` | — | Suppression logique. |
 | `hlc` | TEXT | non | oui | établie | horloge | — | L'horloge de la ligne. |
 
@@ -335,7 +334,7 @@ fait refuser le fichier, la colonne nommée.
 | Clé de `meta` | Valeur | Sens |
 | --- | --- | --- |
 | `format` | `tirelire` | Le marqueur : ce qui distingue un dépôt Tirelire de toute autre base. |
-| `format_version` | `6` | La version du format que ce document décrit, écrite comme le texte `6`. |
+| `format_version` | `7` | La version du format que ce document décrit, écrite comme le texte `7`. |
 
 ## Les formes JSON
 
@@ -457,8 +456,9 @@ Colonne : `automations.selection`. L'objet vide retient toute opération.
 ### Forme « action »
 
 Ce qu'un automatisme fait des opérations retenues (D23) ; chaque champ est facultatif, et `allocation`
-remplace la ventilation entière par une division, dont une seule part est variable (D27). Colonne :
-`automations.action`.
+remplace la ventilation entière par une division, dont une seule part est variable (D27). Colonnes :
+`automations.action`, et `planned_flows.action`, où l'état ne vaut que `reconcile` ou `lock` et où
+`oneOff` n'existe pas (contrainte `planned_flows.action`).
 
 | Champ | Obligatoire | Forme | Désigne | Seulement si |
 | --- | --- | --- | --- | --- |
@@ -473,6 +473,10 @@ remplace la ventilation entière par une division, dont une seule part est varia
 
 ```json
 { "categoryId": "cat-courses", "tirelireId": "tir-alimentation", "state": "reconcile" }
+```
+
+```json
+{ "allocation": [{ "tirelireId": "tir-vacances", "share": { "kind": "fixed", "amount": -5000 } }] }
 ```
 
 ### Forme « colonnes »
@@ -592,7 +596,7 @@ l'instance qui ouvre date les lignes. Le plan se lit à une date postérieure à
 
 ```sql
 CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT);
-INSERT INTO meta (key, value) VALUES ('format', 'tirelire'), ('format_version', '6');
+INSERT INTO meta (key, value) VALUES ('format', 'tirelire'), ('format_version', '7');
 
 CREATE TABLE accounts (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, opening_balance INTEGER NOT NULL, opening_date TEXT NOT NULL);
 INSERT INTO accounts (id, name, kind, opening_balance, opening_date) VALUES ('acc-livret', 'Livret A', 'epargne', 0, '2026-10-01');

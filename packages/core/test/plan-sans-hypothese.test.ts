@@ -49,6 +49,7 @@ import {
   matchTirelireTransfers,
   normalizeLabel,
   periodsAround,
+  proposedOrderAllocation,
   tirelireBalance,
   type Ledger,
   type Operation,
@@ -90,13 +91,22 @@ const LIBELLÉ_VIREMENT = 'VIR PERMANENT TIRELIRE LIVRET A';
 
 /**
  * Un virement du compte principal vers le Livret A, enregistré des deux côtés comme l'import le
- * fait : la sortie est ventilée entre les tirelires du Livret A (D21), l'entrée est rapprochée.
+ * fait : l'entrée est rapprochée, la sortie reconnue par son libellé (D11). Reconnue par son seul
+ * libellé, elle n'est pas ventilée d'office (#393, point 4) : l'utilisateur la ventile, ici par la
+ * ventilation que le plan propose pour ce montant (D21, D60), ce qui la verrouille (D22).
  */
 function avecVirement(l: Ledger, montant: number, date: string, id = 'op-virement'): Ledger {
   const sortie: Operation = { id, accountId: PRINCIPAL, origin: 'imported', date, label: LIBELLÉ_VIREMENT, normalizedLabel: normalizeLabel(LIBELLÉ_VIREMENT), amount: -montant, state: 'untreated' };
   const entrée: Operation = { id: `${id}-entrée`, accountId: LIVRET, origin: 'imported', date, label: LIBELLÉ_VIREMENT, normalizedLabel: normalizeLabel(LIBELLÉ_VIREMENT), amount: montant, state: 'reconciled', transferAccountId: PRINCIPAL };
   const avec: Ledger = { ...l, operations: [...l.operations, entrée, sortie] };
-  return applyPatchToLedger(avec, matchTirelireTransfers(avec));
+  const reconnu = applyPatchToLedger(avec, matchTirelireTransfers(avec));
+  const plan = computePlan(l, date);
+  const parts = proposedOrderAllocation(plan, virement(plan, LIVRET)!, montant);
+  return {
+    ...reconnu,
+    operations: reconnu.operations.map((o) => (o.id === id ? { ...o, state: 'locked' as const } : o)),
+    subOperations: [...reconnu.subOperations, ...parts.map((p, i) => ({ id: `${id}-part-${i}`, operationId: id, ...p }))],
+  };
 }
 
 /** De l'argent arrivé sur le Livret A sans appartenir à aucune tirelire : il dort. */
@@ -242,17 +252,17 @@ const virementLivret = (l: Ledger, asOf: string) => computePlan(l, asOf, LECTURE
 describe('[niveau 1] point 5 — le virement permanent se lit sur son flux, le plan de sa période le montre (D12)', () => {
   it('pointée : une opération rapprochée de l’ordre, dans sa fenêtre', () => {
     const l = avecLignes(ligneDeRelevé('o1', '2026-08-29', -euros(600), { plannedFlowId: 'flow-vir-livret', plannedDate: '2026-08-28' }));
-    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'pointee', operationId: 'o1' }]);
+    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'pointee', operationId: 'o1', flowId: 'flow-vir-livret', flowName: 'Virement Livret A' }]);
   });
 
   it('attendue non reçue : la fenêtre est close sans opération, et le plan de sa période le montre', () => {
     const l = avecLignes(ligneDeRelevé('o2', '2026-09-01', -euros(40)));
-    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'nonRecue' }]);
+    expect(virementLivret(l, SEPTEMBRE).occurrences).toEqual([{ date: '2026-08-28', windowEnd: '2026-09-02', status: 'nonRecue', flowId: 'flow-vir-livret', flowName: 'Virement Livret A' }]);
   });
 
   it('attendue : une période à venir montre l’occurrence à venir, sans rien en supposer', () => {
     const l = avecLignes(ligneDeRelevé('o2', '2026-09-01', -euros(40)));
-    expect(virementLivret(l, OCTOBRE).occurrences).toEqual([{ date: '2026-09-28', windowEnd: '2026-10-03', status: 'attendue' }]);
+    expect(virementLivret(l, OCTOBRE).occurrences).toEqual([{ date: '2026-09-28', windowEnd: '2026-10-03', status: 'attendue', flowId: 'flow-vir-livret', flowName: 'Virement Livret A' }]);
   });
 });
 

@@ -27,7 +27,8 @@ import { alive } from './model.js';
 import { accountBalance, indexLedger, tirelireComponents, tirelireTimeline, type LedgerIndex } from './balances.js';
 import type { Period } from './periods.js';
 import { addDays } from './dates.js';
-import { distributeTransfer, flowOccurrencesThatCount, tracksOperations } from './matching.js';
+import { flowOccurrencesThatCount, tracksOperations } from './matching.js';
+import { actionAllocation } from './automations.js';
 
 /** D'où vient un mouvement du solde prévu. */
 export type ForecastOrigin = 'flux' | 'dotation' | 'liberation' | 'saisie' | 'releve' | 'ouverture';
@@ -99,7 +100,7 @@ export function isPlannedOperation(op: Operation): boolean {
  */
 export function withPlannedOperations(ledger: Ledger, today: ISODate, until: ISODate): { ledger: Ledger } {
   const accounts = new Map(alive(ledger.accounts).map((a) => [a.id, a]));
-  const tirelires = new Set(alive(ledger.tirelires).map((e) => e.id));
+  const categories = new Map(alive(ledger.categories).map((c) => [c.id, c]));
   const tracked = new Map<Id, boolean>();
   const isTracked = (id: Id) => {
     let t = tracked.get(id);
@@ -109,71 +110,53 @@ export function withPlannedOperations(ledger: Ledger, today: ISODate, until: ISO
 
   const operations: Operation[] = [];
   const subOperations: SubOperation[] = [];
-  const transfers: Array<{ flow: PlannedFlow; date: ISODate }> = [];
 
   for (const flow of alive(ledger.plannedFlows)) {
     const account = accounts.get(flow.accountId);
     if (!account) continue;
+    /*
+     * L'opération prévue compte avec la ventilation que prendrait l'opération qui la reprend (D24,
+     * D88) : celle de l'action du flux, calculée sur son montant (`actionAllocation`). Ce que ses
+     * parts n'absorbent pas reste sans tirelire, le non affecté du compte (D21, I2) ; aucune
+     * répartition ne se tire de l'état des tirelires à la date.
+     */
+    const parts = actionAllocation(flow.action, categories) ?? [];
+    const counterpart = flow.kind === 'transfer' && flow.counterpartAccountId && accounts.has(flow.counterpartAccountId) ? flow.counterpartAccountId : undefined;
     // Comme le solde du compte (`accountBalance`), une opération compte après la date d'ouverture.
     for (const o of flowOccurrencesThatCount(ledger, flow, addDays(account.openingDate, 1), until, today, isTracked(flow.accountId)).counted) {
-      if (flow.kind === 'transfer' && flow.counterpartAccountId && accounts.has(flow.counterpartAccountId)) {
-        transfers.push({ flow, date: o.date });
-        continue;
-      }
       const op = plannedOperation(flow, o.date);
       operations.push(op);
-      if (flow.kind === 'dueDate' && flow.tirelireId && tirelires.has(flow.tirelireId))
+      /*
+       * Un virement prévu sort d'un compte et entre sur l'autre : deux opérations appariées, comme
+       * l'import les apparie (`pairInternalTransfers`). La ventilation se pose sur le côté que décrit
+       * le flux ; une ligne sur une tirelire y déplace sa composante d'un compte à l'autre (D19).
+       */
+      if (counterpart) {
+        const entree: Operation = {
+          ...op,
+          id: `${op.id}:contrepartie`,
+          accountId: counterpart,
+          amount: -flow.amount,
+          transferAccountId: flow.accountId,
+          transferOperationId: op.id,
+        };
+        op.transferAccountId = counterpart;
+        op.transferOperationId = entree.id;
+        operations.push(entree);
+      }
+      parts.forEach((l, i) =>
         subOperations.push({
-          id: `${op.id}:tirelire`,
+          id: `${op.id}:part-${i}`,
           operationId: op.id,
-          tirelireId: flow.tirelireId,
-          ...(flow.categoryId ? { categoryId: flow.categoryId } : {}),
-          share: { kind: 'fixed', amount: flow.amount },
-        });
+          share: l.share,
+          ...(l.categoryId ? { categoryId: l.categoryId } : {}),
+          ...(l.tirelireId ? { tirelireId: l.tirelireId } : {}),
+        }),
+      );
     }
   }
 
-  let out: Ledger = { ...ledger, operations: [...ledger.operations, ...operations], subOperations: [...ledger.subOperations, ...subOperations] };
-
-  /*
-   * Un virement prévu sort d'un compte et entre sur l'autre : deux opérations appariées, comme
-   * l'import les apparie (`pairInternalTransfers`). Sa ventilation sur les tirelires est celle de
-   * l'import, par l'ordre de financement au jour de l'opération (D21, D60) : elle se calcule dans
-   * l'ordre des dates, sur ce que les virements précédents ont déjà placé.
-   */
-  transfers.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  for (const { flow, date } of transfers) {
-    const sortie = plannedOperation(flow, date);
-    const entree: Operation = {
-      ...sortie,
-      id: `${sortie.id}:contrepartie`,
-      accountId: flow.counterpartAccountId!,
-      amount: -flow.amount,
-      transferAccountId: flow.accountId,
-      transferOperationId: sortie.id,
-    };
-    sortie.transferAccountId = flow.counterpartAccountId!;
-    sortie.transferOperationId = entree.id;
-    const parts =
-      flow.amount < 0
-        ? distributeTransfer(out, flow.counterpartAccountId!, flow.amount, date)
-        : [];
-    out = {
-      ...out,
-      operations: [...out.operations, sortie, entree],
-      subOperations: [
-        ...out.subOperations,
-        ...parts.map((p, i) => ({
-          id: `${sortie.id}:part-${i}`,
-          operationId: sortie.id,
-          tirelireId: p.tirelireId,
-          ...(flow.categoryId ? { categoryId: flow.categoryId } : {}),
-          share: { kind: 'fixed' as const, amount: -p.amount },
-        })),
-      ],
-    };
-  }
-  return { ledger: out };
+  return { ledger: { ...ledger, operations: [...ledger.operations, ...operations], subOperations: [...ledger.subOperations, ...subOperations] } };
 }
 
 function plannedOperation(flow: PlannedFlow, date: ISODate): Operation {

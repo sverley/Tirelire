@@ -20,18 +20,19 @@ import {
   alive,
   applyMatch,
   computePlan,
-  distributeTransfer,
   emptyLedger,
   euros,
   exampleLedger,
   formatCents,
-  isDerivedFlow,
+  indexLedger,
   matchTirelireTransfers,
   normalizeLabel,
   proposeMatches,
+  proposedOrderAllocation,
   roundOrderUp,
-  standingOrderFlow,
+  standingOrderFlows,
   standingTransferFlow,
+  unallocatedAmount,
   type Ledger,
   type Need,
   type Operation,
@@ -66,15 +67,19 @@ function demande(l: Ledger, asOf: string): number {
   return transfert(l, asOf).t?.permanent ?? 0;
 }
 
-/** Le geste de l'écran Plan : enregistrer le montant que l'ordre exécute chez la banque. */
+/**
+ * Le geste de l'écran Plan : enregistrer le montant que l'ordre exécute chez la banque, avec la
+ * ventilation proposée pour ce montant ; l'ordre qui existe déjà vers ce compte est remplacé.
+ */
 function enregistrerOrdre(l: Ledger, montant: number, asOf = AVANT): Ledger {
   const { plan, t } = transfert(l, asOf);
-  const flux = standingTransferFlow(plan, t!, PRINCIPAL, t!.bankOrder?.flowId ?? 'flow-ordre', montant)!;
+  const existant = t!.bankOrder?.flowId ? l.plannedFlows.find((f) => f.id === t!.bankOrder!.flowId) : undefined;
+  const flux = standingTransferFlow(plan, t!, PRINCIPAL, 'flow-ordre', montant, existant)!;
   return { ...l, plannedFlows: [...l.plannedFlows.filter((f) => f.id !== flux.id), flux] };
 }
 
 function ordre(l: Ledger): PlannedFlow {
-  return standingOrderFlow(l.plannedFlows, LIVRET)!;
+  return standingOrderFlows(l.plannedFlows, PRINCIPAL, LIVRET, AVANT)[0]!;
 }
 
 /** Une ligne de relevé comme la banque l'écrit : « VIR PERMANENT TIRELIRE LIVRET A ». */
@@ -111,8 +116,18 @@ function ventilation(p: Patch | undefined): Record<string, number> {
   return out;
 }
 
-function attendue(l: Ledger, op: Operation): Record<string, number> {
-  return Object.fromEntries(distributeTransfer({ ...l, operations: [...l.operations, op] }, LIVRET, op.amount, op.date).map((p) => [p.tirelireId, p.amount]));
+/** Les parts fixes de l'action d'un ordre, tirelire → montant positif : ce que l'opération qui le reprend prend (D24, D60). */
+function partsDe(f: PlannedFlow): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const l of f.action?.allocation ?? []) if (l.tirelireId && l.share.kind === 'fixed') out[l.tirelireId] = (out[l.tirelireId] ?? 0) - l.share.amount;
+  return out;
+}
+
+/** Ce qu'une opération importée laisse sans tirelire, le non affecté de son compte (D21, D29). */
+function nonAffecté(l: Ledger, p: Patch | undefined, opId: string): number {
+  const après = p ? appliquer(l, p) : l;
+  const op = après.operations.find((o) => o.id === opId)!;
+  return unallocatedAmount(op, indexLedger(après));
 }
 
 const alertes = (l: Ledger, asOf: string) => computePlan(l, asOf).warnings.filter((w) => w.code === 'bankOrderDrift');
@@ -201,32 +216,35 @@ const dotationRevue = (l: Ledger): Ledger => ({
 });
 
 // ---------------------------------------------------------------------------------------------
-// 1. « La ventilation d'un virement dérivé du budget est recalculée, pas mémorisée. »
+// 1. La ventilation d'un ordre est l'action du flux (D21, D24, D60 amendées, #393) : proposée par le
+//    plan pour le montant validé, enregistrée avec l'ordre, prise telle quelle à l'import.
 // ---------------------------------------------------------------------------------------------
 
 describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
-  describe('#14 · la ventilation est recalculée, pas mémorisée', () => {
-    // Dette de #203 (principe 9.3) : D60 amendée enregistre la ventilation choisie avec l'ordre ;
-    // ce test le garde tel que le code le fait aujourd'hui, sans ventilation enregistrée.
-    it('le flux enregistré ne garde que ce qui reconnaît la ligne bancaire : aucune tirelire, aucune part', () => {
+  describe('#393 · la ventilation est celle de l’ordre, enregistrée avec lui', () => {
+    it('le flux enregistré porte la ventilation proposée pour son montant : une part fixe par tirelire, sans catégorie', () => {
       const l = enregistrerOrdre(exampleLedger(), euros(650));
       const f = ordre(l);
-      expect(isDerivedFlow(f)).toBe(true);
       expect(f.labelPattern).toBeTruthy();
       expect(f.amountTolerance).toBeTruthy();
-      const écrit = JSON.stringify(f);
-      for (const e of l.tirelires) expect(écrit, `le flux mentionne la tirelire ${e.name}`).not.toContain(e.id);
-      expect(f.tirelireId).toBeUndefined();
+      // Les échéances d'abord, par priorité puis par date ; l'objectif ensuite (D06).
+      expect(f.action?.allocation).toEqual([
+        { tirelireId: 'env-tf', share: { kind: 'fixed', amount: -euros(100) } },
+        { tirelireId: 'env-auto', share: { kind: 'fixed', amount: -euros(50) } },
+        { tirelireId: 'env-vac', share: { kind: 'fixed', amount: -euros(200) } },
+        { tirelireId: 'env-precaution', share: { kind: 'fixed', amount: -euros(300) } },
+      ]);
     });
 
-    it('à l’import, la répartition est celle de l’ordre de financement au jour de l’opération (D06)', () => {
+    it('à l’import, l’opération prend les parts de l’ordre ; ce qu’elles n’absorbent pas reste non affecté', () => {
       const l = enregistrerOrdre(exampleLedger(), euros(650));
       for (const montant of [euros(650), euros(600), euros(700)]) {
         const op = ligneBancaire(l, montant);
-        const { proposition, patch } = importer(l, op);
+        const { avec, proposition, patch } = importer(l, op);
         expect(proposition?.flowId, `virement de ${formatCents(montant)} non reconnu`).toBe(ordre(l).id);
-        expect(ventilation(patch)).toEqual(attendue(l, op));
-        expect(Object.values(ventilation(patch)).reduce((s, v) => s + v, 0)).toBe(montant);
+        expect(ventilation(patch)).toEqual(partsDe(ordre(l)));
+        // En plus ou en moins, l'écart au montant des parts reste sur le compte, sans tirelire (D21, I2).
+        expect(nonAffecté(avec, patch, op.id), formatCents(montant)).toBe(euros(650) - montant);
       }
     });
 
@@ -234,26 +252,25 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
       ['un besoin ajouté', besoinAjouté],
       ['une priorité modifiée', prioritéModifiée],
       ['une dotation revue', dotationRevue],
-    ])('à montant viré inchangé, %s change la ventilation : c’est le budget du jour qui décide', (_, bouger) => {
+    ])('à montant viré inchangé, %s ne change pas la ventilation : c’est l’ordre qui décide', (_, bouger) => {
       const avant = enregistrerOrdre(exampleLedger(), euros(650));
       const après = bouger(avant);
       const op = ligneBancaire(avant, euros(650));
       const vAvant = ventilation(importer(avant, op).patch);
       const vAprès = ventilation(importer(après, op).patch);
-      expect(vAprès).toEqual(attendue(après, op));
-      expect(vAprès).not.toEqual(vAvant);
+      expect(vAprès).toEqual(partsDe(ordre(après)));
+      expect(vAprès).toEqual(vAvant);
     });
 
-    it('une échéance passée entre deux virements identiques change la ventilation du second', () => {
+    it('une échéance passée entre deux virements identiques ne change pas la ventilation du second', () => {
       const l = enregistrerOrdre(exampleLedger(), euros(650));
       // Taxe foncière due le 15 octobre : le même ordre vire le 28 septembre, puis le 28 octobre.
       const avantÉchéance = ligneBancaire(l, euros(650), '2026-09-28', 'op-avant');
       const aprèsÉchéance = ligneBancaire(l, euros(650), '2026-10-28', 'op-apres');
       const vAvant = ventilation(importer(l, avantÉchéance).patch);
       const vAprès = ventilation(importer(l, aprèsÉchéance).patch);
-      expect(vAvant).toEqual(attendue(l, avantÉchéance));
-      expect(vAprès).toEqual(attendue(l, aprèsÉchéance));
-      expect(vAprès).not.toEqual(vAvant);
+      expect(vAvant).toEqual(partsDe(ordre(l)));
+      expect(vAprès).toEqual(vAvant);
     });
   });
 
@@ -311,13 +328,23 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
       });
     });
 
-    // Dette de #204 (principe 9.3) : D60 amendée ne propose un écart qu'au-delà du pas d'arrondi,
-    // dans les deux sens ; ce test le garde tel que le code le fait aujourd'hui.
-    it('un ordre trop court d’un centime est signalé, quel que soit le pas', () => {
+    // #204 repris par #393 : un écart ne se signale qu'au-delà du pas d'arrondi, dans les deux sens.
+    it('un écart se signale au-delà du pas, dans un sens comme dans l’autre ; égal au pas, non ; à pas nul, tout écart', () => {
       const base = exampleLedger();
-      for (const pas of [0, euros(10), euros(50)]) {
-        const l = enregistrerOrdre({ ...base, settings: { ...base.settings, orderRounding: pas } }, demande(base, AVANT) - 1);
-        expect(alertes(l, AVANT), `pas ${pas}`).toHaveLength(1);
+      const demandé = demande(base, AVANT);
+      const cas: Array<[number, number, number]> = [
+        [0, -1, 1],
+        [0, 1, 1],
+        [euros(10), -1, 0],
+        [euros(10), -euros(10), 0],
+        [euros(10), euros(10), 0],
+        [euros(10), -euros(10) - 1, 1],
+        [euros(10), euros(10) + 1, 1],
+        [euros(50), -euros(30), 0],
+      ];
+      for (const [pas, écart, signalés] of cas) {
+        const l = enregistrerOrdre({ ...base, settings: { ...base.settings, orderRounding: pas } }, demandé + écart);
+        expect(alertes(l, AVANT), `pas ${pas}, ordre à ${écart} du budget`).toHaveLength(signalés);
       }
     });
 
@@ -371,18 +398,19 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // 5. « Distinguer un flux déclaré d'un flux dérivé. Un flux déclaré n'est jamais réécrit. »
+  // 5. Un seul genre de flux (D57 amendée, #393) : un flux n'est jamais réécrit, et tout virement du
+  //    compte principal vers un compte d'accueil est un ordre permanent, quelle que soit sa source.
   // ---------------------------------------------------------------------------------------------
 
-  describe('#14 · déclaré ou dérivé', () => {
-    it('seul l’ordre enregistré depuis le Plan est dérivé ; le reste de l’exemple est déclaré', () => {
+  describe('#393 · un seul genre de flux', () => {
+    it('l’ordre enregistré depuis le Plan est le seul ordre permanent de l’exemple', () => {
       const l = enregistrerOrdre(exampleLedger(), euros(650));
-      const dérivés = alive(l.plannedFlows).filter(isDerivedFlow).map((f) => f.id);
-      expect(dérivés).toEqual([ordre(l).id]);
+      const ordres = alive(l.accounts).flatMap((a) => standingOrderFlows(l.plannedFlows, PRINCIPAL, a.id, AVANT)).map((f) => f.id);
+      expect(ordres).toEqual([ordre(l).id]);
     });
 
-    it('un virement saisi à la main reste déclaré et n’est pas pris pour l’ordre permanent', () => {
-      // L'exemple porte son propre ordre dérivé (D60) : on le retire pour n'avoir que celui saisi.
+    it('un virement saisi à la main est un ordre permanent, comparé comme les autres', () => {
+      // L'exemple porte son propre ordre (D60) : on le retire pour n'avoir que celui saisi.
       const base = exampleLedger();
       const l: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
       const main: PlannedFlow = {
@@ -396,12 +424,11 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
         dateWindowDays: 5,
       };
       const avec: Ledger = { ...l, plannedFlows: [...l.plannedFlows, main] };
-      expect(isDerivedFlow(main)).toBe(false);
-      expect(standingOrderFlow(avec.plannedFlows, LIVRET)).toBeUndefined();
-      expect(transfert(avec, AVANT).t?.bankOrder).toBeUndefined();
+      expect(standingOrderFlows(avec.plannedFlows, PRINCIPAL, LIVRET, AVANT)).toEqual([main]);
+      expect(transfert(avec, AVANT).t?.bankOrder).toMatchObject({ flowId: 'flow-main', amount: euros(650), drift: 0, signaled: false });
     });
 
-    describe('[niveau 0] D57 · un flux déclaré n’est jamais réécrit', () => {
+    describe('[niveau 0] D57 · un flux n’est jamais réécrit', () => {
       it('ni le plan, ni le rapprochement, ni la reconnaissance par libellé ne réécrivent un flux', () => {
         const l = gelé(dotationRevue(enregistrerOrdre(exampleLedger(), euros(650))));
         const op = ligneBancaire(l, euros(650));
@@ -420,7 +447,7 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
     it('réenregistrer l’ordre remplace le fait, sans créer un second flux', () => {
       const une = enregistrerOrdre(exampleLedger(), euros(650));
       const deux = enregistrerOrdre(une, euros(700));
-      expect(alive(deux.plannedFlows).filter(isDerivedFlow)).toHaveLength(1);
+      expect(standingOrderFlows(deux.plannedFlows, PRINCIPAL, LIVRET, AVANT)).toHaveLength(1);
       expect(transfert(deux, AVANT).t?.bankOrder?.amount).toBe(euros(700));
     });
   });
@@ -445,18 +472,20 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
       const nouveau = roundOrderUp(demande(l, AVANT), l.settings.orderRounding);
       const { proposition, patch } = importer(l, ligneBancaire(l, nouveau));
       if (Math.abs(nouveau - euros(650)) <= euros(650) * 0.2) expect(proposition?.flowId).toBe(ordre(l).id);
-      // Au-delà de la tolérance, le libellé « TIRELIRE LIVRET A » suffit encore (D11).
-      else expect(Object.keys(ventilation(matchTirelireTransfers({ ...l, operations: [...l.operations, ligneBancaire(l, nouveau)] })))).not.toHaveLength(0);
-      if (patch) expect(ventilation(patch)).toEqual(attendue(l, ligneBancaire(l, nouveau)));
+      // Au-delà de la tolérance, le libellé « TIRELIRE LIVRET A » suffit encore à reconnaître le virement (D11).
+      else expect(matchTirelireTransfers({ ...l, operations: [...l.operations, ligneBancaire(l, nouveau)] }).operations.map((o) => o.transferAccountId)).toEqual([LIVRET]);
+      if (patch) expect(ventilation(patch)).toEqual(partsDe(ordre(l)));
     });
 
-    it('même hors tolérance, le libellé reconnaît le virement et le ventile par l’ordre de financement', () => {
+    it('même hors tolérance, le libellé reconnaît le virement, sans le ventiler : son montant reste non affecté', () => {
       const l = enregistrerOrdre(exampleLedger(), euros(650));
       const op = ligneBancaire(l, euros(1000));
       expect(importer(l, op).proposition?.flowId).not.toBe(ordre(l).id);
-      const patch = matchTirelireTransfers({ ...l, operations: [...l.operations, op] });
+      const avec: Ledger = { ...l, operations: [...l.operations, op] };
+      const patch = matchTirelireTransfers(avec);
       expect(patch.operations.find((o) => o.id === op.id)?.transferAccountId).toBe(LIVRET);
-      expect(ventilation(patch)).toEqual(attendue(l, op));
+      expect(patch.subOperations).toEqual([]);
+      expect(nonAffecté(avec, patch, op.id)).toBe(-euros(1000));
     });
   });
 
@@ -572,7 +601,7 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
       const base = exampleLedger();
       const décembre = computePlan(base, '2026-12-06');
       const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
-      const flux = standingTransferFlow(décembre, t, PRINCIPAL, t.bankOrder!.flowId, euros(650))!;
+      const flux = standingTransferFlow(décembre, t, PRINCIPAL, 'inutile', euros(650), base.plannedFlows.find((f) => f.id === t.bankOrder!.flowId))!;
       const l: Ledger = { ...base, plannedFlows: base.plannedFlows.map((f) => (f.id === flux.id ? flux : f)) };
       const { proposition } = importer(l, ligneBancaire(l, euros(650), JOUR_VIREMENT));
       expect(proposition?.flowId, `ancrage ${flux.periodicity.anchorDate}`).toBe(flux.id);
@@ -624,7 +653,7 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
     it('un ordre nouveau, enregistré en regardant décembre, reconnaît le virement de septembre', () => {
       // Le Plan se feuillette : la période lue est décembre, la date du jour reste le 6 septembre.
       const base = exampleLedger();
-      const sansOrdre: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => !isDerivedFlow(f)) };
+      const sansOrdre: Ledger = { ...base, plannedFlows: base.plannedFlows.filter((f) => f.id !== 'flow-vir-livret') };
       const décembre = computePlan(sansOrdre, '2026-12-06', AVANT);
       const t = décembre.transfers.find((x) => x.accountId === LIVRET)!;
       expect(t.bankOrder).toBeUndefined();
@@ -638,20 +667,21 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
   // ─────────────────────────────────────────────────────────────────────────────────────────────
   // Témoins rouges des harnais U2 et I10 (docs/gardes.md) : les assertions des sections 1, 2 et 3
   // ci-dessus, rejouées sur des versions volontairement cassées du besoin. Chacun prend le niveau de
-  // ce qu'il garde : la ventilation recalculée (niveau 1), l'ordre enregistré jamais réécrit (niveau 0).
+  // ce qu'il garde : la ventilation de l'ordre (niveau 1), l'ordre enregistré jamais réécrit (niveau 0).
   // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-  it.fails('témoin rouge · un ordre permanent qui mémorise sa ventilation au lieu de la recalculer', () => {
+  it.fails('témoin rouge · une reprise ventilée par le budget du jour au lieu des parts de l’ordre', () => {
     const avant = enregistrerOrdre(exampleLedger(), euros(650));
     const après = besoinAjouté(avant);
     const op = ligneBancaire(avant, euros(650));
     const vAvant = ventilation(importer(avant, op).patch);
-    // Version cassée : la ventilation est la photo prise le jour où l'ordre a été enregistré. Le
-    // budget a bougé, le virement se répartit toujours comme avant.
-    const vAprès = vAvant;
+    // Version cassée : la ventilation se recalcule depuis le budget au jour de l'opération, comme le
+    // faisait l'ordre de financement rejoué. Le budget a bougé, le virement se répartit autrement.
+    const { plan, t } = transfert(après, AVANT);
+    const vAprès = Object.fromEntries(proposedOrderAllocation(plan, t!, euros(650)).map((l) => [l.tirelireId!, -(l.share as { amount: number }).amount]));
 
-    expect(vAprès).toEqual(attendue(après, op));
-    expect(vAprès).not.toEqual(vAvant);
+    expect(vAprès).toEqual(partsDe(ordre(après)));
+    expect(vAprès).toEqual(vAvant);
   });
 
   describe('[niveau 0] I10 · témoin de l’ordre enregistré jamais réécrit', () => {

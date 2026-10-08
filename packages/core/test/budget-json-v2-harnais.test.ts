@@ -20,6 +20,7 @@ import initSqlJs from 'sql.js';
 import {
   appliquerBudget,
   BUDGET_JSON_FORMAT,
+  BUDGET_JSON_VERSION,
   differenceBudget,
   ecrireBudgetJson,
   emptyLedger,
@@ -38,7 +39,7 @@ const SQL = await initSqlJs();
 const DOC = readFileSync(new URL('../../../docs/format-budget-json.md', import.meta.url), 'utf8');
 const exemple = (): Record<string, unknown> =>
   JSON.parse([...DOC.matchAll(/```json\n([\s\S]*?)```/g)].map((m) => m[1]!).find((b) => b.includes('"planned_flows"'))!);
-const v2 = (parties: Record<string, unknown>) => ({ format: BUDGET_JSON_FORMAT, version: 2, ...parties });
+const v2 = (parties: Record<string, unknown>) => ({ format: BUDGET_JSON_FORMAT, version: BUDGET_JSON_VERSION, ...parties });
 
 async function projetExemple(): Promise<LedgerStore> {
   const s = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
@@ -49,12 +50,16 @@ async function projetExemple(): Promise<LedgerStore> {
 }
 const vivantes = <T extends { deletedAt?: string }>(l: T[]) => l.filter((x) => !x.deletedAt);
 
-describe('[niveau 2] #378 · 1 — la version 2', () => {
-  it('la version 2 se lit ; la version 1 est refusée en le disant', () => {
+describe('[niveau 2] #378 · 1 — la version 2, devenue 3 (#393)', () => {
+  it('la version 3 se lit ; les versions 1 et 2 sont refusées en le disant', () => {
+    expect(BUDGET_JSON_VERSION).toBe(3);
     expect(lireBudgetJson(v2({})).ok).toBe(true);
+    const deux = lireBudgetJson({ ...exemple(), version: 2 });
+    expect(deux.ok).toBe(false);
+    if (!deux.ok) expect(deux.message).toMatch(/version vaut 2.*version 3/);
     const lu = lireBudgetJson({ ...exemple(), version: 1 });
     expect(lu.ok).toBe(false);
-    if (!lu.ok) expect(lu.message).toMatch(/version vaut 1.*version 2/);
+    if (!lu.ok) expect(lu.message).toMatch(/version vaut 1.*version 3/);
   });
 });
 
@@ -123,7 +128,7 @@ describe('[niveau 2] #378 · 5 — écrire un état', () => {
   it('relire ce que le cœur écrit redonne les mêmes lignes, colonne pour colonne ; les parties choisies seulement', async () => {
     const projet = (await projetExemple()).load();
     const ecrit = ecrireBudgetJson(projet);
-    expect(ecrit['version']).toBe(2);
+    expect(ecrit['version']).toBe(BUDGET_JSON_VERSION);
     const lu = lireBudgetJson(JSON.stringify(ecrit));
     if (!lu.ok) throw new Error(lu.message);
     expect(lu.budget).toEqual(etatDuProjet(projet));

@@ -101,7 +101,7 @@ describe('[niveau 2] #366 · 1 — le contenu : le budget sans les opérations',
   it('l’ordre permanent enregistré se reprend avec son montant', async () => {
     const l = (await importer(exempleDeLaDoc())).load();
     const f = l.plannedFlows.find((x) => x.id === 'flow-vir-livret')!;
-    expect(f.origin).toBe('derived');
+    expect(f.kind).toBe('transfer');
     expect(f.amount).toBe(-60000);
   });
 });

@@ -13,6 +13,7 @@
 import {
   DEFAULT_PRIORITY,
   alive,
+  flowTirelire,
   budgetSuggestions,
   suggestedNeed,
   suggestedTirelire,
@@ -91,7 +92,7 @@ export class SectionTirelires {
     return this.tirelires.map((t) => ({ t, besoins: needs.filter((n) => n.tirelireId === t.id && n.kind === kind) })).filter((x) => x.besoins.length > 0);
   }
   /** Les prélèvements attendus pour les échéances d'une tirelire : ses flux d'échéance (D40). */
-  prelevementsDe = (t: Tirelire) => this.flows.filter((f) => f.kind === 'dueDate' && f.tirelireId === t.id);
+  prelevementsDe = (t: Tirelire) => this.flows.filter((f) => f.kind === 'dueDate' && flowTirelire(f) === t.id);
 
   // --- Raccourcis de l'exemple (D43, D46) : toujours offerts ; un raccourci déjà repris disparaît ---
   readonly propositions = budgetSuggestions();
@@ -197,7 +198,7 @@ export class SectionTirelires {
         kind: 'dueDate',
         amount: -montant,
         accountId: compte || this.#d.mainAccountId(),
-        tirelireId,
+        action: { tirelireId },
         periodicity: { interval: mois, unit: 'month' as const, anchorDate: echeance },
         dateWindowDays: 7,
       } satisfies PlannedFlow);
@@ -338,7 +339,7 @@ export class SectionTirelires {
       kind: 'dueDate',
       amount: -(n.amount ?? 0),
       accountId: this.#d.mainAccountId(),
-      tirelireId: t.id,
+      action: { tirelireId: t.id },
       periodicity: { ...n.periodicity },
       dateWindowDays: 7,
     } satisfies PlannedFlow);
@@ -351,7 +352,7 @@ export class SectionTirelires {
    */
   removeTirelire(t: Tirelire) {
     const d = this.#d;
-    for (const f of this.flows.filter((f) => f.tirelireId === t.id)) d.remove('plannedFlows', f.id);
+    for (const f of this.prelevementsDe(t)) d.remove('plannedFlows', f.id);
     for (const n of this.needs.filter((n) => n.tirelireId === t.id)) d.remove('needs', n.id);
     for (const c of this.categories.filter((c) => c.tirelireId === t.id)) {
       const { tirelireId: _retiree, ...sans } = c;

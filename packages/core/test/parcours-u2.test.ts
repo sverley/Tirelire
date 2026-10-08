@@ -14,11 +14,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  alive,
   computePlan,
   euros,
-  standingOrderFlow,
+  indexLedger,
+  standingOrderFlows,
   standingTransferFlow,
+  tirelireComponents,
   transferLabel,
+  withPlannedOperations,
   type Cents,
   type Ledger,
   type Plan,
@@ -27,22 +31,36 @@ import { AS_OF, LIVRET, PRINCIPAL, baseVide, ecrireLeBudget, relire } from './pa
 
 const virementDuLivret = (plan: Plan) => plan.transfers.find((t) => t.accountId === LIVRET);
 
+/** L'ordre permanent vers le Livret A, s'il y en a un. */
+const ordreDuLivret = (ledger: Ledger) => standingOrderFlows(ledger.plannedFlows, PRINCIPAL, LIVRET, AS_OF)[0];
+
+/** Ce que chaque tirelire a sur le Livret A le jour de l'occurrence du 28 septembre, au solde prévu (D52, D88). */
+function surLeLivret(ledger: Ledger): Record<string, Cents> {
+  const prevu = withPlannedOperations(ledger, AS_OF, '2026-09-28').ledger;
+  const idx = indexLedger(prevu);
+  return Object.fromEntries(alive(ledger.tirelires).map((t) => [t.name, tirelireComponents(t, idx, '2026-09-28').get(LIVRET) ?? 0]));
+}
+
 /**
- * Ce que l'ordre validé doit être une fois enregistré : un flux dérivé, un seul par couple de
- * comptes (D21), qui porte le fait bancaire — montant, libellé à recopier — et non la ventilation,
- * laquelle se rejoue au plan (D60).
+ * Ce que l'ordre validé doit être une fois enregistré : un flux de virement du compte principal vers
+ * le Livret A, un seul par couple de comptes (D21), qui porte le fait bancaire — montant, libellé à
+ * recopier — et la ventilation proposée pour ce montant, une part fixe par tirelire (D60, point 9 de
+ * #393) ; le plan le compare à ce que le budget demande, et l'opération prévue de son occurrence place
+ * l'argent dans les tirelires de ses parts (point 3).
  */
 function lOrdreEstEnregistré(ledger: Ledger, plan: Plan, permanent: Cents): void {
-  const flux = standingOrderFlow(ledger.plannedFlows, LIVRET);
+  const flux = ordreDuLivret(ledger);
   expect(flux, 'aucun ordre permanent enregistré vers le Livret A').toBeDefined();
   expect(flux!.kind).toBe('transfer');
-  expect(flux!.origin).toBe('derived');
   expect(flux!.accountId).toBe(PRINCIPAL);
   expect(flux!.counterpartAccountId).toBe(LIVRET);
   expect(flux!.labelPattern).toBe(transferLabel('Livret A'));
   expect(flux!.amount).toBe(-permanent);
-  // La ventilation ne se fige pas dans le flux : le plan la recalcule.
-  expect(flux!.tirelireId).toBeUndefined();
+  // La ventilation validée s'enregistre avec l'ordre : l'échéance d'abord, puis l'objectif (D06).
+  expect(flux!.action?.allocation).toEqual([
+    { tirelireId: 'tir-taxe', share: { kind: 'fixed', amount: -euros(100) } },
+    { tirelireId: 'tir-vacances', share: { kind: 'fixed', amount: -euros(200) } },
+  ]);
 
   const virement = virementDuLivret(plan);
   expect(virement, 'le Livret A a disparu du plan').toBeDefined();
@@ -50,7 +68,10 @@ function lOrdreEstEnregistré(ledger: Ledger, plan: Plan, permanent: Cents): voi
   expect(virement!.bankOrder?.drift).toBe(0);
   expect(virement!.breakdown.map((b) => b.tirelireName).sort()).toEqual(['Taxe foncière', 'Vacances']);
   expect(virement!.breakdown.reduce((s, b) => s + b.cruise, 0)).toBe(permanent);
-  expect(plan.warnings.filter((w) => w.code === 'bankOrderDrift')).toEqual([]);
+  expect(plan.warnings.filter((w) => w.code === 'bankOrderDrift' || w.code === 'bankOrderPartDrift')).toEqual([]);
+
+  // L'opération prévue du 28 septembre place l'argent dans les tirelires de ses parts.
+  expect(surLeLivret(ledger)).toEqual({ Courses: 0, 'Taxe foncière': euros(100), Vacances: euros(200) });
 }
 
 describe('[niveau 1] harnais du registre · I3 (U2)', () => {
@@ -68,12 +89,14 @@ describe('[niveau 1] harnais du registre · I3 (U2)', () => {
       expect(permanent).toBe(euros(300));
 
       // Rien ne s'enregistre d'office (I10) : tant que l'utilisateur n'a pas validé, aucun ordre.
-      expect(standingOrderFlow(store.load().plannedFlows, LIVRET)).toBeUndefined();
+      expect(ordreDuLivret(store.load())).toBeUndefined();
       expect(virement!.bankOrder).toBeUndefined();
+      expect(surLeLivret(store.load())).toEqual({ Courses: 0, 'Taxe foncière': 0, Vacances: 0 });
 
-      // L'utilisateur valide la mise en place chez sa banque.
+      // L'utilisateur valide la mise en place chez sa banque, au montant proposé.
+      expect(virement!.proposal?.amount).toBe(permanent);
       const flux = standingTransferFlow(avant, virement!, PRINCIPAL, 'flux-ordre-livret');
-      expect(flux, 'aucun flux dérivé à enregistrer').toBeDefined();
+      expect(flux, 'aucun ordre à enregistrer').toBeDefined();
       store.upsert('plannedFlows', flux!);
 
       const ledger = await relire(store, 'parcours-u2');
@@ -99,6 +122,12 @@ describe('[niveau 1] harnais du registre · I3 (U2)', () => {
         expect(après.permanent).toBe(virement.permanent);
         expect(après.bankOrder?.drift).toBe(virement.permanent - posé);
         expect(computePlan(ledger, AS_OF).warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(1);
+        // L'ordre garde la ventilation proposée pour son montant : la part qui manque est celle des Vacances.
+        expect(ordreDuLivret(ledger)!.amount).toBe(-posé);
+        expect(ordreDuLivret(ledger)!.action?.allocation?.map((l) => [l.tirelireId, l.share])).toEqual([
+          ['tir-taxe', { kind: 'fixed', amount: -euros(100) }],
+          ['tir-vacances', { kind: 'fixed', amount: -euros(180) }],
+        ]);
       });
     });
 

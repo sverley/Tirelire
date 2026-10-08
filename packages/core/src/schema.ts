@@ -13,7 +13,7 @@
 import {
   ACCOUNT_KINDS,
   CATEGORY_NATURES,
-  FLOW_ORIGINS,
+  FLOW_STATE_ACTIONS,
   MAIN_ACCOUNT_ID,
   NEED_KINDS,
   OPERATION_ORIGINS,
@@ -177,9 +177,7 @@ export const TABLES: Record<string, TableDef> = {
       oneOf('kind', PLANNED_FLOW_KINDS, true),
       req('amount', 'integer'),
       ref('accountId', 'accounts', true),
-      ref('tirelireId', 'tirelires'),
       ref('counterpartAccountId', 'accounts'),
-      ref('categoryId', 'categories'),
       json('periodicity', RYTHME, true),
       req('dateWindowDays', 'integer'),
       json('amountTolerance', TOLERANCE),
@@ -187,9 +185,33 @@ export const TABLES: Record<string, TableDef> = {
       c('variable', 'boolean'),
       date('activeFrom'),
       date('activeTo'),
-      c('locks', 'boolean'), // D22, D24 : verrouiller ce que le flux reprend
-      oneOf('origin', FLOW_ORIGINS), // D57 : flux déclaré ou dérivé du budget ; absent vaut déclaré
+      json('action', ACTION), // D24 : l'action du flux, de la forme de celle d'un automatisme
       DELETED_AT,
+    ],
+    constraints: [
+      {
+        // L'action d'un flux est celle d'un automatisme, restreinte (D22, D23, D24) : son état est
+        // *Rapprocher* ou *Verrouiller*, jamais *Ne rien faire* ni *Déverrouiller* ; elle ne porte
+        // pas `oneOff`. La forme « action » refuse déjà deux parts variables (D27).
+        name: 'planned_flows.action',
+        sql: `CASE WHEN action IS NULL OR NOT json_valid(action) OR json_type(action) <> 'object' THEN 1 ELSE coalesce(json_extract(action, '$.state') IN (${FLOW_STATE_ACTIONS.map((x) => `'${x}'`).join(', ')}), 1) AND json_type(action, '$.oneOff') IS NULL END`,
+        problem: (id, v) => {
+          const brut = v['action'];
+          if (typeof brut !== 'string') return undefined;
+          let action: unknown;
+          try {
+            action = JSON.parse(brut);
+          } catch {
+            return undefined;
+          }
+          if (typeof action !== 'object' || action === null || Array.isArray(action)) return undefined;
+          const a = action as Record<string, unknown>;
+          if (a['state'] !== undefined && !(FLOW_STATE_ACTIONS as readonly unknown[]).includes(a['state']))
+            return `planned_flows.action.state vaut « ${String(a['state'])} » pour « ${id} » : l'action d'un flux rapproche (reconcile) ou verrouille (lock) ce qu'il reprend.`;
+          if (a['oneOff'] !== undefined) return `planned_flows.action porte « oneOff » pour « ${id} », qui n'est pas de l'action d'un flux.`;
+          return undefined;
+        },
+      },
     ],
   },
   // Chaque colonne est importée, saisie, ou établie par le rapprochement et gardée pour la raison
@@ -374,10 +396,11 @@ export const FILE_FORMAT = 'tirelire';
  * sous-opérations à tous les niveaux dans `sub_operations` (D88, #297) ; la version 5 leur donne une
  * date propre et range les réponses aux manques dans `shortfall_answers` (#184) ; la version 6 désigne
  * l'opération prévue reprise par son flux et sa date, ajoute la reprise d'une saisie, et donne au flux
- * sa seule sélection, sans automatisme engendré à part (#306). Aucune version antérieure n'est plus
- * lue.
+ * sa seule sélection, sans automatisme engendré à part (#306) ; la version 7 porte l'action d'un flux
+ * dans la forme « action » des automatismes, et ne distingue plus un flux déclaré d'un flux dérivé
+ * (#393). Aucune version antérieure n'est plus lue.
  */
-export const FORMAT_VERSION = 6;
+export const FORMAT_VERSION = 7;
 
 export const SYSTEM_SQL = [
   // Réglages : une ligne par clé, valeur JSON, horloge de la dernière écriture ; synchronisés.

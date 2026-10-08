@@ -7,7 +7,7 @@
  *   figer le calcul, et le plan **compare** l'ordre et le budget en disant lequel changer ;
  * - un ordre arrondi au-dessus dans le pas ne crie pas ; le pas se règle, et à zéro tout écart se dit ;
  * - le fait enregistré survit au rechargement ;
- * - un flux **dérivé** se reconnaît à l'écran Flux et ne s'y modifie pas à la main.
+ * - l'ordre se reconnaît à l'écran Flux comme un ordre permanent, un flux comme les autres (#393).
  *
  * Arbitrage de Simon (10 septembre, PR #19) : le virement permanent s'affiche comme **une somme**,
  * celle des dotations mensuelles des tirelires placées sur le compte, avec un bouton « Détail » qui
@@ -104,7 +104,8 @@ function vérifierOrdrePosé(c: Carte, posé: number, demandé: number, alertes:
   expect(centimes(ligne(c, 'Ordre permanent chez la banque')?.montant ?? '')).toBe(posé);
   expect(centimes(ligne(c, 'Virement permanent')?.montant ?? '')).toBe(demandé);
   expect(ligne(c, 'Ordre permanent chez la banque')?.sous).toMatch(/banque/);
-  const [alerte, ...autres] = alertes;
+  // L'écart du montant ; celui d'une part fixe se dit à part (#393, point 7).
+  const [alerte, ...autres] = alertes.filter((a) => !a.startsWith('La part'));
   expect(autres).toEqual([]);
   expect(alerte).toContain(COMPTE);
   expect(alerte).toContain(euros(posé));
@@ -122,7 +123,7 @@ function vérifierOrdrePosé(c: Carte, posé: number, demandé: number, alertes:
 // Niveau 1 (D83) : le besoin est I3, pour U2, nommé au registre, qui cite tout ce fichier — « à
 // 375 px, l'écran Plan enregistre l'ordre, qui survit au rechargement ». Un ordre mal enregistré ne
 // perd pas la donnée : l'ordre vit chez la banque, et se ressaisit. Certains tests de la traversée ne
-// vaudraient seuls que le niveau 2, des cas de D60 et D57 (le pas d'arrondi, le flux dérivé à l'écran Flux) :
+// vaudraient seuls que le niveau 2, des cas de D60 et D57 (le pas d'arrondi, l'ordre à l'écran Flux) :
 // ils restent ici au niveau 1, que D81 impose à tout ce fichier, car les en sortir demanderait de
 // construire et servir le site une seconde fois, ce qui allongerait la phase du navigateur au lieu de
 // la raccourcir (#246, point 6).
@@ -235,7 +236,11 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
       await saisirMontant(page, euros(posé));
       await cliquerDansCarte(page, 'Enregistrer');
       const c = await carte(page);
-      vérifierOrdrePosé(c, posé, demandé, await alertesÀlÉcran(page));
+      const alertes = await alertesÀlÉcran(page);
+      vérifierOrdrePosé(c, posé, demandé, alertes);
+      // La ventilation proposée pour ce montant sert les tirelires dans l'ordre de financement : la
+      // dernière, l'épargne de précaution, reçoit 70 € de moins que ce que le budget lui demande.
+      expect(alertes.filter((a) => a.startsWith('La part'))).toEqual([expect.stringContaining('Épargne de précaution')]);
     });
 
     it('le fait enregistré survit au rechargement', async () => {
@@ -258,7 +263,7 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
       expect(c.lignes.filter((l) => l.libellé.startsWith('Ordre permanent chez la banque'))).toHaveLength(1);
     });
 
-    it('à l’écran Flux, l’ordre est marqué dérivé et ne s’ouvre pas à la main', async () => {
+    it('à l’écran Flux, l’ordre est marqué ordre permanent, se modifie et renvoie au Plan (#393, point 11)', async () => {
       await allerÀ(page, 'Plus');
       expect(await cliquer(page, 'Flux prévus')).toBe(true);
       const flux = await page.evaluate(() =>
@@ -267,10 +272,12 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
           .map((r) => ({ texte: r.textContent ?? '', boutons: [...r.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '') })),
       );
       expect(flux, 'le flux de l’ordre permanent n’apparaît pas à l’écran Flux').toHaveLength(1);
-      expect(flux[0]!.texte).toContain('dérivé du budget');
-      expect(flux[0]!.boutons).not.toContain('Modifier');
+      expect(flux[0]!.texte).toContain('ordre permanent');
+      expect(flux[0]!.texte).not.toContain('dérivé du budget');
+      expect(flux[0]!.texte).not.toContain('recalcule');
+      expect(flux[0]!.boutons).toContain('Modifier');
       expect(flux[0]!.boutons).toContain('Voir dans le Plan');
-      // Les flux déclarés, eux, restent modifiables.
+      // Les autres flux restent modifiables, comme avant.
       const déclarés = await page.evaluate(() =>
         [...document.querySelectorAll('.row')].filter((r) => r.textContent?.includes('Salaire') && r.querySelector('button')).map((r) => [...r.querySelectorAll('button')].map((b) => b.textContent?.trim())),
       );
@@ -311,7 +318,7 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
       it.todo('depuis « Détail », diviser le virement ne demande pas de quitter la carte, et Annuler revient à la somme');
       it.todo('depuis « Détail », regrouper des tirelires en plusieurs ordres : chaque ordre affiche sa demande, son fait bancaire et son écart');
       it.todo('à 375 px, un compte divisé en quatre ordres reste lisible sans débordement');
-      it.todo('à l’écran Flux, chaque ordre d’un compte divisé est un flux dérivé distinct, non modifiable à la main');
+      it.todo('à l’écran Flux, chaque ordre d’un compte divisé est un ordre permanent distinct');
     });
   });
 });
