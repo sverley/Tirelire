@@ -33,11 +33,17 @@ async function etape(page: Page, libelle: string) {
   await pause(250);
 }
 
-/** Les parts que montre la carte de l'ordre : le nom de sa tirelire, ce qu'elle dit de son montant. */
+/**
+ * Les parts que montre la carte de l'ordre, par la ventilation commune au Plan (#394) : le nom de sa
+ * tirelire, sa forme (« part fixe », « le reste ») et son montant ; la ligne du non affecté n'est pas une part.
+ */
 const parts = (page: Page) =>
   page.evaluate(() => {
-    const t = (e?: Element | null) => (e?.textContent ?? '').replace(/[\s  ]+/g, ' ').trim();
-    return ([...document.querySelectorAll('main .card.ordre .parts-ordre li')] as HTMLElement[]).map((li) => [t(li.querySelector('.n')), t(li.querySelector('.num'))]);
+    const t = (s?: string | null) => (s ?? '').replace(/[\s\u00a0\u202f]+/g, ' ').trim();
+    return ([...document.querySelectorAll('main .card.ordre .ventilation .row.part:not(.non-affecte)')] as HTMLElement[]).map((r) => {
+      const label = r.querySelector('.label');
+      return [t(label?.firstChild?.textContent), t(label?.querySelector('.sub')?.textContent), t(r.querySelector('.num')?.textContent)];
+    });
   });
 
 async function projetConserve(page: Page): Promise<Ledger> {
@@ -100,10 +106,10 @@ describe.skipIf(!navigateur)('#395 — l’assistant propose l’ordre de l’ex
 
     it('[niveau 1] point 3 : la carte de l’ordre dit chaque part, la variable comme le reste, lisible à 375 px', async () => {
       expect(await parts(page)).toEqual([
-        ['Taxe foncière', '100,00 €'],
-        ['Assurance auto', '50,00 €'],
-        ['Vacances', '150,00 €'],
-        ['Épargne de précaution', 'le reste, soit 300,00 €'],
+        ['Taxe foncière', 'part fixe', '100,00 €'],
+        ['Assurance auto', 'part fixe', '50,00 €'],
+        ['Vacances', 'part fixe', '150,00 €'],
+        ['Épargne de précaution', 'le reste', '300,00 €'],
       ]);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     });
@@ -155,9 +161,9 @@ describe.skipIf(!navigateur)('#395 — l’assistant propose l’ordre de l’ex
       await pause(250);
       await etape(page, 'Résumé');
       expect(await parts(page)).toEqual([
-        ['Taxe foncière', '100,00 €'],
-        ['Assurance auto', '50,00 €'],
-        ['Épargne de précaution', 'le reste, soit 450,00 €'],
+        ['Taxe foncière', 'part fixe', '100,00 €'],
+        ['Assurance auto', 'part fixe', '50,00 €'],
+        ['Épargne de précaution', 'le reste', '450,00 €'],
       ]);
       await page.evaluate(() => {
         const i = document.querySelector('main .card.ordre input.mt') as HTMLInputElement;
@@ -166,9 +172,9 @@ describe.skipIf(!navigateur)('#395 — l’assistant propose l’ordre de l’ex
       });
       await pause(250);
       expect(await parts(page)).toEqual([
-        ['Taxe foncière', '100,00 €'],
-        ['Assurance auto', '50,00 €'],
-        ['Épargne de précaution', 'le reste, soit 0,00 €'],
+        ['Taxe foncière', 'part fixe', '100,00 €'],
+        ['Assurance auto', 'part fixe', '50,00 €'],
+        ['Épargne de précaution', 'le reste', '0,00 €'],
       ]);
       expect(await cliquer(page, 'Valider mon budget')).toBe(true);
       await pause(400);
