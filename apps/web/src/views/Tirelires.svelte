@@ -323,6 +323,8 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Tirelires</h1>
+<!-- L'assistant, ouvert sur la seule section de cet écran (D94, #363) : toujours offert, base vide comprise. -->
+<p class="actions"><a class="btn" href="#top" onclick={(e) => { e.preventDefault(); app.demanderAssistant('tirelires'); }}>Compléter avec l’assistant</a></p>
 
 <details class="explication muted small">
   <summary>Comment ça marche ?</summary>

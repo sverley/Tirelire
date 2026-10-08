@@ -7,6 +7,8 @@
   sans valider n'enregistre rien.
   Le compte principal existe dans toute base : l'assistant en renseigne les informations, il ne le
   crée pas ; les autres comptes sont proposés, jamais imposés.
+  Depuis l'écran de sa partie, l'assistant s'ouvre sur sa seule section (D94, #363) : ses étapes,
+  puis un résumé qui ne valide qu'elle ; le reste de l'assistant est celui de l'assistant complet.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -21,7 +23,7 @@
   import { ordreAPoser } from '../lib/consigneOrdre';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
-  import { fichierAEnregistrer, preparerValidation } from '../lib/brouillon';
+  import { fichierAEnregistrer, preparerValidation, titreDeLAssistant, type SectionAssistant } from '../lib/brouillon';
   import { direDifference } from '../lib/differenceAssistant';
   import { saveFile } from '../lib/platform';
   import { budgetDefiniEnJson } from '@tirelire/core';
@@ -70,7 +72,7 @@
 
   type Step = 'intro' | 'income' | 'fixed' | 'everyday' | 'periodic' | 'savings' | 'categories' | 'accounts' | 'summary';
 
-  const STEPS: Array<{ id: Step; label: string }> = [
+  const TOUTES_LES_ETAPES: Array<{ id: Step; label: string }> = [
     { id: 'intro', label: 'Le principe' },
     { id: 'accounts', label: 'Comptes' },
     { id: 'income', label: 'Revenus' },
@@ -82,11 +84,34 @@
     { id: 'summary', label: 'Résumé' },
   ];
 
+  /** Les étapes de chaque section, quand l'assistant s'ouvre sur elle seule (#363) : puis le résumé. */
+  const ETAPES_DES_SECTIONS: Record<SectionAssistant, Step[]> = {
+    comptes: ['accounts', 'summary'],
+    tirelires: ['everyday', 'periodic', 'savings', 'summary'],
+  };
+
   /**
    * Le brouillon : ce que l'assistant prépare, tenu par l'application. On y retrouve, en revenant, ce
    * qui a été préparé et l'étape où l'on s'était arrêté ; il n'entre dans le projet qu'à la validation.
    */
   const brouillon = app.ouvrirAssistant();
+
+  /**
+   * La section sur laquelle l'assistant est ouvert, depuis l'écran de sa partie (#363) ; absente,
+   * l'assistant complet. Ses étapes sont celles de l'assistant complet, montrées et maniées de même.
+   */
+  const sectionOuverte = brouillon.section;
+  const STEPS = sectionOuverte ? TOUTES_LES_ETAPES.filter((s) => ETAPES_DES_SECTIONS[sectionOuverte].includes(s.id)) : TOUTES_LES_ETAPES;
+  /** L'écran d'où l'assistant ouvert sur une section a été ouvert, et où il ramène (#363, point 6). */
+  const ECRAN_DE_LA_SECTION = { comptes: { vue: 'accounts', retour: 'Revenir aux comptes' }, tirelires: { vue: 'tirelires', retour: 'Revenir aux tirelires' } } as const;
+  function revenirALEcran() {
+    if (!sectionOuverte) return;
+    const { vue } = ECRAN_DE_LA_SECTION[sectionOuverte];
+    if (!app.back() || app.view !== vue) {
+      app.switchTab('more');
+      app.go(vue);
+    }
+  }
 
   let step = $state<Step>(untrack(() => brouillon.etape as Step));
   const stepIndex = $derived(STEPS.findIndex((s) => s.id === step));
@@ -445,9 +470,12 @@
     if (etape === 'everyday' || etape === 'periodic' || etape === 'savings') section.garnir(etape);
     // Les catégories viennent après les flux et les tirelires, vers lesquels elles se lient (D32).
     if (etape === 'categories') restantesCategories.forEach(appliquerCategorie);
-    // L'ordre se propose là où l'assistant demande où dort chaque tirelire : au résumé.
-    if (etape === 'summary') restantsOrdres.forEach(appliquerOrdre);
+    // L'ordre se propose là où l'assistant demande où dort chaque tirelire : au résumé — de l'assistant
+    // complet seulement : ouvert sur une section, il ne touche à aucun ordre permanent (#363, point 4).
+    if (etape === 'summary' && !sectionOuverte) restantsOrdres.forEach(appliquerOrdre);
   }
+  // Ouvert sur une section, l'assistant arrive sur sa première étape, qui se garnit comme si on y était allé (D46).
+  if (sectionOuverte) untrack(() => semer(step));
 
   // --- Édition en place de ce qui a été ajouté ---
   function editFlowName(f: PlannedFlow, v: string) {
@@ -608,9 +636,10 @@
 </script>
 
 <p class="small">
-  <a href="#top" onclick={(e) => { e.preventDefault(); if (!app.back()) app.switchTab('more'); }}>‹ Retour</a>
+  <!-- Ouvert sur une section, « ‹ Retour » ramène à son écran, sans rien enregistrer (#363, point 6). -->
+  <a href="#top" onclick={(e) => { e.preventDefault(); if (sectionOuverte) revenirALEcran(); else if (!app.back()) app.switchTab('more'); }}>‹ Retour</a>
 </p>
-<h1>Construire mon budget</h1>
+<h1>{titreDeLAssistant(sectionOuverte)}</h1>
 
 {#if !valide}
   <div class="wizard-steps">
@@ -620,7 +649,7 @@
   </div>
 {/if}
 
-{#if !valide && step !== 'intro' && step !== 'accounts'}
+{#if !valide && step !== 'intro' && step !== 'accounts' && !(sectionOuverte && step === 'summary')}
   <div class="stats">
     <div class="stat"><div class="v num pos">{money(totals.incomes)}</div><div class="k">Revenus par période</div></div>
     <div class="stat"><div class="v num">{money(-totals.fixedCharges)}</div><div class="k">Charges fixes</div></div>
@@ -873,6 +902,25 @@
   <h2>Vos comptes en banque</h2>
   <SectionComptes s={sectionComptes} />
 
+{:else if step === 'summary' && sectionOuverte}
+  <!-- Le résumé de l'assistant ouvert sur une section (#363, point 4) : ce qu'il montre, et rien d'autre. -->
+  <h2>{valide ? 'Vos changements sont enregistrés' : 'Ce que vous avez préparé'}</h2>
+  {#if valide}
+    <p class="muted small">Ils sont entrés dans votre budget, et se modifient ensuite depuis l’écran comme d’habitude.</p>
+    <div class="actions">
+      <button class="btn primary" onclick={revenirALEcran}>{ECRAN_DE_LA_SECTION[sectionOuverte].retour}</button>
+    </div>
+  {:else}
+    <div class="card">
+      <p style="margin:0">
+        <strong>Rien n’est encore enregistré.</strong> Vos changements n’entrent dans l’application que
+        lorsque vous les validez ci-dessous. Si vous fermez ou rechargez l’application avant, ce que
+        vous avez préparé ici est perdu.
+      </p>
+    </div>
+    {@render ouDortChaqueTirelire()}
+    {@render ceQueLaValidationVaChanger('Valider')}
+  {/if}
 {:else if step === 'summary'}
   <h2>{valide ? 'Votre budget est enregistré' : 'Votre budget'}</h2>
   {#if !valide && brouillon.budgetImporte}
@@ -943,25 +991,7 @@
     </div>
   {/if}
 
-  {#if !valide && comptesOuverts.length > 1 && tirelires.length}
-    <h3>Où dort chaque tirelire ?</h3>
-    <p class="muted small">Le compte où son argent est mis de côté. Laissez « Peu importe » si vous ne savez pas : ça se change à tout moment.</p>
-    {#each tirelires as e (e.id)}
-      <div class="card">
-        <div class="row">
-          <div class="label"><strong>{e.name}</strong></div>
-          <!-- Borné à sa ligne : un nom de compte long ne fait pas déborder le résumé à 375 px (C9, #13). -->
-          <select style="max-width:55%;min-width:0" onchange={(ev) => setPlacement(e, (ev.currentTarget as HTMLSelectElement).value)}>
-            <option value="" selected={e.placement.length === 0}>Peu importe</option>
-            {#each openAccounts(accounts, app.asOf, e.placement[0]?.accountId) as a}
-              <option value={a.id} selected={e.placement[0]?.accountId === a.id}>{a.name}</option>
-            {/each}
-          </select>
-        </div>
-      </div>
-    {/each}
-  {/if}
-
+  {@render ouDortChaqueTirelire()}
   {#if !valide && (ordres.length || restantsOrdres.length)}
     <h3>Vos virements permanents déjà en place</h3>
     <p class="muted small">
@@ -1049,40 +1079,7 @@
       <button class="btn" onclick={() => app.switchTab('import')}>Importer un relevé</button>
     </div>
   {:else}
-    <h3>Ce que la validation va changer</h3>
-    {#if aValider.vide}
-      <p class="muted small">Aucun changement : votre budget est déjà celui que l’assistant montre.</p>
-    {:else}
-      <div class="card difference">
-        {#each aValider.parties as partie (partie.nom)}
-          <h4>{partie.nom}</h4>
-          <ul>
-            {#each partie.ajouts as l, i (i)}<li><span class="pill">Ajouté</span> {l.texte}</li>{/each}
-            {#each partie.modifications as l, i (i)}<li><span class="pill">Modifié</span> {l.texte}{#if l.detail}<span class="muted small"> — {l.detail}</span>{/if}</li>{/each}
-            {#each partie.retraits as l, i (i)}<li><span class="pill neg">Retiré</span> {l.texte}</li>{/each}
-          </ul>
-        {/each}
-        {#if aValider.reglages.length}
-          <h4>Réglages</h4>
-          <ul>
-            {#each aValider.reglages as l (l.texte)}<li><span class="pill">Modifié</span> {l.texte}<span class="muted small"> — {l.detail}</span></li>{/each}
-          </ul>
-        {/if}
-      </div>
-    {/if}
-    {#if aValider.conflits.length}
-      <div class="card warn" role="status">
-        <p style="margin:0 0 6px"><strong>Changé aussi ailleurs.</strong> Ces lignes ont été modifiées hors de l’assistant depuis son ouverture : la version de l’assistant sera retenue.</p>
-        <ul style="margin:0">
-          {#each aValider.conflits as l, i (i)}<li>{l.texte}<span class="muted small"> — {l.detail}</span></li>{/each}
-        </ul>
-      </div>
-    {/if}
-    {#if erreurValidation}<div class="err">{erreurValidation}</div>{/if}
-    <div class="actions">
-      <button class="btn" onclick={prev}>‹ Précédent</button>
-      <button class="btn primary" onclick={valider}>Valider mon budget</button>
-    </div>
+    {@render ceQueLaValidationVaChanger('Valider mon budget')}
     <p class="muted small">
       Pour le reprendre plus tard ou sur un autre appareil, sans rien valider :
       <button class="btn small" onclick={enregistrerBrouillon}>Enregistrer ce brouillon (JSON)</button>
@@ -1097,3 +1094,62 @@
     <button class="btn primary" onclick={next}>{step === 'intro' ? 'Commencer' : 'Suivant'} ›</button>
   </div>
 {/if}
+
+{#snippet ouDortChaqueTirelire()}
+<!-- La question de l'assistant complet, aux mêmes conditions ; ouvert sur la section Comptes, il ne la pose pas (#363, point 4). -->
+{#if !valide && sectionOuverte !== 'comptes' && comptesOuverts.length > 1 && tirelires.length}
+  <h3>Où dort chaque tirelire ?</h3>
+  <p class="muted small">Le compte où son argent est mis de côté. Laissez « Peu importe » si vous ne savez pas : ça se change à tout moment.</p>
+  {#each tirelires as e (e.id)}
+    <div class="card">
+      <div class="row">
+        <div class="label"><strong>{e.name}</strong></div>
+        <!-- Borné à sa ligne : un nom de compte long ne fait pas déborder le résumé à 375 px (C9, #13). -->
+        <select style="max-width:55%;min-width:0" onchange={(ev) => setPlacement(e, (ev.currentTarget as HTMLSelectElement).value)}>
+          <option value="" selected={e.placement.length === 0}>Peu importe</option>
+          {#each openAccounts(accounts, app.asOf, e.placement[0]?.accountId) as a}
+            <option value={a.id} selected={e.placement[0]?.accountId === a.id}>{a.name}</option>
+          {/each}
+        </select>
+      </div>
+    </div>
+  {/each}
+{/if}
+{/snippet}
+
+{#snippet ceQueLaValidationVaChanger(libelle: string)}
+<h3>Ce que la validation va changer</h3>
+{#if aValider.vide}
+  <p class="muted small">Aucun changement : votre budget est déjà celui que l’assistant montre.</p>
+{:else}
+  <div class="card difference">
+    {#each aValider.parties as partie (partie.nom)}
+      <h4>{partie.nom}</h4>
+      <ul>
+        {#each partie.ajouts as l, i (i)}<li><span class="pill">Ajouté</span> {l.texte}</li>{/each}
+        {#each partie.modifications as l, i (i)}<li><span class="pill">Modifié</span> {l.texte}{#if l.detail}<span class="muted small"> — {l.detail}</span>{/if}</li>{/each}
+        {#each partie.retraits as l, i (i)}<li><span class="pill neg">Retiré</span> {l.texte}</li>{/each}
+      </ul>
+    {/each}
+    {#if aValider.reglages.length}
+      <h4>Réglages</h4>
+      <ul>
+        {#each aValider.reglages as l (l.texte)}<li><span class="pill">Modifié</span> {l.texte}<span class="muted small"> — {l.detail}</span></li>{/each}
+      </ul>
+    {/if}
+  </div>
+{/if}
+{#if aValider.conflits.length}
+  <div class="card warn" role="status">
+    <p style="margin:0 0 6px"><strong>Changé aussi ailleurs.</strong> Ces lignes ont été modifiées hors de l’assistant depuis son ouverture : la version de l’assistant sera retenue.</p>
+    <ul style="margin:0">
+      {#each aValider.conflits as l, i (i)}<li>{l.texte}<span class="muted small"> — {l.detail}</span></li>{/each}
+    </ul>
+  </div>
+{/if}
+{#if erreurValidation}<div class="err">{erreurValidation}</div>{/if}
+<div class="actions">
+  <button class="btn" onclick={prev}>‹ Précédent</button>
+  <button class="btn primary" onclick={valider}>{libelle}</button>
+</div>
+{/snippet}

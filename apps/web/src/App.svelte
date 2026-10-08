@@ -24,6 +24,7 @@
   import More from './views/More.svelte';
   import Review from './views/Review.svelte';
   import Wizard from './views/Wizard.svelte';
+  import ChoixAssistant from './views/ChoixAssistant.svelte';
   import Sync from './views/Sync.svelte';
   import ImportBudget from './views/ImportBudget.svelte';
 
@@ -227,7 +228,12 @@
     {:else if app.view === 'more'}
       <More />
     {:else if app.view === 'wizard'}
-      {#key app.versionAssistant}<Wizard />{/key}
+      {#if app.choixAssistant}
+        <!-- Un autre assistant a des changements non validés : rien ne les remplace sans accord (#363, point 7). -->
+        <ChoixAssistant />
+      {:else}
+        {#key app.versionAssistant}<Wizard />{/key}
+      {/if}
     {:else if app.view === 'accounts'}
       <Accounts />
     {:else if app.view === 'tirelires'}
