@@ -1,12 +1,18 @@
 /**
- * Tests du codeur de #13, à l'écran, à 375 px : le résumé de l'assistant dit les ordres à poser
+ * Harnais d'audit de #13 — à l'écran, à 375 px : le résumé de l'assistant dit les ordres à poser
  * (points 1, 3, 4, 6, 7, 8), et l'écran Plan propose, une fois l'assistant validé, le même ordre —
- * montant, ventilation, libellé, jour —, dit son jour et se copie (points 2, 5, 6, 7, 8).
+ * montant, ventilation, libellé, jour —, dit son jour et se copie (points 2, 5, 6, 7, 8). Repris des
+ * tests du codeur ; l'auditeur y a ajouté le point 4 sans ordre de l'exemple (tirelires hors de tout
+ * compte d'accueil, puis aucune tirelire).
  *
  * Le parcours part d'une base vierge, avec les propositions de l'exemple : l'ordre de l'exemple vers
  * le Livret A est déjà là au résumé, et le compte n'a pas de bloc (point 1, dernière phrase) ; une fois
  * cet ordre retiré, le budget demande un ordre vers le Livret A, que le résumé dit. Le compte est
  * ensuite renommé d'un nom long, pour un libellé de 35 caractères, la longueur d'un libellé bancaire.
+ *
+ * Niveau (D83) : 1 — U2 (point 1), D43, D60 et I10 (point 3 : rien ne s'enregistre sans geste), I3
+ * (point 4), U3 (points 2, 5 : ce qui se pose est ce que l'import reconnaîtra), C2 (point 6), C9
+ * (point 8). Rouges vus sur le code de `main` et sur mutations : voir la vérification de l'auditeur.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
@@ -163,7 +169,7 @@ const ordresVers = (l: Ledger, compte: string) => {
   return alive(l.plannedFlows).filter((f) => f.kind === 'transfer' && (f.counterpartAccountId === id || f.accountId === id));
 };
 
-describe.skipIf(!navigateur)('[niveau 4] #13 — les ordres à poser, de l’assistant au Plan, à 375 px', () => {
+describe.skipIf(!navigateur)('[niveau 1] #13 — les ordres à poser, de l’assistant au Plan, à 375 px', () => {
   let site: Site;
   let page: Page;
   let dansLAssistant: Ordre & { compte: string };
@@ -290,5 +296,73 @@ describe.skipIf(!navigateur)('[niveau 4] #13 — les ordres à poser, de l’ass
     expect(enregistre?.libelles).toEqual(avant!.libelles);
     expect(enregistre?.jours).toEqual(avant!.jours);
     expect(t(enregistre?.jours[0])).toMatch(/le 28 de chaque mois/);
+  });
+});
+
+describe.skipIf(!navigateur)('[niveau 1] #13 · 4 — rien à poser, c’est dit ; sans tirelire, rien', () => {
+  let site: Site;
+  let page: Page;
+  const resume = (p: Page) =>
+    p.evaluate(() => ({
+      blocs: document.querySelectorAll('main .card.ordre-a-poser').length,
+      phrase: (document.querySelector('main .rien-a-poser')?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      titre: [...document.querySelectorAll('main h3')].some((h) => /ordres permanents à poser/.test(h.textContent ?? '')),
+    }));
+
+  beforeAll(async () => {
+    site = await ouvrirLeSite();
+    page = await ouvrirLAssistant(site);
+    for (const e of ['Budgets', 'Pas tous les mois', 'Épargne', 'Résumé']) await etape(page, e);
+  }, 120_000);
+  afterAll(async () => {
+    await page?.close();
+    await site?.fermer();
+  });
+
+  it('sans ordre de l’exemple, les tirelires laissées hors de tout compte d’accueil : une phrase, aucun bloc, rien qui invite à créer un compte', async () => {
+    const retire = await page.evaluate(() => {
+      const b = document.querySelector('main .card.ordre button[title="Retirer ce virement"]') as HTMLButtonElement | null;
+      b?.click();
+      return !!b;
+    });
+    expect(retire).toBe(true);
+    await pause(250);
+    expect((await resume(page)).blocs, 'le budget doit d’abord demander un ordre').toBeGreaterThan(0);
+    const places = await page.evaluate(() => {
+      const choix = [...document.querySelectorAll('main select')] as HTMLSelectElement[];
+      let n = 0;
+      for (const c of choix) {
+        if (!c.querySelector('option[value=""]') || c.value === '') continue;
+        c.value = '';
+        c.dispatchEvent(new Event('change', { bubbles: true }));
+        n++;
+      }
+      return n;
+    });
+    expect(places, 'aucune tirelire n’était placée ailleurs').toBeGreaterThan(0);
+    await pause(250);
+    const r = await resume(page);
+    expect(r).toMatchObject({ blocs: 0, titre: false });
+    expect(r.phrase).toMatch(/^Aucun ordre permanent à poser chez votre banque/);
+    expect(r.phrase).not.toMatch(/créez|créer|ajoutez|ouvrez/i);
+  });
+
+  it('sans aucune tirelire, le résumé ne parle pas d’ordre à poser', async () => {
+    for (const e of ['Budgets', 'Pas tous les mois', 'Épargne']) {
+      await etape(page, e);
+      for (let i = 0; i < 40; i++) {
+        const retiree = await page.evaluate(() => {
+          const b = document.querySelector('main button[title="Retirer cette tirelire"]') as HTMLButtonElement | null;
+          b?.click();
+          return !!b;
+        });
+        if (!retiree) break;
+        await pause(60);
+      }
+    }
+    await etape(page, 'Résumé');
+    const r = await resume(page);
+    expect(r).toEqual({ blocs: 0, phrase: '', titre: false });
+    expect(await page.evaluate(() => /ordre permanent à poser/i.test(document.querySelector('main')?.textContent ?? ''))).toBe(false);
   });
 });
