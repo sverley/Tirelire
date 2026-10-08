@@ -11,9 +11,13 @@
 import { parseDate, standingTransferFlow, type Id, type Plan, type PlanTransfer, type PlannedFlow } from '@tirelire/core';
 import { periodicityLabel } from './format';
 
-/** Ce qui suit la mise en place d'un ordre : affiché dans l'assistant, replié sur l'écran Plan (D94). */
+/**
+ * Ce qui suit la mise en place d'un ordre : affiché dans l'assistant, replié sur l'écran Plan (D94).
+ * Sans import, l'ordre n'est pas « tenu pour exécuté » : il compte à sa date parce qu'il est
+ * enregistré, et rien ne le dit manquant (D52 ; #13, point 7).
+ */
 export const EXPLICATION_SUITE =
-  'Importer vos relevés n’est pas nécessaire : sans import, le plan tient l’ordre pour exécuté. Si vous importez un relevé, la ligne du virement y est reconnue par son libellé et son montant, dans la tolérance de l’ordre ; l’opération prend les parts de la ventilation de l’ordre, et ce que les parts n’absorbent pas reste non affecté sur le compte qui reçoit le virement. Si votre budget change, le Plan vous dit quand modifier l’ordre chez votre banque ; il ne réécrit jamais l’ordre enregistré.';
+  'Importer vos relevés n’est pas nécessaire : sans import, le plan compte l’ordre à sa date, parce qu’il est enregistré, et ne le dit jamais manquant. Si vous importez un relevé, la ligne du virement y est reconnue par son libellé et son montant, dans la tolérance de l’ordre ; l’opération prend les parts de la ventilation de l’ordre, et ce que les parts n’absorbent pas reste non affecté sur le compte qui reçoit le virement. Si votre budget change, le Plan vous dit quand modifier l’ordre chez votre banque ; il ne réécrit jamais l’ordre enregistré.';
 
 /**
  * L'ordre que le plan propose vers le compte de `transfer`, tel que l'écran Plan l'enregistrera
