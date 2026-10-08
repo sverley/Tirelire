@@ -751,7 +751,15 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
       "amount_tolerance": {
         "pct": 20
       },
-      "label_pattern": "TIRELIRE LIVRET A"
+      "label_pattern": "TIRELIRE LIVRET A",
+      "action": {
+        "allocation": [
+          { "tirelireId": "env-tf", "share": { "kind": "fixed", "amount": -10000 } },
+          { "tirelireId": "env-auto", "share": { "kind": "fixed", "amount": -5000 } },
+          { "tirelireId": "env-vac", "share": { "kind": "fixed", "amount": -15000 } },
+          { "tirelireId": "env-precaution", "share": { "kind": "variable" } }
+        ]
+      }
     },
     {
       "id": "flow-tf",

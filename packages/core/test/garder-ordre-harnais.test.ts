@@ -1,6 +1,6 @@
 /**
- * #205 · Garder un ordre permanent tel quel, sans être bloqué (I10, D20, D60) : tests du codeur, tous
- * de niveau 4, parmi lesquels l'auditeur choisira le harnais.
+ * Harnais d'audit de #205 — garder un ordre permanent tel quel, sans être bloqué (I10, D20, D60) :
+ * tests du codeur retenus par l'auditeur, classés par la suite de questions de D83.
  */
 import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
@@ -66,7 +66,7 @@ const alertesOrdre = (l: Ledger) => computePlan(l, LECTURE).warnings.filter((w) 
 /** L'ordre gardé, sur le budget `l`. */
 const garder = (l: Ledger, f: PlannedFlow = ORDRE): PlannedFlow => keepStandingOrder(livret(avec(l, f)), f)!;
 
-describe('[niveau 4] #205 · 1 et 2. garder l’ordre tel quel ne réécrit rien', () => {
+describe('[niveau 0] #205 · 1 et 2. garder l’ordre tel quel ne réécrit rien', () => {
   it('le geste n’existe que sur un écart proposé, et garde montant et ventilation au centime', () => {
     const dans = { ...ORDRE, amount: -euros(300) };
     expect(keepStandingOrder(livret(avec(budget(), dans)), dans), 'dans le pas : rien à garder').toBeUndefined();
@@ -77,7 +77,7 @@ describe('[niveau 4] #205 · 1 et 2. garder l’ordre tel quel ne réécrit rien
   });
 });
 
-describe('[niveau 4] #205 · 3 et 4. l’écart reste lisible, à surveiller, sans avertissement', () => {
+describe('[niveau 1] #205 · 3 et 4. l’écart reste lisible, à surveiller, sans avertissement', () => {
   it('le montant enregistré et demandé se lisent ; aucun avertissement d’ordre', () => {
     const l = budget();
     expect(alertesOrdre(avec(l))).toHaveLength(1);
@@ -106,7 +106,7 @@ describe('[niveau 4] #205 · 3 et 4. l’écart reste lisible, à surveiller, sa
   });
 });
 
-describe('[niveau 4] #205 · 5. reprendre la proposition', () => {
+describe('[niveau 2] #205 · 5. reprendre la proposition', () => {
   it('rend l’écart à faire, avec son avertissement, l’ordre inchangé', () => {
     const l = budget();
     const repris = resumeStandingOrderProposal(garder(l));
@@ -115,7 +115,7 @@ describe('[niveau 4] #205 · 5. reprendre la proposition', () => {
   });
 });
 
-describe('[niveau 4] #205 · 6. le choix vaut pour l’écart tel qu’il était proposé', () => {
+describe('[niveau 2] #205 · 6. le choix vaut pour l’écart tel qu’il était proposé', () => {
   it('dans le pas autour de la valeur gardée, l’écart reste à surveiller ; au-delà, dans un sens comme dans l’autre, il redevient à faire', () => {
     const g = garder(budget());
     for (const [vac, tient] of [[205, true], [210, true], [190, true], [211, false], [189, false]] as const) {
@@ -142,7 +142,7 @@ describe('[niveau 4] #205 · 6. le choix vaut pour l’écart tel qu’il était
   });
 });
 
-describe('[niveau 4] #205 · 7. le choix cesse quand l’ordre est confirmé ou que l’écart disparaît', () => {
+describe('[niveau 2] #205 · 7. le choix cesse quand l’ordre est confirmé ou que l’écart disparaît', () => {
   it('confirmer le nouvel ordre retire le choix', () => {
     const l = avec(budget(), garder(budget()));
     const t = livret(l);
@@ -159,7 +159,7 @@ describe('[niveau 4] #205 · 7. le choix cesse quand l’ordre est confirmé ou 
   });
 });
 
-describe('[niveau 4] #205 · 8. le choix est une donnée : fichier, budget JSON, synchronisation', () => {
+describe('[niveau 0] #205 · 8. le choix est une donnée : fichier, budget JSON, synchronisation', () => {
   it('il survit à la réouverture du fichier, à l’export et à l’import du budget JSON, et passe par la synchronisation', async () => {
     const g = garder(budget());
     const a = await LedgerStore.create({ sqlJs: SQL, siteId: 'a' });

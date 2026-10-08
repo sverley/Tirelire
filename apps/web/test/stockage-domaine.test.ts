@@ -97,7 +97,21 @@ function lignes(store: LedgerStore, cle: Cle): Ligne[] {
 }
 
 /** Charge l'exemple comme l'application (`replaceWith`) : toutes les tables, puis les réglages. */
-function charger(store: LedgerStore, l: Ledger = exampleLedger()): void {
+/**
+ * L'exemple tel que l'instantané l'a lu : sans la ventilation que #395 a ajoutée à son ordre vers le
+ * Livret A, que l'instantané ne connaissait pas. Ce test vérifie le stockage, non l'exemple.
+ */
+function exempleDeLInstantane(): Ledger {
+  const l = exampleLedger();
+  l.plannedFlows = l.plannedFlows.map((f) => {
+    if (f.id !== 'flow-vir-livret') return f;
+    const { action: _ventilation, ...sans } = f;
+    return sans;
+  });
+  return l;
+}
+
+function charger(store: LedgerStore, l: Ledger = exempleDeLInstantane()): void {
   for (const cle of CLES) for (const r of l[cle] as unknown as Ligne[]) store.upsert(cle, r as never);
   for (const [k, v] of Object.entries(l.settings)) if (k !== 'siteId') store.setSetting(k as never, v as never);
 }

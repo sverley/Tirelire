@@ -231,8 +231,11 @@ export function exampleLedger(): Ledger {
     {
       /*
        * L'ordre permanent vers le Livret A (D57, D60) : le seul flux dont le montant écrit n'est pas
-       * une décision mais un constat — ce que la banque exécute. Il ne porte pas encore de parts
-       * (#395) : son montant va au non affecté du Livret A (D21).
+       * une décision mais un constat — ce que la banque exécute. Il porte sa ventilation sur les
+       * tirelires du livret (D24, D27, #395) : trois parts fixes et l'épargne de précaution, part
+       * variable, qui prend le reste (300 € sur 600 €). La part de Vacances est enregistrée à 150 €
+       * quand le budget lui en demande 200 : le plan signale aussi cet écart, au-delà du pas
+       * d'arrondi ; la part variable, flottante, ne se compare pas (D60).
        * Il est volontairement **décalé** : la banque vire 600 €, le budget en demande 650 (les
        * dotations des quatre tirelires du livret : 100 + 50 + 200 + 300). Le plan affiche donc les
        * deux montants côte à côte et dit d'aller modifier l'ordre — c'est ce qu'on vient voir, et
@@ -254,6 +257,14 @@ export function exampleLedger(): Ledger {
       dateWindowDays: 5,
       labelPattern: 'TIRELIRE LIVRET A',
       amountTolerance: { pct: 20 },
+      action: {
+        allocation: [
+          { tirelireId: 'env-tf', share: { kind: 'fixed', amount: euros(-100) } },
+          { tirelireId: 'env-auto', share: { kind: 'fixed', amount: euros(-50) } },
+          { tirelireId: 'env-vac', share: { kind: 'fixed', amount: euros(-150) } },
+          { tirelireId: 'env-precaution', share: { kind: 'variable' } },
+        ],
+      },
     },
     {
       id: 'flow-tf',
