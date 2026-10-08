@@ -7,7 +7,9 @@
  * `libelle-ordre-renommage.test.ts`, qu'ils couvraient en entier. Sont de moi, dans ses tests : un
  * ordre à venir qui compte (point 4, précisions), un ordre sans libellé qui ne laisse rien
  * reconnaître vers son compte (point 4, précisions), et un libellé tiré d'un nom qui ne reconnaît
- * rien sans « TIRELIRE » (point 4, précisions). Données inventées (D84) : l'exemple, lu au
+ * rien sans « TIRELIRE » (point 4, précisions). Au second tour, les tests du codeur sur la précision
+ * tranchée le 08/10 (point 4 : un débit du compte principal seulement), repris de
+ * `libelle-ordre-sens.test.ts`, qu'ils couvraient en entier. Données inventées (D84) : l'exemple, lu au
  * 6 septembre 2026, et des opérations écrites ici. Le point 7 est de la documentation, relue.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
@@ -33,6 +35,7 @@ import {
 
 const PRINCIPAL = 'acc-principal';
 const LIVRET = 'acc-livret';
+const ENFANTS = 'acc-enfants';
 const ORDRE = 'flow-vir-livret';
 /** Mi-période « septembre » de l'exemple (28 août → 27 septembre). */
 const LECTURE = '2026-09-06';
@@ -57,8 +60,9 @@ function virement(l: Ledger, id = LIVRET, asOf = LECTURE) {
   return computePlan(l, asOf).transfers.find((t) => t.accountId === id);
 }
 
-function ligne(id: string, libellé: string, montant = euros(600), date = '2026-09-29'): Operation {
-  return { id, accountId: PRINCIPAL, origin: 'imported', date, label: libellé, normalizedLabel: normalizeLabel(libellé), amount: -montant, state: 'untreated' };
+/** Un débit du compte principal, sauf `compte` et un `montant` négatif (un crédit) donnés. */
+function ligne(id: string, libellé: string, montant = euros(600), date = '2026-09-29', compte = PRINCIPAL): Operation {
+  return { id, accountId: compte, origin: 'imported', date, label: libellé, normalizedLabel: normalizeLabel(libellé), amount: -montant, state: 'untreated' };
 }
 
 function importer(l: Ledger, ...ops: Operation[]) {
@@ -179,6 +183,30 @@ describe('[niveau 2] #206 · 4. l’import reconnaît le libellé enregistré (p
     const r = importer(égal, ligne('op-2', 'VIR MAISON XYZ'));
     expect(r.vers('op-2')).toBeUndefined();
     expect(r.patch.operations.map((o) => o.id)).not.toContain('op-2');
+  });
+});
+
+describe('[niveau 2] #206 · 4. le libellé d’un ordre ne reconnaît qu’un débit du compte principal (précision du 08/10)', () => {
+  const l = avecOrdre(exampleLedger(), { id: ORDRE, labelPattern: 'VIR' });
+
+  it('un débit du compte principal que le motif reconnaît va vers le compte de l’ordre', () => {
+    expect(importer(l, ligne('op-1', 'VIR LIVRET')).vers('op-1')).toBe(LIVRET);
+  });
+
+  it('un crédit du compte principal n’est pas reconnu par lui, quel que soit son libellé', () => {
+    expect(importer(l, ligne('op-1', 'VIREMENT SALAIRE ACME', -euros(3400))).vers('op-1')).toBeUndefined();
+  });
+
+  it('une opération d’un autre compte n’est pas reconnue par lui, débit comme crédit', () => {
+    const r = importer(l, ligne('op-1', 'VIR CANTINE', euros(45), '2026-09-29', ENFANTS), ligne('op-2', 'VIR RECU', -euros(45), '2026-09-29', ENFANTS));
+    expect(r.vers('op-1')).toBeUndefined();
+    expect(r.vers('op-2')).toBeUndefined();
+  });
+
+  it('le libellé tiré d’un nom garde la reconnaissance d’aujourd’hui, hors du compte principal comme en crédit', () => {
+    const r = importer(sansOrdre(l), ligne('op-1', 'TIRELIRE LIVRET A', euros(10), '2026-09-29', ENFANTS), ligne('op-2', 'TIRELIRE LIVRET A', -euros(10)));
+    expect(r.vers('op-1')).toBe(LIVRET);
+    expect(r.vers('op-2')).toBe(LIVRET);
   });
 });
 
