@@ -184,8 +184,9 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
         page.evaluate((noms: string[]) => {
           const c = [...document.querySelectorAll('.card')].find((x) => x.querySelector(':scope > .row strong')?.textContent?.trim() === 'Livret A');
           if (!c) return [];
+          // Hors de la ventilation d'un ordre, que la carte montre depuis #394 (point 3).
           return [...c.querySelectorAll('.row')]
-            .filter((r) => (r as HTMLElement).offsetParent !== null)
+            .filter((r) => (r as HTMLElement).offsetParent !== null && !r.closest('.ventilation'))
             .map((r) => ({ label: r.querySelector('.label')?.firstChild?.textContent?.trim() ?? '', num: r.querySelector('.num')?.textContent?.trim() ?? '' }))
             .filter((l) => noms.includes(l.label));
         }, TIRELIRES);
@@ -207,7 +208,9 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
       if (refermer) await cliquerDansCarte(page, refermer);
     });
 
-    it('le bouton ouvre une saisie dans la carte, visible, préremplie au pas au-dessus', async () => {
+    // Depuis #394 (point 4), « Corriger mon ordre » ouvre le panneau rempli de l'ordre tel qu'il est
+    // enregistré ; la proposition au pas au-dessus se lit sur la carte et se confirme (point 5).
+    it('le bouton ouvre une saisie dans la carte, visible, préremplie de l’ordre enregistré', async () => {
       expect(await cliquerDansCarte(page, 'Corriger mon ordre')).toBe(true);
       await attendre(400);
       const c = await carte(page);
@@ -215,10 +218,7 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
       expect(c.formulaire, 'aucune saisie ouverte dans la carte').toBeTruthy();
       expect(c.formulaire!.haut).toBeGreaterThanOrEqual(0);
       expect(c.formulaire!.bas).toBeLessThanOrEqual(812);
-      const proposé = centimes(c.formulaire!.valeur);
-      expect(proposé % 1000).toBe(0);
-      expect(proposé).toBeGreaterThanOrEqual(demandé);
-      expect(proposé - demandé).toBeLessThan(1000);
+      expect(centimes(c.formulaire!.valeur)).toBe(centimes(ligne(c, 'Ordre permanent chez la banque')!.montant));
     });
 
     it('Annuler n’enregistre rien', async () => {
@@ -231,6 +231,9 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
     });
 
     it('un ordre posé trop court s’enregistre tel quel, et le plan dit lequel changer', async () => {
+      // L'ordre proposé se confirme avec sa ventilation (#394, point 5), puis son montant se corrige :
+      // les parts restent celles qui sont enregistrées (#394, point 4).
+      expect(await cliquerDansCarte(page, 'Confirmer mon nouvel ordre')).toBe(true);
       await cliquerDansCarte(page, 'Corriger mon ordre');
       const posé = demandé - 7000;
       await saisirMontant(page, euros(posé));
@@ -238,9 +241,11 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
       const c = await carte(page);
       const alertes = await alertesÀlÉcran(page);
       vérifierOrdrePosé(c, posé, demandé, alertes);
-      // La ventilation proposée pour ce montant sert les tirelires dans l'ordre de financement : la
-      // dernière, l'épargne de précaution, reçoit 70 € de moins que ce que le budget lui demande.
-      expect(alertes.filter((a) => a.startsWith('La part'))).toEqual([expect.stringContaining('Épargne de précaution')]);
+      // Les parts enregistrées n'ont pas bougé : aucune part n'est en écart, et la carte dit que les
+      // parts dépassent le montant de 70 € (#394, point 1).
+      expect(alertes.filter((a) => a.startsWith('La part'))).toEqual([]);
+      const texte = await page.evaluate(() => (document.querySelector('.card .ventilation') as HTMLElement | null)?.innerText ?? '');
+      expect(texte).toMatch(/les parts dépassent le montant de 70,00/);
     });
 
     it('le fait enregistré survit au rechargement', async () => {

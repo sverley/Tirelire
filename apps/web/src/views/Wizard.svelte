@@ -14,6 +14,8 @@
   import Manque from '../lib/Manque.svelte';
   import SectionTirelires from '../lib/SectionTirelires.svelte';
   import SectionComptes from '../lib/SectionComptes.svelte';
+  import VentilationOrdre from '../lib/VentilationOrdre.svelte';
+  import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
   import { fichierAEnregistrer, preparerValidation } from '../lib/brouillon';
@@ -928,6 +930,7 @@
       Un virement que vous avez déjà programmé chez votre banque. Indiquez ce qu'il vire vraiment : le
       plan le compare à ce que votre budget demande, et vous dit quand le modifier.
     </p>
+    <ExplicationVentilation />
     {#each ordres as f (f.id)}
       <div class="card ordre">
         <div class="row">
@@ -941,6 +944,7 @@
           <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
           <button class="btn small danger" title="Retirer ce virement" onclick={() => removeFlow(f)}>×</button>
         </div>
+        <VentilationOrdre montant={Math.abs(f.amount)} allocation={f.action?.allocation} compte={nomDuCompte(standingOrderTarget(f, mainAccountId()))} noms={{ tirelires, categories }} />
         <p class="muted small" style="margin:4px 0 0">
           Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {nomDuCompte(f.counterpartAccountId)}.
         </p>
