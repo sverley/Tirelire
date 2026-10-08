@@ -41,7 +41,9 @@ vérification (#355).
    « Fait quand » (porteur, #318). Le témoin rouge d'une ligne `Harnais` du registre reste exigé
    (`docs/gardes.md`). Les tests du codeur que tu ne retiens pas
    restent dans ses fichiers, au niveau 4. Relis de même les tests existants que le codeur a adaptés,
-   et corrige-les s'il le faut, dans leur fichier. Un harnais par issue, en un fichier ou deux, sauf
+   et corrige-les s'il le faut, dans leur fichier. Ne fais pas trop grossir les tests du harnais,
+   pour garder un bon compromis entre fiabilité et productivité (porteur, #403). Un harnais par
+   issue, en un fichier ou deux, sauf
    raison dite : un harnais du registre prend sa forme normale (D81), un fichier de niveau 0 et 1 que
    le registre cite en entier, et un second fichier, hors registre, pour les niveaux 2 à 4. Les trois
    premières lignes de chaque fichier disent « Harnais d'audit de #<n> », pour que les crochets le
