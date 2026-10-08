@@ -3,7 +3,8 @@
 Le porteur du projet. Ses paroles font foi (principe 7) ; il valide, et la fusion vaut validation
 (principe 11, D82). Les sessions des rôles sont économes (D92).
 
-Il lit le compte rendu du codeur et la vérification de l'auditeur, et passe la PR en Ready. La CI y
+Il lit le compte rendu du codeur et la vérification de l'auditeur, et fusionne la PR au vert ;
+l'architecte l'a passée en Ready, en fin de cycle (#401). Au Ready, la CI
 joue le seuil 1, puis le harnais du besoin et les tests navigateur de l'issue, en entier, qui ne
 partent que si le reste est vert ; le seuil 2 hors navigateur a été joué avant, par la livraison et
 par l'auditeur, dont la vérification dit s'il a demandé les tests navigateur, et pourquoi (D83). Les

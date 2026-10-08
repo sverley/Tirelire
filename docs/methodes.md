@@ -161,12 +161,15 @@ au porteur de ne fusionner qu'au vert.
 
 Le codeur ouvre la PR en brouillon (D80), avec le corps du modèle
 `.github/pull_request_template.md` — `Close #n` et la case de l'aperçu, rien d'autre. Une PR ouverte
-par l'API ne reçoit pas le modèle : il se recopie. Le brouillon n'économise que la CI. Le porteur la passe en Ready à la main, ce qui lance
+par l'API ne reçoit pas le modèle : il se recopie. Le brouillon n'économise que la CI. L'architecte la passe en Ready en fin de cycle, après avoir
+vérifié, avec les retours du codeur et de l'auditeur et un diff, que le besoin a bien été codé
+(porteur, #401), jamais tant que le travail n'est pas terminé — une question ouverte, un nouveau
+tour ; le passage en Ready lance
 toute la CI et assemble la version de dev depuis le dernier commit de la branche. À côté du bouton
 de fusion, le statut « Toute la CI sur ce commit » dit si toute la CI a tourné au vert sur le
 dernier commit. Un changement après le Ready est signalé par un commentaire de la PR, sans rien
-bloquer : un commit (la CI n'a pas tourné sur lui, le statut passe en échec, et le porteur repasse
-la PR en brouillon puis en Ready pour la rejouer), une édition de la PR, hors cases cochées ou
+bloquer : un commit (la CI n'a pas tourné sur lui, le statut passe en échec, et l'architecte repasse
+la PR en brouillon puis en Ready pour la rejouer, aux mêmes conditions ; porteur, #401), une édition de la PR, hors cases cochées ou
 décochées, ou une édition de l'issue qu'elle ferme. Les commentaires ne sont pas signalés.
 
 **La case de l'aperçu** (#175). Rien n'est déposé sur la recette sans une action du porteur : il
