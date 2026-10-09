@@ -1,7 +1,12 @@
 /**
  * Harnais d'audit de #321 — sans opération, aucun écran ne présente l'import comme un préalable : ce que
  * disent et offrent l'écran Opérations sans opération (point 1), l'écran Import (point 2) et le bandeau
- * des opérations anciennes (point 3) ; le vouvoiement des textes que la tâche écrit (point 4).
+ * des opérations anciennes (point 3), et qu'aucun des trois ne déborde à 375 px (C9).
+ *
+ * Le point 4 — les textes que la tâche écrit vouvoient (D85) — se vérifie sans navigateur : les trois
+ * textes tels que l'application les montre dans `apps/web/test/import-enrichissement-ecran.test.ts`, sur
+ * l'application montée sous jsdom ; aucune forme du tutoiement dans leurs sources, dans
+ * `apps/web/test/vouvoiement-textes-harnais.test.ts`. #420 en a retiré le test d'ici.
  *
  * Retenus parmi les tests du codeur (`import-enrichissement.test.ts`, d'où ils sont déplacés ; aucun n'est
  * resté au niveau 4, le fichier disparaît), puis complétés :
@@ -13,28 +18,20 @@
  *  - le texte d'aujourd'hui d'Import n'est plus figé mot pour mot : le harnais garde qu'il vient après
  *    ce que l'import apporte, par son ancre « compte principal », que garde déjà le harnais d'I5 ; relu au
  *    diff, le paragraphe est inchangé ;
- *  - aucun des trois blocs ne fait déborder l'écran à 375 px (C9) ;
- *  - le vouvoiement a son test, au niveau de D85, et non dans ceux de l'import.
+ *  - aucun des trois blocs ne fait déborder l'écran à 375 px (C9).
  * Les blocs se reconnaissent à `data-sans-operation` et `data-apport-import`, les marques que le codeur pose.
  *
- * Niveaux (D83) :
- *  - 1 pour les points 1 à 3 : I3 (« aucun écran ne bloque ni n'insiste pour importer » ; aucun usage n'est
- *    présenté comme la version réduite d'un autre : U1, U5) et I5 (l'écran vide dit ce qui le remplit),
- *    comme l'audit de #320 a classé la même famille de besoins. Y compris « dès la première opération,
- *    l'écran redevient celui d'aujourd'hui » : s'il cessait de l'être, qui a des opérations perdrait la
- *    recherche et les actions, donc U5 et I6. Chacun a son témoin rouge, montré à l'audit.
- *  - 2 pour le point 4 : D85, une règle de décision, nominale comme limite.
+ * Niveaux (D83) : 1 pour les points 1 à 3 : I3 (« aucun écran ne bloque ni n'insiste pour importer » ;
+ * aucun usage n'est présenté comme la version réduite d'un autre : U1, U5) et I5 (l'écran vide dit ce qui
+ * le remplit), comme l'audit de #320 a classé la même famille de besoins. Y compris « dès la première
+ * opération, l'écran redevient celui d'aujourd'hui » : s'il cessait de l'être, qui a des opérations
+ * perdrait la recherche et les actions, donc U5 et I6. Chacun a son témoin rouge, montré à l'audit.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
 import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
 
 const pause = (ms = 200) => new Promise((r) => setTimeout(r, ms));
-
-/** Les formes du tutoiement qu'un texte vouvoyé ne porte pas (D85). */
-const TUTOIEMENT = /\b(tu|te|toi|ton|ta|tes)\b|\bimporte un\b|\bsaisis\b/i;
-/** Une forme du vouvoiement : le texte s'adresse bien à « vous ». */
-const VOUVOIEMENT = /\b(vous|votre|vos)\b/i;
 
 /** Les idées que la phrase d'Opérations sans opération doit dire (« Fait quand », point 1). */
 const IDÉES_DE_LA_PHRASE: Record<string, RegExp> = {
@@ -274,32 +271,6 @@ describe.skipIf(!navigateur)('#321 · l’import, un enrichissement et non un pr
       await attendreTitre(page, 'Saisie');
     } finally {
       await page.close();
-    }
-  });
-
-  it('[niveau 2] point 4 — les textes que la tâche écrit vouvoient : Opérations sans opération, ce que l’import apporte, le bandeau (D85)', async () => {
-    const vide = await baseVide(site);
-    const lus: Record<string, string> = {};
-    try {
-      await allerÀ(vide, 'Opérations');
-      await attendreTitre(vide, 'Opérations');
-      lus['Opérations sans opération'] = await vide.$eval('main [data-sans-operation]', (e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim());
-      await allerÀ(vide, 'Import');
-      await attendreTitre(vide, "Import d'un relevé");
-      lus['ce que l’import apporte'] = await vide.$eval('main [data-apport-import]', (e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim());
-    } finally {
-      await vide.close();
-    }
-    const exemple = await exempleAuBandeau(site);
-    try {
-      lus['le bandeau des opérations anciennes'] = (await lireLeBandeau(exemple))?.texte ?? '';
-    } finally {
-      await exemple.close();
-    }
-    for (const [où, texte] of Object.entries(lus)) {
-      expect(texte, `${où} : texte absent`).not.toBe('');
-      expect(texte, `${où} : tutoiement`).not.toMatch(TUTOIEMENT);
-      expect(texte, `${où} : ne s'adresse pas à « vous »`).toMatch(VOUVOIEMENT);
     }
   });
 });
