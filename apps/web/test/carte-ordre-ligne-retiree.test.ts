@@ -2,7 +2,8 @@
  * Tests du codeur de #409, tour 2, sans navigateur : ce que montre la carte d'un ordre permanent
  * dans l'assistant (`carteDeLOrdre`, `partsDeLOrdre`, `src/lib/brouillon.ts`), lue comme la lit
  * `VentilationOrdre.svelte` (`lireVentilation`), sur un vrai dépôt (`LedgerStore`) qui porte le
- * budget de l'exemple.
+ * budget de l'exemple. Les deux tests « #409 · 5 et 6 » sont passés au harnais d'audit
+ * (`budget-json-ligne-retiree-harnais.test.ts`) ; restent ici, au niveau 4, ceux de #407 et de #395.
  *
  * L'ordre « Virement Livret A » (600 €) a trois parts fixes — Taxe foncière (100 €), Assurance auto
  * (50 €), Vacances (150 €) — et la part variable d'Épargne de précaution.
@@ -10,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
 import { LedgerStore, MAIN_ACCOUNT_ID, alive, budgetDefiniEnJson, euros, exampleLedger, lireBudgetJson, type Ledger, type PlannedFlow } from '@tirelire/core';
-import { brouillonDuFichier, carteDeLOrdre, fichierAEnregistrer, montrer, nouveauBrouillon, ordreEnregistre, partsDeLOrdre, retirer, valider, type Brouillon } from '../src/lib/brouillon';
+import { brouillonDuFichier, carteDeLOrdre, fichierAEnregistrer, montrer, nouveauBrouillon, ordreEnregistre, retirer, type Brouillon } from '../src/lib/brouillon';
 import { lireVentilation } from '../src/lib/ventilationOrdre';
 
 const SQL = await initSqlJs();
@@ -63,35 +64,6 @@ function carte(projet: Ledger, b: Brouillon, id: string) {
   const { montant, allocation, noms } = c.ventilation;
   return { ...c, lecture: lireVentilation(montant, allocation, noms), montre };
 }
-
-describe('[niveau 4] #409 · 5 et 6 — la carte d’un ordre qui entre avec le fichier', () => {
-  it('la part d’une tirelire que le fichier dit retirée se montre sous son nom, marquée comme retirée, et la validation la garde', async () => {
-    const { s, b } = await reprisSurUnProjetVierge(await depot(['env-auto']));
-    const projet = s.load();
-    expect(ordreEnregistre(projet, ORDRE)).toBe(false);
-    const c = carte(projet, b, ORDRE);
-    expect(c.lecture.lignes.map((l) => [l.nom, l.montant, l.retiree ?? false])).toEqual([
-      ['Taxe foncière', euros(100), false],
-      ['Assurance auto', euros(50), true],
-      ['Vacances', euros(150), false],
-      ['Épargne de précaution', euros(300), false],
-    ]);
-    // Ce que la carte montre est ce que la validation enregistre : toutes les parts du fichier.
-    const fichier = exampleLedger().plannedFlows.find((f) => f.id === ORDRE)!.action!.allocation;
-    expect(partsDeLOrdre(projet, c.montre, b, ordreMontre(c.montre, ORDRE))).toEqual(fichier);
-    valider(s, projet, b);
-    expect(s.load().plannedFlows.find((f) => f.id === ORDRE)!.action!.allocation).toEqual(fichier);
-  });
-
-  it('le compte que le fichier dit retiré se nomme sur la carte, marqué comme retiré, et n’est nulle part vivant', async () => {
-    const { s, b } = await reprisSurUnProjetVierge(await depot([], ['acc-enfants']));
-    const c = carte(s.load(), b, ORDRE_ENFANTS);
-    expect(c.vers).toBe('Carte enfants (compte retiré)');
-    expect(c.ventilation.compte).toBe('Carte enfants (compte retiré)');
-    expect(c.de).toBe(c.montre.accounts.find((a) => a.id === MAIN_ACCOUNT_ID)!.name);
-    expect(alive(c.montre.accounts).map((a) => a.id)).not.toContain('acc-enfants');
-  });
-});
 
 describe('[niveau 4] #407 · 8 et #395 — la carte d’un ordre enregistré et de l’ordre proposé', () => {
   it('un ordre enregistré montre la part de la tirelire retirée dans le projet, marquée comme retirée', async () => {
