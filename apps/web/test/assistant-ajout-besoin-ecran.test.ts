@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #418 : ce que vérifiait le harnais navigateur d'audit de #344 (« Dans l'assistant, ajouter un
+ * Harnais d'audit de #418, composé parmi les tests du codeur :
+ * ce que vérifiait le harnais navigateur d'audit de #344 (« Dans l'assistant, ajouter un
  * besoin à une tirelire de l'étape Budgets »), que #418 retire, sans navigateur :
  * l'application montée sous jsdom (`ecran.ts`), au jour des tests, projet vierge, tirelire « Enfants et loisirs ».
  * Chaque titre dit le point du « Fait quand » de #344 qu'il vérifie, et le numéro du test retiré dans la table de
@@ -9,6 +10,10 @@
  * « L'étape se franchit par son seul bouton primaire » (I4) reste au harnais du registre,
  * `navigateur/assistant-simple.test.ts` ; ici, les boutons primaires de l'étape sont lus, ce qui rougit si le
  * bouton d'ajout d'un besoin devient primaire. Le point 7 de #344 (D40) se relit, sans test.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #418 recopie. 1 pour ajout 5 (I4) et ajout 7 (I11), rouges
+ * sur deux mutations : le bouton « Ajouter un besoin » rendu primaire ; « Modifier » retiré d'un besoin dans Tirelires.
+ * 3 pour ajout 4 (l'aide, un geste de plus) ; 2 pour les autres.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { alive, euros } from '@tirelire/core';
@@ -59,7 +64,7 @@ describe('#418 · #344 — l’étape Budgets d’un projet vierge, sans navigat
     expect(await etape('Budgets')).toBe(true);
   });
 
-  it('[niveau 4] #344 point 1 (table #418, ajout 1) — chaque carte de tirelire offre d’ajouter un besoin, qui s’ajoute comme ligne de plus, nommée, et se corrige et se retire sur place', async () => {
+  it('[niveau 2] #344 point 1 (table #418, ajout 1) — chaque carte de tirelire offre d’ajouter un besoin, qui s’ajoute comme ligne de plus, nommée, et se corrige et se retire sur place', async () => {
     const cartes = tous('main .card.tirelire');
     expect(cartes.length).toBeGreaterThanOrEqual(2);
     expect(cartes.filter((c) => tous('form.ajout-besoin', c).length !== 1).map((c) => (c.querySelector('input.nom') as HTMLInputElement).value), 'cartes sans exactement un formulaire d’ajout').toEqual([]);
@@ -81,7 +86,7 @@ describe('#418 · #344 — l’étape Budgets d’un projet vierge, sans navigat
     expect(lignes(TIRELIRE)!.map((l) => l.nom)).toEqual(avant.map((l) => l.nom));
   });
 
-  it('[niveau 4] #344 point 2 (table #418, ajout 2) — sans nom, ou sans montant positif, l’étape refuse en le disant et n’ajoute rien', async () => {
+  it('[niveau 2] #344 point 2 (table #418, ajout 2) — sans nom, ou sans montant positif, l’étape refuse en le disant et n’ajoute rien', async () => {
     const avant = lignes(TIRELIRE)!;
     for (const [nom, montant] of [
       ['', '30'],
@@ -102,7 +107,7 @@ describe('#418 · #344 — l’étape Budgets d’un projet vierge, sans navigat
     expect(lignes(TIRELIRE)).toEqual(avant);
   });
 
-  it('[niveau 4] #344 point 3 (table #418, ajout 3) — le bandeau de l’assistant compte aussitôt le besoin ajouté, de son montant par période', async () => {
+  it('[niveau 2] #344 point 3 (table #418, ajout 3) — le bandeau de l’assistant compte aussitôt le besoin ajouté, de son montant par période', async () => {
     const avant = deCote();
     await ajouter(TIRELIRE, 'Péage', '30');
     expect(deCote() - avant).toBe(3000);
@@ -110,7 +115,7 @@ describe('#418 · #344 — l’étape Budgets d’un projet vierge, sans navigat
     expect(deCote()).toBe(avant);
   });
 
-  it('[niveau 4] #344 point 5 (table #418, ajout 4) — sur la carte « Essence », la ligne d’aide est « Cours de piano », 45,00 ; la recopier ajoute le besoin de l’exemple, date de début comprise ; à 50, sans date', async () => {
+  it('[niveau 3] #344 point 5 (table #418, ajout 4) — sur la carte « Essence », la ligne d’aide est « Cours de piano », 45,00 ; la recopier ajoute le besoin de l’exemple, date de début comprise ; à 50, sans date', async () => {
     const f = carte('Essence')!.querySelector('form.ajout-besoin')!;
     expect([(f.querySelector('.besoin-nom') as HTMLInputElement).placeholder, (f.querySelector('.mt') as HTMLInputElement).placeholder]).toEqual(['Cours de piano', '45,00']);
 
@@ -124,9 +129,13 @@ describe('#418 · #344 — l’étape Budgets d’un projet vierge, sans navigat
     expect(lignes('Essence')![2]).toMatchObject({ nom: 'Cours de piano', montant: '50,00', suite: '' });
   });
 
-  it('[niveau 4] #344 point 4, I4 (table #418, ajout 5) — le bouton d’ajout n’est pas primaire : les boutons primaires de l’étape sont « Ajouter » et « Suivant › », et un ajout réussi vide ses formulaires', async () => {
+  it('[niveau 1] #344 point 4, I4 (table #418, ajout 5) — le bouton d’ajout n’est pas primaire : les boutons primaires de l’étape sont « Ajouter » et « Suivant › », et un ajout réussi vide ses formulaires', async () => {
     expect(tous('main .btn.primary').map(t), 'les boutons primaires de l’étape').toEqual(['Ajouter', 'Suivant ›']);
+    // Un ajout réussi, fait ici pour que le test se joue seul à son seuil (D83), vide son formulaire.
+    await ajouter(TIRELIRE, 'Péage', '30');
+    expect(erreur(TIRELIRE)).toBe('');
     expect(tous<HTMLInputElement>('main form.ajout-besoin input').every((i) => i.value === ''), 'un ajout réussi laisse son formulaire rempli').toBe(true);
+    expect(tous('main .btn.primary').map(t), 'les boutons primaires de l’étape, après un ajout').toEqual(['Ajouter', 'Suivant ›']);
     const titre = lire().h2;
     expect(await cliquer('Suivant')).toBe(true);
     expect(lire().h2).not.toBe(titre);
@@ -150,7 +159,7 @@ describe('#418 · #344 — après la validation, sans navigateur', () => {
     return { carte: !!c, ligne: l ? `${(l.querySelector('input.besoin') as HTMLInputElement).value} ${(l.querySelector('input.mt') as HTMLInputElement).value} ${t(l)}`.trim() : '', el: l };
   }
 
-  it('[niveau 4] #344 point 3, D06, D50 (table #418, ajout 6) — validé, « Solfège » est un besoin d’« Enfants et loisirs », sans date, à la priorité 20, et le Plan le dote, 20,00 en croisière, à côté du besoin de la tirelire, 200,00', async () => {
+  it('[niveau 2] #344 point 3, D06, D50 (table #418, ajout 6) — validé, « Solfège » est un besoin d’« Enfants et loisirs », sans date, à la priorité 20, et le Plan le dote, 20,00 en croisière, à côté du besoin de la tirelire, 200,00', async () => {
     const p = projet();
     const enfants = alive(p.tirelires).find((x) => x.name === TIRELIRE)!;
     const solfege = alive(p.needs).find((n) => n.name === 'Solfège');
@@ -170,7 +179,7 @@ describe('#418 · #344 — après la validation, sans navigateur', () => {
     expect(plan, 'le Plan ne dote plus le besoin de la tirelire').toMatch(/Enfants et loisirs non financé[^]*?croisière 200,00/);
   });
 
-  it('[niveau 4] #344 point 6, I11 (table #418, ajout 7) — dans Tirelires, la ligne « Solfège » a son « Modifier » ; son montant passé à 25 s’enregistre, et la ligne le dit', async () => {
+  it('[niveau 1] #344 point 6, I11 (table #418, ajout 7) — dans Tirelires, la ligne « Solfège » a son « Modifier » ; son montant passé à 25 s’enregistre, et la ligne le dit', async () => {
     const { el } = await ligneDansTirelires();
     expect(el, 'le besoin ajouté ne se retrouve pas dans Tirelires').toBeTruthy();
     const modifier = tous<HTMLButtonElement>('button', el!).find((b) => t(b) === 'Modifier');

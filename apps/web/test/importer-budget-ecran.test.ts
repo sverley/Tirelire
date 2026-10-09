@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #418 : ce que vérifiait `navigateur/importer-budget-harnais.test.ts`, harnais d'audit de #367
+ * Harnais d'audit de #418, composé parmi les tests du codeur :
+ * ce que vérifiait `navigateur/importer-budget-harnais.test.ts`, harnais d'audit de #367
  * (« Importer un budget JSON depuis Configuration ou par une adresse, et le valider dans l'assistant »), sauf I7,
  * sans navigateur : l'application montée sous jsdom (`ecran.ts`), au 6 septembre 2026, projet vierge, l'exemple de
  * `docs/format-budget-json.md` (« Exemple complet »). Chaque titre dit le point du « Fait quand » de #367 qu'il
@@ -11,6 +12,9 @@
  * (`hashchange`). « Rouverte » : la page se ferme, et l'application se rouvre sur ce qu'elle a enregistré. Le
  * brouillon seul : `importer-budget.test.ts`. Le message de refus lui-même : `packages/core/test/budget-json-harnais.test.ts`.
  * Reste dans le navigateur : « aucune requête ne porte le budget » (I7), `navigateur/importer-budget-harnais.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #418 recopie. 1 pour import 1 (I10), rouge quand l'import
+ * écrit le budget dans le projet sans attendre la validation ; 2 pour les autres.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -93,7 +97,7 @@ async function parcourirLesEtapes() {
 }
 
 describe('#418 · #367 point 4 — rien n’est enregistré avant « Valider mon budget », sans navigateur', () => {
-  it('[niveau 4] #367 point 4, I10 (table #418, import 1) — importé par le texte collé, puis par l’adresse, l’assistant s’ouvre au résumé ; quitté sans valider, le projet reste vierge, et rouverte sur ce qu’elle a enregistré, l’application montre « Construire mon budget »', async () => {
+  it('[niveau 1] #367 point 4, I10 (table #418, import 1) — importé par le texte collé, puis par l’adresse, l’assistant s’ouvre au résumé ; quitté sans valider, le projet reste vierge, et rouverte sur ce qu’elle a enregistré, l’application montre « Construire mon budget »', async () => {
     await ouvrirLApplication();
     const avant = budgetDe(projet());
     await ouvrirLEntree();
@@ -115,7 +119,7 @@ describe('#418 · #367 point 4 — rien n’est enregistré avant « Valider mon
 
 describe('#418 · #367 points 2, 3, 6 — le parcours de bout en bout, par chaque voie, sans navigateur', () => {
   for (const voie of ['texte collé', 'fichier choisi', 'adresse'] as const) {
-    it(`[niveau 4] #367 points 2, 3, 6, D46 (table #418, import 2) — ${voie} : le résumé dit « Ce budget vient d’un import » et « Rien n’est encore enregistré », les étapes ne proposent rien d’office, « Valider mon budget » mène à « Votre budget est enregistré », et le plan est celui de l’exemple au centime`, async () => {
+    it(`[niveau 2] #367 points 2, 3, 6, D46 (table #418, import 2) — ${voie} : le résumé dit « Ce budget vient d’un import » et « Rien n’est encore enregistré », les étapes ne proposent rien d’office, « Valider mon budget » mène à « Votre budget est enregistré », et le plan est celui de l’exemple au centime`, async () => {
       if (voie === 'texte collé') {
         // L'exemple porte déjà les lignes que l'assistant proposerait : un budget auquel il en manque dit si elles s'ajoutent.
         await ouvrirLApplication();
@@ -154,7 +158,7 @@ describe('#418 · #367 points 2, 3, 6 — le parcours de bout en bout, par chaqu
     });
   }
 
-  it('[niveau 4] #367 point 2 (table #418, import 3) — application déjà ouverte, assistant au début : une adresse #budget= ouvre l’assistant sur le budget importé', async () => {
+  it('[niveau 2] #367 point 2 (table #418, import 3) — application déjà ouverte, assistant au début : une adresse #budget= ouvre l’assistant sur le budget importé', async () => {
     await ouvrirLApplication();
     await allerA('Plus');
     expect(await cliquer('Lancer')).toBe(true);
@@ -176,13 +180,13 @@ describe('#418 · #367 point 4 — ce que l’assistant avait préparé est remp
     await allerA('Plan');
   }
 
-  it('[niveau 4] #367 point 4 (table #418, import 4) — un assistant préparé, l’écran d’import dit « Importer un budget les remplace »', async () => {
+  it('[niveau 2] #367 point 4 (table #418, import 4) — un assistant préparé, l’écran d’import dit « Importer un budget les remplace »', async () => {
     await brouillonPrepare();
     await ouvrirLEntree();
     expect(texte()).toContain('Importer un budget les remplace');
   });
 
-  it('[niveau 4] #367 point 4 (table #418, import 5) — par une adresse : « Garder mes changements » n’importe rien ; « Remplacer par ce budget » remplace le brouillon', async () => {
+  it('[niveau 2] #367 point 4 (table #418, import 5) — par une adresse : « Garder mes changements » n’importe rien ; « Remplacer par ce budget » remplace le brouillon', async () => {
     await brouillonPrepare();
     await changerLAdresse();
     expect(window.location.hash).toBe('');
@@ -199,7 +203,7 @@ describe('#418 · #367 point 4 — ce que l’assistant avait préparé est remp
 });
 
 describe('#418 · #367 point 5 — un JSON refusé n’ouvre pas l’assistant et ne change rien, sans navigateur', () => {
-  it('[niveau 4] #367 point 5 (table #418, import 6) — sur l’écran d’import : « Ce budget JSON ne se lit pas », le premier problème (accounts, opening_balance) et « 1 autre problème » ; l’assistant ne s’ouvre pas, le projet ne change pas', async () => {
+  it('[niveau 2] #367 point 5 (table #418, import 6) — sur l’écran d’import : « Ce budget JSON ne se lit pas », le premier problème (accounts, opening_balance) et « 1 autre problème » ; l’assistant ne s’ouvre pas, le projet ne change pas', async () => {
     await ouvrirLApplication();
     const avant = budgetDe(projet());
     await ouvrirLEntree();
@@ -215,7 +219,7 @@ describe('#418 · #367 point 5 — un JSON refusé n’ouvre pas l’assistant e
     expect(budgetDe(projet())).toBe(avant);
   });
 
-  it('[niveau 4] #367 point 5 (table #418, import 7) — à l’ouverture par une adresse : « Le budget de l’adresse n’a pas été importé », « 1 autre problème » ; l’assistant ne s’ouvre pas, le projet reste vierge', async () => {
+  it('[niveau 2] #367 point 5 (table #418, import 7) — à l’ouverture par une adresse : « Le budget de l’adresse n’a pas été importé », « 1 autre problème » ; l’assistant ne s’ouvre pas, le projet reste vierge', async () => {
     await ouvrirLApplication();
     const vierge = budgetDe(projet());
     await rouvrirLApplication(ADRESSE(FAUX));

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #418 : ce que vérifiait `navigateur/ordre-ventile-assistant-harnais.test.ts` (harnais d'audit
+ * Harnais d'audit de #418, composé parmi les tests du codeur :
+ * ce que vérifiait `navigateur/ordre-ventile-assistant-harnais.test.ts` (harnais d'audit
  * de #395, l'ordre « Virement Livret A » que l'assistant propose au résumé), sauf la carte lue à 375 px, sans
  * navigateur : l'application montée sous jsdom (`ecran.ts`), au jour des tests, projet vierge. Chaque titre dit le
  * point du « Fait quand » de #395 qu'il vérifie, et le numéro du test retiré dans la table de #418 (« ordre 1 » à
@@ -9,6 +10,10 @@
  * Le calcul sur l'exemple : `packages/core/test/ordre-ventile-exemple-harnais.test.ts`. Reste dans le navigateur :
  * « la carte de l'ordre dit chaque part, la variable comme le reste, lisible à 375 px »
  * (`navigateur/ordre-ventile-assistant-harnais.test.ts`).
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #418 recopie. 1 pour ordre 1 (I10) et ordre 2 (U2, I3),
+ * rouges sur trois mutations : l'ordre proposé écrit aussitôt dans le projet ; une part perdue à la validation ; le
+ * Plan qui ne signale plus la part de Vacances. 2 pour ordre 3.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { alive, computePlan, type Ledger } from '@tirelire/core';
@@ -38,12 +43,12 @@ async function auResume() {
 describe('#418 · #395 — parcouru sans rien modifier, sans navigateur', () => {
   beforeAll(auResume);
 
-  it('[niveau 4] #395 point 6, I10 (table #418, ordre 1) — le résumé atteint, l’ordre proposé, le projet ne porte aucun ordre', () => {
+  it('[niveau 1] #395 point 6, I10 (table #418, ordre 1) — le résumé atteint, l’ordre proposé, le projet ne porte aucun ordre', () => {
     expect(parts().length, 'le résumé ne propose pas l’ordre').toBe(4);
     expect(ordreEnregistre(projet())).toBeNull();
   });
 
-  it('[niveau 4] #395 points 6 et 7 (table #418, ordre 2) — validé, l’ordre s’enregistre à 600,00 € avec ses parts, et le Plan signale le montant de l’ordre et la seule part de Vacances', async () => {
+  it('[niveau 1] #395 points 6 et 7 (table #418, ordre 2) — validé, l’ordre s’enregistre à 600,00 € avec ses parts, et le Plan signale le montant de l’ordre et la seule part de Vacances', async () => {
     expect(await cliquer('Valider mon budget')).toBe(true);
     const l = projet();
     expect(ordreEnregistre(l)).toEqual({
@@ -77,7 +82,7 @@ describe('#418 · #395 — parcouru sans rien modifier, sans navigateur', () => 
 describe('#418 · #395 — une tirelire retirée après la proposition, le montant corrigé, sans navigateur', () => {
   beforeAll(auResume);
 
-  it('[niveau 4] #395 points 4 et 5 (table #418, ordre 3) — Vacances retirée : Taxe foncière 100,00, Assurance auto 50,00, Épargne de précaution 450,00 en « le reste » ; à 120,00, la variable à 0,00 ; validé, l’ordre à 120,00 € et ses trois parts', async () => {
+  it('[niveau 2] #395 points 4 et 5 (table #418, ordre 3) — Vacances retirée : Taxe foncière 100,00, Assurance auto 50,00, Épargne de précaution 450,00 en « le reste » ; à 120,00, la variable à 0,00 ; validé, l’ordre à 120,00 € et ses trois parts', async () => {
     expect(await etape('Pas tous les mois')).toBe(true);
     const champ = tous<HTMLInputElement>('main .card.tirelire input.nom').find((i) => i.value.trim() === 'Vacances');
     const b = champ?.parentElement?.querySelector('button.danger') as HTMLButtonElement | null | undefined;

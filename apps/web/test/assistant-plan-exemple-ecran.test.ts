@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #418 : ce que vérifiait le harnais navigateur d'audit de #324 (« L'assistant conduit au plan,
+ * Harnais d'audit de #418, composé parmi les tests du codeur :
+ * ce que vérifiait le harnais navigateur d'audit de #324 (« L'assistant conduit au plan,
  * et son résumé dit ce que dira le plan »), que #418 retire, sans navigateur : l'application
  * montée sous jsdom (`ecran.ts`), sur un projet vierge, au 6 septembre 2026, jour de l'exemple et du critère de
  * #324 (« L'exemple, lu au 6 septembre »). Chaque titre dit le point du « Fait quand » de #324 qu'il vérifie, et le
@@ -10,8 +11,13 @@
  * Plan et Réglages, et le projet que la validation a enregistré, relu dans le dépôt. Le réglage que le brouillon
  * propose, sans écran : `assistant-reglages-ouverture.test.ts`. Le point 6 (I4) est tenu par le harnais du registre
  * `navigateur/assistant-simple.test.ts` ; le point 7, par la relecture de D44.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #418 recopie. 1 pour plan 5, 7, 8 et 9 (principe 4 : le
+ * résumé dit ce que dira le Plan), rouges sur quatre mutations du résumé : les échéances en manque tues ; le non
+ * affecté négatif tu ; « Couvert par les revenus » qui dit le demandé ; « Tout est finançable » jamais dit. 2 pour les
+ * autres. Le parcours accepté tel quel se fait une fois, avant ses tests, pour que chacun se joue seul à son seuil.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { computePlan, dueDateShortfalls, exampleLedger, periodReadingDate, periodsAround, shortfallsForPeriod, type Ledger } from '@tirelire/core';
 import { allerA, app, arriverAuxComptes, avancer, cliquer, ecran, fixerLeJour, lire, ouvrirLApplication, presser, projet, saisir, t, tous } from './ecran';
 
@@ -157,7 +163,8 @@ function leResumeEstLePlan({ resume, plan, projet: l }: Awaited<ReturnType<typeo
 describe('#418 · #324 — un projet vierge, accepté tel quel par les seuls boutons primaires, au 6 septembre 2026, sans navigateur', () => {
   const vus: { periode?: string; propositions?: string[]; coussin?: string; coussinReglages?: string; resume?: ReturnType<typeof lireLeResume>; plan?: ReturnType<typeof lireLePlan>; projet?: Ledger } = {};
 
-  it('[niveau 4] #324 point 1, D44 (table #418, plan 1) — la période commence le 28 dès l’arrivée sur l’étape Revenus, et seul « Suivre le mois calendaire » est proposé, de « Suivre le mois calendaire » et « Commencer au jour de ma paie »', async () => {
+  // Le parcours se fait une fois, avant les tests : chacun se joue seul à son seuil (D83), le niveau 1 sans le 2.
+  beforeAll(async () => {
     await ouvrirLApplication();
     expect(app.asOf, 'l’application ne lit pas au jour de l’exemple').toBe(JOUR);
     await arriverAuxComptes();
@@ -167,8 +174,6 @@ describe('#418 · #324 — un projet vierge, accepté tel quel par les seuls bou
     const champ = tous('main label.f').find((l) => t(l).includes('La période commence le'));
     vus.periode = (champ?.querySelector('input') as HTMLInputElement | null)?.value ?? '';
     vus.propositions = tous('main .propositions .prop .n').map(t);
-    expect(vus.periode).toBe('28');
-    expect(vus.propositions.filter((p) => /mois calendaire|jour de ma paie/.test(p))).toEqual([expect.stringMatching(/^Suivre le mois calendaire/)]);
 
     for (let i = 0; i < 6; i++) expect(await avancer()).toBe(true);
     vus.resume = lireLeResume();
@@ -177,16 +182,21 @@ describe('#418 · #324 — un projet vierge, accepté tel quel par les seuls bou
     vus.coussinReglages = await coussinDeReglages();
   });
 
-  it('[niveau 4] #324 point 2, D41 (table #418, plan 2) — l’étape Comptes montre le coussin de l’exemple, 600,00, sur la ligne du compte principal, et Réglages le montre une fois validé', () => {
+  it('[niveau 2] #324 point 1, D44 (table #418, plan 1) — la période commence le 28 dès l’arrivée sur l’étape Revenus, et seul « Suivre le mois calendaire » est proposé, de « Suivre le mois calendaire » et « Commencer au jour de ma paie »', () => {
+    expect(vus.periode).toBe('28');
+    expect(vus.propositions!.filter((p) => /mois calendaire|jour de ma paie/.test(p))).toEqual([expect.stringMatching(/^Suivre le mois calendaire/)]);
+  });
+
+  it('[niveau 2] #324 point 2, D41 (table #418, plan 2) — l’étape Comptes montre le coussin de l’exemple, 600,00, sur la ligne du compte principal, et Réglages le montre une fois validé', () => {
     expect(vus.coussin).toBe('600,00');
     expect(vus.coussinReglages).toBe('600,00');
   });
 
-  it('[niveau 4] #324 point 5 (table #418, plan 3) — le plan du projet validé aux seuls boutons primaires est celui de l’exemple privé de ses opérations, sur treize périodes', () => {
+  it('[niveau 2] #324 point 5 (table #418, plan 3) — le plan du projet validé aux seuls boutons primaires est celui de l’exemple privé de ses opérations, sur treize périodes', () => {
     expect(lirePlans(vus.projet!)).toEqual(lirePlans(exempleSansOperations()));
   });
 
-  it('[niveau 4] #324 point 5 (table #418, plan 4) — les chiffres que dit l’issue : la période du 28 août au 27 septembre, les totaux, l’ordre vers Livret A, la taxe foncière et son lissage, treize périodes', () => {
+  it('[niveau 2] #324 point 5 (table #418, plan 4) — les chiffres que dit l’issue : la période du 28 août au 27 septembre, les totaux, l’ordre vers Livret A, la taxe foncière et son lissage, treize périodes', () => {
     const plans = lirePlans(vus.projet!);
     const [courante] = plans;
     expect(courante!.periode).toEqual(['2026-08-28', '2026-09-27']);
@@ -196,7 +206,7 @@ describe('#418 · #324 — un projet vierge, accepté tel quel par les seuls bou
     expect(plans).toHaveLength(13);
   });
 
-  it('[niveau 4] #324 point 3 (table #418, plan 5) — le résumé dit ce que dit le Plan de la période en cours une fois validé', async () => {
+  it('[niveau 1] #324 point 3 (table #418, plan 5) — le résumé dit ce que dit le Plan de la période en cours une fois validé', async () => {
     await allerA('Plan');
     vus.plan = lireLePlan();
     leResumeEstLePlan({ resume: vus.resume!, plan: vus.plan, projet: vus.projet! });
@@ -204,7 +214,7 @@ describe('#418 · #324 — un projet vierge, accepté tel quel par les seuls bou
 });
 
 describe('#418 · #324 — ce que l’assistant propose se corrige, sans navigateur', () => {
-  it('[niveau 4] #324 points 1 et 2 (table #418, plan 6) — le coussin corrigé à 450,00 est celui que montre Réglages ; le plus gros revenu passé au 5, « Commencer au jour de ma paie … le 5 » et « Suivre le mois calendaire » sont proposés, et le début de période reste le 28 sans geste', async () => {
+  it('[niveau 2] #324 points 1 et 2 (table #418, plan 6) — le coussin corrigé à 450,00 est celui que montre Réglages ; le plus gros revenu passé au 5, « Commencer au jour de ma paie … le 5 » et « Suivre le mois calendaire » sont proposés, et le début de période reste le 28 sans geste', async () => {
     let propositions: string[] = [];
     const lu = await resumeEtPlan([
       ['Numéro ou IBAN', () => saisirDans('input[aria-label="Coussin du compte principal"]', 0, '450,00')],
@@ -230,14 +240,14 @@ describe('#418 · #324 — ce que l’assistant propose se corrige, sans navigat
 });
 
 describe('#418 · #324 — le résumé dit ce que dira le Plan, sur des budgets qui ne se ressemblent pas, sans navigateur', () => {
-  it('[niveau 4] #324 point 4 (table #418, plan 7) — accepté tel quel, avec 1 500,00 € sur le compte principal : le Plan annonce le non affecté négatif et la seule « Taxe foncière » en manque, et le résumé le dit', async () => {
+  it('[niveau 1] #324 point 4 (table #418, plan 7) — accepté tel quel, avec 1 500,00 € sur le compte principal : le Plan annonce le non affecté négatif et la seule « Taxe foncière » en manque, et le résumé le dit', async () => {
     const lu = await resumeEtPlan([['Numéro ou IBAN', () => saisirDans('.ligne-compte.principal > input.mt', 0, '1500,00')]]);
     expect(lu.plan.annonces.some((a) => a.includes('non affecté est négatif'))).toBe(true);
     expect(lu.plan.manques.map(([nom]) => nom)).toEqual(['Taxe foncière']);
     leResumeEstLePlan(lu);
   });
 
-  it('[niveau 4] #324 point 4 (table #418, plan 8) — les quatre revenus à 100,00 € : chaque ligne non couverte et la marge négative sont dites, pas « Tout est finançable »', async () => {
+  it('[niveau 1] #324 point 4 (table #418, plan 8) — les quatre revenus à 100,00 € : chaque ligne non couverte et la marge négative sont dites, pas « Tout est finançable »', async () => {
     const lu = await resumeEtPlan([
       [
         "Rentrées d'argent",
@@ -251,7 +261,7 @@ describe('#418 · #324 — le résumé dit ce que dira le Plan, sur des budgets 
     leResumeEstLePlan(lu);
   });
 
-  it('[niveau 4] #324 point 3 (table #418, plan 9) — « Taxe foncière » et « Vacances » retirées, ce que la banque vire à 350,00 € : le Plan n’annonce rien, n’a aucune échéance en manque, et le résumé dit « Tout est finançable »', async () => {
+  it('[niveau 1] #324 point 3 (table #418, plan 9) — « Taxe foncière » et « Vacances » retirées, ce que la banque vire à 350,00 € : le Plan n’annonce rien, n’a aucune échéance en manque, et le résumé dit « Tout est finançable »', async () => {
     const lu = await resumeEtPlan([
       [
         'Dépenses à échéance',

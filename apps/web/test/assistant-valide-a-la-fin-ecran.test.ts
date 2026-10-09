@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #418 : ce que vérifiait le harnais navigateur d'audit de #210 (« L'assistant n'écrit dans le
+ * Harnais d'audit de #418, composé parmi les tests du codeur :
+ * ce que vérifiait le harnais navigateur d'audit de #210 (« L'assistant n'écrit dans le
  * projet qu'à sa validation finale »), que #418 retire, sans navigateur : l'application montée sous jsdom (`ecran.ts`), au jour des tests. Chaque titre dit le point du « Fait quand » de
  * #210 qu'il vérifie, et le numéro du test retiré dans la table de #418 (« validé 1 » à « validé 7 »).
  *
@@ -14,6 +15,11 @@
  * seuls boutons primaires : le harnais du registre `navigateur/assistant-simple.test.ts` (I4). « Ses lignes à
  * l'arrivée » : `assistant-flux-exemple-ecran.test.ts`, `assistant-tirelires-exemple-ecran.test.ts` et
  * `assistant-categories-exemple-ecran.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #418 recopie. 1 pour validé 1, 2 (I10) et 3 (I3), rouges sur
+ * trois mutations : un compte de l'assistant écrit aussitôt dans le projet ; une rentrée corrigée écrite aussitôt ; le
+ * début de période oublié à la validation. 3 pour validé 4 ; 2 pour les autres. Validé 5 et 6 rougissent quand « Tout
+ * effacer » ou l'ouverture d'un fichier gardent le brouillon (`eraseAll`, `importFile`).
  */
 import { describe, expect, it } from 'vitest';
 import { LedgerStore, MAIN_ACCOUNT_ID, alive, type Ledger } from '@tirelire/core';
@@ -163,7 +169,7 @@ async function repartDuDebut(apres: string) {
 }
 
 describe('#418 · #210 point 1 — rien de ce que l’assistant montre n’entre dans le projet avant la validation, sans navigateur', () => {
-  it('[niveau 4] #210 point 1, I10 (table #418, validé 1) — projet vierge : le budget préparé, puis quitté sans valider, n’entre ni dans les écrans ni dans le dépôt ; rouverte sur ce qu’elle a enregistré, l’application dit de même, et l’assistant repart de « Commencer »', async () => {
+  it('[niveau 1] #210 point 1, I10 (table #418, validé 1) — projet vierge : le budget préparé, puis quitté sans valider, n’entre ni dans les écrans ni dans le dépôt ; rouverte sur ce qu’elle a enregistré, l’application dit de même, et l’assistant repart de « Commencer »', async () => {
     await ouvrirLApplication();
     const avant = await projetLu();
     const depotAvant = budgetDe(projet());
@@ -182,7 +188,7 @@ describe('#418 · #210 point 1 — rien de ce que l’assistant montre n’entre
     await repartDuDebut('la réouverture');
   });
 
-  it('[niveau 4] #210 point 1, I10 (table #418, validé 2) — projet existant : l’assistant part du contenu ; une rentrée renommée, une autre retirée et un placement changé n’entrent pas ; rouvert, il reprend au résumé avec la correction et le retrait ; validé, les trois entrent', async () => {
+  it('[niveau 1] #210 point 1, I10 (table #418, validé 2) — projet existant : l’assistant part du contenu ; une rentrée renommée, une autre retirée et un placement changé n’entrent pas ; rouvert, il reprend au résumé avec la correction et le retrait ; validé, les trois entrent', async () => {
     await ouvrirLApplication();
     expect(await cliquer('Charger l\'exemple')).toBe(true);
     await attendre(() => alive(app.ledger.accounts).some((a) => a.name === 'Livret A'), 'l’exemple');
@@ -233,7 +239,7 @@ describe('#418 · #210 point 1 — rien de ce que l’assistant montre n’entre
 });
 
 describe('#418 · #210 point 2 — la validation fait entrer exactement ce que l’assistant montre, sans navigateur', () => {
-  it('[niveau 4] #210 point 2, U1 (table #418, validé 3) — le budget préparé, validé : compte principal nommé et doté, compte ajouté, flux, tirelires, début de période et placement entrent ; rouverte sur ce qu’elle a enregistré, l’application dit de même', async () => {
+  it('[niveau 1] #210 point 2, U1 (table #418, validé 3) — le budget préparé, validé : compte principal nommé et doté, compte ajouté, flux, tirelires, début de période et placement entrent ; rouverte sur ce qu’elle a enregistré, l’application dit de même', async () => {
     await ouvrirLApplication();
     const prepare = await preparer();
     const lignes = [...prepare.parEtape].filter(([etape]) => !/comptes|classer/i.test(etape));
@@ -266,7 +272,7 @@ describe('#418 · #210 point 2 — la validation fait entrer exactement ce que l
 });
 
 describe('#418 · #210 point 3 — ce qui est préparé se retrouve en revenant, et le résumé dit que rien n’est enregistré, sans navigateur', () => {
-  it('[niveau 4] #210 point 3 (table #418, validé 4) — on quitte l’assistant au milieu et on y revient : l’étape et ses lignes sont là ; le résumé dit que rien n’est enregistré, sans « Voir le plan » ; après la validation, il le dit enregistré', async () => {
+  it('[niveau 3] #210 point 3 (table #418, validé 4) — on quitte l’assistant au milieu et on y revient : l’étape et ses lignes sont là ; le résumé dit que rien n’est enregistré, sans « Voir le plan » ; après la validation, il le dit enregistré', async () => {
     await ouvrirLApplication();
     await ouvrirLAssistant();
     await avancer();
@@ -303,14 +309,14 @@ describe('#418 · #210 point 3 — remplacer le projet perd ce qui était prépa
     await ecranOrdinaire('Réglages');
   }
 
-  it('[niveau 4] #210 point 3 (table #418, validé 5) — « Tout effacer » dans Réglages : rouvert, l’assistant repart de « Commencer »', async () => {
+  it('[niveau 2] #210 point 3 (table #418, validé 5) — « Tout effacer » dans Réglages : rouvert, l’assistant repart de « Commencer »', async () => {
     await preparerPuisAllerAuxReglages();
     expect(await cliquer('Tout effacer'), 'pas de bouton « Tout effacer »').toBe(true);
     await attendre(() => t(document.querySelector('main')).includes('Données effacées.'), 'la fin de l’effacement');
     await repartDuDebut('« Tout effacer »');
   });
 
-  it('[niveau 4] #210 point 3 (table #418, validé 6) — l’ouverture d’un fichier SQLite dans Réglages : rouvert, l’assistant repart de « Commencer »', async () => {
+  it('[niveau 2] #210 point 3 (table #418, validé 6) — l’ouverture d’un fichier SQLite dans Réglages : rouvert, l’assistant repart de « Commencer »', async () => {
     const requerir = createRequire(resolve(process.cwd(), 'package.json'));
     const SQL = await initSqlJs({ wasmBinary: readFileSync(requerir.resolve('sql.js/dist/sql-wasm.wasm')) as unknown as ArrayBuffer });
     const store = await LedgerStore.create({ sqlJs: SQL, siteId: 'audit-210' });
@@ -328,7 +334,7 @@ describe('#418 · #210 point 3 — remplacer le projet perd ce qui était prépa
 });
 
 describe('#418 · #210 point 4 — projet vierge : une ligne retirée ne revient pas en repassant par l’étape, sans navigateur', () => {
-  it('[niveau 4] #210 point 4, D43, D46 (table #418, validé 7) — à chacune des six étapes qui proposent, une ligne retirée ne revient pas quand on remonte du résumé par « Précédent »', async () => {
+  it('[niveau 2] #210 point 4, D43, D46 (table #418, validé 7) — à chacune des six étapes qui proposent, une ligne retirée ne revient pas quand on remonte du résumé par « Précédent »', async () => {
     await ouvrirLApplication();
     await ouvrirLAssistant();
     await avancer(); // le principe → les comptes
