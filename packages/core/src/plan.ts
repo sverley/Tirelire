@@ -443,14 +443,14 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
    * au-delà du pas d'arrondi, dans un sens comme dans l'autre — c'est le seul endroit du plan qui
    * demande un geste hors de l'application. Rien ne s'y réécrit (I10).
    */
-  const lireOrdres = (a: Account, ordres: PlannedFlow[], permanent: Cents, breakdown: PlanTransfer['breakdown'], retire = false) => {
+  const lireOrdres = (a: Account, ordres: PlannedFlow[], permanent: Cents, breakdown: PlanTransfer['breakdown'], compteRetire = false) => {
     const bankOrder = aDesTirelires && ordres.length > 0 ? compareOrders(ordres, permanent, breakdown, ledger, ledger.settings.orderRounding) : undefined;
     // Un ordre gardé tel quel reste lisible, à surveiller : il ne compte plus parmi les avertissements (#205, D20).
     if (bankOrder && ordres.length === 1 && keptOrderHolds(ordres[0]!, bankOrder, permanent, ledger.settings.orderRounding)) bankOrder.kept = true;
     if (bankOrder?.signaled && !bankOrder.kept)
       warnings.push({
         code: 'bankOrderDrift',
-        message: retire
+        message: compteRetire
           ? `L'ordre permanent de ${formatCents(bankOrder.amount)} vers « ${a.name} », un compte retiré, n'est plus demandé par le budget : à supprimer chez votre banque, puis ici.`
           : permanent === 0
             ? `L'ordre permanent de ${formatCents(bankOrder.amount)} vers « ${a.name} » n'est plus demandé par le budget : à supprimer chez votre banque, puis ici.`

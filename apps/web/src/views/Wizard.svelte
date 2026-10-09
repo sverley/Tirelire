@@ -322,8 +322,8 @@
   const nomDuCompte = (id?: string) => accounts.find((a) => a.id === id)?.name ?? '';
   /** Le compte d'un ordre, nommé même retiré, et alors marqué comme tel (#407, point 8). */
   const nomDuCompteDeLOrdre = (id?: string) => {
-    const retire = accounts.some((a) => a.id === id) ? undefined : app.assistantLedger.accounts.find((a) => a.id === id && a.deletedAt);
-    return retire ? `${retire.name} (compte retiré)` : nomDuCompte(id);
+    const compteRetire = accounts.some((a) => a.id === id) ? undefined : app.assistantLedger.accounts.find((a) => a.id === id && a.deletedAt);
+    return compteRetire ? `${compteRetire.name} (compte retiré)` : nomDuCompte(id);
   };
   /** Les noms des parts d'un ordre, les tirelires retirées comprises : un ordre enregistré les nomme encore (#407, point 8). */
   const nomsDesParts = $derived({ tirelires, categories, retirees: app.assistantLedger.tirelires.filter((t) => t.deletedAt) });
