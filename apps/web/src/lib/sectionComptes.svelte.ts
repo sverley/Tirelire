@@ -44,6 +44,11 @@ export interface DestinationDesComptes {
   /** Le coussin du compte principal (D41) : un réglage du foyer, écrit là où la section écrit. */
   readonly coussin: Cents;
   setCoussin(c: Cents): void;
+  /**
+   * L'ordre permanent est-il enregistré, porté par le projet (#407) ? Il reste quand son compte se
+   * retire. Absent : la destination est le projet, où tout ordre l'est.
+   */
+  ordreEnregistre?(id: Id): boolean;
 }
 
 /** Les genres proposés pour un autre compte que le principal. Typée : un genre renommé casse la compilation. */
@@ -195,9 +200,11 @@ export class SectionComptes {
 
   /**
    * Retire un compte, et ce qui ne tient que par lui : la part du placement d'une tirelire qui y
-   * dort — elle n'a plus de placement, et ne produit aucun écart (D38) — et l'ordre permanent qui en
-   * part ou y arrive. Le compte principal ne se retire jamais (D40). Le geste « × » est celui de
-   * l'assistant ; l'écran Comptes garde sa suppression, confirmée.
+   * dort — elle n'a plus de placement, et ne produit aucun écart (D38) — et l'ordre proposé qui y
+   * va, que le projet ne porte pas encore : il ne se propose que si ses deux comptes sont là (#395,
+   * point 5). Un ordre enregistré reste tel que l'utilisateur l'a validé : le plan le signale comme
+   * plus demandé (#407, point 2 ; D60, I10). Le compte principal ne se retire jamais (D40). Le
+   * geste « × » est celui de l'assistant ; l'écran Comptes garde sa suppression, confirmée.
    */
   retirer(a: Account) {
     if (a.kind === 'principal') return;
@@ -208,7 +215,7 @@ export class SectionComptes {
       }
     }
     for (const f of alive(this.#d.ledger.plannedFlows)) {
-      if (standingOrderTarget(f, MAIN_ACCOUNT_ID) === a.id) this.#d.remove('plannedFlows', f.id);
+      if (standingOrderTarget(f, MAIN_ACCOUNT_ID) === a.id && !(this.#d.ordreEnregistre?.(f.id) ?? true)) this.#d.remove('plannedFlows', f.id);
     }
   }
 }

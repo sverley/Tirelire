@@ -411,7 +411,7 @@ export interface PlannedFlow {
 export interface KeptOrder {
   /** Le montant mensuel demandé ; 0 pour un ordre que le budget ne demandait plus. */
   amount: Cents;
-  /** Par tirelire qui a une part fixe dans l'ordre : la part demandée. */
+  /** Par tirelire qui a une part fixe dans l'ordre, ou une part de genre quelconque quand elle est retirée (#407) : la part demandée. */
   parts?: Array<{ tirelireId: Id; amount: Cents }>;
 }
 

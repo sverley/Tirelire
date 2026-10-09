@@ -28,6 +28,7 @@ import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period
 import { addDays, addMonths } from './dates.js';
 import { flowOccurrences, tracksOperations, type FlowOccurrence } from './matching.js';
 import { computeForecast, withPlannedOperations, type Forecast } from './forecast.js';
+import { resolveShares } from './suboperations.js';
 
 export interface PlanFlowLine {
   flowId: Id;
@@ -113,6 +114,12 @@ export interface PlanTransfer {
   accountName: string;
   accountKind: Account['kind'];
   /**
+   * Le compte est retiré, et au moins un ordre enregistré y va encore (#407, point 6) : le budget n'y
+   * demande rien, même si une tirelire y est encore placée, et l'ordre est plus demandé, à tout
+   * montant — il continue de virer chez la banque tant que personne n'y a touché (D60).
+   */
+  accountRetired?: true;
+  /**
    * Les libellés du virement permanent vers ce compte (D11, D21 ; domaine plan et flux, hypothèse 3) :
    * ceux des ordres enregistrés que le plan compare, chacun une fois, dans l'ordre des ordres — un
    * ordre sans motif de libellé n'en donne aucun ; sans ordre comparé, le libellé tiré du nom actuel
@@ -183,8 +190,13 @@ export interface BankOrder {
   drift: Cents;
   /** L'écart du montant se signale (point 6 de #393). */
   signaled: boolean;
-  /** Par tirelire qui a au moins une part fixe dans ces ordres : leur somme mensuelle, ce que le budget lui demande ici, l'écart. */
-  parts: Array<{ tirelireId: Id; tirelireName: string; amount: Cents; requested: Cents; drift: Cents; signaled: boolean }>;
+  /**
+   * Par tirelire vivante qui a au moins une part fixe dans ces ordres : leur somme mensuelle, ce que le
+   * budget lui demande ici, l'écart. Par tirelire retirée qui a une part dans ces ordres, quel que soit
+   * son genre — fixe, en pourcentage ou variable : ce que ses parts virent par mois, rien de demandé,
+   * signalée à tout montant (`retired`, #407, point 5).
+   */
+  parts: Array<{ tirelireId: Id; tirelireName: string; amount: Cents; requested: Cents; drift: Cents; signaled: boolean; retired?: true }>;
   /**
    * L'ordre est gardé tel quel (#205) : son écart se signale encore (`signaled`, `parts`), mais à
    * surveiller, sans avertissement ni proposition, tant que le choix tient (`keptOrderHolds`).
@@ -425,6 +437,44 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   // Sans aucune tirelire (U5), le budget ne parle d'aucun compte : aucun ordre ne se compare (D60).
   const aDesTirelires = alive(ledger.tirelires).length > 0;
   const transfers: PlanTransfer[] = [];
+  /*
+   * Ce que le budget demande vient d'être calculé ; ce que la banque exécute, lui, ne se devine
+   * pas (D60). Les deux se comparent ici, dès que le budget a une tirelire, et l'écart se dit
+   * au-delà du pas d'arrondi, dans un sens comme dans l'autre — c'est le seul endroit du plan qui
+   * demande un geste hors de l'application. Rien ne s'y réécrit (I10).
+   */
+  const lireOrdres = (a: Account, ordres: PlannedFlow[], permanent: Cents, breakdown: PlanTransfer['breakdown'], retire = false) => {
+    const bankOrder = aDesTirelires && ordres.length > 0 ? compareOrders(ordres, permanent, breakdown, ledger, ledger.settings.orderRounding) : undefined;
+    // Un ordre gardé tel quel reste lisible, à surveiller : il ne compte plus parmi les avertissements (#205, D20).
+    if (bankOrder && ordres.length === 1 && keptOrderHolds(ordres[0]!, bankOrder, permanent, ledger.settings.orderRounding)) bankOrder.kept = true;
+    if (bankOrder?.signaled && !bankOrder.kept)
+      warnings.push({
+        code: 'bankOrderDrift',
+        message: retire
+          ? `L'ordre permanent de ${formatCents(bankOrder.amount)} vers « ${a.name} », un compte retiré, n'est plus demandé par le budget : à supprimer chez votre banque, puis ici.`
+          : permanent === 0
+            ? `L'ordre permanent de ${formatCents(bankOrder.amount)} vers « ${a.name} » n'est plus demandé par le budget : à supprimer chez votre banque, puis ici.`
+            : `L'ordre permanent vers « ${a.name} » est enregistré à ${formatCents(bankOrder.amount)}, le budget en demande ${formatCents(permanent)} : à modifier chez votre banque, puis à confirmer ici.`,
+        accountId: a.id,
+      });
+    for (const part of bankOrder?.kept ? [] : (bankOrder?.parts ?? []))
+      if (part.signaled)
+        warnings.push({
+          code: 'bankOrderPartDrift',
+          message: part.retired
+            ? `La part de « ${part.tirelireName} » dans l'ordre permanent vers « ${a.name} » vire ${formatCents(part.amount)} par mois, mais cette tirelire est retirée : le budget ne lui demande plus rien. L'ordre est à modifier chez votre banque, puis à confirmer ici.`
+            : `La part de « ${part.tirelireName} » dans l'ordre permanent vers « ${a.name} » est enregistrée à ${formatCents(part.amount)}, le budget lui en demande ${formatCents(part.requested)} : l'ordre est à modifier chez votre banque, puis à confirmer ici.`,
+          accountId: a.id,
+          tirelireId: part.tirelireId,
+        });
+    const suivis = ordres.filter((f) => tracksOperations(ledger, f.accountId));
+    const occurrences = suivis.length
+      ? suivis
+          .flatMap((f) => flowOccurrences(ledger, f, period.start, period.end, today).map((o) => ({ ...o, flowId: f.id, flowName: f.name })))
+          .sort((x, y) => x.date.localeCompare(y.date) || x.flowName.localeCompare(y.flowName, 'fr') || x.flowId.localeCompare(y.flowId))
+      : undefined;
+    return { bankOrder, occurrences, labels: [...new Set(ordres.flatMap((f) => (f.labelPattern ? [f.labelPattern] : [])))] };
+  };
   for (const a of idx.accountsById.values()) {
     if (principal && a.id === principal.id) continue;
     const orders: StandingOrder[] = [];
@@ -473,50 +523,19 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
     } else if (!upcoming && a.kind === 'epargne') {
       surplus = unallocated(a, ledger, idx, known);
     }
-    /*
-     * Ce que le budget demande vient d'être calculé ; ce que la banque exécute, lui, ne se devine
-     * pas (D60). Les deux se comparent ici, dès que le budget a une tirelire, et l'écart se dit
-     * au-delà du pas d'arrondi, dans un sens comme dans l'autre — c'est le seul endroit du plan qui
-     * demande un geste hors de l'application. Rien ne s'y réécrit (I10).
-     */
     const breakdown = wantedByAccount.get(a.id) ?? [];
     const permanent = Math.max(0, breakdown.reduce((s, b) => s + b.cruise, 0));
     const ordres = principal ? standingOrderFlows(ledger.plannedFlows, principal.id, a.id, asOf) : [];
-    const bankOrder = aDesTirelires && ordres.length > 0 ? compareOrders(ordres, permanent, breakdown, ledger, ledger.settings.orderRounding) : undefined;
-    // Un ordre gardé tel quel reste lisible, à surveiller : il ne compte plus parmi les avertissements (#205, D20).
-    if (bankOrder && ordres.length === 1 && keptOrderHolds(ordres[0]!, bankOrder, permanent, ledger.settings.orderRounding)) bankOrder.kept = true;
-    if (bankOrder?.signaled && !bankOrder.kept)
-      warnings.push({
-        code: 'bankOrderDrift',
-        message:
-          permanent === 0
-            ? `L'ordre permanent de ${formatCents(bankOrder.amount)} vers « ${a.name} » n'est plus demandé par le budget : à supprimer chez votre banque, puis ici.`
-            : `L'ordre permanent vers « ${a.name} » est enregistré à ${formatCents(bankOrder.amount)}, le budget en demande ${formatCents(permanent)} : à modifier chez votre banque, puis à confirmer ici.`,
-        accountId: a.id,
-      });
-    for (const part of bankOrder?.kept ? [] : (bankOrder?.parts ?? []))
-      if (part.signaled)
-        warnings.push({
-          code: 'bankOrderPartDrift',
-          message: `La part de « ${part.tirelireName} » dans l'ordre permanent vers « ${a.name} » est enregistrée à ${formatCents(part.amount)}, le budget lui en demande ${formatCents(part.requested)} : l'ordre est à modifier chez votre banque, puis à confirmer ici.`,
-          accountId: a.id,
-          tirelireId: part.tirelireId,
-        });
+    const lu = lireOrdres(a, ordres, permanent, breakdown);
     const montantPropose = roundOrderUp(permanent, ledger.settings.orderRounding);
     const proposal = permanent > 0 ? { amount: montantPropose, allocation: orderAllocation(breakdown, lines, montantPropose, -1) } : undefined;
     const net = standing + exceptional + settlement - surplus;
-    if (orders.length === 0 && settlement === 0 && surplus === 0 && !bankOrder) continue;
-    const suivis = ordres.filter((f) => tracksOperations(ledger, f.accountId));
-    const occurrences = suivis.length
-      ? suivis
-          .flatMap((f) => flowOccurrences(ledger, f, period.start, period.end, today).map((o) => ({ ...o, flowId: f.id, flowName: f.name })))
-          .sort((x, y) => x.date.localeCompare(y.date) || x.flowName.localeCompare(y.flowName, 'fr') || x.flowId.localeCompare(y.flowId))
-      : undefined;
+    if (orders.length === 0 && settlement === 0 && surplus === 0 && !lu.bankOrder) continue;
     transfers.push({
       accountId: a.id,
       accountName: a.name,
       accountKind: a.kind,
-      labels: bankOrder ? [...new Set(ordres.flatMap((f) => (f.labelPattern ? [f.labelPattern] : [])))] : [transferLabel(a.name)],
+      labels: lu.bankOrder ? lu.labels : [transferLabel(a.name)],
       orders,
       standing,
       permanent,
@@ -525,11 +544,41 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
       settlement,
       surplus,
       net,
-      ...(bankOrder ? { bankOrder } : {}),
+      ...(lu.bankOrder ? { bankOrder: lu.bankOrder } : {}),
       ...(proposal ? { proposal } : {}),
-      ...(occurrences ? { occurrences } : {}),
+      ...(lu.occurrences ? { occurrences: lu.occurrences } : {}),
     });
   }
+  /*
+   * Un compte retiré vers lequel un ordre enregistré est encore en vigueur (#407, point 6) : l'ordre
+   * reste ce que l'utilisateur a validé (D60, I10), et le plan le montre comme un ordre plus demandé,
+   * sous le nom du compte, marqué comme retiré. Le budget n'y demande rien, même si une tirelire y est
+   * encore placée : aucun ordre ne s'y propose, aucune position de compte ne s'y lit.
+   */
+  if (principal)
+    for (const a of ledger.accounts) {
+      if (!a.deletedAt || a.id === principal.id || idx.accountsById.has(a.id)) continue;
+      const ordres = standingOrderFlows(ledger.plannedFlows, principal.id, a.id, asOf);
+      const lu = lireOrdres(a, ordres, 0, [], true);
+      if (!lu.bankOrder) continue;
+      transfers.push({
+        accountId: a.id,
+        accountName: a.name,
+        accountKind: a.kind,
+        accountRetired: true,
+        labels: lu.labels,
+        orders: [],
+        standing: 0,
+        permanent: 0,
+        breakdown: [],
+        exceptional: 0,
+        settlement: 0,
+        surplus: 0,
+        net: 0,
+        bankOrder: lu.bankOrder,
+        ...(lu.occurrences ? { occurrences: lu.occurrences } : {}),
+      });
+    }
   transfers.sort((x, y) => Math.abs(y.net) - Math.abs(x.net));
 
   const principalUnallocated = principal ? unallocated(principal, ledger, upcoming ? indexLedger(ledger) : idx, known) : 0;
@@ -721,20 +770,36 @@ export function lapsedKeptOrders(ledger: Ledger, asOf: ISODate): PlannedFlow[] {
 /**
  * Les ordres d'un compte comparés à ce que le budget y demande, montant et parts fixes (D60, I10).
  * Une part nomme sa tirelire par le grand livre, celles qui ont été retirées comprises : un ordre
- * garde ses parts quand une tirelire disparaît, et le signal la nomme encore.
+ * garde ses parts quand une tirelire disparaît, et le signal la nomme encore. La part d'une tirelire
+ * retirée, quel que soit son genre, se compare à rien : le budget ne lui demande plus rien, et elle se
+ * signale à tout montant (#407, point 5).
  */
 function compareOrders(ordres: PlannedFlow[], permanent: Cents, breakdown: PlanTransfer['breakdown'], ledger: Ledger, step: Cents): BankOrder {
   const amount = ordres.reduce((s, f) => s + monthlyEquivalent(f.amount, f), 0);
   const drift = permanent - amount;
+  const retirees = new Map(ledger.tirelires.filter((t) => t.deletedAt).map((t) => [t.id, t.name]));
   const fixes = new Map<Id, Cents>();
-  for (const f of ordres)
-    for (const l of f.action?.allocation ?? [])
-      if (l.tirelireId && l.share.kind === 'fixed') fixes.set(l.tirelireId, (fixes.get(l.tirelireId) ?? 0) + monthlyEquivalent(l.share.amount, f));
+  const deRetirees = new Map<Id, Cents>();
+  for (const f of ordres) {
+    // L'action d'un ordre sans parts, qui nomme une tirelire, lui donne tout le montant (`actionAllocation`).
+    const lignes = f.action?.allocation ?? (f.action?.tirelireId ? [{ tirelireId: f.action.tirelireId, share: { kind: 'variable' as const } }] : []);
+    const montants = resolveShares(
+      Math.abs(f.amount),
+      lignes.map((l, i) => ({ id: `p${i}`, operationId: f.id, share: l.share.kind === 'fixed' ? { kind: 'fixed' as const, amount: Math.abs(l.share.amount) } : l.share })),
+    );
+    lignes.forEach((l, i) => {
+      if (!l.tirelireId) return;
+      if (retirees.has(l.tirelireId)) deRetirees.set(l.tirelireId, (deRetirees.get(l.tirelireId) ?? 0) + monthlyEquivalent(montants.get(`p${i}`) ?? 0, f));
+      else if (l.share.kind === 'fixed') fixes.set(l.tirelireId, (fixes.get(l.tirelireId) ?? 0) + monthlyEquivalent(l.share.amount, f));
+    });
+  }
   const parts: BankOrder['parts'] = [...fixes].map(([tirelireId, montant]) => {
     const requested = breakdown.find((b) => b.tirelireId === tirelireId)?.cruise ?? 0;
     const d = requested - montant;
     return { tirelireId, tirelireName: ledger.tirelires.find((t) => t.id === tirelireId)?.name ?? tirelireId, amount: montant, requested, drift: d, signaled: driftSignaled(d, step) };
   });
+  for (const [tirelireId, montant] of deRetirees)
+    parts.push({ tirelireId, tirelireName: retirees.get(tirelireId)!, amount: montant, requested: 0, drift: -montant, signaled: true, retired: true });
   const seul = ordres.length === 1 ? ordres[0]! : undefined;
   return {
     flowIds: ordres.map((f) => f.id),

@@ -301,6 +301,7 @@
       return app.assistantLedger.settings.principalCushion;
     },
     setCoussin: (c) => app.assistantSetSetting('principalCushion', c),
+    ordreEnregistre: (id) => enregistre(id),
   });
 
   // --- Placement des réserves ---
@@ -311,7 +312,21 @@
   }
   // --- Ordres permanents déjà posés chez la banque (D60) : ce qu'ils exécutent est un fait, le seul montant qui s'enregistre ---
   const ordres = $derived(flows.filter((f) => standingOrderTarget(f, mainAccountId()) !== undefined));
+  /**
+   * Un ordre enregistré : le projet le porte (#407). L'ordre proposé, que l'assistant ajoute depuis
+   * l'exemple, ne l'est pas encore (D43, D60).
+   */
+  function enregistre(id: string): boolean {
+    return app.ledger.plannedFlows.some((f) => f.id === id && !f.deletedAt);
+  }
   const nomDuCompte = (id?: string) => accounts.find((a) => a.id === id)?.name ?? '';
+  /** Le compte d'un ordre, nommé même retiré, et alors marqué comme tel (#407, point 8). */
+  const nomDuCompteDeLOrdre = (id?: string) => {
+    const retire = accounts.some((a) => a.id === id) ? undefined : app.assistantLedger.accounts.find((a) => a.id === id && a.deletedAt);
+    return retire ? `${retire.name} (compte retiré)` : nomDuCompte(id);
+  };
+  /** Les noms des parts d'un ordre, les tirelires retirées comprises : un ordre enregistré les nomme encore (#407, point 8). */
+  const nomsDesParts = $derived({ tirelires, categories, retirees: app.assistantLedger.tirelires.filter((t) => t.deletedAt) });
   /** Ce que le budget de l'assistant demande comme ordre permanent vers ce compte (D60) : un calcul, relu à chaque lecture. */
   const demandeVers = (accountId?: string) => app.assistantPlan.transfers.find((t) => t.accountId === accountId)?.permanent ?? 0;
   /**
@@ -405,14 +420,22 @@
     if (f) app.assistantUpsert('plannedFlows', f);
   }
   /**
-   * Une part d'ordre dont la tirelire n'est plus dans le brouillon ne s'enregistre pas (#395) : à la
-   * validation, chaque ordre ne garde que les parts de ses tirelires présentes ; son montant ne change
-   * pas, et ce que ses parts n'absorbent pas reste non affecté sur le compte d'accueil (D21).
+   * Une part de l'ordre proposé dont la tirelire n'est plus dans le brouillon ne s'enregistre pas
+   * (#395) : à la validation, l'ordre proposé ne garde que les parts de ses tirelires présentes ; son
+   * montant ne change pas, et ce que ses parts n'absorbent pas reste non affecté sur le compte
+   * d'accueil (D21). Un ordre enregistré, lui, garde toutes ses parts : rien ne réécrit ce que
+   * l'utilisateur a validé, et le plan signale la part d'une tirelire retirée (#407 ; D60, I10).
    */
-  /** Les parts de l'ordre dont la tirelire est dans le brouillon : seules elles se montrent et s'enregistrent (#395, point 5). */
-  const partsPresentes = (f: PlannedFlow) => f.action?.allocation?.filter((a) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId));
+  /**
+   * Les parts que montre la carte d'un ordre : pour l'ordre proposé, celles dont la tirelire est dans
+   * le brouillon, seules à s'enregistrer (#395, point 5) ; pour un ordre enregistré, toutes, telles
+   * qu'elles sont enregistrées (#407, point 8).
+   */
+  const partsPresentes = (f: PlannedFlow) =>
+    enregistre(f.id) ? f.action?.allocation : f.action?.allocation?.filter((a) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId));
   function elaguerLesParts() {
     for (const f of ordres) {
+      if (enregistre(f.id)) continue;
       const parts = f.action?.allocation;
       if (!parts?.length) continue;
       const gardees = parts.filter((a) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId));
@@ -598,7 +621,9 @@
       const table = prop === 'tirelireId' ? montre.tirelires : prop === 'categoryId' || prop === 'parentId' ? montre.categories : montre.accounts;
       return (table as Array<{ id: string; name?: string }>).find((l) => l.id === id)?.name;
     };
-    return direDifference(difference, preparation.ok ? preparation.conflits : [], nommer);
+    // Les ordres enregistrés que la validation laisse en place, tels que l'assistant les montre (#407, point 7).
+    const enregistres = alive(montre.plannedFlows).filter((f) => enregistre(f.id) && standingOrderTarget(f, mainAccountId()) !== undefined);
+    return direDifference(difference, preparation.ok ? preparation.conflits : [], nommer, enregistres);
   });
 
   /**
@@ -1006,15 +1031,15 @@
             <strong>{f.name}</strong>
             <div class="muted small">
               {f.periodicity.unit === 'month' && f.periodicity.interval === 1 ? `Le ${parseDate(f.periodicity.anchorDate).d} de chaque mois` : periodicityLabel(f.periodicity)},
-              de {nomDuCompte(f.accountId)} vers {nomDuCompte(f.counterpartAccountId)}{f.labelPattern ? ` · libellé « ${f.labelPattern} »` : ''}.
+              de {nomDuCompteDeLOrdre(f.accountId)} vers {nomDuCompteDeLOrdre(f.counterpartAccountId)}{f.labelPattern ? ` · libellé « ${f.labelPattern} »` : ''}.
             </div>
           </div>
           <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
           <button class="btn small danger" title="Retirer ce virement" onclick={() => removeFlow(f)}>×</button>
         </div>
-        <VentilationOrdre montant={Math.abs(f.amount)} allocation={partsPresentes(f)} compte={nomDuCompte(standingOrderTarget(f, mainAccountId()))} noms={{ tirelires, categories }} />
+        <VentilationOrdre montant={Math.abs(f.amount)} allocation={partsPresentes(f)} compte={nomDuCompteDeLOrdre(standingOrderTarget(f, mainAccountId()))} noms={nomsDesParts} />
         <p class="muted small" style="margin:4px 0 0">
-          Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {nomDuCompte(f.counterpartAccountId)}.
+          Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {nomDuCompteDeLOrdre(f.counterpartAccountId)}.
         </p>
       </div>
     {/each}
@@ -1131,6 +1156,13 @@
         {#each partie.retraits as l, i (i)}<li><span class="pill neg">Retiré</span> {l.texte}</li>{/each}
       </ul>
     {/each}
+    {#if aValider.ordres.length}
+      <!-- Ce que les retraits font aux ordres enregistrés : ils restent tels quels (#407, point 7). -->
+      <h4>Virements permanents enregistrés</h4>
+      <ul class="ordres-touches">
+        {#each aValider.ordres as l, i (i)}<li><span class="pill">Inchangé</span> {l.texte}</li>{/each}
+      </ul>
+    {/if}
     {#if aValider.reglages.length}
       <h4>Réglages</h4>
       <ul>

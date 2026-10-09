@@ -5,7 +5,18 @@
  *
  * Sans Svelte ni navigateur : le résumé de l'assistant l'affiche.
  */
-import { CLES_TABLES_BUDGET, TABLES, type CleTableBudget, type ConflitBudget, type DifferenceBudget, type LigneModele } from '@tirelire/core';
+import {
+  CLES_TABLES_BUDGET,
+  MAIN_ACCOUNT_ID,
+  TABLES,
+  flowTirelireIds,
+  standingOrderTarget,
+  type CleTableBudget,
+  type ConflitBudget,
+  type DifferenceBudget,
+  type LigneModele,
+  type PlannedFlow,
+} from '@tirelire/core';
 import { money } from './format';
 
 /** Le nom de chaque partie, tel que l'assistant l'emploie. */
@@ -84,19 +95,55 @@ export interface PartieDite {
 
 export interface DifferenceDite {
   parties: PartieDite[];
+  /**
+   * Ce que les retraits font aux ordres enregistrés (#407, point 7) : une ligne par tirelire ou compte
+   * retiré qu'un ordre enregistré désigne, qui nomme l'ordre et dit qu'il reste enregistré tel quel.
+   */
+  ordres: LigneDite[];
   reglages: LigneDite[];
   conflits: LigneDite[];
   vide: boolean;
 }
 
 /**
+ * Ce que la validation fait aux ordres enregistrés qu'elle laisse en place (#407, point 7) : pour
+ * chaque tirelire ou compte que la différence retire et qu'un de ces ordres désigne, une ligne qui
+ * nomme l'ordre et dit qu'il reste enregistré tel quel, et ce qui en découle (D21, D60, I10).
+ * `ordres` : les ordres enregistrés — ceux que le projet porte — tels que l'assistant les montre, sans
+ * ceux qu'il retire.
+ */
+export function direOrdresTouches(
+  difference: DifferenceBudget,
+  ordres: PlannedFlow[],
+  nommer: (prop: string, id: string) => string | undefined,
+): LigneDite[] {
+  const lignes: LigneDite[] = [];
+  const nom = (prop: string, id: string) => nommer(prop, id) ?? id;
+  for (const t of difference.tables.tirelires?.retraits ?? [])
+    for (const f of ordres.filter((o) => flowTirelireIds(o).includes(t.id))) {
+      const compte = standingOrderTarget(f, MAIN_ACCOUNT_ID);
+      lignes.push({
+        texte: `L’ordre permanent « ${f.name} » reste enregistré tel quel : la part de « ${nom('tirelireId', t.id)} » reste dans l’ordre, ce qu’elle vire restera non affecté sur « ${compte ? nom('accountId', compte) : ''} », et le Plan la signalera.`,
+      });
+    }
+  for (const a of difference.tables.accounts?.retraits ?? [])
+    for (const f of ordres.filter((o) => standingOrderTarget(o, MAIN_ACCOUNT_ID) === a.id))
+      lignes.push({
+        texte: `L’ordre permanent « ${f.name} » vers « ${nom('accountId', a.id)} » reste enregistré tel quel : il continue de virer chez votre banque tant que vous ne l’y supprimez pas, et le Plan le signalera comme plus demandé.`,
+      });
+  return lignes;
+}
+
+/**
  * La différence et les conflits, dits. `nommer` rend le nom d'une ligne désignée (un compte, une
- * tirelire, une catégorie), pour qu'un lien se lise par son nom.
+ * tirelire, une catégorie), pour qu'un lien se lise par son nom. `ordres` : les ordres enregistrés
+ * que la validation laisse en place (`direOrdresTouches`).
  */
 export function direDifference(
   difference: DifferenceBudget,
   conflits: ConflitBudget[],
   nommer: (prop: string, id: string) => string | undefined,
+  ordres: PlannedFlow[] = [],
 ): DifferenceDite {
   const nomDe = (cle: CleTableBudget, l: LigneModele): string => {
     const nom = typeof l['name'] === 'string' && l['name'] ? (l['name'] as string) : undefined;
@@ -151,5 +198,5 @@ export function direDifference(
       detail: `version de l’assistant retenue (${decrire(c.retenue)}) ; version écartée (${decrire(c.ecartee)})`,
     };
   });
-  return { parties, reglages, conflits: dits, vide: !parties.length && !reglages.length };
+  return { parties, ordres: direOrdresTouches(difference, ordres, nommer), reglages, conflits: dits, vide: !parties.length && !reglages.length };
 }
