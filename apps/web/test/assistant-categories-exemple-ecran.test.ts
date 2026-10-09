@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #417 — ce que vérifiait `navigateur/assistant-categories-exemple-harnais.test.ts` (harnais
+ * Harnais d'audit de #417, composé parmi les tests du codeur :
+ * ce que vérifiait `navigateur/assistant-categories-exemple-harnais.test.ts` (harnais
  * d'audit de #212, « L'assistant propose les catégories de l'exemple »), sans navigateur : l'application montée sous
  * jsdom (`ecran.ts`), au jour des tests, sur un dépôt en mémoire. Chaque titre dit le point du « Fait quand » de #212
  * qu'il vérifie, et le numéro du test retiré dans la table de #417.
@@ -16,7 +17,11 @@
  * La ligne d'une catégorie se lit par ce qu'elle dit — quelles tirelires, quels flux —, non par la forme du texte, que
  * #212 laisse libre.
  *
- * Niveau 4, comme tout test du codeur ; l'auditeur donne le leur à ceux qu'il retient (D83) : ceux du test retiré.
+ * Niveaux (D83) : ceux des tests retirés, que la table de #417 recopie. 1 pour le point 6 (catégories 5 et 6, I11) et
+ * les deux tests du point 3 sur la tirelire retirée (catégories 9 et 14, I3). Rouges sur quatre mutations : la
+ * catégorie créée sans sa tirelire par défaut (5, 9, 14) ; ses flux non liés (6) ; la catégorie non créée quand sa
+ * tirelire manque à l'arrivée (9) ; la catégorie emportée avec sa tirelire (14). 2 pour les autres : D43, D46, D32 et
+ * D61 sont des décisions.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { alive, type Category } from '@tirelire/core';
@@ -152,14 +157,14 @@ describe('#417 · #212 — tel quel, sans navigateur', () => {
     ecrans = tous('.wizard-steps .wstep').map(t);
   });
 
-  it('[niveau 4] #212 point 1 (table #417, catégories 1) — une étape Catégories, après Épargne et avant le Résumé', () => {
+  it('[niveau 2] #212 point 1 (table #417, catégories 1) — une étape Catégories, après Épargne et avant le Résumé', () => {
     const i = ecrans.indexOf('Catégories');
     expect(ecrans[i - 1]).toBe('Épargne');
     expect(ecrans[i + 1]).toBe('Résumé');
     expect(titre()).toContain('classer');
   });
 
-  it('[niveau 4] #212 point 1 (table #417, catégories 2) — sur un projet vierge, l’étape arrive avec les dix catégories de l’exemple, et elles seules, chacune rangée sous sa nature, sans raccourci restant', () => {
+  it('[niveau 2] #212 point 1 (table #417, catégories 2) — sur un projet vierge, l’étape arrive avec les dix catégories de l’exemple, et elles seules, chacune rangée sous sa nature, sans raccourci restant', () => {
     const lignes = lesCategories();
     expect(noms(lignes, 'Revenus')).toEqual(['Salaire', 'Loyer perçu', 'Allocations']);
     expect(noms(lignes, 'Dépenses')).toEqual(['Alimentation', 'Santé', 'Enfants', 'Logement', 'Assurances', 'Abonnements', 'Virement interne']);
@@ -167,7 +172,7 @@ describe('#417 · #212 — tel quel, sans navigateur', () => {
     expect(raccourcis()).toEqual([]);
   });
 
-  it('[niveau 4] #212 point 2 (table #417, catégories 3) — chaque ligne dit la tirelire par défaut et les flux qui portent la catégorie', () => {
+  it('[niveau 2] #212 point 2 (table #417, catégories 3) — chaque ligne dit la tirelire par défaut et les flux qui portent la catégorie', () => {
     const lignes = lesCategories();
     expect(dit(lignes, 'Alimentation')).toEqual({ tirelires: ['Alimentation'], flux: [] });
     expect(dit(lignes, 'Santé')).toEqual({ tirelires: ['Santé'], flux: [] });
@@ -182,7 +187,7 @@ describe('#417 · #212 — tel quel, sans navigateur', () => {
     expect(dit(lignes, 'Allocations', 'Revenus')).toEqual({ tirelires: [], flux: ['Allocations'] });
   });
 
-  it('[niveau 4] #212 point 6 (table #417, catégories 5) — validé tel quel, le projet porte les dix catégories, chacune avec sa tirelire par défaut, et Catégories les montre', async () => {
+  it('[niveau 1] #212 point 6 (table #417, catégories 5) — validé tel quel, le projet porte les dix catégories, chacune avec sa tirelire par défaut, et Catégories les montre', async () => {
     await suivant(1);
     expect(await cliquer('Valider mon budget')).toBe(true);
     const p = categoriesDuProjet();
@@ -199,7 +204,7 @@ describe('#417 · #212 — tel quel, sans navigateur', () => {
     expect(cats).toHaveLength(10);
   });
 
-  it('[niveau 4] #212 point 6 (table #417, catégories 6) — chaque flux de l’exemple se retrouve, enregistré et dans Flux prévus, avec sa catégorie', async () => {
+  it('[niveau 1] #212 point 6 (table #417, catégories 6) — chaque flux de l’exemple se retrouve, enregistré et dans Flux prévus, avec sa catégorie', async () => {
     const attendu: Array<[string, string]> = [
       ['Crédit immobilier', 'Logement'],
       ['Électricité', 'Logement'],
@@ -230,7 +235,7 @@ describe('#417 · #212 — renommé, sans navigateur', () => {
     await suivant(3); // Budgets → Pas tous les mois → Épargne → Catégories
   });
 
-  it('[niveau 4] #212 point 2 (table #417, catégories 8) — une catégorie se lie par le nom : un flux ou une tirelire renommé à une étape précédente ne lui est pas lié, la ligne ne le montre pas, et le projet validé le laisse sans catégorie', async () => {
+  it('[niveau 2] #212 point 2 (table #417, catégories 8) — une catégorie se lie par le nom : un flux ou une tirelire renommé à une étape précédente ne lui est pas lié, la ligne ne le montre pas, et le projet validé le laisse sans catégorie', async () => {
     expect(titre()).toContain('classer');
     const lignes = lesCategories();
     expect(lignes).toHaveLength(10);
@@ -262,7 +267,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     await suivant(3); // Budgets → Pas tous les mois → Épargne → Catégories
   });
 
-  it('[niveau 4] #212 point 3, I3 (table #417, catégories 9) — une tirelire retirée à une étape précédente laisse sa catégorie, sans tirelire par défaut', () => {
+  it('[niveau 1] #212 point 3, I3 (table #417, catégories 9) — une tirelire retirée à une étape précédente laisse sa catégorie, sans tirelire par défaut', () => {
     expect(titre()).toContain('classer');
     const lignes = lesCategories();
     expect(lignes).toHaveLength(10);
@@ -271,7 +276,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     expect(dit(lignes, 'Santé').tirelires).toEqual(['Santé']);
   });
 
-  it('[niveau 4] #212 point 3 (table #417, catégories 10) — le nom d’une catégorie se corrige sur place, et la correction tient quand on quitte l’étape et qu’on y revient', async () => {
+  it('[niveau 2] #212 point 3 (table #417, catégories 10) — le nom d’une catégorie se corrige sur place, et la correction tient quand on quitte l’étape et qu’on y revient', async () => {
     await poser('main .ligne-categorie input.nom', 'Santé', 'Soins');
     let lignes = lesCategories();
     expect(noms(lignes, 'Dépenses')).toContain('Soins');
@@ -286,7 +291,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     expect(lignes).toHaveLength(10);
   });
 
-  it('[niveau 4] #212 point 3 (table #417, catégories 11) — le renommage en doublon d’une catégorie de même nature est refusé, dit, et le champ reprend son nom', async () => {
+  it('[niveau 2] #212 point 3 (table #417, catégories 11) — le renommage en doublon d’une catégorie de même nature est refusé, dit, et le champ reprend son nom', async () => {
     await poser('main .ligne-categorie input.nom', 'Enfants', ' logement ');
     expect(erreurs()).toEqual(['Une catégorie « Logement » existe déjà pour cette nature.']);
     const lignes = lesCategories();
@@ -297,7 +302,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     expect(erreurs()).toEqual([]);
   });
 
-  it('[niveau 4] #212 point 3 (table #417, catégories 12) — l’ajout d’une catégorie de même nature et de même nom est refusé et dit ; en l’autre nature, il est accepté', async () => {
+  it('[niveau 2] #212 point 3 (table #417, catégories 12) — l’ajout d’une catégorie de même nature et de même nom est refusé et dit ; en l’autre nature, il est accepté', async () => {
     await ajouter('salaire', 'income');
     expect(erreurs()).toEqual(['Une catégorie « Salaire » existe déjà pour cette nature.']);
     expect(lesCategories()).toHaveLength(10);
@@ -311,7 +316,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     expect(lesCategories()).toHaveLength(10);
   });
 
-  it('[niveau 4] #212 point 3 (table #417, catégories 13) — une catégorie retirée sur place disparaît de l’étape, et ne reste sur aucun flux', async () => {
+  it('[niveau 2] #212 point 3 (table #417, catégories 13) — une catégorie retirée sur place disparaît de l’étape, et ne reste sur aucun flux', async () => {
     await retirer('main .ligne-categorie input.nom', 'Logement');
     await retirer('main .ligne-categorie input.nom', 'Assurances');
     await retirer('main .ligne-categorie input.nom', 'Loyer perçu');
@@ -321,7 +326,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     for (const l of lignes) expect(l.detail, l.nom).not.toMatch(/Crédit immobilier|Électricité|Assurance habitation|Loyer locatif/);
   });
 
-  it('[niveau 4] #212 point 3, I3 (table #417, catégories 14) — une tirelire retirée à l’étape des budgets, après l’arrivée ici, laisse aussi sa catégorie sans tirelire par défaut', async () => {
+  it('[niveau 1] #212 point 3, I3 (table #417, catégories 14) — une tirelire retirée à l’étape des budgets, après l’arrivée ici, laisse aussi sa catégorie sans tirelire par défaut', async () => {
     await etape('Budgets');
     await retirer('main .card.tirelire input.nom', 'Enfants et loisirs');
     await etape('Catégories');
@@ -331,7 +336,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     expect(dit(lignes, 'Soins').tirelires).toEqual(['Santé']);
   });
 
-  it('[niveau 4] #212 point 3 (table #417, catégories 15) — validé, le projet porte les catégories gardées et corrigées, sans celles qui ont été retirées, et leurs flux n’ont plus de catégorie', async () => {
+  it('[niveau 2] #212 point 3 (table #417, catégories 15) — validé, le projet porte les catégories gardées et corrigées, sans celles qui ont été retirées, et leurs flux n’ont plus de catégorie', async () => {
     await etape('Résumé');
     expect(await cliquer('Valider mon budget')).toBe(true);
     const p = categoriesDuProjet();
@@ -346,7 +351,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     expect(await categoriesDuFlux('Crédit immobilier')).toEqual(['—']);
   });
 
-  it('[niveau 4] #212 point 4 (table #417, catégories 16) — rouvert sur ce projet, un raccourci apporte chaque catégorie de l’exemple qui manque, et disparaît dès qu’une catégorie de même nature et de même nom existe', async () => {
+  it('[niveau 2] #212 point 4 (table #417, catégories 16) — rouvert sur ce projet, un raccourci apporte chaque catégorie de l’exemple qui manque, et disparaît dès qu’une catégorie de même nature et de même nom existe', async () => {
     await allerA('Plus');
     expect(await cliquer('Lancer')).toBe(true);
     await etape('Catégories');
@@ -371,7 +376,7 @@ describe('#417 · #212 — corrigé, puis rouvert, sans navigateur', () => {
     expect(raccourcis()).toEqual([]);
   });
 
-  it('[niveau 4] #212 point 4 (table #417, catégories 17) — validé, les catégories apportées par les raccourcis portent leurs flux, enregistrés et dans Flux prévus', async () => {
+  it('[niveau 2] #212 point 4 (table #417, catégories 17) — validé, les catégories apportées par les raccourcis portent leurs flux, enregistrés et dans Flux prévus', async () => {
     await etape('Résumé');
     expect(await cliquer('Valider mon budget')).toBe(true);
     const p = categoriesDuProjet();

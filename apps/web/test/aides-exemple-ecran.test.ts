@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #417 — ce que vérifiait `navigateur/aides-exemple-harnais.test.ts` (harnais d'audit de #214,
+ * Harnais d'audit de #417, composé parmi les tests du codeur :
+ * ce que vérifiait `navigateur/aides-exemple-harnais.test.ts` (harnais d'audit de #214,
  * « Les aides des champs viennent de l'exemple »), sans navigateur : l'application montée sous jsdom (`ecran.ts`), au
  * jour des tests (20 septembre 2026), sur un dépôt en mémoire. Chaque titre dit le point du « Fait quand » de #214
  * qu'il vérifie, et le numéro du test retiré dans la table de #417.
@@ -10,7 +11,8 @@
  * enregistre. Les fonctions de `src/lib/aides.ts` sont lues par `aides-exemple.test.ts` (niveau 4) et, à d'autres dates
  * de lecture, par `aides-exemple-harnais.test.ts` (niveau 2).
  *
- * Niveau 4, comme tout test du codeur ; l'auditeur donne le leur à ceux qu'il retient (D83) : ceux du test retiré.
+ * Niveau 2 pour les douze, ceux des tests retirés (D83) : D43 et D46 sont des décisions ; une aide fausse ou une
+ * ligne recopiée qui perd ce que l'exemple en dit en est un cas faux, l'usage restant possible.
  */
 import { describe, expect, it } from 'vitest';
 import { alive, exampleLedger } from '@tirelire/core';
@@ -110,7 +112,7 @@ async function formulaireDuFlux(nom: string) {
 }
 
 describe('#417 · #214 — dans l’assistant, sur un projet vierge, sans navigateur', () => {
-  it('[niveau 4] #214 point 1 (table #417, aides 1) — à l’étape Revenus, toutes les aides du formulaire viennent d’une même ligne : la première de l’étape, puis celle du premier raccourci restant', async () => {
+  it('[niveau 2] #214 point 1 (table #417, aides 1) — à l’étape Revenus, toutes les aides du formulaire viennent d’une même ligne : la première de l’étape, puis celle du premier raccourci restant', async () => {
     await ouvrirLApplication();
     await arriverAuxRevenus();
     expect(raccourcis()).toEqual([]);
@@ -132,7 +134,7 @@ describe('#417 · #214 — dans l’assistant, sur un projet vierge, sans naviga
     expect(champ('Combien ?')).toMatchObject({ aide: '100,00' });
   });
 
-  it('[niveau 4] #214 point 1 (table #417, aides 2) — chaque étape de l’assistant montre les aides de la première ligne de l’exemple de l’étape : comptes, charges fixes, budgets, échéances, épargne, catégories', async () => {
+  it('[niveau 2] #214 point 1 (table #417, aides 2) — chaque étape de l’assistant montre les aides de la première ligne de l’exemple de l’étape : comptes, charges fixes, budgets, échéances, épargne, catégories', async () => {
     await ouvrirLApplication();
     await arriverAuxComptes();
     expect(champ('Nom du compte'), 'comptes : le nom').toMatchObject({ aide: 'Livret A' });
@@ -154,7 +156,7 @@ describe('#417 · #214 — dans l’assistant, sur un projet vierge, sans naviga
     }
   });
 
-  it('[niveau 4] #214 point 2 (table #417, aides 3) — ajouter « Loyer locatif » en recopiant ses aides fait ce que fait son raccourci : la ligne revient avec son motif de libellé et sa fenêtre, une fois l’assistant validé', async () => {
+  it('[niveau 2] #214 point 2 (table #417, aides 3) — ajouter « Loyer locatif » en recopiant ses aides fait ce que fait son raccourci : la ligne revient avec son motif de libellé et sa fenêtre, une fois l’assistant validé', async () => {
     const loyer = flux.find((f) => f.name === 'Loyer locatif')!;
     expect(loyer.labelPattern, 'l’exemple donne un motif au loyer : sans lui, ce test ne prouverait rien').toBeTruthy();
     await ouvrirLApplication();
@@ -172,7 +174,7 @@ describe('#417 · #214 — dans l’assistant, sur un projet vierge, sans naviga
     expect(await formulaireDuFlux('Loyer locatif')).toEqual({ motif: loyer.labelPattern, fenetre: String(loyer.dateWindowDays), montant: euros(loyer.amount) });
   });
 
-  it('[niveau 4] #214 point 7 (table #417, aides 4) — un champ qui change et la ligne n’est plus celle de l’exemple : « Loyer locatif » à 710,00 € garde son montant et ne reçoit ni le motif ni la fenêtre de l’exemple', async () => {
+  it('[niveau 2] #214 point 7 (table #417, aides 4) — un champ qui change et la ligne n’est plus celle de l’exemple : « Loyer locatif » à 710,00 € garde son montant et ne reçoit ni le motif ni la fenêtre de l’exemple', async () => {
     const loyer = flux.find((f) => f.name === 'Loyer locatif')!;
     await ouvrirLApplication();
     await arriverAuxRevenus();
@@ -192,7 +194,7 @@ describe('#417 · #214 — dans l’assistant, sur un projet vierge, sans naviga
     expect(lu.motif).not.toBe(loyer.labelPattern);
   });
 
-  it('[niveau 4] #214 point 2 (table #417, aides 5) — une étape vidée puis remplie en recopiant chaque aide finit avec les lignes de l’exemple, et elles seules, versions datées du « Salaire » comprises', async () => {
+  it('[niveau 2] #214 point 2 (table #417, aides 5) — une étape vidée puis remplie en recopiant chaque aide finit avec les lignes de l’exemple, et elles seules, versions datées du « Salaire » comprises', async () => {
     const revenus = flux.filter((f) => f.kind === 'income');
     await ouvrirLApplication();
     await arriverAuxRevenus();
@@ -211,7 +213,7 @@ describe('#417 · #214 — dans l’assistant, sur un projet vierge, sans naviga
     expect(vues).toEqual(attendues);
   });
 
-  it('[niveau 4] #214 point 2 (table #417, aides 6) — à chaque étape, l’élément retiré puis rajouté en recopiant ses aides est celui que son raccourci apportait : versions datées, prélèvement, suivi du solde, liens des catégories', async () => {
+  it('[niveau 2] #214 point 2 (table #417, aides 6) — à chaque étape, l’élément retiré puis rajouté en recopiant ses aides est celui que son raccourci apportait : versions datées, prélèvement, suivi du solde, liens des catégories', async () => {
     await ouvrirLApplication();
     await arriverAuxComptes();
     await retirerPuisRecopier({ element: '.ligne-compte', identifiant: 'input', nom: 'Carte enfants', libelles: ['Nom du compte', 'Solde actuel'], ajouter: 'Ajouter un compte', contient: 'Solde à régler' });
@@ -249,7 +251,7 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
     expect(alive(projet().accounts).some((a) => a.name === 'Livret A'), 'l’exemple ne s’est pas chargé').toBe(true);
   }
 
-  it('[niveau 4] #214 point 3 (table #417, aides 7) — Comptes : l’aide du nom et le type proposé sont ceux d’une même ligne de l’exemple (le formulaire d’ajout de la section, #362)', async () => {
+  it('[niveau 2] #214 point 3 (table #417, aides 7) — Comptes : l’aide du nom et le type proposé sont ceux d’une même ligne de l’exemple (le formulaire d’ajout de la section, #362)', async () => {
     await ouvrirLExemple();
     expect(await ecran('Comptes')).toBe(true);
     const aide = champ('Nom du compte').aide;
@@ -258,14 +260,14 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
     expect(champ('Type').valeur).toBe(ligne!.kind);
   });
 
-  it('[niveau 4] #214 point 3 (table #417, aides 8) — Tirelires : l’aide du nom de la tirelire est celle d’une tirelire de l’exemple', async () => {
+  it('[niveau 2] #214 point 3 (table #417, aides 8) — Tirelires : l’aide du nom de la tirelire est celle d’une tirelire de l’exemple', async () => {
     await ouvrirLExemple();
     expect(await ecran('Tirelires')).toBe(true);
     expect(await cliquer('Ajouter une tirelire')).toBe(true);
     expect(alive(exemple.tirelires).map((x) => x.name)).toContain(champ('Quoi ?').aide);
   });
 
-  it('[niveau 4] #214 point 3 (table #417, aides 9) — Tirelires, besoin : les aides sont les valeurs d’un besoin de l’exemple du type choisi, et le « montant à reverser » d’un versement n’en a aucune', async () => {
+  it('[niveau 2] #214 point 3 (table #417, aides 9) — Tirelires, besoin : les aides sont les valeurs d’un besoin de l’exemple du type choisi, et le « montant à reverser » d’un versement n’en a aucune', async () => {
     await ouvrirLExemple();
     expect(await ecran('Tirelires')).toBe(true);
     const b = tous<HTMLButtonElement>('main .par-besoin button').find((x) => t(x) === 'Modifier');
@@ -284,7 +286,7 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
     expect(champ('Montant à reverser').aide, 'l’exemple n’a aucun versement : pas de montant inventé').toBe('');
   });
 
-  it('[niveau 4] #214 point 3 (table #417, aides 10) — Flux prévus : le nom, le montant et le motif d’aide sont ceux d’un même flux de l’exemple du type choisi', async () => {
+  it('[niveau 2] #214 point 3 (table #417, aides 10) — Flux prévus : le nom, le montant et le motif d’aide sont ceux d’un même flux de l’exemple du type choisi', async () => {
     await ouvrirLExemple();
     expect(await ecran('Flux prévus')).toBe(true);
     expect(await cliquer('Ajouter un flux')).toBe(true);
@@ -297,7 +299,7 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
     }
   });
 
-  it('[niveau 4] #214 point 3 (table #417, aides 11) — Catégories : l’aide du nom est celle d’une catégorie de l’exemple de la nature choisie', async () => {
+  it('[niveau 2] #214 point 3 (table #417, aides 11) — Catégories : l’aide du nom est celle d’une catégorie de l’exemple de la nature choisie', async () => {
     await ouvrirLExemple();
     expect(await ecran('Catégories')).toBe(true);
     const categories = alive(exemple.categories);
@@ -308,7 +310,7 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
     expect(categories.find((c) => c.name === champ('Nom').aide)?.nature).toBe('income');
   });
 
-  it('[niveau 4] #214 point 3 (table #417, aides 12) — Saisie : le libellé, le montant et la catégorie d’aide sont ceux d’une même opération saisie de l’exemple de la nature choisie', async () => {
+  it('[niveau 2] #214 point 3 (table #417, aides 12) — Saisie : le libellé, le montant et la catégorie d’aide sont ceux d’une même opération saisie de l’exemple de la nature choisie', async () => {
     await ouvrirLExemple();
     expect(await ecran('Saisie')).toBe(true);
     expect(await cliquer('Saisir une opération')).toBe(true);

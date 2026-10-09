@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #417 — ce que vérifiait `navigateur/assistant-comptes-exemple-harnais.test.ts` (harnais d'audit
+ * Harnais d'audit de #417, composé parmi les tests du codeur :
+ * ce que vérifiait `navigateur/assistant-comptes-exemple-harnais.test.ts` (harnais d'audit
  * de #211, « L'assistant propose les comptes de l'exemple »), sans navigateur : l'application montée sous jsdom
  * (`ecran.ts`), au jour des tests, sur un dépôt en mémoire. Chaque titre dit le point du « Fait quand » de #211 qu'il
  * vérifie, et le numéro du test retiré dans la table de #417.
@@ -11,7 +12,12 @@
  * primaire » (I4) est tenu par `navigateur/assistant-simple.test.ts`, et « retrouvables dans Comptes … et
  * modifiables » (I11) par `navigateur/assistant-equivalent.test.ts`, harnais du registre.
  *
- * Niveau 4, comme tout test du codeur ; l'auditeur donne le leur à ceux qu'il retient (D83) : ceux du test retiré.
+ * Niveaux (D83) : ceux des tests retirés, que la table de #417 recopie. 0 pour les points 7 et 8 de #211 (comptes 9 et
+ * 10) : un nom, un solde ou une clôture que l'utilisateur a posés seraient perdus à la validation. Rouges sur deux
+ * mutations : `appliquerPrincipal` renseigne le principal sans regarder ce qu'il porte ; `recalerLesClotures` recale
+ * aussi les comptes clos du projet. 1 pour le point 6 (comptes 6, I11) : rouge quand l'assistant ne pose plus le
+ * suivi du solde à régler (`appliquer`, `sectionComptes.svelte.ts`). 2 pour les autres : D43, D46 et D56 sont des
+ * décisions.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { addDays, alive, budgetPeriodContaining, euros, MAIN_ACCOUNT_ID } from '@tirelire/core';
@@ -112,26 +118,26 @@ describe('#417 · #211 — l’étape Comptes sur un projet vierge, sans navigat
     arrivee = lignes();
   });
 
-  it('[niveau 4] #211 point 1 (table #417, comptes 1) — l’étape Comptes arrive avec « Livret A », « Carte enfants », « Compte de Marie » et « Livret jeune », chacun avec son nom, son type et son solde', () => {
+  it('[niveau 2] #211 point 1 (table #417, comptes 1) — l’étape Comptes arrive avec « Livret A », « Carte enfants », « Compte de Marie » et « Livret jeune », chacun avec son nom, son type et son solde', () => {
     const autres = arrivee.filter((l) => !l.principal);
     expect(autres.map((l) => l.nom)).toEqual(['Livret A', 'Carte enfants', 'Compte de Marie', 'Livret jeune']);
     expect(autres.map((l) => l.type)).toEqual(['epargne', 'courant', 'courant', 'epargne']);
     expect(autres.map((l) => centimes(l.solde))).toEqual([euros(4815), 0, 0, 0]);
   });
 
-  it('[niveau 4] #211 point 1 (table #417, comptes 2) — les raccourcis sont tous consommés d’entrée : la rangée des raccourcis est vide, et le bouton primaire de l’étape est « Suivant » (D46)', () => {
+  it('[niveau 2] #211 point 1 (table #417, comptes 2) — les raccourcis sont tous consommés d’entrée : la rangée des raccourcis est vide, et le bouton primaire de l’étape est « Suivant » (D46)', () => {
     expect(raccourcis(), 'sur un projet vierge, la rangée des raccourcis est vide').toEqual([]);
     expect(lire().primaires.some((p) => /Suivant/.test(p))).toBe(true);
   });
 
-  it('[niveau 4] #211 point 2 (table #417, comptes 3) — le compte principal arrive avec le nom « Compte courant » et le solde 2 340,00 €', () => {
+  it('[niveau 2] #211 point 2 (table #417, comptes 3) — le compte principal arrive avec le nom « Compte courant » et le solde 2 340,00 €', () => {
     const principal = arrivee.filter((l) => l.principal);
     expect(principal).toHaveLength(1);
     expect(principal[0]!.nom).toBe('Compte courant');
     expect(centimes(principal[0]!.solde)).toBe(euros(2340));
   });
 
-  it('[niveau 4] #211 point 3 (table #417, comptes 4) — l’étape dit qu’un compte est tiers, avec le suivi de son solde à régler tel que l’exemple le dit, et qu’un compte est clos', () => {
+  it('[niveau 2] #211 point 3 (table #417, comptes 4) — l’étape dit qu’un compte est tiers, avec le suivi de son solde à régler tel que l’exemple le dit, et qu’un compte est clos', () => {
     const par = (nom: string) => arrivee.find((l) => l.nom === nom)!;
     for (const nom of ['Carte enfants', 'Compte de Marie']) {
       expect(par(nom).pastilles, nom).toContain('tiers');
@@ -145,7 +151,7 @@ describe('#417 · #211 — l’étape Comptes sur un projet vierge, sans navigat
     }
   });
 
-  it('[niveau 4] #211 point 3 (table #417, comptes 5) — le compte clos ne figure plus dans les menus de comptes des autres étapes (D56)', async () => {
+  it('[niveau 2] #211 point 3 (table #417, comptes 5) — le compte clos ne figure plus dans les menus de comptes des autres étapes (D56)', async () => {
     expect(await avancer()).toBe(true); // → les revenus
     const menus = tous<HTMLSelectElement>('main select')
       .filter((s) => [...s.options].some((o) => t(o) === 'Livret A'))
@@ -159,7 +165,7 @@ describe('#417 · #211 — l’étape Comptes sur un projet vierge, sans navigat
     expect(await cliquer('Précédent')).toBe(true);
   });
 
-  it('[niveau 4] #211 point 6 (table #417, comptes 6) — validé tel quel, l’assistant laisse les comptes de l’exemple dans le projet, avec leur suivi et leur clôture, et Comptes les montre', async () => {
+  it('[niveau 1] #211 point 6 (table #417, comptes 6) — validé tel quel, l’assistant laisse les comptes de l’exemple dans le projet, avec leur suivi et leur clôture, et Comptes les montre', async () => {
     await validerTelQuel();
 
     // Le projet enregistré porte les cinq comptes, le suivi des comptes tiers et la clôture du compte clos.
@@ -194,7 +200,7 @@ describe('#417 · #211 — l’étape Comptes sur un projet vierge, sans navigat
 });
 
 describe('#417 · #211 — la clôture du compte clos quand le début de période est choisi dans l’assistant, sans navigateur', () => {
-  it('[niveau 4] #211 point 3 (table #417, comptes 7) — la clôture du compte clos reste la veille du premier jour de la période qui contient la date de l’assistant, quel que soit le jour où la période commence', async () => {
+  it('[niveau 2] #211 point 3 (table #417, comptes 7) — la clôture du compte clos reste la veille du premier jour de la période qui contient la date de l’assistant, quel que soit le jour où la période commence', async () => {
     await ouvrirLApplication();
     await arriverAuxComptes();
     expect(await avancer(), 'l’étape des revenus ne se franchit pas par son bouton primaire').toBe(true);
@@ -215,7 +221,7 @@ describe('#417 · #211 — la clôture du compte clos quand le début de périod
 });
 
 describe('#417 · #211 — les raccourcis sur un projet existant, sans navigateur', () => {
-  it('[niveau 4] #211 point 4 (table #417, comptes 8) — les raccourcis offrent les comptes de l’exemple qui manquent, chacun disparaît dès qu’un compte du même nom existe, et rien n’est semé d’office', async () => {
+  it('[niveau 2] #211 point 4 (table #417, comptes 8) — les raccourcis offrent les comptes de l’exemple qui manquent, chacun disparaît dès qu’un compte du même nom existe, et rien n’est semé d’office', async () => {
     await ouvrirLApplication();
     await arriverAuxComptes();
     for (const nom of ['Carte enfants', 'Compte de Marie', 'Livret jeune']) await retirer(nom);
@@ -246,7 +252,7 @@ describe('#417 · #211 — les raccourcis sur un projet existant, sans navigateu
 });
 
 describe('#417 · #211 — ce que le projet porte déjà, sans navigateur', () => {
-  it('[niveau 4] #211 point 7 (table #417, comptes 9) — sur un projet vierge dont le compte principal porte un nom et un solde que l’utilisateur a posés, l’assistant validé laisse ce nom et ce solde ; les autres comptes de l’exemple entrent', async () => {
+  it('[niveau 0] #211 point 7 (table #417, comptes 9) — sur un projet vierge dont le compte principal porte un nom et un solde que l’utilisateur a posés, l’assistant validé laisse ce nom et ce solde ; les autres comptes de l’exemple entrent', async () => {
     await ouvrirLApplication();
     expect(await ecran('Comptes')).toBe(true);
     // Le nom et le solde du compte principal se corrigent sur sa ligne, écrits aussitôt dans le projet (#362).
@@ -274,7 +280,7 @@ describe('#417 · #211 — ce que le projet porte déjà, sans navigateur', () =
     expect([...comptes.keys()].sort()).toEqual(['Carte enfants', 'Compte de Marie', 'Compte de la maison', 'Livret A', 'Livret jeune']);
   });
 
-  it('[niveau 4] #211 point 8 (table #417, comptes 10) — sur un projet dont un compte clos porte sa clôture, rouvrir l’assistant, changer le jour de début de période et valider ne déplace pas cette clôture', async () => {
+  it('[niveau 0] #211 point 8 (table #417, comptes 10) — sur un projet dont un compte clos porte sa clôture, rouvrir l’assistant, changer le jour de début de période et valider ne déplace pas cette clôture', async () => {
     await ouvrirLApplication();
     await arriverAuxComptes();
     expect(await jusquAuResume()).toBe(true);

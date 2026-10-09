@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #417 — ce que vérifiait `navigateur/assistant-flux-exemple-harnais.test.ts` (harnais d'audit de
+ * Harnais d'audit de #417, composé parmi les tests du codeur :
+ * ce que vérifiait `navigateur/assistant-flux-exemple-harnais.test.ts` (harnais d'audit de
  * #213, « L'assistant propose tous les revenus et toutes les charges fixes de l'exemple, versions datées comprises »),
  * sans navigateur : l'application montée sous jsdom (`ecran.ts`), au jour des tests (20 septembre 2026), sur un dépôt
  * en mémoire. Chaque titre dit le point du « Fait quand » de #213 qu'il vérifie, et le numéro du test retiré dans la
@@ -16,7 +17,9 @@
  * Les dates se lisent à l'écran sous la forme de l'application (« jusqu’au 27 oct. 2026 ») : seuls le jour et l'année
  * sont figés.
  *
- * Niveau 4, comme tout test du codeur ; l'auditeur donne le leur à ceux qu'il retient (D83) : ceux du test retiré.
+ * Niveaux (D83) : ceux des tests retirés, que la table de #417 recopie. 1 pour le point 7 (flux 10 et 12, I11). Rouges
+ * sur deux mutations : l'assistant pose les flux sans leurs dates de début et de fin (10) ; Flux prévus n'enregistre
+ * plus la date de fin (12). 2 pour les autres : D43, D46 et D50 sont des décisions.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { alive, euros, exampleLedger, type PlannedFlow } from '@tirelire/core';
@@ -129,16 +132,16 @@ describe('#417 · #213 — l’étape Revenus sur un projet vierge, sans navigat
     arrivee = lignes();
   });
 
-  it('[niveau 4] #213 point 1 (table #417, flux 1) — l’étape arrive avec les quatre revenus de l’exemple, et eux seuls : les deux « Salaire », « Loyer locatif », « Allocations »', () => {
+  it('[niveau 2] #213 point 1 (table #417, flux 1) — l’étape arrive avec les quatre revenus de l’exemple, et eux seuls : les deux « Salaire », « Loyer locatif », « Allocations »', () => {
     expect(arrivee.map((l) => l.nom)).toEqual(['Salaire', 'Salaire', 'Loyer locatif', 'Allocations']);
   });
 
-  it('[niveau 4] #213 point 2 (table #417, flux 2) — chacun avec son montant et son jour, tels que l’exemple les dit', () => {
+  it('[niveau 2] #213 point 2 (table #417, flux 2) — chacun avec son montant et son jour, tels que l’exemple les dit', () => {
     expect(arrivee.map((l) => centimes(l.montant))).toEqual([euros(3400), euros(3550), euros(700), euros(100)]);
     expect(arrivee.map((l) => l.jour)).toEqual(['28', '28', '5', '5']);
   });
 
-  it('[niveau 4] #213 point 3 (table #417, flux 3) — deux versions d’un même flux se lisent comme deux lignes du même nom, chacune avec sa date', () => {
+  it('[niveau 2] #213 point 3 (table #417, flux 3) — deux versions d’un même flux se lisent comme deux lignes du même nom, chacune avec sa date', () => {
     const [avant, apres, loyer, alloc] = arrivee as [Ligne, Ligne, Ligne, Ligne];
     expect(avant.suites.join(' ')).toMatch(/jusqu’au 27 \S+ 2026/);
     expect(apres.suites.join(' ')).toMatch(/à partir du 28 \S+ 2026/);
@@ -147,12 +150,12 @@ describe('#417 · #213 — l’étape Revenus sur un projet vierge, sans navigat
     for (const l of [loyer, alloc]) expect(l.suites.join(' '), l.nom).not.toMatch(/jusqu’au|à partir du/);
   });
 
-  it('[niveau 4] #213 point 1 (table #417, flux 4) — les raccourcis sont tous consommés d’entrée : la rangée des raccourcis est vide, et le bouton primaire de l’étape est « Suivant » (D46)', () => {
+  it('[niveau 2] #213 point 1 (table #417, flux 4) — les raccourcis sont tous consommés d’entrée : la rangée des raccourcis est vide, et le bouton primaire de l’étape est « Suivant » (D46)', () => {
     expect(raccourcis(), 'sur un projet vierge, la rangée des raccourcis est vide').toEqual([]);
     expect(lire().primaires.some((p) => /Suivant/.test(p))).toBe(true);
   });
 
-  it('[niveau 4] #213 point 3 (table #417, flux 5) — les deux lignes « Salaire » se retirent une à une', async () => {
+  it('[niveau 2] #213 point 3 (table #417, flux 5) — les deux lignes « Salaire » se retirent une à une', async () => {
     await retirer('Salaire');
     const reste = lignes();
     expect(reste.map((l) => l.nom)).toEqual(['Salaire', 'Loyer locatif', 'Allocations']);
@@ -163,7 +166,7 @@ describe('#417 · #213 — l’étape Revenus sur un projet vierge, sans navigat
 });
 
 describe('#417 · #213 — l’étape Charges fixes sur un projet vierge, sans navigateur', () => {
-  it('[niveau 4] #213 point 1 (table #417, flux 6) — l’étape arrive avec les quatre charges fixes de l’exemple, et elles seules, chacune avec son montant, son jour et sa date de fin', async () => {
+  it('[niveau 2] #213 point 1 (table #417, flux 6) — l’étape arrive avec les quatre charges fixes de l’exemple, et elles seules, chacune avec son montant, son jour et sa date de fin', async () => {
     await ouvrirLApplication();
     await arriverAuxRevenus();
     expect(await avancer()).toBe(true);
@@ -179,7 +182,7 @@ describe('#417 · #213 — l’étape Charges fixes sur un projet vierge, sans n
 });
 
 describe('#417 · #213 — sur un projet existant, sans navigateur', () => {
-  it('[niveau 4] #213 points 5 et 9 (table #417, flux 8) — le raccourci d’un flux apporte toutes ses versions, avec leurs dates, et disparaît dès qu’un flux du même nom existe ; il montre le montant de la version en vigueur', async () => {
+  it('[niveau 2] #213 points 5 et 9 (table #417, flux 8) — le raccourci d’un flux apporte toutes ses versions, avec leurs dates, et disparaît dès qu’un flux du même nom existe ; il montre le montant de la version en vigueur', async () => {
     await projetValide();
     await rouvrirAuxRevenus();
     expect(lignes().map((l) => l.nom), 'sur un projet existant, rien n’est semé d’office').toEqual(['Salaire', 'Salaire', 'Loyer locatif', 'Allocations']);
@@ -202,7 +205,7 @@ describe('#417 · #213 — sur un projet existant, sans navigateur', () => {
     expect(raccourcis(), 'tous les flux de l’exemple sont là : plus de raccourci').toEqual([]);
   });
 
-  it('[niveau 4] #213 point 5 (table #417, flux 9) — un flux saisi à la main sous le même nom fait disparaître le raccourci', async () => {
+  it('[niveau 2] #213 point 5 (table #417, flux 9) — un flux saisi à la main sous le même nom fait disparaître le raccourci', async () => {
     await projetValide();
     await rouvrirAuxRevenus();
     await retirer('Salaire');
@@ -223,7 +226,7 @@ describe('#417 · #213 — l’assistant validé tel quel, sans navigateur', () 
     expect(await ecran('Flux prévus')).toBe(true);
   });
 
-  it('[niveau 4] #213 point 7, I11 (table #417, flux 10) — le projet porte les huit flux de revenu et de charge fixe, et eux seuls, chacun dans son groupe et sur son compte, et Flux prévus les montre avec leur date', () => {
+  it('[niveau 1] #213 point 7, I11 (table #417, flux 10) — le projet porte les huit flux de revenu et de charge fixe, et eux seuls, chacun dans son groupe et sur son compte, et Flux prévus les montre avec leur date', () => {
     const cle = (f: PlannedFlow) => `${f.name} | ${f.kind} | ${compteDe(f.accountId)} | ${f.activeFrom ?? ''} | ${f.activeTo ?? ''}`;
     expect(fluxDuProjet().map(cle).sort(), 'les flux enregistrés (nom | genre | compte | dates) ne sont pas ceux de l’exemple').toEqual(fluxDeLExemple.map(cle).sort());
 
@@ -238,7 +241,7 @@ describe('#417 · #213 — l’assistant validé tel quel, sans navigateur', () 
     expect(l.find((x) => x.nom === 'Crédit immobilier')!.sous).toMatch(/jusqu’au 5 \S+ 2026/);
   });
 
-  it('[niveau 4] #213 point 2 (table #417, flux 11) — chacun des huit flux se lit dans son formulaire tel que l’exemple le dit : montant, rythme, première date, compte, fenêtre, tolérance, motif, montant variable, dates de début et de fin', async () => {
+  it('[niveau 2] #213 point 2 (table #417, flux 11) — chacun des huit flux se lit dans son formulaire tel que l’exemple le dit : montant, rythme, première date, compte, fenêtre, tolérance, motif, montant variable, dates de début et de fin', async () => {
     const n = revenusEtCharges(fluxPrevus()).length;
     const lignesDuGroupe = () => tous('main .row').filter((r) => r.querySelector('.label strong') && /^(Revenus|Charges fixes)/.test(t(r.closest('.card')?.previousElementSibling)));
     const lus = [];
@@ -283,7 +286,7 @@ describe('#417 · #213 — l’assistant validé tel quel, sans navigateur', () 
     expect(lus.sort(parNomEtDate)).toEqual(attendus.sort(parNomEtDate));
   });
 
-  it('[niveau 4] #213 point 7, I11 (table #417, flux 12) — les dates de début et de fin se modifient dans Flux prévus, s’enregistrent, et la ligne le dit', async () => {
+  it('[niveau 1] #213 point 7, I11 (table #417, flux 12) — les dates de début et de fin se modifient dans Flux prévus, s’enregistrent, et la ligne le dit', async () => {
     await modifier('Salaire', /jusqu’au 27/);
     expect(champQuiCommence('Actif à partir du')).toBe('');
     expect(champQuiCommence('Actif jusqu')).toBe('2026-10-27');

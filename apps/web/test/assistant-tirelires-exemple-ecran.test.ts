@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #417 — ce que vérifiait `navigateur/assistant-tirelires-exemple-harnais.test.ts` (harnais d'audit
+ * Harnais d'audit de #417, composé parmi les tests du codeur :
+ * ce que vérifiait `navigateur/assistant-tirelires-exemple-harnais.test.ts` (harnais d'audit
  * de #336, « L'assistant propose toutes les tirelires de l'exemple, leurs besoins, leur placement et l'ordre
  * permanent »), sans navigateur : l'application montée sous jsdom (`ecran.ts`), au jour des tests (20 septembre 2026),
  * sur un dépôt en mémoire. Chaque titre dit le point du « Fait quand » de #336 qu'il vérifie, et le numéro du test
@@ -12,7 +13,9 @@
  * `packages/core/test/suggestions-tirelires-harnais.test.ts` (« #336 · 1 » à « #336 · 7 et 10 »). Les tirelires
  * retrouvées dans Tirelires (I11) sont tenues par `navigateur/assistant-equivalent.test.ts`, harnais du registre.
  *
- * Niveau 4, comme tout test du codeur ; l'auditeur donne le leur à ceux qu'il retient (D83) : ceux du test retiré.
+ * Niveaux (D83) : ceux des tests retirés, que la table de #417 recopie. 1 pour les points 7 et 10 (tirelires 5 et 8,
+ * I10, I11). Rouges sur deux mutations : l'ordre de l'exemple n'est plus posé (5) ; le × de l'ordre est sans effet
+ * (8). 2 pour les autres : D43, D46, D51, D40, D38 et D60 sont des décisions.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { alive, euros, MAIN_ACCOUNT_ID, standingOrderTarget } from '@tirelire/core';
@@ -101,7 +104,7 @@ describe('#417 · #336 — un projet vierge parcouru sans rien changer, sans nav
     await arriverAuxComptes();
   });
 
-  it('[niveau 4] #336 points 1, 2, 3 (table #417, tirelires 1) — Budgets montre les cinq tirelires de son genre, la date de chaque ligne bornée, le piano sous sa tirelire, et aucune priorité', async () => {
+  it('[niveau 2] #336 points 1, 2, 3 (table #417, tirelires 1) — Budgets montre les cinq tirelires de son genre, la date de chaque ligne bornée, le piano sous sa tirelire, et aucune priorité', async () => {
     expect(await etape('Budgets')).toBe(true);
     const vu = cartes();
     expect(vu.map((c) => [c.nom, c.garder, c.deja])).toEqual([
@@ -126,7 +129,7 @@ describe('#417 · #336 — un projet vierge parcouru sans rien changer, sans nav
     expect(raccourcis()).toEqual([]);
   });
 
-  it('[niveau 4] #336 points 1, 3, 4 (table #417, tirelires 2) — Pas tous les mois montre trois échéances, leur déjà de côté, et dit le prélèvement attendu de la seule taxe foncière', async () => {
+  it('[niveau 2] #336 points 1, 3, 4 (table #417, tirelires 2) — Pas tous les mois montre trois échéances, leur déjà de côté, et dit le prélèvement attendu de la seule taxe foncière', async () => {
     expect(await etape('Pas tous les mois')).toBe(true);
     const vu = cartes();
     expect(vu.map((c) => [c.nom, c.deja, c.besoins.map((b) => b.montants)])).toEqual([
@@ -140,14 +143,14 @@ describe('#417 · #336 — un projet vierge parcouru sans rien changer, sans nav
     expect(prelevement['Vacances']).toBe('Aucun prélèvement attendu');
   });
 
-  it('[niveau 4] #336 points 1, 2, 3 (table #417, tirelires 3) — Épargne montre l’épargne de précaution, ses deux versions et ses 3 200 € déjà de côté', async () => {
+  it('[niveau 2] #336 points 1, 2, 3 (table #417, tirelires 3) — Épargne montre l’épargne de précaution, ses deux versions et ses 3 200 € déjà de côté', async () => {
     expect(await etape('Épargne')).toBe(true);
     expect(cartes().map((c) => [c.nom, c.deja, c.besoins.map((b) => b.montants)])).toEqual([
       ['Épargne de précaution', '3200,00', [['300,00', '6000,00'], ['800,00', '12000,00']]],
     ]);
   });
 
-  it('[niveau 4] #336 points 5, 6 (table #417, tirelires 4) — le Résumé montre chaque tirelire placée comme dans l’exemple, et, à côté de l’ordre vers Livret A, ce que le budget demande (650,00 €)', async () => {
+  it('[niveau 2] #336 points 5, 6 (table #417, tirelires 4) — le Résumé montre chaque tirelire placée comme dans l’exemple, et, à côté de l’ordre vers Livret A, ce que le budget demande (650,00 €)', async () => {
     expect(await etape('Résumé')).toBe(true);
     expect(placements()).toEqual({
       'Taxe foncière': 'Livret A',
@@ -167,7 +170,7 @@ describe('#417 · #336 — un projet vierge parcouru sans rien changer, sans nav
     expect(o[0]!.texte).toMatch(/budget demande 650,00 € par mois pour Livret A/);
   });
 
-  it('[niveau 4] #336 points 7, 10, I10, I11 (table #417, tirelires 5) — validé tel quel : le prélèvement et l’ordre s’enregistrent et se retrouvent dans Flux prévus, où ils se modifient, l’ordre avec « Voir dans le Plan » ; l’ordre se corrige depuis le Plan ; « Cours de piano » est un besoin d’« Enfants et loisirs » dans Tirelires', async () => {
+  it('[niveau 1] #336 points 7, 10, I10, I11 (table #417, tirelires 5) — validé tel quel : le prélèvement et l’ordre s’enregistrent et se retrouvent dans Flux prévus, où ils se modifient, l’ordre avec « Voir dans le Plan » ; l’ordre se corrige depuis le Plan ; « Cours de piano » est un besoin d’« Enfants et loisirs » dans Tirelires', async () => {
     expect(await cliquer('Valider mon budget')).toBe(true);
 
     // Ce que la validation enregistre : l'ordre à 600 €, ce que la banque exécute (D60), et le prélèvement de la taxe foncière.
@@ -200,7 +203,7 @@ describe('#417 · #336 — un projet vierge parcouru sans rien changer, sans nav
 });
 
 describe('#417 · #336 — corrigé sur place, sans navigateur', () => {
-  it('[niveau 4] #336 points 3, 5, 6 (table #417, tirelires 6) — chaque correction s’enregistre à la validation : 500 € de côté pour Vacances, Santé sur Livret A, l’ordre à 620 €', async () => {
+  it('[niveau 2] #336 points 3, 5, 6 (table #417, tirelires 6) — chaque correction s’enregistre à la validation : 500 € de côté pour Vacances, Santé sur Livret A, l’ordre à 620 €', async () => {
     await ouvrirLApplication();
     await arriverAuxComptes();
     await etape('Budgets');
@@ -249,13 +252,13 @@ describe('#417 · #336 — ordre retiré, puis réouverture sur le projet exista
     expect(await cliquer('Valider mon budget')).toBe(true);
   });
 
-  it('[niveau 4] #336 point 7, I10 (table #417, tirelires 8) — retiré, aucun ordre n’est enregistré, et le Plan n’en montre aucun', async () => {
+  it('[niveau 1] #336 point 7, I10 (table #417, tirelires 8) — retiré, aucun ordre n’est enregistré, et le Plan n’en montre aucun', async () => {
     expect(ordresDuProjet()).toEqual([]);
     await allerA('Plan');
     expect(carteDuPlan('Livret A')?.some(([l]) => l.startsWith('Ordre permanent chez la banque')) ?? false).toBe(false);
   });
 
-  it('[niveau 4] #336 point 8 (table #417, tirelires 9) — rouvert, un raccourci apporte « Santé » avec son placement, et celui de l’ordre l’apporte tant qu’aucun flux ne porte son nom', async () => {
+  it('[niveau 2] #336 point 8 (table #417, tirelires 9) — rouvert, un raccourci apporte « Santé » avec son placement, et celui de l’ordre l’apporte tant qu’aucun flux ne porte son nom', async () => {
     await allerA('Plus');
     expect(await cliquer('Lancer'), 'pas de bouton « Lancer » pour ouvrir l’assistant').toBe(true);
     await etape('Budgets');
