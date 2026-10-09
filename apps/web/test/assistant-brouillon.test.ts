@@ -3,9 +3,9 @@
  * brouillon (`src/lib/brouillon.ts`), sans navigateur, sur un vrai dépôt (`LedgerStore`).
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie. Ce qui se voit à l'écran
- * — l'assistant lui-même, ses boutons, son résumé — est dans
- * `navigateur/assistant-valide-a-la-fin-harnais.test.ts`, le harnais de l'auditeur, qui a repris les tests
- * navigateur du codeur ; la validation tout à la fois est aussi dans `assistant-valide-a-la-fin-harnais.test.ts`.
+ * — l'assistant lui-même, ses boutons, son résumé, les écrans ordinaires avant et après la validation, « Tout
+ * effacer » et l'ouverture d'un fichier — est dans `assistant-valide-a-la-fin-ecran.test.ts`, sur l'application
+ * montée sous jsdom (#418) ; la validation tout à la fois est aussi dans `assistant-valide-a-la-fin-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -303,8 +303,8 @@ describe('[niveau 4] #210 · 4 — projet vierge ou projet existant', () => {
 });
 
 describe('[niveau 4] #210 · 1 et 2 — l’écran de l’assistant n’écrit dans le projet que par sa validation', () => {
-  // La structure, pas le comportement : le comportement est joué dans le navigateur
-  // (`navigateur/assistant-valide-a-la-fin-harnais.test.ts`) ; ceci garde que l'écran n'a plus d'autre chemin.
+  // La structure, pas le comportement : le comportement est joué sur l'application montée sous jsdom
+  // (`assistant-valide-a-la-fin-ecran.test.ts`, #418) ; ceci garde que l'écran n'a plus d'autre chemin.
   it('Wizard.svelte n’écrit pas dans le projet (le lire est permis) et valide en un seul endroit', () => {
     const ecran = source('views/Wizard.svelte');
     expect(ecran).not.toMatch(/\bapp\.(upsert|remove|setSetting|store|plan)\b/);

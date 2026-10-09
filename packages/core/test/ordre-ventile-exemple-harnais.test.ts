@@ -3,7 +3,8 @@
  * Composé des tests du codeur. Côté cœur : l'ordre de l'exemple et sa ventilation (point 1), ce que le plan du 6 septembre en
  * signale (point 2), ce que montrent ses parts quand le montant change (point 4), les parts dont la
  * tirelire manque (point 5) et l'ordre que reproduit la proposition (point 7). Ce que l'écran en dit
- * est dans `apps/web/test/navigateur/ordre-ventile-assistant-harnais.test.ts`.
+ * est dans `apps/web/test/ordre-ventile-assistant-ecran.test.ts`, sur l'application montée sous jsdom
+ * (#418) ; la carte de l'ordre lue à 375 px, dans `apps/web/test/navigateur/ordre-ventile-assistant-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { alive, budgetSuggestions, computePlan, euros, exampleLedger, orderPartsShown, suggestedOrder, type Ledger, type PlannedFlow } from '../src/index.js';

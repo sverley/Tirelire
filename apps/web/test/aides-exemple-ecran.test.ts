@@ -17,7 +17,9 @@
 import { describe, expect, it } from 'vitest';
 import { alive, exampleLedger } from '@tirelire/core';
 import {
+  app,
   arriverAuxComptes,
+  attendre,
   avancer,
   champ,
   champs,
@@ -246,8 +248,9 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
   async function ouvrirLExemple() {
     await ouvrirLApplication();
     expect(await cliquer('Charger l\'exemple')).toBe(true);
-    // `loadExample` est asynchrone : on attend que l'exemple soit là.
-    for (let i = 0; i < 50 && !alive(projet().accounts).some((a) => a.name === 'Livret A'); i++) await new Promise((r) => setTimeout(r, 10));
+    // `loadExample` est asynchrone, et efface d'abord le dépôt (`eraseAll`), qu'il ferme et rouvre : on attend que
+    // l'application ait relu l'exemple, avant de relire le dépôt.
+    await attendre(() => alive(app.ledger.accounts).some((a) => a.name === 'Livret A'), 'l’exemple');
     expect(alive(projet().accounts).some((a) => a.name === 'Livret A'), 'l’exemple ne s’est pas chargé').toBe(true);
   }
 
