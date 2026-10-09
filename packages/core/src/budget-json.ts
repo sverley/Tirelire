@@ -447,9 +447,9 @@ export interface DifferenceTable {
   /**
    * Les lignes retirées du fichier que l'état lu ne porte pas, ni vivantes ni retirées : elles entrent
    * retirées, entières, avec la date de suppression du fichier (#409, point 4). Ce ne sont pas des ajouts
-   * de lignes vivantes.
+   * de lignes vivantes. Absente quand il n'y en a pas.
    */
-  entreesRetirees: LigneModele[];
+  entreesRetirees?: LigneModele[];
 }
 
 export interface DifferenceBudget {
@@ -480,12 +480,13 @@ export function differenceBudget(fichier: BudgetDefini, etatLu: BudgetDefini): D
     if (!venues) continue;
     const t = TABLES[k]!;
     const lues = new Map((etatLu.tables[k] ?? []).map((l) => [l.id, l]));
-    const d: DifferenceTable = { ajouts: [], modifications: [], retraits: [], entreesRetirees: [] };
+    const d: DifferenceTable = { ajouts: [], modifications: [], retraits: [] };
+    const entrees: LigneModele[] = [];
     const nommees = new Set<string>();
     for (const l of venues) {
       const avant = lues.get(l.id);
       if (estRetiree(l.v)) {
-        if (!avant) d.entreesRetirees.push(versModele(t, l));
+        if (!avant) entrees.push(versModele(t, l));
         else if (estRetiree(avant.v)) nommees.add(l.id);
         continue; // vivante dans l'état lu : un retrait, comme si le fichier ne la nommait pas
       }
@@ -494,6 +495,7 @@ export function differenceBudget(fichier: BudgetDefini, etatLu: BudgetDefini): D
       else if (!memesValeurs(avant.v, l.v)) d.modifications.push({ id: l.id, avant: versModele(t, avant), apres: versModele(t, l), colonnes: colonnesChangees(t, avant.v, l.v) });
     }
     for (const [id, l] of lues) if (!nommees.has(id) && !estRetiree(l.v) && !(k === 'accounts' && id === MAIN_ACCOUNT_ID)) d.retraits.push(versModele(t, l));
+    if (entrees.length) d.entreesRetirees = entrees;
     tables[k] = d;
   }
   const reglages: DifferenceBudget['reglages'] = [];

@@ -191,7 +191,7 @@ describe('[niveau 4] #409 · 4 — la différence et l’application', () => {
     const r = importerBudgetJson(fichier, s.load());
     if (!r.ok) throw new Error(r.message);
     expect(r.difference.tables.tirelires!.retraits.map((t) => t.id)).toEqual(['env-auto']);
-    expect(r.difference.tables.tirelires!.entreesRetirees).toEqual([]);
+    expect(r.difference.tables.tirelires!.entreesRetirees).toBeUndefined();
     expect(r.application.retraits).toEqual([{ cle: 'tirelires', id: 'env-auto' }, { cle: 'needs', id: 'need-auto' }]);
     expect(r.application.ecritures).toEqual([]);
     appliquerBudget(s, r.application);
@@ -235,7 +235,7 @@ describe('[niveau 4] #409 · 4 — la différence et l’application', () => {
     const r = importerBudgetJson(ecrireBudgetJson(l), s.load());
     if (!r.ok) throw new Error(r.message);
     const d = r.difference.tables.tirelires!;
-    expect(d.entreesRetirees.map((t) => [t.id, t['deletedAt']])).toEqual([['env-auto-ancienne', RETIRE]]);
+    expect(d.entreesRetirees!.map((t) => [t.id, t['deletedAt']])).toEqual([['env-auto-ancienne', RETIRE]]);
     expect(d.ajouts).toEqual([]);
     expect(d.retraits.map((t) => t.id)).toEqual(['env-auto']);
     appliquerBudget(s, r.application);
@@ -260,8 +260,8 @@ describe('[niveau 4] #409 · 6 — après la validation', () => {
     const vierge = await LedgerStore.create({ sqlJs: SQL, siteId: 't' });
     const r = importerBudgetJson(fichier, vierge.load());
     if (!r.ok) throw new Error(r.message);
-    expect(r.difference.tables.tirelires!.entreesRetirees.map((t) => t.id)).toEqual(['env-auto']);
-    expect(r.difference.tables.accounts!.entreesRetirees.map((t) => t.id)).toEqual(['acc-enfants']);
+    expect(r.difference.tables.tirelires!.entreesRetirees!.map((t) => t.id)).toEqual(['env-auto']);
+    expect(r.difference.tables.accounts!.entreesRetirees!.map((t) => t.id)).toEqual(['acc-enfants']);
     appliquerBudget(vierge, r.application);
     const apres = vierge.load();
     expect(apres.tirelires.find((t) => t.id === 'env-auto')!.deletedAt).toBe(RETIRE);
