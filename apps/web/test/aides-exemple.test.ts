@@ -2,8 +2,8 @@
  * Tests du codeur de #214 — « Les aides des champs viennent de l'exemple » : la lecture de l'exemple
  * qui donne leurs aides aux champs (`src/lib/aides.ts`), sans navigateur — la ligne d'aide de chaque
  * étape de l'assistant, la reconnaissance d'un formulaire qui recopie ses aides, et les aides des
- * formulaires hors de l'assistant. Ce qui se voit à l'écran, et le geste de recopier, est dans
- * `navigateur/aides-exemple-harnais.test.ts`.
+ * formulaires hors de l'assistant. Ce qui se voit à l'écran, et le geste de recopier, se vérifie sans
+ * navigateur, sur l'application montée sous jsdom : `aides-exemple-ecran.test.ts` (#417).
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
  */

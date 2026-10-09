@@ -6,9 +6,9 @@ import { alive, budgetSuggestions, euros, exampleLedger, suggestedFlow, type Flo
  * l'exemple, versions datées comprises » : la lecture de ces flux dans l'exemple par
  * `budgetSuggestions`, et le flux qu'en fait `suggestedFlow` (`src/suggestions.ts`), sans navigateur.
  * Ce qui se voit à l'écran — les lignes des étapes, leur date, les raccourcis, ce que la validation
- * laisse dans Flux prévus — est dans le harnais d'audit
- * `apps/web/test/navigateur/assistant-flux-exemple-harnais.test.ts`, d'où l'auditeur a aussi repris les
- * points 4 et 6 : ils sont dans `suggestions-flux-harnais.test.ts`. Les tests de ce fichier-ci, de niveau 4,
+ * laisse dans Flux prévus — est dans `apps/web/test/assistant-flux-exemple-ecran.test.ts`, sur l'application
+ * montée sans navigateur (#417) ; l'auditeur de #213 a repris les points 4 et 6 dans
+ * `suggestions-flux-harnais.test.ts`. Les tests de ce fichier-ci, de niveau 4,
  * restent le diagnostic du codeur.
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.

@@ -4,7 +4,8 @@
  * et ce qu'en font `suggestedTirelire` et `suggestedOrder`, que l'assistant appelle tels quels.
  *
  * Retenus parmi les tests du codeur (`suggestions-tirelires.test.ts`, déplacé ici en entier). Ce qui
- * se voit dans l'assistant est dans `apps/web/test/navigateur/assistant-tirelires-exemple-harnais.test.ts` ;
+ * se voit dans l'assistant est dans `apps/web/test/assistant-tirelires-exemple-ecran.test.ts`, sur l'application
+ * montée sans navigateur (#417) ;
  * le point 9 est tranché par `suggestions.test.ts`, que le codeur a étendu aux tirelires et aux ordres ;
  * le point 11 (D40, D51, D60) est de la documentation, vérifiée à la relecture.
  *

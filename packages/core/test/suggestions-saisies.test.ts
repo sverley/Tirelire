@@ -6,7 +6,7 @@ import { alive, entrySuggestions, exampleLedger } from '../src/index.js';
  * opérations saisies de l'exemple par `entrySuggestions` (`src/suggestions.ts`), de quoi donner aux
  * champs du formulaire de Saisie les valeurs d'une même ligne, sans navigateur. Ce qui se voit à
  * l'écran — les aides de chaque formulaire — est dans `apps/web/test/aides-exemple.test.ts` et
- * `apps/web/test/navigateur/aides-exemple-harnais.test.ts`.
+ * `apps/web/test/aides-exemple-ecran.test.ts`, sur l'application montée sans navigateur (#417).
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
  */

@@ -5,7 +5,7 @@ import { alive, budgetSuggestions, euros, exampleLedger } from '../src/index.js'
  * Tests du codeur de #211 — « L'assistant propose les comptes de l'exemple » : la lecture des
  * comptes de l'exemple par `budgetSuggestions` (`src/suggestions.ts`), sans navigateur. Ce qui se voit
  * à l'écran — l'étape Comptes, les raccourcis, la validation — est dans
- * `apps/web/test/navigateur/assistant-comptes-exemple-harnais.test.ts` (le harnais de l'auditeur).
+ * `apps/web/test/assistant-comptes-exemple-ecran.test.ts`, sur l'application montée sans navigateur (#417).
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
  */
