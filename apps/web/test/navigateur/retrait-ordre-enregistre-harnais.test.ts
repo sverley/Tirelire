@@ -1,18 +1,28 @@
 /**
- * Tests du codeur de #407 — à l'écran, à 375 px, sur l'exemple : retirer une tirelire ou un compte,
+ * Harnais d'audit de #407, côté écran — à 375 px, sur l'exemple : retirer une tirelire ou un compte,
  * depuis son écran ou dans l'assistant complet, laisse l'ordre enregistré « Virement Livret A » tel
  * qu'il est ; le Plan signale ce qui n'est plus demandé, et le résumé de l'assistant le dit avant la
- * validation. Ce qui se vérifie sans navigateur est dans `../retrait-ordre-enregistre.test.ts`.
+ * validation. Sur un projet vierge, l'ordre proposé part avec son compte (#395). Le cœur est dans
+ * `packages/core/test/retrait-ordre-enregistre-harnais.test.ts` ; l'assistant sans navigateur, dans
+ * `../retrait-ordre-enregistre-harnais.test.ts`.
+ *
+ * Les tests sont ceux du codeur (`retrait-ordre-enregistre.test.ts`, déplacé ici en entier), classés
+ * par la suite de questions de D83 ; sont de l'auditeur le retrait d'un compte dans l'assistant
+ * complet (points 2, 7 et 8 : seul il passe par le branchement de la section Comptes dans
+ * `Wizard.svelte`) et l'ordre proposé sur un projet vierge (point 3). Niveau 0 : un retrait qui
+ * réécrirait l'ordre enregistré (points 1 et 2, D60, I10) ; vus rouges sur le code de `main`, et le
+ * retrait d'une tirelire dans l'assistant sur une mutation qui rend l'élagage aux ordres enregistrés.
+ * Niveau 2 : l'ordre proposé (point 3).
  *
  * L'ordre (600 €) a trois parts fixes — Taxe foncière 100 €, Assurance auto 50 €, Vacances 150 € — et
- * la part variable d'Épargne de précaution. Chaque test dit, dans son titre, le point du « Fait quand »
- * qu'il vérifie.
+ * la part variable d'Épargne de précaution. Chaque test dit, dans son titre, les points du « Fait
+ * quand » qu'il tranche.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Page } from 'puppeteer-core';
 import { LedgerStore, type Ledger, type PlannedFlow } from '@tirelire/core';
-import { allerÀ, cliquer, navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
+import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
 
 const SQL = await initSqlJs();
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
@@ -69,6 +79,16 @@ async function carteDuPlan(page: Page): Promise<Carte> {
   });
 }
 const avertissements = (page: Page) => page.evaluate(() => [...document.querySelectorAll('.warnings li, .warnings .warn, .warnings > *')].map((w) => (w as HTMLElement).innerText.replace(/\s+/g, ' ')));
+/** Va à une étape de l'assistant par son onglet. */
+async function etape(page: Page, libelle: string): Promise<boolean> {
+  const fait = await page.evaluate((l: string) => {
+    const b = ([...document.querySelectorAll('.wizard-steps .wstep')] as HTMLButtonElement[]).find((x) => (x.textContent ?? '').trim() === l);
+    b?.click();
+    return !!b;
+  }, libelle);
+  await pause(250);
+  return fait;
+}
 async function ouvrirConfiguration(page: Page, partie: string) {
   await allerÀ(page, 'Plus');
   expect(await cliquer(page, partie)).toBe(true);
@@ -84,7 +104,7 @@ describe.skipIf(!navigateur)('#407 · un retrait laisse l’ordre enregistré, �
     await site?.fermer();
   });
 
-  it('[niveau 4] 1, 5, 9 — depuis l’écran Tirelires : l’ordre reste ; le Plan montre la part sous le nom de la tirelire, retirée, et offre ses gestes', async () => {
+  it('[niveau 0] 1, 5, 9 — depuis l’écran Tirelires : l’ordre reste ; le Plan montre la part sous le nom de la tirelire, retirée, et offre ses gestes', async () => {
     const page = await ouvrirLExemple(site, 375, 812);
     const avant = ordre(await conserve(page));
     await ouvrirConfiguration(page, 'Tirelires');
@@ -121,7 +141,7 @@ describe.skipIf(!navigateur)('#407 · un retrait laisse l’ordre enregistré, �
     await page.close();
   });
 
-  it('[niveau 4] 2, 6, 9 — depuis l’écran Comptes : l’ordre reste ; le Plan montre la carte du compte retiré, l’ordre plus demandé, et ses gestes', async () => {
+  it('[niveau 0] 2, 6, 9 — depuis l’écran Comptes : l’ordre reste ; le Plan montre la carte du compte retiré, l’ordre plus demandé, et ses gestes', async () => {
     const page = await ouvrirLExemple(site, 375, 812);
     const avant = ordre(await conserve(page));
     await ouvrirConfiguration(page, 'Comptes');
@@ -159,7 +179,7 @@ describe.skipIf(!navigateur)('#407 · un retrait laisse l’ordre enregistré, �
     await page.close();
   });
 
-  it('[niveau 4] 1, 4, 7, 8, 9 — dans l’assistant complet : le résumé dit que l’ordre reste, sa carte montre la part retirée ; la validation l’écrit tel quel', async () => {
+  it('[niveau 0] 1, 4, 7, 8, 9 — dans l’assistant complet : le résumé dit que l’ordre reste, sa carte montre la part retirée ; la validation l’écrit tel quel', async () => {
     const page = await ouvrirLExemple(site, 375, 812);
     const avant = ordre(await conserve(page));
     await allerÀ(page, 'Plus');
@@ -197,6 +217,84 @@ describe.skipIf(!navigateur)('#407 · un retrait laisse l’ordre enregistré, �
     const apres = await conserve(page);
     expect(apres.tirelires.find((t) => t.id === 'env-auto')?.deletedAt).toBeTruthy();
     expect(ordre(apres)).toEqual(avant);
+    await page.close();
+  });
+  it('[niveau 0] 2, 4, 7, 8, 9 — dans l’assistant complet, retirer un compte : le résumé dit que l’ordre reste, sa carte nomme le compte retiré ; la validation l’écrit tel quel', async () => {
+    const page = await ouvrirLExemple(site, 375, 812);
+    const avant = ordre(await conserve(page));
+    await allerÀ(page, 'Plus');
+    expect(await cliquer(page, 'Lancer')).toBe(true);
+    await pause(300);
+    expect(await etape(page, 'Comptes')).toBe(true);
+    await pause(200);
+    const retire = await page.evaluate(() => {
+      const l = [...document.querySelectorAll('.ligne-compte')].find((x) => (x.querySelector('input') as HTMLInputElement | null)?.value === 'Livret A');
+      const b = l?.querySelector('button[title="Retirer ce compte"]') as HTMLButtonElement | null;
+      b?.click();
+      return !!b;
+    });
+    expect(retire, 'bouton « Retirer ce compte » du Livret A absent dans l’assistant').toBe(true);
+    await pause(200);
+    expect(await etape(page, 'Résumé')).toBe(true);
+    await pause(300);
+    const resume = await page.evaluate(() => ({
+      lignes: [...document.querySelectorAll('.difference .ordres-touches li')].map((l) => (l as HTMLElement).innerText.replace(/\s+/g, ' ')),
+      cartes: [...document.querySelectorAll('.card.ordre')].map((c) => (c as HTMLElement).innerText.replace(/\s+/g, ' ')),
+      debord: document.documentElement.scrollWidth > window.innerWidth,
+    }));
+    expect(resume.lignes).toHaveLength(1);
+    expect(resume.lignes[0]).toMatch(/« Virement Livret A » vers « Livret A » reste enregistré tel quel/);
+    expect(resume.lignes[0]).toMatch(/continue de virer chez votre banque/);
+    expect(resume.lignes[0]).toMatch(/plus demandé/);
+    expect(resume.cartes.filter((c) => /Virement Livret A/.test(c) && /Livret A \(compte retiré\)/.test(c)), resume.cartes.join(' | ')).toHaveLength(1);
+    expect(resume.debord).toBe(false);
+    expect(await cliquer(page, 'Valider mon budget')).toBe(true);
+    const apres = await conserve(page);
+    expect(apres.accounts.find((a) => a.id === 'acc-livret')?.deletedAt).toBeTruthy();
+    expect(ordre(apres)).toEqual(avant);
+    await page.close();
+  });
+
+  it('[niveau 2] 3 — sur un projet vierge, retirer le Livret A dans l’assistant : l’ordre proposé part avec lui, et la validation passe', async () => {
+    const page = await nouvellePage(site);
+    await page.goto(site.url, { waitUntil: 'networkidle0' });
+    await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
+    await allerÀ(page, 'Plan');
+    expect(await cliquer(page, 'Construire mon budget')).toBe(true);
+    await pause(300);
+    expect(await cliquer(page, 'Commencer')).toBe(true);
+    await pause(250);
+    // L'exemple accepté tel quel propose l'ordre vers le Livret A (#395).
+    expect(await etape(page, 'Résumé')).toBe(true);
+    await pause(300);
+    const cartesAvant = await page.evaluate(() => [...document.querySelectorAll('.card.ordre')].map((c) => (c as HTMLElement).innerText.replace(/\s+/g, ' ')));
+    expect(cartesAvant.some((c) => /Livret A/.test(c)), 'l’ordre proposé vers le Livret A absent avant le retrait').toBe(true);
+    expect(await etape(page, 'Comptes')).toBe(true);
+    await pause(200);
+    const retire = await page.evaluate(() => {
+      const l = [...document.querySelectorAll('.ligne-compte')].find((x) => (x.querySelector('input') as HTMLInputElement | null)?.value === 'Livret A');
+      const b = l?.querySelector('button[title="Retirer ce compte"]') as HTMLButtonElement | null;
+      b?.click();
+      return !!b;
+    });
+    expect(retire, 'bouton « Retirer ce compte » du Livret A absent').toBe(true);
+    await pause(200);
+    expect(await etape(page, 'Résumé')).toBe(true);
+    await pause(300);
+    const vu = await page.evaluate(() => ({
+      cartes: [...document.querySelectorAll('.card.ordre')].map((c) => (c as HTMLElement).innerText.replace(/\s+/g, ' ')),
+      lignes: document.querySelectorAll('.difference .ordres-touches li').length,
+    }));
+    expect(vu.cartes.filter((c) => /Livret A/.test(c))).toEqual([]);
+    expect(vu.lignes).toBe(0);
+    expect(await cliquer(page, 'Valider mon budget')).toBe(true);
+    await pause(400);
+    expect(await page.evaluate(() => document.body.innerText.includes('n’a pas été validé'))).toBe(false);
+    const apres = await conserve(page);
+    expect(apres.accounts.filter((a) => !a.deletedAt).map((a) => a.name)).not.toContain('Livret A');
+    expect(apres.accounts.length, 'la validation n’a rien écrit').toBeGreaterThan(0);
+    const versUnCompteRetire = apres.plannedFlows.filter((f) => !f.deletedAt && f.counterpartAccountId && !apres.accounts.some((a) => a.id === f.counterpartAccountId && !a.deletedAt));
+    expect(versUnCompteRetire).toEqual([]);
     await page.close();
   });
 });

@@ -1,23 +1,33 @@
 /**
- * Tests du codeur de #407 — un retrait qui touche un ordre enregistré suit une seule règle : l'ordre et
- * ses parts restent ce que l'utilisateur a validé, le plan signale ce qui n'est plus demandé, et la
- * validation d'un budget (celle de l'assistant, par le cœur) accepte ce qu'un ordre enregistré désigne
- * encore.
+ * Harnais d'audit de #407 — « Un retrait qui touche un ordre enregistré suit une seule règle, à
+ * l'écran et dans l'assistant, montrée au résumé » : côté cœur, le plan (points 1, 5 et 6) et la
+ * validation d'un budget (point 4). L'assistant sans navigateur est dans
+ * `apps/web/test/retrait-ordre-enregistre-harnais.test.ts` ; l'écran, dans
+ * `apps/web/test/navigateur/retrait-ordre-enregistre-harnais.test.ts`. Trois fichiers, un par
+ * ensemble de tests où le codeur a écrit les siens (cœur, interface sans navigateur, navigateur).
+ *
+ * Les tests sont ceux du codeur (`retrait-ordre-enregistre.test.ts`, déplacé ici en entier), classés
+ * par la suite de questions de D83 ; est de l'auditeur la lecture du point 1 par le vrai chemin de
+ * l'import (`flowVentilation`) et par le solde prévu (`computeForecast`). Niveau 1 : les points 1, 5
+ * et 6 (I2, I10, D60). Niveau 2 : le point 4 (D93, #378). Vus rouges sur le code de `main` ou sur des
+ * mutations ciblées, dites dans la vérification de la PR.
  *
  * Sur le jeu d'exemple : l'ordre « Virement Livret A » (600 €) a trois parts fixes — Taxe foncière
- * 100 €, Assurance auto 50 €, Vacances 150 € — et la part variable d'Épargne de précaution. Chaque test
- * dit, dans son titre, le point du « Fait quand » qu'il vérifie.
+ * 100 €, Assurance auto 50 €, Vacances 150 € — et la part variable d'Épargne de précaution. Chaque
+ * `describe` dit le point du « Fait quand » qu'il tranche.
  */
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
 import {
   appliquerBudget,
+  budgetPeriodContaining,
+  computeForecast,
   computePlan,
   differenceBudget,
   etatDuProjet,
   euros,
   exampleLedger,
-  importerBudgetJson,
+  flowVentilation,
   indexLedger,
   keepStandingOrder,
   LedgerStore,
@@ -45,7 +55,7 @@ function exemple(retirer: { tirelires?: string[]; comptes?: string[] } = {}, ord
 const livret = (l: Ledger) => computePlan(l, LECTURE).transfers.find((t) => t.accountId === 'acc-livret');
 const alertes = (l: Ledger, code: string) => computePlan(l, LECTURE).warnings.filter((w) => w.code === code);
 
-describe('[niveau 4] #407 · 5 — le plan signale la part d’une tirelire retirée', () => {
+describe('[niveau 1] #407 · 5 — le plan signale la part d’une tirelire retirée', () => {
   it('une part fixe sous le pas d’arrondi se signale : la tirelire retirée ne demande plus rien', () => {
     // Assurance auto ne garde que 5 € dans l'ordre : sous le pas de 10 €, une part vivante ne se signalerait pas.
     const l = exemple({ tirelires: ['env-auto'] }, (f) => ({
@@ -103,17 +113,31 @@ describe('[niveau 4] #407 · 5 — le plan signale la part d’une tirelire reti
   });
 });
 
-describe('[niveau 4] #407 · 1 — ce que vire la part d’une tirelire retirée est non affecté sur le compte d’accueil', () => {
-  it('une opération qui prend les parts de l’ordre laisse la part de la tirelire retirée au non affecté (D21, I2)', () => {
+describe('[niveau 1] #407 · 1 — ce que vire la part d’une tirelire retirée est non affecté sur le compte d’accueil', () => {
+  it('à l’import : l’opération qui reprend l’ordre prend toutes ses parts, et la part de la tirelire retirée reste au non affecté (D21, I2)', () => {
     const l = exemple({ tirelires: ['env-auto'] });
-    l.operations.push({ id: 'op-vir', accountId: 'acc-livret', origin: 'imported', date: '2026-08-28', label: 'TIRELIRE LIVRET A', normalizedLabel: 'TIRELIRE LIVRET A', amount: euros(600), state: 'reconciled' });
-    for (const [i, p] of l.plannedFlows.find((f) => f.id === ORDRE)!.action!.allocation!.entries())
-      l.subOperations.push({ id: `sub-${i}`, operationId: 'op-vir', tirelireId: p.tirelireId!, share: p.share.kind === 'fixed' ? { kind: 'fixed', amount: -p.share.amount } : p.share });
-    expect(unallocatedAmount(l.operations.find((o) => o.id === 'op-vir')!, indexLedger(l))).toBe(euros(50));
+    // Le virement importé, côté compte principal, que décrit l'ordre, et la ventilation que pose l'import
+    // quand il reprend l'ordre (D24, D88) : ce que ses parts vivantes n'absorbent pas, 50 €, est sans tirelire.
+    l.operations.push({ id: 'op-vir', accountId: 'acc-principal', transferAccountId: 'acc-livret', origin: 'imported', date: '2026-08-28', label: 'TIRELIRE LIVRET A', normalizedLabel: 'TIRELIRE LIVRET A', amount: euros(-600), state: 'reconciled', plannedFlowId: ORDRE });
+    const subs = flowVentilation(l, l.plannedFlows.find((f) => f.id === ORDRE)!, 'op-vir');
+    expect(subs.map((x) => x.tirelireId)).toEqual(['env-tf', 'env-auto', 'env-vac', 'env-precaution']);
+    l.subOperations.push(...subs);
+    expect(unallocatedAmount(l.operations.find((o) => o.id === 'op-vir')!, indexLedger(l))).toBe(euros(-50));
+  });
+
+  it('au solde prévu : l’occurrence de l’ordre laisse la part de la tirelire retirée au non affecté du compte d’accueil', () => {
+    // Le non affecté prévu du Livret A gagne, sur la période qui porte l'occurrence du 28 septembre,
+    // 50 € de plus quand Assurance auto est retirée que quand elle est vivante.
+    const gain = (l: Ledger) => {
+      const avant = computeForecast(l, budgetPeriodContaining('2026-09-20', 28), LECTURE).accounts.find((a) => a.id === 'acc-livret')!.unallocated;
+      const apres = computeForecast(l, budgetPeriodContaining('2026-10-06', 28), LECTURE).accounts.find((a) => a.id === 'acc-livret')!.unallocated;
+      return apres - avant;
+    };
+    expect(gain(exemple({ tirelires: ['env-auto'] })) - gain(exemple())).toBe(euros(50));
   });
 });
 
-describe('[niveau 4] #407 · 6 — le plan signale l’ordre vers un compte retiré', () => {
+describe('[niveau 1] #407 · 6 — le plan signale l’ordre vers un compte retiré', () => {
   it('la carte du compte retiré, sous son nom : l’ordre plus demandé, à tout montant, sans proposition', () => {
     const l = exemple({ comptes: ['acc-livret'] });
     const t = livret(l)!;
@@ -171,7 +195,7 @@ const sansAuto = (f: BudgetDefini) => {
   f.tables.needs = f.tables.needs!.filter((n) => n.v['tirelire_id'] !== 'env-auto');
 };
 
-describe('[niveau 4] #407 · 4 — la validation de l’assistant accepte ce qu’un ordre enregistré désigne', () => {
+describe('[niveau 2] #407 · 4 — la validation de l’assistant accepte ce qu’un ordre enregistré désigne', () => {
   it('retirer une tirelire qu’une part désigne : la validation écrit le retrait, l’ordre reste tel quel', async () => {
     const s = await depot();
     const avant = s.load().plannedFlows.find((f) => f.id === ORDRE);
