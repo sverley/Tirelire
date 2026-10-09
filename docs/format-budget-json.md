@@ -20,7 +20,7 @@ Un objet JSON, encodé en UTF-8 :
 | Clé | Obligatoire | Forme |
 | --- | --- | --- |
 | `format` | oui | `"tirelire-budget"` |
-| `version` | oui | `4`, la seule version lue aujourd'hui ; les versions 1 à 3 sont refusées |
+| `version` | oui | `5`, la seule version lue aujourd'hui ; les versions 1 à 4 sont refusées |
 | `accounts`, `tirelires`, `needs`, `categories`, `planned_flows` | non | une liste de lignes : présente, la table entière ; absente, la table n'est pas définie |
 | `settings` | non | un objet, une clé par réglage : présente, le réglage est défini ; absente, il ne l'est pas |
 
@@ -30,6 +30,8 @@ Aucune autre clé n'est acceptée. Les noms de tables et de colonnes sont ceux d
 - **montant** : un nombre entier de centimes, signé (`-60000` pour −600,00 €) ;
 - **date** : un texte `AAAA-MM-JJ` qui existe au calendrier ;
 - **booléen** : `true` ou `false` ;
+- **horodatage** : un texte `AAAA-MM-JJTHH:MM:SS.mmmZ`, en UTC, la forme du fichier SQLite
+  (`docs/format-depot-sqlite.md`, « Horodatages ») ;
 - **objet JSON** (placement, report, rythme, tolérance, action) : un objet ou une liste, pas un texte ;
 - une colonne facultative absente ou `null` prend sa valeur par défaut : vide, sauf ce que dit sa
   ligne dans les tables ci-dessous (un report absent vaut illimité).
@@ -43,8 +45,8 @@ table ou une clé de réglage absente **n'est pas définie** et ne change pas. L
 simple — une seule table, quelques colonnes — ou complet — toutes les tables, toutes les colonnes.
 
 Le fichier **se lit seul**, sans le projet : format, version, colonnes, valeurs, identifiants et
-références entre ses propres lignes. Une référence vers une table qu'il ne définit pas se vérifie à
-l'application, contre le projet.
+références entre ses propres lignes, ses lignes retirées comprises. Une référence vers une table qu'il
+ne définit pas se vérifie à l'application, contre le projet.
 
 ## Les identifiants et les références
 
@@ -66,7 +68,26 @@ ligne du projet.
 Le **compte principal** du fichier, le seul de genre `principal`, est celui du projet, au lieu d'en
 créer un second (D40) : quel que soit son identifiant dans le fichier, il devient `acc-principal`,
 et ce qui le désigne dans le fichier désigne le compte principal du projet. Il ne se retire jamais :
-une table `accounts` qui ne le nomme pas laisse celui du projet tel quel.
+une table `accounts` qui ne le nomme pas laisse celui du projet tel quel, et un compte principal
+retiré dans le fichier est refusé.
+
+## Les lignes retirées
+
+Une **ligne retirée** est une ligne supprimée par suppression logique : le fichier SQLite la garde,
+avec sa date de suppression, et une autre ligne peut encore la désigner — un ordre permanent
+enregistré, la tirelire d'une de ses parts ou son compte (D58, D60). Le budget JSON la dit comme le
+fichier SQLite, avec ses mots (D42) : la ligne s'écrit entière, comme une ligne vivante, avec sa
+colonne `deleted_at`, l'horodatage de sa suppression. Une ligne sans `deleted_at` est vivante.
+
+- **Ce que le fichier écrit porte.** Dans chaque table qu'il définit, ses lignes vivantes et, de proche
+  en proche, chaque ligne retirée de cette table qu'une ligne qu'il porte désigne ; aucune autre ligne
+  retirée. Une table qu'il ne définit pas n'y gagne aucune ligne.
+- **Ce que la lecture accepte et refuse.** `deleted_at` s'accepte sur une ligne de chacune des cinq
+  tables. Une ligne retirée se vérifie comme une ligne vivante : colonnes, valeurs, identifiant, et ses
+  références, qui désignent une ligne du fichier, vivante ou retirée, dans une table qu'il définit. Une
+  ligne vivante peut désigner une ligne retirée du fichier. Sont refusés, en nommant la ligne et la
+  colonne : un `deleted_at` qui n'est pas un horodatage de cette forme ; le compte principal retiré.
+- **Ce que la différence et l'application en font** : voir « La différence et son application ».
 
 ## La différence et son application
 
@@ -75,12 +96,22 @@ lues dans le projet à son ouverture. **Pour un import, l'état lu est le projet
 
 **La différence.** Le cœur compare le fichier à l'état lu et en tire, partie par partie, les lignes
 ajoutées, les lignes modifiées avec leurs colonnes changées, les lignes retirées, et les réglages
-changés. Une partie que le fichier ne définit pas n'a pas de différence.
+changés. Une partie que le fichier ne définit pas n'a pas de différence. L'état lu porte aussi les
+lignes que le projet a retirées. Une ligne retirée du fichier :
+
+- que l'état lu porte vivante est un retrait, exactement comme si le fichier ne la nommait pas ;
+- que l'état lu porte déjà retirée ne fait aucune différence, quelles que soient ses colonnes ; une
+  ligne absente du fichier que l'état lu porte retirée n'en fait pas non plus ;
+- que l'état lu ne porte pas, ni vivante ni retirée, **entre retirée**, entière, avec la date de
+  suppression que le fichier lui donne : ce n'est pas l'ajout d'une ligne vivante.
+
+Une ligne vivante du fichier se diffère comme une ligne que l'état lu ne porte pas vivante.
 
 **L'application**, au projet du moment : les ajouts et les modifications s'écrivent, ligne entière ;
-un retrait est la suppression logique de la ligne (D58). Ce que le projet a changé depuis l'état lu,
-et que la différence ne touche pas, reste tel quel. Ainsi, pour un import, appliquer donne au projet,
-pour chaque partie définie, exactement les lignes du fichier.
+un retrait est la suppression logique de la ligne (D58) ; une ligne qui entre retirée s'écrit entière,
+avec sa date de suppression, sauf si le projet du moment la porte déjà retirée. Ce que le projet a
+changé depuis l'état lu, et que la différence ne touche pas, reste tel quel. Ainsi, pour un import,
+appliquer donne au projet, pour chaque partie définie, exactement les lignes du fichier.
 
 **Les conflits.** Une ligne que la différence touche et que le projet a changée depuis l'état lu —
 modifiée, ajoutée ou retirée de part et d'autre — est un conflit. La règle est celle de la
@@ -94,11 +125,13 @@ fichier ouvert (D58) : valeurs obligatoires, énumérations, montants en centime
 forme des objets JSON, une seule part variable par placement, références — une ligne retirée
 qu'une autre ligne, une opération comprise, désigne encore —, identifiants répétés, un seul compte
 principal. Une seule faute refuse le tout ; le refus nomme le premier problème — la partie, la
-ligne, la colonne — et dit combien d'autres il y a. Rien n'est écrit.
+ligne, la colonne — et dit combien d'autres il y a. Rien n'est écrit. Une ligne qui entre retirée est
+présente dans le projet qui en résulte : une ligne qui la désigne n'y fait pas faute.
 
-**Écrire un état.** Le cœur écrit en version 4 les parties choisies d'un projet, toutes par défaut :
-ses lignes vivantes, sans les colonnes vides, et ses réglages. Relire ce qu'il a écrit redonne les
-mêmes lignes, colonne pour colonne.
+**Écrire un état.** Le cœur écrit en version 5 les parties choisies d'un projet, toutes par défaut :
+ses lignes vivantes et les lignes retirées qu'elles désignent (« Les lignes retirées »), sans les
+colonnes vides, et ses réglages. Relire ce qu'il a écrit redonne les mêmes lignes, colonne pour
+colonne, retirées comprises.
 
 ## Les tables
 
@@ -120,6 +153,7 @@ Les comptes bancaires du foyer.
 | `settlement_direction` | non | `both`, `toThird` ou `fromThird` : le sens permis des règlements |
 | `active_from` | non | date : ouverture réelle du compte (D56) |
 | `active_to` | non | date : clôture réelle du compte (D56) |
+| `deleted_at` | non | horodatage : la ligne est retirée, depuis ce moment (« Les lignes retirées ») ; absent, elle est vivante |
 
 ### `tirelires`
 
@@ -131,6 +165,7 @@ Les comptes bancaires du foyer.
 | `opening_balance` | oui | montant : le solde de la tirelire à son ouverture |
 | `opening_date` | oui | date : celle de ce solde |
 | `rollover` | non | objet : le report d'une période à l'autre, `{ "mode": "none" }`, `{ "mode": "unlimited" }` ou `{ "mode": "capped", "months": <entier> }` ; absent, illimité |
+| `deleted_at` | non | horodatage : la ligne est retirée, depuis ce moment (« Les lignes retirées ») ; absent, elle est vivante |
 
 ### `needs`
 
@@ -148,6 +183,7 @@ Les besoins d'une tirelire.
 | `priority` | oui | entier : l'ordre de financement, le plus petit servi en premier (D06) |
 | `active_from` | non | date : début de validité (D50) |
 | `active_to` | non | date : fin de validité (D50) |
+| `deleted_at` | non | horodatage : la ligne est retirée, depuis ce moment (« Les lignes retirées ») ; absent, elle est vivante |
 
 ### `categories`
 
@@ -158,6 +194,7 @@ Les besoins d'une tirelire.
 | `parent_id` | non | la catégorie parente, sans cycle |
 | `tirelire_id` | non | la tirelire par défaut des opérations de cette catégorie |
 | `nature` | oui | `expense` ou `income` |
+| `deleted_at` | non | horodatage : la ligne est retirée, depuis ce moment (« Les lignes retirées ») ; absent, elle est vivante |
 
 ### `planned_flows`
 
@@ -181,6 +218,7 @@ enregistrés.
 | `active_to` | non | date : fin de validité |
 | `action` | non | objet : ce que le flux fait de l'opération qui reprend une occurrence (D24), la forme « action » des automatismes du fichier SQLite (`docs/format-depot-sqlite.md`) — `categoryId`, `tirelireId` (celle qu'une échéance vide), `allocation` (une liste de parts, une seule variable, D27) et `state`, `reconcile` (le défaut) ou `lock` (D22, D23), chacun facultatif |
 | `kept` | non | objet `{ "amount": <montant>, "parts": [{ "tirelireId": <tirelire>, "amount": <montant> }] }`, `parts` facultatif : l'ordre permanent gardé tel quel, et ce que le budget demandait alors (#205) |
+| `deleted_at` | non | horodatage : la ligne est retirée, depuis ce moment (« Les lignes retirées ») ; absent, elle est vivante |
 
 ### `settings`
 
@@ -201,7 +239,7 @@ Le budget de l'exemple embarqué, sans ses opérations. Lu sur un projet vierge,
 ```json
 {
   "format": "tirelire-budget",
-  "version": 4,
+  "version": 5,
   "accounts": [
     {
       "id": "acc-principal",

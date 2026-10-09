@@ -50,16 +50,16 @@ async function projetExemple(): Promise<LedgerStore> {
 }
 const vivantes = <T extends { deletedAt?: string }>(l: T[]) => l.filter((x) => !x.deletedAt);
 
-describe('[niveau 2] #378 · 1 — la version 2, devenue 3 (#393), puis 4 (#205)', () => {
-  it('la version 4 se lit ; les versions 1 à 3 sont refusées en le disant', () => {
-    expect(BUDGET_JSON_VERSION).toBe(4);
+describe('[niveau 2] #378 · 1 — la version 2, devenue 3 (#393), puis 4 (#205), puis 5 (#409)', () => {
+  it('la version 5 se lit ; les versions 1 à 4 sont refusées en le disant', () => {
+    expect(BUDGET_JSON_VERSION).toBe(5);
     expect(lireBudgetJson(v2({})).ok).toBe(true);
     const deux = lireBudgetJson({ ...exemple(), version: 2 });
     expect(deux.ok).toBe(false);
-    if (!deux.ok) expect(deux.message).toMatch(/version vaut 2.*version 4/);
+    if (!deux.ok) expect(deux.message).toMatch(/version vaut 2.*version 5/);
     const lu = lireBudgetJson({ ...exemple(), version: 1 });
     expect(lu.ok).toBe(false);
-    if (!lu.ok) expect(lu.message).toMatch(/version vaut 1.*version 4/);
+    if (!lu.ok) expect(lu.message).toMatch(/version vaut 1.*version 5/);
   });
 });
 

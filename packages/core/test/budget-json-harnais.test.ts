@@ -216,7 +216,7 @@ describe('[niveau 2] #366 · 4 — la lecture, tout ou rien', () => {
   });
   it('une colonne hors du format est refusée', () => {
     const j = copie();
-    (j['accounts'] as Array<Record<string, unknown>>)[0]!['deleted_at'] = '2026-01-01T00:00:00.000Z';
+    (j['accounts'] as Array<Record<string, unknown>>)[0]!['hlc'] = '0000000000001:0000:t'; // deleted_at est du format depuis #409 ; hlc décrit l'instance (D58)
     expect(importerBudgetJson(j, emptyLedger()).ok).toBe(false);
   });
 });
