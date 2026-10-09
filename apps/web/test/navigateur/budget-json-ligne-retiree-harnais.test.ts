@@ -1,10 +1,17 @@
 /**
- * Tests du codeur de #409, côté écran — à 375 px puis sur ordinateur : un budget JSON qui porte un
+ * Harnais d'audit de #409, côté écran — à 375 px puis sur ordinateur : un budget JSON qui porte un
  * ordre enregistré désignant une tirelire et un compte retirés, importé par l'adresse (#367) sur un
  * projet vierge. Le résumé de l'assistant dit les lignes qui entrent retirées, à part des ajouts
  * (point 5) ; les cartes des ordres montrent la part et le compte retirés (point 5, #407 point 8) ;
  * aucune ligne retirée ne se montre comme vivante (point 7) ; rien ne déborde (point 9) ; la
- * validation laisse le projet tel que le fichier le dit (point 6).
+ * validation laisse le projet tel que le fichier le dit (point 6). Le cœur est dans
+ * `packages/core/test/budget-json-ligne-retiree-harnais.test.ts` ; l'assistant sans navigateur, dans
+ * `../budget-json-ligne-retiree-harnais.test.ts`.
+ *
+ * Le test est celui du codeur (`budget-json-ligne-retiree.test.ts`, déplacé ici en entier), classé par
+ * la suite de questions de D83 : niveau 1, le résumé et la carte d'un ordre qui entre avec le fichier
+ * (point 5, D40, I10), la validation qui garde chacune de ses parts (point 6, D60, I10) et C9 (point
+ * 9). Vu rouge sur des mutations ciblées, dites dans la vérification de la PR.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
@@ -96,7 +103,7 @@ describe.skipIf(!navigateur)('#409 · un budget JSON qui porte une tirelire et u
     [375, 812],
     [1280, 900],
   ] as const) {
-    it(`[niveau 4] 5, 6, 7, 9 — à ${largeur} px : le résumé et les cartes les disent retirés ; validé, le projet est celui du fichier`, async () => {
+    it(`[niveau 1] 5, 6, 7, 9 — à ${largeur} px : le résumé et les cartes les disent retirés ; validé, le projet est celui du fichier`, async () => {
       const page = await nouvellePage(site, largeur, hauteur);
       try {
         await page.goto(`${site.url}#budget=${encodeURIComponent(budget())}`, { waitUntil: 'networkidle0' });

@@ -1,8 +1,16 @@
 /**
- * Tests du codeur de #409, côté assistant, sans navigateur : le brouillon enregistré en JSON
+ * Harnais d'audit de #409, côté assistant, sans navigateur : le brouillon enregistré en JSON
  * (`src/lib/brouillon.ts`, point 2), repris sur un projet (points 4 et 6), ce que le résumé en dit
  * (`src/lib/differenceAssistant.ts`, point 5) et ce que l'assistant en montre (point 7), sur un vrai
- * dépôt (`LedgerStore`) qui porte le budget de l'exemple.
+ * dépôt (`LedgerStore`) qui porte le budget de l'exemple. Le cœur est dans
+ * `packages/core/test/budget-json-ligne-retiree-harnais.test.ts` ; l'écran, dans
+ * `navigateur/budget-json-ligne-retiree-harnais.test.ts`.
+ *
+ * Les tests sont ceux du codeur (`budget-json-ligne-retiree.test.ts`, déplacé ici en entier), classés
+ * par la suite de questions de D83 ; est de l'auditeur le brouillon enregistré depuis l'assistant
+ * ouvert sur chaque section (point 2, #363). Niveau 1 : le résumé (point 5, D40, I10) et la validation
+ * (point 6, I10), vus rouges sur des mutations ciblées, dites dans la vérification de la PR. Niveau 2 :
+ * le reste.
  *
  * L'ordre « Virement Livret A » (600 €) a trois parts fixes — Taxe foncière, Assurance auto, Vacances —
  * et la part variable d'Épargne de précaution.
@@ -44,7 +52,7 @@ const dire = (projet: Ledger, b: Brouillon) => {
 };
 const tireliresDe = (j: Record<string, unknown>) => (j['tirelires'] as Array<Record<string, unknown>>) ?? [];
 
-describe('[niveau 4] #409 · 2 — le brouillon enregistré se relit', () => {
+describe('[niveau 2] #409 · 2 — le brouillon enregistré se relit', () => {
   it('le projet retiré à l’écran : le brouillon de l’assistant complet porte la tirelire retirée, avec sa date de suppression', async () => {
     const s = await depot(['env-auto']);
     const projet = s.load();
@@ -79,9 +87,19 @@ describe('[niveau 4] #409 · 2 — le brouillon enregistré se relit', () => {
     const lu = lireBudgetJson(JSON.stringify(budgetDefiniEnJson(fichierAEnregistrer(projet, nouveauBrouillon(projet), MAINTENANT))));
     expect(lu.ok).toBe(true);
   });
+
+  it('enregistré depuis l’assistant ouvert sur une section, sur un projet où l’ordre désigne une tirelire et un compte retirés : il se relit (auditeur)', async () => {
+    const s = await depot(['env-auto']);
+    s.remove('accounts', 'acc-enfants');
+    const projet = s.load();
+    for (const section of ['comptes', 'tirelires'] as const) {
+      const lu = lireBudgetJson(JSON.stringify(budgetDefiniEnJson(fichierAEnregistrer(projet, nouveauBrouillon(projet, section), MAINTENANT))));
+      if (!lu.ok) throw new Error(`${section} : ${lu.message}`);
+    }
+  });
 });
 
-describe('[niveau 4] #409 · 4 à 7 — repris sur un projet vierge', () => {
+describe('[niveau 2] #409 · 4 à 7 — repris sur un projet vierge', () => {
   async function repris() {
     const source = await depot(['env-auto']);
     const j = budgetDefiniEnJson(fichierAEnregistrer(source.load(), nouveauBrouillon(source.load()), MAINTENANT));
@@ -91,7 +109,7 @@ describe('[niveau 4] #409 · 4 à 7 — repris sur un projet vierge', () => {
     return { s, b: brouillonDuFichier(s.load(), lu.budget), deleted: source.load().tirelires.find((t) => t.id === 'env-auto')!.deletedAt };
   }
 
-  it('5 — le résumé dit la tirelire qui entre retirée, sous son nom, à part des ajouts', async () => {
+  it('[niveau 1] 5 — le résumé dit la tirelire qui entre retirée, sous son nom, à part des ajouts', async () => {
     const { s, b } = await repris();
     const d = dire(s.load(), b);
     const tirelires = d.parties.find((p) => p.nom === 'Tirelires')!;
@@ -109,7 +127,7 @@ describe('[niveau 4] #409 · 4 à 7 — repris sur un projet vierge', () => {
     expect(retireesDuFichier(b, 'tirelires')).toEqual(new Set(['env-auto']));
   });
 
-  it('6 — validé : la tirelire retirée, l’ordre et chacune de ses parts, tels que le fichier les dit', async () => {
+  it('[niveau 1] 6 — validé : la tirelire retirée, l’ordre et chacune de ses parts, tels que le fichier les dit', async () => {
     const { s, b, deleted } = await repris();
     valider(s, s.load(), b);
     const apres = s.load();

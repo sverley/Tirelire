@@ -1,8 +1,18 @@
 /**
- * Tests du codeur de #409 — « Le budget JSON porte un ordre enregistré qui désigne une tirelire ou un
+ * Harnais d'audit de #409 — « Le budget JSON porte un ordre enregistré qui désigne une tirelire ou un
  * compte retirés » : côté cœur, l'écriture (point 1), la relecture (point 2), la lecture (point 3), la
  * différence et l'application (point 4), le projet après la validation (point 6), rien d'autre (point
- * 7) et la version 5 (point 8).
+ * 7) et la version 5 (point 8). L'assistant sans navigateur est dans
+ * `apps/web/test/budget-json-ligne-retiree-harnais.test.ts` ; l'écran, dans
+ * `apps/web/test/navigateur/budget-json-ligne-retiree-harnais.test.ts` : trois fichiers, un par
+ * ensemble de tests où le codeur a écrit les siens, comme pour #407.
+ *
+ * Les tests sont ceux du codeur (`budget-json-ligne-retiree.test.ts`, déplacé ici en entier), classés
+ * par la suite de questions de D83. Sont de l'auditeur : l'application d'une ligne que le projet porte
+ * déjà retirée, qui la laisse telle qu'elle est (point 4, niveau 0 : une ligne du projet réécrite ne
+ * revient pas) ; ce que vire la part de la tirelire entrée retirée, non affecté sur le compte d'accueil
+ * (point 6, D21, I2) ; les versions 1 à 4 refusées (point 8). Niveau 1 : le point 6 (I2, I10). Niveau
+ * 2 : le reste. Vus rouges sur des mutations ciblées, dites dans la vérification de la PR.
  *
  * Sur le jeu d'exemple : l'ordre « Virement Livret A » (600 €), du compte principal vers le Livret A,
  * a trois parts fixes — Taxe foncière, Assurance auto, Vacances — et la part variable d'Épargne de
@@ -19,10 +29,14 @@ import {
   ecrireBudgetJson,
   etatDuProjet,
   etatLuDuProjet,
+  euros,
   exampleLedger,
+  flowVentilation,
   importerBudgetJson,
+  indexLedger,
   LedgerStore,
   lireBudgetJson,
+  unallocatedAmount,
   type Ledger,
 } from '../src/index.js';
 
@@ -53,7 +67,7 @@ const lignes = (j: Record<string, unknown>, table: string) => (j[table] as Array
 const ids = (j: Record<string, unknown>, table: string) => lignes(j, table).map((l) => l['id']);
 const retirees = (j: Record<string, unknown>, table: string) => lignes(j, table).filter((l) => 'deleted_at' in l).map((l) => l['id']);
 
-describe('[niveau 4] #409 · 1 — le fichier écrit porte la ligne retirée désignée', () => {
+describe('[niveau 2] #409 · 1 — le fichier écrit porte la ligne retirée désignée', () => {
   it('une tirelire retirée qu’une part de l’ordre désigne s’écrit entière, avec sa date de suppression ; une autre retirée, non', () => {
     // Santé, retirée, n'est plus désignée par rien de vivant : son besoin est retiré, sa catégorie n'a plus de tirelire par défaut.
     const l = exemple({ tirelires: ['env-auto', 'env-sante'] });
@@ -103,7 +117,7 @@ describe('[niveau 4] #409 · 1 — le fichier écrit porte la ligne retirée dé
   });
 });
 
-describe('[niveau 4] #409 · 2 — il se relit', () => {
+describe('[niveau 2] #409 · 2 — il se relit', () => {
   it('relire redonne les mêmes lignes, colonne pour colonne, retirées comprises', () => {
     const l = exemple({ tirelires: ['env-auto', 'env-tf'], comptes: ['acc-livret'] });
     const j = ecrireBudgetJson(l);
@@ -125,7 +139,7 @@ describe('[niveau 4] #409 · 2 — il se relit', () => {
   });
 });
 
-describe('[niveau 4] #409 · 3 — ce que la lecture accepte et refuse', () => {
+describe('[niveau 2] #409 · 3 — ce que la lecture accepte et refuse', () => {
   const v5 = (parties: Record<string, unknown>) => ({ format: BUDGET_JSON_FORMAT, version: 5, ...parties });
   const compte = { id: 'acc-x', name: 'X', kind: 'courant', opening_balance: 0, opening_date: '2026-01-01' };
   const tirelire = { id: 'env-x', name: 'T', placement: [], opening_balance: 0, opening_date: '2026-01-01' };
@@ -184,7 +198,25 @@ describe('[niveau 4] #409 · 3 — ce que la lecture accepte et refuse', () => {
   });
 });
 
-describe('[niveau 4] #409 · 4 — la différence et l’application', () => {
+describe('[niveau 0] #409 · 4 — une ligne que le projet porte déjà retirée ne reçoit rien du fichier', () => {
+  it('une ligne retirée du fichier que le projet porte déjà retirée ne fait aucune différence, quelles que soient ses colonnes ; appliqué, le projet la garde telle quelle', async () => {
+    const s = await depot(exemple({ tirelires: ['env-auto'] }));
+    const avant = s.load().tirelires.find((t) => t.id === 'env-auto');
+    const fichier = ecrireBudgetJson(exemple({ tirelires: ['env-auto'] }));
+    const auto = lignes(fichier, 'tirelires').find((t) => t['id'] === 'env-auto')!;
+    auto['name'] = 'Autre nom';
+    auto['opening_balance'] = 99900;
+    auto['deleted_at'] = '2025-01-01T00:00:00.000Z';
+    const r = importerBudgetJson(fichier, s.load());
+    if (!r.ok) throw new Error(r.message);
+    expect(differenceVide(r.difference)).toBe(true);
+    expect(r.application.ecritures).toEqual([]);
+    appliquerBudget(s, r.application);
+    expect(s.load().tirelires.find((t) => t.id === 'env-auto')).toEqual(avant);
+  });
+});
+
+describe('[niveau 2] #409 · 4 — la différence et l’application', () => {
   it('une ligne retirée du fichier que le projet porte vivante est un retrait, comme si le fichier ne la nommait pas', async () => {
     const fichier = ecrireBudgetJson(exemple({ tirelires: ['env-auto'] }));
     const s = await depot(exemple());
@@ -197,18 +229,6 @@ describe('[niveau 4] #409 · 4 — la différence et l’application', () => {
     appliquerBudget(s, r.application);
     expect(s.load().tirelires.find((t) => t.id === 'env-auto')!.deletedAt).toBeTruthy();
     expect(s.load().plannedFlows.find((f) => f.id === ORDRE)).toEqual(exemple().plannedFlows.find((f) => f.id === ORDRE));
-  });
-
-  it('une ligne retirée du fichier que le projet porte déjà retirée ne fait aucune différence, quelles que soient ses colonnes', async () => {
-    const s = await depot(exemple({ tirelires: ['env-auto'] }));
-    const fichier = ecrireBudgetJson(exemple({ tirelires: ['env-auto'] }));
-    const auto = lignes(fichier, 'tirelires').find((t) => t['id'] === 'env-auto')!;
-    auto['name'] = 'Autre nom';
-    auto['deleted_at'] = '2025-01-01T00:00:00.000Z';
-    const r = importerBudgetJson(fichier, s.load());
-    if (!r.ok) throw new Error(r.message);
-    expect(differenceVide(r.difference)).toBe(true);
-    expect(r.application.ecritures).toEqual([]);
   });
 
   it('une ligne absente du fichier que le projet porte retirée ne fait aucune différence', async () => {
@@ -251,7 +271,7 @@ describe('[niveau 4] #409 · 4 — la différence et l’application', () => {
   });
 });
 
-describe('[niveau 4] #409 · 6 — après la validation', () => {
+describe('[niveau 1] #409 · 6 — après la validation', () => {
   it('sur un projet qui ne portait ni la tirelire ni le compte retirés ni l’ordre : le projet tel que le fichier le dit, et le plan le signale', async () => {
     const source = exemple({ tirelires: ['env-auto'], comptes: ['acc-enfants'] });
     // Un second ordre, vers la Carte enfants retirée.
@@ -276,20 +296,31 @@ describe('[niveau 4] #409 · 6 — après la validation', () => {
     expect(part).toMatchObject({ retired: true, signaled: true });
     expect(plan.warnings.some((w) => w.code === 'bankOrderPartDrift' && w.tirelireId === 'env-auto')).toBe(true);
     expect(plan.transfers.find((t) => t.accountId === 'acc-enfants')).toMatchObject({ accountRetired: true, permanent: 0, bankOrder: { flowId: 'flow-vir-enfants', signaled: true } });
+
+    // Ce que vire la part de la tirelire entrée retirée est non affecté sur le compte d'accueil (D21, I2) :
+    // à l'import, l'opération qui reprend l'ordre prend toutes ses parts, et les 50 € d'Assurance auto
+    // restent sans tirelire (auditeur).
+    apres.operations.push({ id: 'op-vir', accountId: 'acc-principal', transferAccountId: 'acc-livret', origin: 'imported', date: '2026-08-28', label: 'TIRELIRE LIVRET A', normalizedLabel: 'TIRELIRE LIVRET A', amount: euros(-600), state: 'reconciled', plannedFlowId: ORDRE });
+    const subs = flowVentilation(apres, apres.plannedFlows.find((f) => f.id === ORDRE)!, 'op-vir');
+    expect(subs.map((x) => x.tirelireId)).toEqual(['env-tf', 'env-auto', 'env-vac', 'env-precaution']);
+    apres.subOperations.push(...subs);
+    expect(unallocatedAmount(apres.operations.find((o) => o.id === 'op-vir')!, indexLedger(apres))).toBe(euros(-50));
   });
 });
 
-describe('[niveau 4] #409 · 7 et 8 — rien d’autre ne change ; la version 5', () => {
+describe('[niveau 2] #409 · 7 et 8 — rien d’autre ne change ; la version 5', () => {
   it('un projet sans ligne retirée désignée s’écrit sans deleted_at, en version 5', () => {
     const j = ecrireBudgetJson(exemple({ categories: ['cat-transfert'] }));
     expect(j['version']).toBe(5);
     for (const t of ['accounts', 'tirelires', 'needs', 'categories', 'planned_flows']) expect(retirees(j, t)).toEqual([]);
   });
 
-  it('la version 4 est refusée en le disant, sans rien lire', () => {
-    const j = { ...ecrireBudgetJson(exemple()), version: 4 };
-    const lu = lireBudgetJson(j);
-    expect(lu.ok).toBe(false);
-    if (!lu.ok) expect(lu.message).toMatch(/version vaut 4.*version 5/);
+  it('les versions 1 à 4 sont refusées en le disant, sans rien lire', () => {
+    for (const version of [1, 2, 3, 4]) {
+      const j = { ...ecrireBudgetJson(exemple()), version };
+      const lu = lireBudgetJson(j);
+      expect(lu.ok).toBe(false);
+      if (!lu.ok) expect(lu.message).toMatch(new RegExp(`version vaut ${version}.*version 5`));
+    }
   });
 });
