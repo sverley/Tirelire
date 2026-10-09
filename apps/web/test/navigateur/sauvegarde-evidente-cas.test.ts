@@ -13,7 +13,7 @@
  * Un impératif sans pronom échappe au repérage : il reste à la relecture.
  *
  * Niveaux (D83) : 2 — D85 est une décision ; un texte qui tutoie la contredit, l'usage restant
- * possible. Un contrôle du repérage lui-même est de niveau 4.
+ * possible.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';
@@ -44,12 +44,6 @@ describe('[niveau 2] C5 · #41 · les textes vouvoient (D85)', () => {
   });
   it.fails('témoin rouge · une carte « Données » qui tutoie', () => {
     vérifierVouvoiement({ où: 'Réglages', texte: 'Ta dernière sauvegarde : jamais' });
-  });
-});
-
-describe('[niveau 4] C5 · #41 · le repérage du tutoiement', () => {
-  it('un texte qui vouvoie passe', () => {
-    vérifierVouvoiement({ où: 'exemple', texte: 'Dernière sauvegarde : jamais. Enregistrez une copie de vos données : exportez-les sur votre appareil.' });
   });
 });
 

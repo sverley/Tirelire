@@ -34,7 +34,11 @@ reprends toi-même les retours de l'auditeur, sans session de codeur.
    alors aucun test ; le codeur n'en écrit pas, l'auditeur ne compose pas de harnais, et rien ne
    s'ajoute aux tests de la garde (D81, #382). Un test qui recopie un réglage ne vérifie que la
    recopie : il est une seconde place pour la même valeur (D78), et rougit à chaque changement voulu
-   (05ede00).
+   (05ede00). Dis aussi, après la ligne « Usages », « Navigateur : » suivi des seuls points du
+   « Fait quand » qui demandent un test dans le navigateur — une mesure de mise en page à une
+   largeur d'écran, une capacité du navigateur, un harnais du registre qui le demande —, ou
+   « Navigateur : aucun », qui vaut quand l'issue ne dit rien : le reste se vérifie sans navigateur
+   (D83, « Le navigateur au minimum » ; porteur, #413).
 4. Écris dans l'issue la section « Invariants et contraintes » : les entrées du registre touchées,
    et pour chacune la vérification manuelle attendue, sans case (`node packages/gardes/cli.mjs
    demander` la prépare).

@@ -4,7 +4,7 @@
  * du « Fait quand ». Le calcul est gardé dans le cœur (`packages/core/test/bilan-budget-harnais.test.ts`) ;
  * ici, seulement ce qui se voit et ce qui mène ailleurs.
  *
- * Retenus parmi les tests du codeur (`bilan-budget.test.ts`, d'où ils sont déplacés), puis complétés : les
+ * Retenus parmi les tests du codeur de #320, puis complétés : les
  * états que son seul exemple ne montrait pas — des revenus qui ne couvrent pas tout, des opérations sans
  * aucun besoin, la réponse à un manque — se fabriquent ici en grand livre importé par Réglages, comme le
  * font les autres harnais. Les cartes de période se reconnaissent à `data-periode`, la marque que le

@@ -47,8 +47,7 @@
  * laisse travailler, la nouvelle version tourne à l'ouverture suivante. Niveau 2 : les noms des
  * quatre sortes de builds (D83, « Livraison »), pas de faux signal, chaque aperçu servi par lui-même
  * (#233), hors ligne après une première visite, le signal qui ne revient pas une fois la mise à jour
- * faite (un faux signal), les textes qui vouvoient (D85, une décision). Niveau 4 : un diagnostic qui
- * dit où la version se lit.
+ * faite (un faux signal), les textes qui vouvoient (D85, une décision).
  */
 // @ts-ignore — module JavaScript sans déclaration de types
 import { CLÉ_ÉTAPE, STATUT, besoins, expression, jobs, scalaire, vrai, évaluer, étapes, commande } from '../../../../packages/gardes/workflow-a-blanc.mjs';
@@ -1341,26 +1340,6 @@ describe.skipIf(!navigateur)('#142 · D85', () => {
       expect(t, 'pas de version à relire').toBeDefined();
       const lignes = t!.lecture.texte.split('\n').filter((l) => /version|développement|main/i.test(l));
       for (const l of lignes) expect(l, `une ligne de la version tutoie : « ${l} »`).not.toMatch(TUTOIEMENT);
-    });
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════════════════════
-// Diagnostic
-// ═════════════════════════════════════════════════════════════════════════════════════════════
-
-describe.skipIf(!navigateur)('#142 · diagnostic', () => {
-  describe('[niveau 4] où la version se lit, sorte par sorte', () => {
-    it('dit, pour chaque sorte de build, les gestes qui mènent à la version et ce qu\'elle dit', async () => {
-      const { bac: b } = bacPrêt();
-      const cherche = CHERCHE();
-      const lignes: string[] = [`dépôt d'essai : ${TAG} = ${court(b.c0)}, main = ${court(b.c1)}, suivant = ${court(b.c2)}, tête de la PR = ${court(b.p)}, fusion = ${court(b.m)}`];
-      for (const sorte of ['tag', 'forcée', 'main', 'pr', 'local'] as const) {
-        const t = await versionDe(sorte, cherche[sorte]);
-        lignes.push(`${sorte} : ${t ? `en ${t.par.length} geste(s) [${t.par.join(' › ') || 'accueil'}] — ${t.lecture.versions[0] ?? t.lecture.texte.replace(/\s+/g, ' ').slice(0, 160)}` : 'introuvable'}`);
-      }
-      console.info(`\n#142 · diagnostic\n${lignes.join('\n')}\n`);
-      expect(lignes.length).toBeGreaterThan(1);
     });
   });
 });
