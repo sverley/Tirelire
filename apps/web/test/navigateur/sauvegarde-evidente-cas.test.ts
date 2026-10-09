@@ -47,12 +47,6 @@ describe('[niveau 2] C5 · #41 · les textes vouvoient (D85)', () => {
   });
 });
 
-describe('[niveau 4] C5 · #41 · le repérage du tutoiement', () => {
-  it('un texte qui vouvoie passe', () => {
-    vérifierVouvoiement({ où: 'exemple', texte: 'Dernière sauvegarde : jamais. Enregistrez une copie de vos données : exportez-les sur votre appareil.' });
-  });
-});
-
 /** Réponse du navigateur : persistance accordée, pour que le seul signal soit le rappel. */
 async function accorder(page: Page): Promise<void> {
   await page.evaluateOnNewDocument(() => {

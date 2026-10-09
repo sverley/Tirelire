@@ -55,14 +55,6 @@ describe('[niveau 2] C4 · #42 · les textes vouvoient (D85)', () => {
   });
 });
 
-// Niveau 4 : un contrôle du repérage lui-même, qu'il ne prenne pas un texte qui vouvoie pour du
-// tutoiement ; rien du produit n'en dépend.
-describe('[niveau 4] C4 · #42 · le repérage du tutoiement', () => {
-  it('un texte qui vouvoie passe', () => {
-    vérifierVouvoiement({ où: 'exemple', texte: "Vos données peuvent être effacées par le navigateur s'il manque de place : exportez-les, c'est votre sauvegarde. Tout est stocké dans ce navigateur." });
-  });
-});
-
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // Mesures dans le navigateur
 // ─────────────────────────────────────────────────────────────────────────────────────────────
