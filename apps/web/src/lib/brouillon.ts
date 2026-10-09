@@ -45,6 +45,26 @@ type Ligne = { id: string; deletedAt?: string };
 /** Les parties du budget que l'assistant couvre : ses tables, et les réglages qu'il montre. */
 export const PARTIES_ASSISTANT: readonly PartieBudget[] = [...CLES_TABLES_BUDGET, 'periodStartDay', 'principalCushion'];
 
+/**
+ * Les sections sur lesquelles l'assistant s'ouvre depuis l'écran de leur partie (D94, #363) : il n'y
+ * couvre que leurs parties, et ne s'ouvre que sur leurs étapes, puis le résumé.
+ */
+export type SectionAssistant = 'comptes' | 'tirelires';
+
+/** Les parties que couvre l'assistant ouvert sur une section : ce que ses étapes écrivent d'abord. */
+export const PARTIES_DES_SECTIONS: Record<SectionAssistant, readonly PartieBudget[]> = {
+  comptes: ['accounts', 'principalCushion'],
+  tirelires: ['tirelires', 'needs'],
+};
+
+/** Ce que l'assistant s'appelle, complet ou ouvert sur une section : son titre, et le nom que lui donne le choix entre deux assistants. */
+export function titreDeLAssistant(section?: SectionAssistant): string {
+  return section === 'comptes' ? 'Compléter mes comptes' : section === 'tirelires' ? 'Compléter mes tirelires' : 'Construire mon budget';
+}
+
+/** La première étape de l'assistant ouvert sur une section : il s'ouvre sur elle, sans « Le principe ». */
+const PREMIERE_ETAPE: Record<SectionAssistant, string> = { comptes: 'accounts', tirelires: 'everyday' };
+
 /** La suppression logique que montre l'assistant sur une ligne que son brouillon retire. */
 const RETIREE = '1970-01-01T00:00:00.000Z';
 
@@ -72,9 +92,15 @@ export interface Brouillon {
    */
   budgetImporte?: true;
   /**
+   * L'assistant est ouvert sur une seule section, depuis l'écran de sa partie (#363) : le fichier ne
+   * couvre que ses parties, et rien d'autre ne se propose d'office. Absent : l'assistant complet.
+   */
+  section?: SectionAssistant;
+  /**
    * Les parties de l'assistant qu'un fichier repris ne définit pas, telles que le projet les portait à
-   * la reprise (#379) : hors du fichier, elles ne s'enregistrent pas. La première étape qui en change
-   * une l'y fait entrer, avec cet état lu.
+   * la reprise (#379), ou que la section ne couvre pas, telles qu'il les portait à l'ouverture (#363) :
+   * hors du fichier, elles ne s'enregistrent pas, et la validation n'y change rien. La première étape
+   * qui en change une l'y fait entrer, avec cet état lu.
    */
   horsFichier?: BudgetDefini;
 }
@@ -122,14 +148,27 @@ function reglagesDeLExemple(projet: Ledger): Partial<Settings> {
   return proposes;
 }
 
-/** Un brouillon neuf : l'ouverture de l'assistant sur ce projet. */
-export function nouveauBrouillon(projet: Ledger): Brouillon {
+/**
+ * Un brouillon neuf : l'ouverture de l'assistant sur ce projet — complet, ou sur une seule section
+ * (#363). Ouvert sur une section, il ne couvre que ses parties ; les autres sont lues hors du fichier,
+ * et seul le réglage de la section se propose d'office sur un projet vierge : le coussin pour les
+ * comptes, rien pour les tirelires — jamais le jour de début de période, qui appartient aux revenus (D44).
+ */
+export function nouveauBrouillon(projet: Ledger, section?: SectionAssistant): Brouillon {
   const vierge = projetEstVierge(projet);
-  const etatLu = etatDuProjet(projet, PARTIES_ASSISTANT);
-  const reglagesProposes = vierge ? reglagesDeLExemple(projet) : {};
+  const parties = section ? PARTIES_DES_SECTIONS[section] : PARTIES_ASSISTANT;
+  const etatLu = etatDuProjet(projet, parties);
+  const reglagesProposes: Partial<Settings> = {};
+  if (vierge) for (const [cle, valeur] of Object.entries(reglagesDeLExemple(projet))) if (parties.includes(cle as PartieBudget)) Object.assign(reglagesProposes, { [cle]: valeur });
   const fichier = copie(etatLu);
   Object.assign(fichier.settings, reglagesProposes); // le garnissage d'office écrit dans le fichier (D46)
-  return { fichier, etatLu, ouverture: JSON.stringify(fichier), etape: 'intro', semees: [], projetVierge: vierge, reglagesProposes };
+  const b: Brouillon = { fichier, etatLu, ouverture: JSON.stringify(fichier), etape: 'intro', semees: [], projetVierge: vierge, reglagesProposes };
+  if (section) {
+    b.section = section;
+    b.etape = PREMIERE_ETAPE[section];
+    b.horsFichier = etatDuProjet(projet, PARTIES_ASSISTANT.filter((p) => !parties.includes(p)));
+  }
+  return b;
 }
 
 const copie = (b: BudgetDefini): BudgetDefini => JSON.parse(JSON.stringify(b)) as BudgetDefini;

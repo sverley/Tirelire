@@ -1514,3 +1514,11 @@ qui est proche partage le même code (principe 13). Ce qui se calcule sur les do
 l'utilisateur — le lissage proposé, l'évolution d'un ordre, l'adaptation du train de vie — ne passe
 pas par une section. La section Tirelires est la première (#361) ; l'écran Tirelires l'emploie
 (#369), les autres parties suivent.
+
+**Depuis l'écran de sa partie, l'assistant s'ouvre sur la seule section de cet écran** (#363) : ses
+étapes, puis le résumé qui valide. Il y garde ce qui distingue l'assistant — le brouillon (D40), le
+garnissage d'office d'un projet vierge (D46), les champs simples (I4), l'explication affichée —, et
+sa validation n'écrit que ce que la section a changé (D93) : les autres parties du budget restent
+ce que le projet porte. L'application ne tient qu'un assistant à la fois : quand l'un a des
+changements non validés et qu'on en ouvre un autre, rien ne les remplace sans accord ; le même se
+reprend. Une partie qui devient une section reçoit ce point d'entrée par la même règle.

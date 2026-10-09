@@ -39,6 +39,7 @@ import {
   retirer as retirerDuBrouillon,
   valider as validerLeBrouillon,
   type Brouillon,
+  type SectionAssistant,
 } from './brouillon';
 import { eraseStore, openStore, OuvertureRefusee, type OpenedStore } from './db';
 import { demanderPersistance, type EtatPersistance } from './persistance';
@@ -116,6 +117,42 @@ class AppState {
    */
   versionAssistant = $state(0);
 
+  /**
+   * L'assistant demandé : complet (`undefined`), ou ouvert sur une seule section depuis l'écran de sa
+   * partie (#363). L'écran de l'assistant s'ouvre sur lui.
+   */
+  assistantDemande = $state<SectionAssistant | undefined>(undefined);
+
+  /**
+   * Un autre assistant que celui qui est demandé a des changements non validés : l'écran de
+   * l'assistant demande d'abord de le reprendre, ou de l'abandonner pour ouvrir celui qui est demandé
+   * (#363, point 7). Rien ne les remplace sans cet accord.
+   */
+  get choixAssistant(): boolean {
+    return this.assistantPrepare && this.assistant!.section !== this.assistantDemande;
+  }
+
+  /**
+   * Demande l'assistant, complet ou sur une section, et l'ouvre. Il n'y a qu'un brouillon : le même
+   * assistant se reprend ; un autre qui a des changements non validés fait d'abord demander lequel
+   * garder (`choixAssistant`).
+   */
+  demanderAssistant(section?: SectionAssistant): void {
+    this.assistantDemande = section;
+    this.go('wizard');
+  }
+
+  /** Reprend l'assistant en cours, au lieu de celui qui était demandé : rien n'est perdu. */
+  reprendreAssistant(): void {
+    this.assistantDemande = this.assistant?.section;
+  }
+
+  /** Abandonne l'assistant en cours pour ouvrir celui qui était demandé : ses changements sont perdus, rien n'est écrit dans le projet. */
+  abandonnerAssistant(): void {
+    this.assistant = undefined;
+    this.versionAssistant++;
+  }
+
   /** Ce que l'assistant a préparé sans le valider : un import le remplacerait (#367). */
   get assistantPrepare(): boolean {
     return !!this.assistant && !brouillonIntact(this.assistant);
@@ -135,6 +172,8 @@ class AppState {
     const budget = lireBudgetJson(texte);
     if (!budget.ok) return { ok: false, message: budget.message };
     this.assistant = brouillonDuFichier(this.ledger, budget.budget);
+    // Un budget importé arrive dans l'assistant complet (#367).
+    this.assistantDemande = undefined;
     this.versionAssistant++;
     return { ok: true };
   }
@@ -297,11 +336,13 @@ class AppState {
   }
 
   /**
-   * Ouvre l'assistant : reprend son brouillon s'il y a déjà quelque chose de préparé, sinon repart du
-   * projet tel qu'il est (D43 : son état d'ouverture, projet vierge ou non, se relit alors).
+   * Ouvre l'assistant demandé, complet ou sur une section (#363) : reprend son brouillon s'il y a déjà
+   * quelque chose de préparé, sinon repart du projet tel qu'il est (D43 : son état d'ouverture, projet
+   * vierge ou non, se relit alors). Un brouillon préparé par un autre assistant ne se remplace pas ici :
+   * `demanderAssistant` a d'abord demandé lequel garder.
    */
   ouvrirAssistant(): Brouillon {
-    if (!this.assistant || brouillonIntact(this.assistant)) this.assistant = nouveauBrouillon(this.ledger);
+    if (!this.assistant || brouillonIntact(this.assistant)) this.assistant = nouveauBrouillon(this.ledger, this.assistantDemande);
     return this.assistant;
   }
 

@@ -22,7 +22,7 @@
       <strong>Construire mon budget</strong>
       <span class="sub">Quelques questions simples, et vos tirelires se créent toutes seules</span>
     </div>
-    <button class="btn primary" onclick={() => app.go('wizard')}>Lancer</button>
+    <button class="btn primary" onclick={() => app.demanderAssistant()}>Lancer</button>
   </div>
 </div>
 

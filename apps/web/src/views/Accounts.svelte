@@ -147,6 +147,8 @@
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Comptes</h1>
+<!-- L'assistant, ouvert sur la seule section de cet écran (D94, #363) : toujours offert, base vide comprise. -->
+<p class="actions"><a class="btn" href="#top" onclick={(e) => { e.preventDefault(); app.demanderAssistant('comptes'); }}>Compléter avec l’assistant</a></p>
 
 {#snippet filtre()}
   <FiltreEtat bind:value={etatsVisibles} counts={états} quoi="les comptes" />

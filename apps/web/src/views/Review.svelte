@@ -93,7 +93,7 @@
   <div class="card accent">
     <p style="margin-top:0">Le Bilan lira votre budget, période par période, dès qu’il y en aura un ; et ce que vous avez dépensé dès qu’il y aura des opérations, importées ou saisies.</p>
     <div class="actions" style="margin-bottom:0">
-      <button class="btn primary" onclick={() => app.go('wizard')}>Construire mon budget</button>
+      <button class="btn primary" onclick={() => app.demanderAssistant()}>Construire mon budget</button>
     </div>
   </div>
 {:else}
