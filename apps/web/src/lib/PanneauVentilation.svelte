@@ -94,6 +94,8 @@
           <select bind:value={p.tirelireId} onchange={toucher}>
             <option value="">—</option>
             {#each noms.tirelires as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
+            <!-- La part d'une tirelire retirée garde sa tirelire tant qu'on n'en choisit pas une autre (#407, I10). -->
+            {#each (noms.retirees ?? []).filter((t) => t.id === p.tirelireId) as t (t.id)}<option value={t.id}>{t.name} (retirée)</option>{/each}
           </select>
         </label>
         <label class="f">Catégorie

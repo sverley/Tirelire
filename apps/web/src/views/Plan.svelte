@@ -99,7 +99,8 @@
 
   /** L'ordre ouvert dans le panneau de correction : sur la proposition, ou l'ordre enregistré du compte. */
   let surProposition = $state(false);
-  const noms = $derived({ tirelires: alive(app.ledger.tirelires), categories: alive(app.ledger.categories) });
+  /** Les noms des parts : les tirelires vivantes, et les retirées qu'un ordre enregistré nomme encore (#407, point 5). */
+  const noms = $derived({ tirelires: alive(app.ledger.tirelires), categories: alive(app.ledger.categories), retirees: app.ledger.tirelires.filter((t) => t.deletedAt) });
 
   function ouvrirOrdre(t: PlanTransfer, proposition: boolean) {
     ordreEdite = t.accountId;
@@ -414,7 +415,7 @@
       <div class="row">
         <div class="label">
           <strong>{t.accountName}</strong>
-          <span class="sub">{ACCOUNT_KINDS[t.accountKind]}</span>
+          <span class="sub">{ACCOUNT_KINDS[t.accountKind]}{#if t.accountRetired} · compte retiré : le budget n’y demande rien{/if}</span>
         </div>
         <div class="{moneyClass(-t.net)}" style="font-size:18px">{t.net >= 0 ? money(t.net) : `← ${money(-t.net)}`}</div>
       </div>

@@ -24,6 +24,8 @@ export interface LigneDeVentilation {
   montant: Cents;
   tirelireId?: Id;
   share: Share;
+  /** La tirelire de la part est retirée : la part se montre sous son nom, marquée comme retirée (#407). */
+  retiree?: true;
 }
 
 export interface LectureDeVentilation {
@@ -33,13 +35,25 @@ export interface LectureDeVentilation {
 }
 
 export interface Noms {
+  /** Les tirelires vivantes : celles qu'une part peut nommer, et que le panneau propose. */
   tirelires: Array<Pick<Tirelire, 'id' | 'name'>>;
   categories: Array<Pick<Category, 'id' | 'name'>>;
+  /**
+   * Les tirelires retirées, que la part d'un ordre enregistré peut encore nommer (#407, points 5 et
+   * 8) : la part se lit sous leur nom, marquée comme retirée ; le panneau ne les propose pas.
+   */
+  retirees?: Array<Pick<Tirelire, 'id' | 'name'>>;
+}
+
+/** La tirelire retirée que nomme une part, s'il y en a une. */
+function tirelireRetiree(l: { tirelireId?: Id | undefined }, noms: Noms): Pick<Tirelire, 'id' | 'name'> | undefined {
+  if (!l.tirelireId || noms.tirelires.some((x) => x.id === l.tirelireId)) return undefined;
+  return noms.retirees?.find((x) => x.id === l.tirelireId);
 }
 
 /** Ce qu'une part nomme : la tirelire, la catégorie, ou « tirelire · catégorie ». */
 export function nomDeLaPart(l: { tirelireId?: Id | undefined; categoryId?: Id | undefined }, noms: Noms): string {
-  const t = l.tirelireId ? (noms.tirelires.find((x) => x.id === l.tirelireId)?.name ?? 'tirelire retirée') : undefined;
+  const t = l.tirelireId ? (noms.tirelires.find((x) => x.id === l.tirelireId)?.name ?? tirelireRetiree(l, noms)?.name ?? 'tirelire retirée') : undefined;
   const c = l.categoryId ? (noms.categories.find((x) => x.id === l.categoryId)?.name ?? 'catégorie retirée') : undefined;
   return [t, c].filter(Boolean).join(' · ');
 }
@@ -63,6 +77,7 @@ export function lireVentilation(montant: Cents, allocation: AllocationLine[] | u
     montant: resolus.get(p.id) ?? 0,
     ...(p.tirelireId ? { tirelireId: p.tirelireId } : {}),
     share: p.share,
+    ...(tirelireRetiree(p, noms) ? { retiree: true as const } : {}),
   }));
   return { lignes, nonAffecte: Math.abs(montant) - lignes.reduce((s, l) => s + l.montant, 0) };
 }

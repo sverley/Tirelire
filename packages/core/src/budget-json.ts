@@ -17,7 +17,7 @@
  * `true` ou `false`.
  */
 import type { Ledger, Settings } from './model.js';
-import { MAIN_ACCOUNT_ID } from './model.js';
+import { MAIN_ACCOUNT_ID, standingOrderTarget } from './model.js';
 import { CLES_REGLAGES, settingProblem, referencesDe } from './formes.js';
 import { sha256Hex } from './ids.js';
 import { rowProblem, TABLES, type ColumnDef, type TableDef } from './schema.js';
@@ -519,6 +519,12 @@ export function preparerApplication(difference: DifferenceBudget, etatLu: Budget
  * écrite, et ce qui lie les lignes — une ligne retirée qu'une autre ligne vivante, une opération
  * comprise, désigne encore. Seuls comptent les problèmes que l'application fait naître : ceux que le
  * projet avait déjà ne sont pas les siens.
+ *
+ * Sauf ce qu'un ordre enregistré désigne (#407, point 4) : une tirelire ou un compte que
+ * l'application retire reste dans le fichier, avec sa date de suppression, et un ordre permanent
+ * que le projet porte peut encore le désigner — il reste ce que l'utilisateur a validé (D60, I10),
+ * et le plan le signale. Une part ne refuse le tout que si sa tirelire n'est pas dans le fichier, ni
+ * vivante ni retirée.
  */
 function verifierResultat(projet: Ledger, ecritures: ApplicationBudget['ecritures'], retraits: ApplicationBudget['retraits'], reglages: Record<string, unknown>): Probleme[] {
   const problemes: Probleme[] = [];
@@ -569,14 +575,37 @@ function verifierResultat(projet: Ledger, ecritures: ApplicationBudget['ecriture
   for (const [nom, l] of apres) for (const x of l) vivantes.set(`${nom}\u0000${x.id}`, x.v['deleted_at'] === null || x.v['deleted_at'] === undefined);
   const liens: Probleme[] = [];
   verifierLiens(apres, liens);
+  // Les mêmes liens, les tirelires et les comptes retirés restés dans le fichier : un problème qui n'y
+  // est plus vient d'une de ces lignes retirées, et ne compte pas quand un ordre enregistré le porte.
+  const ordres = ordresEnregistres(projet);
+  const sansRetires = new Set<string>();
+  if (ordres.size) {
+    const avecRetires = new Map(apres);
+    for (const k of ['tirelires', 'accounts'] as const) {
+      const t = TABLES[k]!;
+      const presentes = new Set(apres.get(t.name)!.map((x) => x.id));
+      const retireesIci = (projet[k] as unknown as Array<Record<string, unknown>>).filter((r) => retirees.has(`${t.name}\u0000${r['id'] as string}`) && !presentes.has(r['id'] as string));
+      avecRetires.set(t.name, [...apres.get(t.name)!, ...retireesIci.map((r) => ({ id: r['id'] as string, hlc: '', v: { ...enValeurs(t, r), deleted_at: 'retirée' } }))]);
+    }
+    const encore: Probleme[] = [];
+    verifierLiens(avecRetires, encore);
+    const restent = new Set(encore.map(cleDe));
+    for (const p of liens) if (!restent.has(cleDe(p))) sansRetires.add(cleDe(p));
+  }
   for (const p of liens) {
     if (dejaLa.has(cleDe(p))) continue;
+    if (p.table === 'planned_flows' && p.id && ordres.has(p.id) && sansRetires.has(cleDe(p))) continue;
     const source = `${p.table}\u0000${p.id ?? ''}`;
     // Une ligne déjà supprimée qui désigne une ligne retirée ne compte pas : elle n'existe plus.
     if (!ecrites.has(source) && vivantes.get(source) === false) continue;
     problemes.push(p);
   }
   return problemes;
+}
+
+/** Les ordres permanents que le projet porte (D57, D60) : un flux de virement vivant du compte principal vers un autre compte. */
+function ordresEnregistres(projet: Ledger): Set<string> {
+  return new Set(projet.plannedFlows.filter((f) => !f.deletedAt && standingOrderTarget(f, MAIN_ACCOUNT_ID) !== undefined).map((f) => f.id));
 }
 
 /**

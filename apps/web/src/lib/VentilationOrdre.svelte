@@ -3,6 +3,8 @@
   sa forme, son montant pour le montant de l'ordre —, puis ce que les parts n'absorbent pas, non
   affecté sur le compte d'accueil (D21). Écrite une fois, pour l'écran Plan et l'assistant (D94).
   `ecarts` marque les parts fixes dont l'écart se signale, avec ce que le budget demande (point 6).
+  La part d'une tirelire retirée se lit sous son nom, marquée comme retirée, quel que soit son genre
+  (#407, points 5 et 8) : le budget ne lui demande plus rien.
 -->
 <script lang="ts">
   import type { AllocationLine, Cents, Id } from '@tirelire/core';
@@ -29,10 +31,10 @@
 
 <div class="ventilation">
   {#each lecture.lignes as l, i (i)}
-    {@const demande = l.share.kind === 'fixed' && l.tirelireId ? ecarts.get(l.tirelireId) : undefined}
-    <div class="row part" class:ecart={demande !== undefined}>
-      <div class="label">{l.nom}<span class="sub">{l.forme}{#if demande !== undefined} · le budget demande {money(demande)} par mois{/if}</span></div>
-      <div class="num {demande !== undefined ? 'neg' : ''}">{money(l.montant)}</div>
+    {@const demande = !l.retiree && l.share.kind === 'fixed' && l.tirelireId ? ecarts.get(l.tirelireId) : undefined}
+    <div class="row part" class:ecart={demande !== undefined || l.retiree} class:retiree={l.retiree}>
+      <div class="label">{l.nom}<span class="sub">{l.forme}{#if l.retiree} · tirelire retirée : le budget ne lui demande plus rien{:else if demande !== undefined} · le budget demande {money(demande)} par mois{/if}</span></div>
+      <div class="num {demande !== undefined || l.retiree ? 'neg' : ''}">{money(l.montant)}</div>
     </div>
   {/each}
   {#if reste}
