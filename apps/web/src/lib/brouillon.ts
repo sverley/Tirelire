@@ -30,15 +30,20 @@ import {
   preparerApplication,
   rowProblem,
   settingProblem,
+  standingOrderTarget,
+  type AllocationLine,
   type BudgetDefini,
+  type Cents,
   type CleTableBudget,
   type ColumnDef,
   type Ledger,
   type LedgerKey,
   type LedgerStore,
   type PartieBudget,
+  type PlannedFlow,
   type Settings,
 } from '@tirelire/core';
+import type { Noms } from './ventilationOrdre';
 
 /** Ce que porte toute ligne : son identifiant, et sa suppression logique quand sa table en a une. */
 type Ligne = { id: string; deletedAt?: string };
@@ -377,4 +382,64 @@ export function fichierAEnregistrer(projet: Ledger, b: Brouillon, maintenant: st
 export function retireesDuFichier(b: Brouillon, key: CleTableBudget): Set<string> {
   const lignes = b.fichier.tables[key] ?? b.horsFichier?.tables[key] ?? [];
   return new Set(lignes.filter((l) => l.v['deleted_at'] !== null && l.v['deleted_at'] !== undefined).map((l) => l.id));
+}
+
+/**
+ * Un ordre enregistré : le projet le porte, vivant (#407). L'ordre proposé, que l'assistant ajoute
+ * depuis l'exemple, ne l'est pas encore (D43, D60) ; un ordre qui entre avec un budget JSON non plus.
+ */
+export function ordreEnregistre(projet: Ledger, id: string): boolean {
+  return projet.plannedFlows.some((f) => f.id === id && !f.deletedAt);
+}
+
+/**
+ * Les parts d'un ordre que montre sa carte et que la validation enregistre (#395 ; #407, point 8 ;
+ * #409, points 5 et 6). Un ordre enregistré les garde toutes, telles qu'elles sont enregistrées :
+ * rien ne réécrit ce que l'utilisateur a validé (D60, I10). L'ordre que le projet ne porte pas ne
+ * garde que les parts dont la tirelire est dans ce que l'assistant montre (`montre`), vivante, ou que
+ * le fichier porte retirée : l'ordre proposé de l'exemple perd la part d'une tirelire retirée dans
+ * l'assistant (#395), un ordre qui entre avec un budget JSON garde celle d'une tirelire que le fichier
+ * dit retirée (#409). Son montant ne change pas ; ce que ses parts n'absorbent pas reste non affecté
+ * sur le compte d'accueil (D21).
+ */
+export function partsDeLOrdre(projet: Ledger, montre: Ledger, b: Brouillon, f: PlannedFlow): AllocationLine[] | undefined {
+  const parts = f.action?.allocation;
+  if (!parts || ordreEnregistre(projet, f.id)) return parts;
+  const vivantes = new Set(alive(montre.tirelires).map((t) => t.id));
+  const retirees = retireesDuFichier(b, 'tirelires');
+  return parts.filter((p) => p.tirelireId === undefined || vivantes.has(p.tirelireId) || retirees.has(p.tirelireId));
+}
+
+/** Ce que montre la carte d'un ordre permanent dans l'assistant (#407, point 8 ; #409, points 5 et 7). */
+export interface CarteDOrdre {
+  /** Le compte d'où part l'ordre, et celui où il va, nommés : un compte retiré, marqué comme tel. */
+  de: string;
+  vers: string;
+  /** Ce que lit la ventilation de la carte (`VentilationOrdre.svelte`, `lireVentilation`). */
+  ventilation: { montant: Cents; allocation: AllocationLine[] | undefined; compte: string; noms: Noms };
+}
+
+/**
+ * La carte d'un ordre permanent, telle que l'assistant la montre : ses comptes et ses parts. Une
+ * tirelire ou un compte retirés ne se montrent comme vivants nulle part (#409, point 7) : la carte les
+ * nomme, marqués comme retirés, qu'ils l'aient été dans le projet, dans l'assistant ou par le fichier
+ * (#407, point 8 ; #409, point 5).
+ */
+export function carteDeLOrdre(projet: Ledger, montre: Ledger, b: Brouillon, f: PlannedFlow, principalId: string): CarteDOrdre {
+  const nomDuCompte = (id?: string): string => {
+    const vivant = montre.accounts.find((a) => a.id === id && !a.deletedAt);
+    if (vivant) return vivant.name;
+    const retire = montre.accounts.find((a) => a.id === id && a.deletedAt);
+    return retire ? `${retire.name} (compte retiré)` : '';
+  };
+  const noms: Noms = {
+    tirelires: alive(montre.tirelires),
+    categories: alive(montre.categories),
+    retirees: montre.tirelires.filter((t) => t.deletedAt),
+  };
+  return {
+    de: nomDuCompte(f.accountId),
+    vers: nomDuCompte(f.counterpartAccountId),
+    ventilation: { montant: Math.abs(f.amount), allocation: partsDeLOrdre(projet, montre, b, f), compte: nomDuCompte(standingOrderTarget(f, principalId)), noms },
+  };
 }

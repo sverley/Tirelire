@@ -23,7 +23,7 @@
   import { ordreAPoser } from '../lib/consigneOrdre';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
-  import { fichierAEnregistrer, preparerValidation, retireesDuFichier, titreDeLAssistant, type SectionAssistant } from '../lib/brouillon';
+  import { carteDeLOrdre, fichierAEnregistrer, ordreEnregistre, partsDeLOrdre, preparerValidation, titreDeLAssistant, type SectionAssistant } from '../lib/brouillon';
   import { direDifference } from '../lib/differenceAssistant';
   import { saveFile } from '../lib/platform';
   import { budgetDefiniEnJson } from '@tirelire/core';
@@ -312,21 +312,10 @@
   }
   // --- Ordres permanents déjà posés chez la banque (D60) : ce qu'ils exécutent est un fait, le seul montant qui s'enregistre ---
   const ordres = $derived(flows.filter((f) => standingOrderTarget(f, mainAccountId()) !== undefined));
-  /**
-   * Un ordre enregistré : le projet le porte (#407). L'ordre proposé, que l'assistant ajoute depuis
-   * l'exemple, ne l'est pas encore (D43, D60).
-   */
-  function enregistre(id: string): boolean {
-    return app.ledger.plannedFlows.some((f) => f.id === id && !f.deletedAt);
-  }
-  const nomDuCompte = (id?: string) => accounts.find((a) => a.id === id)?.name ?? '';
-  /** Le compte d'un ordre, nommé même retiré, et alors marqué comme tel (#407, point 8). */
-  const nomDuCompteDeLOrdre = (id?: string) => {
-    const compteRetire = accounts.some((a) => a.id === id) ? undefined : app.assistantLedger.accounts.find((a) => a.id === id && a.deletedAt);
-    return compteRetire ? `${compteRetire.name} (compte retiré)` : nomDuCompte(id);
-  };
-  /** Les noms des parts d'un ordre, les tirelires retirées comprises : un ordre enregistré les nomme encore (#407, point 8). */
-  const nomsDesParts = $derived({ tirelires, categories, retirees: app.assistantLedger.tirelires.filter((t) => t.deletedAt) });
+  /** Un ordre enregistré : le projet le porte (#407 ; `ordreEnregistre`). */
+  const enregistre = (id: string): boolean => ordreEnregistre(app.ledger, id);
+  /** Ce que montre la carte d'un ordre — ses comptes, ses parts, retirés compris et marqués (#407, point 8 ; #409, points 5 et 7). */
+  const carte = (f: PlannedFlow) => carteDeLOrdre(app.ledger, app.assistantLedger, brouillon, f, mainAccountId());
   /** Ce que le budget de l'assistant demande comme ordre permanent vers ce compte (D60) : un calcul, relu à chaque lecture. */
   const demandeVers = (accountId?: string) => app.assistantPlan.transfers.find((t) => t.accountId === accountId)?.permanent ?? 0;
   /**
@@ -420,31 +409,14 @@
     if (f) app.assistantUpsert('plannedFlows', f);
   }
   /**
-   * Une part de l'ordre proposé dont la tirelire n'est plus dans le brouillon ne s'enregistre pas
-   * (#395) : à la validation, l'ordre proposé ne garde que les parts de ses tirelires présentes ; son
-   * montant ne change pas, et ce que ses parts n'absorbent pas reste non affecté sur le compte
-   * d'accueil (D21). Un ordre enregistré, lui, garde toutes ses parts : rien ne réécrit ce que
-   * l'utilisateur a validé, et le plan signale la part d'une tirelire retirée (#407 ; D60, I10).
+   * À la validation, l'ordre que le projet ne porte pas ne garde que les parts que montre sa carte
+   * (`partsDeLOrdre` : #395 ; #409, point 6) ; un ordre enregistré garde toutes les siennes (#407 ; D60, I10).
    */
-  /**
-   * Les parts que montre la carte d'un ordre : pour l'ordre proposé, celles dont la tirelire est dans
-   * le brouillon, seules à s'enregistrer (#395, point 5) ; pour un ordre enregistré, toutes, telles
-   * qu'elles sont enregistrées (#407, point 8).
-   */
-  const partsPresentes = (f: PlannedFlow) => (enregistre(f.id) ? f.action?.allocation : f.action?.allocation?.filter(partGardee));
-  /**
-   * Les tirelires que le fichier porte retirées (#409) : un ordre qui entre avec un budget JSON garde
-   * la part d'une tirelire que le fichier dit retirée, comme un ordre enregistré (D60, I10).
-   */
-  const tireliresRetireesDuFichier = $derived(retireesDuFichier(brouillon, 'tirelires'));
-  /** Une part de l'ordre proposé se garde si sa tirelire est dans le brouillon, vivante, ou retirée par le fichier (#395, #409). */
-  const partGardee = (a: { tirelireId?: string }) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId) || tireliresRetireesDuFichier.has(a.tirelireId);
   function elaguerLesParts() {
     for (const f of ordres) {
-      if (enregistre(f.id)) continue;
       const parts = f.action?.allocation;
       if (!parts?.length) continue;
-      const gardees = parts.filter(partGardee);
+      const gardees = partsDeLOrdre(app.ledger, app.assistantLedger, brouillon, f) ?? [];
       if (gardees.length === parts.length) continue;
       const { allocation: _retirees, ...action } = f.action!;
       app.assistantUpsert('plannedFlows', { ...f, action: gardees.length ? { ...action, allocation: gardees } : action });
@@ -1031,21 +1003,22 @@
     </p>
     <ExplicationVentilation />
     {#each ordres as f (f.id)}
+      {@const c = carte(f)}
       <div class="card ordre">
         <div class="row">
           <div class="label">
             <strong>{f.name}</strong>
             <div class="muted small">
               {f.periodicity.unit === 'month' && f.periodicity.interval === 1 ? `Le ${parseDate(f.periodicity.anchorDate).d} de chaque mois` : periodicityLabel(f.periodicity)},
-              de {nomDuCompteDeLOrdre(f.accountId)} vers {nomDuCompteDeLOrdre(f.counterpartAccountId)}{f.labelPattern ? ` · libellé « ${f.labelPattern} »` : ''}.
+              de {c.de} vers {c.vers}{f.labelPattern ? ` · libellé « ${f.labelPattern} »` : ''}.
             </div>
           </div>
           <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
           <button class="btn small danger" title="Retirer ce virement" onclick={() => removeFlow(f)}>×</button>
         </div>
-        <VentilationOrdre montant={Math.abs(f.amount)} allocation={partsPresentes(f)} compte={nomDuCompteDeLOrdre(standingOrderTarget(f, mainAccountId()))} noms={nomsDesParts} />
+        <VentilationOrdre {...c.ventilation} />
         <p class="muted small" style="margin:4px 0 0">
-          Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {nomDuCompteDeLOrdre(f.counterpartAccountId)}.
+          Votre budget demande <strong class="num">{money(demandeVers(f.counterpartAccountId))}</strong> par mois pour {c.vers}.
         </p>
       </div>
     {/each}
