@@ -6,7 +6,7 @@
   rend exactement ce que montre le panneau ; les refus nomment ce qui ne va pas (D85). Écrit une
   fois (D94).
 
-  Chaque part s'y lit sur une ligne, une fois (#408, point 2) ; une part s'ouvre à la demande pour se
+  Chaque part s'y lit sur une ligne, une fois (#408, point 2) ; une part se déplie à la demande pour se
   corriger, une à la fois, et reprend sa ligne en se refermant (point 3). Le panneau tient ainsi dans
   l'écran d'un téléphone à son ouverture, parts fermées (C9).
 -->
@@ -41,7 +41,7 @@
     onannuler: () => void;
   } = $props();
 
-  // Le panneau s'ouvre rempli, puis ne suit que la saisie : il ne relit pas ses données d'ouverture.
+  // Le panneau est rempli à son ouverture, puis ne suit que la saisie : il ne relit pas ses données d'ouverture.
   // svelte-ignore state_referenced_locally
   let montant = $state(centsToInput(montantInitial));
   // svelte-ignore state_referenced_locally
@@ -65,7 +65,7 @@
   function ajouter() {
     toucher();
     parts = [...parts, { tirelireId: '', categoryId: '', forme: 'fixed', valeur: '' }];
-    ouverte = parts.length - 1; // la nouvelle part s'ouvre, prête à être remplie (point 3)
+    ouverte = parts.length - 1; // la nouvelle part est dépliée, prête à être remplie (point 3)
   }
   function retirer(i: number) {
     toucher();
