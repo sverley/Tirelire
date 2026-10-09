@@ -1,8 +1,8 @@
 /**
  * Tests du codeur de #324 — les réglages que l'ouverture de l'assistant propose d'elle-même sur un
  * projet vierge : le jour de début de période et le coussin du compte principal de l'exemple (points
- * 1 et 2, D44, D41). Sans navigateur ; ce que l'écran en montre est dans
- * `navigateur/assistant-plan-exemple.test.ts`.
+ * 1 et 2, D44, D41). Sans navigateur ; ce que l'écran en montre — l'étape Revenus, l'étape Comptes, Réglages
+ * une fois validé — est dans `assistant-plan-exemple-ecran.test.ts`, sur l'application montée sous jsdom (#418).
  */
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';

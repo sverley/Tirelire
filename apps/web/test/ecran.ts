@@ -1,96 +1,188 @@
 /**
- * L'application montée sans navigateur (#417) : sous jsdom, sur un dépôt en mémoire, au jour des tests.
+ * L'application montée sans navigateur (#417, #418) : sous jsdom, au jour des tests.
  *
  * Ce que D83 (« Le navigateur au minimum ») laisse aux tests de l'interface sans navigateur — ce qu'un écran
- * montre ou enregistre — se lit ici sur l'application elle-même : `App.svelte` est monté tel que `main.ts` le
- * monte, ses écrans s'y rendent et ses boutons s'y pressent ; ce qu'un test lit, c'est le DOM que les
- * composants produisent, et ce qu'ils enregistrent, le projet que le dépôt relit. jsdom ne met rien en page :
- * aucune mesure de largeur, de position ni de défilement ne se fait ici (D59) ; elles restent au navigateur.
+ * montre ou enregistre — se lit ici sur l'application elle-même : `App.svelte` est monté et `app.init()` appelé
+ * tels que `main.ts` les monte et les appelle, ses écrans s'y rendent et ses boutons s'y pressent ; ce qu'un test
+ * lit, c'est le DOM que les composants produisent, et ce qu'ils enregistrent, le projet que le dépôt relit. jsdom
+ * ne met rien en page : aucune mesure de largeur, de position ni de défilement ne se fait ici (D59) ; elles
+ * restent au navigateur.
+ *
+ * Chaque ouverture est une page neuve : les modules de l'application se rechargent (`vi.resetModules`), un nouvel
+ * état s'ouvre sur ce que le stockage garde, et ce que la page précédente tenait en mémoire — le brouillon de
+ * l'assistant — n'existe plus. `ouvrirLApplication` ouvre sur un stockage vide ; `rouvrirLApplication` recharge :
+ * la page se ferme (son `beforeunload` écrit ce qui attendait de l'être, comme dans le navigateur), puis
+ * l'application se rouvre sur ce qu'elle a enregistré.
  *
  * Ce qui diffère du site servi, et seulement cela :
- * - le dépôt est ouvert en mémoire (`LedgerStore`), sans IndexedDB : l'enregistrement dans le navigateur est
- *   une capacité du navigateur (C4), qui ne se vérifie pas ici ; « Charger l'exemple » remplace ce dépôt par
- *   un dépôt neuf, comme `eraseAll` le fait du fichier enregistré ;
- * - l'horloge est fixée au jour des tests, comme `nouvellePage` la fixe dans `harnais.ts` ;
- * - le service worker ne s'inscrit pas (`vitest.config.ts`) ; `confirm` répond oui ; `scrollIntoView` et
- *   `matchMedia`, que jsdom n'a pas, ne font rien.
+ * - le stockage du navigateur (IndexedDB) est une table en mémoire : son écriture sur l'appareil est une capacité
+ *   du navigateur (C4, D83), qui ne se vérifie pas ici ; ce que l'application y lit et y écrit (`src/lib/db.ts`),
+ *   « Tout effacer » et l'ouverture d'un fichier sont les siens ;
+ * - sql.js reçoit son binaire du disque, au lieu de le télécharger ;
+ * - l'horloge est fixée au jour des tests, comme `nouvellePage` la fixe dans `harnais.ts`, ou au jour qu'un
+ *   fichier choisit (`fixerLeJour`) ;
+ * - le service worker ne s'inscrit pas (`vitest.config.ts`) ; le navigateur garde les données (`navigator.storage`) ;
+ *   `confirm` répond oui ; `scrollIntoView` et `matchMedia`, que jsdom n'a pas, ne font rien.
  *
  * Un fichier qui s'en sert se déclare `// @vitest-environment jsdom` en tête.
  */
-import { flushSync, mount, tick, unmount } from 'svelte';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { vi } from 'vitest';
 import initSqlJs from 'sql.js';
-import { LedgerStore, type Ledger } from '@tirelire/core';
+import type { Ledger } from '@tirelire/core';
 import { JOUR_DES_TESTS } from './jour-des-tests';
 
 /** La date de lecture que le jour des tests donne à l'application. */
 export const JOUR = JOUR_DES_TESTS.slice(0, 10);
 
 vi.useFakeTimers({ toFake: ['Date'], now: new Date(JOUR_DES_TESTS) });
+
+/** Fixe l'horloge à ce jour, à midi heure de Paris : les pages ouvertes ensuite lisent à cette date. */
+export function fixerLeJour(jour: string): void {
+  vi.setSystemTime(new Date(`${jour}T12:00:00+02:00`));
+}
+
 Element.prototype.scrollIntoView = () => {};
 window.matchMedia = ((media: string) => ({ matches: false, media, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
 window.confirm = () => true;
 window.alert = () => {};
+Object.defineProperty(navigator, 'storage', { configurable: true, value: { persisted: async () => true, persist: async () => true } });
 
 const requerir = createRequire(resolve(process.cwd(), 'package.json'));
-const SQL = await initSqlJs({ wasmBinary: readFileSync(requerir.resolve('sql.js/dist/sql-wasm.wasm')) as unknown as ArrayBuffer });
-
-const { app } = await import('../src/lib/state.svelte');
-const { default: App } = await import('../src/App.svelte');
-export { app };
-
-/** Le dépôt que l'application tient (`opened`, privé dans `state.svelte.ts`). */
-type AppOuverte = { opened: { store: LedgerStore; flush: () => Promise<void> } | undefined };
-
-async function nouveauDepot(): Promise<void> {
-  const ouverte = app as unknown as AppOuverte;
-  ouverte.opened?.store.close();
-  const store = await LedgerStore.create({ sqlJs: SQL });
-  ouverte.opened = { store, flush: async () => {} };
-}
-
-// Effacer tout, c'est repartir d'un dépôt neuf : ce que fait `eraseAll` du fichier enregistré.
-app.eraseAll = async () => {
-  app.assistant = undefined;
-  await nouveauDepot();
-  app.reload();
-};
-
-let monte: ReturnType<typeof mount> | undefined;
-let cible: HTMLElement | undefined;
+const BINAIRE = readFileSync(requerir.resolve('sql.js/dist/sql-wasm.wasm')) as unknown as ArrayBuffer;
+const SQL = initSqlJs({ wasmBinary: BINAIRE });
+vi.doMock('sql.js', () => ({ default: () => SQL }));
 
 /**
- * Monte l'application sur un projet vierge, au jour des tests, sur l'écran Plan — comme une page neuve
- * de `harnais.ts`. Ce qu'un montage précédent du même fichier tenait est oublié.
+ * Le stockage du navigateur, en mémoire : une base par nom, une table par magasin. Il répond comme IndexedDB, de
+ * façon asynchrone — chaque requête, puis la fin de sa transaction —, à ce que `src/lib/db.ts` en utilise.
  */
-export async function ouvrirLApplication(): Promise<void> {
-  if (monte) unmount(monte);
+const stockage = new Map<string, Map<string, Map<IDBValidKey, unknown>>>();
+const plusTard = (f: () => void) => setTimeout(f, 0);
+type Requete = { result?: unknown; error: unknown; onsuccess: (() => void) | null; onerror: (() => void) | null; onupgradeneeded?: (() => void) | null };
+function requete(faire: () => unknown): Requete {
+  const r: Requete = { error: null, onsuccess: null, onerror: null };
+  plusTard(() => {
+    r.result = faire();
+    r.onsuccess?.();
+  });
+  return r;
+}
+const copie = (v: unknown) => (v instanceof Uint8Array ? v.slice() : v);
+function baseOuverte(base: Map<string, Map<IDBValidKey, unknown>>) {
+  return {
+    objectStoreNames: { contains: (nom: string) => base.has(nom) },
+    createObjectStore: (nom: string) => void base.set(nom, new Map()),
+    close: () => {},
+    transaction(nom: string) {
+      const magasin = base.get(nom)!;
+      const tx = { error: null, oncomplete: null as (() => void) | null, onerror: null as (() => void) | null, objectStore: () => objet };
+      const objet = {
+        get: (cle: IDBValidKey) => requete(() => copie(magasin.get(cle))),
+        put: (valeur: unknown, cle: IDBValidKey) => requete(() => (magasin.set(cle, copie(valeur)), cle)),
+        delete: (cle: IDBValidKey) => requete(() => void magasin.delete(cle)),
+      };
+      plusTard(() => plusTard(() => tx.oncomplete?.()));
+      return tx;
+    },
+  };
+}
+(globalThis as unknown as { indexedDB: unknown }).indexedDB = {
+  open(nom: string) {
+    const r: Requete = { error: null, onsuccess: null, onerror: null, onupgradeneeded: null };
+    plusTard(() => {
+      const neuve = !stockage.has(nom);
+      if (neuve) stockage.set(nom, new Map());
+      r.result = baseOuverte(stockage.get(nom)!);
+      if (neuve) r.onupgradeneeded?.();
+      r.onsuccess?.();
+    });
+    return r;
+  },
+};
+
+/** Attend que ce que l'application a lancé de façon asynchrone — une écriture, une ouverture — soit fini. */
+export const pause = (ms = 30) => new Promise<void>((fin) => setTimeout(fin, ms));
+
+/** Attend que la condition soit vraie, en laissant l'application rendre ; échoue au bout d'un moment. */
+export async function attendre(condition: () => boolean, quoi = 'la condition'): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    await rendu();
+    if (condition()) return;
+    await pause(10);
+  }
+  throw new Error(`${quoi} n’est pas venue`);
+}
+
+type Etat = typeof import('../src/lib/state.svelte');
+type Svelte = typeof import('svelte');
+
+/** L'état de l'application de la page ouverte. */
+export let app: Etat['app'];
+let svelte: Svelte | undefined;
+let monte: ReturnType<Svelte['mount']> | undefined;
+let cible: HTMLElement | undefined;
+
+// Les écoutes que la page pose sur `window` (l'adresse, la fermeture) s'en vont avec elle.
+let ecoutes: Array<Parameters<typeof window.addEventListener>> = [];
+const ecouter = window.addEventListener.bind(window);
+window.addEventListener = ((...a: Parameters<typeof window.addEventListener>) => {
+  ecoutes.push(a);
+  ecouter(...a);
+}) as typeof window.addEventListener;
+
+/** Ferme la page : ce qui attendait d'être écrit l'est (`beforeunload`), puis plus rien d'elle ne vit. */
+async function fermerLaPage(): Promise<void> {
+  if (!svelte) return;
+  window.dispatchEvent(new Event('beforeunload'));
+  await pause();
+  if (monte) svelte.unmount(monte);
+  // La mémoire de la page s'en va avec elle : sa base sql.js se ferme (`opened`, privé dans `state.svelte.ts`).
+  (app as unknown as { opened?: { store: { close(): void } } }).opened?.store.close();
   cible?.remove();
-  await nouveauDepot();
-  app.assistant = undefined;
-  app.assistantDemande = undefined;
-  app.importEnAttente = undefined;
-  app.refusAdresse = undefined;
-  app.conflicts = [];
-  app.history = [];
-  app.view = 'plan';
-  app.asOf = JOUR;
-  app.reload();
-  app.ready = true;
+  for (const a of ecoutes) window.removeEventListener(a[0], a[1], a[2]);
+  ecoutes = [];
+  monte = undefined;
+}
+
+/** Ouvre une page neuve à cette adresse (« / », ou une adresse qui porte un budget) : comme `main.ts`. */
+async function ouvrirUnePage(adresse: string): Promise<void> {
+  window.history.replaceState(null, '', adresse);
+  vi.resetModules();
+  svelte = await import('svelte');
+  ({ app } = await import('../src/lib/state.svelte'));
+  const { default: App } = await import('../src/App.svelte');
+  const pret = app.init();
   cible = document.createElement('div');
   document.body.append(cible);
-  monte = mount(App, { target: cible });
+  monte = svelte.mount(App, { target: cible });
+  await pret;
   await rendu();
+}
+
+/**
+ * Ouvre l'application pour la première fois, sur un stockage vide — un projet vierge —, sur l'écran Plan, comme
+ * une page neuve de `harnais.ts`. `adresse` est l'adresse d'ouverture : `/` sans rien, ou `/#budget=…`.
+ */
+export async function ouvrirLApplication(adresse = '/'): Promise<void> {
+  await fermerLaPage();
+  stockage.clear();
+  await ouvrirUnePage(adresse);
+}
+
+/** Recharge l'application : la page se ferme, et l'application se rouvre sur ce qu'elle a enregistré. */
+export async function rouvrirLApplication(adresse = '/'): Promise<void> {
+  await fermerLaPage();
+  await ouvrirUnePage(adresse);
 }
 
 /** Laisse l'application rendre ce qui vient de changer. */
 export async function rendu(): Promise<void> {
-  flushSync();
-  await tick();
-  flushSync();
+  svelte!.flushSync();
+  await svelte!.tick();
+  svelte!.flushSync();
 }
 
 /** Le texte d'un élément, espaces resserrés. */

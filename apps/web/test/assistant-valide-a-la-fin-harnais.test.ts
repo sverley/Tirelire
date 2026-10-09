@@ -10,7 +10,7 @@
  * le refus doit venir — au geste qui prépare la ligne, comme pour `ecrire` et `reglage`, ou à la validation, avant
  * d'écrire —, seulement que le budget entre en entier ou pas du tout. Les autres tests du codeur sur ce point (la
  * validation exacte, sa reprise après une interruption simulée) restent dans son fichier, au niveau 4 : l'exactitude
- * est tranchée par `navigateur/assistant-valide-a-la-fin-harnais.test.ts`.
+ * est tranchée par `assistant-valide-a-la-fin-ecran.test.ts`, sur l'application montée sous jsdom (#418).
  *
  * Niveau (D83) : 2 pour les deux. Un budget à moitié écrit est un cas faux de la validation, l'usage restant possible
  * : le brouillon garde ce qui manque, et le reste se saisit dans les écrans ordinaires.
