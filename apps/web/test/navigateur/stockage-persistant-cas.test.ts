@@ -15,7 +15,7 @@
  * relecture.
  *
  * Niveaux (D83) : 2 — D85 est une décision ; un texte qui tutoie la contredit, l'usage restant
- * possible. Un contrôle du repérage lui-même est de niveau 4.
+ * possible.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'puppeteer-core';

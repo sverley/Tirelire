@@ -337,8 +337,8 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   « Navigateur : aucun », qui vaut quand elle ne dit rien. Le codeur n'écrit de test navigateur que
   pour ces points ; l'auditeur n'en compose pas d'autre, et s'il juge qu'un autre point en demande
   un, il le dit dans la PR, et le porteur tranche. Un test navigateur existant qu'un changement casse
-  s'adapte, sans en ajouter un autre. Un test navigateur coûte à l'écrire, à le rejouer en entier à
-  chaque push de la PR qui ajoute ou modifie son fichier, et à l'adapter quand un écran change : du
+  s'adapte, sans en ajouter un autre. Un test navigateur coûte à l'écrire, à le rejouer en entier
+  pendant toute la PR qui ajoute ou modifie son fichier, et à l'adapter quand un écran change : du
   1er au 9 octobre, les codeurs en ont ajouté 19 fichiers, environ 115 tests.
 - **Les tests navigateur la nuit ; ceux de l'issue, pendant toute la PR** (#264, #307, #383). Les tests
   navigateur de non-régression — tout fichier de `apps/web/test/navigateur/` qui n'est pas un test de
