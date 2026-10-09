@@ -1219,8 +1219,11 @@ la garde est structurelle, jamais géométrique. Le rendu à 375 px, le déborde
 réelle d'un panneau se mesurent dans un navigateur. `main` sait le faire depuis D55 : `harnais.ts`
 construit le site, le sert et le pilote. La mesure du panneau — ouvrir « Ajouter un besoin » sur la
 dernière tirelire à 375 px et vérifier qu'il tombe dans la fenêtre — a sa place là, et reste à
-écrire. Aucun composant n'étant monté ici, ce harnais n'a besoin ni du plugin Svelte ni d'un
-environnement jsdom global : seul `revealed.test.ts` le demande, par son en-tête.
+écrire. ~~Aucun composant n'étant monté ici, ce harnais n'a besoin ni du plugin Svelte ni d'un
+environnement jsdom global : seul `revealed.test.ts` le demande, par son en-tête.~~ — amendé le
+9 octobre 2026 : le greffon Svelte y entre, pour que des tests de l'interface sans navigateur
+montent l'application sous jsdom et vérifient ce qu'un écran montre ou enregistre (D83, #417) ;
+l'environnement jsdom n'y est pas global : chaque fichier qui le demande le dit par son en-tête.
 
 **Deux voies écartées, et pourquoi.** La *feuille modale* — le formulaire en superposition, avec
 focus, Échap et retour exact au point de départ — traitait le même défaut plus rigoureusement, mais

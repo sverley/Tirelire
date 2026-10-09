@@ -1,6 +1,6 @@
 /**
  * Harnais d'audit de #214 — « Les aides des champs viennent de l'exemple », sans navigateur : ce que les tests
- * d'écran (`navigateur/aides-exemple-harnais.test.ts`) ne voient pas. Le point 1 à d'autres dates de lecture que le
+ * d'écran (`aides-exemple-ecran.test.ts`, sur l'application montée sans navigateur, #417) ne voient pas. Le point 1 à d'autres dates de lecture que le
  * jour des tests, quand un revenu, un budget ou un objectif change de version : l'aide est celle que le raccourci
  * apporterait à cette date, version en vigueur comprise. Et le point 5 côté code : aucun écran n'écrit en dur une
  * aide qui propose une valeur (D43 : « aucun écran ne l'écrit en dur »).

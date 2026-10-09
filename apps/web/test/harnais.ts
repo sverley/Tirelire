@@ -15,6 +15,7 @@ import { build, preview, type PreviewServer } from 'vite';
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { inject } from 'vitest';
 import '../vitest.site-du-lancement';
+import { JOUR_DES_TESTS } from './jour-des-tests';
 
 export const RACINE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -140,13 +141,8 @@ export async function ouvrirLeSite(): Promise<Site> {
   }
 }
 
-/**
- * Le jour où tournent les pages : un jour fixe, pour que le verdict ne dépende pas de la date réelle
- * (#149). C'est un jour quelconque après l'exemple (daté du 6 septembre 2026) et dans sa période
- * (28 août – 27 septembre) : comme chez tout utilisateur qui charge l'exemple, l'écran lit au
- * 6 septembre, pas « aujourd'hui ». Midi, heure de Paris : loin de tout changement de jour.
- */
-export const JOUR_DES_TESTS = '2026-09-20T12:00:00+02:00';
+/** Le jour où tournent les pages (`jour-des-tests.ts`). */
+export { JOUR_DES_TESTS };
 const FUSEAU_DES_TESTS = 'Europe/Paris';
 
 /**

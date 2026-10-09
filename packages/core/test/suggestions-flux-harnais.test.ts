@@ -1,7 +1,7 @@
 /**
  * Harnais d'audit de #213 — « L'assistant propose tous les revenus et toutes les charges fixes de l'exemple, versions
  * datées comprises », côté cœur, sans navigateur : les points 4 et 6 du « Fait quand ». Les autres points sont dans
- * `apps/web/test/navigateur/assistant-flux-exemple-harnais.test.ts`.
+ * `apps/web/test/assistant-flux-exemple-ecran.test.ts`, sur l'application montée sans navigateur (#417).
  *
  * Retenus parmi les tests du codeur (`suggestions-flux.test.ts`, d'où ils sont déplacés) :
  *  - point 4 : ce que compte le bandeau, lu par le calcul du Plan, à cinq périodes — là où l'écran n'en joue qu'une

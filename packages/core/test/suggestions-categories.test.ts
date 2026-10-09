@@ -5,7 +5,7 @@ import { alive, budgetSuggestions, exampleLedger, suggestedCategory } from '../s
  * Tests du codeur de #212 — « L'assistant propose les catégories de l'exemple » : la lecture des
  * catégories de l'exemple et de leurs liens par `budgetSuggestions` (`src/suggestions.ts`), sans
  * navigateur. Ce qui se voit à l'écran — l'étape Catégories, les raccourcis, la validation — est dans
- * `apps/web/test/navigateur/assistant-categories-exemple.test.ts`.
+ * `apps/web/test/assistant-categories-exemple-ecran.test.ts`, sur l'application montée sans navigateur (#417).
  *
  * Chaque test dit, dans son titre, le point du « Fait quand » qu'il vérifie.
  */
