@@ -436,9 +436,14 @@ describe.skipIf(!navigateur)('#324 — l’assistant conduit au plan, et son ré
 
     it('[niveau 1] 3 — un budget que le Plan n’annonce rien à regarder : le résumé dit « Tout est finançable »', async () => {
       const lu = await resumeEtPlan(site, [
-        ['Dépenses à échéance', (p) => retirerLaTirelire(p, 'Taxe foncière')],
-        // Sans la taxe foncière, le budget demande 550,00 € vers le Livret A : l'ordre permanent déjà en place les vire.
-        ['Valider mon budget', (p) => saisir(p, 'input[aria-label="Ce que la banque vire"]', 0, '550,00')],
+        ['Dépenses à échéance', async (p) => {
+          await retirerLaTirelire(p, 'Taxe foncière');
+          await retirerLaTirelire(p, 'Vacances');
+        }],
+        // Sans la taxe foncière ni les vacances, le budget demande 350,00 € vers le Livret A : l'ordre permanent déjà en place les vire.
+        // Les parts de l'ordre ne se corrigent pas dans l'assistant (#394, point 7) : la part des vacances, enregistrée à 150,00 €
+        // quand le budget en demandait 200,00 (#395), ne laisserait pas le Plan sans annonce si la tirelire restait.
+        ['Valider mon budget', (p) => saisir(p, 'input[aria-label="Ce que la banque vire"]', 0, '350,00')],
       ]);
       expect(lu.plan.annonces).toEqual([]);
       expect(lu.plan.manques).toEqual([]);

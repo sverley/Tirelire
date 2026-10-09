@@ -213,6 +213,13 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
     it('le bouton ouvre une saisie dans la carte, visible, préremplie de l’ordre enregistré', async () => {
       expect(await cliquerDansCarte(page, 'Corriger mon ordre')).toBe(true);
       await attendre(400);
+      // Le panneau s'amène à l'écran en défilant : la mesure se prend une fois le défilement posé.
+      for (let avant = -1, i = 0; i < 30; i++) {
+        const y = await page.evaluate(() => window.scrollY);
+        if (y === avant) break;
+        avant = y;
+        await attendre(150);
+      }
       const c = await carte(page);
       expect(dialogues, 'une boîte de confirmation fige-t-elle encore un calcul ?').toEqual([]);
       expect(c.formulaire, 'aucune saisie ouverte dans la carte').toBeTruthy();
