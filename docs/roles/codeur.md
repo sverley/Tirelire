@@ -53,6 +53,10 @@ dans ton compte rendu (#355).
    place pour la même valeur (D78), et rougit à chaque changement voulu (05ede00). Sinon, écris
    les tests dont tu as besoin, tous : ceux qui vérifient le besoin, parmi lesquels
    l'auditeur choisira le harnais, et ceux qui ne servent qu'à toi — un diagnostic, une analyse.
+   N'écris de test dans le navigateur que pour les points que l'issue nomme à sa ligne
+   « Navigateur : » ; teste le reste sans navigateur, au cœur ou dans les tests de l'interface sans
+   navigateur. Un test navigateur existant que ton changement casse, adapte-le, sans en ajouter un
+   autre (D83, « Le navigateur au minimum » ; porteur, #413).
    Écris-les dans tes propres fichiers, jamais dans celui du harnais, et marque-les tous de niveau 4
    (`[niveau 4]`) : un codeur ne fait pas de test de niveau inférieur ; seul l'auditeur donne un
    autre niveau, aux tests qu'il retient (porteur, #283 ; D83). Ils restent dans le dépôt et ne se

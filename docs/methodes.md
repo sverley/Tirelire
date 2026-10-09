@@ -327,6 +327,19 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   branche vertes au Ready et l'empreinte de `main`, et saute ce qui est vert sur son empreinte ; sans
   attestation — une PR rouverte, dont l'attestation a disparu, par exemple —, ce que la table prévoit,
   hors ce qui est inchangé depuis `main` ou vert au Ready sur une tête précédente.
+- **Le navigateur au minimum** (porteur, #413 : « Minimise au maximum les tests avec navigateur »).
+  Un test ne passe par le navigateur que pour ce qui n'existe que dans un navigateur : une mesure de
+  mise en page à une largeur d'écran (C9), une capacité du navigateur — stockage persistant,
+  installation, presse-papiers, mise à jour du site —, ou un harnais du registre qui le demande
+  (D79). Tout le reste — un calcul, une donnée, un texte, ce qu'un écran montre ou enregistre — se
+  vérifie sans navigateur, au cœur ou par les tests de l'interface sans navigateur. L'issue le dit,
+  après la ligne « Usages » : « Navigateur : » suivi des seuls points qui en demandent un, ou
+  « Navigateur : aucun », qui vaut quand elle ne dit rien. Le codeur n'écrit de test navigateur que
+  pour ces points ; l'auditeur n'en compose pas d'autre, et s'il juge qu'un autre point en demande
+  un, il le dit dans la PR, et le porteur tranche. Un test navigateur existant qu'un changement casse
+  s'adapte, sans en ajouter un autre. Un test navigateur coûte à l'écrire, à le rejouer en entier
+  pendant toute la PR qui ajoute ou modifie son fichier, et à l'adapter quand un écran change : du
+  1er au 9 octobre, les codeurs en ont ajouté une vingtaine de fichiers, environ 115 tests.
 - **Les tests navigateur la nuit ; ceux de l'issue, pendant toute la PR** (#264, #307, #383). Les tests
   navigateur de non-régression — tout fichier de `apps/web/test/navigateur/` qui n'est pas un test de
   l'issue, harnais du registre compris — ne se jouent ni avant la fusion ni à la CI d'une fusion sur
