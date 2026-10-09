@@ -122,6 +122,19 @@ function pourcentage(s: string): number | undefined {
   return n > 0 ? n : undefined;
 }
 
+/**
+ * Les parts en saisie, lues telles qu'elles sont, sans rien refuser : de quoi dire chaque part dans
+ * le panneau pendant qu'on la remplit (#408, point 2). Une part dont le montant ou le pourcentage
+ * manque vaut zéro ; `validerCorrection` seule décide de ce qui s'écrit.
+ */
+export function allocationDeSaisie(parts: PartEnSaisie[]): AllocationLine[] {
+  return parts.map((p) => {
+    const share: Share =
+      p.forme === 'fixed' ? { kind: 'fixed', amount: Math.max(inputToCents(p.valeur) ?? 0, 0) } : p.forme === 'percent' ? { kind: 'percent', pct: pourcentage(p.valeur) ?? 0 } : { kind: 'variable' };
+    return { ...(p.tirelireId ? { tirelireId: p.tirelireId } : {}), ...(p.categoryId ? { categoryId: p.categoryId } : {}), share };
+  });
+}
+
 export type Correction = { ok: true; montant: Cents; allocation: AllocationLine[] } | { ok: false; message: string };
 
 /**

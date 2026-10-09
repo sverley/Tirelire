@@ -94,12 +94,27 @@ async function cliquerDansLaCarte(page: Page, texte: string): Promise<boolean> {
   await pause(300);
   return ok;
 }
+/** Ouvre la part `i` du panneau, qui s'ouvre à la demande, une à la fois (#408, point 3), si elle ne l'est pas déjà. */
+async function ouvrirLaPart(page: Page, i: number) {
+  await page.evaluate((j: number) => {
+    const f = document.querySelector('.panneau-ventilation')!;
+    if (f.querySelector(`fieldset[data-part="${j}"]`)) return;
+    (f.querySelector(`.ventilation .row.part[data-part="${j}"]`) as HTMLElement).click();
+  }, i);
+  await pause(150);
+}
+/** Referme la part ouverte : elle reprend sa ligne, avec ce qui a été choisi (#408, point 3). */
+async function refermerLaPart(page: Page) {
+  expect(await cliquer(page, 'Refermer')).toBe(true);
+  await pause(150);
+}
 /** Saisit `valeur` dans le champ `quoi` du panneau : le montant de l'ordre, ou la valeur de la part `i`. */
 async function saisir(page: Page, quoi: 'montant' | number, valeur: string) {
+  if (quoi !== 'montant') await ouvrirLaPart(page, quoi);
   await page.evaluate(
     (q: 'montant' | number, v: string) => {
       const f = document.querySelector('.panneau-ventilation')!;
-      const i = (q === 'montant' ? f.querySelector(':scope > .grid input') : f.querySelectorAll('fieldset')[q]!.querySelector('input')) as HTMLInputElement;
+      const i = (q === 'montant' ? f.querySelector(':scope > .grid input') : f.querySelector(`fieldset[data-part="${q}"]`)!.querySelector('input')) as HTMLInputElement;
       i.value = v;
       i.dispatchEvent(new Event('input', { bubbles: true }));
     },
@@ -109,9 +124,10 @@ async function saisir(page: Page, quoi: 'montant' | number, valeur: string) {
   await pause(150);
 }
 async function forme(page: Page, i: number, valeur: 'fixed' | 'percent' | 'variable') {
+  await ouvrirLaPart(page, i);
   await page.evaluate(
     (j: number, v: string) => {
-      const s = document.querySelectorAll('.panneau-ventilation fieldset')[j]!.querySelectorAll('select')[2] as HTMLSelectElement;
+      const s = document.querySelector(`.panneau-ventilation fieldset[data-part="${j}"]`)!.querySelectorAll('select')[2] as HTMLSelectElement;
       s.value = v;
       s.dispatchEvent(new Event('change', { bubbles: true }));
     },
@@ -184,6 +200,7 @@ describe.skipIf(!navigateur)('#394 · l’écran Plan valide un ordre avec sa ve
     await forme(page, 0, 'fixed');
     await saisir(page, 0, String((premier - 5000) / 100));
     await saisir(page, 'montant', '700');
+    await refermerLaPart(page);
     const panneau = (await carte(page)).panneau.map((l) => l.montant);
     expect(await soumettre(page)).toBe('');
     const [après] = await ordresConservés(page);
@@ -224,6 +241,7 @@ describe.skipIf(!navigateur)('#394 · l’écran Plan valide un ordre avec sa ve
     expect(suivi.some((l) => l.texte.startsWith('Non affecté')), 'à 300 €, les parts proposées dépassent le montant').toBe(false);
     expect(suivi.reduce((s, l) => s + centimes(l.montant), 0)).toBe(30000);
     await saisir(page, 0, '10');
+    await refermerLaPart(page);
     const touché = (await carte(page)).panneau.map((l) => l.texte);
     await saisir(page, 'montant', '650');
     expect((await carte(page)).panneau.slice(0, -1).map((l) => l.texte)).toEqual(touché.filter((t) => !t.startsWith('Non affecté')));
