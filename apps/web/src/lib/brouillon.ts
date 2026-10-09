@@ -22,6 +22,7 @@ import {
   budgetSuggestions,
   differenceBudget,
   etatDuProjet,
+  etatLuDuProjet,
   ligneBudgetDuModele,
   ligneBudgetVersModele,
   memesLignesBudget,
@@ -157,7 +158,8 @@ function reglagesDeLExemple(projet: Ledger): Partial<Settings> {
 export function nouveauBrouillon(projet: Ledger, section?: SectionAssistant): Brouillon {
   const vierge = projetEstVierge(projet);
   const parties = section ? PARTIES_DES_SECTIONS[section] : PARTIES_ASSISTANT;
-  const etatLu = etatDuProjet(projet, parties);
+  // L'état lu porte aussi les lignes que le projet a retirées : la différence les reconnaît (#409).
+  const etatLu = etatLuDuProjet(projet, parties);
   const reglagesProposes: Partial<Settings> = {};
   if (vierge) for (const [cle, valeur] of Object.entries(reglagesDeLExemple(projet))) if (parties.includes(cle as PartieBudget)) Object.assign(reglagesProposes, { [cle]: valeur });
   const fichier = copie(etatLu);
@@ -166,7 +168,7 @@ export function nouveauBrouillon(projet: Ledger, section?: SectionAssistant): Br
   if (section) {
     b.section = section;
     b.etape = PREMIERE_ETAPE[section];
-    b.horsFichier = etatDuProjet(projet, PARTIES_ASSISTANT.filter((p) => !parties.includes(p)));
+    b.horsFichier = etatLuDuProjet(projet, PARTIES_ASSISTANT.filter((p) => !parties.includes(p)));
   }
   return b;
 }
@@ -275,7 +277,7 @@ const jsonEgal = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) 
  * qu'il ne change pas est celle du projet, telle qu'elle est maintenant. Le compte principal ne se
  * retire pas (D40).
  */
-export function montrer(projet: Ledger, b: Brouillon): Ledger {
+export function montrer(projet: Ledger, b: Brouillon, retireeLe: string = RETIREE): Ledger {
   const settings: Record<string, unknown> = { ...projet.settings };
   for (const [cle, valeur] of Object.entries(b.fichier.settings))
     if (!jsonEgal(valeur, (b.etatLu.settings as Record<string, unknown>)[cle])) settings[cle] = valeur;
@@ -294,7 +296,7 @@ export function montrer(projet: Ledger, b: Brouillon): Ledger {
     const connus = new Set(duProjet.map((r) => r.id));
     const fusion: Ligne[] = duProjet.map((r) => {
       if (fichier.has(r.id)) return change(r.id) ? ligneBudgetVersModele(key, fichier.get(r.id)!) : r;
-      if (lues.has(r.id) && !r.deletedAt && !(key === 'accounts' && r.id === MAIN_ACCOUNT_ID)) return { ...r, deletedAt: RETIREE };
+      if (lues.has(r.id) && !r.deletedAt && !(key === 'accounts' && r.id === MAIN_ACCOUNT_ID)) return { ...r, deletedAt: retireeLe };
       return r;
     });
     for (const l of venues) if (!connus.has(l.id)) fusion.push(ligneBudgetVersModele(key, l));
@@ -341,8 +343,8 @@ export function brouillonDuFichier(projet: Ledger, budget: BudgetDefini): Brouil
   const definies = partiesDe(budget);
   const manquantes = PARTIES_ASSISTANT.filter((p) => !definies.includes(p));
   const fichier = copie(budget);
-  const etatLu = etatDuProjet(projet, definies);
-  const horsFichier = etatDuProjet(projet, manquantes);
+  const etatLu = etatLuDuProjet(projet, definies);
+  const horsFichier = etatLuDuProjet(projet, manquantes);
   return {
     fichier,
     etatLu,
@@ -358,9 +360,21 @@ export function brouillonDuFichier(projet: Ledger, budget: BudgetDefini): Brouil
 
 /**
  * Le budget JSON à enregistrer (#379) : les parties du fichier, telles que l'assistant les montre — le
- * projet du moment avec la différence dessus —, en version 2. Repris sur le même projet, il redonne
- * la même différence. Ni l'étape, ni les étapes garnies : elles décrivent la session (D58).
+ * projet du moment avec la différence dessus. Repris sur le même projet, il redonne la même
+ * différence. Ni l'étape, ni les étapes garnies : elles décrivent la session (D58).
+ *
+ * Une ligne retirée qu'une ligne portée désigne encore s'y écrit avec sa date de suppression (#409) :
+ * celle du projet, ou, pour une ligne que le brouillon retire, le moment de l'enregistrement.
  */
-export function fichierAEnregistrer(projet: Ledger, b: Brouillon): BudgetDefini {
-  return etatDuProjet(montrer(projet, b), partiesDe(b.fichier));
+export function fichierAEnregistrer(projet: Ledger, b: Brouillon, maintenant: string = new Date().toISOString()): BudgetDefini {
+  return etatDuProjet(montrer(projet, b, maintenant), partiesDe(b.fichier));
+}
+
+/**
+ * Les lignes d'une table que le fichier porte retirées (#409) : venues d'un budget JSON ou de l'état
+ * lu, elles ne se montrent nulle part comme vivantes ; un ordre qui en désigne une la garde.
+ */
+export function retireesDuFichier(b: Brouillon, key: CleTableBudget): Set<string> {
+  const lignes = b.fichier.tables[key] ?? b.horsFichier?.tables[key] ?? [];
+  return new Set(lignes.filter((l) => l.v['deleted_at'] !== null && l.v['deleted_at'] !== undefined).map((l) => l.id));
 }

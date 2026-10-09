@@ -14,7 +14,9 @@
  *
  * Il parle le vocabulaire du fichier (D42, D58) : les tables, leurs colonnes SQL, les réglages du
  * format. Une valeur s'y écrit en JSON natif : une colonne JSON est un objet ou une liste, un booléen
- * `true` ou `false`.
+ * `true` ou `false`. Une ligne retirée qu'une ligne qu'il porte désigne encore s'y écrit comme dans le
+ * fichier, avec sa colonne `deleted_at` (#409) : il se lit seul, et relire ce qu'il a écrit redonne
+ * les mêmes lignes.
  */
 import type { Ledger, Settings } from './model.js';
 import { MAIN_ACCOUNT_ID, standingOrderTarget } from './model.js';
@@ -27,7 +29,7 @@ import { messageDeRefus, verifierLiens, type LigneLue, type Probleme } from './v
 /** Le nom du format, que porte la clé `format` du JSON. */
 export const BUDGET_JSON_FORMAT = 'tirelire-budget';
 /** La version du format que cette application lit et écrit, que porte la clé `version` (D30). */
-export const BUDGET_JSON_VERSION = 4;
+export const BUDGET_JSON_VERSION = 5;
 
 /** Les tables du budget, dans l'ordre où elles se lisent, par clé de `Ledger`. */
 export const CLES_TABLES_BUDGET = ['accounts', 'tirelires', 'needs', 'categories', 'plannedFlows'] as const;
@@ -38,21 +40,16 @@ type CleTable = CleTableBudget;
 /** Le début d'un identifiant déduit du nom, par table : `acc-`, `env-`, `need-`, `cat-`, `flow-`. */
 export const PREFIXES_IDENTIFIANT: Record<CleTable, string> = { accounts: 'acc', tirelires: 'env', needs: 'need', categories: 'cat', plannedFlows: 'flow' };
 
-/** Ce qu'une ligne du fichier porte et que le budget JSON ne porte pas : la suppression logique. */
-const COLONNES_EXCLUES = new Set(['deleted_at']);
-
-/** Les colonnes acceptées par table, par nom SQL ; les réglages sous `settings`. */
+/** Les colonnes acceptées par table, par nom SQL, `deleted_at` comprise (#409) ; les réglages sous `settings`. */
 export const COLONNES_BUDGET_JSON: Record<string, string[]> = {
-  ...Object.fromEntries(
-    CLES_TABLES.map((k) => {
-      const t = TABLES[k]!;
-      return [t.name, t.columns.map((c) => c.col).filter((c) => !COLONNES_EXCLUES.has(c))];
-    }),
-  ),
+  ...Object.fromEntries(CLES_TABLES.map((k) => [TABLES[k]!.name, TABLES[k]!.columns.map((c) => c.col)])),
   settings: [...CLES_REGLAGES],
 };
 
-/** Une ligne du budget, aux valeurs du fichier (SQL), sans sa suppression logique. */
+/**
+ * Une ligne du budget, aux valeurs du fichier (SQL). Une ligne retirée porte sa suppression logique,
+ * `deleted_at`, l'horodatage de sa suppression (D58, #409) ; une ligne vivante l'a vide.
+ */
 type Valeurs = Record<string, string | number | null>;
 export interface LigneBudget {
   id: string;
@@ -202,7 +199,35 @@ export function lireBudgetJson(source: string | unknown): LectureBudgetJson {
   return { ok: true, budget: { tables, settings: settings as BudgetDefini['settings'] } };
 }
 
-/** Les références d'une ligne vers une table que le fichier définit : elle doit y être (le compte principal est toujours là). */
+/**
+ * Les lignes qu'une ligne du budget désigne (« Les identifiants et les références ») : par une colonne
+ * (`tirelire_id`, `account_id`, `parent_id`…) ou dans une colonne JSON (le placement, l'action). Le même
+ * code sert à la lecture, qui les vérifie, et à l'écriture, qui porte les lignes retirées désignées
+ * (D94, #409).
+ */
+function referencesDeLaLigne(t: TableDef, l: LigneBudget): Array<{ table: string; id: string; colonne: string; chemin: string }> {
+  const refs: Array<{ table: string; id: string; colonne: string; chemin: string }> = [];
+  for (const c of t.columns) {
+    const x = l.v[c.col];
+    if (x === null || x === undefined) continue;
+    if (c.ref) refs.push({ table: c.ref, id: String(x), colonne: c.col, chemin: `${t.name}.${c.col}` });
+    if (c.shape && typeof x === 'string') {
+      let valeur: unknown;
+      try {
+        valeur = JSON.parse(x);
+      } catch {
+        continue;
+      }
+      for (const r of referencesDe(`${t.name}.${c.col}`, valeur, c.shape)) refs.push({ table: r.table, id: r.id, colonne: c.col, chemin: r.chemin });
+    }
+  }
+  return refs;
+}
+
+/**
+ * Les références d'une ligne vers une table que le fichier définit : elle doit y être, vivante ou
+ * retirée (#409 ; le compte principal est toujours là). Une ligne retirée se vérifie comme une vivante.
+ */
 function referencesInternes(tables: BudgetDefini['tables'], problemes: Probleme[]): void {
   const ids = new Map<string, Set<string>>();
   for (const k of CLES_TABLES) {
@@ -213,28 +238,47 @@ function referencesInternes(tables: BudgetDefini['tables'], problemes: Probleme[
   for (const k of CLES_TABLES) {
     const t = TABLES[k]!;
     for (const l of tables[k] ?? [])
-      for (const c of t.columns) {
-        const x = l.v[c.col];
-        if (x === null || x === undefined) continue;
-        if (c.ref) {
-          const cible = ids.get(c.ref);
-          if (cible && !cible.has(String(x)))
-            problemes.push({ table: t.name, id: l.id, colonne: c.col, message: `${t.name}.${c.col} désigne « ${String(x)} », absent de la table ${c.ref} du budget JSON.` });
-        }
-        if (c.shape && typeof x === 'string') {
-          let valeur: unknown;
-          try {
-            valeur = JSON.parse(x);
-          } catch {
-            continue;
-          }
-          for (const r of referencesDe(`${t.name}.${c.col}`, valeur, c.shape)) {
-            const cible = ids.get(r.table);
-            if (cible && !cible.has(r.id)) problemes.push({ table: t.name, id: l.id, colonne: c.col, message: `${r.chemin} désigne « ${r.id} », absent de la table ${r.table} du budget JSON.` });
-          }
-        }
+      for (const r of referencesDeLaLigne(t, l)) {
+        const cible = ids.get(r.table);
+        if (cible && !cible.has(r.id)) problemes.push({ table: t.name, id: l.id, colonne: r.colonne, message: `${r.chemin} désigne « ${r.id} », absent de la table ${r.table} du budget JSON.` });
       }
   }
+}
+
+/** Une ligne retirée : sa suppression logique est posée (D58). */
+const estRetiree = (v: Valeurs): boolean => v['deleted_at'] !== null && v['deleted_at'] !== undefined;
+
+/**
+ * Les lignes que porte un budget défini qui s'écrit (#409, point 1) : dans chaque table qu'il définit,
+ * ses lignes vivantes et, de proche en proche, chaque ligne retirée de cette table qu'une ligne portée
+ * désigne ; aucune autre ligne retirée. Une table qu'il ne définit pas n'y gagne aucune ligne. L'ordre
+ * des lignes ne change pas.
+ */
+function lignesPortees(tables: BudgetDefini['tables']): BudgetDefini['tables'] {
+  const parNom = new Map<string, { k: CleTable; parId: Map<string, LigneBudget> }>();
+  for (const k of CLES_TABLES) {
+    const l = tables[k];
+    if (l) parNom.set(TABLES[k]!.name, { k, parId: new Map(l.map((x) => [x.id, x])) });
+  }
+  const portees = new Set<LigneBudget>();
+  const aSuivre: Array<{ k: CleTable; l: LigneBudget }> = [];
+  for (const k of CLES_TABLES) for (const l of tables[k] ?? []) if (!estRetiree(l.v)) aSuivre.push({ k, l }), portees.add(l);
+  while (aSuivre.length) {
+    const { k, l } = aSuivre.pop()!;
+    for (const r of referencesDeLaLigne(TABLES[k]!, l)) {
+      const cible = parNom.get(r.table);
+      const designee = cible?.parId.get(r.id);
+      if (!cible || !designee || portees.has(designee)) continue;
+      portees.add(designee);
+      aSuivre.push({ k: cible.k, l: designee });
+    }
+  }
+  const out: BudgetDefini['tables'] = {};
+  for (const k of CLES_TABLES) {
+    const l = tables[k];
+    if (l) out[k] = l.filter((x) => portees.has(x));
+  }
+  return out;
 }
 
 /**
@@ -272,10 +316,7 @@ function lireLigne(
     if (!acceptees.includes(col)) problemes.push({ table: t.name, id: nomLigne, colonne: col, message: `La colonne « ${t.name}.${col} » n’est pas du budget JSON.` });
   const v: Valeurs = {};
   for (const c of t.columns) {
-    if (c.col === 'id' || COLONNES_EXCLUES.has(c.col)) {
-      if (c.col !== 'id') v[c.col] = null;
-      continue;
-    }
+    if (c.col === 'id') continue;
     let x = ligne[c.col];
     if (x === undefined || x === null) {
       v[c.col] = null;
@@ -322,24 +363,35 @@ function lireLigne(
 const TOUTES_PARTIES: PartieBudget[] = [...CLES_TABLES, ...(CLES_REGLAGES as Array<keyof Omit<Settings, 'siteId'>>)];
 
 /**
- * L'état d'un projet, pour les parties choisies — toutes par défaut : ses lignes vivantes, aux valeurs
- * du fichier, et ses réglages. C'est l'état lu que garde l'assistant, et ce que `ecrireBudgetJson` écrit.
+ * L'état lu d'un projet, pour les parties choisies — toutes par défaut : toutes ses lignes, vivantes et
+ * retirées, aux valeurs du fichier, et ses réglages. C'est l'état lu que garde l'assistant, et celui
+ * d'un import : la différence y reconnaît une ligne que le projet porte déjà retirée (#409, point 4).
  */
-export function etatDuProjet(projet: Ledger, parties: readonly PartieBudget[] = TOUTES_PARTIES): BudgetDefini {
+export function etatLuDuProjet(projet: Ledger, parties: readonly PartieBudget[] = TOUTES_PARTIES): BudgetDefini {
   const tables: BudgetDefini['tables'] = {};
   const settings: Record<string, unknown> = {};
   for (const p of parties) {
     if ((CLES_TABLES as readonly string[]).includes(p)) {
       const k = p as CleTable;
       const t = TABLES[k]!;
-      tables[k] = (projet[k] as unknown as Array<Record<string, unknown>>).filter((r) => !r['deletedAt']).map((r) => ({ id: r['id'] as string, v: enValeurs(t, r) }));
+      tables[k] = (projet[k] as unknown as Array<Record<string, unknown>>).map((r) => ({ id: r['id'] as string, v: enValeurs(t, r) }));
     } else if (CLES_REGLAGES.includes(p)) settings[p] = projet.settings[p as keyof Settings];
   }
   return { tables, settings: settings as BudgetDefini['settings'] };
 }
 
 /**
- * Le budget JSON, en version 4, des parties choisies d'un projet — toutes par défaut : une valeur JSON,
+ * L'état d'un projet, pour les parties choisies — toutes par défaut : ses lignes vivantes et, de proche
+ * en proche, les lignes retirées qu'elles désignent dans ces parties (#409, point 1), aux valeurs du
+ * fichier, et ses réglages. C'est ce que `ecrireBudgetJson` écrit.
+ */
+export function etatDuProjet(projet: Ledger, parties: readonly PartieBudget[] = TOUTES_PARTIES): BudgetDefini {
+  const lu = etatLuDuProjet(projet, parties);
+  return { tables: lignesPortees(lu.tables), settings: lu.settings };
+}
+
+/**
+ * Le budget JSON, en version 5, des parties choisies d'un projet — toutes par défaut : une valeur JSON,
  * prête à `JSON.stringify`. Une colonne vide n'est pas écrite. Relu, il redonne les mêmes lignes.
  */
 export function ecrireBudgetJson(projet: Ledger, parties: readonly PartieBudget[] = TOUTES_PARTIES): Record<string, unknown> {
@@ -347,19 +399,21 @@ export function ecrireBudgetJson(projet: Ledger, parties: readonly PartieBudget[
 }
 
 /**
- * Le budget JSON, en version 4, d'un budget défini — ses parties, et elles seules : une valeur JSON,
- * prête à `JSON.stringify` (#379 : le brouillon de l'assistant s'enregistre ainsi).
+ * Le budget JSON, en version 5, d'un budget défini — ses parties, et elles seules : une valeur JSON,
+ * prête à `JSON.stringify` (#379 : le brouillon de l'assistant s'enregistre ainsi). Il porte, dans
+ * chaque table, les lignes vivantes et les lignes retirées qu'une ligne portée désigne (#409, point 1).
  */
 export function budgetDefiniEnJson(etat: BudgetDefini): Record<string, unknown> {
   const out: Record<string, unknown> = { format: BUDGET_JSON_FORMAT, version: BUDGET_JSON_VERSION };
+  const portees = lignesPortees(etat.tables);
   for (const k of CLES_TABLES) {
-    const lignes = etat.tables[k];
+    const lignes = portees[k];
     if (!lignes) continue;
     const t = TABLES[k]!;
     out[t.name] = lignes.map((l) => {
       const o: Record<string, unknown> = { id: l.id };
       for (const c of t.columns) {
-        if (c.col === 'id' || COLONNES_EXCLUES.has(c.col)) continue;
+        if (c.col === 'id') continue;
         const x = l.v[c.col];
         if (x === null || x === undefined) continue;
         o[c.col] = c.type === 'json' ? JSON.parse(x as string) : c.type === 'boolean' ? x === 1 : x;
@@ -390,6 +444,12 @@ export interface DifferenceTable {
   ajouts: LigneModele[];
   modifications: ModificationLigne[];
   retraits: LigneModele[];
+  /**
+   * Les lignes retirées du fichier que l'état lu ne porte pas, ni vivantes ni retirées : elles entrent
+   * retirées, entières, avec la date de suppression du fichier (#409, point 4). Ce ne sont pas des ajouts
+   * de lignes vivantes.
+   */
+  entreesRetirees: LigneModele[];
 }
 
 export interface DifferenceBudget {
@@ -406,6 +466,12 @@ const jsonEgal = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) 
  * partie par partie, les lignes ajoutées, modifiées (et leurs colonnes changées), retirées, et les
  * réglages changés. Une partie que le fichier ne définit pas n'a pas de différence. Le compte
  * principal ne se retire pas : il reste celui du projet (D40).
+ *
+ * Une ligne retirée du fichier (#409, point 4) : vivante dans l'état lu, elle est un retrait, comme si
+ * le fichier ne la nommait pas ; retirée dans l'état lu, elle ne fait aucune différence, quelles que
+ * soient ses colonnes ; absente de l'état lu, elle entre retirée (`entreesRetirees`). Une ligne de
+ * l'état lu déjà retirée que le fichier ne nomme pas ne fait pas de différence non plus. Une ligne
+ * vivante du fichier se diffère comme une ligne que l'état lu ne porte pas vivante.
  */
 export function differenceBudget(fichier: BudgetDefini, etatLu: BudgetDefini): DifferenceBudget {
   const tables: DifferenceBudget['tables'] = {};
@@ -414,15 +480,20 @@ export function differenceBudget(fichier: BudgetDefini, etatLu: BudgetDefini): D
     if (!venues) continue;
     const t = TABLES[k]!;
     const lues = new Map((etatLu.tables[k] ?? []).map((l) => [l.id, l]));
-    const d: DifferenceTable = { ajouts: [], modifications: [], retraits: [] };
+    const d: DifferenceTable = { ajouts: [], modifications: [], retraits: [], entreesRetirees: [] };
     const nommees = new Set<string>();
     for (const l of venues) {
-      nommees.add(l.id);
       const avant = lues.get(l.id);
-      if (!avant) d.ajouts.push(versModele(t, l));
+      if (estRetiree(l.v)) {
+        if (!avant) d.entreesRetirees.push(versModele(t, l));
+        else if (estRetiree(avant.v)) nommees.add(l.id);
+        continue; // vivante dans l'état lu : un retrait, comme si le fichier ne la nommait pas
+      }
+      nommees.add(l.id);
+      if (!avant || estRetiree(avant.v)) d.ajouts.push(versModele(t, l));
       else if (!memesValeurs(avant.v, l.v)) d.modifications.push({ id: l.id, avant: versModele(t, avant), apres: versModele(t, l), colonnes: colonnesChangees(t, avant.v, l.v) });
     }
-    for (const [id, l] of lues) if (!nommees.has(id) && !(k === 'accounts' && id === MAIN_ACCOUNT_ID)) d.retraits.push(versModele(t, l));
+    for (const [id, l] of lues) if (!nommees.has(id) && !estRetiree(l.v) && !(k === 'accounts' && id === MAIN_ACCOUNT_ID)) d.retraits.push(versModele(t, l));
     tables[k] = d;
   }
   const reglages: DifferenceBudget['reglages'] = [];
@@ -435,7 +506,7 @@ export function differenceBudget(fichier: BudgetDefini, etatLu: BudgetDefini): D
 
 /** La différence est-elle vide : rien à ajouter, modifier, retirer ni régler ? */
 export function differenceVide(d: DifferenceBudget): boolean {
-  return !d.reglages.length && Object.values(d.tables).every((x) => !x.ajouts.length && !x.modifications.length && !x.retraits.length);
+  return !d.reglages.length && Object.values(d.tables).every((x) => !x.ajouts.length && !x.modifications.length && !x.retraits.length && !x.entreesRetirees?.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +525,10 @@ export interface ConflitBudget {
   ecartee: LigneModele | null;
 }
 
-/** Ce que l'application écrira : les lignes entières, les retraits, les réglages ; et les conflits. */
+/**
+ * Ce que l'application écrira : les lignes entières — une ligne qui entre retirée porte sa date de
+ * suppression (#409) —, les retraits, les réglages ; et les conflits.
+ */
 export interface ApplicationBudget {
   ecritures: Array<{ cle: CleTable; ligne: LigneModele }>;
   retraits: Array<{ cle: CleTable; id: string }>;
@@ -479,8 +553,10 @@ export function preparerApplication(difference: DifferenceBudget, etatLu: Budget
     const d = difference.tables[k];
     if (!d) continue;
     const t = TABLES[k]!;
-    const lues = new Map((etatLu.tables[k] ?? []).map((l) => [l.id, l.v]));
-    const courantes = new Map((projet[k] as unknown as Array<Record<string, unknown>>).filter((r) => !r['deletedAt']).map((r) => [r['id'] as string, r]));
+    const lues = new Map((etatLu.tables[k] ?? []).filter((l) => !estRetiree(l.v)).map((l) => [l.id, l.v]));
+    const toutes = projet[k] as unknown as Array<Record<string, unknown>>;
+    const courantes = new Map(toutes.filter((r) => !r['deletedAt']).map((r) => [r['id'] as string, r]));
+    const dejaRetirees = new Set(toutes.filter((r) => r['deletedAt']).map((r) => r['id'] as string));
     const aChange = (id: string): boolean => {
       const lu = lues.get(id);
       const r = courantes.get(id);
@@ -498,6 +574,18 @@ export function preparerApplication(difference: DifferenceBudget, etatLu: Budget
     for (const ligne of d.retraits) {
       if (aChange(ligne.id)) conflits.push({ table: t.name, id: ligne.id, retenue: null, ecartee: ecartee(ligne.id) });
       if (courantes.has(ligne.id)) retraits.push({ cle: k, id: ligne.id });
+    }
+    // Une ligne qui entre retirée (#409, point 4) : le projet du moment qui la porte déjà retirée n'en
+    // reçoit rien ; qui l'a reçue vivante depuis l'état lu, c'est un conflit, et la version retenue,
+    // retirée, en est le retrait ; sinon elle s'écrit, entière, avec sa date de suppression.
+    for (const ligne of d.entreesRetirees ?? []) {
+      if (dejaRetirees.has(ligne.id)) continue;
+      if (courantes.has(ligne.id)) {
+        conflits.push({ table: t.name, id: ligne.id, retenue: ligne, ecartee: ecartee(ligne.id) });
+        retraits.push({ cle: k, id: ligne.id });
+        continue;
+      }
+      ecritures.push({ cle: k, ligne });
     }
   }
   const reglages: Record<string, unknown> = {};
@@ -630,7 +718,7 @@ export type ImportBudgetJson = { ok: true; difference: DifferenceBudget; applica
 export function importerBudgetJson(source: string | unknown, projet: Ledger): ImportBudgetJson {
   const lu = lireBudgetJson(source);
   if (!lu.ok) return lu;
-  const etatLu = etatDuProjet(projet, partiesDe(lu.budget));
+  const etatLu = etatLuDuProjet(projet, partiesDe(lu.budget));
   const difference = differenceBudget(lu.budget, etatLu);
   const prep = preparerApplication(difference, etatLu, projet);
   if (!prep.ok) return prep;
@@ -648,7 +736,7 @@ function versModele(t: TableDef, l: LigneBudget): LigneModele {
   return { ...fromRow(t, l.v), id: l.id } as LigneModele;
 }
 
-/** Une ligne du modèle, aux valeurs du fichier, sans sa suppression logique. */
+/** Une ligne du modèle, aux valeurs du fichier, sa suppression logique comprise. */
 function enValeurs(t: TableDef, r: Record<string, unknown>): Valeurs {
   const v: Valeurs = {};
   for (const c of t.columns) if (c.col !== 'id') v[c.col] = toSql(c, r[c.prop]);
@@ -675,7 +763,7 @@ function fromRow(t: TableDef, v: Record<string, string | number | null>): Record
 }
 
 
-/** Une ligne du modèle, en ligne du budget (valeurs du fichier, sans sa suppression logique) : ce que le brouillon de l'assistant garde (#379). */
+/** Une ligne du modèle, en ligne du budget (valeurs du fichier, sa suppression logique comprise) : ce que le brouillon de l'assistant garde (#379). */
 export function ligneBudgetDuModele(cle: CleTable, r: Record<string, unknown> & { id: string }): LigneBudget {
   return { id: r.id, v: enValeurs(TABLES[cle]!, r) };
 }

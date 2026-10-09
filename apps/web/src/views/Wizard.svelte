@@ -23,7 +23,7 @@
   import { ordreAPoser } from '../lib/consigneOrdre';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
-  import { fichierAEnregistrer, preparerValidation, titreDeLAssistant, type SectionAssistant } from '../lib/brouillon';
+  import { fichierAEnregistrer, preparerValidation, retireesDuFichier, titreDeLAssistant, type SectionAssistant } from '../lib/brouillon';
   import { direDifference } from '../lib/differenceAssistant';
   import { saveFile } from '../lib/platform';
   import { budgetDefiniEnJson } from '@tirelire/core';
@@ -431,14 +431,20 @@
    * le brouillon, seules à s'enregistrer (#395, point 5) ; pour un ordre enregistré, toutes, telles
    * qu'elles sont enregistrées (#407, point 8).
    */
-  const partsPresentes = (f: PlannedFlow) =>
-    enregistre(f.id) ? f.action?.allocation : f.action?.allocation?.filter((a) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId));
+  const partsPresentes = (f: PlannedFlow) => (enregistre(f.id) ? f.action?.allocation : f.action?.allocation?.filter(partGardee));
+  /**
+   * Les tirelires que le fichier porte retirées (#409) : un ordre qui entre avec un budget JSON garde
+   * la part d'une tirelire que le fichier dit retirée, comme un ordre enregistré (D60, I10).
+   */
+  const tireliresRetireesDuFichier = $derived(retireesDuFichier(brouillon, 'tirelires'));
+  /** Une part de l'ordre proposé se garde si sa tirelire est dans le brouillon, vivante, ou retirée par le fichier (#395, #409). */
+  const partGardee = (a: { tirelireId?: string }) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId) || tireliresRetireesDuFichier.has(a.tirelireId);
   function elaguerLesParts() {
     for (const f of ordres) {
       if (enregistre(f.id)) continue;
       const parts = f.action?.allocation;
       if (!parts?.length) continue;
-      const gardees = parts.filter((a) => a.tirelireId === undefined || tirelires.some((t) => t.id === a.tirelireId));
+      const gardees = parts.filter(partGardee);
       if (gardees.length === parts.length) continue;
       const { allocation: _retirees, ...action } = f.action!;
       app.assistantUpsert('plannedFlows', { ...f, action: gardees.length ? { ...action, allocation: gardees } : action });
@@ -1154,6 +1160,8 @@
         {#each partie.ajouts as l, i (i)}<li><span class="pill">Ajouté</span> {l.texte}</li>{/each}
         {#each partie.modifications as l, i (i)}<li><span class="pill">Modifié</span> {l.texte}{#if l.detail}<span class="muted small"> — {l.detail}</span>{/if}</li>{/each}
         {#each partie.retraits as l, i (i)}<li><span class="pill neg">Retiré</span> {l.texte}</li>{/each}
+        <!-- Une ligne qui entre déjà retirée, telle que le fichier la dit : ce n'est pas un ajout (#409, point 5). -->
+        {#each partie.entreesRetirees as l, i (i)}<li class="entree-retiree"><span class="pill">Ajouté, déjà retiré</span> {l.texte}{#if l.detail}<span class="muted small"> — {l.detail}</span>{/if}</li>{/each}
       </ul>
     {/each}
     {#if aValider.ordres.length}

@@ -91,6 +91,8 @@ export interface PartieDite {
   ajouts: LigneDite[];
   modifications: LigneDite[];
   retraits: LigneDite[];
+  /** Les lignes qui entrent retirées, telles que le fichier les dit (#409, point 5) : pas des ajouts. */
+  entreesRetirees: LigneDite[];
 }
 
 export interface DifferenceDite {
@@ -159,7 +161,8 @@ export function direDifference(
   const parties: PartieDite[] = [];
   for (const cle of CLES_TABLES_BUDGET) {
     const d = difference.tables[cle];
-    if (!d || (!d.ajouts.length && !d.modifications.length && !d.retraits.length)) continue;
+    const entrees = d?.entreesRetirees ?? [];
+    if (!d || (!d.ajouts.length && !d.modifications.length && !d.retraits.length && !entrees.length)) continue;
     parties.push({
       nom: NOMS_DES_PARTIES[cle],
       ajouts: d.ajouts.map((l) => ({ texte: nomDe(cle, l) })),
@@ -171,6 +174,10 @@ export function direDifference(
         return { texte: nomDe(cle, m.avant['name'] !== m.apres['name'] ? m.apres : m.avant), detail };
       }),
       retraits: d.retraits.map((l) => ({ texte: nomDe(cle, l) })),
+      entreesRetirees: entrees.map((l) => ({
+        texte: nomDe(cle, l),
+        detail: 'tel que le fichier le dit, sans apparaître nulle part comme actif',
+      })),
     });
   }
   const reglages = difference.reglages.map((r) => ({
