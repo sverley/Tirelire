@@ -2,7 +2,9 @@
  * Harnais d'audit de #13 — sans navigateur : l'ordre que dit l'assistant est celui que le Plan
  * enregistrera (point 2), son jour et sa fenêtre se lisent sur l'ordre (point 5), le libellé se copie
  * tel qu'il se lit ou rien ne se copie (point 6), et le texte de la suite (point 7). L'écran est
- * vérifié par `navigateur/ordres-a-poser-harnais.test.ts`. Repris des tests du codeur.
+ * vérifié dans le navigateur, pour la copie dans le presse-papiers et ce qui se lit à 375 px, par
+ * `navigateur/ordres-a-poser-harnais.test.ts` ; pour le reste, sans navigateur, depuis #419, par
+ * `ordres-a-poser-ecran.test.ts`. Repris des tests du codeur.
  *
  * Niveaux (D83) : 1 pour les points 2 (U2, U3 : l'ordre posé chez la banque est celui que l'import
  * reconnaîtra), 5 (U3), 6 (C2) et 7 (I3 : le texte ne suppose pas qu'on importe) ; 4 pour la longueur

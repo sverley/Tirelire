@@ -1,7 +1,8 @@
 /**
  * Harnais d'audit de #296 — le plan d'une période à venir montre le solde prévu des comptes et des
- * tirelires (D52, D88). Côté cœur ; ce qui se lit à l'écran est dans
- * `apps/web/test/navigateur/plan-solde-prevu.test.ts`.
+ * tirelires (D52, D88). Côté cœur ; ce qui se lit à l'écran Plan se vérifie sans navigateur, depuis
+ * #419, dans `apps/web/test/plan-solde-prevu-ecran.test.ts` ; seule la mesure de l'écran déplié à
+ * 375 px (C9) reste dans `apps/web/test/navigateur/plan-solde-prevu.test.ts`.
  *
  * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
  * peut trancher, un test — celui du codeur quand il la tranche (repris de `solde-prevu.test.ts` et,

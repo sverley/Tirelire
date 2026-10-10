@@ -3,15 +3,22 @@
  * Composé par l'auditeur à partir des tests du codeur (`ventilation-ordre-plan.test.ts`), complétés.
  *
  * L'exemple porte un ordre vers le Livret A décalé de ce que le budget demande (D60). Dans l'ordre :
- * rien ne s'écrit sans geste (I10) ; « Confirmer mon nouvel ordre » écrit l'ordre tel que la carte le
- * montre, relu après rechargement (points 5 et 8) ; le panneau refuse, puis écrit exactement ce qu'il
- * montre, et une part fixe en écart se marque et se propose (points 4, 5, 6) ; l'ordre retiré, la
- * carte propose, le panneau suit le montant tant qu'aucune part n'est touchée, et « Enregistrer mon
- * ordre permanent » écrit la proposition montrée (points 2 et 4). Partout, pas de débord (point 9).
+ * rien ne s'écrit sans geste (I10) ; l'ordre confirmé depuis la carte et la page rechargée, le panneau
+ * refuse, puis écrit exactement ce qu'il montre, et une part fixe en écart se marque et se propose
+ * (points 4, 5, 6) ; l'ordre supprimé à l'écran Flux prévus, « Enregistrer mon ordre permanent » écrit
+ * la proposition montrée (point 2). Partout, pas de débord (point 9) : ce qui se mesure à 375 px et ce
+ * que la carte offre à cette largeur restent ici (D83, « Le navigateur au minimum »).
+ *
+ * Depuis #419, « Confirmer mon nouvel ordre », qui écrit l'ordre tel que la carte le montre, relu après
+ * rechargement (points 5 et 8), et le panneau qui suit le montant d'une proposition tant qu'aucune
+ * part n'est touchée (point 4), se vérifient sans navigateur : `../ventilation-ordre-ecran.test.ts` ;
+ * les règles du panneau, sans écran : `../ventilation-ordre-harnais.test.ts`. Les gestes qui les
+ * précédaient ici — confirmer l'ordre et recharger la page, puis supprimer l'ordre à l'écran Flux
+ * prévus — se font toujours, avant les tests qui en partent.
  *
  * Niveaux (D83) : 0 pour ce qui écrit ou réécrit un ordre — un ordre altéré sans geste, ou autrement
  * que montré, est un fait bancaire faux que corriger le code ne rend pas ; 1 pour U2 et I4 (l'ordre
- * proposé s'enregistre en un geste avec sa ventilation) ; 2 pour la règle du panneau qui suit.
+ * proposé s'enregistre en un geste avec sa ventilation).
  * Rouges vus sur mutations du code de la PR : voir la vérification de l'auditeur dans la PR.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -168,95 +175,72 @@ describe.skipIf(!navigateur)('#394 · l’écran Plan valide un ordre avec sa ve
     expect(await ordresConservés(page)).toEqual(avant);
   });
 
-  it('[niveau 1] 5, 8 · U2 — « Confirmer mon nouvel ordre » écrit l’ordre tel que la carte le montre ; relu après rechargement', async () => {
-    const [avant] = await ordresConservés(page);
-    const montré = await carte(page);
-    const montant = centimes(montré.texte.match(/Ordre que le plan propose[^\n]*\n?[^\n]*?([\d\s  ]+,\d\d)/)?.[1] ?? '');
-    const parts = montré.proposition.filter((l) => !l.texte.startsWith('Non affecté')).map((l) => centimes(l.montant));
-    expect(await cliquerDansLaCarte(page, 'Confirmer mon nouvel ordre')).toBe(true);
-    await page.reload({ waitUntil: 'networkidle0' });
-    await allerÀ(page, 'Plan');
-    const [après] = await ordresConservés(page);
-    expect({ id: après!.id, name: après!.name, periodicity: après!.periodicity }).toEqual({ id: avant!.id, name: avant!.name, periodicity: avant!.periodicity });
-    expect(Math.abs(après!.amount)).toBe(montant);
-    expect(montants(après!.action?.allocation)).toEqual(parts);
-    const c = await carte(page);
-    expect(c.boutons).not.toContain('Confirmer mon nouvel ordre');
-    expect(c.enregistre.filter((l) => !l.texte.startsWith('Non affecté')).map((l) => centimes(l.montant))).toEqual(parts);
-  });
-
-  it('[niveau 0] 4, 5, 6 — le panneau refuse sans écrire, puis écrit exactement ce qu’il montre ; la part fixe en écart se marque et se propose', async () => {
-    const [avant] = await ordresConservés(page);
-    expect(await cliquerDansLaCarte(page, 'Corriger mon ordre')).toBe(true);
-    const titre = await page.evaluate(() => document.querySelector('.panneau-ventilation .titre-panneau')?.textContent ?? '');
-    expect(titre).toContain(avant!.name);
-    await forme(page, 0, 'percent');
-    await saisir(page, 0, '150');
-    expect(await soumettre(page)).toMatch(/ne dépasse pas 100/);
-    expect(await ordresConservés(page)).toEqual([avant]);
-    expect((await carte(page)).débord).toBe(false);
-    // Première part : fixe, 50 € sous ce que le budget demande (au-delà du pas de 10 €) ; montant : 700 €.
-    const premier = Math.abs((avant!.action!.allocation![0]!.share as { amount: number }).amount);
-    await forme(page, 0, 'fixed');
-    await saisir(page, 0, String((premier - 5000) / 100));
-    await saisir(page, 'montant', '700');
-    await refermerLaPart(page);
-    const panneau = (await carte(page)).panneau.map((l) => l.montant);
-    expect(await soumettre(page)).toBe('');
-    const [après] = await ordresConservés(page);
-    expect({ id: après!.id, name: après!.name, periodicity: après!.periodicity, labelPattern: après!.labelPattern }).toEqual({
-      id: avant!.id, name: avant!.name, periodicity: avant!.periodicity, labelPattern: avant!.labelPattern,
+  describe('l’ordre confirmé depuis la carte, la page rechargée', () => {
+    beforeAll(async () => {
+      expect(await cliquerDansLaCarte(page, 'Confirmer mon nouvel ordre')).toBe(true);
+      await page.reload({ waitUntil: 'networkidle0' });
+      await allerÀ(page, 'Plan');
     });
-    expect(Math.abs(après!.amount)).toBe(70000);
-    const attendues = [premier - 5000, ...montants(avant!.action!.allocation!.slice(1))];
-    expect(montants(après!.action?.allocation)).toEqual(attendues);
-    const c = await carte(page);
-    expect(c.enregistre.map((l) => l.montant), 'la carte ne montre pas ce que montrait le panneau').toEqual(panneau);
-    expect(c.enregistre[0]!.ecart, 'la part fixe en écart n’est pas marquée').toBe(true);
-    expect(c.enregistre[0]!.texte).toMatch(new RegExp(`le budget demande ${(premier / 100).toFixed(2).replace('.', ',')}`));
-    expect(c.enregistre.slice(1).some((l) => l.ecart), 'une part sans écart est marquée').toBe(false);
-    expect(c.boutons).toContain('Confirmer mon nouvel ordre');
-  });
 
-  it('[niveau 2] 4 — sur une proposition, le panneau suit le montant tant qu’aucune part n’est touchée, puis ne suit plus', async () => {
-    page.once('dialog', (d) => void d.accept());
-    await allerÀ(page, 'Plus');
-    expect(await cliquer(page, 'Flux prévus')).toBe(true);
-    const supprimé = await page.evaluate(() => {
-      const r = [...document.querySelectorAll('.row')].find((x) => x.querySelector('.label strong')?.textContent?.trim() === 'Virement Livret A');
-      const b = r && [...r.querySelectorAll('button')].find((x) => x.textContent?.trim() === 'Supprimer');
-      (b as HTMLButtonElement | undefined)?.click();
-      return !!b;
+    it('[niveau 0] 4, 5, 6 — le panneau refuse sans écrire, puis écrit exactement ce qu’il montre ; la part fixe en écart se marque et se propose', async () => {
+      const [avant] = await ordresConservés(page);
+      expect(await cliquerDansLaCarte(page, 'Corriger mon ordre')).toBe(true);
+      const titre = await page.evaluate(() => document.querySelector('.panneau-ventilation .titre-panneau')?.textContent ?? '');
+      expect(titre).toContain(avant!.name);
+      await forme(page, 0, 'percent');
+      await saisir(page, 0, '150');
+      expect(await soumettre(page)).toMatch(/ne dépasse pas 100/);
+      expect(await ordresConservés(page)).toEqual([avant]);
+      expect((await carte(page)).débord).toBe(false);
+      // Première part : fixe, 50 € sous ce que le budget demande (au-delà du pas de 10 €) ; montant : 700 €.
+      const premier = Math.abs((avant!.action!.allocation![0]!.share as { amount: number }).amount);
+      await forme(page, 0, 'fixed');
+      await saisir(page, 0, String((premier - 5000) / 100));
+      await saisir(page, 'montant', '700');
+      await refermerLaPart(page);
+      const panneau = (await carte(page)).panneau.map((l) => l.montant);
+      expect(await soumettre(page)).toBe('');
+      const [après] = await ordresConservés(page);
+      expect({ id: après!.id, name: après!.name, periodicity: après!.periodicity, labelPattern: après!.labelPattern }).toEqual({
+        id: avant!.id, name: avant!.name, periodicity: avant!.periodicity, labelPattern: avant!.labelPattern,
+      });
+      expect(Math.abs(après!.amount)).toBe(70000);
+      const attendues = [premier - 5000, ...montants(avant!.action!.allocation!.slice(1))];
+      expect(montants(après!.action?.allocation)).toEqual(attendues);
+      const c = await carte(page);
+      expect(c.enregistre.map((l) => l.montant), 'la carte ne montre pas ce que montrait le panneau').toEqual(panneau);
+      expect(c.enregistre[0]!.ecart, 'la part fixe en écart n’est pas marquée').toBe(true);
+      expect(c.enregistre[0]!.texte).toMatch(new RegExp(`le budget demande ${(premier / 100).toFixed(2).replace('.', ',')}`));
+      expect(c.enregistre.slice(1).some((l) => l.ecart), 'une part sans écart est marquée').toBe(false);
+      expect(c.boutons).toContain('Confirmer mon nouvel ordre');
     });
-    expect(supprimé, 'bouton « Supprimer » de l’ordre absent').toBe(true);
-    await pause(300);
-    expect(await ordresConservés(page)).toEqual([]);
-    await allerÀ(page, 'Plan');
-    expect(await cliquerDansLaCarte(page, 'Modifier avant d’enregistrer')).toBe(true);
-    const proposé = (await carte(page)).panneau.map((l) => l.texte);
-    expect(proposé.length).toBeGreaterThan(0);
-    await saisir(page, 'montant', '300');
-    const suivi = (await carte(page)).panneau;
-    expect(suivi.map((l) => l.texte)).not.toEqual(proposé);
-    expect(suivi.some((l) => l.texte.startsWith('Non affecté')), 'à 300 €, les parts proposées dépassent le montant').toBe(false);
-    expect(suivi.reduce((s, l) => s + centimes(l.montant), 0)).toBe(30000);
-    await saisir(page, 0, '10');
-    await refermerLaPart(page);
-    const touché = (await carte(page)).panneau.map((l) => l.texte);
-    await saisir(page, 'montant', '650');
-    expect((await carte(page)).panneau.slice(0, -1).map((l) => l.texte)).toEqual(touché.filter((t) => !t.startsWith('Non affecté')));
-    expect(await cliquer(page, 'Annuler')).toBe(true);
-    expect(await ordresConservés(page)).toEqual([]);
   });
 
-  it('[niveau 1] 2 · I4 — sans ordre : « Enregistrer mon ordre permanent » écrit en un geste la proposition montrée', async () => {
-    const c = await carte(page);
-    expect(c.boutons).toEqual(expect.arrayContaining(['Enregistrer mon ordre permanent', 'Modifier avant d’enregistrer']));
-    expect(c.débord).toBe(false);
-    const parts = c.proposition.filter((l) => !l.texte.startsWith('Non affecté')).map((l) => centimes(l.montant));
-    expect(parts.length).toBeGreaterThan(0);
-    expect(await cliquerDansLaCarte(page, 'Enregistrer mon ordre permanent')).toBe(true);
-    const [nouveau] = await ordresConservés(page);
-    expect(montants(nouveau!.action?.allocation)).toEqual(parts);
+  describe('l’ordre supprimé à l’écran Flux prévus', () => {
+    beforeAll(async () => {
+      page.once('dialog', (d) => void d.accept());
+      await allerÀ(page, 'Plus');
+      expect(await cliquer(page, 'Flux prévus')).toBe(true);
+      const supprimé = await page.evaluate(() => {
+        const r = [...document.querySelectorAll('.row')].find((x) => x.querySelector('.label strong')?.textContent?.trim() === 'Virement Livret A');
+        const b = r && [...r.querySelectorAll('button')].find((x) => x.textContent?.trim() === 'Supprimer');
+        (b as HTMLButtonElement | undefined)?.click();
+        return !!b;
+      });
+      expect(supprimé, 'bouton « Supprimer » de l’ordre absent').toBe(true);
+      await pause(300);
+      await allerÀ(page, 'Plan');
+    });
+
+    it('[niveau 1] 2 · I4 — sans ordre : « Enregistrer mon ordre permanent » écrit en un geste la proposition montrée', async () => {
+      const c = await carte(page);
+      expect(c.boutons).toEqual(expect.arrayContaining(['Enregistrer mon ordre permanent', 'Modifier avant d’enregistrer']));
+      expect(c.débord).toBe(false);
+      const parts = c.proposition.filter((l) => !l.texte.startsWith('Non affecté')).map((l) => centimes(l.montant));
+      expect(parts.length).toBeGreaterThan(0);
+      expect(await cliquerDansLaCarte(page, 'Enregistrer mon ordre permanent')).toBe(true);
+      const [nouveau] = await ordresConservés(page);
+      expect(montants(nouveau!.action?.allocation)).toEqual(parts);
+    });
   });
 });

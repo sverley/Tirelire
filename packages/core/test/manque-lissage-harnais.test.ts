@@ -1,7 +1,8 @@
 /**
  * Harnais d'audit de #184 — une échéance trop proche : le plan annonce le manque et propose le
- * lissage (principe 1.4, D88). Côté cœur ; ce qui se lit à l'écran est dans
- * `apps/web/test/navigateur/manque-lissage-harnais.test.ts`.
+ * lissage (principe 1.4, D88). Côté cœur ; ce qui se lit à l'écran — le Plan, l'écran Tirelires,
+ * l'éditeur de la ventilation de l'écran Opérations — se vérifie sans navigateur, depuis #419, dans
+ * `apps/web/test/manque-lissage-ecran.test.ts`.
  *
  * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
  * peut trancher, un test — celui du codeur quand il la tranche (repris de `manque-lissage.test.ts`,

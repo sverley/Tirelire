@@ -2,17 +2,17 @@
  * Harnais d'audit de #407, côté écran — à 375 px, sur l'exemple : retirer une tirelire ou un compte,
  * depuis son écran ou dans l'assistant complet, laisse l'ordre enregistré « Virement Livret A » tel
  * qu'il est ; le Plan signale ce qui n'est plus demandé, et le résumé de l'assistant le dit avant la
- * validation. Sur un projet vierge, l'ordre proposé part avec son compte (#395). Le cœur est dans
- * `packages/core/test/retrait-ordre-enregistre-harnais.test.ts` ; l'assistant sans navigateur, dans
- * `../retrait-ordre-enregistre-harnais.test.ts`.
+ * validation. Le cœur est dans `packages/core/test/retrait-ordre-enregistre-harnais.test.ts` ;
+ * l'assistant sans navigateur, dans `../retrait-ordre-enregistre-harnais.test.ts`. L'ordre proposé
+ * sur un projet vierge, qui part avec son compte (point 3, #395), à l'écran : depuis #419, sans
+ * navigateur, dans `../retrait-ordre-enregistre-ecran.test.ts`.
  *
  * Les tests sont ceux du codeur (`retrait-ordre-enregistre.test.ts`, déplacé ici en entier), classés
- * par la suite de questions de D83 ; sont de l'auditeur le retrait d'un compte dans l'assistant
+ * par la suite de questions de D83 ; est de l'auditeur le retrait d'un compte dans l'assistant
  * complet (points 2, 7 et 8 : seul il passe par le branchement de la section Comptes dans
- * `Wizard.svelte`) et l'ordre proposé sur un projet vierge (point 3). Niveau 0 : un retrait qui
- * réécrirait l'ordre enregistré (points 1 et 2, D60, I10) ; vus rouges sur le code de `main`, et le
- * retrait d'une tirelire dans l'assistant sur une mutation qui rend l'élagage aux ordres enregistrés.
- * Niveau 2 : l'ordre proposé (point 3).
+ * `Wizard.svelte`). Niveau 0 : un retrait qui réécrirait l'ordre enregistré (points 1 et 2, D60,
+ * I10) ; vus rouges sur le code de `main`, et le retrait d'une tirelire dans l'assistant sur une
+ * mutation qui rend l'élagage aux ordres enregistrés.
  *
  * L'ordre (600 €) a trois parts fixes — Taxe foncière 100 €, Assurance auto 50 €, Vacances 150 € — et
  * la part variable d'Épargne de précaution. Chaque test dit, dans son titre, les points du « Fait
@@ -22,7 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
 import type { Page } from 'puppeteer-core';
 import { LedgerStore, type Ledger, type PlannedFlow } from '@tirelire/core';
-import { allerÀ, cliquer, navigateur, nouvellePage, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
+import { allerÀ, cliquer, navigateur, ouvrirLExemple, ouvrirLeSite, type Site } from '../harnais.js';
 
 const SQL = await initSqlJs();
 const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
@@ -252,49 +252,6 @@ describe.skipIf(!navigateur)('#407 · un retrait laisse l’ordre enregistré, �
     const apres = await conserve(page);
     expect(apres.accounts.find((a) => a.id === 'acc-livret')?.deletedAt).toBeTruthy();
     expect(ordre(apres)).toEqual(avant);
-    await page.close();
-  });
-
-  it('[niveau 2] 3 — sur un projet vierge, retirer le Livret A dans l’assistant : l’ordre proposé part avec lui, et la validation passe', async () => {
-    const page = await nouvellePage(site);
-    await page.goto(site.url, { waitUntil: 'networkidle0' });
-    await page.waitForFunction(() => !!document.querySelector('.tabbar') && !document.body.textContent?.includes('Ouverture de la base'));
-    await allerÀ(page, 'Plan');
-    expect(await cliquer(page, 'Construire mon budget')).toBe(true);
-    await pause(300);
-    expect(await cliquer(page, 'Commencer')).toBe(true);
-    await pause(250);
-    // L'exemple accepté tel quel propose l'ordre vers le Livret A (#395).
-    expect(await etape(page, 'Résumé')).toBe(true);
-    await pause(300);
-    const cartesAvant = await page.evaluate(() => [...document.querySelectorAll('.card.ordre')].map((c) => (c as HTMLElement).innerText.replace(/\s+/g, ' ')));
-    expect(cartesAvant.some((c) => /Livret A/.test(c)), 'l’ordre proposé vers le Livret A absent avant le retrait').toBe(true);
-    expect(await etape(page, 'Comptes')).toBe(true);
-    await pause(200);
-    const retire = await page.evaluate(() => {
-      const l = [...document.querySelectorAll('.ligne-compte')].find((x) => (x.querySelector('input') as HTMLInputElement | null)?.value === 'Livret A');
-      const b = l?.querySelector('button[title="Retirer ce compte"]') as HTMLButtonElement | null;
-      b?.click();
-      return !!b;
-    });
-    expect(retire, 'bouton « Retirer ce compte » du Livret A absent').toBe(true);
-    await pause(200);
-    expect(await etape(page, 'Résumé')).toBe(true);
-    await pause(300);
-    const vu = await page.evaluate(() => ({
-      cartes: [...document.querySelectorAll('.card.ordre')].map((c) => (c as HTMLElement).innerText.replace(/\s+/g, ' ')),
-      lignes: document.querySelectorAll('.difference .ordres-touches li').length,
-    }));
-    expect(vu.cartes.filter((c) => /Livret A/.test(c))).toEqual([]);
-    expect(vu.lignes).toBe(0);
-    expect(await cliquer(page, 'Valider mon budget')).toBe(true);
-    await pause(400);
-    expect(await page.evaluate(() => document.body.innerText.includes('n’a pas été validé'))).toBe(false);
-    const apres = await conserve(page);
-    expect(apres.accounts.filter((a) => !a.deletedAt).map((a) => a.name)).not.toContain('Livret A');
-    expect(apres.accounts.length, 'la validation n’a rien écrit').toBeGreaterThan(0);
-    const versUnCompteRetire = apres.plannedFlows.filter((f) => !f.deletedAt && f.counterpartAccountId && !apres.accounts.some((a) => a.id === f.counterpartAccountId && !a.deletedAt));
-    expect(versUnCompteRetire).toEqual([]);
     await page.close();
   });
 });

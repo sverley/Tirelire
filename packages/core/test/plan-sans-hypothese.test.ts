@@ -1,7 +1,8 @@
 /**
  * Harnais d'audit de #183 — « Le plan des périodes à venir suppose exécutés ses propres virements
- * (D52), contre le principe 1.3 ». Côté cœur ; ce qui se voit à l'écran est dans
- * `apps/web/test/navigateur/plan-sans-hypothese.test.ts`.
+ * (D52), contre le principe 1.3 ». Côté cœur ; ce qui se voit à l'écran — l'écran Plan et la ligne
+ * de chaque flux à l'écran Flux prévus — se vérifie sans navigateur, depuis #419, dans
+ * `apps/web/test/plan-sans-hypothese-ecran.test.ts`.
  *
  * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
  * peut trancher, un test — celui du codeur quand il la tranche (points 5 et 6, repris de
