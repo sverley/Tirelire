@@ -40,7 +40,10 @@ vérification (#355).
    niveau, vérifie à la relecture qu'il affirme le résultat observable qu'annonce sa phrase du
    « Fait quand » (porteur, #318). Le témoin rouge d'une ligne `Harnais` du registre reste exigé
    (`docs/gardes.md`). Les tests du codeur que tu ne retiens pas
-   restent dans ses fichiers, au niveau 4. Relis de même les tests existants que le codeur a adaptés,
+   restent dans ses fichiers, au niveau 4. Le test que le codeur nomme pour vérifier sans navigateur
+   le besoin d'un test navigateur qu'il a retiré, retiens-le dans le harnais, au niveau du test
+   retiré, même s'il ne tranche aucune phrase du « Fait quand » : « deux tests du même besoin ont le
+   même niveau » (D83, les niveaux ; #422). Relis de même les tests existants que le codeur a adaptés,
    et corrige-les s'il le faut, dans leur fichier. Ne fais pas trop grossir les tests du harnais,
    pour garder un bon compromis entre fiabilité et productivité (porteur, #403). Un harnais par
    issue, en un fichier ou deux, sauf
