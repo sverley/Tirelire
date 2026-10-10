@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #420 : ce que vérifiait, dans le navigateur, le harnais d'audit de #306 côté écran (« Une
+ * Harnais d'audit de #420, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #306 côté écran (« Une
  * opération en reprend une autre, et la sélection d'un flux est la seule qui le reconnaisse »), que #420 retire, se
  * vérifie ici sans navigateur : l'application montée sous jsdom (`ecran.ts`). Chaque titre dit le point du « Fait quand »
  * de #306 qu'il vérifie, et le numéro du test retiré dans la table de #420 (« reprise 1 » à « reprise 4 »).
@@ -14,6 +15,10 @@
  * octobre 2026 est la première période à venir et dont le salaire du 28 août est repris par une opération du relevé ;
  * pour le point 9, l'exemple dont le salaire d'octobre est corrigé par une saisie que reprend une opération du relevé,
  * écrit par le cœur et posé dans l'application comme elle pose l'exemple (`replaceWith`), lu au jour des tests.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #420 recopie. 1 pour reprise 1 (U1 : corriger le Plan sans
+ * import) et reprise 4 (I2 : une saisie reprise ne se supprime pas tant que la reprise tient), chacun vu rouge sur une
+ * mutation ciblée de l'application à l'audit ; 3 pour reprise 2 (ce que l'écran dit d'une reprise) ; 2 pour reprise 3.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -139,7 +144,7 @@ const ligneOperation = (motif: RegExp): string | null => {
 };
 
 describe('#420 · #306 points 2, 4 et 5 — la reprise à l’écran, sur l’exemple, sans navigateur', () => {
-  it('[niveau 4] #306 point 2 (table #420, reprise 1) — dans le détail d’un solde prévu, l’utilisateur corrige une opération prévue ou la masque, et retire sa saisie pour la faire compter de nouveau', async () => {
+  it('[niveau 1] #306 point 2 (table #420, reprise 1) — dans le détail d’un solde prévu, l’utilisateur corrige une opération prévue ou la masque, et retire sa saisie pour la faire compter de nouveau', async () => {
     const mv = prevu().movements.find((m) => m.flowId === 'flow-salaire')!;
     const initial = fmt(prevu().end);
     const corrige = fmt(prevu((l) => applyPatchToLedger(l, correctPlannedOperation(l, 'flow-salaire', mv.date, euros(3000), mv.date))).end);
@@ -179,7 +184,7 @@ describe('#420 · #306 points 2, 4 et 5 — la reprise à l’écran, sur l’ex
     expect(alive(projet().operations).some((o) => o.origin === 'manual' && o.plannedFlowId === 'flow-salaire' && o.plannedDate === mv.date), 'une saisie retirée reste enregistrée').toBe(false);
   });
 
-  it('[niveau 4] #306 point 4 (table #420, reprise 2) — l’écran des opérations dit ce qu’une opération reprend et l’écart de montant, et la reprise se défait', async () => {
+  it('[niveau 3] #306 point 4 (table #420, reprise 2) — l’écran des opérations dit ce qu’une opération reprend et l’écart de montant, et la reprise se défait', async () => {
     await ouvrirLExemple();
     await toutesLesOperations();
     const reprise = /reprend l’opération prévue « Salaire » du/;
@@ -198,7 +203,7 @@ describe('#420 · #306 points 2, 4 et 5 — la reprise à l’écran, sur l’ex
     expect(repris, 'la reprise défaite est encore enregistrée').toEqual([]);
   });
 
-  it('[niveau 4] #306 point 5 (table #420, reprise 3) — un flux n’a qu’une sélection : un seul jeu de critères à l’écran Flux prévus, aucun automatisme engendré, aucun dans la liste des automatismes', async () => {
+  it('[niveau 2] #306 point 5 (table #420, reprise 3) — un flux n’a qu’une sélection : un seul jeu de critères à l’écran Flux prévus, aucun automatisme engendré, aucun dans la liste des automatismes', async () => {
     await ouvrirLExemple();
     /** La liste « Automatismes » du Bilan, ligne par ligne. */
     const automatismes = async (): Promise<string[] | null> => {
@@ -285,7 +290,7 @@ describe('#420 · #306 point 9 — une saisie qu’une opération reprend ne se 
   it.each([
     ['Opérations', 'Supprimer'],
     ['Saisie manuelle', '×'],
-  ])('[niveau 4] #306 point 9, I2 (table #420, reprise 4) — depuis l’écran %s, supprimer la saisie reprise le dit, et ne change rien tant qu’on ne défait pas la reprise ; acceptée, la reprise se défait et la saisie se supprime', async (ecranNom, bouton) => {
+  ])('[niveau 1] #306 point 9, I2 (table #420, reprise 4) — depuis l’écran %s, supprimer la saisie reprise le dit, et ne change rien tant qu’on ne défait pas la reprise ; acceptée, la reprise se défait et la saisie se supprime', async (ecranNom, bouton) => {
     const { l, saisie, releve } = avecReprise();
     const tenue = soldeDuCoeur(l);
     const defaite = soldeDuCoeur(repriseDefaiteSaisieSupprimee(l, saisie, releve));

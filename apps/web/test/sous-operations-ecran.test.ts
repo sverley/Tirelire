@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #420 : ce que vérifiait, dans le navigateur, le harnais d'audit de #297 côté écran (« Une
+ * Harnais d'audit de #420, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #297 côté écran (« Une
  * opération contient des sous-opérations, sur autant de niveaux qu'on veut »), que #420 retire, se vérifie ici sans
  * navigateur : l'application montée sous jsdom (`ecran.ts`). Chaque titre dit le point du « Fait quand » de #297
  * qu'il vérifie, et le numéro du test retiré dans la table de #420 (« sous-opérations 1 » à « sous-opérations 5 »).
@@ -11,6 +12,10 @@
  * tirelire « Enfants et loisirs »), parfois divisé à la main en deux moitiés de −73 € : l'une classée
  * « Alimentation », l'autre sans catégorie ni tirelire, qui prend celles du niveau au-dessus. Le calcul, la
  * conservation et la synchronisation : `packages/core/test/sous-operations-harnais.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #420 recopie. 0 pour sous-opérations 2 et 5 : un écran qui
+ * écraserait ce que contient une opération divisée perdrait une ventilation que l'utilisateur a faite ; chacun vu
+ * rouge sur une mutation ciblée de l'application à l'audit. 2 pour les autres.
  */
 import { describe, expect, it } from 'vitest';
 import { alive, liveSubOperations, type SubOperation } from '@tirelire/core';
@@ -139,7 +144,7 @@ const parId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : 1);
 const nomDeCategorie = (id?: string) => projet().categories.find((c) => c.id === id)?.name;
 
 describe('#420 · #297 points 6 et 11 — les sous-opérations à l’écran, sur l’exemple, sans navigateur', () => {
-  it('[niveau 4] #297 point 6 (table #420, sous-opérations 1) — on divise une part à tout niveau, et on la lit avec son montant et ce qui vaut pour elle', async () => {
+  it('[niveau 2] #297 point 6 (table #420, sous-opérations 1) — on divise une part à tout niveau, et on la lit avec son montant et ce qui vaut pour elle', async () => {
     await ouvrirLExemple();
     const ouverture = await diviserEnDeux();
     // Le niveau qu'on ouvre dit son montant et ce que prendra une ligne qui ne règle rien.
@@ -167,7 +172,7 @@ describe('#420 · #297 points 6 et 11 — les sous-opérations à l’écran, su
     expect(troisieme).toContain('Vous divisez cette part de −73,00 €');
   });
 
-  it('[niveau 4] #297 point 6 (table #420, sous-opérations 2) — modifier un niveau, l’opération ou sa saisie garde ce que contiennent les autres niveaux', async () => {
+  it('[niveau 0] #297 point 6 (table #420, sous-opérations 2) — modifier un niveau, l’opération ou sa saisie garde ce que contiennent les autres niveaux', async () => {
     await ouvrirLExemple();
     await diviserEnDeux();
     const { op, subs: apresDivision } = enregistree();
@@ -207,7 +212,7 @@ describe('#420 · #297 points 6 et 11 — les sous-opérations à l’écran, su
     expect(apresSaisie).toContain('Santé / Enfants et loisirs / −73,00 €');
   });
 
-  it('[niveau 4] #297 point 11 (table #420, sous-opérations 3) — changer dans la Saisie le montant d’une opération qui n’a qu’une part remet cette part à « le reste »', async () => {
+  it('[niveau 2] #297 point 11 (table #420, sous-opérations 3) — changer dans la Saisie le montant d’une opération qui n’a qu’une part remet cette part à « le reste »', async () => {
     await ouvrirLExemple();
     // L'exemple : une seule part « montant fixe » de −146 €. Portée à 200 €, elle vaut 200 €, et rien ne tombe dans le non affecté.
     await saisieModifier(OPERATION, { montant: '200,00' });
@@ -220,7 +225,7 @@ describe('#420 · #297 points 6 et 11 — les sous-opérations à l’écran, su
     expect(panneau()).not.toMatch(/non affecté\s*:/);
   });
 
-  it('[niveau 4] #297 point 11 (table #420, sous-opérations 4) — … sans toucher à ce que contient cette part : ses moitiés suivent le nouveau montant', async () => {
+  it('[niveau 2] #297 point 11 (table #420, sous-opérations 4) — … sans toucher à ce que contient cette part : ses moitiés suivent le nouveau montant', async () => {
     await ouvrirLExemple();
     await diviserEnDeux();
     await saisieModifier(OPERATION, { montant: '200,00' });
@@ -230,7 +235,7 @@ describe('#420 · #297 points 6 et 11 — les sous-opérations à l’écran, su
     expect(lignes).toContain('Enfants / Enfants et loisirs / −100,00 €');
   });
 
-  it('[niveau 4] #297 point 11 (table #420, sous-opérations 5) — une opération divisée en plusieurs parts reste telle qu’elle est quand la Saisie en change le montant', async () => {
+  it('[niveau 0] #297 point 11 (table #420, sous-opérations 5) — une opération divisée en plusieurs parts reste telle qu’elle est quand la Saisie en change le montant', async () => {
     await ouvrirLExemple();
     // L'exemple, divisé au premier niveau en deux parts : −100 € « montant fixe », et le reste.
     await afficherToutes();

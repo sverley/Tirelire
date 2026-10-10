@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Test du codeur de #420 : ce que vérifiait, dans le navigateur, le test du point 4 du harnais d'audit de #321 (« sans
+ * Harnais d'audit de #420, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le test du point 4 du harnais d'audit de #321 (« sans
  * opération, aucun écran ne présente l'import comme un préalable »), que #420 retire, se vérifie ici sans navigateur :
  * l'application montée sous jsdom (`ecran.ts`). Son titre dit le point du « Fait quand » de #321
  * qu'il vérifie, et son numéro dans la table de #420 (« import 1 »).
@@ -10,6 +11,8 @@
  * 20 octobre 2026 par la date de lecture de l'en-tête. Les blocs se reconnaissent à `data-sans-operation` et
  * `data-apport-import`. Aucune forme du tutoiement dans les sources : `vouvoiement-textes-harnais.test.ts`. Les
  * points 1 à 3 restent dans le navigateur : `navigateur/import-enrichissement-harnais.test.ts`.
+ *
+ * Niveau (D83) : 2, celui du test retiré, que la table de #420 recopie (D85, une règle de décision).
  */
 import { describe, expect, it } from 'vitest';
 import { alive } from '@tirelire/core';
@@ -24,7 +27,7 @@ const VOUVOIEMENT = /\b(vous|votre|vos)\b/i;
 const bandeau = () => tous('main .card.warn').find((c) => t(c).includes('Dernière opération connue'));
 
 describe('#420 · #321 point 4 — les textes que la tâche écrit vouvoient, sans navigateur', () => {
-  it('[niveau 4] #321 point 4, D85 (table #420, import 1) — les textes que la tâche écrit vouvoient : Opérations sans opération, ce que l’import apporte, le bandeau', async () => {
+  it('[niveau 2] #321 point 4, D85 (table #420, import 1) — les textes que la tâche écrit vouvoient : Opérations sans opération, ce que l’import apporte, le bandeau', async () => {
     const lus: Record<string, string> = {};
 
     await ouvrirLApplication();

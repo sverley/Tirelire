@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #420 : ce que vérifiait, dans le navigateur, le harnais d'audit de #320 côté écran (« Le Bilan
+ * Harnais d'audit de #420, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #320 côté écran (« Le Bilan
  * lit le budget d'abord »), sauf C9, se vérifie ici sans navigateur : l'application montée sous jsdom (`ecran.ts`). Chaque titre dit le point du « Fait quand » de #320 qu'il vérifie, et le numéro du test retiré dans
  * la table de #420 (« bilan 1 » à « bilan 7 »).
  *
@@ -11,6 +12,10 @@
  * l'application comme elle pose l'exemple (`replaceWith`) et lus au jour des tests ; une base vide. La lecture
  * elle-même : `packages/core/test/bilan-budget-harnais.test.ts`. Reste dans le navigateur la mesure à 375 px (C9) :
  * `navigateur/bilan-budget-harnais.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #420 recopie. 1 pour bilan 5 (I3, U1 : sans opération), bilan 6
+ * (I3, U5 : sans besoin) et bilan 7 (I5, I3 : la base vide), chacun vu rouge sur une mutation ciblée du Bilan à
+ * l'audit ; 2 pour bilan 1 à 4 (D06, D29, D52, D57, et la réponse au manque de #184).
  */
 import { describe, expect, it } from 'vitest';
 import { alive, dueDateShortfalls, exampleLedger, formatCents, readBudgetAhead, type Ledger } from '@tirelire/core';
@@ -103,7 +108,7 @@ function operationsSansBesoin(): Ledger {
 }
 
 describe('#420 · #320 — sur l’exemple, lu au 6 septembre : un budget et des opérations, sans navigateur', () => {
-  it('[niveau 4] #320 points 1, 4 et 5 (table #420, bilan 1) — le budget d’abord, période par période, sans moyenne ; le passé dessous ; le choix des périodes vaut pour les deux', async () => {
+  it('[niveau 2] #320 points 1, 4 et 5 (table #420, bilan 1) — le budget d’abord, période par période, sans moyenne ; le passé dessous ; le choix des périodes vaut pour les deux', async () => {
     const lecture = readBudgetAhead(exampleLedger(), LECTURE_EXEMPLE, 12)!;
     await ouvrirLExemple();
     await allerAuBilan();
@@ -146,7 +151,7 @@ describe('#420 · #320 — sur l’exemple, lu au 6 septembre : un budget et des
   it.each([
     ['l’exemple lu au 6 septembre', 'exemple'],
     ['un budget aux revenus réduits, lu au jour des tests', 'reduits'],
-  ])('[niveau 4] #320 point 1 (table #420, bilan 2) — chaque période dit, au centime, ce que le Plan dit de la même période : la période en cours, puis la suivante (%s)', async (_decor, quel) => {
+  ])('[niveau 2] #320 point 1 (table #420, bilan 2) — chaque période dit, au centime, ce que le Plan dit de la même période : la période en cours, puis la suivante (%s)', async (_decor, quel) => {
     if (quel === 'exemple') await ouvrirLExemple();
     else {
       const l = budgetSansOperationAuxRevenusReduits();
@@ -171,7 +176,7 @@ describe('#420 · #320 — sur l’exemple, lu au 6 septembre : un budget et des
     }
   });
 
-  it('[niveau 4] #320 point 3 (table #420, bilan 3) — l’échéance en manque et la réponse qu’elle a reçue se lisent au Bilan : lissage décidé, aucune, refus ; la proposition n’y est pas répétée, le Plan en est le chemin', async () => {
+  it('[niveau 2] #320 point 3 (table #420, bilan 3) — l’échéance en manque et la réponse qu’elle a reçue se lisent au Bilan : lissage décidé, aucune, refus ; la proposition n’y est pas répétée, le Plan en est le chemin', async () => {
     const manque = dueDateShortfalls(sansReponse(), LECTURE_EXEMPLE).find((s) => s.needId === 'need-tf')!;
     await ouvrirLExemple();
     await allerAuBilan();
@@ -204,7 +209,7 @@ describe('#420 · #320 — sur l’exemple, lu au 6 septembre : un budget et des
 });
 
 describe('#420 · #320 — un budget sans aucune opération, dont les revenus ne couvrent pas tout, sans navigateur', () => {
-  it('[niveau 4] #320 point 2 (table #420, bilan 4) — une période dont des besoins ne sont pas couverts se distingue des autres et les nomme, avec le montant non couvert de chacun ; le détail de tous les besoins se déplie', async () => {
+  it('[niveau 2] #320 point 2 (table #420, bilan 4) — une période dont des besoins ne sont pas couverts se distingue des autres et les nomme, avec le montant non couvert de chacun ; le détail de tous les besoins se déplie', async () => {
     const l = budgetSansOperationAuxRevenusReduits();
     const lecture = readBudgetAhead(l, JOUR, 6)!;
     expect(lecture.periods.some((p) => p.uncovered.length > 0), 'le projet de ce test doit avoir des besoins non couverts').toBe(true);
@@ -234,7 +239,7 @@ describe('#420 · #320 — un budget sans aucune opération, dont les revenus ne
     for (const n of lecture.periods[0]!.needs) expect(t(premiere())).toContain(n.name);
   });
 
-  it('[niveau 4] #320 point 6, I3, U1 (table #420, bilan 5) — sans opération, la place du passé dit en une phrase ce que des opérations y ajouteront, comme un enrichissement : aucune invitation à importer, aucune case « revenus », aucune moyenne', async () => {
+  it('[niveau 1] #320 point 6, I3, U1 (table #420, bilan 5) — sans opération, la place du passé dit en une phrase ce que des opérations y ajouteront, comme un enrichissement : aucune invitation à importer, aucune case « revenus », aucune moyenne', async () => {
     await ouvrirSur(budgetSansOperationAuxRevenusReduits());
     await allerAuBilan();
     const b = lireLeBilan();
@@ -255,7 +260,7 @@ describe('#420 · #320 — un budget sans aucune opération, dont les revenus ne
 });
 
 describe('#420 · #320 — des opérations, et aucun besoin (U5), sans navigateur', () => {
-  it('[niveau 4] #320 point 7, I3, U5 (table #420, bilan 6) — sans aucun besoin et avec des opérations, le Bilan reste la lecture du passé seule, sans place vide pour le budget', async () => {
+  it('[niveau 1] #320 point 7, I3, U5 (table #420, bilan 6) — sans aucun besoin et avec des opérations, le Bilan reste la lecture du passé seule, sans place vide pour le budget', async () => {
     await ouvrirSur(operationsSansBesoin());
     await allerAuBilan();
     const b = lireLeBilan();
@@ -270,7 +275,7 @@ describe('#420 · #320 — des opérations, et aucun besoin (U5), sans navigateu
 });
 
 describe('#420 · #320 — une base vide, sans navigateur', () => {
-  it('[niveau 4] #320 point 7, I5, I3 (table #420, bilan 7) — sans besoin ni opération, le Bilan dit ce qu’il lira, et mène à « Construire mon budget »', async () => {
+  it('[niveau 1] #320 point 7, I5, I3 (table #420, bilan 7) — sans besoin ni opération, le Bilan dit ce qu’il lira, et mène à « Construire mon budget »', async () => {
     await ouvrirLApplication();
     await allerAuBilan();
     const b = lireLeBilan();
