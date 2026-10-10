@@ -336,10 +336,22 @@ cette case**, et ne la décochent pas non plus : elle est au porteur et aux work
   après la ligne « Usages » : « Navigateur : » suivi des seuls points qui en demandent un, ou
   « Navigateur : aucun », qui vaut quand elle ne dit rien. Le codeur n'écrit de test navigateur que
   pour ces points ; l'auditeur n'en compose pas d'autre, et s'il juge qu'un autre point en demande
-  un, il le dit dans la PR, et le porteur tranche. Un test navigateur existant qu'un changement casse
-  s'adapte, sans en ajouter un autre. Un test navigateur coûte à l'écrire, à le rejouer en entier
-  pendant toute la PR qui ajoute ou modifie son fichier, et à l'adapter quand un écran change : du
-  1er au 9 octobre, les codeurs en ont ajouté une vingtaine de fichiers, environ 115 tests.
+  un, il le dit dans la PR, et le porteur tranche. Sur tout le dépôt, un test navigateur existant
+  qui ne vérifie rien de ce qui n'existe que dans un navigateur, au sens ci-dessus, se retire
+  (porteur, sur #415 : « retirer les tests navigateurs qui ne servent pas à vérifier un besoin
+  (besoin décrivant l'interface et quelque chose en particulier nécessitant le passage par un
+  navigateur) ou à déboguer un pb » ; « Tout le dépôt ») ; son besoin reste vérifié sans navigateur,
+  au même niveau, par un test qui existe ou par un test à écrire (principe 10), au cœur ou par les
+  tests de l'interface sans navigateur, qui montent l'application sous jsdom. Un test navigateur
+  existant qu'un changement casse s'adapte, sans en ajouter un autre, s'il vérifie ce qui n'existe
+  que dans un navigateur ; sinon, il se retire, de même. Un test navigateur peut servir le temps de
+  déboguer un problème, même hors des points que l'issue nomme à sa ligne « Navigateur : » ; il se
+  retire avec la correction, et ne reste pas dans la PR qui passe en Ready (porteur, #422, à la
+  question : se garde-t-il au dépôt, au niveau 4, joué à la demande (A), ou ne vit-il que le temps
+  du débogage, et se retire-t-il avec la correction (B) ? — « B »). Un test navigateur coûte à
+  l'écrire, à le rejouer en entier pendant toute la PR qui ajoute ou modifie son fichier, et à
+  l'adapter quand un écran change : du 1er au 9 octobre, les codeurs en ont ajouté une vingtaine de
+  fichiers, environ 115 tests.
 - **Les tests navigateur la nuit ; ceux de l'issue, pendant toute la PR** (#264, #307, #383). Les tests
   navigateur de non-régression — tout fichier de `apps/web/test/navigateur/` qui n'est pas un test de
   l'issue, harnais du registre compris — ne se jouent ni avant la fusion ni à la CI d'une fusion sur

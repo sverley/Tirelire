@@ -59,8 +59,10 @@ vérification (#355).
    valeur (D78), et rougit à chaque changement voulu (05ede00). Si tu juges qu'un test le mérite,
    dis-le dans la PR : le porteur tranche. Compose le harnais sans navigateur, hors des points que
    l'issue nomme à sa ligne « Navigateur : », et n'ajoute pas de test dans le navigateur ; si tu
-   juges qu'un autre point en demande un, dis-le dans la PR : le porteur tranche (D83, « Le
-   navigateur au minimum » ; #413).
+   juges qu'un autre point en demande un, dis-le dans la PR : le porteur tranche. Un test navigateur
+   peut te servir le temps de déboguer un problème, même hors de ces points : retire-le avec la
+   correction ; il ne reste pas dans la PR qui passe en Ready (D83, « Le navigateur au minimum » ;
+   #413, #422).
 3. Pour un besoin sans code, ou que l'issue dit « Vérification : relecture », ta vérification est
    la relecture du diff et la garde hors ligne, sans `pnpm test 2` ; ce que la livraison a attesté
    ne se rejoue pas (D92). Sinon, vérifie le travail

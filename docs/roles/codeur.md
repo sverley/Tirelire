@@ -55,13 +55,18 @@ dans ton compte rendu (#355).
    l'auditeur choisira le harnais, et ceux qui ne servent qu'à toi — un diagnostic, une analyse.
    N'écris de test dans le navigateur que pour les points que l'issue nomme à sa ligne
    « Navigateur : » ; teste le reste sans navigateur, au cœur ou dans les tests de l'interface sans
-   navigateur. Un test navigateur existant que ton changement casse, adapte-le, sans en ajouter un
-   autre (D83, « Le navigateur au minimum » ; porteur, #413).
+   navigateur. Un test navigateur peut te servir le temps de déboguer un problème, même hors de ces
+   points : retire-le avec la correction ; il ne reste pas dans la PR qui passe en Ready. Un test
+   navigateur existant que ton changement casse, adapte-le, sans en ajouter un autre, s'il vérifie ce
+   qui n'existe que dans un navigateur ; sinon, retire-le, et vérifie son besoin sans navigateur, au
+   même niveau, par un test qui existe ou que tu écris (D83, « Le navigateur au minimum » ; porteur,
+   #413, #422).
    Écris-les dans tes propres fichiers, jamais dans celui du harnais, et marque-les tous de niveau 4
    (`[niveau 4]`) : un codeur ne fait pas de test de niveau inférieur ; seul l'auditeur donne un
-   autre niveau, aux tests qu'il retient (porteur, #283 ; D83). Ils restent dans le dépôt et ne se
-   jouent que nommément ou au seuil 4. Un test qui ne sert qu'à développer une fonction de la garde
-   est un test de développement : il va dans `packages/gardes/dev/`, en fichier `*.dev.mjs` (D81).
+   autre niveau, aux tests qu'il retient (porteur, #283 ; D83). Hors un test navigateur de débogage,
+   ils restent dans le dépôt et ne se jouent que nommément ou au seuil 4. Un test qui ne sert qu'à
+   développer une fonction de la garde est un test de développement : il va dans
+   `packages/gardes/dev/`, en fichier `*.dev.mjs` (D81).
    Si ton codage change ce que vérifie un test existant, adapte-le, sans toucher à son niveau,
    puisque la non-régression rouge bloque le commit ou le push (D83), et nomme-le dans ton compte
    rendu : l'auditeur le relit comme un test qu'il retient.
