@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #419 : ce que vérifiait, dans le navigateur, le harnais d'audit de #183 côté écran (« Le plan des
+ * Harnais d'audit de #419, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #183 côté écran (« Le plan des
  * périodes à venir suppose exécutés ses propres virements (D52), contre le principe 1.3 »), que #419 retire, se vérifie
  * ici sans navigateur : l'application montée sous jsdom (`ecran.ts`). Chaque titre dit le point du « Fait quand » de
  * #183 qu'il vérifie, et le numéro du test retiré dans la table de #419 (« sans hypothèse 1 » à « sans hypothèse 7 »).
@@ -14,6 +15,10 @@
  * Décors : l'exemple chargé par « Charger l'exemple », lu au 6 septembre 2026 (`loadExample`) ; pour les points 5 et 7,
  * un projet écrit ici, posé dans l'application comme elle pose l'exemple (`replaceWith`), lu au jour des tests, le
  * 20 septembre 2026. Deux lectures à des dates différentes ne se comparent jamais entre elles.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #419 recopie. 1 pour les sept (principe 1.3 : le plan sans
+ * hypothèse ; U1 : le plan sans suivi des opérations ; U3 : le plan qui ne change pas quand on commence à importer),
+ * chacun vu rouge à l'audit sur une mutation ciblée de l'application.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -252,7 +257,7 @@ async function lecture(compte: string) {
 
 describe('#419 · #183 — le plan sans hypothèse, sans navigateur', () => {
   describe('l’exemple, sans suivi des opérations', () => {
-    it('[niveau 4] #183 points 2 et 6 (table #419, sans hypothèse 1) — aucune période à venir ne dit « soldes projetés » ni « virements supposés faits », ni ne montre de position de compte', async () => {
+    it('[niveau 1] #183 points 2 et 6 (table #419, sans hypothèse 1) — aucune période à venir ne dit « soldes projetés » ni « virements supposés faits », ni ne montre de position de compte', async () => {
       await ouvrirLExemple();
       for (const p of A_VENIR) {
         await allerALaPeriode(p.label);
@@ -264,7 +269,7 @@ describe('#419 · #183 — le plan sans hypothèse, sans navigateur', () => {
       }
     });
 
-    it('[niveau 4] #183 points 3 et 4 (table #419, sans hypothèse 2) — pour chaque période à venir, le virement vers le Livret A vaut ce que ses tirelires demandent, lu sur la même page', async () => {
+    it('[niveau 1] #183 points 3 et 4 (table #419, sans hypothèse 2) — pour chaque période à venir, le virement vers le Livret A vaut ce que ses tirelires demandent, lu sur la même page', async () => {
       await ouvrirLExemple();
       for (const p of A_VENIR) {
         await allerALaPeriode(p.label);
@@ -279,7 +284,7 @@ describe('#419 · #183 — le plan sans hypothèse, sans navigateur', () => {
       }
     });
 
-    it('[niveau 4] #183 point 6 (table #419, sans hypothèse 3) — sans suivi des opérations, le plan ne montre, en aucune période, ni manquement ni état d’occurrence', async () => {
+    it('[niveau 1] #183 point 6 (table #419, sans hypothèse 3) — sans suivi des opérations, le plan ne montre, en aucune période, ni manquement ni état d’occurrence', async () => {
       await ouvrirLExemple();
       for (const p of [SEPTEMBRE!, ...A_VENIR]) {
         await allerALaPeriode(p.label);
@@ -299,14 +304,14 @@ describe('#419 · #183 — le plan sans hypothèse, sans navigateur', () => {
       expect(e.legende).toMatch(/soldes au 20 sept/i);
     }
 
-    it('[niveau 4] #183 point 5 (table #419, sans hypothèse 4) — le virement pointé se lit « pointé » sur son flux, et n’est pas un manquement', async () => {
+    it('[niveau 1] #183 point 5 (table #419, sans hypothèse 4) — le virement pointé se lit « pointé » sur son flux, et n’est pas un manquement', async () => {
       await ouvrirLeBudgetSuivi();
       const v = await lecture('Livret A');
       expect(etats(v.surLesFlux).pointee, `rien ne dit, sur le flux, que l’occurrence du 28 août du « Virement Livret A » est pointée : ${v.surLesFlux.join(' | ')}`).toBe(true);
       expect(v.nonRecue, 'un virement pointé ne remonte pas en « attendu, non reçu »').toBe(false);
     });
 
-    it('[niveau 4] #183 point 5 (table #419, sans hypothèse 5) — le virement dont la fenêtre est ouverte se lit « attendu » sur son flux, sans être un manquement', async () => {
+    it('[niveau 1] #183 point 5 (table #419, sans hypothèse 5) — le virement dont la fenêtre est ouverte se lit « attendu » sur son flux, sans être un manquement', async () => {
       await ouvrirLeBudgetSuivi();
       const v = await lecture('Livret B');
       expect(etats(v.surLesFlux).attendue, `rien ne dit, sur le flux, que l’occurrence du 18 septembre du « Virement Livret B » est attendue dans sa fenêtre : ${v.surLesFlux.join(' | ')}`).toBe(true);
@@ -314,7 +319,7 @@ describe('#419 · #183 — le plan sans hypothèse, sans navigateur', () => {
       expect(v.pointee, 'aucune ligne de relevé ne l’a rapproché').toBe(false);
     });
 
-    it('[niveau 4] #183 point 5 (table #419, sans hypothèse 6) — le virement attendu non reçu se lit « non reçu » sur son flux, et se voit depuis le plan de sa période', async () => {
+    it('[niveau 1] #183 point 5 (table #419, sans hypothèse 6) — le virement attendu non reçu se lit « non reçu » sur son flux, et se voit depuis le plan de sa période', async () => {
       await ouvrirLeBudgetSuivi();
       const v = await lecture('Livret C');
       expect(etats(v.surLesFlux).nonRecue, `le « Virement Livret C » du 3 septembre, fenêtre close le 8, n’est pas dit non reçu sur son flux : ${v.surLesFlux.join(' | ')}`).toBe(true);
@@ -325,7 +330,7 @@ describe('#419 · #183 — le plan sans hypothèse, sans navigateur', () => {
   });
 
   describe('commencer à importer', () => {
-    it('[niveau 4] #183 point 7 (table #419, sans hypothèse 7) — le même projet, avec des lignes de relevé en plus, affiche les mêmes virements permanents et les mêmes tirelires', async () => {
+    it('[niveau 1] #183 point 7 (table #419, sans hypothèse 7) — le même projet, avec des lignes de relevé en plus, affiche les mêmes virements permanents et les mêmes tirelires', async () => {
       const periodes = periodsAround(exampleLedger(), JOUR, 0, 3).map((p) => p.label);
       const lire = async () => {
         const lu: Array<{ periode: string; permanent: number | undefined; tirelires: string }> = [];

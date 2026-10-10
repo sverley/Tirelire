@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #419 : ce que vérifiait, dans le navigateur, le harnais d'audit de #394 (« l'écran Plan valide un
+ * Harnais d'audit de #419, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #394 (« l'écran Plan valide un
  * ordre avec sa ventilation ») et que #419 en retire, se vérifie ici sans navigateur : l'application montée sous jsdom
  * (`ecran.ts`). Chaque titre dit le point du « Fait quand » de #394 qu'il vérifie, et le numéro du test retiré dans la
  * table de #419 (« ventilation 1 » et « ventilation 2 »). Ce qui reste au navigateur — l'écart proposé sans rien écrire,
@@ -12,6 +13,10 @@
  * relu dans le dépôt. L'exemple chargé par « Charger l'exemple » (lu au 6 septembre 2026) porte un ordre vers le
  * Livret A décalé de ce que le budget demande (D60). Les montants attendus sont relus dans le cœur, sur le même exemple
  * et à la même date. Les règles du panneau, sans écran : `ventilation-ordre-harnais.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #419 recopie. 1 pour ventilation 1 (U2 : l'ordre proposé
+ * s'enregistre avec sa ventilation), vu rouge à l'audit sur une mutation qui enregistre l'ordre sans sa première part ;
+ * 2 pour ventilation 2 (D21, D94 : le panneau qui suit le montant).
  */
 import { describe, expect, it } from 'vitest';
 import { alive, computePlan, exampleLedger, type AllocationLine, type PlannedFlow } from '@tirelire/core';
@@ -68,7 +73,7 @@ const montants = (a: AllocationLine[] | undefined) => (a ?? []).map((l) => (l.sh
 const sansNonAffecte = (l: Ligne[]) => l.filter((x) => !x.texte.startsWith('Non affecté'));
 
 describe('#419 · #394 — l’écran Plan valide un ordre avec sa ventilation, sur l’exemple, sans navigateur', () => {
-  it('[niveau 4] #394 points 5 et 8 (table #419, ventilation 1) — « Confirmer mon nouvel ordre » écrit l’ordre tel que la carte le montre, celui que le cœur propose ; relu après rechargement', async () => {
+  it('[niveau 1] #394 points 5 et 8 (table #419, ventilation 1) — « Confirmer mon nouvel ordre » écrit l’ordre tel que la carte le montre, celui que le cœur propose ; relu après rechargement', async () => {
     await ouvrirLExemple();
     const [avant] = ordresEnregistres();
     expect(avant, 'l’exemple ne porte pas d’ordre vers le Livret A').toBeTruthy();
@@ -95,7 +100,7 @@ describe('#419 · #394 — l’écran Plan valide un ordre avec sa ventilation, 
     expect(sansNonAffecte(c.enregistre).map((l) => centimes(l.montant))).toEqual(parts);
   });
 
-  it('[niveau 4] #394 point 4 (table #419, ventilation 2) — sur une proposition, le panneau suit le montant tant qu’aucune part n’est touchée, puis ne suit plus', async () => {
+  it('[niveau 2] #394 point 4 (table #419, ventilation 2) — sur une proposition, le panneau suit le montant tant qu’aucune part n’est touchée, puis ne suit plus', async () => {
     await ouvrirLExemple();
     // Sans ordre : on supprime celui de l'exemple à l'écran Flux prévus (`confirm` répond oui).
     expect(await ecran('Flux prévus')).toBe(true);

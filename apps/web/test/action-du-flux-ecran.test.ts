@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #419 : ce que vérifiait, dans le navigateur, le harnais d'audit de #393 côté écran (point 11 :
+ * Harnais d'audit de #419, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #393 côté écran (point 11 :
  * « modifier un ordre à l'écran Flux ne retire pas les parts de son action »), que #419 retire, se vérifie ici sans
  * navigateur : l'application montée sous jsdom (`ecran.ts`). Le titre dit le point du « Fait quand » de #393 qu'il
  * vérifie, et le numéro du test retiré dans la table de #419 (« action-du-flux 1 »).
@@ -10,6 +11,10 @@
  * l'ordre vers le Livret A s'enregistre depuis le Plan avec la ventilation proposée (« Confirmer mon nouvel ordre ») ;
  * on l'ouvre ensuite à l'écran Flux prévus par « Modifier », on coche le verrouillage et on enregistre. L'enregistrement
  * de l'ordre lui-même, calculé : `packages/core/test/action-du-flux-harnais.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #419 recopie. 0 pour action-du-flux 1 (une ventilation
+ * validée, perdue en douce, ne se rend pas en corrigeant le code ; I10), vu rouge à l'audit sur une mutation du
+ * formulaire du flux qui repart d'une action vide.
  */
 import { describe, expect, it } from 'vitest';
 import { alive, type PlannedFlow } from '@tirelire/core';
@@ -36,7 +41,7 @@ async function cliquerDansLaCarte(texte: string): Promise<boolean> {
 }
 
 describe('#419 · #393 point 11 — modifier un ordre à l’écran Flux prévus garde les parts de son action, sans navigateur', () => {
-  it('[niveau 4] #393 point 11 (table #419, action-du-flux 1) — enregistré depuis le Plan avec ses parts, modifié et verrouillé à l’écran Flux prévus : le projet garde son identifiant et ses parts, et son action porte le verrouillage', async () => {
+  it('[niveau 0] #393 point 11 (table #419, action-du-flux 1) — enregistré depuis le Plan avec ses parts, modifié et verrouillé à l’écran Flux prévus : le projet garde son identifiant et ses parts, et son action porte le verrouillage', async () => {
     await ouvrirLExemple();
     await allerA('Plan');
     expect(await cliquerDansLaCarte('Confirmer mon nouvel ordre'), 'bouton « Confirmer mon nouvel ordre » absent de la carte du Livret A').toBe(true);

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #419 : ce que vérifiait, dans le navigateur, le harnais d'audit de #13 (les ordres à poser, du
+ * Harnais d'audit de #419, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #13 (les ordres à poser, du
  * résumé de l'assistant au Plan) et que #419 en retire, se vérifie ici sans navigateur : l'application montée sous
  * jsdom (`ecran.ts`). Chaque titre dit les points du « Fait quand » de #13 qu'il vérifie, et le numéro du test retiré
  * dans la table de #419 (« ordres à poser 1 » à « ordres à poser 6 »). Ce qui reste au navigateur — la copie dans le
@@ -13,6 +14,10 @@
  * vers le Livret A, que le résumé dit. Les montants attendus sont relus dans le cœur, sur le même budget et à la même
  * date. Ce que l'assistant calcule et dit, sans écran : `ordres-a-poser-harnais.test.ts` (« #13 · 2 », « #13 · 5 »,
  * « #13 · 7 »).
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #419 recopie. 1 pour les six (U2 et U3 : l'ordre à poser,
+ * puis enregistré ; I3 : rien n'invite à créer un compte ; I10 : rien ne s'enregistre sans geste), chacun vu rouge à
+ * l'audit sur une mutation ciblée de l'application.
  */
 import { describe, expect, it } from 'vitest';
 import { alive, computePlan, exampleLedger, formatCents, transferLabel, type Ledger } from '@tirelire/core';
@@ -84,7 +89,7 @@ const propose = (() => {
 })();
 
 describe('#419 · #13 — les ordres à poser, de l’assistant au Plan, sans navigateur', () => {
-  it('[niveau 4] #13 points 1 et 4 (table #419, ordres à poser 1) — l’ordre de l’exemple est là : pas de bloc, une phrase, et rien qui invite à créer un compte', async () => {
+  it('[niveau 1] #13 points 1 et 4 (table #419, ordres à poser 1) — l’ordre de l’exemple est là : pas de bloc, une phrase, et rien qui invite à créer un compte', async () => {
     await auResume();
     expect(blocsDeLAssistant()).toEqual([]);
     const phrase = t(document.querySelector('main .rien-a-poser'));
@@ -93,7 +98,7 @@ describe('#419 · #13 — les ordres à poser, de l’assistant au Plan, sans na
     expect(tous('main .card.ordre').some((c) => /Livret A/.test(t(c))), 'l’ordre de l’exemple n’est pas au résumé').toBe(true);
   });
 
-  it('[niveau 4] #13 points 1, 3, 6 et 7 (table #419, ordres à poser 2) — l’ordre retiré, le résumé dit celui à poser vers le Livret A, sans geste qui l’enregistre', async () => {
+  it('[niveau 1] #13 points 1, 3, 6 et 7 (table #419, ordres à poser 2) — l’ordre retiré, le résumé dit celui à poser vers le Livret A, sans geste qui l’enregistre', async () => {
     await auResume();
     await retirerLOrdreDeLExemple();
     const blocs = blocsDeLAssistant();
@@ -113,7 +118,7 @@ describe('#419 · #13 — les ordres à poser, de l’assistant au Plan, sans na
     expect(ordresVers(projet(), COMPTE)).toEqual([]);
   });
 
-  it('[niveau 4] #13 point 3 (table #419, ordres à poser 3) — validé, aucun ordre n’est enregistré ; l’écran dit que les ordres se mettent en place sur le Plan, et le bouton principal y conduit', async () => {
+  it('[niveau 1] #13 point 3 (table #419, ordres à poser 3) — validé, aucun ordre n’est enregistré ; l’écran dit que les ordres se mettent en place sur le Plan, et le bouton principal y conduit', async () => {
     await auResume();
     await retirerLOrdreDeLExemple();
     expect(blocsDeLAssistant().length, 'le budget doit d’abord demander un ordre').toBe(1);
@@ -128,7 +133,7 @@ describe('#419 · #13 — les ordres à poser, de l’assistant au Plan, sans na
     expect(carteDuPlan(COMPTE, '.proposition'), 'le Plan ne propose pas l’ordre à mettre en place').not.toBeNull();
   });
 
-  it('[niveau 4] #13 point 5 (table #419, ordres à poser 4) — enregistré depuis le Plan, l’ordre dit le jour de son ancrage et son libellé, ceux que le Plan proposait', async () => {
+  it('[niveau 1] #13 point 5 (table #419, ordres à poser 4) — enregistré depuis le Plan, l’ordre dit le jour de son ancrage et son libellé, ceux que le Plan proposait', async () => {
     await auResume();
     await retirerLOrdreDeLExemple();
     expect(await cliquer('Valider mon budget')).toBe(true);
@@ -147,7 +152,7 @@ describe('#419 · #13 — les ordres à poser, de l’assistant au Plan, sans na
     expect(enregistre?.jours[0]).toMatch(/le 28 de chaque mois/);
   });
 
-  it('[niveau 4] #13 point 4 (table #419, ordres à poser 5) — sans ordre de l’exemple, les tirelires laissées hors de tout compte d’accueil : une phrase, aucun bloc, rien qui invite à créer un compte', async () => {
+  it('[niveau 1] #13 point 4 (table #419, ordres à poser 5) — sans ordre de l’exemple, les tirelires laissées hors de tout compte d’accueil : une phrase, aucun bloc, rien qui invite à créer un compte', async () => {
     await auResume();
     await retirerLOrdreDeLExemple();
     expect(resume().blocs, 'le budget doit d’abord demander un ordre').toBeGreaterThan(0);
@@ -158,7 +163,7 @@ describe('#419 · #13 — les ordres à poser, de l’assistant au Plan, sans na
     expect(r.phrase).not.toMatch(/créez|créer|ajoutez|ouvrez/i);
   });
 
-  it('[niveau 4] #13 point 4 (table #419, ordres à poser 6) — sans aucune tirelire, le résumé ne parle pas d’ordre à poser', async () => {
+  it('[niveau 1] #13 point 4 (table #419, ordres à poser 6) — sans aucune tirelire, le résumé ne parle pas d’ordre à poser', async () => {
     await auResume();
     // L'état où le test retiré partait : l'ordre de l'exemple retiré, les tirelires hors de tout compte d'accueil.
     await retirerLOrdreDeLExemple();

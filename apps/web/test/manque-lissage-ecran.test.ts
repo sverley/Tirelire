@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #419 : ce que vérifiait, dans le navigateur, le harnais d'audit de #184 côté écran (« une
+ * Harnais d'audit de #419, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #184 côté écran (« une
  * échéance trop proche : le plan annonce le manque et propose le lissage », principe 1.4, D88), que #419 retire, se
  * vérifie ici sans navigateur : l'application montée sous jsdom (`ecran.ts`). Chaque titre dit le point du « Fait
  * quand » de #184 qu'il vérifie, et le numéro du test retiré dans la table de #419 (« manque-lissage 1 » à
@@ -12,9 +13,14 @@
  * 2026), dont la taxe foncière porte son lissage décidé : « Retirer le lissage » ramène le manque (100 € au 15 octobre)
  * et sa proposition. Les montants attendus sont relus dans le cœur, sur le même projet et à la même date. Le calcul, la
  * réponse enregistrée et l'éditeur de la ventilation hors de l'écran : `packages/core/test/manque-lissage-harnais.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #419 recopie. 0 pour manque-lissage 4 (la date d'une part,
+ * perdue ou changée par l'éditeur de la ventilation) ; 1 pour manque-lissage 1 et 3 (principe 1.4 ; I10 : rien ne
+ * s'écrit sans geste) ; 2 pour manque-lissage 2 (D88 : la réponse au manque). Ceux de niveau 0 et 1 vus rouges à
+ * l'audit, chacun sur une mutation ciblée de l'application.
  */
 import { describe, expect, it } from 'vitest';
-import { alive, dueDateShortfalls, euros, exampleLedger, formatCents, liveSubOperations } from '@tirelire/core';
+import { alive, dueDateShortfalls, euros, exampleLedger, formatCents, liveSubOperations, periodsAround } from '@tirelire/core';
 import { allerA, app, attendre, cliquer, cliquerExactement, ecran, ouvrirLApplication, presser, projet, rendu, saisir, t, tous } from './ecran';
 
 /** Un montant tel que l'écran l'écrit, espaces resserrés comme `t` les resserre. */
@@ -60,7 +66,7 @@ const manque = (() => {
 })();
 
 describe('#419 · #184 — le manque d’une échéance à l’écran, sur l’exemple, sans navigateur', () => {
-  it('[niveau 4] #184 points 1 et 2 (table #419, manque-lissage 1) — le Plan annonce le manque, montant et date, à côté de ce que l’ordre permanent demande, avec la proposition de lisser ; rien ne s’écrit sans le geste de l’utilisateur', async () => {
+  it('[niveau 1] #184 points 1 et 2 (table #419, manque-lissage 1) — le Plan annonce le manque, montant et date, à côté de ce que l’ordre permanent demande, avec la proposition de lisser ; rien ne s’écrit sans le geste de l’utilisateur', async () => {
     await ouvrirLExemple();
     await allerA('Plan');
     // L'exemple porte le lissage décidé de la taxe foncière : le bloc le dit, et se retire d'un geste.
@@ -85,7 +91,7 @@ describe('#419 · #184 — le manque d’une échéance à l’écran, sur l’e
     expect(ligne).not.toMatch(/demandé|lissage décidé/);
   });
 
-  it('[niveau 4] #184 point 5 (table #419, manque-lissage 2) — refuser, revenir sur le refus, puis lisser : la réponse se lit, la proposition ne revient pas, le manque qui reste se dit toujours', async () => {
+  it('[niveau 2] #184 point 5 (table #419, manque-lissage 2) — refuser, revenir sur le refus, puis lisser : la réponse se lit, la proposition ne revient pas, le manque qui reste se dit toujours', async () => {
     await ouvrirLExemple();
     await allerA('Plan');
     expect(await cliquerExactement('Retirer le lissage')).toBe(true);
@@ -106,11 +112,15 @@ describe('#419 · #184 — le manque d’une échéance à l’écran, sur l’e
     expect(lisse.boutons).toEqual(['Retirer le lissage']);
     expect(lisse.texte).not.toMatch(/Il manquera|Proposé/);
     for (const part of manque.proposal!) expect(lisse.texte).toContain(fmt(part.amount));
-    // Le plan de la période lit la part du lissage décidé sur la ligne de la taxe.
-    expect(t(document.querySelector('main'))).toContain(`dont lissage décidé ${fmt(euros(50))}`);
+    // Le plan de la période lit la part du lissage décidé sur la ligne de la taxe : celle que le cœur propose pour
+    // la période où l'on lit.
+    const [enCours] = periodsAround(exampleLedger(), LECTURE, 0, 0);
+    const part = manque.proposal!.find((p) => p.date >= enCours!.start && p.date <= enCours!.end);
+    expect(part, 'le cœur ne propose aucune part pour la période où l’on lit : ce test ne vérifie rien').toBeTruthy();
+    expect(t(document.querySelector('main'))).toContain(`dont lissage décidé ${fmt(part!.amount)}`);
   });
 
-  it('[niveau 4] #184 point 3 (table #419, manque-lissage 3) — une échéance qu’on vient d’enregistrer en manque se dit aussitôt à l’écran Tirelires : montant, date, croisière par période, proposition', async () => {
+  it('[niveau 1] #184 point 3 (table #419, manque-lissage 3) — une échéance qu’on vient d’enregistrer en manque se dit aussitôt à l’écran Tirelires : montant, date, croisière par période, proposition', async () => {
     await ouvrirLExemple();
     expect(await ecran('Tirelires')).toBe(true);
     // Une tirelire neuve, avec une échéance de 120 € tous les 24 mois, au 10 novembre : trop proche.
@@ -146,7 +156,7 @@ describe('#419 · #184 — le manque d’une échéance à l’écran, sur l’e
     expect(alive(projet().shortfallAnswers).filter((a) => a.needId === besoin!.id)).toEqual([]);
   });
 
-  it('[niveau 4] #184 point 7 (table #419, manque-lissage 4) — l’éditeur de la ventilation de l’écran Opérations montre la date de chaque part de lissage, et la garde — modifiée ou non — à l’enregistrement', async () => {
+  it('[niveau 0] #184 point 7 (table #419, manque-lissage 4) — l’éditeur de la ventilation de l’écran Opérations montre la date de chaque part de lissage, et la garde — modifiée ou non — à l’enregistrement', async () => {
     await ouvrirLExemple();
     await allerA('Opérations');
     // L'opération du lissage est verrouillée : l'affichage « Toutes » la montre.

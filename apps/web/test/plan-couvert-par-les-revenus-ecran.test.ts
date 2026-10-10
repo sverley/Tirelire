@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #419 : ce que vérifiait, dans le navigateur, le harnais d'audit de #323 (« Le Plan se lit sans
+ * Harnais d'audit de #419, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #323 (« Le Plan se lit sans
  * opération, période passée comprise »), que #419 retire, se vérifie ici sans navigateur : l'application montée sous
  * jsdom (`ecran.ts`). Chaque titre dit le point du « Fait quand » de #323 qu'il vérifie, et le numéro du test retiré
  * dans la table de #419 (« couvert 1 » et « couvert 2 »). Le point 3 (les textes vouvoient) : déjà,
@@ -12,6 +13,9 @@
  * comme elle pose l'exemple (`replaceWith`), lu au jour des tests. Les montants attendus sont relus dans le cœur, sur
  * le même projet et à la même date. Le montant de la tuile comparé au Bilan : `bilan-budget-ecran.test.ts` (« bilan 2 ») ;
  * la prémisse du point 2, sans écran : `plan-couvert-par-les-revenus.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #419 recopie. 2 pour couvert 1 (D29 : ce que couvrent les
+ * revenus) ; 3 pour couvert 2 (la période sans besoin, moins lisible si elle ne le dit pas).
  */
 import { describe, expect, it } from 'vitest';
 import { alive, computePlan, exampleLedger, formatCents, periodReadingDate, periodsAround, type Ledger } from '@tirelire/core';
@@ -47,7 +51,7 @@ function lireLePlan() {
 }
 
 describe('#419 · #323 — le Plan sans opération, sans navigateur', () => {
-  it('[niveau 4] #323 point 1 (table #419, couvert 1) — la tuile et le total des tirelires disent « Couvert par les revenus », pour le même montant, celui que le cœur calcule, sans « viré » ; les virements restent sous leur titre', async () => {
+  it('[niveau 2] #323 point 1 (table #419, couvert 1) — la tuile et le total des tirelires disent « Couvert par les revenus », pour le même montant, celui que le cœur calcule, sans « viré » ; les virements restent sous leur titre', async () => {
     await ouvrirLApplication();
     expect(await cliquer('Charger l\'exemple')).toBe(true);
     await attendre(() => alive(app.ledger.accounts).some((a) => a.name === 'Livret A') && app.asOf === LECTURE, 'l’exemple');
@@ -66,7 +70,7 @@ describe('#419 · #323 — le Plan sans opération, sans navigateur', () => {
     expect(e.titres, `titres : ${e.titres.join(' | ')}`).toContain('Virements à faire depuis le compte principal');
   });
 
-  it('[niveau 4] #323 point 2 (table #419, couvert 2) — la période sans besoin le dit sous « Tirelires », sans carte ; la suivante garde sa carte', async () => {
+  it('[niveau 3] #323 point 2 (table #419, couvert 2) — la période sans besoin le dit sous « Tirelires », sans carte ; la suivante garde sa carte', async () => {
     const b = besoinsDifferes(JOUR);
     await ouvrirLApplication();
     await app.replaceWith(b.ledger);

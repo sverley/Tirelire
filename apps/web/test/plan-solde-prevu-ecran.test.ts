@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #419 : ce que vérifiait, dans le navigateur, le harnais d'audit de #296 côté écran (« le plan
+ * Harnais d'audit de #419, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #296 côté écran (« le plan
  * d'une période à venir montre le solde prévu des comptes et des tirelires », D52, D88), que #419 retire, se vérifie
  * ici sans navigateur : l'application montée sous jsdom (`ecran.ts`). Chaque titre dit le point du « Fait quand » de
  * #296 qu'il vérifie, et le numéro du test retiré dans la table de #419 (« solde prévu 1 » à « solde prévu 4 »). Ce
@@ -10,6 +11,9 @@
  * de leurs opérations, replié ou déplié. L'exemple chargé par « Charger l'exemple » se lit au 6 septembre 2026 ;
  * octobre 2026 est la première période à venir. Les montants attendus sont relus dans le cœur, sur le même exemple et
  * à la même date. Le calcul : `packages/core/test/plan-solde-prevu.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #419 recopie. 1 pour solde prévu 3 (principe 1.3 : le manque
+ * signalé), vu rouge à l'audit sur une mutation qui retire la date du manque ; 2 pour solde prévu 1, 2 et 4 (D52, D88).
  */
 import { describe, expect, it } from 'vitest';
 import { alive, computePlan, exampleLedger, formatCents, type ForecastMovement } from '@tirelire/core';
@@ -104,7 +108,7 @@ function memesOperations(lu: Ligne['detail'], prevu: ForecastMovement[]): void {
 describe('#419 · #296 — le solde prévu à l’écran Plan, sur l’exemple, sans navigateur', () => {
   const plan = computePlan(exampleLedger(), DEBUT_OCTOBRE, LECTURE);
 
-  it('[niveau 4] #296 point 6 (table #419, solde prévu 1) — la période où l’on lit ne montre pas de solde prévu', async () => {
+  it('[niveau 2] #296 point 6 (table #419, solde prévu 1) — la période où l’on lit ne montre pas de solde prévu', async () => {
     await ouvrirLExemple();
     // La période où l'on lit est bien affichée : son plan est là, sans bloc « Soldes prévus ».
     expect(tous('main h2').map(t)).toContain('Tirelires');
@@ -114,7 +118,7 @@ describe('#419 · #296 — le solde prévu à l’écran Plan, sur l’exemple, 
     expect(soldesPrevus()).not.toBeNull();
   });
 
-  it('[niveau 4] #296 point 1 (table #419, solde prévu 2) — octobre montre le solde prévu de chaque compte et de chaque tirelire, celui que le cœur calcule', async () => {
+  it('[niveau 2] #296 point 1 (table #419, solde prévu 2) — octobre montre le solde prévu de chaque compte et de chaque tirelire, celui que le cœur calcule', async () => {
     await ouvrirLExemple();
     await ouvrirOctobre();
     const bloc = soldesPrevus();
@@ -126,7 +130,7 @@ describe('#419 · #296 — le solde prévu à l’écran Plan, sur l’exemple, 
     expect(bloc!.tirelires.map((x) => [x.nom, x.montant])).toEqual(f.tirelires.map((x) => [x.name, fmt(x.end)]));
   });
 
-  it('[niveau 4] #296 point 3 (table #419, solde prévu 3) — un manque se lit avec sa date et son montant', async () => {
+  it('[niveau 1] #296 point 3 (table #419, solde prévu 3) — un manque se lit avec sa date et son montant', async () => {
     await ouvrirLExemple();
     await ouvrirOctobre();
     const bloc = soldesPrevus()!;
@@ -143,7 +147,7 @@ describe('#419 · #296 — le solde prévu à l’écran Plan, sur l’exemple, 
     }
   });
 
-  it('[niveau 4] #296 point 4 (table #419, solde prévu 4) — repliées par défaut, les opérations se lisent sur demande, chacune avec son origine', async () => {
+  it('[niveau 2] #296 point 4 (table #419, solde prévu 4) — repliées par défaut, les opérations se lisent sur demande, chacune avec son origine', async () => {
     await ouvrirLExemple();
     await ouvrirOctobre();
     let bloc = soldesPrevus()!;
