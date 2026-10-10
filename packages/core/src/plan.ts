@@ -26,7 +26,7 @@ import {
 } from './balances.js';
 import { occurrencesBetween, budgetPeriodContaining, previousPeriod, type Period } from './periods.js';
 import { addDays, addMonths } from './dates.js';
-import { flowOccurrences, tracksOperations, type FlowOccurrence } from './matching.js';
+import { flowOccurrences, readLabelPattern, tracksOperations, type FlowOccurrence } from './matching.js';
 import { computeForecast, withPlannedOperations, type Forecast } from './forecast.js';
 import { resolveShares } from './suboperations.js';
 
@@ -124,7 +124,8 @@ export interface PlanTransfer {
    * ceux des ordres enregistrés que le plan compare, chacun une fois, dans l'ordre des ordres — un
    * ordre sans motif de libellé n'en donne aucun ; sans ordre comparé, le libellé tiré du nom actuel
    * du compte (`transferLabel`), celui que le plan propose de recopier chez la banque. Renommer le
-   * compte ne change pas le libellé d'un ordre enregistré.
+   * compte ne change pas le libellé d'un ordre enregistré. Chacun se lit comme sa sélection le lit
+   * (`readLabelPattern`) : sans blanc au début ni à la fin, ce qui se montre étant ce qui se copie (#26).
    */
   labels: string[];
   /** Détail par tirelire. */
@@ -473,7 +474,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
           .flatMap((f) => flowOccurrences(ledger, f, period.start, period.end, today).map((o) => ({ ...o, flowId: f.id, flowName: f.name })))
           .sort((x, y) => x.date.localeCompare(y.date) || x.flowName.localeCompare(y.flowName, 'fr') || x.flowId.localeCompare(y.flowId))
       : undefined;
-    return { bankOrder, occurrences, labels: [...new Set(ordres.flatMap((f) => (f.labelPattern ? [f.labelPattern] : [])))] };
+    return { bankOrder, occurrences, labels: [...new Set(ordres.flatMap((f) => { const motif = readLabelPattern(f.labelPattern); return motif ? [motif] : []; }))] };
   };
   for (const a of idx.accountsById.values()) {
     if (principal && a.id === principal.id) continue;
@@ -927,7 +928,10 @@ export function periodsAround(ledger: Ledger, asOf: ISODate, before: number, aft
   return out;
 }
 
-/** Libellé de virement (D21 : un par compte cible) : majuscules sans accents, tronqué à ce que les banques acceptent. */
+/**
+ * Libellé de virement (D21 : un par compte cible) : majuscules sans accents, tronqué à ce que les
+ * banques acceptent, 35 caractères, sans le blanc qu'une coupe laisserait à sa fin (#26, point 1).
+ */
 export function transferLabel(accountName: string): string {
   const base = accountName
     .normalize('NFD')
@@ -936,7 +940,7 @@ export function transferLabel(accountName: string): string {
     .replace(/[^A-Z0-9 ]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return `TIRELIRE ${base}`.slice(0, 35);
+  return `TIRELIRE ${base}`.slice(0, 35).trimEnd();
 }
 
 /** Solde d'une tirelire et sa position, pour l'interface. */

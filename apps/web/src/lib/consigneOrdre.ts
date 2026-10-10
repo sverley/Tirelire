@@ -8,7 +8,7 @@
  * Tout se lit sur l'ordre — l'ordre enregistré, ou celui que le plan enregistrera
  * (`ordreAPoser`) — : le jour dit est celui qui s'enregistre avec lui.
  */
-import { parseDate, standingTransferFlow, type Id, type Plan, type PlanTransfer, type PlannedFlow } from '@tirelire/core';
+import { parseDate, readLabelPattern, standingTransferFlow, type Id, type Plan, type PlanTransfer, type PlannedFlow } from '@tirelire/core';
 import { periodicityLabel } from './format';
 
 /**
@@ -43,7 +43,7 @@ export interface Consigne {
   reconnaissance: string;
 }
 
-/** La consigne d'un ordre : son libellé, son jour et sa fenêtre, lus sur lui. */
+/** La consigne d'un ordre : son libellé, tel que sa sélection le lit (#26), son jour et sa fenêtre, lus sur lui. */
 export function consigneDe(f: PlannedFlow): Consigne {
   const { d } = parseDate(f.periodicity.anchorDate);
   const mensuel = f.periodicity.unit === 'month' && f.periodicity.interval === 1;
@@ -55,7 +55,8 @@ export function consigneDe(f: PlannedFlow): Consigne {
     fenetre === 0
       ? 'un virement passé un autre jour n’est pas reconnu à l’import'
       : `un virement passé jusqu’à ${fenetre} jour${fenetre > 1 ? 's' : ''} avant ou après est reconnu à l’import ; au-delà, il ne l’est pas`;
-  return { ...(f.labelPattern ? { libelle: f.labelPattern } : {}), jour: d, quand, fenetre, reconnaissance };
+  const libelle = readLabelPattern(f.labelPattern);
+  return { ...(libelle ? { libelle } : {}), jour: d, quand, fenetre, reconnaissance };
 }
 
 /**
