@@ -6,7 +6,9 @@
  * - une nuit rouge ouvre une issue, ou complète, d'un commentaire, celle d'une nuit précédente encore
  *   ouverte ; elle nomme les fichiers rouges et le commit de `main` jugé ;
  * - la nuit verte qui suit une nuit rouge le dit dans cette issue, sans la fermer ; une nuit verte
- *   qui suit une nuit verte ne dit rien, comme une nuit où rien ne s'est joué.
+ *   qui suit une nuit verte ne dit rien, comme une nuit où rien ne s'est joué. Le dernier message de
+ *   la nuit est le dernier, du corps de l'issue puis de ses commentaires, qui porte la marque d'une
+ *   nuit rouge ou verte : les commentaires d'une session ou du porteur ne comptent pas (#431).
  *
  * Une nuit rouge ne bloque aucune fusion : rien d'autre que cette issue ne la porte.
  *
@@ -117,9 +119,19 @@ export function texteVert({ commit, execution }) {
 }
 
 /**
+ * Le dernier message de la nuit dans une issue de la nuit (#431) : le dernier, du corps puis des
+ * commentaires dans leur ordre, qui porte la marque d'une nuit rouge ou verte ; `''` si aucun. Les
+ * autres commentaires, quel qu'en soit l'auteur, ne comptent pas.
+ */
+export function dernierMessageDeLaNuit(corps, commentaires = []) {
+  const messages = [corps, ...(commentaires ?? []).map((c) => c?.body)].map((m) => String(m ?? ''));
+  return messages.findLast((m) => m.includes(ROUGE) || m.includes(VERTE)) ?? '';
+}
+
+/**
  * La suite d'une nuit. `verdict` : `vert` ou `rouge` ; `issue` : l'issue de la nuit encore ouverte,
- * `{ number }`, ou `null` ; `dernier` : le texte de son dernier commentaire, ou de son corps sans
- * commentaire. Rend `{ action: 'creer' | 'commenter' | 'rien', titre?, corps? }`.
+ * `{ number }`, ou `null` ; `dernier` : le texte du dernier message de la nuit dans l'issue
+ * (`dernierMessageDeLaNuit`). Rend `{ action: 'creer' | 'commenter' | 'rien', titre?, corps? }`.
  */
 export function suiteDeLaNuit({ verdict, commit, rouges = null, execution, issue = null, dernier = '' }) {
   if (verdict === 'rouge') {
@@ -165,12 +177,13 @@ async function signaler([verdict, commit, fichierRapport, execution]) {
   const issue = issueDeLaNuit(await api('issues?state=open&per_page=100&sort=created&direction=asc'));
   let dernier = '';
   if (issue) {
-    dernier = issue.body ?? '';
-    if (issue.comments > 0) {
-      const page = Math.ceil(issue.comments / 100);
-      const commentaires = await api(`issues/${issue.number}/comments?per_page=100&page=${page}`);
-      dernier = commentaires.at(-1)?.body ?? dernier;
+    const commentaires = [];
+    for (let page = 1; commentaires.length < issue.comments; page++) {
+      const lot = await api(`issues/${issue.number}/comments?per_page=100&page=${page}`);
+      commentaires.push(...lot);
+      if (lot.length < 100) break;
     }
+    dernier = dernierMessageDeLaNuit(issue.body, commentaires);
   }
   const suite = suiteDeLaNuit({ verdict, commit, rouges, execution, issue, dernier });
   if (suite.action === 'creer') {
