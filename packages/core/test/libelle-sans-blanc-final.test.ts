@@ -1,7 +1,12 @@
 /**
- * Tests du codeur de #26 — « Un libellé de virement tronqué peut finir par un blanc, et la ligne n'est
- * plus reconnue ». Côté cœur ; ce que l'écran Plan montre et copie (point 2) est dans
- * `apps/web/test/libelle-sans-blanc-final-ecran.test.ts`.
+ * Harnais d'audit de #26, composé parmi les tests du codeur (D83) — « Un libellé de virement tronqué
+ * peut finir par un blanc, et la ligne n'est plus reconnue ». Côté cœur ; ce que l'écran Plan montre et
+ * copie (point 2) est dans `apps/web/test/libelle-sans-blanc-final-ecran.test.ts`.
+ *
+ * Niveaux (D83) : le point 6 — un ordre enregistré n'est jamais réécrit (I10, D57) — est de niveau 0 :
+ * un motif réécrit resterait réécrit après correction du code. Les points 1 à 5 et 7 disent ce que
+ * valent D11, D12, D21 et D24 sur un cas, l'usage restant possible : niveau 2. Le test de
+ * `readLabelPattern` ne vérifie qu'un détail du code : niveau 4.
  *
  * Données inventées (D84) : l'exemple, lu au 6 septembre 2026, son Livret A renommé « Assurance vie de
  * Simon et Marie » — le nom de l'issue, dont le libellé coupé à 35 caractères finissait par un blanc —,
@@ -68,7 +73,7 @@ function importer(l: Ledger): Ledger {
   return out;
 }
 
-describe('[niveau 4] #26 · 1. le libellé proposé', () => {
+describe('[niveau 2] #26 · 1. le libellé proposé', () => {
   it('« Assurance vie de Simon et Marie » donne le libellé de l’issue, 34 caractères, sans blanc final', () => {
     expect(transferLabel(NOM)).toBe(LIBELLE);
     expect(LIBELLE.length).toBe(34);
@@ -100,7 +105,7 @@ describe('[niveau 4] #26 · 1. le libellé proposé', () => {
   });
 });
 
-describe('[niveau 4] #26 · 2. ce qu’on voit est ce qu’on copie — le plan', () => {
+describe('[niveau 2] #26 · 2. ce qu’on voit est ce qu’on copie — le plan', () => {
   it('un ordre enregistré avant, au motif qui finit par un blanc : le plan donne le libellé sans lui', () => {
     const l = motifDeLOrdre(renomme(exampleLedger()), ANCIEN);
     expect(virement(l).labels).toEqual([LIBELLE]);
@@ -111,7 +116,7 @@ describe('[niveau 4] #26 · 2. ce qu’on voit est ce qu’on copie — le plan'
   });
 });
 
-describe('[niveau 4] #26 · 3. reconnu par l’ordre', () => {
+describe('[niveau 2] #26 · 3. reconnu par l’ordre', () => {
   for (const [quand, motif] of [
     ['enregistré après ce changement', LIBELLE],
     ['enregistré avant, blanc final compris', ANCIEN],
@@ -134,7 +139,7 @@ describe('[niveau 4] #26 · 3. reconnu par l’ordre', () => {
   });
 });
 
-describe('[niveau 4] #26 · 4. reconnu sans ordre', () => {
+describe('[niveau 2] #26 · 4. reconnu sans ordre', () => {
   it('vers un compte sans ordre, la ligne au libellé tiré de son nom est un virement vers lui, son montant non affecté', () => {
     const l = avec(renomme(sansOrdre(exampleLedger())), ligne('op-av', `VIR ${LIBELLE}`));
     const patch = matchTirelireTransfers(l);
@@ -146,10 +151,10 @@ describe('[niveau 4] #26 · 4. reconnu sans ordre', () => {
   });
 });
 
-describe('[niveau 4] #26 · 5. une seule lecture du motif', () => {
+describe('[niveau 2] #26 · 5. une seule lecture du motif', () => {
   const op = ligne('op-av', `VIR ${LIBELLE}`);
 
-  it('readLabelPattern retire les blancs d’extrémité, et rien d’autre', () => {
+  it('[niveau 4] readLabelPattern retire les blancs d’extrémité, et rien d’autre', () => {
     expect(readLabelPattern(ANCIEN)).toBe(LIBELLE);
     expect(readLabelPattern(`  ${LIBELLE}\t`)).toBe(LIBELLE);
     expect(readLabelPattern('VIR  .*SALAIRE')).toBe('VIR  .*SALAIRE');
@@ -188,7 +193,7 @@ describe('[niveau 4] #26 · 5. une seule lecture du motif', () => {
   });
 });
 
-describe('[niveau 4] #26 · 6. rien ne se réécrit', () => {
+describe('[niveau 0] #26 · 6. rien ne se réécrit', () => {
   it('calculer le plan, importer et rapprocher laissent le motif enregistré tel quel, blanc compris', () => {
     const l = avec(motifDeLOrdre(renomme(exampleLedger()), ANCIEN), ligne('op-av', `VIR ${LIBELLE}`));
     const avant = structuredClone(l.plannedFlows);
@@ -208,7 +213,7 @@ describe('[niveau 4] #26 · 6. rien ne se réécrit', () => {
   });
 });
 
-describe('[niveau 4] #26 · 7. deux comptes au même libellé : écarté', () => {
+describe('[niveau 2] #26 · 7. deux comptes au même libellé : écarté', () => {
   it('vers deux comptes sans ordre au même libellé, la ligne n’est reconnue vers aucun', () => {
     const base = renomme(sansOrdre(exampleLedger()));
     const l: Ledger = avec(

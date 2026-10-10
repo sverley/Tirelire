@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #26, point 2 — « Ce qu'on voit est ce qu'on copie » : le libellé que l'écran Plan
+ * Harnais d'audit de #26, côté écran, composé parmi les tests du codeur (D83) : point 2, niveau 2.
+ * « Ce qu'on voit est ce qu'on copie » : le libellé que l'écran Plan
  * montre à recopier, et que son bouton Copier copie, ne commence ni ne finit par un blanc, et le texte
  * copié est exactement le texte montré, y compris pour un ordre enregistré avant ce changement, dont
  * le motif de libellé finit par un blanc. L'application montée sans navigateur (`ecran.ts`) ; le
@@ -10,7 +11,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { exampleLedger, type Ledger, type PlannedFlow } from '@tirelire/core';
-import { allerA, app, ouvrirLApplication, presser, projet, rendu, t, tous } from './ecran';
+import { allerA, app, ouvrirLApplication, presser, rendu, t, tous } from './ecran';
 
 const COMPTE = 'acc-livret';
 const NOM = 'Assurance vie de Simon et Marie';
@@ -47,7 +48,7 @@ async function libellesDeLaCarte(): Promise<Array<{ montre: string; copie: strin
   return out;
 }
 
-describe('[niveau 4] #26 · 2. ce qu’on voit est ce qu’on copie, à l’écran Plan', () => {
+describe('[niveau 2] #26 · 2. ce qu’on voit est ce qu’on copie, à l’écran Plan', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('ordre enregistré avant ce changement, motif finissant par un blanc : montré et copié sans lui, identiques', async () => {
@@ -58,8 +59,6 @@ describe('[niveau 4] #26 · 2. ce qu’on voit est ce qu’on copie, à l’écr
       expect(l.montre).toBe(LIBELLE);
       expect(l.copie).toEqual([l.montre]);
     }
-    // Montrer n'a rien réécrit : l'ordre garde son motif enregistré, blanc compris (point 6).
-    expect(projet().plannedFlows.find((f) => f.id === ORDRE)?.labelPattern).toBe(`${LIBELLE} `);
   });
 
   it('compte sans ordre : le libellé tiré du nom, montré et copié sans blanc final', async () => {
