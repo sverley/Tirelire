@@ -58,9 +58,10 @@ dans ton compte rendu (#355).
    navigateur. Un test navigateur peut te servir le temps de déboguer un problème, même hors de ces
    points : retire-le avec la correction ; il ne reste pas dans la PR qui passe en Ready. Un test
    navigateur existant que ton changement casse, adapte-le, sans en ajouter un autre, s'il vérifie ce
-   qui n'existe que dans un navigateur ; sinon, retire-le, et vérifie son besoin sans navigateur, au
-   même niveau, par un test qui existe ou que tu écris (D83, « Le navigateur au minimum » ; porteur,
-   #413, #422).
+   qui n'existe que dans un navigateur ; sinon, retire-le, vérifie son besoin sans navigateur, par un
+   test qui existe ou que tu écris, et nomme ce test dans ton compte rendu avec le niveau du test
+   retiré : l'auditeur le lui donne, car « deux tests du même besoin ont le même niveau » (D83,
+   « Le navigateur au minimum » ; porteur, #413, #422).
    Écris-les dans tes propres fichiers, jamais dans celui du harnais, et marque-les tous de niveau 4
    (`[niveau 4]`) : un codeur ne fait pas de test de niveau inférieur ; seul l'auditeur donne un
    autre niveau, aux tests qu'il retient (porteur, #283 ; D83). Hors un test navigateur de débogage,
