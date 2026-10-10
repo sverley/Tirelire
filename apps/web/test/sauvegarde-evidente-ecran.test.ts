@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #421 : ce que vérifiait, dans le navigateur, le second fichier du harnais d'audit de #41
+ * Harnais d'audit de #421, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le second fichier du harnais d'audit de #41
  * (`navigateur/sauvegarde-evidente-cas.test.ts`, « Sans serveur, la sauvegarde doit être évidente », la dernière phrase
  * du « Fait quand » : « Les textes vouvoient (D85). »), que #421 retire, se vérifie ici sans navigateur : l'application
  * montée sous jsdom (`ecran.ts`), au jour des tests. Le titre dit ce qu'il vérifie, et le numéro du test retiré dans la
- * table de #421 (« sauvegarde-evidente-cas 1 »).
+ * table de #421 (« sauvegarde-evidente-cas 1 »). Les niveaux 0 et 1 de #41, que le registre cite sous C5, restent dans
+ * `navigateur/sauvegarde-evidente.test.ts`.
  *
  * Les textes que #41 ajoute ou touche : le rappel de sauvegarde de l'accueil et la carte « Données » de Réglages, lus
  * comme dans le test retiré — un enfant direct de `main` qui parle de sauvegarde et porte un bouton ; l'élément qui suit
@@ -14,6 +16,8 @@
  * Le tutoiement se repère aux formes que repérait le test retiré, son expression `TUTOIEMENT` recopiée : les pronoms
  * et possessifs de la deuxième personne du singulier et l'impératif suivi d'un pronom (« Exporte-le »). Les textes
  * sont lus tels que l'application les montre, nœud de texte par nœud de texte.
+ *
+ * Niveau (D83) : celui du test retiré, que la table de #421 recopie : 2 (D85, une décision).
  */
 import { describe, expect, it } from 'vitest';
 import { alive } from '@tirelire/core';
@@ -60,7 +64,7 @@ async function lireLaCarteDonnees(): Promise<string | null> {
 }
 
 describe('#421 · #41 — les textes de la sauvegarde vouvoient (D85), sans navigateur', () => {
-  it('[niveau 4] #41, D85 (table #421, sauvegarde-evidente-cas 1) — persistance accordée, l’exemple chargé puis l’application rouverte : le rappel de l’accueil, s’il est là, et la carte « Données » de Réglages, qui doit l’être, ne tutoient pas', async () => {
+  it('[niveau 2] #41, D85 (table #421, sauvegarde-evidente-cas 1) — persistance accordée, l’exemple chargé puis l’application rouverte : le rappel de l’accueil, s’il est là, et la carte « Données » de Réglages, qui doit l’être, ne tutoient pas', async () => {
     await ouvrirLApplication();
     expect(await cliquer('Charger l\'exemple')).toBe(true);
     await attendre(() => alive(app.ledger.accounts).some((a) => a.name === 'Livret A'), 'l’exemple');

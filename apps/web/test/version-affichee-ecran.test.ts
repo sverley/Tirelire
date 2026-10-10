@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #421 : ce que vérifiait, dans le navigateur, le harnais d'audit de #142
- * (`navigateur/version-affichee.test.ts`, « La webapp affiche sa version et signale qu'une mise à jour est prête ») sur
- * le nom de chaque sorte de build (D83, « Livraison ») et le vouvoiement de ses textes (D85), que #421 retire du
- * navigateur, se vérifie ici sans navigateur. Chaque titre dit le point du « Fait quand » de #142 qu'il vérifie, et le
- * numéro du test retiré dans la table de #421 (« version-affichee 1 » à « version-affichee 7 »).
+ * Harnais d'audit de #421, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #142 (`navigateur/version-affichee.test.ts`, « La
+ * webapp affiche sa version et signale qu'une mise à jour est prête ») sur le nom de chaque sorte de build (D83,
+ * « Livraison ») et le vouvoiement de ses textes (D85), que #421 retire du navigateur, se vérifie ici sans navigateur.
+ * Chaque titre dit le point du « Fait quand » de #142 qu'il vérifie, et le numéro du test retiré dans la table de #421
+ * (« version-affichee 1 » à « version-affichee 7 »).
  *
  * **D'où part chaque nom.** Pour chaque événement — le tag `v0.1` poussé, la version forcée que `version-forcee.yml`
  * lance sur `main`, un push sur `main`, la PR 12 —, `ci.yml`, tel qu'il est écrit, est joué à blanc
@@ -26,6 +27,15 @@
  * Le vouvoiement (D85) se lit dans le signal de mise à jour tel que l'application le montre quand une version plus
  * récente attend (`miseAJour.prete`), ses commandes, et la ligne de la version que Plus montre pour `main`, aux formes
  * que repérait le test retiré : son expression `TUTOIEMENT`, recopiée.
+ *
+ * **Son empreinte.** Ce fichier lit `.github/workflows/ci.yml` et `version-forcee.yml`, que l'ensemble « interface sans
+ * navigateur » écarte de ce qu'il lit (`OUTILLAGE_CI`, `packages/gardes/attestation.mjs`) : un changement de ces seuls
+ * fichiers ne le rejoue pas, comme il ne rejouait pas le test retiré, dans l'ensemble du navigateur (D83, « Les
+ * empreintes »). Lancé par son nom (`-t`), il se joue toujours.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #421 recopie. 2 pour les sept (D83, « Livraison » : le nom
+ * de chaque sorte de build ; D85 : les textes vouvoient), vus rouges au codage sur deux mutations : `TIRELIRE_VERSION`
+ * retiré de l'étape qui assemble le site (2 et 6), « main » retiré de la ligne de la version (3 et 7).
  */
 // @ts-ignore — module JavaScript sans déclaration de types
 import { besoins, interpoler, jobs, jouer, commande } from '../../../packages/gardes/workflow-a-blanc.mjs';
@@ -299,33 +309,33 @@ afterAll(() => {
 });
 
 describe('#421 · #142 point 1 — le nom de chaque sorte de build (D83, « Livraison »), sans navigateur', () => {
-  it('[niveau 4] #142 point 1, D83 (table #421, version-affichee 1) — une version publiée : Plus dit « v0.1 », seul, sans suite', async () => {
+  it('[niveau 2] #142 point 1, D83 (table #421, version-affichee 1) — une version publiée : Plus dit « v0.1 », seul, sans suite', async () => {
     const texte = await ecranPlus(versions.tag);
     expect(dit.nom(TAG)(texte), `Plus ne dit pas « ${TAG} », le nom du tag : « ${texte} »`).toBe(true);
   });
 
-  it('[niveau 4] #142 point 1, D83 (table #421, version-affichee 2) — une version forcée : Plus dit « v0.1- » suivi du hash court du commit construit', async () => {
+  it('[niveau 2] #142 point 1, D83 (table #421, version-affichee 2) — une version forcée : Plus dit « v0.1- » suivi du hash court du commit construit', async () => {
     const texte = await ecranPlus(versions['forcée']);
     expect(dit.nom(`${TAG}-${court(bac.c1)}`)(texte), `Plus ne dit pas « ${TAG}-${court(bac.c1)} », le nom de la version forcée : « ${texte} »`).toBe(true);
   });
 
-  it('[niveau 4] #142 point 1, D83 (table #421, version-affichee 3) — main, à la recette : Plus dit le développement, « main » et le hash court du commit', async () => {
+  it('[niveau 2] #142 point 1, D83 (table #421, version-affichee 3) — main, à la recette : Plus dit le développement, « main » et le hash court du commit', async () => {
     const texte = await ecranPlus(versions.main);
     expect(dit.main(court(bac.c1))(texte), `Plus ne dit pas à la fois « développement », « main » et le commit ${court(bac.c1)} : « ${texte} »`).toBe(true);
   });
 
-  it('[niveau 4] #142 point 1, D83 (table #421, version-affichee 4) — une PR : Plus dit le développement et le numéro 12 de la PR', async () => {
+  it('[niveau 2] #142 point 1, D83 (table #421, version-affichee 4) — une PR : Plus dit le développement et le numéro 12 de la PR', async () => {
     const texte = await ecranPlus(versions.pr);
     expect(dit.pr(PR)(texte), `Plus ne dit pas à la fois « développement » et « PR ${PR} » : « ${texte} »`).toBe(true);
   });
 
-  it('[niveau 4] #142 point 1, D83 (table #421, version-affichee 5) — un build local : Plus dit une construction locale ou le développement, sans numéro pointé', async () => {
+  it('[niveau 2] #142 point 1, D83 (table #421, version-affichee 5) — un build local : Plus dit une construction locale ou le développement, sans numéro pointé', async () => {
     await ecranPlus(versions.local);
     const lignes = plusPetits((s) => s.length <= 300 && /version|build|construction/i.test(s) && /local|développement/i.test(s));
     expect(lignes.some((l) => !NUMERO.test(l)), `aucun élément de Plus ne parle de version en disant « local » ou « développement » sans numéro pointé (${lignes.map((l) => `« ${l} »`).join(', ') || 'aucun'})`).toBe(true);
   });
 
-  it('[niveau 4] #142 point 1, D83 (table #421, version-affichee 6) — la version publiée ne dit aucun hash de commit, et la version forcée ne se dit pas sous le nom du tag seul', async () => {
+  it('[niveau 2] #142 point 1, D83 (table #421, version-affichee 6) — la version publiée ne dit aucun hash de commit, et la version forcée ne se dit pas sous le nom du tag seul', async () => {
     const tag = await ecranPlus(versions.tag);
     expect(dit.nom(TAG)(tag), `la version publiée ne dit pas son nom, ${TAG}`).toBe(true);
     for (const sha of [bac.c0, bac.c1, bac.p, bac.m]) expect(tag.includes(court(sha)), `la version publiée ${TAG} dit le hash ${court(sha)} : « ${tag} »`).toBe(false);
@@ -337,7 +347,7 @@ describe('#421 · #142 point 1 — le nom de chaque sorte de build (D83, « Livr
 });
 
 describe('#421 · #142, D85 — les textes que la version et la mise à jour ajoutent vouvoient, sans navigateur', () => {
-  it('[niveau 4] #142, D85 (table #421, version-affichee 7) — le signal de mise à jour, quand une version plus récente attend, ses commandes, et la ligne de la version que Plus montre pour main ne tutoient pas', async () => {
+  it('[niveau 2] #142, D85 (table #421, version-affichee 7) — le signal de mise à jour, quand une version plus récente attend, ses commandes, et la ligne de la version que Plus montre pour main ne tutoient pas', async () => {
     (globalThis as unknown as { __TIRELIRE_VERSION__?: VersionConstruite }).__TIRELIRE_VERSION__ = versions.main;
     await ouvrirLApplication();
     // Une version plus récente est installée et attend : ce que le service worker dit à l'application (`onNeedRefresh`).

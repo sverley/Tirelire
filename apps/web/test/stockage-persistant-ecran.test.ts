@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #421 : ce que vérifiait, dans le navigateur, le second fichier du harnais d'audit de #42
+ * Harnais d'audit de #421, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le second fichier du harnais d'audit de #42
  * (`navigateur/stockage-persistant-cas.test.ts`, « Les données du navigateur doivent être protégées de l'effacement »,
  * la dernière phrase du « Fait quand » : « Les textes vouvoient (D85). »), que #421 retire, se vérifie ici sans
  * navigateur : l'application montée sous jsdom (`ecran.ts`), au jour des tests, sur une base vide. Le titre dit ce qu'il
  * vérifie, et le numéro du test retiré dans la table de #421 (« stockage-persistant-cas 1 », joué pour les trois
- * réponses du navigateur).
+ * réponses du navigateur). Les niveaux 0 et 1 de #42, que le registre cite sous C4, restent dans
+ * `navigateur/stockage-persistant.test.ts`.
  *
  * Les textes que #42 ajoute ou touche : le signal de l'accueil, quand la persistance est refusée ou impossible, et la
  * carte « Données » de Réglages, sous les trois réponses. La réponse du navigateur se règle, comme dans le test retiré,
@@ -17,6 +19,8 @@
  *
  * Le tutoiement se repère aux formes que repérait le test retiré, son expression `TUTOIEMENT` recopiée. Les textes sont
  * lus tels que l'application les montre, nœud de texte par nœud de texte.
+ *
+ * Niveau (D83) : celui du test retiré, que la table de #421 recopie : 2 (D85, une décision).
  */
 import { describe, expect, it } from 'vitest';
 import { app, attendre, ecran, ouvrirLApplication, tous } from './ecran';
@@ -91,7 +95,7 @@ const ETAT = { accordée: 'accordee', refusée: 'refusee', impossible: 'impossib
 
 describe('#421 · #42 — les textes de la persistance vouvoient (D85), sans navigateur', () => {
   for (const reponse of ['accordée', 'refusée', 'impossible'] as const) {
-    it(`[niveau 4] #42, D85 (table #421, stockage-persistant-cas 1) — persistance ${reponse} : le signal de l’accueil, s’il est là, et la carte « Données » de Réglages, qui doit l’être, ne tutoient pas`, async () => {
+    it(`[niveau 2] #42, D85 (table #421, stockage-persistant-cas 1) — persistance ${reponse} : le signal de l’accueil, s’il est là, et la carte « Données » de Réglages, qui doit l’être, ne tutoient pas`, async () => {
       regler(reponse);
       await ouvrirLApplication();
       await attendre(() => app.persistance === ETAT[reponse], `la persistance ${reponse}`);

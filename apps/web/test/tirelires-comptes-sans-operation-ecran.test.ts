@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #421 : ce que vérifiait, dans le navigateur, le harnais d'audit de #322
+ * Harnais d'audit de #421, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #322
  * (`navigateur/tirelires-comptes-sans-operation-harnais.test.ts`, « Les écrans Tirelires et Comptes se lisent sans
  * opération »), que #421 retire, se vérifie ici sans navigateur : l'application montée sous jsdom (`ecran.ts`), au jour
  * des tests, dans un projet sans aucune opération. Chaque titre dit le point du « Fait quand » de #322 qu'il vérifie,
@@ -16,6 +17,12 @@
  * leur alerte ; l'annonce d'une échéance en manque, dont le montant se relit au cœur (`dueDateShortfalls`), sur le
  * projet enregistré et à la même date. Le vouvoiement (D85, point 4) se lit dans ces textes tels que l'application
  * les montre, aux formes que repérait le test retiré : son expression `TUTOIEMENT`, recopiée.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #421 recopie. 1 pour 4 (I11, D38 : ce que l'assistant a créé
+ * se range sous le compte principal, complet, et se complète hors de lui) et 5 (principe 1.4 : le montant qui
+ * manquera), chacun vu rouge à l'audit sur une mutation ciblée de l'écran Tirelires — une tirelire sans placement
+ * voulu qui n'est plus rangée sous le compte principal (4), une échéance en manque qui ne s'annonce qu'une fois une
+ * réponse enregistrée (5) ; 2 pour 1, 2, 3 et 6 (#322 points 2 et 3, D85 : un résultat faux, l'usage restant possible).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { alive, dueDateShortfalls, exampleLedger } from '@tirelire/core';
@@ -132,7 +139,7 @@ async function traverserLAssistant(solde: string): Promise<void> {
 }
 
 describe('#421 · #322 — base vide, sans navigateur', () => {
-  it('[niveau 4] #322 point 3, point 4 (table #421, tirelires-comptes-sans-operation 1) — dans Comptes, la carte du compte principal non renseigné dit « solde initial à renseigner », sans « 0,00 » ni « 1970 », et sans forme du tutoiement', async () => {
+  it('[niveau 2] #322 point 3, point 4 (table #421, tirelires-comptes-sans-operation 1) — dans Comptes, la carte du compte principal non renseigné dit « solde initial à renseigner », sans « 0,00 » ni « 1970 », et sans forme du tutoiement', async () => {
     await ouvrirLApplication();
     expect(await ecran('Comptes')).toBe(true);
     const ligne = soldeInitialDuPrincipal();
@@ -141,7 +148,7 @@ describe('#421 · #322 — base vide, sans navigateur', () => {
     expect(ligne, 'point 4 · vouvoiement').not.toMatch(TUTOIEMENT);
   });
 
-  it('[niveau 4] #322 point 3 (table #421, tirelires-comptes-sans-operation 2) — 1 500,00 saisis sur la ligne du compte principal, dans Comptes, sa carte dit « solde initial 1 500,00 € au » suivi d’une date, et plus « à renseigner » ni « 1970 »', async () => {
+  it('[niveau 2] #322 point 3 (table #421, tirelires-comptes-sans-operation 2) — 1 500,00 saisis sur la ligne du compte principal, dans Comptes, sa carte dit « solde initial 1 500,00 € au » suivi d’une date, et plus « à renseigner » ni « 1970 »', async () => {
     await ouvrirLApplication();
     expect(await ecran('Comptes')).toBe(true);
     // Le solde se corrige sur la ligne, comme dans l'assistant (#362) : le panneau ne porte plus que les champs avancés.
@@ -160,14 +167,14 @@ describe('#421 · #322 — après l’assistant, mené par ses boutons primaires
     expect(alive(projet().operations).length, 'le projet porte des opérations').toBe(0);
   });
 
-  it('[niveau 4] #322 point 3 (table #421, tirelires-comptes-sans-operation 3) — renseigné par l’assistant, la carte du compte principal, dans Comptes, dit « solde initial 1 500,00 € au » suivi d’une date', async () => {
+  it('[niveau 2] #322 point 3 (table #421, tirelires-comptes-sans-operation 3) — renseigné par l’assistant, la carte du compte principal, dans Comptes, dit « solde initial 1 500,00 € au » suivi d’une date', async () => {
     expect(await ecran('Comptes')).toBe(true);
     const ligne = soldeInitialDuPrincipal();
     expect(ligne).toMatch(/solde initial 1\s?500,00\s?€ au \S*\d/);
     expect(ligne).not.toMatch(/à renseigner|1970/);
   });
 
-  it('[niveau 4] #322 point 1, I11, point 4 (table #421, tirelires-comptes-sans-operation 4) — dans Tirelires, chaque carte est sous la rubrique du compte principal, sans alerte, dit « voulu : libre », un solde en euros et ses besoins, porte « Ajouter un besoin », « Modifier » et « × », et ne tutoie pas ; l’écran ne dit pas « Sans compte de placement »', async () => {
+  it('[niveau 1] #322 point 1, I11, point 4 (table #421, tirelires-comptes-sans-operation 4) — dans Tirelires, chaque carte est sous la rubrique du compte principal, sans alerte, dit « voulu : libre », un solde en euros et ses besoins, porte « Ajouter un besoin », « Modifier » et « × », et ne tutoie pas ; l’écran ne dit pas « Sans compte de placement »', async () => {
     expect(await ecran('Tirelires')).toBe(true);
     const cartes = lireLesTirelires();
     expect(cartes.length, t(document.querySelector('main'))).toBeGreaterThan(0);
@@ -185,7 +192,7 @@ describe('#421 · #322 — après l’assistant, mené par ses boutons primaires
     expect(t(document.querySelector('main'))).not.toContain('Sans compte de placement');
   });
 
-  it('[niveau 4] #322 point 1, principe 1.4 (table #421, tirelires-comptes-sans-operation 5) — une tirelire « Dépense à échéance », « Contrôle technique », 1 200,00 € au 15 octobre 2026, ajoutée par le formulaire de l’écran Tirelires, s’annonce dans sa carte, sans autre geste : « Il manquera », au montant que le cœur calcule, au centime', async () => {
+  it('[niveau 1] #322 point 1, principe 1.4 (table #421, tirelires-comptes-sans-operation 5) — une tirelire « Dépense à échéance », « Contrôle technique », 1 200,00 € au 15 octobre 2026, ajoutée par le formulaire de l’écran Tirelires, s’annonce dans sa carte, sans autre geste : « Il manquera », au montant que le cœur calcule, au centime', async () => {
     expect(await ecran('Tirelires')).toBe(true);
     // L'échéance s'ajoute par le formulaire de la section, « Dépense à échéance » (#369).
     expect(await cliquer('Ajouter une tirelire')).toBe(true);
@@ -209,7 +216,7 @@ describe('#421 · #322 — après l’assistant, mené par ses boutons primaires
     expect(centimes(dit), `l’annonce dit « ${dit} »`).toBe(manque!.amount);
   });
 
-  it('[niveau 4] #322 point 2, D38, point 4 (table #421, tirelires-comptes-sans-operation 6) — une tirelire placée sur un compte ensuite supprimé reste seule à part, sous « Sans compte de placement », en alerte, avec un texte qui dit que le compte n’existe plus, sans tutoiement, et un « Modifier » qui ouvre « Placement voulu » ; aucune autre carte n’est en alerte', async () => {
+  it('[niveau 2] #322 point 2, D38, point 4 (table #421, tirelires-comptes-sans-operation 6) — une tirelire placée sur un compte ensuite supprimé reste seule à part, sous « Sans compte de placement », en alerte, avec un texte qui dit que le compte n’existe plus, sans tutoiement, et un « Modifier » qui ouvre « Placement voulu » ; aucune autre carte n’est en alerte', async () => {
     expect(await ecran('Comptes')).toBe(true);
     // Le formulaire d'ajout de la section Comptes est toujours là (#362) : il n'ouvre pas de panneau.
     expect(await remplir('Nom du compte', 'Livret Témoin')).toBe(true);

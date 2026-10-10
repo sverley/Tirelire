@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #421 : ce que vérifiait, dans le navigateur, le harnais d'audit de #369
+ * Harnais d'audit de #421, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, le harnais d'audit de #369
  * (`navigateur/ecran-tirelires-harnais.test.ts`, « l'écran Tirelires emploie la section Tirelires de l'assistant »),
- * sauf sa mesure à 375 px, que #421 retire du navigateur, se vérifie ici sans navigateur : l'application montée sous
- * jsdom (`ecran.ts`), au jour des tests, sur une base vide. Chaque titre dit le point du « Fait quand » de #369 qu'il
- * vérifie, et le numéro du test retiré dans la table de #421 (« ecran-tirelires 1 » à « ecran-tirelires 8 »).
+ * sauf le formulaire d'ajout mesuré à 375 px, que #421 retire du navigateur, se vérifie ici sans navigateur :
+ * l'application montée sous jsdom (`ecran.ts`), au jour des tests, sur une base vide. Chaque titre dit le point du
+ * « Fait quand » de #369 qu'il vérifie, et le numéro du test retiré dans la table de #421 (« ecran-tirelires 1 » à
+ * « ecran-tirelires 8 »).
  *
  * Décor, comme dans le test retiré : une base vide ; les tests se suivent, et 5 à 8 portent sur la tirelire que le
  * premier raccourci y crée (le 4). Chaque test repart de l'écran Tirelires rouvert ; « l'écran rouvert » est ici
@@ -15,6 +17,12 @@
  * et l'écran qui offre les raccourcis sont lus dans les sources par `ecran-tirelires-section.test.ts` ; le formulaire
  * d'ajout de la section, avec ses aides, et sa mesure à 375 px restent dans le navigateur
  * (`navigateur/ecran-tirelires-harnais.test.ts`).
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #421 recopie. 1 pour 1 (I10, D46 : rien de créé d'office),
+ * 2 (I5 : l'écran vide dit ce qui le remplirait) et 5 (U1 : la carte corrigée s'écrit dans le projet), chacun vu rouge
+ * à l'audit sur une mutation ciblée — un écran qui garnit d'office une base vide (1), un écran vide sans raccourcis
+ * (2), un déjà de côté corrigé sur la carte qui ne s'écrit pas (5) ; 2 pour 4, 6, 7 et 8 (D46, D51, D59 : un
+ * résultat faux, l'usage restant possible) ; 3 pour 3 (l'explication, moins lisible si elle manque).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { alive, type Need } from '@tirelire/core';
@@ -65,13 +73,13 @@ describe('#421 · #369 — l’écran Tirelires emploie la section Tirelires, su
     await ouvrirLApplication();
   });
 
-  it('[niveau 4] #369 point 3, I5, I10, D46 (table #421, ecran-tirelires 1) — sur une base vide, Tirelires ne montre aucune carte de tirelire, et le projet enregistré n’en porte aucune : rien n’est créé d’office', async () => {
+  it('[niveau 1] #369 point 3, I5, I10, D46 (table #421, ecran-tirelires 1) — sur une base vide, Tirelires ne montre aucune carte de tirelire, et le projet enregistré n’en porte aucune : rien n’est créé d’office', async () => {
     await ouvrir();
     expect(cartes(), 'rien n’est créé d’office').toEqual([]);
     expect(tireliresEnregistrees().map((x) => x.name), 'le projet enregistré porte une tirelire créée d’office').toEqual([]);
   });
 
-  it('[niveau 4] #369 point 3, I5 (table #421, ecran-tirelires 2) — sur une base vide, l’écran porte au moins un raccourci, sous « Ajouter en un geste »', async () => {
+  it('[niveau 1] #369 point 3, I5 (table #421, ecran-tirelires 2) — sur une base vide, l’écran porte au moins un raccourci, sous « Ajouter en un geste »', async () => {
     await ouvrir();
     expect(raccourcis().length, 'l’écran vide doit porter ce qui le remplirait').toBeGreaterThan(0);
     const titre = tous('main .eyebrow').find((e) => t(e) === 'Ajouter en un geste');
@@ -79,7 +87,7 @@ describe('#421 · #369 — l’écran Tirelires emploie la section Tirelires, su
     expect(titre!.nextElementSibling?.querySelector('.prop'), 'les raccourcis ne sont pas sous « Ajouter en un geste »').not.toBeNull();
   });
 
-  it('[niveau 4] #369 point 4 (table #421, ecran-tirelires 3) — l’explication est repliée, sous le titre « Comment ça marche ? » ; un geste sur ce titre l’ouvre ; elle contient « Courses, essence », « C’est ici que les tirelires servent » et « Une épargne sans date »', async () => {
+  it('[niveau 3] #369 point 4 (table #421, ecran-tirelires 3) — l’explication est repliée, sous le titre « Comment ça marche ? » ; un geste sur ce titre l’ouvre ; elle contient « Courses, essence », « C’est ici que les tirelires servent » et « Une épargne sans date »', async () => {
     await ouvrir();
     const d = document.querySelector('main details.explication') as HTMLDetailsElement | null;
     expect(d, 'pas de « Comment ça marche ? »').not.toBeNull();
@@ -92,7 +100,7 @@ describe('#421 · #369 — l’écran Tirelires emploie la section Tirelires, su
     }
   });
 
-  it('[niveau 4] #369 point 3, D46 (table #421, ecran-tirelires 4) — le premier raccourci pressé, sa tirelire, au nom du raccourci, est à l’écran et dans le projet enregistré, l’écran rouvert la montre, et ce raccourci n’est plus offert', async () => {
+  it('[niveau 2] #369 point 3, D46 (table #421, ecran-tirelires 4) — le premier raccourci pressé, sa tirelire, au nom du raccourci, est à l’écran et dans le projet enregistré, l’écran rouvert la montre, et ce raccourci n’est plus offert', async () => {
     await ouvrir();
     const nom = raccourcis()[0]!;
     const b = document.querySelector('main .prop') as HTMLButtonElement | null;
@@ -108,7 +116,7 @@ describe('#421 · #369 — l’écran Tirelires emploie la section Tirelires, su
     creee = nom;
   });
 
-  it('[niveau 4] #369 point 1, U1 (table #421, ecran-tirelires 5) — corrigés sur la carte, l’un après l’autre, le déjà de côté, le montant du besoin, le nom du besoin et celui de la tirelire s’écrivent dans le projet, et l’écran rouvert les montre', async () => {
+  it('[niveau 1] #369 point 1, U1 (table #421, ecran-tirelires 5) — corrigés sur la carte, l’un après l’autre, le déjà de côté, le montant du besoin, le nom du besoin et celui de la tirelire s’écrivent dans le projet, et l’écran rouvert les montre', async () => {
     await ouvrir();
     expect(cartes()[0], 'la tirelire du raccourci n’est pas la première carte').toBe(creee);
     const tirelire = tireliresEnregistrees().find((x) => x.name === creee)!;
@@ -137,7 +145,7 @@ describe('#421 · #369 — l’écran Tirelires emploie la section Tirelires, su
     creee = 'Renommée en place';
   });
 
-  it('[niveau 4] #369 point 1 (table #421, ecran-tirelires 6) — « Besoin ajouté sur la carte », 12,00, ajouté par le formulaire d’ajout de la carte : la carte a une ligne de plus, l’écran rouvert aussi, et le projet enregistré porte ce besoin, avec son nom et son montant', async () => {
+  it('[niveau 2] #369 point 1 (table #421, ecran-tirelires 6) — « Besoin ajouté sur la carte », 12,00, ajouté par le formulaire d’ajout de la carte : la carte a une ligne de plus, l’écran rouvert aussi, et le projet enregistré porte ce besoin, avec son nom et son montant', async () => {
     await ouvrir();
     const lignes = () => premiereCarte().querySelectorAll('.ligne').length;
     const avant = lignes();
@@ -156,7 +164,7 @@ describe('#421 · #369 — l’écran Tirelires emploie la section Tirelires, su
     expect(tous<HTMLInputElement>('.ligne input.besoin', premiereCarte()).some((i) => i.value === 'Besoin ajouté sur la carte')).toBe(true);
   });
 
-  it('[niveau 4] #369 point 2, D51, D59 (table #421, ecran-tirelires 7) — la ligne du besoin dit « priorité N » et offre « Réviser » et « Modifier » ; la carte dit « voulu : » ; le panneau « Modifier » de la tirelire porte ses champs avancés, celui du besoin, la priorité et les dates de validité', async () => {
+  it('[niveau 2] #369 point 2, D51, D59 (table #421, ecran-tirelires 7) — la ligne du besoin dit « priorité N » et offre « Réviser » et « Modifier » ; la carte dit « voulu : » ; le panneau « Modifier » de la tirelire porte ses champs avancés, celui du besoin, la priorité et les dates de validité', async () => {
     await ouvrir();
     const ligne = premiereCarte().querySelector('.ligne .par-besoin') as HTMLElement | null;
     expect(ligne, 'la ligne du besoin ne dit rien de plus').not.toBeNull();
@@ -177,7 +185,7 @@ describe('#421 · #369 — l’écran Tirelires emploie la section Tirelires, su
     expect(await cliquer('Annuler')).toBe(true);
   });
 
-  it('[niveau 4] #369 point 2, D59 (table #421, ecran-tirelires 8) — « Ajouter un besoin d’un autre type », sur la carte, ouvre un panneau dont le titre nomme la tirelire, et dont le choix du type offre au moins l’échéance, l’objectif et le versement', async () => {
+  it('[niveau 2] #369 point 2, D59 (table #421, ecran-tirelires 8) — « Ajouter un besoin d’un autre type », sur la carte, ouvre un panneau dont le titre nomme la tirelire, et dont le choix du type offre au moins l’échéance, l’objectif et le versement', async () => {
     await ouvrir();
     expect(await auPied('autre type'), 'la carte n’offre pas « Ajouter un besoin d’un autre type »').toBe(true);
     const f = document.querySelector('main form.edit') as HTMLElement | null;

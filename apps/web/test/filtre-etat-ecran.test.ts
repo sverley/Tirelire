@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #421 : ce que vérifiait, dans le navigateur, la garde du filtre d'état des écrans de cartes (D56,
+ * Harnais d'audit de #421, composé parmi les tests du codeur :
+ * ce que vérifiait, dans le navigateur, la garde du filtre d'état des écrans de cartes (D56,
  * `navigateur/filtre-etat.test.ts`), que #421 retire, se vérifie ici sans navigateur : l'application montée sous jsdom
  * (`ecran.ts`), l'exemple chargé (« Charger l'exemple »), au jour des tests. Chaque titre dit ce qu'il vérifie de D56,
  * et le numéro du test retiré dans la table de #421 (« filtre-etat 1 » à « filtre-etat 3 »).
@@ -9,6 +10,9 @@
  * les pastilles d'état de ce qu'il affiche ; chaque interrupteur se bascule d'un clic. La règle de chaque état, les
  * interrupteurs indépendants et l'exemple qui porte les trois états, pour la donnée seule, sont vérifiés au cœur par
  * `packages/core/test/etats.test.ts`.
+ *
+ * Niveaux (D83) : ceux des tests retirés, que la table de #421 recopie. 2 pour les trois (D56 : un écran de cartes
+ * montrerait ou rangerait à tort ce qui est clos ou à venir, l'usage restant possible).
  */
 import { describe, expect, it } from 'vitest';
 import { alive } from '@tirelire/core';
@@ -46,7 +50,7 @@ async function basculer(etat: string): Promise<void> {
 }
 
 describe('#421 · D56 — le filtre d’état des écrans de cartes, sur l’exemple chargé, sans navigateur', () => {
-  it('[niveau 4] D56 (table #421, filtre-etat 1) — l’écran Tirelires part avec « En cours » et « À venir » allumés et « Clos » affiché et éteint, sans pastille « clos » ; « Clos » allumé rend le besoin clos ; « En cours » et « À venir » éteints, seul le clos reste', async () => {
+  it('[niveau 2] D56 (table #421, filtre-etat 1) — l’écran Tirelires part avec « En cours » et « À venir » allumés et « Clos » affiché et éteint, sans pastille « clos » ; « Clos » allumé rend le besoin clos ; « En cours » et « À venir » éteints, seul le clos reste', async () => {
     await ouvrir('Tirelires');
 
     const depart = lire();
@@ -75,7 +79,7 @@ describe('#421 · D56 — le filtre d’état des écrans de cartes, sur l’exe
     expect(closSeul.pastilles.every((p) => p === 'clos'), 'seul le clos doit rester').toBe(true);
   });
 
-  it('[niveau 4] D56 (table #421, filtre-etat 2) — l’écran Comptes part avec « Compte courant » et sans « Livret jeune », « Clos » affiché ; « Clos » allumé, les deux y sont ; « En cours » éteint, il ne reste que « Livret jeune »', async () => {
+  it('[niveau 2] D56 (table #421, filtre-etat 2) — l’écran Comptes part avec « Compte courant » et sans « Livret jeune », « Clos » affiché ; « Clos » allumé, les deux y sont ; « En cours » éteint, il ne reste que « Livret jeune »', async () => {
     await ouvrir('Comptes');
 
     const depart = lire();
@@ -92,7 +96,7 @@ describe('#421 · D56 — le filtre d’état des écrans de cartes, sur l’exe
     expect(lire().cartes).toEqual(['Livret jeune']);
   });
 
-  it('[niveau 4] D56 (table #421, filtre-etat 3) — l’écran Flux prévus affiche « À venir » et une pastille « à venir » (le salaire revalorisé, D51) ; éteint, plus aucune pastille « à venir », et des flux restent à l’écran', async () => {
+  it('[niveau 2] D56 (table #421, filtre-etat 3) — l’écran Flux prévus affiche « À venir » et une pastille « à venir » (le salaire revalorisé, D51) ; éteint, plus aucune pastille « à venir », et des flux restent à l’écran', async () => {
     await ouvrir('Flux prévus');
 
     const depart = lire();
