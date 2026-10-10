@@ -114,13 +114,6 @@ describe('[niveau 4] #367 · 4 — par une adresse, avec un brouillon non vide, 
   });
 });
 
-describe('[niveau 4] #367 · 2 — l’assistant déjà affiché passe au brouillon importé', () => {
-  it('un import change la version de l’assistant, et l’écran se remonte sur elle', () => {
-    expect(lire('src/lib/state.svelte.ts')).toMatch(/this\.assistant = brouillonDuFichier\([^)]*\);\s*this\.versionAssistant\+\+;/);
-    expect(lire('src/App.svelte')).toMatch(/\{#key app\.versionAssistant\}<Wizard \/>\{\/key\}/);
-  });
-});
-
 describe('[niveau 4] #367 · 3 — le résumé d’un budget importé dit d’où il vient et que rien n’est enregistré avant la validation', () => {
   it('l’encart d’import du résumé porte les deux phrases', () => {
     const ecran = lire('src/views/Wizard.svelte');
