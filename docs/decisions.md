@@ -1311,7 +1311,8 @@ la division d'un virement en plusieurs ordres (issue #25).
 Un ordre déjà enregistré garde son ancrage quand on corrige son montant : le déplacer ferait perdre
 la reconnaissance des virements déjà passés. Un ordre nouveau s'ancre sur la période en cours, et
 non sur celle qu'on regarde — le Plan se feuillette, et un ordre enregistré en lisant décembre vire
-dès ce mois-ci.
+dès ce mois-ci. Un ordre fait d'un virement importé s'ancre sur la date de ce virement, qui en est la
+première occurrence (#40, #434).
 
 Le jeu d'exemple porte l'ordre, et le porte **décalé** : la banque vire 600 €, le budget en demande
 650, si bien que le plan du 6 septembre montre les deux montants côte à côte sans qu'on ait rien à
