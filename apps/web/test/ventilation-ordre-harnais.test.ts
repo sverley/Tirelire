@@ -1,7 +1,9 @@
 /**
  * Harnais d'audit de #394 — la ventilation d'un ordre, sa lecture et sa correction (points 1, 4 et 7),
  * sans navigateur. Composé par l'auditeur parmi les tests du codeur ; l'écran est gardé par
- * `navigateur/ventilation-ordre-harnais.test.ts`. Niveau 2 : les règles de D21, D27, D85 et D94.
+ * `navigateur/ventilation-ordre-harnais.test.ts`, et, depuis #419, sans navigateur pour la
+ * confirmation depuis la carte et le panneau qui suit le montant, par `ventilation-ordre-ecran.test.ts`.
+ * Niveau 2 : les règles de D21, D27, D85 et D94.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';

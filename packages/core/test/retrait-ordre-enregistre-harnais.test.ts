@@ -3,8 +3,11 @@
  * l'écran et dans l'assistant, montrée au résumé » : côté cœur, le plan (points 1, 5 et 6) et la
  * validation d'un budget (point 4). L'assistant sans navigateur est dans
  * `apps/web/test/retrait-ordre-enregistre-harnais.test.ts` ; l'écran, dans
- * `apps/web/test/navigateur/retrait-ordre-enregistre-harnais.test.ts`. Trois fichiers, un par
- * ensemble de tests où le codeur a écrit les siens (cœur, interface sans navigateur, navigateur).
+ * `apps/web/test/navigateur/retrait-ordre-enregistre-harnais.test.ts`, et, depuis #419, sans
+ * navigateur pour l'ordre proposé sur un projet vierge (point 3), dans
+ * `apps/web/test/retrait-ordre-enregistre-ecran.test.ts`. Trois fichiers, un par ensemble de tests où
+ * le codeur a écrit les siens (cœur, interface sans navigateur, navigateur), et un quatrième, celui
+ * de #419.
  *
  * Les tests sont ceux du codeur (`retrait-ordre-enregistre.test.ts`, déplacé ici en entier), classés
  * par la suite de questions de D83 ; est de l'auditeur la lecture du point 1 par le vrai chemin de

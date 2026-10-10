@@ -1,7 +1,8 @@
 /**
  * Harnais d'audit de #393 — « Le flux porte une action d'automatisme ; l'ordre permanent en est le
- * premier usage » (D21, D24, D57, D60 amendées). Côté cœur ; ce que l'écran Flux garde d'une action
- * est dans `apps/web/test/navigateur/action-du-flux-harnais.test.ts`.
+ * premier usage » (D21, D24, D57, D60 amendées). Côté cœur ; ce que l'écran Flux prévus garde d'une
+ * action (point 11) se vérifie sans navigateur, depuis #419, dans
+ * `apps/web/test/action-du-flux-ecran.test.ts`.
  *
  * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur (`action-du-flux.test.ts`,
  * déplacé ici en entier) : chaque `describe` nomme le point du « Fait quand » qu'il tranche. Est de

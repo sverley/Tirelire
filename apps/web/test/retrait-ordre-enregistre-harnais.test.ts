@@ -4,7 +4,9 @@
  * (`src/lib/sectionComptes.svelte.ts`), les lignes du résumé (`src/lib/differenceAssistant.ts`) et la
  * lecture d'une ventilation (`src/lib/ventilationOrdre.ts`), sur un vrai dépôt (`LedgerStore`) qui
  * porte le budget de l'exemple. Le cœur est dans `packages/core/test/retrait-ordre-enregistre-harnais.test.ts` ;
- * l'écran, dans `navigateur/retrait-ordre-enregistre-harnais.test.ts`.
+ * l'écran, dans `navigateur/retrait-ordre-enregistre-harnais.test.ts`, et, depuis #419, sans
+ * navigateur pour l'ordre proposé sur un projet vierge (point 3), dans
+ * `retrait-ordre-enregistre-ecran.test.ts`.
  *
  * Les tests sont ceux du codeur (`retrait-ordre-enregistre.test.ts`, déplacé ici en entier), classés
  * par la suite de questions de D83. Niveau 0 : les points 1, 2 et 4 dans l'assistant — une validation
