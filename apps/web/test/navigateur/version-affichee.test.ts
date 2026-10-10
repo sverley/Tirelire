@@ -46,7 +46,7 @@
  * revient pas une fois la mise à jour faite (un faux signal).
  */
 // @ts-ignore — module JavaScript sans déclaration de types
-import { CLÉ_ÉTAPE, STATUT, besoins, expression, jobs, scalaire, vrai, évaluer, étapes, commande } from '../../../../packages/gardes/workflow-a-blanc.mjs';
+import { STATUT, besoins, expression, jobs, scalaire, vrai, évaluer, étapes, commande } from '../../../../packages/gardes/workflow-a-blanc.mjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
