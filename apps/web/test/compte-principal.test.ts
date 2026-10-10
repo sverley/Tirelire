@@ -5,7 +5,8 @@
  *
  * Fichier de niveau 0 et 1, que le registre cite (D81). Les niveaux 2 à 4 sont dans
  * `compte-principal-cas.test.ts` ; ce qui se voit à l'écran — le plan, l'écran Comptes, l'assistant —
- * dans `navigateur/compte-principal.test.ts`, parce que les tests navigateur vivent à part (D83).
+ * dans `compte-principal-ecran.test.ts`, sans navigateur, sur l'application montée sous jsdom (D83,
+ * « Le navigateur au minimum » ; #421).
  *
  * Chaque `describe` reprend un point du « Fait quand » de l'issue, sous son numéro. Le harnais
  * passe par ce que l'application appelle déjà : le dépôt (`LedgerStore`, que `openStore` ouvre pour
@@ -27,9 +28,10 @@
  *    test —, par chaque transport et dans les deux sens ; l'exemple chargé d'un côté donne le même
  *    compte principal et le même plan de l'autre. Deux renseignements concurrents sont un conflit
  *    ordinaire (D58) : même version des deux côtés, l'écartée dans la trace, comme #196 le mesure.
- * 4. L'assistant : dans le navigateur seulement.
+ * 4. L'assistant : à l'écran, dans `compte-principal-ecran.test.ts` ; le projet qu'il enregistre, dans
+ *    `assistant-comptes-exemple-ecran.test.ts`.
  * 5. Le dépôt refuse, en le disant, de supprimer le compte principal, d'en changer le genre et d'en
- *    écrire un second ; rien n'est écrit. Ce que l'écran propose se mesure dans le navigateur.
+ *    écrire un second ; rien n'est écrit. Ce que l'écran propose se lit dans `compte-principal-ecran.test.ts`.
  * 6. Un fichier exporté se rouvre à l'identique, compte principal renseigné compris. Le plan de
  *    l'exemple et l'import d'un relevé : second fichier (niveau 2).
  * 7. Les catalogues : en relisant (D81).

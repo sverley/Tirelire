@@ -5,7 +5,9 @@
  * I11 (« la section le rend vrai par construction », issue) ; vu rouge sur le `Wizard.svelte` de `main` et sur
  * une mutation de l'écran. Points 2 à 5, niveau 2 : D43, D45, D46, D40, D56, D59 (cas de règle). Point 6, la
  * réplique de l'explication : niveau 3 (même résultat, moins lisible). Le comportement se joue dans les tests
- * navigateur que l'issue nomme (points 2, 3, 7), adaptés par le codeur et relus.
+ * que l'issue nomme (points 2, 3, 7), adaptés par le codeur et relus : `navigateur/panneaux-nommes.test.ts`,
+ * dans le navigateur ; les écrans Tirelires et Comptes sans opération (#322) et le filtre d'état (D56), sans
+ * navigateur depuis #421, dans `tirelires-comptes-sans-operation-ecran.test.ts` et `filtre-etat-ecran.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';

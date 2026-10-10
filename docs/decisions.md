@@ -1059,11 +1059,15 @@ restée invisible au chargement.
 
 **Gardes.** `packages/core/test/etats.test.ts` fige les trois états et leurs bornes, les deux
 réserves de l'état d'une tirelire, et le fait que l'exemple porte les trois états sur les trois
-écrans. `apps/web/test/filtre-etat.test.ts` charge l'exemple dans un vrai navigateur à 375 px, va
+écrans. ~~`apps/web/test/filtre-etat.test.ts` charge l'exemple dans un vrai navigateur à 375 px, va
 sur chacun des trois écrans et vérifie l'état de départ des interrupteurs, que le clos part rangé
 sans que son bouton disparaisse, et que chaque interrupteur montre ou masque ce qu'il annonce sans
 toucher aux autres — même harnais que la garde de mise en page (D54), et même abstention faute de
-Chrome, sauf en intégration continue.
+Chrome, sauf en intégration continue.~~ — amendé le 10 octobre 2026 : le filtre des trois écrans se
+vérifie sans navigateur, sur l'exemple chargé, l'application montée sous jsdom :
+`apps/web/test/filtre-etat-ecran.test.ts` va sur chacun des trois écrans et vérifie l'état de départ
+des interrupteurs, que le clos part rangé sans que son bouton disparaisse, et que chaque interrupteur
+montre ou masque ce qu'il annonce sans toucher aux autres (D83, « Le navigateur au minimum » ; #421).
 
 ### D57 · Deux sens de lecture, et le budget d'abord
 
