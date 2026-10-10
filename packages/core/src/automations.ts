@@ -14,7 +14,7 @@
 import { liveSubOperations } from './suboperations.js';
 import type { SubOperation, Category, Id, Ledger, Operation, OperationState, Automation, AutomationAction, AutomationSelection, AutomationStateAction, AllocationLine, FlowAction } from './model.js';
 import { alive, isLocked } from './model.js';
-import { emptyPatch, type Patch } from './matching.js';
+import { emptyPatch, readLabelPattern, type Patch } from './matching.js';
 import { uuidv7 } from './ids.js';
 
 // ---------------------------------------------------------------------------
@@ -72,9 +72,10 @@ export function selects(sel: AutomationSelection, op: Operation): boolean {
   if (sel.amountMax !== undefined && op.amount > sel.amountMax) return false;
   if (sel.dateFrom && op.date < sel.dateFrom) return false;
   if (sel.dateTo && op.date > sel.dateTo) return false;
-  if (sel.labelPattern) {
+  const motif = readLabelPattern(sel.labelPattern);
+  if (motif) {
     try {
-      const re = new RegExp(sel.labelPattern, 'i');
+      const re = new RegExp(motif, 'i');
       if (!re.test(op.label) && !re.test(op.normalizedLabel) && !(op.details && re.test(op.details))) return false;
     } catch {
       return false;

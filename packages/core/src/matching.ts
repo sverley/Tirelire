@@ -21,6 +21,17 @@ export interface Patch {
   removedSubOperations?: Id[];
 }
 
+/**
+ * Le motif de libellé d'une sélection — un flux, un ordre permanent, un automatisme (D24) — tel qu'il
+ * se lit : sans les blancs qui le commencent ou le finissent, qu'une banque ne garde pas (#26, point 5).
+ * Un motif fait de blancs seuls ne sélectionne rien de plus qu'aucun motif : `undefined`. Le motif
+ * enregistré n'en est pas réécrit (D57, I10) : seule sa lecture les retire.
+ */
+export function readLabelPattern(pattern: string | undefined): string | undefined {
+  const lu = pattern?.trim();
+  return lu ? lu : undefined;
+}
+
 export function emptyPatch(): Patch {
   return { operations: [], subOperations: [], removedSubOperations: [] };
 }
@@ -91,12 +102,13 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
   for (const f of alive(ledger.plannedFlows)) {
     const vers = principal ? standingOrderTarget(f, principal.id) : undefined;
     if (vers === undefined) continue;
-    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(f.labelPattern ? [f.labelPattern] : [])]);
+    const motif = readLabelPattern(f.labelPattern);
+    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(motif ? [motif] : [])]);
   }
   const accounts = alive(ledger.accounts).map((a) => ({
     a,
     patterns: ordres.get(a.id),
-    name: transferLabel(a.name).replace(/^TIRELIRE /, ''),
+    name: transferLabel(a.name).replace(/^TIRELIRE ?/, ''),
   }));
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
@@ -176,10 +188,10 @@ function amountWithinTolerance(flow: PlannedFlow, amount: Cents): { ok: boolean;
   return { ok: diff <= allowed + 0.5, ratio, exact: diff === 0 };
 }
 
-/** Le motif de libellé du flux reconnaît-il l'opération ? Un motif illisible ne reconnaît rien. */
-function labelRecognized(pattern: string, op: Operation): boolean {
+/** Le motif de libellé du flux, lu sans ses blancs d'extrémité (`readLabelPattern`), reconnaît-il l'opération ? Un motif illisible ne reconnaît rien. */
+function labelRecognized(motif: string, op: Operation): boolean {
   try {
-    const re = new RegExp(pattern, 'i');
+    const re = new RegExp(motif, 'i');
     return re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '');
   } catch {
     return false;
@@ -210,7 +222,8 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       if (f.activeTo && op.date > f.activeTo) continue;
       const amt = amountWithinTolerance(f, op.amount);
       if (!amt.ok) continue;
-      const label = f.labelPattern ? labelRecognized(f.labelPattern, op) : undefined;
+      const motif = readLabelPattern(f.labelPattern);
+      const label = motif ? labelRecognized(motif, op) : undefined;
       if (label === false) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
