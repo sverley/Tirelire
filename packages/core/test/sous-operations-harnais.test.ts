@@ -1,7 +1,8 @@
 /**
  * Harnais d'audit de #297 — « Une opération contient des sous-opérations, sur autant de niveaux
- * qu'on veut ». Côté cœur ; ce que les écrans Opérations et Saisie en font (point 6) est gardé par le
- * second fichier du harnais, `apps/web/test/navigateur/sous-operations-harnais.test.ts`.
+ * qu'on veut ». Côté cœur ; ce que les écrans Opérations et Saisie en font (points 6 et 11) se vérifie
+ * sans navigateur, sur l'application montée sous jsdom, dans `apps/web/test/sous-operations-ecran.test.ts`
+ * (#420).
  *
  * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
  * tranche, le test du codeur quand il la tranche — repris de `sous-operations.test.ts`, qui garde

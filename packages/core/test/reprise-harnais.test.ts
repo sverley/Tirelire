@@ -1,7 +1,8 @@
 /**
  * Harnais d'audit de #306 — « Une opération en reprend une autre, et la sélection d'un flux est la
- * seule qui le reconnaisse » (D12, D22, D24, D88). Côté cœur ; ce qui se lit et se fait à l'écran est
- * dans `apps/web/test/navigateur/reprise-harnais.test.ts`.
+ * seule qui le reconnaisse » (D12, D22, D24, D88). Côté cœur ; ce qui se lit et se fait à l'écran se
+ * vérifie sans navigateur, sur l'application montée sous jsdom, dans `apps/web/test/reprise-ecran.test.ts`
+ * (#420).
  *
  * Composé après le codage (auditeur.md, étape 2) : pour chaque phrase du « Fait quand » qu'un test
  * peut trancher, un test — celui du codeur quand il la tranche (repris de `reprise.test.ts`, où ne
@@ -12,7 +13,8 @@
  * Données inventées (D84) : de petits grands livres écrits ici, et l'exemple, lu au 6 septembre 2026.
  *
  * Chaque `describe` reprend un point du « Fait quand » sous son numéro. Les phrases qui se lisent à
- * l'écran (points 2, 4, 5 et 9) y ont leur épreuve ; le point 8 est de la documentation, relue.
+ * l'écran (points 2, 4, 5 et 9) ont leur épreuve dans `apps/web/test/reprise-ecran.test.ts` ; le point 8
+ * est de la documentation, relue.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce que l'utilisateur a décidé sur une opération n'est jamais écrasé par une reprise (point 4),

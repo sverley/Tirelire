@@ -2,7 +2,9 @@
  * Harnais d'audit de #320, côté cœur — la lecture du budget que le Bilan affiche (`readBudgetAhead`) :
  * points 1, 2, 3 et 7 du « Fait quand ». Elle ne calcule rien de propre : chaque période est le Plan de
  * cette période, lu à la même date, et les échéances en manque sont celles que le Plan annonce (D78).
- * Ce qui se voit à l'écran est dans `apps/web/test/navigateur/bilan-budget-harnais.test.ts`.
+ * Ce qui se voit à l'écran se vérifie sans navigateur, sur l'application montée sous jsdom, dans
+ * `apps/web/test/bilan-budget-ecran.test.ts` (#420) ; seule la mesure à 375 px (C9) reste dans le
+ * navigateur, `apps/web/test/navigateur/bilan-budget-harnais.test.ts`.
  *
  * Retenus parmi les tests du codeur (`lecture-budget.test.ts`, d'où ils sont déplacés), sans changer ce
  * qu'ils affirment : montants, périodes et états relus dans le Plan, sur l'exemple lu au 6 septembre.
