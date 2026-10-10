@@ -1,6 +1,13 @@
 /**
- * Tests du codeur de #434 — faire d'un virement importé vers un compte d'accueil l'ordre permanent
- * que le plan propose (#40, U3). Chaque `describe` nomme le point du « Fait quand » qu'il vérifie.
+ * Harnais d'audit de #434 — « Faire d'un virement importé l'ordre permanent que le plan propose »
+ * (#40, U3 ; D60 précisée). Côté cœur ; l'écran qui propose ce geste vient avec #435.
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur
+ * (`ordre-depuis-virement.test.ts`, déplacé ici en entier) : chaque `describe` nomme le point du
+ * « Fait quand » qu'il tranche. Sont de moi : la séparation, au point 1, de l'opération qui reprend
+ * déjà quelque chose, dont l'enregistrement effacerait la reprise (niveau 0), et, au point 7, la
+ * non-réécriture de l'ordre lue contre une copie prise avant le calcul du plan, et non contre l'objet
+ * même que le grand livre porte.
  *
  * Données inventées : un compte principal, un Livret A, un compte joint sans tirelire ; sur le
  * livret, une tirelire qui porte une échéance (400 €/mois) et un objectif (250 €/mois) : le budget y
@@ -76,7 +83,7 @@ function enregistrer(l: Ledger, opId = 'op-vir', montant?: number): { ledger: Le
   return { ledger: applyPatchToLedger({ ...l, plannedFlows: [...l.plannedFlows, r!.flow] }, r!.patch), flow: r!.flow };
 }
 
-describe('[niveau 4] #434 · 1. le virement qui peut devenir un ordre', () => {
+describe('[niveau 2] #434 · 1. le virement qui peut devenir un ordre', () => {
   it('le budget demande 650 € sur le Livret A, et le plan y propose un ordre', () => {
     const t = livret(avec(budget(), virement(euros(600))));
     expect(t.permanent).toBe(euros(650));
@@ -111,15 +118,13 @@ describe('[niveau 4] #434 · 1. le virement qui peut devenir un ordre', () => {
     expect(orderFromTransfer(l, 'op-vir', LECTURE, 'x')?.amount).toBe(-euros(600));
   });
 
-  it('rien pour une opération qui n’est pas un virement importé vivant du principal, sans reprise', () => {
+  it('rien pour une opération qui n’est pas un virement importé vivant du principal', () => {
     const cas: Array<[string, Operation]> = [
       ['saisie', virement(euros(600), { origin: 'manual' })],
       ['retirée', virement(euros(600), { deletedAt: '2026-09-05T00:00:00Z' })],
       ['crédit', virement(-euros(600))],
       ['pas un virement', (() => { const o = virement(euros(600)); delete o.transferAccountId; return o; })()],
       ['depuis un autre compte', virement(euros(600), { accountId: JOINT })],
-      ['reprend une occurrence', virement(euros(600), { plannedFlowId: 'salaire', plannedDate: '2026-08-28' })],
-      ['reprend une saisie', virement(euros(600), { resumedOperationId: 'op-saisie' })],
     ];
     for (const [nom, op] of cas) expect(orderFromTransfer(avec(budget(), op), 'op-vir', LECTURE, 'x'), nom).toBeUndefined();
   });
@@ -150,7 +155,21 @@ describe('[niveau 4] #434 · 1. le virement qui peut devenir un ordre', () => {
   });
 });
 
-describe('[niveau 4] #434 · 2. l’ordre proposé', () => {
+describe('[niveau 0] #434 · 1 et 5. une opération qui reprend déjà quelque chose ne propose rien, et son enregistrement n’efface rien (D88)', () => {
+  it('ni l’occurrence d’un flux, ni une saisie ne se perdent', () => {
+    const cas: Array<[string, Operation]> = [
+      ['reprend une occurrence', virement(euros(600), { plannedFlowId: 'salaire', plannedDate: '2026-08-28' })],
+      ['reprend une saisie', virement(euros(600), { resumedOperationId: 'op-saisie' })],
+    ];
+    for (const [nom, op] of cas) {
+      const l = avec(budget(), op);
+      expect(orderFromTransfer(l, 'op-vir', LECTURE, 'x'), nom).toBeUndefined();
+      expect(recordOrderFromTransfer(l, 'op-vir', LECTURE, 'x'), nom).toBeUndefined();
+    }
+  });
+});
+
+describe('[niveau 2] #434 · 2. l’ordre proposé', () => {
   it('l’ordre de l’écran Plan, sauf le montant, la ventilation, l’ancrage et le motif', () => {
     const l = avec(budget(), virement(euros(600)));
     const plan = computePlan(l, LECTURE);
@@ -182,7 +201,7 @@ describe('[niveau 4] #434 · 2. l’ordre proposé', () => {
   });
 });
 
-describe('[niveau 4] #434 · 3. un montant corrigé', () => {
+describe('[niveau 2] #434 · 3. un montant corrigé', () => {
   it('la ventilation se recalcule pour le montant validé ; l’opération reste la première occurrence', () => {
     const l = avec(budget(), virement(euros(600)));
     const à500 = orderFromTransfer(l, 'op-vir', LECTURE, 'x', euros(500))!;
@@ -223,7 +242,7 @@ async function base(l: Ledger): Promise<LedgerStore> {
   return s;
 }
 
-describe('[niveau 4] #434 · 4. rien ne s’écrit avant le geste (I10)', () => {
+describe('[niveau 0] #434 · 4. rien ne s’écrit avant le geste (I10)', () => {
   it('calculer la proposition ne modifie ni le grand livre lu ni la base', async () => {
     const s = await base(avec(budget(), virement(euros(600))));
     const lu = s.load();
@@ -241,7 +260,7 @@ describe('[niveau 4] #434 · 4. rien ne s’écrit avant le geste (I10)', () => 
   });
 });
 
-describe('[niveau 4] #434 · 5. enregistrer', () => {
+describe('[niveau 0] #434 · 5. enregistrer', () => {
   it('l’ordre, la reprise de sa première occurrence et les parts se relisent après un redémarrage', async () => {
     const l = avec(budget(), virement(euros(600)));
     const s = await base(l);
@@ -277,7 +296,7 @@ describe('[niveau 4] #434 · 5. enregistrer', () => {
   });
 });
 
-describe('[niveau 4] #434 · 6. le livre de compte tient (I2, D19)', () => {
+describe('[niveau 1] #434 · 6. le livre de compte tient (I2, D19)', () => {
   const verifier = (ledger: Ledger, nonAffecteDuVirement: number) => {
     const idx = indexLedger(ledger);
     for (const a of idx.accountsById.values()) expect(componentsOnAccount(a, idx, '2026-09-30') + unallocated(a, ledger, idx, '2026-09-30'), a.id).toBe(accountBalance(a, ledger, '2026-09-30'));
@@ -306,10 +325,22 @@ describe('[niveau 4] #434 · 6. le livre de compte tient (I2, D19)', () => {
   });
 });
 
-describe('[niveau 4] #434 · 7. un ordre comme les autres', () => {
-  it('le plan signale l’écart de 50 € avec un pas de 10 €, pas avec un pas de 50 €, sans réécrire l’ordre (D60, I10)', () => {
+describe('[niveau 0] #434 · 7. le plan ne réécrit pas l’ordre fait d’un virement (D60, I10)', () => {
+  it('ni son montant ni ses parts, l’écart signalé ou non', () => {
+    for (const pas of [euros(10), euros(50)]) {
+      const { ledger } = enregistrer(avec(budget(pas), virement(euros(600))));
+      const avant = structuredClone(ledger.plannedFlows.find((f) => f.id === 'ordre-u3')!);
+      computePlan(ledger, LECTURE);
+      computePlan(ledger, '2026-10-06');
+      expect(ledger.plannedFlows.find((f) => f.id === 'ordre-u3'), `pas ${pas}`).toEqual(avant);
+    }
+  });
+});
+
+describe('[niveau 2] #434 · 7. un ordre comme les autres', () => {
+  it('le plan signale l’écart de 50 € avec un pas de 10 €, pas avec un pas de 50 € (D60)', () => {
     for (const [pas, signale] of [[euros(10), true], [euros(50), false]] as const) {
-      const { ledger, flow } = enregistrer(avec(budget(pas), virement(euros(600))));
+      const { ledger } = enregistrer(avec(budget(pas), virement(euros(600))));
       const t = livret(ledger);
       expect(t.bankOrder?.flowId).toBe('ordre-u3');
       expect(t.bankOrder?.drift).toBe(euros(50));
@@ -320,7 +351,6 @@ describe('[niveau 4] #434 · 7. un ordre comme les autres', () => {
         ['vac', euros(50), signale],
       ]);
       expect(computePlan(ledger, LECTURE).warnings.filter((w) => w.code === 'bankOrderDrift')).toHaveLength(signale ? 1 : 0);
-      expect(ledger.plannedFlows.find((f) => f.id === 'ordre-u3')).toEqual(flow);
     }
   });
 
