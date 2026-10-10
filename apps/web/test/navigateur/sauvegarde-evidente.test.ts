@@ -2,8 +2,8 @@
  * Harnais d'audit de #41 — « Sans serveur, la sauvegarde doit être évidente ».
  * Garde la part de C5 que #41 construit : « La sauvegarde doit donc être évidente, sans supposer que
  * l'utilisateur y pense ». Fichier de niveau 0 et 1, que le registre cite sous C5 (point 9 : la ligne
- * « À bâtir » y devient ce harnais) ; les niveaux 2 à 4 — les textes vouvoient (D85) — sont dans
- * `sauvegarde-evidente-cas.test.ts`, hors registre (D81).
+ * « À bâtir » y devient ce harnais) ; les niveaux 2 à 4 — les textes vouvoient (D85) — se vérifient sans
+ * navigateur, dans `../sauvegarde-evidente-ecran.test.ts` (#421), hors registre (D81).
  *
  * Tout se passe dans le navigateur, sur le site construit. Le point 3 suit la lecture de
  * l'architecte, confirmée par le porteur le 28 septembre : sans sauvegarde, le rappel vient dès que

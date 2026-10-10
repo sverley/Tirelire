@@ -1,41 +1,38 @@
 /**
- * Harnais d'audit de #142 — « La webapp affiche sa version et signale qu'une mise à jour est prête ».
- * Un seul fichier, hors registre (D81) : l'issue ne demande aucune entrée au registre ; tous les
- * niveaux y sont (D83), marqués dans chaque titre, et il se joue en entier comme harnais du besoin.
+ * Harnais d'audit de #142 — « La webapp affiche sa version et signale qu'une mise à jour est prête »,
+ * ce qui n'existe que dans un navigateur. Hors registre (D81) : l'issue ne demande aucune entrée au
+ * registre ; chaque test marque son niveau dans son titre (D83).
  *
- * Ce que le harnais garde, dans le « Fait quand » de l'issue, borné aux cibles actives (webapp sur
+ * Ce que le harnais garde ici, dans le « Fait quand » de l'issue, borné aux cibles actives (webapp sur
  * Chromium, Android et ordinateur) :
  *
- * 1. La version se lit, en deux gestes au plus depuis l'accueil (I5) : le nom du tag pour une version
- *    publiée, le nom d'une version forcée, et pour un build de développement qu'il s'agit du
- *    développement et de quel commit (`main` à la recette) ou de quelle PR ; un build local le dit
- *    aussi, sans numéro inventé.
+ * 1. La version se lit en deux gestes au plus depuis l'accueil (I5), sur un téléphone comme sur un
+ *    ordinateur : celle d'une PR et celle de `main` à la recette.
  * 2. C'est celle qui tourne : la version du code exécuté par la page, pas la dernière disponible.
  * 3. Une mise à jour se dit, au plus tard quand l'utilisateur revient sur l'onglet, avec de quoi
- *    recharger ; rien ne se recharge à son insu (principe 4).
+ *    recharger ; rien ne se recharge à son insu (principe 4) ; pas de faux signal.
  * 4. Recharger ne perd rien ; refuser ou ignorer le signal laisse travailler, et la nouvelle version
- *    s'exécute à l'ouverture suivante.
+ *    s'exécute à l'ouverture suivante ; la mise à jour faite, le signal ne revient pas.
  * 5. Ce qui tenait tient encore : l'application s'ouvre hors ligne après une première visite ; chaque
  *    aperçu de PR reste servi par lui-même, et la version de développement de la recette n'y déborde pas.
  *
- * Et « les textes vouvoient » (D85).
+ * Le nom de chaque sorte de build (point 1 : le tag d'une version publiée, le nom d'une version forcée,
+ * `main` et son commit, une PR et son numéro, un build local sans numéro inventé) et le vouvoiement du
+ * signal et de la ligne de la version (D85) se vérifient sans navigateur, depuis ce que `ci.yml` donne à
+ * l'étape qui assemble le site, jusqu'à ce que l'écran Plus en dit : `../version-affichee-ecran.test.ts`
+ * (#421).
  *
- * **Comment les sites sont construits.** L'issue laisse au codeur le moyen de faire passer le nom du
- * tag ou du commit à la construction, et lui permet de modifier `ci.yml` à cette seule fin : le
- * harnais n'impose donc ni nom de variable ni fichier. Il construit chaque site comme la CI le
- * construit — `ci.yml` joué à blanc dans un dossier d'essai, événement par événement (tag poussé,
- * version forcée, push sur `main`, PR), ses étapes exécutées pour de vrai, sauf ce qui joue les tests,
- * installe, dépose ou publie — puis mesure ce que l'application dit dans le navigateur. Le dossier
- * d'essai est une copie des fichiers suivis (et des nouveaux, non ignorés) dans un dépôt git à
- * l'historique connu : la version publiée `v0.1` sur C0, `main` en C1 puis C2, la tête P d'une PR et
- * sa fusion M ; il n'est jamais poussé nulle part. Le build local, lui, est `pnpm build`, sans rien
- * de ce que pose la CI.
+ * **Comment les sites sont construits.** Le harnais construit chaque site comme la CI le construit —
+ * `ci.yml` joué à blanc dans un dossier d'essai, événement par événement (push sur `main`, push suivant
+ * sur `main`, PR), ses étapes exécutées pour de vrai, sauf ce qui joue les tests, installe, dépose ou
+ * publie — puis mesure ce que l'application dit dans le navigateur. Le dossier d'essai est une copie des
+ * fichiers suivis (et des nouveaux, non ignorés) dans un dépôt git à l'historique connu : `main` en C1
+ * puis C2, la tête P d'une PR et sa fusion M ; il n'est jamais poussé nulle part.
  *
  * **Ce que le harnais lit de l'application**, sans supposer ni la place ni les mots exacts :
  * - la version : le texte visible d'un écran atteint en deux gestes au plus depuis l'accueil (un
- *   onglet, puis une ligne ou un bouton de l'écran) porte le nom attendu — `v0.1`, `v0.1-<hash court>`,
- *   `main` et le hash court avec « développement », « PR 12 » avec « développement » ; pour le build
- *   local, un élément qui parle de version et dit « local » ou « développement », sans numéro pointé ;
+ *   onglet, puis une ligne ou un bouton de l'écran) porte le nom attendu — `main` et le hash court avec
+ *   « développement », « PR 12 » avec « développement » ;
  * - le signal de mise à jour : un élément visible qui dit « mise à jour », « nouvelle version » ou
  *   « plus récente » et porte une commande « Recharger », « Actualiser » ou « Mettre à jour » ;
  * - « revenir sur l'onglet » : la page passe cachée puis visible (`visibilitychange`, `blur`, `focus`),
@@ -44,13 +41,12 @@
  * Chaque test déclare son niveau (D83). Niveau 0 : recharger ou ignorer le signal ne doit jamais
  * perdre une donnée saisie (C4, C5, I7). Niveau 1 : la version se lit en deux gestes (I5), la version
  * affichée est celle qui tourne, le signal paraît sans recharger d'office (C8, principe 4), refuser
- * laisse travailler, la nouvelle version tourne à l'ouverture suivante. Niveau 2 : les noms des
- * quatre sortes de builds (D83, « Livraison »), pas de faux signal, chaque aperçu servi par lui-même
- * (#233), hors ligne après une première visite, le signal qui ne revient pas une fois la mise à jour
- * faite (un faux signal), les textes qui vouvoient (D85, une décision).
+ * laisse travailler, la nouvelle version tourne à l'ouverture suivante. Niveau 2 : pas de faux signal,
+ * chaque aperçu servi par lui-même (#233), hors ligne après une première visite, le signal qui ne
+ * revient pas une fois la mise à jour faite (un faux signal).
  */
 // @ts-ignore — module JavaScript sans déclaration de types
-import { CLÉ_ÉTAPE, STATUT, besoins, expression, jobs, scalaire, vrai, évaluer, étapes, commande } from '../../../../packages/gardes/workflow-a-blanc.mjs';
+import { STATUT, besoins, expression, jobs, scalaire, vrai, évaluer, étapes, commande } from '../../../../packages/gardes/workflow-a-blanc.mjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -69,15 +65,11 @@ const pause = (ms: number) => new Promise((fin) => setTimeout(fin, ms));
 
 const DÉPÔT = resolve(RACINE, '../..');
 const WORKFLOW = '.github/workflows/ci.yml';
-/** La version publiée du dossier d'essai, posée sur C0. */
-const TAG = 'v0.1';
 /** Le numéro de la PR jouée. */
 const PR = 12;
 
 interface Bac {
   dossier: string;
-  /** Le commit de la version publiée (`v0.1`). */
-  c0: string;
   /** `main`, un commit plus loin ; `c2`, un de plus (la version « plus récente » d'une mise à jour). */
   c1: string;
   c2: string;
@@ -109,9 +101,7 @@ function créerLeBac(): Bac {
   }
   git(dossier, 'init', '-q', '-b', 'main');
   git(dossier, 'add', '-A');
-  git(dossier, 'commit', '-q', '-m', 'C0 : la version publiée');
-  const c0 = git(dossier, 'rev-parse', 'HEAD');
-  git(dossier, 'tag', TAG);
+  git(dossier, 'commit', '-q', '-m', 'C0 : le dépôt');
   git(dossier, 'commit', '-q', '--allow-empty', '-m', 'C1 : main avance');
   const c1 = git(dossier, 'rev-parse', 'HEAD');
   git(dossier, 'checkout', '-q', '-b', 'pr');
@@ -137,7 +127,7 @@ function créerLeBac(): Bac {
     writeFileSync(join(bin, outil), '#!/bin/sh\nexit 0\n');
     chmodSync(join(bin, outil), 0o755);
   }
-  return { dossier, c0, c1, c2, p, m, bin, temp: mkdtempSync(join(tmpdir(), 'tirelire-ci-temp-')), sites: mkdtempSync(join(tmpdir(), 'tirelire-ci-sites-')) };
+  return { dossier, c1, c2, p, m, bin, temp: mkdtempSync(join(tmpdir(), 'tirelire-ci-temp-')), sites: mkdtempSync(join(tmpdir(), 'tirelire-ci-sites-')) };
 }
 
 /** L'environnement d'un poste : rien de ce que pose la CI, ni des lanceurs de test. */
@@ -172,7 +162,7 @@ function lancer(script: string, cwd: string, env: NodeJS.ProcessEnv, délai = 42
 // ci.yml joué à blanc, événement par événement, étapes exécutées pour de vrai
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-type Sorte = 'tag' | 'forcée' | 'main' | 'main-suivant' | 'pr' | 'local';
+type Sorte = 'main' | 'main-suivant' | 'pr';
 
 /**
  * Les étapes qu'on ne joue pas : elles installent, jouent les tests, déposent ou publient, ou lisent
@@ -275,7 +265,7 @@ interface Événement {
   charge: Record<string, unknown>;
 }
 
-function événement(bac: Bac, sorte: Exclude<Sorte, 'local'>): Événement {
+function événement(bac: Bac, sorte: Sorte): Événement {
   const dépôt = 'sverley/Tirelire';
   const push = (ref: string, nom: string, type: string, sha: string): Événement => ({
     github: { event_name: 'push', ref, ref_name: nom, ref_type: type, sha, head_ref: '', event: { ref, after: sha } },
@@ -283,18 +273,8 @@ function événement(bac: Bac, sorte: Exclude<Sorte, 'local'>): Événement {
     tête: sha,
     charge: { ref, after: sha, repository: { full_name: dépôt } },
   });
-  if (sorte === 'tag') return push(`refs/tags/${TAG}`, TAG, 'tag', bac.c0);
   if (sorte === 'main') return push('refs/heads/main', 'main', 'branch', bac.c1);
   if (sorte === 'main-suivant') return push('refs/heads/main', 'main', 'branch', bac.c2);
-  if (sorte === 'forcée') {
-    // `version-forcee.yml` appelle `ci.yml` : l'événement est celui du déclenchement manuel.
-    return {
-      github: { event_name: 'workflow_dispatch', ref: 'refs/heads/main', ref_name: 'main', ref_type: 'branch', sha: bac.c1, head_ref: '', event: {} },
-      inputs: { version_forcee: true },
-      tête: bac.c1,
-      charge: { ref: 'refs/heads/main', inputs: {} },
-    };
-  }
   const pull = { number: PR, draft: false, head: { sha: bac.p, ref: 'audit/142-essai' }, base: { ref: 'main' } };
   return {
     github: { event_name: 'pull_request', ref: `refs/pull/${PR}/merge`, ref_name: `${PR}/merge`, ref_type: 'branch', sha: bac.m, head_ref: 'audit/142-essai', base_ref: 'main', event: { action: 'opened', number: PR, pull_request: pull } },
@@ -341,7 +321,7 @@ function variablesGitHub(bac: Bac, ev: Événement, ctx: { github: Record<string
  * dont ils dépendent, sont joués ; chaque job qui passe sa condition joue ses étapes qui passent la
  * leur, sauf `ÉCARTÉES`. Une étape qui échoue arrête tout, en disant laquelle.
  */
-async function jouerLaCI(bac: Bac, sorte: Exclude<Sorte, 'local'>): Promise<string> {
+async function jouerLaCI(bac: Bac, sorte: Sorte): Promise<string> {
   const yaml = readFileSync(join(bac.dossier, WORKFLOW), 'utf8').replace(/\r\n?/g, '\n');
   const blocs = jobs(yaml) as Map<string, { lignes: string[] }>;
   const ev = événement(bac, sorte);
@@ -440,17 +420,6 @@ async function jouerLaCI(bac: Bac, sorte: Exclude<Sorte, 'local'>): Promise<stri
   return sortie;
 }
 
-/** Un build local : `pnpm build`, comme le dit le README, sans rien de ce que pose la CI. */
-async function construireEnLocal(bac: Bac): Promise<string> {
-  git(bac.dossier, 'checkout', '-q', '--detach', bac.c1);
-  rmSync(join(bac.dossier, 'apps/web/dist'), { recursive: true, force: true });
-  const r = await lancer('pnpm build', bac.dossier, environnementDePoste(bac));
-  if (r.code !== 0) throw new Error(`Le build local (pnpm build) échoue :\n${r.sortie.trim().split('\n').slice(-25).join('\n')}`);
-  const sortie = join(bac.sites, 'local');
-  cpSync(join(bac.dossier, 'apps/web/dist'), sortie, { recursive: true });
-  return sortie;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // Un serveur de fichiers, dont le contenu change entre deux visites
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -514,28 +483,10 @@ async function servir(montages: Record<string, string>): Promise<Serveur> {
 interface Lecture {
   /** Le texte visible de la page. */
   texte: string;
-  /** Les plus petits éléments qui parlent de version et disent « local » ou « développement ». */
-  versions: string[];
 }
 
 async function lire(page: Page): Promise<Lecture> {
-  return page.evaluate(() => {
-    const net = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim();
-    const visible = (e: Element) => {
-      const r = e.getBoundingClientRect();
-      const c = getComputedStyle(e);
-      return r.width > 0 && r.height > 0 && c.visibility !== 'hidden' && c.display !== 'none';
-    };
-    const dit = (t: string) => /version|build|construction/i.test(t) && /local|développement/i.test(t);
-    const tous = [...document.querySelectorAll('body *')].filter((e) => !e.closest('.tabbar') && visible(e));
-    const versions = tous
-      .filter((e) => {
-        const t = net(e.textContent);
-        return t.length <= 300 && dit(t) && ![...e.children].some((c) => dit(net(c.textContent)));
-      })
-      .map((e) => net(e.textContent));
-    return { texte: document.body.innerText, versions };
-  });
+  return page.evaluate(() => ({ texte: document.body.innerText }));
 }
 
 /** Une ouverture de l'application : la base ouverte, l'écran monté. */
@@ -652,14 +603,9 @@ async function trouver(page: Page, cherche: (l: Lecture) => boolean, connu?: str
 
 // Les noms qu'une sorte de build doit dire (D83) ─────────────────────────────────────────────
 
-const échapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const DÉVELOPPEMENT = /développement|\bdev\b/i;
-/** Un numéro de version pointé : `0.1`, `v0.1.0`. */
-const NUMÉRO = /(?<![\w.])v?\d+\.\d+(?:\.\d+)*(?![\w])/i;
 
 const dit = {
-  /** Le nom du tag : seul, sans suite (`v0.1` n'est pas `v0.1-1a2b3c4`). */
-  nom: (nom: string) => (l: Lecture) => new RegExp(`(?<![\\w.-])${échapper(nom)}(?![\\w-]|\\.\\d)`).test(l.texte),
   /** `main` à la recette : le développement, `main` et le hash court du commit. */
   main: (court: string) => (l: Lecture) => l.texte.includes(court) && /\bmain\b/i.test(l.texte) && DÉVELOPPEMENT.test(l.texte),
   /** Le hash court d'un commit, sans plus. */
@@ -667,8 +613,6 @@ const dit = {
   /** Une PR : le développement et son numéro. */
   pr: (numéro: number) => (l: Lecture) =>
     DÉVELOPPEMENT.test(l.texte) && new RegExp(`(?:\\b(?:PR|pull\\s+request)\\b[\\s\\-#:n°]*|\\bpr-|#)${numéro}\\b`, 'i').test(l.texte),
-  /** Un build local : un élément qui parle de version, dit « local » ou « développement », sans numéro. */
-  local: (l: Lecture) => l.versions.some((v) => !NUMÉRO.test(v)),
 };
 
 const court = (sha: string) => sha.slice(0, 7);
@@ -826,8 +770,7 @@ beforeAll(async () => {
   bac = créerLeBac();
   chrome = await puppeteer.launch({ executablePath: navigateur, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-features=BackForwardCache'] });
   // L'un après l'autre : ils partagent le dossier d'essai.
-  for (const sorte of ['tag', 'forcée', 'main', 'main-suivant', 'pr'] as const) dossiers[sorte] = await jouerLaCI(bac, sorte);
-  dossiers['local'] = await construireEnLocal(bac);
+  for (const sorte of ['main', 'main-suivant', 'pr'] as const) dossiers[sorte] = await jouerLaCI(bac, sorte);
 }, 1_200_000);
 
 afterAll(async () => {
@@ -861,12 +804,9 @@ function versionDe(sorte: Sorte, cherche: (l: Lecture) => boolean, largeur = 375
 const CHERCHE = (): Record<Sorte, (l: Lecture) => boolean> => {
   const { bac: b } = bacPrêt();
   return {
-    tag: dit.nom(TAG),
-    forcée: dit.nom(`${TAG}-${court(b.c1)}`),
     main: dit.main(court(b.c1)),
     'main-suivant': dit.main(court(b.c2)),
     pr: dit.pr(PR),
-    local: dit.local,
   };
 };
 
@@ -877,45 +817,6 @@ const vu = (l: Lecture | undefined) => (l ? `« ${l.texte.replace(/\s+/g, ' ').s
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 
 describe.skipIf(!navigateur)('#142 · 1. la version se lit', () => {
-  describe('[niveau 2] le nom de chaque sorte de build (D83, « Livraison »)', () => {
-    it('une version publiée dit le nom de son tag', async () => {
-      const t = await versionDe('tag', CHERCHE().tag);
-      expect(t, `depuis l'accueil, en deux gestes au plus, rien ne dit « ${TAG} », le nom du tag`).toBeDefined();
-    });
-
-    it('une version forcée dit son nom : le dernier numéro publié, un tiret, le hash court du commit', async () => {
-      const { bac: b } = bacPrêt();
-      const t = await versionDe('forcée', CHERCHE().forcée);
-      expect(t, `depuis l'accueil, en deux gestes au plus, rien ne dit « ${TAG}-${court(b.c1)} », le nom de la version forcée`).toBeDefined();
-    });
-
-    it('main, à la recette : le développement, main et le commit', async () => {
-      const { bac: b } = bacPrêt();
-      const t = await versionDe('main', CHERCHE().main);
-      expect(t, `depuis l'accueil, en deux gestes au plus, rien ne dit à la fois « développement », « main » et le commit ${court(b.c1)}`).toBeDefined();
-    });
-
-    it('une PR : le développement et son numéro', async () => {
-      const t = await versionDe('pr', CHERCHE().pr);
-      expect(t, `depuis l'accueil, en deux gestes au plus, rien ne dit à la fois « développement » et « PR ${PR} »`).toBeDefined();
-    });
-
-    it('un build local dit le développement, sans numéro inventé', async () => {
-      const t = await versionDe('local', CHERCHE().local);
-      expect(t, `depuis l'accueil, en deux gestes au plus, aucun élément ne parle de version en disant « local » ou « développement » sans numéro pointé (un numéro serait inventé : le build local n'a pas de tag, et le dépôt d'essai en porte un, ${TAG}, sur un commit plus ancien)`).toBeDefined();
-    });
-
-    it('un tag ne dit pas le nom d\'une version forcée, ni l\'inverse', async () => {
-      const { bac: b } = bacPrêt();
-      const tag = await versionDe('tag', CHERCHE().tag);
-      const forcée = await versionDe('forcée', CHERCHE().forcée);
-      expect(tag, `la version publiée ne dit pas son nom, ${TAG}`).toBeDefined();
-      expect(forcée, `la version forcée ne dit pas son nom, ${TAG}-${court(b.c1)}`).toBeDefined();
-      expect(dit.commit(court(b.c1))(tag!.lecture), `la version publiée ${TAG} dit un hash de commit qui n'est pas le sien`).toBe(false);
-      expect(dit.nom(TAG)(forcée!.lecture), `la version forcée se dit sous le nom du tag ${TAG} seul`).toBe(false);
-    });
-  });
-
   describe('[niveau 1] I5 · en deux gestes au plus depuis l\'accueil, sur un téléphone comme sur un ordinateur', () => {
     it('la version d\'une PR se lit en deux gestes au plus depuis l\'accueil, à 375 px', async () => {
       const t = await versionDe('pr', CHERCHE().pr);
@@ -950,7 +851,6 @@ interface Observation {
   /** Après avoir ignoré, puis rouvert ; ou après avoir accepté. */
   après: { rechargé: boolean; ancienne: boolean; nouvelle: boolean; signalRevenu: boolean; coussin: string; plan: string[] };
   cliquéSurLeSignal: boolean;
-  texteDuSignal?: string | undefined;
 }
 
 /** Les trois façons de jouer la mise à jour ; voir `scénario`. */
@@ -1015,7 +915,6 @@ async function scénario(mode: Mode): Promise<Observation> {
       await pause(300);
     });
     obs.signal = await attendre(() => signal(p), 25_000);
-    obs.texteDuSignal = obs.signal?.texte;
     await pause(4_000);
     const jeton = await p.evaluate(() => (window as unknown as { __jeton?: string }).__jeton).catch(() => 'navigation');
     obs.rechargéSeul = navigations > 0 || jeton !== 'A';
@@ -1318,28 +1217,6 @@ describe.skipIf(!navigateur)('#142 · 5. ce qui tenait tient encore', () => {
         await page.close().catch(() => {});
         await serveur.fermer();
       }
-    });
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════════════════════
-// D85 · Les textes vouvoient
-// ═════════════════════════════════════════════════════════════════════════════════════════════
-
-/** Un tutoiement : un pronom de la deuxième personne du singulier, ou un impératif qui la porte. */
-const TUTOIEMENT = /\b(?:tu|toi|ton|ta|tes)\b|\bt['’]|\b(?:recharge|actualise|mets|clique|appuie|relance|redémarre|profite|installe|choisis|attends)\b/i;
-
-describe.skipIf(!navigateur)('#142 · D85', () => {
-  describe('[niveau 2] D85 · les textes que la version et la mise à jour ajoutent vouvoient', () => {
-    it('ni le signal de mise à jour ni la ligne de la version ne tutoient', async () => {
-      const o = await jouer('ignorer');
-      expect(o.texteDuSignal, 'pas de signal à relire').toBeDefined();
-      expect(o.texteDuSignal, `le signal tutoie : « ${o.texteDuSignal} »`).not.toMatch(TUTOIEMENT);
-      expect(o.signal?.commande, `la commande du signal tutoie : « ${o.signal?.commande} »`).not.toMatch(TUTOIEMENT);
-      const t = await versionDe('main', CHERCHE().main);
-      expect(t, 'pas de version à relire').toBeDefined();
-      const lignes = t!.lecture.texte.split('\n').filter((l) => /version|développement|main/i.test(l));
-      for (const l of lignes) expect(l, `une ligne de la version tutoie : « ${l} »`).not.toMatch(TUTOIEMENT);
     });
   });
 });

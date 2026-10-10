@@ -2,8 +2,9 @@
  * Tests du codeur de #369 — l'écran Tirelires emploie la section Tirelires de l'assistant.
  *
  * Sans navigateur, sur le texte des sources : la section est écrite une fois, et l'écran la donne à
- * construire sur le projet, sans réécrire ce qu'elle porte (D94). Le parcours sur le site construit est
- * dans `navigateur/ecran-tirelires-harnais.test.ts`.
+ * construire sur le projet, sans réécrire ce qu'elle porte (D94). Ce que l'écran montre et enregistre se
+ * vérifie sur l'application montée sous jsdom, dans `ecran-tirelires-ecran.test.ts` (#421) ; le formulaire
+ * d'ajout de la section, à 375 px sur le site construit, dans `navigateur/ecran-tirelires-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
