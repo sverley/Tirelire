@@ -17,26 +17,54 @@ import { applyMatch, readLabelPattern, resumesSomething, type Patch } from './ma
 import { suggestPattern } from './automations.js';
 
 /**
+ * Le compte d'accueil vers lequel l'opération `op` peut devenir un ordre permanent, sans encore lire
+ * le plan (#434, point 1) ; `undefined` sinon. Il faut une opération importée et vivante ; un débit
+ * du compte principal reconnu comme virement vers un autre compte vivant — par le libellé, par
+ * l'appariement, ou désignée à la main (D11, D22) : toutes portent `transferAccountId` — ; sans
+ * reprise (D88) ; vers un compte qui n'a aucun ordre permanent vivant, quelle que soit sa validité
+ * (#393, point 5). Reste au plan d'y proposer un ordre (`transferToOrder`).
+ */
+function transferTarget(ledger: Ledger, op: Operation, principalId: Id): Id | undefined {
+  if (op.deletedAt || op.origin !== 'imported' || resumesSomething(op)) return undefined;
+  if (op.accountId !== principalId || op.amount >= 0) return undefined;
+  const vers = op.transferAccountId;
+  if (!vers || vers === principalId || !alive(ledger.accounts).some((a) => a.id === vers)) return undefined;
+  if (alive(ledger.plannedFlows).some((f) => standingOrderTarget(f, principalId) === vers)) return undefined;
+  return vers;
+}
+
+/**
  * Le compte d'accueil vers lequel l'opération `operationId` peut devenir un ordre permanent, avec ce
- * que le plan lu à `today` propose pour lui (#434, point 1) ; `undefined` sinon. Il faut une
- * opération importée et vivante ; un débit du compte principal reconnu comme virement vers un autre
- * compte vivant — par le libellé, par l'appariement, ou désignée à la main (D11, D22) : toutes
- * portent `transferAccountId` — ; sans reprise (D88) ; vers un compte où le plan propose un ordre
- * (D60 ; #393, point 9), et qui n'a aucun ordre permanent vivant, quelle que soit sa validité
- * (#393, point 5).
+ * que le plan lu à `today` propose pour lui (#434, point 1) ; `undefined` sinon : `transferTarget`,
+ * et un compte où le plan propose un ordre (D60 ; #393, point 9).
  */
 function transferToOrder(ledger: Ledger, operationId: Id, today: ISODate): { op: Operation; principalId: Id; transfer: PlanTransfer; plan: ReturnType<typeof computePlan> } | undefined {
   const op = alive(ledger.operations).find((o) => o.id === operationId);
   const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
-  if (!op || !principal || op.origin !== 'imported' || resumesSomething(op)) return undefined;
-  if (op.accountId !== principal.id || op.amount >= 0) return undefined;
-  const vers = op.transferAccountId;
-  if (!vers || vers === principal.id || !alive(ledger.accounts).some((a) => a.id === vers)) return undefined;
-  if (alive(ledger.plannedFlows).some((f) => standingOrderTarget(f, principal.id) === vers)) return undefined;
+  if (!op || !principal || !transferTarget(ledger, op, principal.id)) return undefined;
   const plan = computePlan(ledger, today);
-  const transfer = plan.transfers.find((t) => t.accountId === vers);
+  const transfer = plan.transfers.find((t) => t.accountId === op.transferAccountId);
   if (!transfer?.proposal) return undefined;
   return { op, principalId: principal.id, transfer, plan };
+}
+
+/**
+ * Toutes les opérations qui peuvent devenir un ordre permanent, le plan lu à `today` (#434, point 1 ;
+ * #435, point 1), chacune avec le compte d'accueil de l'ordre : la règle de `orderFromTransfer`,
+ * appliquée à toutes, sur un seul calcul du plan. Rien ne s'écrit (I10).
+ */
+export function transfersToOrder(ledger: Ledger, today: ISODate): Map<Id, Id> {
+  const out = new Map<Id, Id>();
+  const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
+  if (!principal) return out;
+  const candidats = alive(ledger.operations).flatMap((op) => {
+    const vers = transferTarget(ledger, op, principal.id);
+    return vers ? [[op.id, vers] as const] : [];
+  });
+  if (!candidats.length) return out;
+  const proposes = new Set(computePlan(ledger, today).transfers.filter((t) => t.proposal).map((t) => t.accountId));
+  for (const [id, vers] of candidats) if (proposes.has(vers)) out.set(id, vers);
+  return out;
 }
 
 /**
@@ -75,7 +103,19 @@ export function orderFromTransfer(ledger: Ledger, operationId: Id, today: ISODat
 export function recordOrderFromTransfer(ledger: Ledger, operationId: Id, today: ISODate, id: Id, amount?: Cents): { flow: PlannedFlow; patch: Patch } | undefined {
   const flow = orderFromTransfer(ledger, operationId, today, id, amount);
   if (!flow) return undefined;
-  const avecOrdre: Ledger = { ...ledger, plannedFlows: [...ledger.plannedFlows, flow] };
-  const patch = applyMatch(avecOrdre, { operationId, flowId: flow.id, expectedDate: flow.periodicity.anchorDate, expectedAmount: flow.amount, score: 1, auto: false, reasons: [] });
-  return { flow, patch };
+  return { flow, patch: resumeFirstOccurrence(ledger, operationId, flow) };
+}
+
+/**
+ * Ce que l'enregistrement de l'ordre `flow`, fait du virement importé `operationId`, écrit sur
+ * l'opération (#434, point 5) : elle reprend sa première occurrence, désignée par l'ordre et son
+ * ancrage, la date de l'opération (D88), comme une occurrence confirmée (`applyMatch`) — rapprochée,
+ * ou verrouillée si elle l'était (D22) ; les parts de l'ordre si elle ne porte pas de ventilation, la
+ * sienne sinon (#393, point 2). `flow` est l'ordre tel qu'il s'enregistre : celui que
+ * `orderFromTransfer` propose, ou ce qu'en fait le panneau de correction (#435, point 5). Rien ne
+ * s'écrit ici (I10).
+ */
+export function resumeFirstOccurrence(ledger: Ledger, operationId: Id, flow: PlannedFlow): Patch {
+  const avecOrdre: Ledger = { ...ledger, plannedFlows: [...ledger.plannedFlows.filter((f) => f.id !== flow.id), flow] };
+  return applyMatch(avecOrdre, { operationId, flowId: flow.id, expectedDate: flow.periodicity.anchorDate, expectedAmount: flow.amount, score: 1, auto: false, reasons: [] });
 }

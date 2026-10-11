@@ -30,9 +30,21 @@ export function ordreAPoser(plan: Plan, transfer: PlanTransfer, principalId: Id,
   return standingTransferFlow(plan, transfer, principalId, 'ordre-a-poser', transfer.proposal.amount, existant);
 }
 
+/**
+ * Un motif de libellé se lit-il comme un libellé, un simple texte que la banque peut porter (#435,
+ * point 8) ? Un motif qui contient un caractère qu'une expression régulière interprète — « .* »,
+ * « | », une parenthèse… — n'est le libellé d'aucun virement : il ne se donne pas à recopier, et se
+ * montre comme ce que l'import reconnaît (D11 ; #13, point 6).
+ */
+export function estUnLibelle(motif: string): boolean {
+  return !/[.*+?^${}()|[\]\\]/.test(motif);
+}
+
 export interface Consigne {
-  /** Le libellé à recopier chez la banque, caractère pour caractère ; absent si l'ordre n'en a pas. */
+  /** Le libellé à recopier chez la banque, caractère pour caractère ; absent si l'ordre n'en a pas, ou si son motif n'est pas un simple texte. */
   libelle?: string;
+  /** Le motif que l'import reconnaît, quand il n'est pas un simple texte (`estUnLibelle`) : il ne se recopie pas. */
+  motif?: string;
   /** Le jour du mois de l'ancrage de l'ordre. */
   jour: number;
   /** Quand la banque doit virer, en mots : « le 28 de chaque mois ». */
@@ -55,8 +67,9 @@ export function consigneDe(f: PlannedFlow): Consigne {
     fenetre === 0
       ? 'un virement passé un autre jour n’est pas reconnu à l’import'
       : `un virement passé jusqu’à ${fenetre} jour${fenetre > 1 ? 's' : ''} avant ou après est reconnu à l’import ; au-delà, il ne l’est pas`;
-  const libelle = readLabelPattern(f.labelPattern);
-  return { ...(libelle ? { libelle } : {}), jour: d, quand, fenetre, reconnaissance };
+  const lu = readLabelPattern(f.labelPattern);
+  const motif = lu === undefined ? {} : estUnLibelle(lu) ? { libelle: lu } : { motif: lu };
+  return { ...motif, jour: d, quand, fenetre, reconnaissance };
 }
 
 /**
