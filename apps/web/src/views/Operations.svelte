@@ -2,6 +2,10 @@
   import { app } from '../lib/state.svelte';
   import { money, shortDate, centsToInput, inputToCents } from '../lib/format';
   import { supprimerOperations } from '../lib/suppression';
+  import VentilationOrdre from '../lib/VentilationOrdre.svelte';
+  import PanneauVentilation from '../lib/PanneauVentilation.svelte';
+  import ConsigneOrdre from '../lib/ConsigneOrdre.svelte';
+  import { avecVentilation } from '../lib/ventilationOrdre';
   import {
     alive,
     applyMatch,
@@ -34,6 +38,13 @@
     type Operation,
     type OperationState,
     type Automation,
+    orderFromTransfer,
+    recordOrderFromTransfer,
+    resumeFirstOccurrence,
+    transfersToOrder,
+    type AllocationLine,
+    type Patch,
+    type PlannedFlow,
   } from '@tirelire/core';
 
   type Filter = 'untreated' | 'all' | 'reconciled' | 'locked' | 'transfer';
@@ -98,6 +109,21 @@
     for (const p of proposeMatches(app.ledger, addDays(period.start, -400), addDays(period.end, 40))) m.set(p.operationId, p);
     return m;
   });
+  /*
+   * Les virements importés qui peuvent devenir un ordre permanent, chacun avec son compte d'accueil,
+   * le plan lu à la date de lecture (#435, point 1 ; #434, D52). Rien ne s'écrit avant le geste (I10).
+   */
+  const ordresProposes = $derived(transfersToOrder(app.ledger, app.asOf));
+  /**
+   * Les opérations sur lesquelles l'utilisateur vient d'agir sans quitter l'écran — désignées à la main
+   * comme virement, ou devenues un ordre — : elles y restent, quel que soit le filtre d'affichage
+   * (#435, points 2 et 4). Ne se conserve pas.
+   */
+  let restent = $state<Set<string>>(new Set());
+  function garderALEcran(id: string) {
+    if (!restent.has(id)) restent = new Set([...restent, id]);
+  }
+
   /** Les champs de recherche, convertis en sélection pour le cœur. Vide = critère absent. */
   const selection = $derived.by<AutomationSelection>(() => {
     const out: AutomationSelection = {};
@@ -119,7 +145,8 @@
   const matching = $derived(
     alive(app.ledger.operations)
       .filter((o) => selects(selection, o))
-      .filter((o) => (filter === 'all' ? true : filter === 'transfer' ? !!o.transferAccountId : o.state === filter))
+      // Une opération qui se propose comme ordre est à traiter, quel que soit son état (#435, point 2).
+      .filter((o) => restent.has(o.id) || (filter === 'all' ? true : filter === 'transfer' ? !!o.transferAccountId : o.state === filter || (filter === 'untreated' && ordresProposes.has(o.id))))
       .filter((o) => !periodOnly || (o.date >= period.start && o.date <= period.end))
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Math.abs(b.amount) - Math.abs(a.amount))),
   );
@@ -168,6 +195,7 @@
 
   function startEdit(op: Operation) {
     editingId = op.id;
+    panneauOrdre = false;
     openLevel(op, undefined);
     newCategory = '';
     oneOff = !!op.oneOff;
@@ -443,6 +471,7 @@
 
   function markTransfer(op: Operation, accountId: string) {
     if (!accountId) return;
+    garderALEcran(op.id); // elle ne quitte pas l'écran : si elle se propose alors, sa proposition s'y lit (#435, point 2)
     // Désigner un virement est une modification manuelle : elle verrouille (D22).
     app.upsert('operations', { ...op, state: 'locked', transferAccountId: accountId });
   }
@@ -475,6 +504,48 @@
     for (const a of allocByOp.get(op.id) ?? []) app.store.remove('subOperations', a.id);
     app.upsert('operations', next);
     editingId = undefined;
+  }
+
+  /*
+   * Faire d'un virement importé l'ordre permanent que le plan propose (#435, #434). L'opération ouverte
+   * montre l'ordre tel qu'il s'enregistrera ; un bouton l'enregistre en un geste, un autre ouvre le
+   * panneau de correction de l'écran Plan (#394). Rien ne s'écrit avant l'un des deux « Enregistrer » (I10).
+   */
+  let panneauOrdre = $state(false);
+  const noms = $derived({ tirelires, categories, retirees: app.ledger.tirelires.filter((t) => t.deletedAt) });
+
+  /** L'ordre proposé, tel qu'il s'enregistrera (#434, point 2) ; un aperçu, que rien n'écrit. */
+  function ordreDe(op: Operation): PlannedFlow | undefined {
+    return ordresProposes.has(op.id) ? orderFromTransfer(app.ledger, op.id, app.asOf, 'apercu') : undefined;
+  }
+
+  /** Les virements importés plus anciens vers le même compte qui se proposent aussi (#434, point 7). */
+  function plusAnciens(op: Operation): Operation[] {
+    const vers = ordresProposes.get(op.id);
+    return alive(app.ledger.operations).filter((o) => o.id !== op.id && ordresProposes.get(o.id) === vers && o.date < op.date);
+  }
+
+  /** L'ordre et la reprise de sa première occurrence s'écrivent dans le même geste (#434, point 5). */
+  function ecrireOrdre(op: Operation, flow: PlannedFlow, patch: Patch) {
+    garderALEcran(op.id);
+    app.store.upsert('plannedFlows', flow);
+    app.applyPatch(patch);
+    panneauOrdre = false;
+    editingId = undefined;
+  }
+
+  /** « Enregistrer mon ordre permanent » : l'ordre tel qu'il est montré (#435, point 4). */
+  function enregistrerOrdre(op: Operation) {
+    const r = recordOrderFromTransfer(app.ledger, op.id, app.asOf, app.newId());
+    if (r) ecrireOrdre(op, r.flow, r.patch);
+  }
+
+  /** « Enregistrer » du panneau : exactement ce qu'il montre, ancré sur l'opération, avec son motif (#435, point 5). */
+  function enregistrerOrdreCorrige(op: Operation, montant: number, allocation: AllocationLine[]) {
+    const base = orderFromTransfer(app.ledger, op.id, app.asOf, app.newId(), montant);
+    if (!base) return;
+    const flow = avecVentilation(base, montant, allocation);
+    ecrireOrdre(op, flow, resumeFirstOccurrence(app.ledger, op.id, flow));
   }
 
   /** Une saisie reprise ne se supprime pas tant que la reprise tient (#306, point 9). */
@@ -628,6 +699,9 @@
           {#if counted(op).length} · {counted(op).map((l) => [categoryName(l.categoryId), tirelireName(l.tirelireId), counted(op).length > 1 ? money(l.amount) : ''].filter(Boolean).join(' / ')).join(' + ')}{/if}
           {#if op.suggestedCategory && !allocs.length} · banque : {op.suggestedCategory}{/if}
         </span>
+        {#if ordresProposes.has(op.id)}
+          <span class="sub proposition-ordre" style="color:var(--accent)">Proposition : en faire votre ordre permanent vers « {accountName(ordresProposes.get(op.id))} »</span>
+        {/if}
         {#if prop && op.state !== 'locked'}
           <span class="sub" style="color:var(--accent)">Proposition : reprendre {propositionText(prop)} ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
         {/if}
@@ -635,6 +709,44 @@
       <div class="num {op.amount > 0 ? 'pos' : ''}">{money(op.amount)}</div>
 
       {#if editingId === op.id}
+        {@const ordre = ordreDe(op)}
+        {#if ordre}
+          {@const compte = accountName(ordresProposes.get(op.id))}
+          {@const anciens = plusAnciens(op)}
+          <!-- L'ordre que le plan propose de faire de ce virement, tel qu'il s'enregistrera (#435, point 3). -->
+          <div class="edit ordre-depuis-operation" style="width:100%">
+            <h3 style="margin-top:0">En faire votre ordre permanent</h3>
+            <div class="row"><div class="label">Ordre permanent vers « {compte} »<span class="sub">le montant de cette opération</span></div><div class="num">{money(Math.abs(ordre.amount))}</div></div>
+            <VentilationOrdre montant={Math.abs(ordre.amount)} allocation={ordre.action?.allocation} {compte} {noms} />
+            <ConsigneOrdre {ordre} constate />
+            <p class="small" style="margin:4px 0">
+              L’enregistrer fait de cette opération la première occurrence de l’ordre, qu’elle reprend :
+              {(allocByOp.get(op.id) ?? []).length ? 'elle garde sa propre ventilation, et ne prend pas les parts de l’ordre.' : 'elle prend ses parts.'}
+            </p>
+            {#if anciens.length}
+              <p class="small" style="margin:4px 0">
+                L’ordre commencera avec ce virement du {shortDate(op.date)} : {anciens.length > 1 ? `les ${anciens.length} virements plus anciens` : 'le virement plus ancien'} vers « {compte} » ({anciens.map((o) => shortDate(o.date)).join(', ')}) ne {anciens.length > 1 ? 'seront' : 'sera'} pas repris.
+              </p>
+            {/if}
+            {#if !panneauOrdre}
+              <div class="actions" style="margin:6px 0 0">
+                <button class="btn primary" type="button" onclick={() => enregistrerOrdre(op)}>Enregistrer mon ordre permanent</button>
+                <button class="btn small" type="button" onclick={() => (panneauOrdre = true)}>Modifier avant d’enregistrer</button>
+              </div>
+            {:else}
+              <PanneauVentilation
+                titre={`Enregistrer mon ordre permanent — ${compte}`}
+                montant={Math.abs(ordre.amount)}
+                allocation={ordre.action?.allocation}
+                {compte}
+                {noms}
+                suivre={(m) => orderFromTransfer(app.ledger, op.id, app.asOf, 'apercu', m)?.action?.allocation ?? []}
+                onenregistrer={(m, al) => enregistrerOrdreCorrige(op, m, al)}
+                onannuler={() => (panneauOrdre = false)}
+              />
+            {/if}
+          </div>
+        {/if}
         <form class="edit" style="width:100%" onsubmit={(e) => { e.preventDefault(); save(op); }}>
           {#if op.details}<p class="small muted">{op.details}</p>{/if}
           {#if prop && op.state !== 'locked'}

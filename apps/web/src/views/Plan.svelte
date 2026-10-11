@@ -8,12 +8,13 @@
   import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
   import ConsigneOrdre from '../lib/ConsigneOrdre.svelte';
   import LibelleACopier from '../lib/LibelleACopier.svelte';
+  import MotifReconnu from '../lib/MotifReconnu.svelte';
   import ExplicationSuite from '../lib/ExplicationSuite.svelte';
-  import { ordreAPoser } from '../lib/consigneOrdre';
+  import { estUnLibelle, ordreAPoser } from '../lib/consigneOrdre';
   import { avecVentilation } from '../lib/ventilationOrdre';
   import Manque from '../lib/Manque.svelte';
   import { supprimerOperations } from '../lib/suppression';
-  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, proposedOrderAllocation, keepStandingOrder, resumeStandingOrderProposal, type ForecastMovement, type Operation, type Period, type PlanTransfer, type AllocationLine } from '@tirelire/core';
+  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, proposedOrderAllocation, keepStandingOrder, resumeStandingOrderProposal, transfersToOrder, type ForecastMovement, type Operation, type Period, type PlanTransfer, type AllocationLine } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -159,6 +160,22 @@
   function aUneConsigne(t: PlanTransfer): boolean {
     return (t.permanent > 0 || t.exceptional > 0 || !!t.bankOrder) && (ordresDe(t).length > 0 || (!!t.proposal && t.permanent > 0 && (!t.bankOrder || ecartPropose(t))));
   }
+
+  /*
+   * Les virements importés qui peuvent devenir l'ordre d'un compte, le plan lu à la date de lecture
+   * comme l'écran Opérations les propose (#435, points 1 et 9) : par compte d'accueil, du plus ancien
+   * au plus récent. Rien ne s'écrit (I10).
+   */
+  const virementsQuiSeProposent = $derived.by(() => {
+    const parCompte = new Map<string, Operation[]>();
+    const proposes = transfersToOrder(app.ledger, app.asOf);
+    for (const o of alive(app.ledger.operations)) {
+      const vers = proposes.get(o.id);
+      if (vers) parCompte.set(vers, [...(parCompte.get(vers) ?? []), o]);
+    }
+    for (const liste of parCompte.values()) liste.sort((a, b) => a.date.localeCompare(b.date));
+    return parCompte;
+  });
 
   /** Ce que montre le panneau, exactement (point 4). */
   function enregistrerPanneau(t: PlanTransfer, montant: number, allocation: AllocationLine[]) {
@@ -421,7 +438,7 @@
       </div>
       <!-- Le libellé se lit avec chaque ordre, sa copie et son jour (#13, points 5 et 6) ; une carte sans ordre ni proposition le dit ici. -->
       {#if !aUneConsigne(t)}
-        {#each t.labels as l (l)}<LibelleACopier libelle={l} />{/each}
+        {#each t.labels as l (l)}{#if estUnLibelle(l)}<LibelleACopier libelle={l} />{:else}<MotifReconnu motif={l} />{/if}{/each}
       {/if}
       {#if t.permanent > 0 || t.exceptional > 0 || t.bankOrder}
         <div class="row">
@@ -488,6 +505,21 @@
             <div class="row"><div class="label">{t.bankOrder ? 'Ordre que le plan propose' : 'Ordre permanent proposé'}<span class="sub">arrondi au pas au-dessus de {money(t.permanent)}</span></div><div class="num">{money(t.proposal.amount)}</div></div>
             <VentilationOrdre montant={t.proposal.amount} allocation={t.proposal.allocation} compte={t.accountName} {noms} />
             {#each [ordrePropose(t)].filter((x) => !!x) as aPoser (aPoser.id)}<ConsigneOrdre ordre={aPoser} libelleDejaDit={!!ordreSeul(t) && ordreSeul(t)?.labelPattern === aPoser.labelPattern} />{/each}
+            {#if !t.bankOrder && virementsQuiSeProposent.get(t.accountId)?.length}
+              {@const virements = virementsQuiSeProposent.get(t.accountId)!}
+              <!-- Un virement importé vers ce compte peut devenir l'ordre (#435, point 9) : il se lit, avec sa proposition, sur l'écran Opérations. -->
+              <div class="virements-ordre">
+                <p class="small" style="margin:6px 0 2px">
+                  {virements.length > 1 ? 'Ces virements importés vers' : 'Ce virement importé vers'} « {t.accountName} » {virements.length > 1 ? 'peuvent' : 'peut'} devenir votre ordre permanent :
+                </p>
+                {#each virements as v (v.id)}
+                  <div class="row"><div class="label">{v.label}<span class="sub">du {shortDate(v.date)}</span></div><div class="num">{money(-v.amount)}</div></div>
+                {/each}
+                <div class="actions" style="margin:4px 0 0">
+                  <button class="btn small" onclick={() => app.switchTab('operations')}>{virements.length > 1 ? 'Voir ces virements dans les opérations' : 'Voir ce virement dans les opérations'}</button>
+                </div>
+              </div>
+            {/if}
           </div>
         {/if}
         <div class="actions" style="margin:6px 0 0">
