@@ -1,7 +1,13 @@
 /**
- * Tests du codeur de #365 — la section Catégories, écrite une fois (point 1), sur le texte des sources ; et le
- * brouillon ouvert sur la section (point 7), sans navigateur, sur un vrai dépôt (`LedgerStore`). Ce que l'écran et
- * l'assistant montrent et enregistrent est dans `section-categories-ecran.test.ts`.
+ * Harnais d'audit de #365 — « La section Catégories sert à l'assistant et à l'écran Catégories » : la
+ * section écrite une fois (point 1), sur le texte des sources ; le brouillon ouvert sur la section
+ * (point 7), sans navigateur, sur un vrai dépôt (`LedgerStore`). Ce que l'écran et l'assistant montrent
+ * et enregistrent est dans `section-categories-ecran-harnais.test.ts`.
+ *
+ * Les tests sont ceux du codeur (`section-categories.test.ts`, d'où ils sont déplacés en entier), classés
+ * par la suite de questions de D83. Point 1, niveau 1 : le principe 13 et I11, que la section rend vrais par
+ * construction (D94) ; vu rouge sur le `Wizard.svelte` et le `Categories.svelte` de `main`. Point 7 : ce que
+ * le brouillon couvre et D93, niveau 2 (cas de règle, comme pour #363) ; le titre, niveau 3.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -15,7 +21,7 @@ const ecran = lire('src/views/Categories.svelte');
 const wizard = lire('src/views/Wizard.svelte');
 const composant = lire('src/lib/SectionCategories.svelte');
 
-describe('[niveau 4] #365 · 1 — une section, écrite une fois', () => {
+describe('[niveau 1] #365 · 1 — une section, écrite une fois', () => {
   it('l’assistant et l’écran emploient la même section ; l’assistant sur son brouillon, l’écran sur le projet', () => {
     expect(wizard).toMatch(/<SectionCategories s=\{sectionCategories\} \/>/);
     expect(wizard).toMatch(/new SectionDesCategories\(\s*\{[\s\S]*?app\.assistantLedger[\s\S]*?app\.assistantUpsert/);
@@ -55,12 +61,12 @@ const charge = (id: string, name: string, categoryId?: string): PlannedFlow => (
   ...(categoryId ? { action: { categoryId } } : {}),
 });
 
-describe('[niveau 4] #365 · 7 — le brouillon ouvert sur la section Catégories', () => {
-  it('le titre nomme la section', () => {
+describe('#365 · 7 — le brouillon ouvert sur la section Catégories', () => {
+  it('[niveau 3] le titre nomme la section', () => {
     expect(titreDeLAssistant('categories')).toBe('Compléter mes catégories');
   });
 
-  it('ouvert, il ne couvre que les catégories ; aucun réglage ne se propose d’office, même sur un projet vierge', async () => {
+  it('[niveau 2] ouvert, il ne couvre que les catégories ; aucun réglage ne se propose d’office, même sur un projet vierge', async () => {
     const store = await depot();
     const b = nouveauBrouillon(store.load(), 'categories');
     expect(Object.keys(b.fichier.tables)).toEqual(['categories']);
@@ -69,7 +75,7 @@ describe('[niveau 4] #365 · 7 — le brouillon ouvert sur la section Catégorie
     expect(b.etape).toBe('categories');
   });
 
-  it('une ligne changée des deux côtés suit D93, et ce que le projet a changé ailleurs reste', async () => {
+  it('[niveau 2] une ligne changée des deux côtés suit D93, et ce que le projet a changé ailleurs reste', async () => {
     const store = await depot();
     store.upsert('categories', cat('c-a', 'Alimentation'));
     store.upsert('plannedFlows', charge('f-e', 'Électricité'));

@@ -1,10 +1,19 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #365 — la section Catégories sert à l'assistant et à l'écran Catégories : l'écran Catégories et
- * l'assistant ouvert sur la section, sur l'application montée sans navigateur (`ecran.ts`), au jour des tests. Ce qui
- * se lit ici est ce que l'écran montre et ce que le projet enregistré porte. Chaque titre dit le point du « Fait
- * quand » qu'il vérifie. Que l'étape Catégories de l'assistant complet reste ce qu'elle est (point 2) est vérifié
- * par les tests qu'il nomme ; que la section soit écrite une fois (point 1), par `section-categories.test.ts`.
+ * Harnais d'audit de #365 — « La section Catégories sert à l'assistant et à l'écran Catégories » : l'écran
+ * Catégories et l'assistant ouvert sur la section, sur l'application montée sans navigateur (`ecran.ts`), au
+ * jour des tests. Ce qui se lit ici est ce que l'écran montre et ce que le projet enregistré porte. Chaque
+ * titre dit le point du « Fait quand » qu'il tranche, et son niveau (D83).
+ *
+ * Les tests sont ceux du codeur (`section-categories-ecran.test.ts`, d'où ils sont déplacés en entier). Est de
+ * moi, au point 3, « les opérations déjà classées gardent leur ventilation » : le codeur ne lisait que la
+ * confirmation qui le dit. Niveau 0 : une suppression qui ôterait la catégorie des opérations, ou une
+ * validation qui écrirait hors de la section (point 7), altérerait des données que le code corrigé ne
+ * rendrait pas ; vus rouges sur des mutations du code de la PR, dites dans la vérification de la PR. Niveau 1 :
+ * I5 et I3 sur une base vide (point 5). Niveau 2 : les règles de D32, D46, D59, D61, D94 (points 3 à 5).
+ * Niveau 3 : l'explication repliée (point 6). Que l'étape de l'assistant complet reste ce qu'elle est
+ * (point 2) se tranche par les tests qu'il nomme ; que la section soit écrite une fois (point 1), par
+ * `section-categories-harnais.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, MAIN_ACCOUNT_ID, alive, euros, type Category } from '@tirelire/core';
@@ -46,7 +55,7 @@ async function completerAvecLAssistant() {
   await presser(a!);
 }
 
-describe('[niveau 4] #365 · 5, I5 — sur une base vide, l’écran porte les raccourcis, et rien n’est créé d’office', () => {
+describe('[niveau 1] #365 · 5, I5 — sur une base vide, l’écran porte les raccourcis, et rien n’est créé d’office', () => {
   it('aucune catégorie à l’écran ni dans le projet ; les dix raccourcis sous « Ajouter en un geste » ; l’assistant est offert', async () => {
     await ouvrirLApplication();
     await ouvrir();
@@ -67,7 +76,7 @@ describe('[niveau 4] #365 · 5, I5 — sur une base vide, l’écran porte les r
   });
 });
 
-describe('[niveau 4] #365 · 3 à 6 — l’écran Catégories emploie la section, sur l’exemple', () => {
+describe('[niveau 2] #365 · 3 à 6 — l’écran Catégories emploie la section, sur l’exemple', () => {
   async function ouvrirLExemple() {
     await ouvrirLApplication();
     expect(await cliquer('Charger l\'exemple')).toBe(true);
@@ -184,7 +193,7 @@ describe('[niveau 4] #365 · 3 à 6 — l’écran Catégories emploie la sectio
     expect(enregistrees().find((c) => c.name === 'Coiffeur')?.tirelireId).toBe(tirelire.id);
   });
 
-  it('point 6 — l’explication est repliée sous « Comment ça marche ? », s’ouvre d’un geste, et dit la tirelire par défaut sans dire qu’une catégorie alimente un budget', async () => {
+  it('[niveau 3] point 6 — l’explication est repliée sous « Comment ça marche ? », s’ouvre d’un geste, et dit la tirelire par défaut sans dire qu’une catégorie alimente un budget', async () => {
     const d = document.querySelector('main details.explication') as HTMLDetailsElement;
     expect(t(d.querySelector('summary'))).toBe('Comment ça marche ?');
     expect(d.open).toBe(false);
@@ -198,7 +207,29 @@ describe('[niveau 4] #365 · 3 à 6 — l’écran Catégories emploie la sectio
   });
 });
 
-describe('[niveau 4] #365 · 7 — l’assistant ouvert sur la section Catégories', () => {
+describe('[niveau 0] #365 · 3 — supprimer une catégorie dans l’écran ne touche pas aux opérations déjà classées', () => {
+  it('les sous-opérations classées dans la catégorie supprimée la gardent, vivantes, avec leur part', async () => {
+    await ouvrirLApplication();
+    expect(await cliquer('Charger l\'exemple')).toBe(true);
+    for (let i = 0; i < 200 && !alive(app.ledger.accounts).some((a) => a.name === 'Livret A'); i++) await rendu(), await new Promise((f) => setTimeout(f, 10));
+    await ouvrir();
+    const sante = enregistrees().find((c) => c.name === 'Santé' && c.nature === 'expense')!;
+    const classees = alive(projet().subOperations).filter((s) => s.categoryId === sante.id);
+    expect(classees.length, 'l’exemple n’a plus d’opération classée dans « Santé » : choisir une autre catégorie').toBeGreaterThan(0);
+    const avant = window.confirm;
+    window.confirm = () => true;
+    try {
+      await geste('Santé', 'Supprimer');
+    } finally {
+      window.confirm = avant;
+    }
+    expect(enregistrees().map((c) => c.name)).not.toContain('Santé');
+    const apres = alive(projet().subOperations);
+    for (const s of classees) expect(apres.find((x) => x.id === s.id)).toEqual(s);
+  });
+});
+
+describe('[niveau 0] #365 · 7 — l’assistant ouvert sur la section Catégories', () => {
   it('sur une base vide, ouvert depuis l’écran et validé sans rien toucher : les dix catégories, sans tirelire par défaut ; ni tirelire, ni flux, ni compte, ni jour de début de période', async () => {
     await ouvrirLApplication();
     await ouvrir();
@@ -248,5 +279,20 @@ describe('[niveau 4] #365 · 7 — l’assistant ouvert sur la section Catégori
     expect(alive(p.tirelires)).toEqual(alive(avant.tirelires));
     expect(alive(p.accounts)).toEqual(alive(avant.accounts));
     expect(p.settings).toEqual(avant.settings);
+  });
+});
+
+describe('[niveau 2] #365 · 7 — sur un projet vierge qui porte déjà des catégories, le garnissage n’ajoute que celles de l’exemple qui manquent (D43, D46)', () => {
+  it('« Alimentation », déjà là, n’est ni doublée ni remplacée ; les neuf autres entrent', async () => {
+    await ouvrirLApplication();
+    app.upsert('categories', { id: 'c-ali', name: 'alimentation', nature: 'expense' });
+    await ouvrir();
+    await completerAvecLAssistant();
+    expect(lignes().map((l) => l.nom).sort((a, b) => a.localeCompare(b, 'fr'))).toEqual(['alimentation', ...DIX.filter((n) => n !== 'Alimentation')].sort((a, b) => a.localeCompare(b, 'fr')));
+    expect(await cliquer('Suivant')).toBe(true);
+    expect(await cliquerExactement('Valider')).toBe(true);
+    const p = projet();
+    expect(alive(p.categories).filter((c) => c.name.toLowerCase() === 'alimentation').map((c) => c.id)).toEqual(['c-ali']);
+    expect(alive(p.categories)).toHaveLength(10);
   });
 });
