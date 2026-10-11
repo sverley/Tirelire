@@ -51,8 +51,8 @@ describe('[niveau 2] #214 · 1 — à une autre date de lecture, l’aide est ce
   });
 });
 
-/** Les écrans dont les aides viennent de l'exemple : les formulaires de l'assistant, de la section Comptes (l'assistant et l'écran Comptes), de Tirelires, de Flux prévus, de Catégories et de Saisie. */
-const ECRANS = ['views/Wizard.svelte', 'views/Tirelires.svelte', 'views/Flows.svelte', 'views/Categories.svelte', 'views/Entries.svelte', 'lib/CarteTirelire.svelte', 'lib/FormulaireTirelire.svelte', 'lib/SectionComptes.svelte'];
+/** Les écrans dont les aides viennent de l'exemple : les formulaires de l'assistant, de la section Comptes (l'assistant et l'écran Comptes), de Tirelires, de Flux prévus, de la section Catégories (l'assistant et l'écran Catégories, #365) et de Saisie. */
+const ECRANS = ['views/Wizard.svelte', 'views/Tirelires.svelte', 'views/Flows.svelte', 'views/Categories.svelte', 'views/Entries.svelte', 'lib/CarteTirelire.svelte', 'lib/FormulaireTirelire.svelte', 'lib/SectionComptes.svelte', 'lib/FormulaireCategorie.svelte'];
 /** Les textes indicatifs qui nomment le champ ou son formulaire sans proposer de valeur (point 4) : les seuls qu'un écran peut encore écrire en dur. */
 const INDICATIFS = ['Nom du compte', 'Banque', 'FR76 …', 'cible'];
 

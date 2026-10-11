@@ -669,24 +669,19 @@ async function changerLesDonnées(i: Instance, nouveau: string): Promise<void> {
   await allerÀ(i.page, 'Plus');
   expect(await cliquer(i.page, 'Catégories'), 'écran Catégories introuvable').toBe(true);
   await pause(200);
-  const ouvert = await i.page.evaluate(() => {
-    const b = [...document.querySelectorAll('main .row button')].find((x) => x.textContent?.trim() === 'Modifier') as HTMLButtonElement | undefined;
-    b?.click();
-    return !!b;
-  });
+  // Le nom d'une catégorie se corrige sur sa ligne et s'écrit aussitôt (la section Catégories, #365).
+  const ouvert = await i.page.evaluate(() => !!document.querySelector('main .ligne-categorie input.nom'));
   expect(ouvert, 'aucune catégorie à modifier sur l’écran Catégories').toBe(true);
-  await pause(200);
   const enregistré = await i.page.evaluate(async (nom: string) => {
-    const f = document.querySelector('form') as HTMLFormElement | null;
-    const l = f && [...f.querySelectorAll('label')].find((x) => x.textContent?.trim().startsWith('Nom'));
-    const champ = l?.querySelector('input') as HTMLInputElement | null;
-    if (!f || !champ) return false;
+    const champ = document.querySelector('main .ligne-categorie input.nom') as HTMLInputElement | null;
+    if (!champ) return false;
     champ.value = nom;
-    champ.dispatchEvent(new Event('input', { bubbles: true }));
-    await new Promise((fin) => setTimeout(fin, 50));
-    f.requestSubmit();
-    for (let k = 0; k < 40 && f.isConnected; k++) await new Promise((fin) => setTimeout(fin, 50));
-    return !f.isConnected;
+    champ.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let k = 0; k < 40; k++) {
+      await new Promise((fin) => setTimeout(fin, 50));
+      if ([...document.querySelectorAll('main .ligne-categorie input.nom')].some((x) => (x as HTMLInputElement).value === nom) && !document.querySelector('main .err')) return true;
+    }
+    return false;
   }, nouveau);
   expect(enregistré, `la catégorie ne se renomme pas en « ${nouveau} »`).toBe(true);
   await pause(800);

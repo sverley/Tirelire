@@ -2,27 +2,49 @@
   import { app } from '../lib/state.svelte';
   import { revealed } from '../lib/actions';
   import { alive, findCategoryByName, type Category, type CategoryNature } from '@tirelire/core';
-  import { aidesDeCategorie } from '../lib/aides';
+  import { aideCategorieDeNature } from '../lib/aides';
+  import SectionCategories from '../lib/SectionCategories.svelte';
+  import FormulaireCategorie from '../lib/FormulaireCategorie.svelte';
+  import { NATURES_DE_CATEGORIE, SectionCategories as SectionDesCategories } from '../lib/sectionCategories.svelte';
 
-  let editing = $state<Category | undefined>(undefined);
-  /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
-  let titre = $state('');
-  /** Seul un panneau de création suit la nature ; « Modifier la catégorie — … » ne bouge pas. */
-  let enCréation = $state(false);
-  const titreCréation = (nature: CategoryNature) =>
-    `Ajouter une catégorie de ${nature === 'expense' ? 'dépense' : 'revenu'}`;
-  let form = $state({ name: '', nature: 'expense' as CategoryNature, parentId: '', tirelireId: '' });
-  let error = $state('');
-  /** L'aide du nom (D43) : celui d'une catégorie de l'exemple de la nature choisie. */
-  const aides = $derived(aidesDeCategorie(form.nature));
+  /**
+   * Les lignes des catégories, la correction de leur nom sur place, ce qu'elles disent, leur retrait,
+   * les raccourcis de l'exemple, le formulaire d'ajout et l'explication sont la section Catégories
+   * (#365), la même que celle de l'assistant : elle écrit ici dans le projet. L'écran garde ce qui lui
+   * est propre (D94) — le rangement par nature puis par ordre alphabétique, chaque sous-catégorie en
+   * retrait sous sa parente ; le panneau des champs avancés (D59) ; la confirmation avant de supprimer ;
+   * les deux boutons qui ouvrent, sous eux, le formulaire d'ajout de la nature choisie.
+   */
+  const section = new SectionDesCategories(
+    {
+      get ledger() {
+        return app.ledger;
+      },
+      upsert: (key, row) => app.upsert(key, row),
+      remove: (key, id) => app.remove(key, id),
+      newId: () => app.newId(),
+    },
+    // Hors de l'assistant, l'aide du nom est une catégorie de l'exemple de la nature choisie (D43).
+    (restantes, toutes, nature) => aideCategorieDeNature(restantes, toutes, nature ?? 'expense'),
+  );
 
   const categories = $derived(alive(app.ledger.categories));
   const tirelires = $derived(alive(app.ledger.tirelires));
-  const budgetTirelires = $derived(tirelires);
   const byId = $derived(new Map(categories.map((c) => [c.id, c])));
-  const tirelireName = (id: string | undefined) => tirelires.find((e) => e.id === id)?.name;
 
-  /** Une catégorie et elle-même (pour exclure ses descendants des parents possibles). */
+  /** Le panneau des champs avancés (D59), ouvert par « Modifier » sur une catégorie. */
+  let editing = $state<Category | undefined>(undefined);
+  /** Ce qu'annonce le panneau : figé à l'ouverture, pour ne pas suivre la saisie en cours. */
+  let titre = $state('');
+  let form = $state({ nature: 'expense' as CategoryNature, parentId: '', tirelireId: '' });
+  let error = $state('');
+
+  /** Le formulaire d'ajout de la section, ouvert sous le bouton de sa nature (D59) ; ses champs avancés. */
+  let ajout = $state(false);
+  let avances = $state({ parentId: '', tirelireId: '' });
+  const titreAjout = (nature: CategoryNature) => `Ajouter une catégorie de ${nature === 'expense' ? 'dépense' : 'revenu'}`;
+
+  /** Une catégorie et ses descendantes : on ne la range pas sous l'une d'elles. */
   function descendantsOf(id: string): Set<string> {
     const out = new Set<string>([id]);
     let grew = true;
@@ -37,99 +59,90 @@
     }
     return out;
   }
+  const parentsPossibles = (nature: CategoryNature, sauf?: string) => {
+    const exclues = sauf ? descendantsOf(sauf) : new Set<string>();
+    return categories.filter((c) => c.nature === nature && !exclues.has(c.id)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  };
 
-  const parentChoices = $derived.by(() => {
-    const excluded = editing ? descendantsOf(editing.id) : new Set<string>();
-    return categories.filter((c) => c.nature === form.nature && !excluded.has(c.id)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-  });
-
-  function byNature(nature: CategoryNature) {
-    const all = categories.filter((c) => c.nature === nature);
-    const roots = all.filter((c) => !c.parentId || !byId.has(c.parentId)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-    const children = (id: string) => all.filter((c) => c.parentId === id).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-    return { roots, children };
+  /** Le rangement de l'écran : par ordre alphabétique, chaque sous-catégorie en retrait sous sa parente. */
+  function ranger(nature: CategoryNature): Array<{ c: Category; retrait: boolean }> {
+    const toutes = categories.filter((c) => c.nature === nature);
+    const alpha = (a: Category, b: Category) => a.name.localeCompare(b.name, 'fr');
+    const sortie: Array<{ c: Category; retrait: boolean }> = [];
+    const vues = new Set<string>();
+    const poser = (c: Category, profondeur: number) => {
+      if (vues.has(c.id)) return;
+      vues.add(c.id);
+      sortie.push({ c, retrait: profondeur > 0 });
+      for (const sous of toutes.filter((x) => x.parentId === c.id).sort(alpha)) poser(sous, profondeur + 1);
+    };
+    for (const racine of toutes.filter((c) => !c.parentId || !byId.has(c.parentId) || byId.get(c.parentId)!.nature !== nature).sort(alpha)) poser(racine, 0);
+    return sortie;
   }
 
-  function startNew(nature: CategoryNature) {
-    editing = { id: app.newId(), name: '', nature };
-    form = { name: '', nature, parentId: '', tirelireId: '' };
-    enCréation = true;
-    titre = titreCréation(nature);
-    error = '';
+  function ouvrirAjout(nature: CategoryNature) {
+    editing = undefined;
+    section.vider(nature);
+    avances = { parentId: '', tirelireId: '' };
+    ajout = true;
+  }
+  /** Le parent et la tirelire par défaut dépendent de la nature : ils se vident si le choix ne tient plus. */
+  function natureAjout(nature: CategoryNature) {
+    if (!parentsPossibles(nature).some((c) => c.id === avances.parentId)) avances.parentId = '';
+    if (nature !== 'expense') avances.tirelireId = '';
   }
 
   function startEdit(c: Category) {
+    ajout = false;
     editing = c;
-    form = { name: c.name, nature: c.nature, parentId: c.parentId ?? '', tirelireId: c.tirelireId ?? '' };
-    enCréation = false;
+    form = { nature: c.nature, parentId: c.parentId ?? '', tirelireId: c.tirelireId ?? '' };
     titre = `Modifier la catégorie — ${c.name}`;
     error = '';
   }
-
   function onNatureChange() {
-    // Le parent et la tirelire budget dépendent de la nature ; on les réinitialise si le choix ne tient plus.
-    if (!parentChoices.some((c) => c.id === form.parentId)) form.parentId = '';
+    if (!parentsPossibles(form.nature, editing?.id).some((c) => c.id === form.parentId)) form.parentId = '';
     if (form.nature !== 'expense') form.tirelireId = '';
-    if (enCréation) titre = titreCréation(form.nature);
   }
-
   function save(e: Event) {
     e.preventDefault();
     if (!editing) return;
-    const name = form.name.trim();
-    if (!name) return void (error = 'Le nom est obligatoire.');
-    const clash = findCategoryByName(categories, name, form.nature);
-    if (clash && clash.id !== editing.id) return void (error = `Une catégorie « ${clash.name} » existe déjà pour cette nature.`);
-    const row: Category = {
-      id: editing.id,
-      name,
+    const actuelle = categories.find((c) => c.id === editing!.id) ?? editing;
+    const clash = findCategoryByName(categories, actuelle.name, form.nature);
+    if (clash && clash.id !== actuelle.id) return void (error = `Une catégorie « ${clash.name} » existe déjà pour cette nature.`);
+    const { parentId: _p, tirelireId: _t, ...reste } = actuelle;
+    app.upsert('categories', {
+      ...reste,
       nature: form.nature,
       ...(form.parentId ? { parentId: form.parentId } : {}),
       ...(form.nature === 'expense' && form.tirelireId ? { tirelireId: form.tirelireId } : {}),
-    };
-    app.upsert('categories', row);
+    });
     editing = undefined;
   }
 
+  /** Supprimer retire la catégorie des flux qui la portent, comme dans l'assistant ; les opérations gardent leur ventilation. */
   function remove(c: Category) {
-    const children = categories.filter((x) => x.parentId === c.id);
-    if (children.length) return void alert(`« ${c.name} » a ${children.length} sous-catégorie(s) : détachez-les ou supprimez-les d'abord.`);
-    if (confirm(`Supprimer la catégorie « ${c.name} » ?\nLes opérations déjà classées avec elle gardent leur ventilation.`)) app.remove('categories', c.id);
+    section.retirer(c, () =>
+      confirm(`Supprimer la catégorie « ${c.name} » ?\nElle est retirée des flux prévus qui la portent. Les opérations déjà classées avec elle gardent leur ventilation.`),
+    );
+    if (editing?.id === c.id && !categories.some((x) => x.id === c.id)) editing = undefined;
   }
 </script>
 
 <p class="small"><a href="#top" onclick={(e) => { e.preventDefault(); app.back() || app.switchTab('more'); }}>‹ Configuration</a></p>
 <h1>Catégories</h1>
-<p class="muted small">
-  Classent les opérations, indépendamment des tirelires. Une catégorie de dépense peut être liée à un budget : les
-  opérations qui la portent viennent alors alimenter ce budget dans le bilan.
-</p>
+<!-- L'assistant, ouvert sur la seule section de cet écran (D94, #363, #365) : toujours offert, base vide comprise. -->
+<p class="actions"><a class="btn" href="#top" onclick={(e) => { e.preventDefault(); app.demanderAssistant('categories'); }}>Compléter avec l’assistant</a></p>
 
 {#snippet editeur()}
   <form class="edit attached" use:revealed onsubmit={save}>
     <p class="titre-panneau">{titre}</p>
     <div class="grid">
-      <label class="f">Nom <input bind:value={form.name} placeholder={aides.name} /></label>
       <label class="f">Nature
         <select bind:value={form.nature} onchange={onNatureChange}>
-          <option value="expense">Dépense</option>
-          <option value="income">Revenu</option>
+          {#each NATURES_DE_CATEGORIE as g}<option value={g.nature}>{g.libelle}</option>{/each}
         </select>
       </label>
-      <label class="f">Catégorie parente (facultatif)
-        <select bind:value={form.parentId}>
-          <option value="">— (catégorie principale)</option>
-          {#each parentChoices as c}<option value={c.id}>{c.name}</option>{/each}
-        </select>
-      </label>
-      {#if form.nature === 'expense'}
-        <label class="f">Budget consommé (facultatif)
-          <select bind:value={form.tirelireId}>
-            <option value="">— (simple suivi, pas de budget)</option>
-            {#each budgetTirelires as e}<option value={e.id}>{e.name}</option>{/each}
-          </select>
-        </label>
-      {/if}
+      {@render champsAvances(form, form.nature, editing?.id)}
     </div>
     {#if error}<div class="err">{error}</div>{/if}
     <div class="actions" style="margin:0">
@@ -139,49 +152,60 @@
   </form>
 {/snippet}
 
-{#each [{ nature: 'expense', title: 'Dépenses' }, { nature: 'income', title: 'Revenus' }] as g (g.nature)}
-  {@const { roots, children } = byNature(g.nature as CategoryNature)}
-  <h2>{g.title}</h2>
+<!-- Les champs avancés (D59) : la catégorie parente, et la tirelire par défaut d'une catégorie de dépense (D32). -->
+{#snippet champsAvances(v: { parentId: string; tirelireId: string }, nature: CategoryNature, sauf: string | undefined)}
+  <label class="f">Catégorie parente (facultatif)
+    <select bind:value={v.parentId}>
+      <option value="">— (catégorie principale)</option>
+      {#each parentsPossibles(nature, sauf) as c}<option value={c.id}>{c.name}</option>{/each}
+    </select>
+  </label>
+  {#if nature === 'expense'}
+    <label class="f">Tirelire par défaut (facultatif)
+      <select bind:value={v.tirelireId}>
+        <option value="">— (aucune)</option>
+        {#each tirelires as t}<option value={t.id}>{t.name}</option>{/each}
+      </select>
+    </label>
+  {/if}
+{/snippet}
+
+{#snippet avancesAjout()}
+  {@render champsAvances(avances, section.natureSaisie, undefined)}
+{/snippet}
+
+{#snippet avantNature(nature: CategoryNature)}
+  {@const g = NATURES_DE_CATEGORIE.find((x) => x.nature === nature)!}
   <div class="actions">
-    <button class="btn small" onclick={() => startNew(g.nature as CategoryNature)}>Ajouter une catégorie de {g.title.toLowerCase()}</button>
+    <button class="btn small" onclick={() => ouvrirAjout(nature)}>Ajouter une catégorie de {g.titre.toLowerCase()}</button>
   </div>
-  <!-- Une catégorie qu'on crée n'a pas encore de ligne : son formulaire suit le bouton, dans sa section. -->
-  {#if editing && !categories.some((c) => c.id === editing?.id) && form.nature === g.nature}
+  <!-- Le formulaire d'ajout de la section suit le bouton de sa nature, intitulé et avec les champs avancés (D59). -->
+  {#if ajout && section.natureSaisie === nature}
+    <div use:revealed>
+      <FormulaireCategorie
+        s={section}
+        titre={titreAjout(nature)}
+        champsAvances={() => avances}
+        onnature={natureAjout}
+        onajoute={() => (ajout = false)}
+        onannule={() => (ajout = false)}
+        avances={avancesAjout}
+      />
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet actions(c: Category)}
+  <div class="actions" style="margin:0">
+    <button class="btn small" onclick={() => startEdit(c)}>Modifier</button>
+    <button class="btn small danger" onclick={() => remove(c)}>Supprimer</button>
+  </div>
+{/snippet}
+
+{#snippet apresLigne(c: Category)}
+  {#if editing?.id === c.id}
     {@render editeur()}
   {/if}
-  {#if roots.length === 0}
-    <div class="muted">Aucune catégorie de {g.title.toLowerCase()} pour l'instant.</div>
-  {/if}
-  <div class="card" style="padding:0">
-    {#each roots as c (c.id)}
-      <div class="row" class:editing={editing?.id === c.id}>
-        <div class="label">
-          <strong>{c.name}</strong>
-          {#if c.tirelireId}<span class="sub">budget {tirelireName(c.tirelireId)}</span>{/if}
-        </div>
-        <div class="actions" style="margin:0">
-          <button class="btn small" onclick={() => startEdit(c)}>Modifier</button>
-          <button class="btn small danger" onclick={() => remove(c)}>Supprimer</button>
-        </div>
-      </div>
-      {#if editing?.id === c.id}
-        {@render editeur()}
-      {/if}
-      {#each children(c.id) as sub (sub.id)}
-        <div class="row" class:editing={editing?.id === sub.id} style="padding-left:24px">
-          <div class="label">
-            {sub.name}
-            {#if sub.tirelireId}<span class="sub">budget {tirelireName(sub.tirelireId)}</span>{/if}
-          </div>
-          <div class="actions" style="margin:0">
-            <button class="btn small" onclick={() => startEdit(sub)}>Modifier</button>
-            <button class="btn small danger" onclick={() => remove(sub)}>Supprimer</button>
-          </div>
-        </div>
-        {#if editing?.id === sub.id}
-          {@render editeur()}
-        {/if}
-      {/each}
-    {/each}
-  </div>
-{/each}
+{/snippet}
+
+<SectionCategories s={section} explicationRepliee titreNature="h2" formulaire={false} enEdition={editing?.id} {ranger} {avantNature} {actions} {apresLigne} />

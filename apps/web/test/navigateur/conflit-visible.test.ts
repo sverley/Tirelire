@@ -117,26 +117,27 @@ async function renommerLaCategorie(page: Page, ancien: string, nouveau: string):
   await allerÀ(page, 'Plus');
   expect(await cliquer(page, 'Catégories'), 'écran Catégories introuvable').toBe(true);
   await pause(200);
-  const ouvert = await page.evaluate((nom: string) => {
-    const ligne = [...document.querySelectorAll('.row')].find((r) => r.querySelector('.label strong')?.textContent?.trim() === nom);
-    const b = ligne && ([...ligne.querySelectorAll('button')].find((x) => x.textContent?.trim() === 'Modifier') as HTMLButtonElement | undefined);
-    b?.click();
-    return !!b;
-  }, ancien);
+  // Le nom d'une catégorie se corrige sur sa ligne et s'écrit aussitôt (la section Catégories, #365).
+  const ouvert = await page.evaluate(
+    (nom: string) => [...document.querySelectorAll('.ligne-categorie input.nom')].some((i) => (i as HTMLInputElement).value.trim() === nom),
+    ancien,
+  );
   expect(ouvert, `catégorie « ${ancien} » introuvable sur l’écran Catégories : la première synchronisation ne l’a pas apportée`).toBe(true);
-  await pause(200);
-  const enregistre = await page.evaluate(async (nom: string) => {
-    const f = document.querySelector('form') as HTMLFormElement | null;
-    const l = f && [...f.querySelectorAll('label')].find((x) => x.textContent?.trim().startsWith('Nom'));
-    const champ = l?.querySelector('input') as HTMLInputElement | null;
-    if (!f || !champ) return false;
-    champ.value = nom;
-    champ.dispatchEvent(new Event('input', { bubbles: true }));
-    await new Promise((fin) => setTimeout(fin, 50));
-    f.requestSubmit();
-    for (let i = 0; i < 40 && f.isConnected; i++) await new Promise((fin) => setTimeout(fin, 50));
-    return !f.isConnected;
-  }, nouveau);
+  const enregistre = await page.evaluate(
+    async (ancien: string, nom: string) => {
+      const champ = [...document.querySelectorAll('.ligne-categorie input.nom')].find((i) => (i as HTMLInputElement).value.trim() === ancien) as HTMLInputElement | undefined;
+      if (!champ) return false;
+      champ.value = nom;
+      champ.dispatchEvent(new Event('change', { bubbles: true }));
+      for (let i = 0; i < 40; i++) {
+        await new Promise((fin) => setTimeout(fin, 50));
+        if ([...document.querySelectorAll('.ligne-categorie input.nom')].some((x) => (x as HTMLInputElement).value === nom) && !document.querySelector('main .err')) return true;
+      }
+      return false;
+    },
+    ancien,
+    nouveau,
+  );
   expect(enregistre, `la catégorie ne se renomme pas en « ${nouveau} »`).toBe(true);
   await pause(600);
 }
