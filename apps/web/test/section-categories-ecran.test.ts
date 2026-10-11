@@ -115,7 +115,7 @@ describe('[niveau 4] #365 · 3 à 6 — l’écran Catégories emploie la sectio
     await geste('Alimentation', 'Modifier');
     const f = document.querySelector('main form.edit.attached');
     expect(t(f?.querySelector('.titre-panneau'))).toBe('Modifier la catégorie — Alimentation');
-    const libelles = tous('label.f', f!).map((l) => t(l).split(/\s—|\s{2}/)[0]);
+    const libelles = tous('label.f', f!).map((l) => t(l));
     expect(libelles.some((x) => x.startsWith('Nature'))).toBe(true);
     expect(libelles.some((x) => x.startsWith('Catégorie parente (facultatif)'))).toBe(true);
     expect(libelles.some((x) => x.startsWith('Tirelire par défaut (facultatif)'))).toBe(true);
