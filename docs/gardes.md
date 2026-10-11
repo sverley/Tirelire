@@ -148,7 +148,14 @@ de son test.
   même montant, est repris par l'ordre sans rien demander. Sinon, et notamment si elle ne touche que
   des tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi
   l'application n'est pas atteinte.
-- **À bâtir** · (U3) le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
+- **Harnais** · `packages/core/test/parcours-u3.test.ts` — « parcours U3 · du budget sans virement validé à l’ordre fait d’un virement importé » :
+  d'une base vide, le budget de l'assistant écrit sans valider d'ordre ; un relevé du compte
+  principal importé, dont le virement vers le compte d'accueil, au libellé de la banque et d'un autre
+  montant, n'est reconnu vers aucun compte ; désigné, il reste non affecté ; l'ordre proposé, au
+  montant du virement et ventilé comme le plan le propose pour ce montant, s'enregistre tel quel et
+  reprend le virement avec ses parts ; le plan signale son écart avec le budget sans le réécrire, et
+  le virement du mois suivant est repris sans proposition — relu après chaque redémarrage (#434, #435).
+  Témoin rouge : « témoin rouge · un ordre ventilé comme le budget le demande, et non comme le plan le propose pour le montant du virement »
 - **Harnais** · `packages/core/test/review.test.ts` — (U4) bilans par catégorie et des provisions
   tirés des opérations ; une proposition d'ajustement ne s'applique jamais seule.
   Témoin rouge : « témoin rouge · un bilan qui compte les dépenses ponctuelles dans la moyenne »

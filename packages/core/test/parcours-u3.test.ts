@@ -1,5 +1,6 @@
 /**
- * Parcours de bout en bout de **U3 · budget sans virements validés, puis import** (#40, #436).
+ * Harnais d'audit de #436 : le parcours de bout en bout de **U3 · budget sans virements validés,
+ * puis import** (#40), au registre (I3), avec son témoin rouge.
  *
  * L'usage : le budget construit, l'utilisateur ne valide aucun des virements permanents proposés ;
  * il importe ensuite un relevé du compte principal où figure le virement qu'il fait déjà vers un
@@ -257,7 +258,7 @@ async function parcoursU3(site: string, enregistrer: Enregistrer): Promise<void>
   expect(surLeLivret(ledger, '2026-10-20')).toEqual({ 'tir-courses': 0, 'tir-taxe': euros(200), 'tir-vacances': euros(300) });
 }
 
-describe('[niveau 4] I3 (U3) · parcours de bout en bout', () => {
+describe('[niveau 1] harnais du registre · I3 (U3)', () => {
   describe('U3 · budget sans virements validés, puis import, de bout en bout (#40, #436)', () => {
     it('parcours U3 · du budget sans virement validé à l’ordre fait d’un virement importé', async () => {
       await parcoursU3('parcours-u3', enregistrerCommeLÉcran);
