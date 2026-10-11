@@ -16,6 +16,7 @@
   import Manque from '../lib/Manque.svelte';
   import SectionTirelires from '../lib/SectionTirelires.svelte';
   import SectionComptes from '../lib/SectionComptes.svelte';
+  import SectionCategories from '../lib/SectionCategories.svelte';
   import VentilationOrdre from '../lib/VentilationOrdre.svelte';
   import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
   import ConsigneOrdre from '../lib/ConsigneOrdre.svelte';
@@ -23,6 +24,7 @@
   import { ordreAPoser } from '../lib/consigneOrdre';
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
+  import { SectionCategories as SectionDesCategories } from '../lib/sectionCategories.svelte';
   import { carteDeLOrdre, fichierAEnregistrer, ordreEnregistre, partsDeLOrdre, preparerValidation, titreDeLAssistant, type SectionAssistant } from '../lib/brouillon';
   import { direDifference } from '../lib/differenceAssistant';
   import { saveFile } from '../lib/platform';
@@ -43,16 +45,11 @@
     needName,
     nextOccurrence,
     budgetSuggestions,
-    findCategoryByName,
-    suggestedCategory,
     suggestedFlow,
     suggestedOrder,
     standingOrderTarget,
     MAIN_ACCOUNT_ID,
     type PeriodUnit,
-    type Category,
-    type CategoryNature,
-    type CategorySuggestion,
     type Cents,
     type FlowSuggestion,
     type OrderSuggestion,
@@ -64,7 +61,6 @@
     aideFlux,
     montantAide,
     parNom,
-    recopieCategorie,
     recopieFlux,
     versionMontree,
     type FluxPropose,
@@ -88,6 +84,7 @@
   const ETAPES_DES_SECTIONS: Record<SectionAssistant, Step[]> = {
     comptes: ['accounts', 'summary'],
     tirelires: ['everyday', 'periodic', 'savings', 'summary'],
+    categories: ['categories', 'summary'],
   };
 
   /**
@@ -103,7 +100,11 @@
   const sectionOuverte = brouillon.section;
   const STEPS = sectionOuverte ? TOUTES_LES_ETAPES.filter((s) => ETAPES_DES_SECTIONS[sectionOuverte].includes(s.id)) : TOUTES_LES_ETAPES;
   /** L'écran d'où l'assistant ouvert sur une section a été ouvert, et où il ramène (#363, point 6). */
-  const ECRAN_DE_LA_SECTION = { comptes: { vue: 'accounts', retour: 'Revenir aux comptes' }, tirelires: { vue: 'tirelires', retour: 'Revenir aux tirelires' } } as const;
+  const ECRAN_DE_LA_SECTION = {
+    comptes: { vue: 'accounts', retour: 'Revenir aux comptes' },
+    tirelires: { vue: 'tirelires', retour: 'Revenir aux tirelires' },
+    categories: { vue: 'categories', retour: 'Revenir aux catégories' },
+  } as const;
   function revenirALEcran() {
     if (!sectionOuverte) return;
     const { vue } = ECRAN_DE_LA_SECTION[sectionOuverte];
@@ -129,7 +130,6 @@
   const comptesOuverts = $derived(openAccounts(accounts, app.asOf));
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
   const fixedCharges = $derived(flows.filter((f) => f.kind === 'fixedCharge'));
-  const tirelireById = (id: string) => tirelires.find((e) => e.id === id);
   const plan = $derived(app.assistantPlan);
   const totals = $derived(plan.totals);
   /**
@@ -170,8 +170,7 @@
   }
 
   function goStep(s: Step) {
-    catLigneError = '';
-    catError = '';
+    sectionCategories.effacerErreurs();
     step = s;
     brouillon.etape = s;
     semer(s);
@@ -304,6 +303,20 @@
     ordreEnregistre: (id) => enregistre(id),
   });
 
+  // --- Catégories : la section, écrite une fois (#365), qui écrit ici dans le brouillon (#210) ---
+  const sectionCategories = new SectionDesCategories(
+    {
+      get ledger() {
+        return app.assistantLedger;
+      },
+      upsert: (key, row) => app.assistantUpsert(key, row),
+      remove: (key, id) => app.assistantRemove(key, id),
+      newId: () => app.newId(),
+    },
+    // L'aide du formulaire : la ligne du premier raccourci restant de l'étape, à défaut la première de l'exemple (D43).
+    (restantes, toutes) => aideCategorie(restantes, toutes),
+  );
+
   // --- Placement des réserves ---
   /** Placement voulu d'une tirelire (D38) : tout sur un compte, ou rien de déclaré. */
   function setPlacement(e: Tirelire, accountId: string) {
@@ -362,8 +375,6 @@
   const restantsOrdres = $derived(
     propositions.orders.filter((o) => !dejaPris(o.name) && suggestedOrder(o, { id: '', principalId: mainAccountId(), compte: compteNomme }) !== undefined),
   );
-  /** Une catégorie de même nature et de même nom n'est plus proposée : une catégorie se reconnaît à sa nature et à son nom (D46, D61). */
-  const restantesCategories = $derived(propositions.categories.filter((p) => !findCategoryByName(categories, p.name, p.nature)));
 
   // --- Aides des champs (#214) : ce que les champs vides d'un formulaire d'ajout laissent lire ---
   // Elles viennent de l'exemple (`../lib/aides`), d'une même ligne par formulaire : celle que le
@@ -373,7 +384,6 @@
   // dont chaque champ porte la valeur de son aide fait ce que fait le raccourci de cette ligne.
   const aideRevenu = $derived(aideFlux(restantsRevenus, parNom(propositions.incomes), app.asOf));
   const aideCharge = $derived(aideFlux(restantsCharges, parNom(propositions.charges), app.asOf));
-  const aideDeCategorie = $derived(aideCategorie(restantesCategories, propositions.categories));
   /** Le compte que l'exemple donne à une ligne, ici : celui du même nom, à défaut le compte principal (D40). */
   const compteNommeOuPrincipal = (nom?: string) => (nom ? compteNomme(nom) : undefined) ?? mainAccountId();
   /** Ce que montrent les champs sans texte indicatif d'un flux : ce qu'on y a posé, sinon la valeur de la ligne d'aide. */
@@ -389,7 +399,6 @@
     day: fix.day ?? String(aideCharge?.day ?? 5),
     accountId: fix.accountId ?? compteNommeOuPrincipal(aideCharge?.version.accountName),
   });
-  const natureDeCategorie = $derived.by((): CategoryNature => cat.nature ?? aideDeCategorie?.nature ?? 'expense');
 
   // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
   /**
@@ -420,22 +429,6 @@
       if (gardees.length === parts.length) continue;
       const { allocation: _retirees, ...action } = f.action!;
       app.assistantUpsert('plannedFlows', { ...f, action: gardees.length ? { ...action, allocation: gardees } : action });
-    }
-  }
-  /**
-   * Une catégorie de l'exemple, avec ses liens vers ce qui existe ici, par noms (D46) : sa tirelire
-   * par défaut quand une tirelire porte le nom que l'exemple dit — sinon elle se garde sans (D32, I3) —,
-   * et chaque flux que l'exemple lui donne : le flux de même nom et de même genre, quand il n'a pas
-   * déjà une catégorie, que celle posée l'emporte.
-   */
-  function appliquerCategorie(p: CategorySuggestion) {
-    const id = app.newId();
-    const tirelire = p.tirelireName === undefined ? undefined : tirelires.find((t) => t.name === p.tirelireName);
-    app.assistantUpsert('categories', suggestedCategory(p, { id, ...(tirelire ? { tirelireId: tirelire.id } : {}) }));
-    for (const lie of p.flows) {
-      for (const f of flows.filter((x) => x.name === lie.name && x.kind === lie.kind && x.action?.categoryId === undefined)) {
-        app.assistantUpsert('plannedFlows', { ...f, action: { ...f.action, categoryId: id } });
-      }
     }
   }
   /**
@@ -470,7 +463,7 @@
     if (etape === 'fixed') restantsCharges.forEach(appliquerCharge);
     if (etape === 'everyday' || etape === 'periodic' || etape === 'savings') section.garnir(etape);
     // Les catégories viennent après les flux et les tirelires, vers lesquels elles se lient (D32).
-    if (etape === 'categories') restantesCategories.forEach(appliquerCategorie);
+    if (etape === 'categories') sectionCategories.garnir();
     // L'ordre se propose là où l'assistant demande où dort chaque tirelire : au résumé — de l'assistant
     // complet seulement : ouvert sur une section, il ne touche à aucun ordre permanent (#363, point 4).
     if (etape === 'summary' && !sectionOuverte) restantsOrdres.forEach(appliquerOrdre);
@@ -515,78 +508,6 @@
   }
   function removeFlow(f: PlannedFlow) {
     app.assistantRemove('plannedFlows', f.id);
-  }
-  // --- Catégories : celles de l'exemple, avec leurs liens (D32), modifiables sur place ---
-  const NATURES_DE_CATEGORIE: Array<{ nature: CategoryNature; titre: string; vide: string }> = [
-    { nature: 'expense', titre: 'Dépenses', vide: 'Aucune catégorie de dépense pour l’instant.' },
-    { nature: 'income', titre: 'Revenus', vide: 'Aucune catégorie de revenu pour l’instant.' },
-  ];
-  /** La nature se choisit ; tant qu'on n'y a pas touché (`undefined`), elle est celle de la ligne d'aide (#214). */
-  let cat = $state<{ name: string; nature?: CategoryNature | undefined }>({ name: '' });
-  /** Ce qu'un geste sur une ligne de catégorie refuse (renommer en doublon, retirer un parent), et pourquoi. Chaque refus s'efface au geste suivant de l'étape, et quand on la quitte. */
-  let catLigneError = $state('');
-  let catError = $state('');
-  /**
-   * Deux catégories de même nature ne portent pas le même nom (D61) : le message dit laquelle existe
-   * déjà. `sauf` est la catégorie qu'on renomme, qui ne fait pas doublon avec elle-même (« santé » pour « Santé »).
-   */
-  const doublonDe = (nom: string, nature: CategoryNature, sauf?: string) => {
-    const existante = findCategoryByName(categories.filter((x) => x.id !== sauf), nom, nature);
-    return existante ? `Une catégorie « ${existante.name} » existe déjà pour cette nature.` : '';
-  };
-  /** Ce que l'étape dit d'une catégorie : sa catégorie parente, sa tirelire par défaut et les flux qui la portent, une fois chacun. */
-  function detailDe(c: Category): string {
-    const parties: string[] = [];
-    const parent = c.parentId ? categories.find((x) => x.id === c.parentId)?.name : undefined;
-    if (parent) parties.push(`Dans « ${parent} »`);
-    const tirelire = c.tirelireId ? tirelireById(c.tirelireId)?.name : undefined;
-    if (tirelire) parties.push(`Tirelire par défaut : ${tirelire}`);
-    const portes = [...new Set(flows.filter((f) => f.action?.categoryId === c.id).map((f) => f.name))];
-    if (portes.length) parties.push(`Flux : ${portes.join(', ')}`);
-    return parties.join(' · ');
-  }
-  /** Renomme une catégorie ; un nom vide ou déjà pris par une catégorie de même nature est refusé, et le champ reprend le nom d'avant. */
-  function editCategoryName(c: Category, champ: HTMLInputElement) {
-    catError = '';
-    const nom = champ.value.trim();
-    const refus = !nom ? 'Le nom est obligatoire.' : nom === c.name ? '' : doublonDe(nom, c.nature, c.id);
-    if (refus || nom === c.name) {
-      champ.value = c.name;
-      catLigneError = refus;
-      return;
-    }
-    catLigneError = '';
-    app.assistantUpsert('categories', { ...c, name: nom });
-  }
-  /** Retire une catégorie, et elle ne reste sur aucun flux. Une catégorie qui en porte d'autres ne se retire pas, comme dans Catégories. */
-  function removeCategory(c: Category) {
-    catError = '';
-    const enfants = categories.filter((x) => x.parentId === c.id).length;
-    if (enfants) return void (catLigneError = `« ${c.name} » a ${enfants} sous-catégorie(s) : détachez-les ou retirez-les d’abord.`);
-    for (const f of flows.filter((f) => f.action?.categoryId === c.id)) {
-      const { categoryId: _retiree, ...action } = f.action!;
-      const { action: _avant, ...sans } = f;
-      app.assistantUpsert('plannedFlows', Object.keys(action).length ? { ...sans, action } : sans);
-    }
-    app.assistantRemove('categories', c.id);
-    catLigneError = '';
-  }
-  function addCategory() {
-    catLigneError = '';
-    const nom = cat.name.trim();
-    if (!nom) return void (catError = 'Donnez un nom à cette catégorie.');
-    const nature = natureDeCategorie;
-    const refus = doublonDe(nom, nature);
-    if (refus) return void (catError = refus);
-    const ligne = aideDeCategorie;
-    if (ligne && recopieCategorie({ name: nom, nature }, ligne)) {
-      appliquerCategorie(ligne.ligne);
-      cat = { name: '' };
-    } else {
-      app.assistantUpsert('categories', { id: app.newId(), name: nom, nature } satisfies Category);
-      cat = { ...cat, name: '' };
-    }
-    catError = '';
   }
   /**
    * Ce que la validation va changer au projet du moment (#379, point 3) : la différence entre le
@@ -861,46 +782,7 @@
   <SectionTirelires s={section} genre="savings" cartes={section.parTirelire('savings')} />
 {:else if step === 'categories'}
   <h2>Comment classer vos dépenses et vos rentrées ?</h2>
-  <p class="muted small">
-    Une catégorie dit à quoi sert une opération : les courses, le loyer, un salaire. Elle classe vos
-    opérations sans demander de tirelire ; gardez celles qui vous parlent, renommez ou retirez les autres.
-  </p>
-  {#each NATURES_DE_CATEGORIE as g (g.nature)}
-    <h3>{g.titre}</h3>
-    {#each categories.filter((c) => c.nature === g.nature) as c (c.id)}
-      {@const detail = detailDe(c)}
-      <div class="card ligne ligne-categorie">
-        <input class="nom" value={c.name} aria-label="Nom de la catégorie" onchange={(e) => editCategoryName(c, e.currentTarget)} />
-        <button class="btn small danger" title="Retirer cette catégorie" onclick={() => removeCategory(c)}>×</button>
-        {#if detail}<p class="muted small suite">{detail}</p>{/if}
-      </div>
-    {:else}
-      <p class="muted small">{g.vide}</p>
-    {/each}
-  {/each}
-  {#if catLigneError}<div class="err">{catLigneError}</div>{/if}
-  {#if restantesCategories.length}
-    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
-    <div class="propositions">
-      {#each restantesCategories as p (p.nature + p.name)}
-        <button class="prop" onclick={() => appliquerCategorie(p)}>
-          <span class="n">+ {p.name}</span><span class="v">{p.nature === 'income' ? 'revenu' : 'dépense'}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-  <form class="edit" onsubmit={(e) => { e.preventDefault(); addCategory(); }}>
-    <div class="grid">
-      <label class="f">Nom de la catégorie <input bind:value={cat.name} placeholder={aideDeCategorie?.name} /></label>
-      <label class="f">Nature
-        <select value={natureDeCategorie} onchange={(e) => (cat.nature = e.currentTarget.value as CategoryNature)}>
-          {#each NATURES_DE_CATEGORIE as g}<option value={g.nature}>{g.nature === 'expense' ? 'Dépense' : 'Revenu'}</option>{/each}
-        </select>
-      </label>
-    </div>
-    {#if catError}<div class="err">{catError}</div>{/if}
-    <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter une catégorie</button></div>
-  </form>
+  <SectionCategories s={sectionCategories} />
 {:else if step === 'accounts'}
   <h2>Vos comptes en banque</h2>
   <SectionComptes s={sectionComptes} />
@@ -1100,8 +982,8 @@
 {/if}
 
 {#snippet ouDortChaqueTirelire()}
-<!-- La question de l'assistant complet, aux mêmes conditions ; ouvert sur la section Comptes, il ne la pose pas (#363, point 4). -->
-{#if !valide && sectionOuverte !== 'comptes' && comptesOuverts.length > 1 && tirelires.length}
+<!-- La question de l'assistant complet, aux mêmes conditions ; ouvert sur la section Comptes ou Catégories, il ne la pose pas (#363, point 4 ; #365, point 7). -->
+{#if !valide && (!sectionOuverte || sectionOuverte === 'tirelires') && comptesOuverts.length > 1 && tirelires.length}
   <h3>Où dort chaque tirelire ?</h3>
   <p class="muted small">Le compte où son argent est mis de côté. Laissez « Peu importe » si vous ne savez pas : ça se change à tout moment.</p>
   {#each tirelires as e (e.id)}

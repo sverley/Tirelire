@@ -230,6 +230,9 @@ function installer() {
       const requis = noms.filter((n) => lus.some((l) => l.includes(n)));
       return { requis: [...new Set(requis)].sort(), conteneur: (ligne ? 'ligne' : 'carte') as Conteneur };
     }
+    // Une catégorie porte son nom dans le champ de sa ligne (la section Catégories, #365) : ses gestes sont sur la ligne.
+    const ligneDeCategorie = b.closest('.ligne-categorie');
+    if (ligneDeCategorie) return { requis: noms.filter((n) => valeur(ligneDeCategorie.querySelector('input.nom')).includes(n)).sort(), conteneur: 'ligne' as Conteneur };
     const ligne = b.closest('.row');
     const carte = b.closest('.card');
     // Une carte de compte porte son nom dans le champ de sa ligne (la section Comptes, #362).

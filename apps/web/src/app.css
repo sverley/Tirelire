@@ -198,6 +198,9 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 .ligne-compte > .coussin { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 6px; align-items: center; margin: 2px 0 0; }
 /* Une catégorie de l'assistant : son nom et de quoi la retirer ; ce qu'elle porte (tirelire par défaut, flux) vient dessous (#212). */
 .ligne.ligne-categorie { grid-template-columns: minmax(0, 1fr) 44px; } /* 44 px : la cible tactile du bouton (C9), pour qu'il ne déborde pas de la carte */
+/* Dans l'écran Catégories, la ligne porte « Modifier » et « Supprimer » ; une sous-catégorie se range en retrait sous sa parente (#365). */
+.ligne.ligne-categorie.avec-actions { grid-template-columns: minmax(0, 1fr) auto; }
+.ligne.ligne-categorie.sous { margin-left: 24px; }
 /* Une tirelire de l'assistant : son en-tête (nom, déjà de côté, reliquat), puis ses besoins (D28, #336). */
 .card.tirelire { padding: 8px; margin-bottom: 6px; }
 .ligne-tirelire { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }

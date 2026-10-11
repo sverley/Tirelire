@@ -197,6 +197,13 @@ export function aideCategorie(restantes: readonly CategorySuggestion[], toutes: 
   const ligne = ligneDAide(restantes, toutes);
   return ligne ? { ligne, name: ligne.name, nature: ligne.nature } : undefined;
 }
+/**
+ * Catégories, hors de l'assistant (#365, D43) : la ligne d'aide de la nature choisie — celle du premier
+ * raccourci restant de cette nature, à défaut la première catégorie de l'exemple de cette nature.
+ */
+export function aideCategorieDeNature(restantes: readonly CategorySuggestion[], toutes: readonly CategorySuggestion[], nature: CategoryNature): AideCategorie | undefined {
+  return aideCategorie(restantes.filter((p) => p.nature === nature), toutes.filter((p) => p.nature === nature));
+}
 export const recopieCategorie = (s: { name: string; nature: CategoryNature }, a: AideCategorie): boolean => s.name === a.name && s.nature === a.nature;
 
 /** Comptes : le nom, le type et le solde actuel. */

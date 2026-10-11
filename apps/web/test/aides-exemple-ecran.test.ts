@@ -306,11 +306,12 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
     await ouvrirLExemple();
     expect(await ecran('Catégories')).toBe(true);
     const categories = alive(exemple.categories);
+    // Le formulaire d'ajout de l'écran est celui de la section Catégories (#365) : son champ s'appelle comme dans l'assistant.
     expect(await cliquer('Ajouter une catégorie de dépenses')).toBe(true);
-    expect(categories.find((c) => c.name === champ('Nom').aide)?.nature).toBe('expense');
+    expect(categories.find((c) => c.name === champ('Nom de la catégorie').aide)?.nature).toBe('expense');
     await cliquer('Annuler');
     expect(await cliquer('Ajouter une catégorie de revenus')).toBe(true);
-    expect(categories.find((c) => c.name === champ('Nom').aide)?.nature).toBe('income');
+    expect(categories.find((c) => c.name === champ('Nom de la catégorie').aide)?.nature).toBe('income');
   });
 
   it('[niveau 2] #214 point 3 (table #417, aides 12) — Saisie : le libellé, le montant et la catégorie d’aide sont ceux d’une même opération saisie de l’exemple de la nature choisie', async () => {

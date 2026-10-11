@@ -159,6 +159,16 @@ describe('[niveau 1] I11 · harnais du registre', () => {
         b.click();
         return { trouvé: true, bouton: true };
       }
+      // Une catégorie porte son nom dans le champ de sa ligne, et son « Modifier » sur la ligne (la section Catégories, #365).
+      const ligneDeCategorie = ([...document.querySelectorAll('.ligne-categorie')] as HTMLElement[]).find(
+        (l) => ((l.querySelector('input.nom') as HTMLInputElement | null)?.value ?? '').trim() === nom,
+      );
+      if (ligneDeCategorie) {
+        const b = ([...ligneDeCategorie.querySelectorAll('button')] as HTMLButtonElement[]).find((x) => (x.textContent ?? '').trim() === 'Modifier');
+        if (!b) return { trouvé: true, bouton: false };
+        b.click();
+        return { trouvé: true, bouton: true };
+      }
       const label = [...document.querySelectorAll('.label')].find((l) => propre(l) === nom);
       // Un compte porte son nom dans le champ de sa ligne, dans sa carte (la section Comptes, #362) : le bouton est dans la carte.
       const ligneDeCompte = [...document.querySelectorAll('.card > .ligne-compte')].find((l) => ((l.querySelector('input') as HTMLInputElement | null)?.value ?? '').trim() === nom);

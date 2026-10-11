@@ -102,14 +102,23 @@ async function suivant(n: number) {
   for (let i = 0; i < n; i++) expect(await cliquer('Suivant'), 'pas de bouton « Suivant »').toBe(true);
 }
 
-/** Ce que l'écran Catégories du projet dit : chaque catégorie, sa nature (le titre qui la range) et son budget. */
+/**
+ * Ce que l'écran Catégories du projet dit : chaque catégorie, sa nature (le titre qui la range) et sa tirelire par
+ * défaut. La ligne de l'écran est celle de la section Catégories (#365) : le nom dans son champ, la tirelire par
+ * défaut dans ce qu'elle dit dessous.
+ */
 async function categoriesDeLEcran(): Promise<Array<{ nature: string; nom: string; budget: string }>> {
   expect(await ecran('Catégories')).toBe(true);
   const sortie: Array<{ nature: string; nom: string; budget: string }> = [];
   let nature = '';
-  for (const e of tous('main h2, main .row .label')) {
+  for (const e of tous('main h2, main .ligne-categorie')) {
     if (e.tagName === 'H2') nature = t(e);
-    else sortie.push({ nature, nom: t(e.querySelector('strong')), budget: t(e.querySelector('.sub')).replace(/^budget\s*/, '') });
+    else
+      sortie.push({
+        nature,
+        nom: (e.querySelector('input.nom') as HTMLInputElement).value,
+        budget: /Tirelire par défaut : ([^·]+)/.exec(t(e.querySelector('.suite')))?.[1]?.trim() ?? '',
+      });
   }
   return sortie;
 }
