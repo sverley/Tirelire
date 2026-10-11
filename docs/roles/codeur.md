@@ -65,7 +65,11 @@ dans ton compte rendu (#355).
    Écris-les dans tes propres fichiers, jamais dans celui du harnais, et marque-les tous de niveau 4
    (`[niveau 4]`) : un codeur ne fait pas de test de niveau inférieur ; seul l'auditeur donne un
    autre niveau, aux tests qu'il retient (porteur, #283 ; D83). Hors un test navigateur de débogage,
-   ils restent dans le dépôt et ne se jouent que nommément ou au seuil 4. Un test qui ne sert qu'à
+   ils restent dans le dépôt et ne se jouent que nommément ou au seuil 4. Quand le besoin ajoute ou
+   change une ligne `Harnais` du registre (`docs/gardes.md`), ou nomme un harnais dans
+   `docs/versions.md`, ne l'écris pas : la garde la refuserait, car elle n'accepte au registre aucun
+   test de niveau 4 (D81) ; nomme dans ton compte rendu le test qu'elle devra citer, et l'auditeur
+   l'écrit avec le niveau qu'il donne (#436). Un test qui ne sert qu'à
    développer une fonction de la garde est un test de développement : il va dans
    `packages/gardes/dev/`, en fichier `*.dev.mjs` (D81).
    Si ton codage change ce que vérifie un test existant, adapte-le, sans toucher à son niveau,

@@ -55,8 +55,8 @@ de travail : une version prévue attend que les précédentes soient publiées (
 
 - **Usage** · U3 · Budget sans virements validés, puis import.
 - **Cibles** · Webapp · Chromium sur Android ; Webapp · Chromium sur ordinateur.
-- **Fin** · le parcours U3 d'I3 est vert — son harnais reste à bâtir (dette d'I3 au registre), et le
-  porteur a fait `VM-I3-u3-rapprochement` sur chacune des deux cibles.
+- **Fin** · le parcours U3 d'I3 (`packages/core/test/parcours-u3.test.ts`) est vert, et le porteur a
+  fait `VM-I3-u3-rapprochement` sur chacune des deux cibles.
 - **Tag** · `v0.3`.
 
 ## v0.4 · Budget reconstruit

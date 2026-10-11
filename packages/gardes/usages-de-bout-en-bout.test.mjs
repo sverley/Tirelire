@@ -172,6 +172,20 @@ const sansDette = (texte) => texte.replace(/^- \*\*À bâtir\*\* · .*\n(?:[ \t]
 const sansDetteDe = (texte, id) =>
   texte.replace(new RegExp(`^- \\*\\*À bâtir\\*\\* · \\(${id}\\).*\\n(?:[ \\t]+\\S.*\\n)*`, 'm'), '');
 
+/**
+ * La version « dette due » d'un usage dont le parcours part avec son besoin : son parcours retiré
+ * s'il est bâti, et sa ligne « À bâtir » qui renvoie à son besoin, remise si elle n'y est plus. Le
+ * témoin de sa dette se joue dessus, vert avant comme après la construction du parcours (#436).
+ */
+function avecDetteDe(texte, id) {
+  const [e] = entreesDesUsages(texte, [id]);
+  const sansSonParcours = retirerLignes(texte, new Set(ajoutes(e).map((h) => h.ligne)));
+  const issue = PARCOURS_AVEC_LE_BESOIN[id];
+  const [reste] = entreesDesUsages(sansSonParcours, [id]);
+  if (reste.aBatir.some((a) => [...a.matchAll(/#(\d+)/g)].some((m) => m[1] === issue))) return sansSonParcours;
+  return sansSonParcours.replace(/^## I3 · .*$/m, (ligne) => `${ligne}\n\n- **À bâtir** · (${id}) le parcours complet (#${issue}).`);
+}
+
 /** La version volontairement cassée : U1 retombe en dette. */
 const enDette = (texte) =>
   texte.replace(/^## I3 · .*$/m, (ligne) => `${ligne}\n\n- **À bâtir** · (U1) le parcours complet sans aucune opération (#15).`);
@@ -229,8 +243,9 @@ describe('[niveau 1] I3 : U1 à U5 gardés de bout en bout au registre (#70)', (
   });
 
   test('#70 · témoin rouge — la dette de U3 effacée sans parcours fait échouer « U3 et U4 gardent leur dette »', () => {
-    const casse = sansDetteDe(registre(), 'U3');
-    assert.notEqual(casse, registre(), `la dette de U3 n'a pas pu être effacée : ${RELIRE}`);
+    const tenu = avecDetteDe(registre(), 'U3');
+    const casse = sansDetteDe(tenu, 'U3');
+    assert.notEqual(casse, tenu, `la dette de U3 n'a pas pu être effacée : ${RELIRE}`);
     assert.throws(() => detteOuParcours(casse), /ont perdu leur dette sans recevoir leur parcours/);
   });
 
