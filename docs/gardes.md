@@ -137,11 +137,17 @@ de son test.
   leur montant reste non affecté (D11, D21) —, flux rapprochés quand libellé et montant concordent.
   Témoin rouge : « témoin rouge · un virement reconnu par son seul libellé, ventilé d’office »
 - **Vérification manuelle** · `VM-I3-u3-rapprochement` — Si la PR touche l'application, ou à la fin
-  d'une version (`docs/versions.md`) : (U3) Construire un budget sans valider les virements, puis
-  importer un relevé inventé qui les contient : l'application propose de les rapprocher et reprend
-  la ventilation prévue par le budget. Sinon, et notamment si elle ne touche que des tests, de
-  l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi l'application
-  n'est pas atteinte.
+  d'une version (`docs/versions.md`) : (U3) Construire un budget avec l'assistant sans valider les
+  virements permanents proposés, puis importer un relevé inventé du compte principal qui contient un
+  virement vers un compte d'accueil, au libellé de la banque et d'un autre montant que celui que le
+  plan propose ; s'il n'est pas reconnu, le désigner comme virement vers ce compte : l'écran
+  Opérations propose d'en faire l'ordre permanent, au montant du virement et ventilé comme le plan le
+  propose pour ce montant ; l'enregistrer fait reprendre au virement la première occurrence de
+  l'ordre, avec ses parts, et l'écran Plan montre l'ordre enregistré et son écart avec ce que le
+  budget demande ; un relevé importé ensuite, avec le virement du mois suivant au même libellé et au
+  même montant, est repris par l'ordre sans rien demander. Sinon, et notamment si elle ne touche que
+  des tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur pourquoi
+  l'application n'est pas atteinte.
 - **À bâtir** · (U3) le parcours complet, du budget sans virements validés au rapprochement de l'import (#40).
 - **Harnais** · `packages/core/test/review.test.ts` — (U4) bilans par catégorie et des provisions
   tirés des opérations ; une proposition d'ajustement ne s'applique jamais seule.
