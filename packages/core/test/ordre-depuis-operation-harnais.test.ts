@@ -1,8 +1,10 @@
 /**
- * Tests du codeur de #435, côté cœur : ce que l'écran Opérations lit pour proposer, depuis
+ * Harnais d'audit de #435, côté cœur : ce que l'écran Opérations lit pour proposer, depuis
  * l'opération, d'en faire l'ordre permanent — toutes les opérations qui se proposent, sur un seul
- * calcul du plan (`transfersToOrder`), et la reprise de la première occurrence d'un ordre corrigé
- * dans le panneau (`resumeFirstOccurrence`).
+ * calcul du plan (`transfersToOrder`), « si, et seulement si, le cœur le propose » (point 1) —, et la
+ * reprise de la première occurrence de l'ordre corrigé dans le panneau (`resumeFirstOccurrence`,
+ * point 5). Tests du codeur (`ordre-depuis-operation.test.ts`), déplacés ici en entier ; l'écran est
+ * dans `apps/web/test/ordre-depuis-operation-harnais.test.ts`.
  *
  * Données inventées : un compte principal, un Livret A, un compte joint sans tirelire ; sur le
  * livret, une tirelire qui porte une échéance (400 €/mois) et un objectif (250 €/mois). Lecture le
@@ -64,11 +66,13 @@ function projet(tirelires = true): Ledger {
     op('credit', euros(600), { accountId: LIVRET, transferAccountId: CC }),
     op('saisie', -euros(600), { origin: 'manual', transferAccountId: LIVRET }),
     op('supprimee', -euros(600), { transferAccountId: LIVRET, deletedAt: '2026-09-03T00:00:00Z' }),
+    // De l'auditeur : une opération qui reprend déjà quelque chose ne se propose pas (D88).
+    op('reprend', -euros(600), { transferAccountId: LIVRET, resumedOperationId: 'saisie' }),
   );
   return l;
 }
 
-describe('[niveau 4] #435 · 1. transfersToOrder : la règle de orderFromTransfer, pour toutes les opérations', () => {
+describe('[niveau 2] #435 · 1. transfersToOrder : la règle de orderFromTransfer, pour toutes les opérations', () => {
   it('les deux virements importés vers le livret, et eux seuls, chacun avec le livret', () => {
     const l = projet();
     const m = transfersToOrder(l, LECTURE);
@@ -92,7 +96,7 @@ describe('[niveau 4] #435 · 1. transfersToOrder : la règle de orderFromTransfe
     expect(transfersToOrder(apres, LECTURE).size).toBe(0);
   });
 
-  it('ne modifie rien (I10)', () => {
+  it('[niveau 0] ne modifie rien (I10 ; point 7)', () => {
     const l = projet();
     const avant = JSON.stringify(l);
     transfersToOrder(l, LECTURE);
@@ -100,7 +104,7 @@ describe('[niveau 4] #435 · 1. transfersToOrder : la règle de orderFromTransfe
   });
 });
 
-describe('[niveau 4] #435 · 5. resumeFirstOccurrence : la reprise de l’ordre corrigé', () => {
+describe('[niveau 0] #435 · 5. resumeFirstOccurrence : la reprise de l’ordre corrigé', () => {
   it('sans ventilation propre, l’opération prend les parts de l’ordre corrigé, et non celles de la proposition', () => {
     const l = projet();
     const base = orderFromTransfer(l, 'vir-sept', LECTURE, 'ordre', euros(500))!;
@@ -113,7 +117,7 @@ describe('[niveau 4] #435 · 5. resumeFirstOccurrence : la reprise de l’ordre 
     expect(patch.subOperations.map((s) => s.tirelireId)).toEqual(['vac']);
   });
 
-  it('rend, pour l’ordre proposé, ce que rend recordOrderFromTransfer', () => {
+  it('[niveau 4] diagnostic du codage : rend, pour l’ordre proposé, ce que rend recordOrderFromTransfer', () => {
     const l = projet();
     const r = recordOrderFromTransfer(l, 'vir-sept', LECTURE, 'ordre')!;
     const patch = resumeFirstOccurrence(l, 'vir-sept', r.flow);
