@@ -5,11 +5,21 @@
   import VentilationOrdre from '../lib/VentilationOrdre.svelte';
   import PanneauVentilation from '../lib/PanneauVentilation.svelte';
   import ConsigneOrdre from '../lib/ConsigneOrdre.svelte';
+  import RepriseOccurrence from '../lib/RepriseOccurrence.svelte';
+  import { revealed } from '../lib/actions';
   import { avecVentilation } from '../lib/ventilationOrdre';
   import {
     alive,
     applyMatch,
+    applyBulkOccurrence,
+    bulkOccurrencePlan,
+    bulkOfferedFlows,
     entryCandidates,
+    offeredFlows,
+    operationsOfferedAFlow,
+    resumeOccurrence,
+    type BulkOccurrenceOutcome,
+    type OfferedOccurrence,
     findCategoryByName,
     proposeMatches,
     resumeEntry,
@@ -82,6 +92,13 @@
   let bulkOneOff = $state<'' | 'yes' | 'no'>('');
   let automationName = $state('');
   let saved = $state('');
+  /** Le flux dont les cibles reprendraient une occurrence (#445, point 6) ; vide : l'action habituelle. */
+  let bulkFlow = $state('');
+  /**
+   * Le panneau ouvert sous une ligne pour y reprendre une occurrence d'un flux, sans ouvrir
+   * l'opération (#445, point 5) ; son titre, figé à l'ouverture, nomme l'opération (D59).
+   */
+  let repriseLigne = $state<{ id: string; titre: string } | undefined>(undefined);
 
   const accounts = $derived(alive(app.ledger.accounts));
   const tirelires = $derived(alive(app.ledger.tirelires));
@@ -114,6 +131,8 @@
    * le plan lu à la date de lecture (#435, point 1 ; #434, D52). Rien ne s'écrit avant le geste (I10).
    */
   const ordresProposes = $derived(transfersToOrder(app.ledger, app.asOf));
+  /** Les opérations dont la ligne porte le geste « Reprendre une occurrence » (#445, point 5) ; dans un projet sans flux, aucune (U5). */
+  const avecGeste = $derived(operationsOfferedAFlow(app.ledger));
   /**
    * Les opérations sur lesquelles l'utilisateur vient d'agir sans quitter l'écran — désignées à la main
    * comme virement, ou devenues un ordre — : elles y restent, quel que soit le filtre d'affichage
@@ -195,6 +214,8 @@
 
   function startEdit(op: Operation) {
     editingId = op.id;
+    // L'opération ouverte offre elle-même la reprise d'une occurrence : un seul panneau à la fois.
+    if (repriseLigne?.id === op.id) repriseLigne = undefined;
     panneauOrdre = false;
     openLevel(op, undefined);
     newCategory = '';
@@ -403,9 +424,28 @@
     };
   }
 
+  /*
+   * Reprendre une occurrence d'un flux par l'action groupée (#445, point 6) : les flux offerts aux
+   * cibles, ou pourquoi aucun ; le flux choisi, s'il est encore offert ; ce que chaque cible prendra.
+   * Rien ne s'écrit avant « Appliquer » (I10, point 9).
+   */
+  const bulkFlux = $derived(bulkOpen ? bulkOfferedFlows(app.ledger, targets) : { flows: [] as PlannedFlow[] });
+  const bulkFlowChoisi = $derived(bulkFlux.flows.some((f) => f.id === bulkFlow) ? bulkFlow : '');
+  const bulkReprises = $derived<BulkOccurrenceOutcome[]>(bulkOpen && bulkFlowChoisi ? bulkOccurrencePlan(app.ledger, targets, bulkFlowChoisi) : []);
+  // Aucune cible concernée, ou un projet sans flux : le panneau ne parle pas de la reprise (U1, U5).
+  const bulkRefus = $derived(
+    bulkFlux.refusal === 'mixed'
+      ? 'aucun flux n’est offert, les opérations visées ne partagent pas un même compte et un même sens.'
+      : bulkFlux.refusal === 'noFree'
+        ? 'aucun flux de ce compte et de ce sens n’a d’occurrence libre.'
+        : '',
+  );
+  const operationsParId = $derived(new Map(app.ledger.operations.map((o) => [o.id, o])));
+  const operationParId = (id: string) => operationsParId.get(id)!;
+
   /** Aperçu obligatoire (D26) : ce que l'action changerait, avant de l'appliquer. */
   const bulkPreview = $derived.by(() => {
-    if (!bulkOpen) return [];
+    if (!bulkOpen || bulkFlowChoisi) return [];
     const patch = applyBulkAction(app.ledger, targets, bulkActionValue());
     return patch.operations.map((next) => {
       const before = app.ledger.operations.find((o) => o.id === next.id)!;
@@ -414,6 +454,10 @@
   });
 
   function applyBulk() {
+    if (bulkFlowChoisi) {
+      applyBulkReprise();
+      return;
+    }
     const n = targets.length;
     if (n > 20 && !confirm(`Appliquer à ${n} opérations ?`)) return;
     app.applyPatch(applyBulkAction(app.ledger, targets, bulkActionValue()));
@@ -422,10 +466,35 @@
   }
 
   /**
+   * « Appliquer » avec un flux choisi : les reprises que montre l'aperçu, et elles seules — ni
+   * catégorie, ni tirelire, ni état (#445, point 6). Les opérations reprises restent à l'écran, quel que
+   * soit le filtre d'affichage : leur ligne dit ce qu'elles reprennent (point 7).
+   */
+  function applyBulkReprise() {
+    const n = bulkReprises.filter((r) => r.occurrence).length;
+    const nom = flowName(bulkFlowChoisi);
+    if (n > 20 && !confirm(`Reprendre ${n} occurrences de « ${nom} » ?`)) return;
+    const patch = applyBulkOccurrence(app.ledger, targets, bulkFlowChoisi);
+    restent = new Set([...restent, ...patch.operations.map((o) => o.id)]);
+    app.applyPatch(patch);
+    saved = `${n} opération(s) reprennent une occurrence de « ${nom} ».`;
+    bulkFlow = '';
+    clearSelection();
+  }
+
+  /** Ce qu'une cible reprendra : l'occurrence, ou la saisie qui la corrige ou la masque (D88). */
+  function occurrenceText(flowId: string, occ: OfferedOccurrence): string {
+    const prevue = `l’opération prévue « ${flowName(flowId)} » du ${shortDate(occ.date)}`;
+    return occ.entry ? `la saisie « ${occ.entry.label} » du ${shortDate(occ.entry.date)}, qui ${occ.entry.amount === 0 ? 'masque' : 'corrige'} ${prevue}` : prevue;
+  }
+
+  /**
    * Enregistrer la recherche et ses actions comme automatisme (D39) : la sélection part telle
-   * quelle, sans inférence — c'est ce que l'utilisateur vient d'écrire.
+   * quelle, sans inférence — c'est ce que l'utilisateur vient d'écrire. Jamais avec une reprise (D24 ;
+   * #445, point 6).
    */
   function saveAutomation() {
+    if (bulkFlowChoisi) return;
     if (!selectionActive) {
       error = 'Renseignez au moins un critère de recherche avant d’enregistrer.';
       return;
@@ -474,6 +543,28 @@
     garderALEcran(op.id); // elle ne quitte pas l'écran : si elle se propose alors, sa proposition s'y lit (#435, point 2)
     // Désigner un virement est une modification manuelle : elle verrouille (D22).
     app.upsert('operations', { ...op, state: 'locked', transferAccountId: accountId });
+  }
+
+  /**
+   * L'opération reprend l'occurrence choisie (#445, point 7) : comme une proposition acceptée de ce
+   * flux à cette date, et verrouillée (D22). Elle reste à l'écran, quel que soit le filtre d'affichage :
+   * sa ligne dit aussitôt ce qu'elle reprend, avec l'écart.
+   */
+  function reprendreOccurrence(op: Operation, flowId: string, date: string) {
+    garderALEcran(op.id);
+    app.applyPatch(resumeOccurrence(app.ledger, op.id, flowId, date));
+    repriseLigne = undefined;
+    editingId = undefined;
+  }
+
+  /** Le geste de la ligne (#445, point 5) : ouvre sous elle, sans ouvrir l'opération, le panneau de la reprise ; le refermer n'écrit rien. */
+  function basculerRepriseLigne(op: Operation) {
+    if (repriseLigne?.id === op.id) {
+      repriseLigne = undefined;
+      return;
+    }
+    if (editingId === op.id) editingId = undefined;
+    repriseLigne = { id: op.id, titre: `Reprendre une occurrence d’un flux — ${op.label}` };
   }
 
   /** Déverrouiller : l'opération repart aux automatismes, sans rien perdre (D22). */
@@ -631,6 +722,19 @@
     <p class="sub" style="margin-top:0">
       {selected.size ? `${selected.size} opération(s) cochée(s)` : `les ${matching.length} opération(s) trouvée(s)`}
     </p>
+    {#if bulkFlux.flows.length}
+      <label class="f">Reprendre une occurrence d’un flux
+        <select bind:value={bulkFlow}>
+          <option value="">— (ne pas reprendre)</option>
+          {#each bulkFlux.flows as f (f.id)}<option value={f.id}>{f.name} · {money(f.amount)}</option>{/each}
+        </select>
+      </label>
+    {:else if bulkRefus}
+      <p class="sub reprise-refus" style="margin:0">Reprendre une occurrence d’un flux : {bulkRefus}</p>
+    {/if}
+    {#if bulkFlowChoisi}
+      <p class="sub" style="margin:0">Chaque opération reprend l’occurrence libre de « {flowName(bulkFlowChoisi)} » la plus proche de sa date, et se verrouille. Seules ces reprises s’appliquent : ni catégorie, ni tirelire, ni état.</p>
+    {:else}
     <div class="grid">
       <label class="f">Catégorie
         <select bind:value={bulkCategory}>
@@ -660,7 +764,30 @@
         </select>
       </label>
     </div>
+    {/if}
     <h3>Aperçu</h3>
+    {#if bulkFlowChoisi}
+      <!-- Pour chaque cible, l'occurrence qu'elle prendra, avec l'écart, ou pourquoi elle n'en prend aucune (#445, point 6). -->
+      <div class="card apercu-reprises">
+        {#each bulkReprises as r (r.operationId)}
+          {@const o = operationParId(r.operationId)}
+          <div class="row">
+            <div class="label">{o.label}
+              <span class="sub">
+                {shortDate(o.date)} · {money(o.amount)} ·
+                {#if r.occurrence}
+                  {stateLabel(o.state)} → reprend {occurrenceText(bulkFlowChoisi, r.occurrence)} · écart {r.occurrence.gap === 0 ? 'nul' : money(r.occurrence.gap)} · verrouillée
+                {:else if r.refusal === 'notConcerned'}
+                  non concernée : {o.origin === 'imported' ? 'elle reprend déjà une opération' : 'c’est une saisie'}
+                {:else}
+                  aucune occurrence libre ne lui reste
+                {/if}
+              </span>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {:else}
     <div class="card">
       {#each bulkPreview.slice(0, 8) as p}
         <div class="row"><div class="label">{p.label}<span class="sub">{p.from} → {p.to}</span></div></div>
@@ -668,12 +795,13 @@
       {#if bulkPreview.length > 8}<div class="sub">…et {bulkPreview.length - 8} autre(s).</div>{/if}
     </div>
     <label class="f">Nom de l’automatisme (facultatif) <input bind:value={automationName} placeholder="Courses du supermarché" /></label>
+    {/if}
     <div class="actions" style="margin:0">
       <button class="btn primary" type="submit">Appliquer maintenant</button>
-      <button class="btn primary" type="button" onclick={saveAutomation} disabled={!selectionActive}>Enregistrer l’automatisme</button>
+      {#if !bulkFlowChoisi}<button class="btn primary" type="button" onclick={saveAutomation} disabled={!selectionActive}>Enregistrer l’automatisme</button>{/if}
       <button class="btn" type="button" onclick={() => (bulkOpen = false)}>Fermer</button>
     </div>
-    {#if !selectionActive}
+    {#if !selectionActive && !bulkFlowChoisi}
       <p class="sub">Pour enregistrer un automatisme, renseignez au moins un critère de recherche : c’est lui qui dira à quelles opérations futures ces actions s’appliquent.</p>
     {/if}
   </form>
@@ -707,6 +835,23 @@
         {/if}
       </button>
       <div class="num {op.amount > 0 ? 'pos' : ''}">{money(op.amount)}</div>
+      {#if avecGeste.has(op.id)}
+        <!-- Le geste de la ligne (#445, point 5) : à part du bouton de la ligne, qui ouvre toujours l'opération. -->
+        <button class="btn small reprendre-occurrence" type="button" aria-expanded={repriseLigne?.id === op.id} onclick={() => basculerRepriseLigne(op)}>Reprendre une occurrence</button>
+      {/if}
+
+      {#if repriseLigne?.id === op.id}
+        {@const offres = offeredFlows(app.ledger, op.id)}
+        <form class="edit attached reprise-ligne" style="width:100%" use:revealed onsubmit={(e) => e.preventDefault()}>
+          <p class="titre-panneau">{repriseLigne.titre}</p>
+          {#if offres.length}
+            <RepriseOccurrence {offres} onreprendre={(f, d) => reprendreOccurrence(op, f, d)} />
+          {:else}
+            <p class="small muted" style="margin:0">Aucun flux n’est plus offert à cette opération.</p>
+          {/if}
+          <div class="actions" style="margin:0"><button class="btn" type="button" onclick={() => (repriseLigne = undefined)}>Fermer</button></div>
+        </form>
+      {/if}
 
       {#if editingId === op.id}
         {@const ordre = ordreDe(op)}
@@ -769,6 +914,13 @@
                   <button class="btn small" type="button" onclick={() => acceptEntry(op, e)}>Reprendre</button>
                 </div>
               {/each}
+            {/if}
+            {@const offres = offeredFlows(app.ledger, op.id)}
+            {#if offres.length}
+              <!-- #445, point 4 : l'utilisateur dit que cette opération est l'occurrence d'un flux, hors de sa fenêtre et de sa tolérance. -->
+              <h3>Reprendre une occurrence d’un flux</h3>
+              <p class="small muted">Une occurrence d’un flux prévu que cette opération réalise, même hors de sa fenêtre ou de sa tolérance : elle la reprend, avec ce que le flux lui donne, et se verrouille.</p>
+              <RepriseOccurrence {offres} onreprendre={(f, d) => reprendreOccurrence(op, f, d)} />
             {/if}
           {/if}
           <h3>Ventilation</h3>

@@ -159,6 +159,31 @@ function occurrenceTakers(ledger: Ledger): Map<string, Operation> {
   return out;
 }
 
+/** Ce qui dit si une occurrence est libre (`freeOccurrence`), lu une fois sur le grand livre. */
+export interface OccurrenceIndex {
+  /** Pour chaque occurrence reprise, l'opération qui la reprend. */
+  takers: Map<string, Operation>;
+  /** Les opérations reprises par une opération vivante. */
+  resumed: Set<Id>;
+}
+
+export function occurrenceIndex(ledger: Ledger): OccurrenceIndex {
+  return { takers: occurrenceTakers(ledger), resumed: resumedOperationIds(ledger.operations) };
+}
+
+/**
+ * L'occurrence d'un flux à cette date est-elle libre (D12, D88) ? Aucune opération bancaire ne la
+ * reprend, ni aucune saisie qu'une autre opération reprend : une occurrence n'est reprise qu'une fois.
+ * Libre, elle se rend avec la saisie qui la corrige ou la masque, s'il y en a une : c'est cette saisie
+ * qu'une opération bancaire reprendrait (D88). Non libre : `undefined`.
+ */
+export function freeOccurrence(index: OccurrenceIndex, flowId: Id, date: ISODate): { entry?: Operation } | undefined {
+  const taker = index.takers.get(occurrenceKey(flowId, date));
+  if (!taker) return {};
+  if (taker.origin !== 'manual' || index.resumed.has(taker.id)) return undefined;
+  return { entry: taker };
+}
+
 export interface MatchProposal {
   operationId: Id;
   flowId: Id;
@@ -211,8 +236,8 @@ function labelRecognized(motif: string, op: Operation): boolean {
  */
 export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): MatchProposal[] {
   const flows = alive(ledger.plannedFlows);
-  const resumed = resumedOperationIds(ledger.operations);
-  const takers = occurrenceTakers(ledger);
+  const index = occurrenceIndex(ledger);
+  const resumed = index.resumed;
   const ops = alive(ledger.operations).filter((o) => o.origin === 'imported' && !isLocked(o) && !resumesSomething(o) && !resumed.has(o.id) && o.date >= from && o.date <= to);
   const candidates: MatchProposal[] = [];
   for (const op of ops) {
@@ -228,9 +253,10 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
-      const taker = takers.get(occurrenceKey(f.id, expectedDate));
       // Reprise par une opération bancaire, ou par une saisie déjà reprise : l'occurrence est servie.
-      if (taker && (taker.origin !== 'manual' || resumed.has(taker.id))) continue;
+      const libre = freeOccurrence(index, f.id, expectedDate);
+      if (!libre) continue;
+      const taker = libre.entry;
       const reasons: string[] = [];
       const dateScore = 1 - Math.abs(diffDays(expectedDate, op.date)) / (f.dateWindowDays + 1);
       reasons.push(`date à ${Math.abs(diffDays(expectedDate, op.date))} j`);
