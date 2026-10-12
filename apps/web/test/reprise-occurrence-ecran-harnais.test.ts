@@ -13,6 +13,9 @@
  * chemins, le flux inchangé compris ; au point 9, la base relue en entier après avoir ouvert, puis
  * fermé, les trois panneaux et quitté l'écran ; au point 6, l'écart de l'aperçu ; au point 8,
  * l'occurrence de nouveau « attendue, non reçue ».
+ * Au second tour, le point 6 amendé (porteur, 12/10) : les tests du codeur
+ * (`reprise-occurrence-silence-ecran.test.ts`, déplacé ici en entier) — sans cible concernée, le
+ * panneau des actions groupées ne parle pas de la reprise (U1).
  *
  * Le décor : une paie de 2 500 € le 25 de chaque mois depuis octobre 2026 (fenêtre de 3 jours), classée
  * « Salaire » ; les paies d'octobre et de novembre la reprennent ; celle de décembre tombe le 19, hors
@@ -296,5 +299,39 @@ describe('[niveau 2] #445 · 6. par la sélection', () => {
     await ouvrirLOperation('SALAIRE-DEC');
     expect(await cliquer('Actions sur')).toBe(true);
     expect(t(document.querySelector('main form.edit'))).not.toContain('occurrence');
+  });
+
+  /** Un compte, une paie et un loyer prévus, sans catégorie ; des opérations selon `operations`. */
+  const avecFlux = (operations: Operation[]): Ledger => {
+    const l = emptyLedger({ periodStartDay: 1 });
+    l.accounts.push({ id: CC, name: 'Compte courant', kind: 'principal', openingBalance: euros(1000), openingDate: '2026-09-30' });
+    l.plannedFlows.push(flux({ id: 'f-paie', name: 'Paie', amount: euros(2500) }), flux({ id: 'f-loyer', name: 'Loyer', kind: 'fixedCharge', amount: -euros(700), periodicity: { interval: 1, unit: 'month', anchorDate: '2026-10-05' } }));
+    l.operations.push(...operations);
+    return l;
+  };
+  const panneau = () => t(document.querySelector('main form.edit'));
+
+  it('sans cible concernée, il ne parle pas de la reprise : U1, un projet qui a des flux et aucun import, ses saisies visées', async () => {
+    await ouvrirSur(avecFlux([opération({ id: 'courses', date: '2026-12-10', amount: -euros(50), origin: 'manual', state: 'locked' })]));
+    await toutes();
+    expect(await cliquer('Actions sur 1 opération(s)')).toBe(true);
+    expect(panneau()).toContain('Actions à appliquer');
+    expect(panneau()).not.toContain('occurrence');
+  });
+
+  it('des cibles cochées dont aucune n’est concernée — une saisie, une opération qui reprend déjà — : rien sur la reprise ; une concernée de plus : le choix revient', async () => {
+    await ouvrirSur(
+      avecFlux([
+        opération({ id: 'courses', date: '2026-12-10', amount: -euros(50), origin: 'manual', state: 'locked' }),
+        opération({ id: 'salaire-nov', date: '2026-11-25', amount: euros(2500), state: 'reconciled', plannedFlowId: 'f-paie', plannedDate: '2026-11-25' }),
+        opération({ id: 'salaire-dec', date: '2026-12-19', amount: euros(2480) }),
+      ]),
+    );
+    await toutes();
+    for (const l of ['COURSES', 'SALAIRE-NOV']) await cocher(l);
+    expect(await cliquer('Actions sur 2 opération(s)')).toBe(true);
+    expect(panneau()).not.toContain('occurrence');
+    await cocher('SALAIRE-DEC');
+    expect(panneau()).toContain(TITRE);
   });
 });
