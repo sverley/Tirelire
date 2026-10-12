@@ -13,6 +13,13 @@ jamais (D77). Travail en français.
 - Chaque session tient un seul rôle, donné dans le premier message avec son objet, et décrit dans
   `docs/roles/` : `architecte.md`, `auditeur.md`, `codeur.md`, `porteur.md`. Commence par ce
   fichier, puis par ce que ton rôle te fait lire.
+- Une session qui lance un rôle en agent lance l'agent de ce rôle (`architecte`, `codeur`,
+  `auditeur`, définis dans `.claude/agents/`), avec son objet pour consigne — une issue, ou une
+  version à suivre pour l'architecte — et le modèle suggéré (celui du codeur et de l'auditeur, c'est
+  l'architecte qui le suggère : `docs/roles/architecte.md`, étape 6). Une session qui ne voit pas ces
+  définitions — ouverte depuis le projet (Chat) sans les charger, ou avant que `.claude/agents/`
+  existe — lance un agent généraliste dont la consigne renvoie à la définition du rôle sur
+  `origin/main` (`.claude/agents/<rôle>.md`), avec son objet.
 - Les sessions sont autorisées, et même tenues, à accéder au dépôt et à le modifier pour les
   besoins de leur tâche — issue, branche, commits, PR, commentaires, passage en Ready pour
   l'architecte —, sans en demander l'autorisation au porteur (#403).
@@ -23,8 +30,7 @@ jamais (D77). Travail en français.
 
 ## Pratique
 
-La façon de travailler dans l'environnement des sessions (porteur, #403). L'architecte la recopie
-telle quelle dans la consigne des agents qu'il lance (`docs/roles/architecte.md`, étape 7).
+La façon de travailler dans l'environnement des sessions (porteur, #403).
 
 - Réduis le nombre d'appels d'outils : combine-les quand c'est possible.
 - Lis par extraits — documents, code, diffs, fils de l'issue et de la PR — et, d'un tour à l'autre,
