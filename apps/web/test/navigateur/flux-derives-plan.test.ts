@@ -289,9 +289,11 @@ describe('[niveau 1] I3 (U2) · harnais du registre : l’ordre permanent à l�
       expect(flux[0]!.texte).not.toContain('recalcule');
       expect(flux[0]!.boutons).toContain('Modifier');
       expect(flux[0]!.boutons).toContain('Voir dans le Plan');
-      // Les autres flux restent modifiables, comme avant.
+      // Les autres flux restent modifiables, comme avant : un revenu est une ligne de la section, son nom dans son champ (#364).
       const déclarés = await page.evaluate(() =>
-        [...document.querySelectorAll('.row')].filter((r) => r.textContent?.includes('Salaire') && r.querySelector('button')).map((r) => [...r.querySelectorAll('button')].map((b) => b.textContent?.trim())),
+        [...document.querySelectorAll('.ligne-flux')]
+          .filter((r) => (r.querySelector('input.nom') as HTMLInputElement | null)?.value.includes('Salaire') && r.querySelector('button'))
+          .map((r) => [...r.querySelectorAll('button')].map((b) => b.textContent?.trim())),
       );
       expect(déclarés.length).toBeGreaterThan(0);
       for (const b of déclarés) expect(b).toContain('Modifier');

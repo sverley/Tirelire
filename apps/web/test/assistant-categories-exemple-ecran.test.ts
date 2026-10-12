@@ -126,7 +126,11 @@ async function categoriesDeLEcran(): Promise<Array<{ nature: string; nom: string
 /** Les lignes de Flux prévus qui portent ce nom : on ouvre chacune, et on lit sa catégorie. */
 async function categoriesDuFlux(nom: string): Promise<string[]> {
   expect(await ecran('Flux prévus')).toBe(true);
-  const lignes = () => tous('main .row').filter((r) => t(r.querySelector('.label > strong')) === nom);
+  // Un revenu ou une charge fixe est une ligne de la section, son nom dans son champ (#364) ; les autres flux, une ligne de carte.
+  const lignes = () => [
+    ...tous('main .ligne-flux').filter((l) => (l.querySelector('input.nom') as HTMLInputElement | null)?.value === nom),
+    ...tous('main .row').filter((r) => t(r.querySelector('.label > strong')) === nom),
+  ];
   const vues: string[] = [];
   const combien = lignes().length;
   for (let i = 0; i < combien; i++) {

@@ -159,8 +159,9 @@ describe('[niveau 1] I11 · harnais du registre', () => {
         b.click();
         return { trouvé: true, bouton: true };
       }
-      // Une catégorie porte son nom dans le champ de sa ligne, et son « Modifier » sur la ligne (la section Catégories, #365).
-      const ligneDeCategorie = ([...document.querySelectorAll('.ligne-categorie')] as HTMLElement[]).find(
+      // Une catégorie, un revenu ou une charge fixe portent leur nom dans le champ de leur ligne, et leur « Modifier » sur la
+      // ligne (les sections Catégories, #365, et Revenus et charges fixes, #364).
+      const ligneDeCategorie = ([...document.querySelectorAll('.ligne-categorie, .ligne-flux')] as HTMLElement[]).find(
         (l) => ((l.querySelector('input.nom') as HTMLInputElement | null)?.value ?? '').trim() === nom,
       );
       if (ligneDeCategorie) {

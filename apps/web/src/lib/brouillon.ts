@@ -55,7 +55,7 @@ export const PARTIES_ASSISTANT: readonly PartieBudget[] = [...CLES_TABLES_BUDGET
  * Les sections sur lesquelles l'assistant s'ouvre depuis l'écran de leur partie (D94, #363) : il n'y
  * couvre que leurs parties, et ne s'ouvre que sur leurs étapes, puis le résumé.
  */
-export type SectionAssistant = 'comptes' | 'tirelires' | 'categories';
+export type SectionAssistant = 'comptes' | 'tirelires' | 'categories' | 'revenus';
 
 /** Les parties que couvre l'assistant ouvert sur une section : ce que ses étapes écrivent d'abord. */
 export const PARTIES_DES_SECTIONS: Record<SectionAssistant, readonly PartieBudget[]> = {
@@ -63,6 +63,9 @@ export const PARTIES_DES_SECTIONS: Record<SectionAssistant, readonly PartieBudge
   tirelires: ['tirelires', 'needs'],
   // Les flux dont l'étape donne ou retire la catégorie entrent dans le fichier au geste qui les change (#365, point 7).
   categories: ['categories'],
+  // Les revenus et les charges fixes, et le jour de début de période, qui appartient aux revenus (D44) ; les autres flux
+  // sont lus avec eux et ne changent pas : la validation n'applique que la différence (#364, point 9).
+  revenus: ['plannedFlows', 'periodStartDay'],
 };
 
 /** Ce que l'assistant s'appelle, complet ou ouvert sur une section : son titre, et le nom que lui donne le choix entre deux assistants. */
@@ -73,11 +76,13 @@ export function titreDeLAssistant(section?: SectionAssistant): string {
       ? 'Compléter mes tirelires'
       : section === 'categories'
         ? 'Compléter mes catégories'
-        : 'Construire mon budget';
+        : section === 'revenus'
+          ? 'Compléter mes revenus et charges fixes'
+          : 'Construire mon budget';
 }
 
 /** La première étape de l'assistant ouvert sur une section : il s'ouvre sur elle, sans « Le principe ». */
-const PREMIERE_ETAPE: Record<SectionAssistant, string> = { comptes: 'accounts', tirelires: 'everyday', categories: 'categories' };
+const PREMIERE_ETAPE: Record<SectionAssistant, string> = { comptes: 'accounts', tirelires: 'everyday', categories: 'categories', revenus: 'income' };
 
 /** La suppression logique que montre l'assistant sur une ligne que son brouillon retire. */
 const RETIREE = '1970-01-01T00:00:00.000Z';
@@ -166,8 +171,8 @@ function reglagesDeLExemple(projet: Ledger): Partial<Settings> {
  * Un brouillon neuf : l'ouverture de l'assistant sur ce projet — complet, ou sur une seule section
  * (#363). Ouvert sur une section, il ne couvre que ses parties ; les autres sont lues hors du fichier,
  * et seul le réglage de la section se propose d'office sur un projet vierge : le coussin pour les
- * comptes, rien pour les tirelires ni pour les catégories — jamais le jour de début de période, qui
- * appartient aux revenus (D44).
+ * comptes, le jour de début de période pour les revenus et charges fixes, à qui il appartient (D44),
+ * rien pour les tirelires ni pour les catégories.
  */
 export function nouveauBrouillon(projet: Ledger, section?: SectionAssistant): Brouillon {
   const vierge = projetEstVierge(projet);

@@ -201,6 +201,12 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
 /* Dans l'écran Catégories, la ligne porte « Modifier » et « Supprimer » ; une sous-catégorie se range en retrait sous sa parente (#365). */
 .ligne.ligne-categorie.avec-actions { grid-template-columns: minmax(0, 1fr) auto; }
 .ligne.ligne-categorie.sous { margin-left: 24px; }
+/* Dans l'écran Flux prévus, la ligne d'un revenu ou d'une charge fixe porte « Modifier » et « Supprimer » sous ses champs (#364). */
+.tete-flux.avec-actions, .ligne-flux.avec-actions { grid-template-columns: minmax(0, 1fr) 96px 52px 52px 84px var(--col-compte, 0px); }
+.ligne-flux.avec-actions > .actions { grid-column: 1 / -1; justify-content: flex-end; }
+@media (max-width: 640px) {
+  .ligne-flux.avec-actions { grid-template-columns: minmax(0, 1fr) 96px 32px; }
+}
 /* Une tirelire de l'assistant : son en-tête (nom, déjà de côté, reliquat), puis ses besoins (D28, #336). */
 .card.tirelire { padding: 8px; margin-bottom: 6px; }
 .ligne-tirelire { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }

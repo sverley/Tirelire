@@ -230,8 +230,9 @@ function installer() {
       const requis = noms.filter((n) => lus.some((l) => l.includes(n)));
       return { requis: [...new Set(requis)].sort(), conteneur: (ligne ? 'ligne' : 'carte') as Conteneur };
     }
-    // Une catégorie porte son nom dans le champ de sa ligne (la section Catégories, #365) : ses gestes sont sur la ligne.
-    const ligneDeCategorie = b.closest('.ligne-categorie');
+    // Une catégorie, un revenu ou une charge fixe portent leur nom dans le champ de leur ligne (les sections Catégories,
+    // #365, et Revenus et charges fixes, #364) : leurs gestes sont sur la ligne.
+    const ligneDeCategorie = b.closest('.ligne-categorie, .ligne-flux');
     if (ligneDeCategorie) return { requis: noms.filter((n) => valeur(ligneDeCategorie.querySelector('input.nom')).includes(n)).sort(), conteneur: 'ligne' as Conteneur };
     const ligne = b.closest('.row');
     const carte = b.closest('.card');
@@ -509,12 +510,13 @@ describe('[niveau 1] C9 · harnais du registre : un panneau d’édition nomme c
       await aller(FLUX);
       await page.evaluate(async (n: Noms) => {
         const o = (window as unknown as { __panneaux: Outillage }).__panneaux;
+        // Un revenu s'ajoute par le formulaire de la section, ouvert sous son bouton (#364, point 5).
         for (const nom of [n.flux, n.fluxLong]) {
-          o.bouton(document, 'Ajouter un flux').click();
+          o.bouton(document, 'Ajouter un revenu').click();
           await o.attendre();
           const f = o.panneaux()[0]!;
-          await o.remplir(f, 'Nom', nom);
-          await o.remplir(f, 'Montant', '10,00');
+          await o.remplir(f, 'Quoi ?', nom);
+          await o.remplir(f, 'Combien ?', '10,00');
           await o.soumettre(f);
         }
       }, NOMS);

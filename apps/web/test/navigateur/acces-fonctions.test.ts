@@ -53,7 +53,7 @@ const INVENTAIRE: Fonction[] = [
   { vue: 'accounts', nom: 'Comptes', par: 'Configuration', point: 'Comptes', marque: 'Comptes', amorce: 'Ajouter un compte' },
   { vue: 'tirelires', nom: 'Tirelires', par: 'Configuration', point: 'Tirelires', marque: 'Tirelires', amorce: 'Ajouter une tirelire' },
   { vue: 'categories', nom: 'Catégories', par: 'Configuration', point: 'Catégories', marque: 'Catégories', amorce: 'Ajouter une catégorie de dépenses' },
-  { vue: 'flows', nom: 'Flux prévus', par: 'Configuration', point: 'Flux prévus', marque: 'Flux prévus', amorce: 'Ajouter un flux' },
+  { vue: 'flows', nom: 'Flux prévus', par: 'Configuration', point: 'Flux prévus', marque: 'Flux prévus', amorce: 'Ajouter un revenu' },
   { vue: 'entries', nom: 'Saisie manuelle', par: 'Configuration', point: 'Saisie manuelle', marque: 'Saisie', amorce: 'Saisir une opération' },
   { vue: 'importBudget', nom: 'Importer un budget (JSON)', par: 'Configuration', point: 'Importer un budget (JSON)', marque: 'Importer un budget (JSON)', amorce: 'Importer ce texte' },
   { vue: 'sync', nom: 'Synchronisation', par: 'Configuration', point: 'Synchronisation', marque: 'Synchronisation', amorce: 'Proposer' },
