@@ -23,8 +23,9 @@ jamais (D77). Travail en français.
 
 ## Pratique
 
-La façon de travailler dans l'environnement des sessions (porteur, #403). L'architecte la recopie
-telle quelle dans la consigne des agents qu'il lance (`docs/roles/architecte.md`, étape 7).
+La façon de travailler dans l'environnement des sessions (porteur, #403). Les agents codeur et
+auditeur la lisent sur `main`, par leur définition ; l'architecte ne la recopie pas dans leur
+consigne (`docs/roles/architecte.md`, étape 7).
 
 - Réduis le nombre d'appels d'outils : combine-les quand c'est possible.
 - Lis par extraits — documents, code, diffs, fils de l'issue et de la PR — et, d'un tour à l'autre,

@@ -76,7 +76,7 @@ vérification (#355).
    en local, au seuil 2, sans les tests navigateur (`pnpm test 2` : ce qui est
    déjà vert sur son empreinte s'y saute, et le lanceur dit quoi ; un fichier se rejoue exprès par
    un lancement par nom de test, `-t` ou `--test-name-pattern`), avant le Ready. **Dans les deux cas,
-   à chaque tour, joue la garde**, l'outil, que `pnpm test 2` ne joue pas, hors ligne, sur le corps de l'issue tel qu'il est sur GitHub, en entier, jamais un commentaire, donné en fichier (`node packages/gardes/cli.mjs pr --corps-fichier <fichier>`) ou en texte (variable `CORPS`) ; si ce corps n'a pas
+   à chaque tour, joue la garde**, l'outil, que `pnpm test 2` ne joue pas, hors ligne, sur le corps entier de l'issue (skill `garde-hors-ligne`) ; si ce corps n'a pas
    de section « Invariants et contraintes », dis-le dans l'issue, sans la chercher ailleurs (#349).
    Elle seule dit les entrées du
    registre que les fichiers modifiés imposent, et leurs vérifications manuelles : ajoute-les dans
