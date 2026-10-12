@@ -17,6 +17,22 @@ Aucune donnée réelle ici : seulement la forme des fichiers.
 - `Pointée` : `Oui` / `Non` (pointage côté banque, sans rapport avec notre rapprochement).
 - Préfixes de libellé utiles pour les règles : `VIR PERM` (virements permanents), `PRELEVEMENT EUROPEEN`, `ECHEANCE PRET`, `VIR RECU`, `VIR INST`, `CARTE …`.
 
+## Fichier OFX (`.ofx`, `.qfx`)
+
+Lu pour ce qu'il contient, quelle que soit l'extension : l'utilisateur ne décrit rien (pas de profil, de colonne, de format de date, d'encodage ni de séparateur).
+
+- **Forme.** Version 1 : un en-tête `OFXHEADER:100` suivi de balises dont la valeur n'est pas fermée (`<TRNAMT>-76.00`). Version 2 : du XML, toutes les balises fermées. Les deux se lisent de la même façon, balise fermée ou non. Encodage UTF-8 ou Windows-1252 / ISO-8859-1, reconnu seul ; les entités (`&amp;`, `&lt;`, `&gt;`…) se décodent, les blancs autour d'une valeur se retirent.
+- **Un ou plusieurs relevés.** Un fichier porte un relevé de compte bancaire (`STMTRS`) ou de carte (`CCSTMTRS`), ou plusieurs. Chaque compte du fichier est reconnu par son numéro (`ACCTID`) et se rattache à un compte de l'application comme celui d'un CSV multi-comptes (D18) : prérempli quand un compte porte ce numéro mémorisé, ignoré sinon, jusqu'au choix de l'utilisateur, avec la case qui propose de mémoriser le numéro.
+- **Ce qui se lit d'une opération (`STMTTRN`).**
+  - la date : `DTUSER`, la date de l'opération, quand elle est présente (comme la « Date transaction » du CSV de la banque), sinon `DTPOSTED` ; le jour écrit dans le fichier, ses huit premiers chiffres, sans décalage d'heure ni de fuseau ;
+  - le montant : `TRNAMT`, signé, au centime exact, la virgule décimale valant le point ;
+  - le libellé : `NAME`, à défaut le `NAME` de `PAYEE`, à défaut `MEMO` ; le libellé complet : `MEMO`, quand il est présent et diffère du libellé.
+- **Une autre devise.** Un relevé dont la devise déclarée (`CURDEF`) n'est pas l'euro ne s'importe pas : son compte se montre avec sa devise et ne se rattache à aucun compte. Sans devise déclarée, le relevé vaut en euros.
+- **Ce qui ne se lit pas.** Une opération dont la date ou le montant est illisible est comptée et listée avec la raison, comme une ligne illisible d'un CSV ; les autres s'importent. Un fichier reconnu comme OFX sans aucun relevé de compte ou de carte lisible (tronqué, réponse d'erreur de la banque, relevé de titres seul) est refusé par un message.
+- **Ce qui s'ignore.** L'identifiant de transaction de la banque (`FITID`), le type (`TRNTYPE`), les numéros de chèque et de référence, la date de disponibilité, les soldes du relevé et toute catégorie : l'OFX n'en suggère aucune.
+- **Identité.** Comme celle d'un CSV : la clé de D09, calculée de la même façon quelle que soit la source. L'identifiant de transaction ne sert pas ; à contenu égal, un OFX et un CSV donnent les mêmes opérations. Une même opération venue de deux sources différentes relève du rapprochement des sources, pas de la clé.
+- **Aucun profil.** L'import d'un OFX n'enregistre aucun profil d'import.
+
 ## Linxo (historique)
 
 À documenter au premier fichier : encodage, colonnes, ventilation par compte, catégories Linxo à importer comme suggestion.
