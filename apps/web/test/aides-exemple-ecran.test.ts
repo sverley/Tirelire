@@ -102,13 +102,17 @@ async function retirerPuisRecopier(quoi: { element: string; identifiant: string;
   expect(etatDe(quoi.element, quoi.identifiant, quoi.nom), `« ${quoi.nom} » rajouté en recopiant ses aides n’est pas celui de son raccourci`).toEqual(avant);
 }
 
-/** Ce que dit, dans Flux prévus, le formulaire du flux qui porte ce nom : le motif, la fenêtre, le montant. */
+/**
+ * Ce que dit, dans Flux prévus, le flux qui porte ce nom : le motif et la fenêtre dans son panneau, le montant sur sa
+ * ligne, où il se corrige (la section Revenus et charges fixes, #364).
+ */
 async function formulaireDuFlux(nom: string) {
-  const ligne = tous('main .row').find((r) => t(r.querySelector('.label strong')) === nom);
+  const ligne = tous('main .ligne-flux').find((l) => (l.querySelector('input.nom') as HTMLInputElement | null)?.value === nom);
+  const montant = (ligne?.querySelector('input.mt') as HTMLInputElement | null | undefined)?.value ?? '';
   const b = tous<HTMLButtonElement>('button', ligne ?? document.createElement('div')).find((x) => t(x) === 'Modifier');
   expect(b, `pas de bouton « Modifier » sur le flux « ${nom} »`).toBeTruthy();
   await presser(b!);
-  const lu = { motif: champ('Motif de libellé (regex)').valeur, fenetre: champ('Fenêtre des échéances (± jours)').valeur, montant: champ('Montant').valeur };
+  const lu = { motif: champ('Motif de libellé (regex)').valeur, fenetre: champ('Fenêtre des échéances (± jours)').valeur, montant };
   await cliquer('Annuler');
   return lu;
 }
@@ -292,8 +296,18 @@ describe('#417 · #214 — hors de l’assistant, sur l’exemple chargé, sans 
   it('[niveau 2] #214 point 3 (table #417, aides 10) — Flux prévus : le nom, le montant et le motif d’aide sont ceux d’un même flux de l’exemple du type choisi', async () => {
     await ouvrirLExemple();
     expect(await ecran('Flux prévus')).toBe(true);
-    expect(await cliquer('Ajouter un flux')).toBe(true);
-    for (const genre of ['income', 'fixedCharge', 'dueDate', 'transfer'] as const) {
+    // Un revenu ou une charge fixe s'ajoute par le formulaire de la section, ouvert sous le bouton de son genre (#364, point 5).
+    for (const [genre, bouton] of [['income', 'Ajouter un revenu'], ['fixedCharge', 'Ajouter une charge fixe']] as const) {
+      expect(await cliquerExactement(bouton), bouton).toBe(true);
+      const f = flux.find((x) => x.kind === genre)!;
+      expect(champ('Quoi ?'), genre).toMatchObject({ aide: f.name });
+      expect(champ('Combien ?'), genre).toMatchObject({ aide: euros(f.amount) });
+      expect(champ('Motif de libellé (regex)'), genre).toMatchObject({ aide: f.labelPattern ?? '' });
+      await cliquer('Annuler');
+    }
+    // Une échéance ou un virement, par le panneau, son type limité à ces deux genres (#364, point 7).
+    expect(await cliquer('Ajouter une échéance ou un virement')).toBe(true);
+    for (const genre of ['dueDate', 'transfer'] as const) {
       await saisirChamp('Type', genre);
       const f = flux.find((x) => x.kind === genre)!;
       expect(champ('Nom'), genre).toMatchObject({ aide: f.name });

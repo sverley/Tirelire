@@ -98,20 +98,39 @@ async function retirer(nom: string) {
 interface LigneEcran {
   nom: string;
   genre: string;
+  compte: string;
   sous: string;
 }
 
-/** Les lignes de l'écran Flux prévus : leur nom, leur groupe, ce qu'elles disent sous le nom. */
-const fluxPrevus = (): LigneEcran[] =>
-  tous('main .row')
+/** Le titre du groupe d'un élément de l'écran Flux prévus : le dernier `h2` qui le précède. */
+function groupeDe(e: Element): string {
+  let x = e.previousElementSibling;
+  while (x && x.tagName !== 'H2') x = x.previousElementSibling;
+  return t(x);
+}
+
+/**
+ * Les lignes de l'écran Flux prévus : leur nom, leur groupe, leur compte, ce qu'elles disent sous leurs champs. Un
+ * revenu ou une charge fixe est une ligne de la section, corrigée sur place (#364) : son nom, son compte sont dans ses
+ * champs ; les autres flux, une ligne de carte, leur compte en tête de ce qu'elles disent sous le nom.
+ */
+const fluxPrevus = (): LigneEcran[] => [
+  ...tous('main .ligne-flux').map((l) => ({
+    nom: (l.querySelector('input.nom') as HTMLInputElement).value,
+    genre: groupeDe(l),
+    compte: t((l.querySelector('select.cpt') as HTMLSelectElement | null)?.selectedOptions[0]),
+    sous: tous('.suite', l).map(t).join(' · '),
+  })),
+  ...tous('main .row')
     .filter((r) => r.querySelector('.label strong'))
-    .map((r) => ({ nom: t(r.querySelector('.label strong')), genre: t(r.closest('.card')?.previousElementSibling), sous: t(r.querySelector('.label .sub')) }));
+    .map((r) => ({ nom: t(r.querySelector('.label strong')), genre: t(r.closest('.card')?.previousElementSibling), compte: t(r.querySelector('.label .sub')).split(' · ')[0]!, sous: t(r.querySelector('.label .sub')) })),
+];
 
 const revenusEtCharges = (l: LigneEcran[]) => l.filter((x) => /^(Revenus|Charges fixes)/.test(x.genre));
 
-/** Ouvre le formulaire du flux de Flux prévus dont la ligne dit ceci sous son nom. */
+/** Ouvre le panneau du revenu ou de la charge fixe de Flux prévus dont la ligne dit ceci sous ses champs (#364). */
 async function modifier(nom: string, sousContient: RegExp) {
-  const ligne = tous('main .row').find((r) => t(r.querySelector('.label strong')) === nom && sousContient.test(t(r.querySelector('.label .sub'))));
+  const ligne = tous('main .ligne-flux').find((l) => (l.querySelector('input.nom') as HTMLInputElement).value === nom && sousContient.test(tous('.suite', l).map(t).join(' · ')));
   const b = tous<HTMLButtonElement>('button', ligne ?? document.createElement('div')).find((x) => t(x) === 'Modifier');
   expect(b, `pas de bouton « Modifier » sur la ligne « ${nom} » (${sousContient})`).toBeTruthy();
   await presser(b!);
@@ -231,7 +250,7 @@ describe('#417 · #213 — l’assistant validé tel quel, sans navigateur', () 
     expect(fluxDuProjet().map(cle).sort(), 'les flux enregistrés (nom | genre | compte | dates) ne sont pas ceux de l’exemple').toEqual(fluxDeLExemple.map(cle).sort());
 
     const l = revenusEtCharges(fluxPrevus());
-    const vus = l.map((x) => `${x.nom} | ${/^Revenu/.test(x.genre) ? 'income' : 'fixedCharge'} | ${x.sous.split(' · ')[0]}`).sort();
+    const vus = l.map((x) => `${x.nom} | ${/^Revenu/.test(x.genre) ? 'income' : 'fixedCharge'} | ${x.compte}`).sort();
     const attendus = fluxDeLExemple.map((f) => `${f.name} | ${f.kind} | ${compteDe(f.accountId)}`).sort();
     expect(vus).toEqual(attendus);
     expect(l).toHaveLength(8);
@@ -243,20 +262,30 @@ describe('#417 · #213 — l’assistant validé tel quel, sans navigateur', () 
 
   it('[niveau 2] #213 point 2 (table #417, flux 11) — chacun des huit flux se lit dans son formulaire tel que l’exemple le dit : montant, rythme, première date, compte, fenêtre, tolérance, motif, montant variable, dates de début et de fin', async () => {
     const n = revenusEtCharges(fluxPrevus()).length;
-    const lignesDuGroupe = () => tous('main .row').filter((r) => r.querySelector('.label strong') && /^(Revenus|Charges fixes)/.test(t(r.closest('.card')?.previousElementSibling)));
+    // Un revenu ou une charge fixe se lit sur sa ligne — nom, montant, jour ou date de la première occurrence, rythme,
+    // compte — et dans son panneau, pour ce que la ligne ne corrige pas (#364, points 3 et 4).
+    const lignesDuGroupe = () => tous('main .ligne-flux').filter((l) => /^(Revenus|Charges fixes)/.test(groupeDe(l)));
     const lus = [];
     for (let i = 0; i < n; i++) {
-      const b = tous<HTMLButtonElement>('button', lignesDuGroupe()[i]!).find((x) => t(x) === 'Modifier')!;
+      const ligne = lignesDuGroupe()[i]!;
+      const surLaLigne = (selecteur: string) => ligne.querySelector(selecteur) as HTMLInputElement | HTMLSelectElement;
+      const jours = tous<HTMLInputElement>('input.jour', ligne);
+      const date = ligne.querySelector('input.date') as HTMLInputElement | null;
+      const surLigne = {
+        nom: surLaLigne('input.nom').value,
+        compte: t((surLaLigne('select.cpt') as HTMLSelectElement).selectedOptions[0]),
+        montant: Math.abs(centimes(surLaLigne('input.mt').value)),
+        tousLes: date ? jours[0]!.value : jours[1]!.value,
+        unite: surLaLigne('select.unite').value,
+        // Tous les mois, la ligne dit le jour de la première occurrence ; à un autre rythme, sa date.
+        premiere: date ? date.value : jours[0]!.value,
+      };
+      const b = tous<HTMLButtonElement>('button', ligne).find((x) => t(x) === 'Modifier')!;
       await presser(b);
       const entree = (l: string) => tous('form.edit label.f').find((x) => t(x).startsWith(l))?.querySelector('input, select') as HTMLInputElement | HTMLSelectElement | null | undefined;
       const v = (l: string) => entree(l)?.value ?? '';
       lus.push({
-        nom: v('Nom'),
-        compte: t((entree('Compte') as HTMLSelectElement).selectedOptions[0]),
-        montant: Math.abs(centimes(v('Montant'))),
-        tousLes: v('Tous les'),
-        unite: v('Unité'),
-        premiere: v('Première date'),
+        ...surLigne,
         fenetre: v('Fenêtre des échéances'),
         toleranceEuros: v('Tolérance de montant (€)') === '' ? null : centimes(v('Tolérance de montant (€)')),
         tolerancePct: v('Tolérance de montant (%)') === '' ? null : Number(v('Tolérance de montant (%)')),
@@ -273,7 +302,7 @@ describe('#417 · #213 — l’assistant validé tel quel, sans navigateur', () 
       montant: Math.abs(f.amount),
       tousLes: String(f.periodicity.interval),
       unite: f.periodicity.unit,
-      premiere: f.periodicity.anchorDate,
+      premiere: f.periodicity.unit === 'month' && f.periodicity.interval === 1 ? String(Number(f.periodicity.anchorDate.slice(8))) : f.periodicity.anchorDate,
       fenetre: String(f.dateWindowDays),
       toleranceEuros: f.amountTolerance?.abs ?? null,
       tolerancePct: f.amountTolerance?.pct ?? null,
@@ -282,7 +311,9 @@ describe('#417 · #213 — l’assistant validé tel quel, sans navigateur', () 
       a: f.activeTo ?? '',
       variable: !!f.variable,
     }));
-    const parNomEtDate = (a: { nom: string; premiere: string }, b: { nom: string; premiere: string }) => `${a.nom}|${a.premiere}`.localeCompare(`${b.nom}|${b.premiere}`);
+    // Les deux « Salaire » tombent le même jour : leur montant les départage.
+    const parNomEtDate = (a: { nom: string; premiere: string; montant: number }, b: { nom: string; premiere: string; montant: number }) =>
+      `${a.nom}|${a.premiere}|${a.montant}`.localeCompare(`${b.nom}|${b.premiere}|${b.montant}`);
     expect(lus.sort(parNomEtDate)).toEqual(attendus.sort(parNomEtDate));
   });
 

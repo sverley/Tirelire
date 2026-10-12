@@ -68,6 +68,18 @@ async function ecranOrdinaire(nom: string): Promise<string> {
     // Les comptes se corrigent sur leur ligne, dans des champs (#362) : leurs valeurs sont ce que l'écran dit.
     return `${t(document.querySelector('main'))} || ${tous<HTMLInputElement>('main .ligne-compte input').map((i) => i.value).join(' | ')}`;
   }
+  if (nom === 'Flux prévus') {
+    // Les revenus et les charges fixes se corrigent sur leur ligne, dans des champs (#364) : leurs valeurs sont ce que l'écran dit.
+    // Les raccourcis de l'exemple, offerts sous chaque groupe (#364, point 6), ne sont pas des flux du projet : ils ne se lisent pas ici.
+    const m = document.querySelector('main')!.cloneNode(true) as HTMLElement;
+    m.querySelectorAll('.propositions').forEach((p) => p.remove());
+    const vivants = tous<HTMLInputElement | HTMLSelectElement>('main .ligne-flux input, main .ligne-flux select');
+    tous<HTMLInputElement | HTMLSelectElement>('.ligne-flux input, .ligne-flux select', m).forEach((c, i) => {
+      const v = vivants[i]!;
+      c.replaceWith(document.createTextNode(` ${v instanceof HTMLSelectElement ? t(v.selectedOptions[0]) : v.value} `));
+    });
+    return t(m);
+  }
   return nom === 'Tirelires' ? texteAvecLesChamps() : t(document.querySelector('main'));
 }
 

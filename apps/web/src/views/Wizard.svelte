@@ -17,6 +17,7 @@
   import SectionTirelires from '../lib/SectionTirelires.svelte';
   import SectionComptes from '../lib/SectionComptes.svelte';
   import SectionCategories from '../lib/SectionCategories.svelte';
+  import SectionRevenusCharges from '../lib/SectionRevenusCharges.svelte';
   import VentilationOrdre from '../lib/VentilationOrdre.svelte';
   import ExplicationVentilation from '../lib/ExplicationVentilation.svelte';
   import ConsigneOrdre from '../lib/ConsigneOrdre.svelte';
@@ -25,46 +26,33 @@
   import { SectionTirelires as Section } from '../lib/sectionTirelires.svelte';
   import { SectionComptes as SectionDesComptes } from '../lib/sectionComptes.svelte';
   import { SectionCategories as SectionDesCategories } from '../lib/sectionCategories.svelte';
+  import { SectionRevenusCharges as SectionDesFlux } from '../lib/sectionRevenusCharges.svelte';
   import { carteDeLOrdre, fichierAEnregistrer, ordreEnregistre, partsDeLOrdre, preparerValidation, titreDeLAssistant, type SectionAssistant } from '../lib/brouillon';
   import { direDifference } from '../lib/differenceAssistant';
   import { saveFile } from '../lib/platform';
   import { budgetDefiniEnJson } from '@tirelire/core';
-  import { UNITS, money, periodicityLabel, shortDate, centsToInput, inputToCents, openAccounts, validityBadge, validityLabel } from '../lib/format';
+  import { money, periodicityLabel, shortDate, centsToInput, openAccounts } from '../lib/format';
   import {
     activeAt,
     alive,
     addDays,
     divideCents,
-    dateInMonth,
     dueDateShortfalls,
     shortfallsForPeriod,
     parseDate,
     todayISO,
-    daysInMonth,
     budgetPeriodContaining,
     needName,
-    nextOccurrence,
     budgetSuggestions,
-    suggestedFlow,
     suggestedOrder,
     standingOrderTarget,
     MAIN_ACCOUNT_ID,
-    type PeriodUnit,
     type Cents,
-    type FlowSuggestion,
     type OrderSuggestion,
     type Tirelire,
     type PlannedFlow,
   } from '@tirelire/core';
-  import {
-    aideCategorie,
-    aideFlux,
-    montantAide,
-    parNom,
-    recopieFlux,
-    versionMontree,
-    type FluxPropose,
-  } from '../lib/aides';
+  import { aideCategorie } from '../lib/aides';
 
   type Step = 'intro' | 'income' | 'fixed' | 'everyday' | 'periodic' | 'savings' | 'categories' | 'accounts' | 'summary';
 
@@ -85,6 +73,7 @@
     comptes: ['accounts', 'summary'],
     tirelires: ['everyday', 'periodic', 'savings', 'summary'],
     categories: ['categories', 'summary'],
+    revenus: ['income', 'fixed', 'summary'],
   };
 
   /**
@@ -104,6 +93,7 @@
     comptes: { vue: 'accounts', retour: 'Revenir aux comptes' },
     tirelires: { vue: 'tirelires', retour: 'Revenir aux tirelires' },
     categories: { vue: 'categories', retour: 'Revenir aux catégories' },
+    revenus: { vue: 'flows', retour: 'Revenir aux flux prévus' },
   } as const;
   function revenirALEcran() {
     if (!sectionOuverte) return;
@@ -129,7 +119,6 @@
   /** Les comptes des menus : un compte clos n'en fait plus partie (D56) ; il reste listé à l'étape Comptes. */
   const comptesOuverts = $derived(openAccounts(accounts, app.asOf));
   const incomes = $derived(flows.filter((f) => f.kind === 'income'));
-  const fixedCharges = $derived(flows.filter((f) => f.kind === 'fixedCharge'));
   const plan = $derived(app.assistantPlan);
   const totals = $derived(plan.totals);
   /**
@@ -141,19 +130,6 @@
   const manques = $derived(shortfallsForPeriod(dueDateShortfalls(app.assistantLedger, app.asOf), plan.period, app.asOf));
   const nbAnnonces = $derived(plan.warnings.length + manques.length);
 
-  /**
-   * Ancrage d'un flux sur le jour `day` : la dernière occurrence à cette date qui soit déjà
-   * passée. L'ancrage étant la *première* occurrence (`nextOccurrence` ne remonte jamais avant),
-   * l'ancrer dans le futur ferait disparaître le revenu de la période en cours.
-   */
-  function lastDayOnOrBefore(day: number): string {
-    const today = todayISO();
-    const { y, m } = parseDate(today);
-    const clamp = (yy: number, mm: number) => dateInMonth(yy, mm, Math.min(Math.max(1, day), daysInMonth(yy, mm)));
-    const here = clamp(y, m);
-    if (here <= today) return here;
-    return m === 1 ? clamp(y - 1, 12) : clamp(y, m - 1);
-  }
   /**
    * Date d'ouverture d'une tirelire : le début de la période en cours. La chronologie ne
    * démarre qu'à la première période entièrement postérieure à l'ouverture ; ouvrir « aujourd'hui »
@@ -197,76 +173,19 @@
     return principal ? parseDate(principal.periodicity.anchorDate).d : undefined;
   });
 
-  // --- Revenus ---
-  /**
-   * Les champs du formulaire d'ajout d'un flux. Le nom et le montant se saisissent, et leur aide est
-   * un texte indicatif ; les autres champs, tant qu'on n'y a pas touché (`undefined`), prennent la
-   * valeur de la ligne d'aide (#214) : une liste, un nombre ne montrent pas de texte indicatif.
-   */
-  type SaisieDeFlux = { name: string; amount: string; interval?: string | undefined; unit?: PeriodUnit | undefined; day?: string | undefined; accountId?: string | undefined };
-  let inc = $state<SaisieDeFlux>({ name: '', amount: '' });
-  let incError = $state('');
-  function creerRevenu(nom: string, montant: number, interval: number, unit: PeriodUnit, jour: number, compte?: string) {
-    const row: PlannedFlow = {
-      id: app.newId(),
-      name: nom,
-      kind: 'income',
-      amount: montant,
-      accountId: compte || mainAccountId(),
-      periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
-      dateWindowDays: 5,
-    };
-    app.assistantUpsert('plannedFlows', row);
-  }
-  function addIncome() {
-    const amount = inputToCents(inc.amount);
-    if (!inc.name.trim()) return void (incError = 'Donnez un nom à cette rentrée d’argent.');
-    if (amount === undefined || amount <= 0) return void (incError = 'Indiquez un montant, en positif.');
-    const interval = Math.max(1, Number(evRevenu.interval) || 1);
-    const jour = Number(evRevenu.day) || 1;
-    // Une ligne dont chaque champ porte la valeur de son aide fait ce que fait le raccourci de cette ligne (#214).
-    const ligne = aideRevenu;
-    if (ligne && recopieFlux({ name: inc.name.trim(), amount, interval, unit: evRevenu.unit, day: jour, accountId: evRevenu.accountId }, ligne, compteDuFlux(ligne.version))) {
-      appliquerRevenu(ligne.ligne);
-      inc = { name: '', amount: '' };
-    } else {
-      creerRevenu(inc.name.trim(), amount, interval, evRevenu.unit, jour, evRevenu.accountId);
-      inc = { ...inc, name: '', amount: '' };
-    }
-    incError = '';
-  }
-
-  // --- Charges fixes : montant fixe, tous les mois, sans réserve à constituer ---
-  let fix = $state<SaisieDeFlux>({ name: '', amount: '' });
-  let fixError = $state('');
-  function creerCharge(nom: string, montant: number, interval: number, unit: PeriodUnit, jour: number, compte?: string) {
-    const row: PlannedFlow = {
-      id: app.newId(),
-      name: nom,
-      kind: 'fixedCharge',
-      amount: -montant,
-      accountId: compte || mainAccountId(),
-      periodicity: { interval, unit, anchorDate: lastDayOnOrBefore(jour) },
-      dateWindowDays: 5,
-    };
-    app.assistantUpsert('plannedFlows', row);
-  }
-  function addFixed() {
-    const amount = inputToCents(fix.amount);
-    if (!fix.name.trim()) return void (fixError = 'Donnez un nom à cette charge.');
-    if (amount === undefined || amount <= 0) return void (fixError = 'Indiquez un montant, en positif.');
-    const interval = Math.max(1, Number(evCharge.interval) || 1);
-    const jour = Number(evCharge.day) || 1;
-    const ligne = aideCharge;
-    if (ligne && recopieFlux({ name: fix.name.trim(), amount, interval, unit: evCharge.unit, day: jour, accountId: evCharge.accountId }, ligne, compteDuFlux(ligne.version))) {
-      appliquerCharge(ligne.ligne);
-      fix = { name: '', amount: '' };
-    } else {
-      creerCharge(fix.name.trim(), amount, interval, evCharge.unit, jour, evCharge.accountId);
-      fix = { ...fix, name: '', amount: '' };
-    }
-    fixError = '';
-  }
+  // --- Revenus et charges fixes : la section, écrite une fois (#364), qui écrit ici dans le brouillon (#210) ---
+  const sectionFlux = new SectionDesFlux({
+    get ledger() {
+      return app.assistantLedger;
+    },
+    upsert: (key, row) => app.assistantUpsert(key, row),
+    remove: (key, id) => app.assistantRemove(key, id),
+    newId: () => app.newId(),
+    get asOf() {
+      return app.asOf;
+    },
+    mainAccountId,
+  });
 
   // --- Tirelires : la section, écrite une fois (#361), qui écrit ici dans le brouillon (#210) ---
   const section = new Section({
@@ -360,13 +279,6 @@
   const propositions = budgetSuggestions();
   /** Un raccourci déjà repris disparaît : on ne propose pas ce qui existe déjà. */
   const dejaPris = (nom: string) => flows.some((f) => f.name === nom) || tirelires.some((t) => t.name === nom);
-  // Un flux proposé (`FluxPropose`) : toutes ses versions, regroupées par leur nom dans l'ordre de
-  // l'exemple (`parNom`). Un raccourci apporte le flux avec toutes ses versions, et disparaît dès
-  // qu'un flux du même nom existe (D46, D51).
-  /** Le montant que montre le raccourci d'un flux : celui de la version en vigueur à la date de lecture, à défaut la première. */
-  const montantDuRaccourci = (g: FluxPropose) => versionMontree(g, app.asOf).amount;
-  const restantsRevenus = $derived(parNom(propositions.incomes).filter((g) => !dejaPris(g.name)));
-  const restantsCharges = $derived(parNom(propositions.charges).filter((g) => !dejaPris(g.name)));
   /** Le compte du même nom, ici ; le compte principal se désigne par l'absence de nom. */
   const compteNomme = (nom: string) => accounts.find((a) => a.name === nom)?.id;
   /** La tirelire du même nom, ici : celle où se lie une part d'un ordre proposé (#395). */
@@ -376,42 +288,6 @@
     propositions.orders.filter((o) => !dejaPris(o.name) && suggestedOrder(o, { id: '', principalId: mainAccountId(), compte: compteNomme }) !== undefined),
   );
 
-  // --- Aides des champs (#214) : ce que les champs vides d'un formulaire d'ajout laissent lire ---
-  // Elles viennent de l'exemple (`../lib/aides`), d'une même ligne par formulaire : celle que le
-  // premier raccourci restant de l'étape apporterait, ou, quand il n'en reste aucun, la première
-  // ligne de l'exemple de cette étape. Un champ qui ne montre pas de texte indicatif — liste, case,
-  // date, nombre — prend la valeur de cette ligne tant qu'on n'y a pas touché ; et ajouter une ligne
-  // dont chaque champ porte la valeur de son aide fait ce que fait le raccourci de cette ligne.
-  const aideRevenu = $derived(aideFlux(restantsRevenus, parNom(propositions.incomes), app.asOf));
-  const aideCharge = $derived(aideFlux(restantsCharges, parNom(propositions.charges), app.asOf));
-  /** Le compte que l'exemple donne à une ligne, ici : celui du même nom, à défaut le compte principal (D40). */
-  const compteNommeOuPrincipal = (nom?: string) => (nom ? compteNomme(nom) : undefined) ?? mainAccountId();
-  /** Ce que montrent les champs sans texte indicatif d'un flux : ce qu'on y a posé, sinon la valeur de la ligne d'aide. */
-  const evRevenu = $derived({
-    interval: inc.interval ?? String(aideRevenu?.interval ?? 1),
-    unit: inc.unit ?? aideRevenu?.unit ?? ('month' as PeriodUnit),
-    day: inc.day ?? String(aideRevenu?.day ?? 1),
-    accountId: inc.accountId ?? compteNommeOuPrincipal(aideRevenu?.version.accountName),
-  });
-  const evCharge = $derived({
-    interval: fix.interval ?? String(aideCharge?.interval ?? 1),
-    unit: fix.unit ?? aideCharge?.unit ?? ('month' as PeriodUnit),
-    day: fix.day ?? String(aideCharge?.day ?? 5),
-    accountId: fix.accountId ?? compteNommeOuPrincipal(aideCharge?.version.accountName),
-  });
-
-  // Ce que fait un clic sur un raccourci : créer la ligne, dans l'assistant.
-  /**
-   * Le compte d'un flux proposé : celui que l'exemple dit, quand il n'est pas le principal et qu'il
-   * existe ici ; sinon le compte principal (D40).
-   */
-  const compteDuFlux = (p: FlowSuggestion) =>
-    (p.accountName ? accounts.find((a) => a.name === p.accountName)?.id : undefined) ?? mainAccountId();
-  /** Une version d'un flux de l'exemple, avec tout ce que l'exemple en dit : bornes, fenêtre, tolérance, motif, montant variable. */
-  const appliquerVersion = (p: FlowSuggestion, genre: 'income' | 'fixedCharge') =>
-    app.assistantUpsert('plannedFlows', suggestedFlow(p, genre, { id: app.newId(), accountId: compteDuFlux(p) }));
-  const appliquerRevenu = (g: FluxPropose) => g.versions.forEach((p) => appliquerVersion(p, 'income'));
-  const appliquerCharge = (g: FluxPropose) => g.versions.forEach((p) => appliquerVersion(p, 'fixedCharge'));
   /** L'ordre de l'exemple, déjà posé chez la banque : il s'enregistre à la validation, comme ce que la banque exécute (D60). */
   function appliquerOrdre(p: OrderSuggestion) {
     const f = suggestedOrder(p, { id: app.newId(), principalId: mainAccountId(), compte: compteNomme, tirelire: tirelireNommee });
@@ -459,8 +335,8 @@
     if (etape === 'accounts') {
       sectionComptes.garnir();
     }
-    if (etape === 'income') restantsRevenus.forEach(appliquerRevenu);
-    if (etape === 'fixed') restantsCharges.forEach(appliquerCharge);
+    if (etape === 'income') sectionFlux.garnir('income');
+    if (etape === 'fixed') sectionFlux.garnir('fixedCharge');
     if (etape === 'everyday' || etape === 'periodic' || etape === 'savings') section.garnir(etape);
     // Les catégories viennent après les flux et les tirelires, vers lesquels elles se lient (D32).
     if (etape === 'categories') sectionCategories.garnir();
@@ -471,44 +347,6 @@
   // Ouvert sur une section, l'assistant arrive sur sa première étape, qui se garnit comme si on y était allé (D46).
   if (sectionOuverte) untrack(() => semer(step));
 
-  // --- Édition en place de ce qui a été ajouté ---
-  function editFlowName(f: PlannedFlow, v: string) {
-    if (v.trim() && v.trim() !== f.name) app.assistantUpsert('plannedFlows', { ...f, name: v.trim() });
-  }
-  /** Le signe est porté par le genre du flux, pas par la saisie : on la prend en valeur absolue. */
-  function editFlowAmount(f: PlannedFlow, v: string) {
-    const c = inputToCents(v);
-    if (c === undefined) return;
-    const signe = f.kind === 'income' ? Math.abs(c) : -Math.abs(c);
-    if (signe !== f.amount) app.assistantUpsert('plannedFlows', { ...f, amount: signe });
-  }
-  /** Rythme non mensuel : l'ancrage porte la date entière, dont toutes les occurrences découlent. */
-  function editFlowDate(f: PlannedFlow, v: string) {
-    if (v && v !== f.periodicity.anchorDate) app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate: v } });
-  }
-  function editFlowStep(f: PlannedFlow, champ: 'interval' | 'unit', v: string) {
-    const actuel = f.periodicity;
-    const suivant =
-      champ === 'interval'
-        ? { ...actuel, interval: Math.max(1, Number(v) || 1) }
-        : { ...actuel, unit: v as PeriodUnit };
-    if (suivant.interval === actuel.interval && suivant.unit === actuel.unit) return;
-    app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...suivant, anchorDate: f.periodicity.anchorDate } });
-  }
-  function editFlowAccount(f: PlannedFlow, v: string) {
-    if (v && v !== f.accountId) app.assistantUpsert('plannedFlows', { ...f, accountId: v });
-  }
-  function editFlowDay(f: PlannedFlow, v: string) {
-    const d = Math.min(31, Math.max(1, Number(v) || 1));
-    const { y, m } = parseDate(f.periodicity.anchorDate);
-    const anchorDate = dateInMonth(y, m, Math.min(d, daysInMonth(y, m)));
-    if (anchorDate !== f.periodicity.anchorDate) {
-      app.assistantUpsert('plannedFlows', { ...f, periodicity: { ...f.periodicity, anchorDate } });
-    }
-  }
-  function removeFlow(f: PlannedFlow) {
-    app.assistantRemove('plannedFlows', f.id);
-  }
   /**
    * Ce que la validation va changer au projet du moment (#379, point 3) : la différence entre le
    * brouillon et ce que l'assistant a lu, dite partie par partie, et les lignes changées des deux côtés.
@@ -610,74 +448,7 @@
   </p>
 {:else if step === 'income'}
   <h2>Qu'est-ce qui rentre, et quand ?</h2>
-  <p class="muted small">
-    Déclarez ce qui rentre, avec la date à laquelle ça tombe. Le montant se saisit en positif.
-  </p>
-
-  <h3>Rentrées d'argent</h3>
-  <div class="tete tete-flux" class:avec-compte={comptesOuverts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if comptesOuverts.length > 1}<span>Compte</span>{/if}<span></span></div>
-  {#each incomes as f (f.id)}
-    <div class="card ligne ligne-flux" class:avec-compte={comptesOuverts.length > 1}>
-      <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
-      <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
-      {#if f.periodicity.unit === 'month' && f.periodicity.interval === 1}
-        <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
-      {:else}
-        <input class="date" type="date" value={f.periodicity.anchorDate} onchange={(e) => editFlowDate(f, e.currentTarget.value)} title="Première échéance ; les suivantes en découlent" />
-      {/if}
-      <input class="jour" type="number" min="1" value={f.periodicity.interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
-      <select class="unite" value={f.periodicity.unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
-        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{f.periodicity.interval > 1 ? l.pluriel : l.un}</option>{/each}
-      </select>
-      {#if comptesOuverts.length > 1}
-        <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
-          {#each openAccounts(accounts, app.asOf, f.accountId) as a}<option value={a.id}>{a.name}</option>{/each}
-        </select>
-      {/if}
-      <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
-      {#if f.periodicity.unit !== 'month' || f.periodicity.interval !== 1}
-        <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
-      {/if}
-      {#if validityLabel(f)}
-        <!-- Une ligne que l'exemple borne le dit, avec sa date : deux versions d'un flux sont deux lignes du même nom (D51). -->
-        <p class="muted small suite">
-          {#if validityBadge(f, app.asOf)}<span class="pill dim">{validityBadge(f, app.asOf)}</span> {/if}{validityLabel(f)}
-        </p>
-      {/if}
-    </div>
-  {/each}
-  {#if restantsRevenus.length}
-    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
-    <div class="propositions">
-      {#each restantsRevenus as p (p.name)}
-        <button class="prop" onclick={() => appliquerRevenu(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(montantDuRaccourci(p))}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-  <form class="edit" onsubmit={(e) => { e.preventDefault(); addIncome(); }}>
-    <div class="grid">
-      <label class="f">Quoi ? <input bind:value={inc.name} placeholder={aideRevenu?.name} /></label>
-      <label class="f">Combien ? <input bind:value={inc.amount} inputmode="decimal" placeholder={aideRevenu ? montantAide(aideRevenu.amount) : undefined} /></label>
-      <label class="f">Tous les <input type="number" min="1" value={evRevenu.interval} oninput={(e) => (inc.interval = e.currentTarget.value)} /></label>
-      <label class="f">Unité
-        <select value={evRevenu.unit} onchange={(e) => (inc.unit = e.currentTarget.value as PeriodUnit)}>
-          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{Number(evRevenu.interval) > 1 ? l.pluriel : l.un}</option>{/each}
-        </select>
-      </label>
-      <label class="f">Vers le (jour) <input type="number" min="1" max="31" value={evRevenu.day} oninput={(e) => (inc.day = e.currentTarget.value)} /></label>
-        {#if comptesOuverts.length > 1}
-          <label class="f">Sur quel compte ?
-            <select value={evRevenu.accountId} onchange={(e) => (inc.accountId = e.currentTarget.value)}>
-              {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
-            </select>
-          </label>
-        {/if}
-    </div>
-    {#if incError}<div class="err">{incError}</div>{/if}
-    <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
-  </form>
+  <SectionRevenusCharges s={sectionFlux} genre="income" />
 
   <h3>Découpage du budget</h3>
   <p class="muted small">
@@ -704,73 +475,7 @@
 
 {:else if step === 'fixed'}
   <h2>Qu'est-ce qui part tout seul, au même montant ?</h2>
-  <p class="muted small">
-    Loyer, abonnements, mensualités : le montant est connu et il part chaque mois. Pas besoin de
-    réserve — il suffit que le plan sache que cet argent est déjà engagé.
-  </p>
-  <h3>Charges fixes</h3>
-  <div class="tete tete-flux" class:avec-compte={comptesOuverts.length > 1}><span>Quoi ?</span><span class="d">Combien</span><span>Le</span><span>Tous les</span><span>Unité</span>{#if comptesOuverts.length > 1}<span>Compte</span>{/if}<span></span></div>
-  {#each fixedCharges as f (f.id)}
-    <div class="card ligne ligne-flux" class:avec-compte={comptesOuverts.length > 1}>
-      <input class="nom" value={f.name} onchange={(e) => editFlowName(f, e.currentTarget.value)} />
-      <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
-      {#if f.periodicity.unit === 'month' && f.periodicity.interval === 1}
-        <input class="jour" type="number" min="1" max="31" value={parseDate(f.periodicity.anchorDate).d} onchange={(e) => editFlowDay(f, e.currentTarget.value)} />
-      {:else}
-        <input class="date" type="date" value={f.periodicity.anchorDate} onchange={(e) => editFlowDate(f, e.currentTarget.value)} title="Première échéance ; les suivantes en découlent" />
-      {/if}
-      <input class="jour" type="number" min="1" value={f.periodicity.interval} onchange={(e) => editFlowStep(f, 'interval', e.currentTarget.value)} />
-      <select class="unite" value={f.periodicity.unit} onchange={(e) => editFlowStep(f, 'unit', e.currentTarget.value)}>
-        {#each Object.entries(UNITS) as [u, l]}<option value={u}>{f.periodicity.interval > 1 ? l.pluriel : l.un}</option>{/each}
-      </select>
-      {#if comptesOuverts.length > 1}
-        <select class="cpt" value={f.accountId} onchange={(e) => editFlowAccount(f, e.currentTarget.value)}>
-          {#each openAccounts(accounts, app.asOf, f.accountId) as a}<option value={a.id}>{a.name}</option>{/each}
-        </select>
-      {/if}
-      <button class="btn small danger" onclick={() => removeFlow(f)}>×</button>
-      {#if f.periodicity.unit !== 'month' || f.periodicity.interval !== 1}
-        <p class="muted small suite">Prochaine : {shortDate(nextOccurrence(f.periodicity, app.asOf))}</p>
-      {/if}
-      {#if validityLabel(f)}
-        <p class="muted small suite">
-          {#if validityBadge(f, app.asOf)}<span class="pill dim">{validityBadge(f, app.asOf)}</span> {/if}{validityLabel(f)}
-        </p>
-      {/if}
-    </div>
-  {/each}
-  {#if restantsCharges.length}
-    <p class="eyebrow" style="margin:12px 0 6px">Ajouter en un geste</p>
-    <div class="propositions">
-      {#each restantsCharges as p (p.name)}
-        <button class="prop" onclick={() => appliquerCharge(p)}>
-          <span class="n">+ {p.name}</span><span class="v num">{money(montantDuRaccourci(p))}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-  <form class="edit" onsubmit={(e) => { e.preventDefault(); addFixed(); }}>
-    <div class="grid">
-      <label class="f">Quoi ? <input bind:value={fix.name} placeholder={aideCharge?.name} /></label>
-      <label class="f">Combien ? <input bind:value={fix.amount} inputmode="decimal" placeholder={aideCharge ? montantAide(aideCharge.amount) : undefined} /></label>
-      <label class="f">Tous les <input type="number" min="1" value={evCharge.interval} oninput={(e) => (fix.interval = e.currentTarget.value)} /></label>
-      <label class="f">Unité
-        <select value={evCharge.unit} onchange={(e) => (fix.unit = e.currentTarget.value as PeriodUnit)}>
-          {#each Object.entries(UNITS) as [u, l]}<option value={u}>{Number(evCharge.interval) > 1 ? l.pluriel : l.un}</option>{/each}
-        </select>
-      </label>
-      <label class="f">Vers le (jour) <input type="number" min="1" max="31" value={evCharge.day} oninput={(e) => (fix.day = e.currentTarget.value)} /></label>
-        {#if comptesOuverts.length > 1}
-          <label class="f">Sur quel compte ?
-            <select value={evCharge.accountId} onchange={(e) => (fix.accountId = e.currentTarget.value)}>
-              {#each comptesOuverts as a}<option value={a.id}>{a.name}</option>{/each}
-            </select>
-          </label>
-        {/if}
-    </div>
-    {#if fixError}<div class="err">{fixError}</div>{/if}
-    <div class="actions" style="margin:0"><button class="btn primary" type="submit">Ajouter</button></div>
-  </form>
+  <SectionRevenusCharges s={sectionFlux} genre="fixedCharge" />
 {:else if step === 'everyday'}
   <h2>Sur quoi voulez-vous vous tenir à un montant ?</h2>
   <SectionTirelires s={section} genre="everyday" cartes={section.parTirelire('everyday')} />
@@ -895,8 +600,8 @@
               de {c.de} vers {c.vers}{f.labelPattern ? ` · libellé « ${f.labelPattern} »` : ''}.
             </div>
           </div>
-          <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => editFlowAmount(f, e.currentTarget.value)} />
-          <button class="btn small danger" title="Retirer ce virement" onclick={() => removeFlow(f)}>×</button>
+          <input class="mt" value={centsToInput(Math.abs(f.amount))} inputmode="decimal" aria-label="Ce que la banque vire" onchange={(e) => sectionFlux.changerMontant(f, e.currentTarget.value)} />
+          <button class="btn small danger" title="Retirer ce virement" onclick={() => sectionFlux.retirer(f)}>×</button>
         </div>
         <VentilationOrdre {...c.ventilation} />
         <p class="muted small" style="margin:4px 0 0">
