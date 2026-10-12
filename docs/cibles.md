@@ -119,8 +119,8 @@ partout (il sert I8).
 |---|---|---|---|
 | U1 · Budget seul | **prioritaire** | **prioritaire** | sans objet |
 | U2 · Budget et virements permanents | **prioritaire** | **prioritaire** | sans objet |
-| U3 · Budget sans virements validés, puis import | à venir | à venir | sans objet |
-| U4 · Budget reconstruit depuis l'historique | à venir | à venir | sans objet |
+| U3 · Budget sans virements validés, puis import | **prioritaire** | **prioritaire** | sans objet |
+| U4 · Budget reconstruit depuis l'historique | **prioritaire** | **prioritaire** | sans objet |
 | U5 · Import seul | à venir | à venir | sans objet |
 | U6 · Couple aux revenus inégaux | à venir | à venir | sans objet |
 | U7 · Colocation | à venir | à venir | sans objet |
