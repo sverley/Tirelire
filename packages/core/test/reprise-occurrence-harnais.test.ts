@@ -1,11 +1,19 @@
 /**
- * Tests du codeur de #445 — dire à la main qu'une opération est l'occurrence d'un flux prévu, hors de
+ * Harnais d'audit de #445 — dire à la main qu'une opération est l'occurrence d'un flux prévu, hors de
  * sa fenêtre et de sa tolérance (D12, D22, D24, D26, D88). Côté cœur ; ce qui se lit et se fait à
- * l'écran : `apps/web/test/reprise-occurrence-ecran.test.ts`. Chaque `describe` reprend un point du
- * « Fait quand » sous son numéro. Données inventées (D84) : de petits grands livres écrits ici.
+ * l'écran : `apps/web/test/reprise-occurrence-ecran-harnais.test.ts`. Chaque `describe` reprend un
+ * point du « Fait quand » sous son numéro, et son niveau (D83).
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur
+ * (`reprise-occurrence.test.ts`, déplacé ici en entier). Sont de moi : aux points 7 et 8, la
+ * séparation de ce qui serait irréparable — l'opération verrouillée, sa propre ventilation gardée, le
+ * flux inchangé, lu contre une copie prise avant la reprise et non contre l'objet que porte le grand
+ * livre — ; le solde prévu, aux deux points ; la proposition qui revient, au point 8.
+ * Données inventées (D84) : de petits grands livres écrits ici.
  */
 import { describe, expect, it } from 'vitest';
 import {
+  accountBalance,
   applyBulkOccurrence,
   applyPatchToLedger,
   bulkOccurrencePlan,
@@ -21,6 +29,7 @@ import {
   resumeOccurrence,
   resumptionOf,
   undoResumption,
+  withPlannedOperations,
   type Ledger,
   type Operation,
   type PlannedFlow,
@@ -62,7 +71,7 @@ const lire = (l: Ledger, id: string) => l.operations.find((o) => o.id === id)!;
 const dates = (l: Ledger, opId: string, flowId: string) => offeredFlows(l, opId).find((o) => o.flow.id === flowId)?.occurrences.map((o) => o.date);
 const instantané = (l: Ledger) => JSON.stringify(l);
 
-describe('[niveau 4] #445 · 1. les opérations concernées', () => {
+describe('[niveau 2] #445 · 1. les opérations concernées', () => {
   it('une opération importée qui ne reprend rien, quel que soit son état ; ni une saisie, ni une opération qui reprend déjà', () => {
     const l = budget();
     expect(canResumeOccurrence(lire(l, 'salaire-dec'))).toBe(true);
@@ -81,7 +90,7 @@ describe('[niveau 4] #445 · 1. les opérations concernées', () => {
   });
 });
 
-describe('[niveau 4] #445 · 2. les flux offerts', () => {
+describe('[niveau 2] #445 · 2. les flux offerts', () => {
   it('ceux de son compte et de son sens, non supprimés, quels que soient motif, tolérance, fenêtre, variable', () => {
     const l = budget();
     l.plannedFlows.push(
@@ -113,7 +122,7 @@ describe('[niveau 4] #445 · 2. les flux offerts', () => {
   });
 });
 
-describe('[niveau 4] #445 · 3. les occurrences offertes', () => {
+describe('[niveau 2] #445 · 3. les occurrences offertes', () => {
   it('le cas du besoin : la paie du 19 décembre se voit offrir d’abord l’occurrence du 25 décembre', () => {
     const l = budget();
     const paie = offeredFlows(l, 'salaire-dec')[0]!;
@@ -174,7 +183,7 @@ describe('[niveau 4] #445 · 3. les occurrences offertes', () => {
   });
 });
 
-describe('[niveau 4] #445 · 5. les lignes qui portent le geste', () => {
+describe('[niveau 2] #445 · 5. les lignes qui portent le geste', () => {
   it('les opérations concernées à qui au moins un flux est offert, et elles seules', () => {
     const l = budget();
     l.operations.push(
@@ -194,16 +203,20 @@ describe('[niveau 4] #445 · 5. les lignes qui portent le geste', () => {
   });
 });
 
-describe('[niveau 4] #445 · 7. ce que fait la reprise', () => {
+describe('[niveau 0] #445 · 7. verrouillée, elle garde ce qui a été décidé sur elle, et le flux ne change pas (D22, D88, I10)', () => {
   it('l’opération reprend l’occurrence, avec la ventilation du flux, et devient verrouillée ; le flux ne change pas', () => {
     const l = budget();
+    const fluxAvant = JSON.stringify(l.plannedFlows);
     const p = resumeOccurrence(l, 'salaire-dec', 'f-paie', '2026-12-25');
     expect(p.operations).toHaveLength(1);
     expect(p.operations[0]).toMatchObject({ id: 'salaire-dec', plannedFlowId: 'f-paie', plannedDate: '2026-12-25', state: 'locked' });
     expect(p.subOperations.map((s) => [s.operationId, s.categoryId, s.share.kind])).toEqual([['salaire-dec', 'cat-salaire', 'variable']]);
+    // La reprise n'écrit que l'opération et sa ventilation : aucun flux.
     expect(Object.keys(p).sort()).toEqual(['operations', 'removedSubOperations', 'subOperations']);
+    expect(p.removedSubOperations).toEqual([]);
     const après = applyPatchToLedger(l, p);
-    expect(après.plannedFlows).toEqual(l.plannedFlows);
+    // Lu contre une copie prise avant la reprise : un flux changé en place ne se compare pas à lui-même.
+    expect(JSON.stringify(après.plannedFlows)).toBe(fluxAvant);
     expect(resumptionOf(après, lire(après, 'salaire-dec'))).toMatchObject({ date: '2026-12-25', amount: euros(2500), gap: -euros(20) });
   });
 
@@ -213,9 +226,14 @@ describe('[niveau 4] #445 · 7. ce que fait la reprise', () => {
     l.subOperations.push({ id: 's-own', operationId: 'salaire-dec', categoryId: 'cat-divers', share: { kind: 'variable' } });
     const p = resumeOccurrence(l, 'salaire-dec', 'f-paie', '2026-12-25');
     expect(p.subOperations).toEqual([]);
+    expect(p.removedSubOperations).toEqual([]);
     expect(p.operations[0]!.state).toBe('locked');
+    const après = applyPatchToLedger(l, p);
+    expect(après.subOperations.filter((s) => s.operationId === 'salaire-dec' && !s.deletedAt).map((s) => s.categoryId)).toEqual(['cat-divers']);
   });
+});
 
+describe('[niveau 2] #445 · 7. ce que fait la reprise', () => {
   it('pour un flux de virement, son compte de destination', () => {
     const l = budget();
     l.plannedFlows.push(flux({ id: 'f-epargne', name: 'Épargne', kind: 'transfer', amount: -euros(200), counterpartAccountId: LIVRET, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-10-02' } }));
@@ -250,6 +268,17 @@ describe('[niveau 4] #445 · 7. ce que fait la reprise', () => {
     expect(missingFlows(repris, '2026-12-01', '2026-12-31').some((m) => m.flowId === 'f-paie')).toBe(false);
   });
 
+  it('l’opération compte à sa place dans le solde prévu (D88)', () => {
+    const l = budget();
+    const cc = l.accounts.find((a) => a.id === CC)!;
+    // Lu le 20 décembre : la fenêtre du 25 n'est pas passée, l'occurrence compte encore en plus de la paie du 19.
+    const soldePrévu = (x: Ledger) => accountBalance(cc, withPlannedOperations(x, '2026-12-20', '2026-12-31').ledger, '2026-12-31');
+    const repris = applyPatchToLedger(l, resumeOccurrence(l, 'salaire-dec', 'f-paie', '2026-12-25'));
+    expect(soldePrévu(l) - soldePrévu(repris), 'l’occurrence reprise compte encore').toBe(euros(2500));
+    // Le loyer du 5 décembre est attendu, non reçu : reste le solde du compte, où la paie du 19 compte pour 2 480 €.
+    expect(soldePrévu(repris), 'l’opération ne compte pas à sa place, pour son propre montant').toBe(accountBalance(cc, repris, '2026-12-31'));
+  });
+
   it('rien pour une occurrence prise, hors validité, qui n’existe pas, ou un flux d’un autre sens', () => {
     const l = budget();
     expect(resumeOccurrence(l, 'salaire-dec', 'f-paie', '2026-11-25').operations).toEqual([]);
@@ -260,21 +289,47 @@ describe('[niveau 4] #445 · 7. ce que fait la reprise', () => {
   });
 });
 
-describe('[niveau 4] #445 · 8. la défaire', () => {
-  it('l’occurrence redevient libre et s’offre de nouveau ; l’opération reste verrouillée et garde sa ventilation', () => {
+describe('[niveau 0] #445 · 8. la défaire : l’opération reste verrouillée et garde ce qu’elle porte (D22)', () => {
+  it('« Défaire la reprise » ne la déverrouille pas, et ne lui retire pas la ventilation qu’elle a prise ni la sienne', () => {
     const l = budget();
     const repris = applyPatchToLedger(l, resumeOccurrence(l, 'salaire-dec', 'f-paie', '2026-12-25'));
-    const défait = applyPatchToLedger(repris, undoResumption(repris, 'salaire-dec'));
+    const p = undoResumption(repris, 'salaire-dec');
+    expect(p.removedSubOperations ?? []).toEqual([]);
+    const défait = applyPatchToLedger(repris, p);
     const op = lire(défait, 'salaire-dec');
     expect(op.plannedFlowId).toBeUndefined();
+    expect(op.plannedDate).toBeUndefined();
     expect(op.state).toBe('locked');
-    expect(défait.subOperations.filter((s) => s.operationId === 'salaire-dec').map((s) => s.categoryId)).toEqual(['cat-salaire']);
-    expect(dates(défait, 'salaire-dec', 'f-paie')).toEqual(['2026-12-25']);
-    expect(missingFlows(défait, '2026-12-01', '2026-12-31').some((m) => m.flowId === 'f-paie' && m.expectedDate === '2026-12-25')).toBe(true);
+    expect(défait.subOperations.filter((s) => s.operationId === 'salaire-dec' && !s.deletedAt).map((s) => s.categoryId)).toEqual(['cat-salaire']);
+    // Sa propre ventilation, gardée à la reprise, l'est aussi à la reprise défaite.
+    const propre = budget();
+    propre.subOperations.push({ id: 's-own', operationId: 'salaire-dec', categoryId: 'cat-divers', share: { kind: 'variable' } });
+    const r2 = applyPatchToLedger(propre, resumeOccurrence(propre, 'salaire-dec', 'f-paie', '2026-12-25'));
+    const d2 = applyPatchToLedger(r2, undoResumption(r2, 'salaire-dec'));
+    expect(lire(d2, 'salaire-dec').state).toBe('locked');
+    expect(d2.subOperations.filter((s) => s.operationId === 'salaire-dec' && !s.deletedAt).map((s) => s.categoryId)).toEqual(['cat-divers']);
   });
 });
 
-describe('[niveau 4] #445 · 6. par la sélection', () => {
+describe('[niveau 2] #445 · 8. la défaire : l’occurrence redevient libre', () => {
+  it('elle compte de nouveau, ou se signale attendue, non reçue ; elle s’offre et se propose de nouveau', () => {
+    const l = budget();
+    const cc = l.accounts.find((a) => a.id === CC)!;
+    const soldePrévu = (x: Ledger) => accountBalance(cc, withPlannedOperations(x, '2026-12-20', '2026-12-31').ledger, '2026-12-31');
+    const repris = applyPatchToLedger(l, resumeOccurrence(l, 'salaire-dec', 'f-paie', '2026-12-25'));
+    const défait = applyPatchToLedger(repris, undoResumption(repris, 'salaire-dec'));
+    expect(soldePrévu(défait), 'elle ne compte pas de nouveau dans le solde prévu').toBe(soldePrévu(l));
+    expect(missingFlows(défait, '2026-12-01', '2026-12-31').some((m) => m.flowId === 'f-paie' && m.expectedDate === '2026-12-25')).toBe(true);
+    expect(dates(défait, 'salaire-dec', 'f-paie')).toEqual(['2026-12-25']);
+    // Une opération que la sélection du flux reconnaît se la voit proposer de nouveau ; reprise, elle ne l'était pas.
+    const reconnue = opération({ id: 'salaire-24', date: '2026-12-24', amount: euros(2500), label: 'SALAIRE', normalizedLabel: 'SALAIRE' });
+    const propose = (x: Ledger) => proposeMatches({ ...x, operations: [...x.operations, reconnue] }, '2026-12-01', '2026-12-31').filter((p) => p.operationId === 'salaire-24').map((p) => p.expectedDate);
+    expect(propose(repris)).toEqual([]);
+    expect(propose(défait)).toEqual(['2026-12-25']);
+  });
+});
+
+describe('[niveau 2] #445 · 6. par la sélection', () => {
   /** Trois paies de décembre à janvier, hors de leur fenêtre, et ce qu'il faut autour. */
   function plusieurs(): Ledger {
     const l = budget();
@@ -339,7 +394,7 @@ describe('[niveau 4] #445 · 6. par la sélection', () => {
   });
 });
 
-describe('[niveau 4] #445 · 9. rien ne s’écrit avant le geste (I10)', () => {
+describe('[niveau 0] #445 · 9. rien ne s’écrit avant le geste (I10)', () => {
   it('lire ce qui s’offre, l’aperçu ou la reprise ne touche pas au grand livre', () => {
     const l = budget();
     const avant = instantané(l);

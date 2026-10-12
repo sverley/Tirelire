@@ -1,9 +1,18 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #445 — dire à la main qu'une opération est l'occurrence d'un flux prévu, hors de
- * sa fenêtre, depuis l'opération ouverte, depuis sa ligne et par la sélection. L'application montée sous
- * jsdom (`ecran.ts`), sur un projet inventé (D84) posé comme l'application pose l'exemple
- * (`replaceWith`), lu au 5 janvier 2027. Les règles elles-mêmes : `packages/core/test/reprise-occurrence.test.ts`.
+ * Harnais d'audit de #445 — dire à la main qu'une opération est l'occurrence d'un flux prévu, hors de
+ * sa fenêtre, depuis l'opération ouverte, depuis sa ligne et par la sélection. Côté écran :
+ * l'application montée sous jsdom (`ecran.ts`), sur un projet inventé (D84) posé comme l'application
+ * pose l'exemple (`replaceWith`), lu au 5 janvier 2027. Les règles elles-mêmes :
+ * `packages/core/test/reprise-occurrence-harnais.test.ts`. Chaque `describe` nomme le point du
+ * « Fait quand » qu'il tranche, et son niveau (D83).
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur
+ * (`reprise-occurrence-ecran.test.ts`, déplacé ici en entier, et réparti). Sont de moi : au point 5,
+ * l'accès depuis l'accueil (I5) ; au point 7, la reprise relue après un redémarrage par ses trois
+ * chemins, le flux inchangé compris ; au point 9, la base relue en entier après avoir ouvert, puis
+ * fermé, les trois panneaux et quitté l'écran ; au point 6, l'écart de l'aperçu ; au point 8,
+ * l'occurrence de nouveau « attendue, non reçue ».
  *
  * Le décor : une paie de 2 500 € le 25 de chaque mois depuis octobre 2026 (fenêtre de 3 jours), classée
  * « Salaire » ; les paies d'octobre et de novembre la reprennent ; celle de décembre tombe le 19, hors
@@ -17,6 +26,7 @@ const fmt = (c: number) => formatCents(c).replace(/[\s  ]+/g, ' ');
 const CC = 'acc-principal';
 const TITRE = 'Reprendre une occurrence d’un flux';
 const GESTE = 'Reprendre une occurrence';
+const ATTENDU = 'Paie | attendu le 25 déc. 2026, fenêtre close le 28 déc. 2026';
 
 function flux(f: Partial<PlannedFlow> & Pick<PlannedFlow, 'id' | 'name' | 'amount'>): PlannedFlow {
   return { kind: 'income', accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-10-25' }, dateWindowDays: 3, ...f };
@@ -44,12 +54,13 @@ function budget(): Ledger {
   return l;
 }
 
-async function ouvrirSur(l: Ledger): Promise<void> {
+/** Le projet posé, puis l'accueil ; `onglet` vide : on y reste. */
+async function ouvrirSur(l: Ledger, onglet = 'Opérations'): Promise<void> {
   fixerLeJour('2027-01-05');
   await ouvrirLApplication();
   await app.replaceWith(l);
   await rendu();
-  await allerA('Opérations');
+  if (onglet) await allerA(onglet);
 }
 
 /** L'écran Opérations, sur toutes les opérations (il s'ouvre sur les non traitées). */
@@ -61,6 +72,8 @@ async function toutes(): Promise<void> {
 /** La ligne de l'opération de ce libellé, dans la liste. */
 const ligne = (libelle: string): HTMLElement | undefined => tous('main .card > .row').find((r) => t(r.querySelector(':scope > button.label strong')) === libelle);
 const geste = (libelle: string) => tous<HTMLButtonElement>(':scope > button', ligne(libelle)!).find((b) => t(b) === GESTE);
+const ouvrirLOperation = (libelle: string) => presser(ligne(libelle)!.querySelector(':scope > button.label') as HTMLElement);
+const cocher = (libelle: string) => presser(ligne(libelle)!.querySelector('label.cocher input') as HTMLElement);
 const lu = (id: string) => alive(projet().operations).find((o) => o.id === id)!;
 const partsDe = (id: string) => alive(projet().subOperations).filter((s) => s.operationId === id).map((s) => s.categoryId);
 const instantané = () => JSON.stringify({ ...projet(), settings: undefined });
@@ -74,15 +87,104 @@ async function attendusNonRecus(): Promise<string[]> {
 }
 /** La première occurrence offerte dans ce conteneur. */
 const premiereOccurrence = (dans: Element) => dans.querySelector('.occurrence-offerte') as HTMLElement | null;
+/** Le choix du flux dans la section ou le panneau : la liste qui offre la paie. */
+const choixDuFlux = (dans: Element) => tous<HTMLSelectElement>('select', dans).find((s) => [...s.options].some((o) => t(o).startsWith('Paie ·')))!;
+const reprendre = (occ: Element) => presser(tous<HTMLButtonElement>('button', occ).find((b) => t(b) === 'Reprendre')!);
+/** Le panneau des actions groupées ouvert sur les cibles cochées, et son choix d'un flux. */
+async function actionsSur(libelles: string[]): Promise<{ form: HTMLElement; choix: HTMLSelectElement }> {
+  for (const l of libelles) await cocher(l);
+  expect(await cliquer(`Actions sur ${libelles.length} opération(s)`)).toBe(true);
+  const form = document.querySelector('main form.edit') as HTMLElement;
+  const champ = tous('label.f', form).find((x) => t(x).startsWith(TITRE));
+  return { form, choix: champ?.querySelector('select') as HTMLSelectElement };
+}
 
-describe('#445 · la reprise d’une occurrence choisie, à l’écran', () => {
-  it('[niveau 4] points 4, 7, 8 et 9 — depuis l’opération ouverte : la section, la reprise verrouillée, relue au redémarrage, puis défaite', async () => {
+/**
+ * La reprise écrite, et relue après un redémarrage : l'opération reprend l'occurrence, verrouillée, avec
+ * la ventilation du flux ; aucun flux n'a changé.
+ */
+async function laRepriseTient(id: string, date: string, fluxAvant: string): Promise<void> {
+  const verifier = () => {
+    expect(lu(id)).toMatchObject({ plannedFlowId: 'f-paie', plannedDate: date, state: 'locked' });
+    expect(partsDe(id)).toEqual(['cat-salaire']);
+    expect(JSON.stringify(projet().plannedFlows), 'le flux a changé').toBe(fluxAvant);
+  };
+  verifier();
+  await rouvrirLApplication();
+  verifier();
+}
+
+describe('[niveau 1] #445 · 5. (I5) depuis l’accueil, en deux gestes', () => {
+  it('l’onglet Opérations, sur son filtre d’ouverture, puis le geste de la ligne, qui le nomme : le panneau de la reprise s’ouvre', async () => {
+    await ouvrirSur(budget(), '');
+    await allerA('Opérations');
+    expect(geste('SALAIRE-DEC'), 'la ligne ne porte pas le geste').toBeDefined();
+    await presser(geste('SALAIRE-DEC')!);
+    expect(t(ligne('SALAIRE-DEC')!.querySelector('form.reprise-ligne .titre-panneau'))).toBe(`${TITRE} — SALAIRE-DEC`);
+    expect(premiereOccurrence(ligne('SALAIRE-DEC')!), 'le panneau n’offre aucune occurrence').toBeTruthy();
+  });
+});
+
+describe('[niveau 0] #445 · 7. la reprise s’écrit, verrouillée, avec la ventilation du flux, le flux inchangé, et se relit après un redémarrage', () => {
+  it('depuis l’opération ouverte (point 4)', async () => {
     await ouvrirSur(budget());
-    const attendu = 'Paie | attendu le 25 déc. 2026, fenêtre close le 28 déc. 2026';
-    expect(await attendusNonRecus(), 'le décor ne montre pas l’occurrence du 25 décembre attendue, non reçue').toContain(attendu);
-    const avant = instantané();
     const fluxAvant = JSON.stringify(projet().plannedFlows);
-    await presser(ligne('SALAIRE-DEC')!.querySelector(':scope > button.label') as HTMLElement);
+    await ouvrirLOperation('SALAIRE-DEC');
+    await reprendre(premiereOccurrence(ligne('SALAIRE-DEC')!.querySelector('form.edit')!)!);
+    await laRepriseTient('salaire-dec', '2026-12-25', fluxAvant);
+  });
+
+  it('depuis la ligne, sans l’ouvrir (point 5)', async () => {
+    await ouvrirSur(budget());
+    const fluxAvant = JSON.stringify(projet().plannedFlows);
+    await presser(geste('SALAIRE-DEC')!);
+    await reprendre(premiereOccurrence(ligne('SALAIRE-DEC')!.querySelector('form.reprise-ligne')!)!);
+    await laRepriseTient('salaire-dec', '2026-12-25', fluxAvant);
+  });
+
+  it('par la sélection, à « Appliquer » (point 6)', async () => {
+    await ouvrirSur(budget());
+    const fluxAvant = JSON.stringify(projet().plannedFlows);
+    const { choix } = await actionsSur(['SALAIRE-DEC', 'SALAIRE-JAN']);
+    await saisir(choix, 'f-paie');
+    expect(await cliquerExactement('Appliquer maintenant')).toBe(true);
+    await laRepriseTient('salaire-dec', '2026-12-25', fluxAvant);
+    await laRepriseTient('salaire-jan', '2027-01-25', fluxAvant);
+  });
+});
+
+describe('[niveau 0] #445 · 9. rien ne s’écrit avant le geste (I10)', () => {
+  it('ouvrir la section, le panneau de la ligne et celui des actions groupées, y choisir un flux, lire l’aperçu, fermer, quitter l’écran : la base relue est identique', async () => {
+    await ouvrirSur(budget(), 'Plan');
+    const avant = JSON.stringify(projet());
+    await allerA('Opérations');
+    await toutes();
+    // La section de l'opération ouverte, un autre flux choisi, puis l'opération refermée.
+    await ouvrirLOperation('SALAIRE-DEC');
+    const form = ligne('SALAIRE-DEC')!.querySelector('form.edit')!;
+    expect(tous('h3', form).map(t)).toContain(TITRE);
+    await saisir(choixDuFlux(form), 'f-prime');
+    await ouvrirLOperation('SALAIRE-DEC');
+    // Le panneau de la ligne, un autre flux choisi, puis « Fermer ».
+    await presser(geste('SALAIRE-DEC')!);
+    await saisir(choixDuFlux(ligne('SALAIRE-DEC')!.querySelector('form.reprise-ligne')!), 'f-prime');
+    await cliquerExactement('Fermer');
+    expect(ligne('SALAIRE-DEC')!.querySelector('form.reprise-ligne')).toBeNull();
+    // Le panneau des actions groupées, un flux choisi et son aperçu, puis « Fermer ».
+    const { form: groupe, choix } = await actionsSur(['SALAIRE-DEC', 'SALAIRE-JAN']);
+    await saisir(choix, 'f-paie');
+    expect(tous('.apercu-reprises .row', groupe)).toHaveLength(2);
+    await cliquerExactement('Fermer');
+    await allerA('Plan');
+    expect(JSON.stringify(projet())).toBe(avant);
+  });
+});
+
+describe('[niveau 2] #445 · 4. depuis l’opération ouverte', () => {
+  it('la section, avec « Reprendre une saisie » : les flux offerts, du plus proche en montant, et les occurrences de celui qui est choisi, avec l’écart ; ouvrir n’écrit rien', async () => {
+    await ouvrirSur(budget());
+    const avant = instantané();
+    await ouvrirLOperation('SALAIRE-DEC');
     const form = ligne('SALAIRE-DEC')!.querySelector('form.edit')!;
     expect(tous('h3', form).map(t), 'l’opération ouverte ne montre pas la section').toContain(TITRE);
     expect([...form.querySelectorAll('select')].some((s) => [...s.options].map(t).join('|') === `Paie · ${fmt(euros(2500))}|Prime · ${fmt(euros(300))}`), 'les flux offerts, du plus proche en montant').toBe(true);
@@ -90,30 +192,34 @@ describe('#445 · la reprise d’une occurrence choisie, à l’écran', () => {
     expect(t(occ)).toContain('Occurrence du 25 déc. 2026');
     expect(t(occ)).toContain(`écart ${fmt(-euros(20))}`);
     expect(instantané(), 'ouvrir l’opération a écrit').toBe(avant);
+  });
+});
 
-    await presser(tous<HTMLButtonElement>('button', occ).find((b) => t(b) === 'Reprendre')!);
-    expect(lu('salaire-dec')).toMatchObject({ plannedFlowId: 'f-paie', plannedDate: '2026-12-25', state: 'locked' });
-    expect(partsDe('salaire-dec')).toEqual(['cat-salaire']);
+describe('[niveau 2] #445 · 7 et 8. aussitôt, sans recharger ; puis défaite', () => {
+  it('la ligne dit ce qu’elle reprend, avec l’écart ; l’occurrence n’est plus attendue, non reçue ; défaite, l’opération reste verrouillée avec sa ventilation, l’occurrence se signale de nouveau et s’offre de nouveau', async () => {
+    await ouvrirSur(budget());
+    expect(await attendusNonRecus(), 'le décor ne montre pas l’occurrence du 25 décembre attendue, non reçue').toContain(ATTENDU);
+    await ouvrirLOperation('SALAIRE-DEC');
+    await reprendre(premiereOccurrence(ligne('SALAIRE-DEC')!.querySelector('form.edit')!)!);
     // Aussitôt : la ligne, restée à l'écran malgré le filtre « Non traitées », dit ce qu'elle reprend.
     expect(t(ligne('SALAIRE-DEC'))).toContain(`reprend l’opération prévue « Paie » du 25 déc. 2026 · écart ${fmt(-euros(20))}`);
     expect(geste('SALAIRE-DEC'), 'une opération qui reprend ne porte plus le geste').toBeUndefined();
-    expect(JSON.stringify(projet().plannedFlows), 'le flux a changé').toBe(fluxAvant);
-    // Le Plan ne compte plus l'occurrence du 25 décembre parmi les attendus non reçus.
-    expect(await attendusNonRecus()).not.toContain(attendu);
+    expect(await attendusNonRecus()).not.toContain(ATTENDU);
 
-    await rouvrirLApplication();
-    expect(lu('salaire-dec')).toMatchObject({ plannedFlowId: 'f-paie', plannedDate: '2026-12-25', state: 'locked' });
-    await allerA('Opérations');
     await toutes();
-    await presser(ligne('SALAIRE-DEC')!.querySelector(':scope > button.label') as HTMLElement);
+    await ouvrirLOperation('SALAIRE-DEC');
     expect(await cliquer('Défaire la reprise')).toBe(true);
     expect(lu('salaire-dec').plannedFlowId).toBeUndefined();
     expect(lu('salaire-dec').state).toBe('locked');
     expect(partsDe('salaire-dec')).toEqual(['cat-salaire']);
     expect(geste('SALAIRE-DEC'), 'défaite, l’occurrence s’offre de nouveau').toBeDefined();
+    // Sa fenêtre est passée au 5 janvier, sur un compte suivi : attendue, non reçue de nouveau.
+    expect(await attendusNonRecus()).toContain(ATTENDU);
   });
+});
 
-  it('[niveau 4] points 5 et 9 — sur la ligne, sans l’ouvrir : le geste, le panneau qui nomme l’opération, le choix d’un flux, la fermeture qui n’écrit rien', async () => {
+describe('[niveau 2] #445 · 5. sur la ligne, sans l’ouvrir', () => {
+  it('le geste, sur les seules lignes concernées ; le panneau qui nomme l’opération ; le choix d’un flux ; la fermeture qui n’écrit rien ; le reste de la ligne inchangé', async () => {
     await ouvrirSur(budget());
     await toutes();
     expect(geste('SALAIRE-DEC')).toBeDefined();
@@ -135,32 +241,29 @@ describe('#445 · la reprise d’une occurrence choisie, à l’écran', () => {
     expect(instantané(), 'ouvrir, choisir, fermer a écrit').toBe(avant);
 
     await presser(geste('SALAIRE-DEC')!);
-    const p2 = ligne('SALAIRE-DEC')!.querySelector('form.reprise-ligne')!;
-    await presser(tous<HTMLButtonElement>('button', premiereOccurrence(p2)!).find((b) => t(b) === 'Reprendre')!);
+    await reprendre(premiereOccurrence(ligne('SALAIRE-DEC')!.querySelector('form.reprise-ligne')!)!);
     expect(lu('salaire-dec')).toMatchObject({ plannedFlowId: 'f-paie', plannedDate: '2026-12-25', state: 'locked' });
     expect(ligne('SALAIRE-DEC')!.querySelector('form.reprise-ligne')).toBeNull();
 
     // Le reste de la ligne ne change pas : sa case se coche, et la toucher ouvre l'opération.
-    await presser(ligne('LOYER-DEC')!.querySelector('label.cocher input') as HTMLElement);
+    await cocher('LOYER-DEC');
     expect(tous<HTMLButtonElement>('main button').some((b) => t(b) === 'Actions sur 1 opération(s)')).toBe(true);
-    await presser(ligne('LOYER-DEC')!.querySelector(':scope > button.label') as HTMLElement);
+    await ouvrirLOperation('LOYER-DEC');
     expect(ligne('LOYER-DEC')!.querySelector('form.edit:not(.reprise-ligne)')).toBeTruthy();
   });
+});
 
-  it('[niveau 4] points 6 et 9 — par la sélection : le flux, l’aperçu pour chaque cible, « Appliquer » qui ne fait que les reprises', async () => {
+describe('[niveau 2] #445 · 6. par la sélection', () => {
+  it('le flux offert ; l’aperçu pour chaque cible, avec l’écart ; ni catégorie ni automatisme avec une reprise ; « Appliquer » ne fait que les reprises', async () => {
     await ouvrirSur(budget());
     await toutes();
-    for (const l of ['SALAIRE-DEC', 'SALAIRE-JAN', 'COURSES']) await presser(ligne(l)!.querySelector('label.cocher input') as HTMLElement);
-    expect(await cliquer('Actions sur 3 opération(s)')).toBe(true);
-    const form = document.querySelector('main form.edit') as HTMLElement;
-    const champ = tous('label.f', form).find((x) => t(x).startsWith(TITRE))!;
-    const choix = champ.querySelector('select') as HTMLSelectElement;
+    const { form, choix } = await actionsSur(['SALAIRE-DEC', 'SALAIRE-JAN', 'COURSES']);
     expect([...choix.options].map(t)).toEqual(['— (ne pas reprendre)', `Paie · ${fmt(euros(2500))}`, `Prime · ${fmt(euros(300))}`]);
     const avant = instantané();
     await saisir(choix, 'f-paie');
     const apercu = tous('.apercu-reprises .row', form).map(t);
-    expect(apercu.find((x) => x.startsWith('SALAIRE-DEC'))).toContain('reprend l’opération prévue « Paie » du 25 déc. 2026');
-    expect(apercu.find((x) => x.startsWith('SALAIRE-JAN'))).toContain('reprend l’opération prévue « Paie » du 25 janv. 2027');
+    expect(apercu.find((x) => x.startsWith('SALAIRE-DEC'))).toContain(`reprend l’opération prévue « Paie » du 25 déc. 2026 · écart ${fmt(-euros(20))}`);
+    expect(apercu.find((x) => x.startsWith('SALAIRE-JAN'))).toContain(`reprend l’opération prévue « Paie » du 25 janv. 2027 · écart ${fmt(-euros(10))}`);
     expect(apercu.find((x) => x.startsWith('COURSES'))).toContain('non concernée');
     expect(tous<HTMLButtonElement>('button', form).map(t), 'une reprise ne s’enregistre pas en automatisme').not.toContain('Enregistrer l’automatisme');
     expect(tous('label.f', form).map(t).some((x) => x.startsWith('Catégorie')), 'ni catégorie ne s’applique avec une reprise').toBe(false);
@@ -174,10 +277,9 @@ describe('#445 · la reprise d’une occurrence choisie, à l’écran', () => {
     expect(t(ligne('SALAIRE-JAN'))).toContain('reprend l’opération prévue « Paie » du 25 janv. 2027');
   });
 
-  it('[niveau 4] point 6 — sans flux offert, le panneau le dit ; dans un projet sans flux, ni geste ni mot (U5)', async () => {
+  it('sans flux offert, le panneau le dit ; dans un projet sans flux, ni geste, ni section, ni mot (U5)', async () => {
     await ouvrirSur(budget());
-    for (const l of ['SALAIRE-DEC', 'LOYER-DEC']) await presser(ligne(l)!.querySelector('label.cocher input') as HTMLElement);
-    expect(await cliquer('Actions sur 2 opération(s)')).toBe(true);
+    await actionsSur(['SALAIRE-DEC', 'LOYER-DEC']);
     expect(t(document.querySelector('main form.edit'))).toContain(`${TITRE} : aucun flux n’est offert, les opérations visées ne partagent pas un même compte et un même sens.`);
 
     const sansFlux = budget();
@@ -189,6 +291,9 @@ describe('#445 · la reprise d’une occurrence choisie, à l’écran', () => {
     await ouvrirSur(sansFlux);
     await toutes();
     expect(tous<HTMLButtonElement>('main button').some((b) => t(b) === GESTE), 'une ligne porte le geste dans un projet sans flux').toBe(false);
+    await ouvrirLOperation('SALAIRE-DEC');
+    expect(tous('h3', ligne('SALAIRE-DEC')!).map(t), 'sans flux offert, la section est montrée').not.toContain(TITRE);
+    await ouvrirLOperation('SALAIRE-DEC');
     expect(await cliquer('Actions sur')).toBe(true);
     expect(t(document.querySelector('main form.edit'))).not.toContain('occurrence');
   });
