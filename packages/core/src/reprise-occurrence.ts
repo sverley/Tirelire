@@ -11,7 +11,7 @@
  */
 import type { Cents, Id, ISODate, Ledger, Operation, PlannedFlow } from './model.js';
 import { alive } from './model.js';
-import { addDays, diffDays } from './dates.js';
+import { addDays, diffDays, toDayNumber } from './dates.js';
 import { nextOccurrence, occurrencesBetween } from './periods.js';
 import { applyMatch, emptyPatch, freeOccurrence, occurrenceIndex, resumesSomething, type OccurrenceIndex, type Patch } from './matching.js';
 
@@ -84,27 +84,6 @@ function offered(index: OccurrenceIndex, f: PlannedFlow, op: Operation, date: IS
 
 /** La plus proche en jours d'abord ; à égalité, la plus ancienne (point 3). */
 const nearestFirst = (a: OfferedOccurrence, b: OfferedOccurrence) => a.days - b.days || (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
-
-/**
- * Les occurrences libres du flux les plus proches de l'opération, `limit` au plus, la plus proche en
- * jours d'abord, à égalité la plus ancienne : de chaque côté de sa date, on avance de la plus proche
- * à la plus éloignée.
- */
-function nearestFree(index: OccurrenceIndex, f: PlannedFlow, op: Operation, limit: number): OfferedOccurrence[] {
-  const before: OfferedOccurrence[] = [];
-  const passees = upTo(f, op.date);
-  for (let i = passees.length - 1; i >= 0 && before.length < limit; i--) {
-    const o = offered(index, f, op, passees[i]!);
-    if (o) before.push(o);
-  }
-  const after: OfferedOccurrence[] = [];
-  for (const d of forward(f, addDays(op.date, 1))) {
-    if (after.length >= limit) break;
-    const o = offered(index, f, op, d);
-    if (o) after.push(o);
-  }
-  return [...before, ...after].sort(nearestFirst).slice(0, limit);
-}
 
 /**
  * Point 3 : les occurrences offertes d'un flux à une opération — deux au plus, libres, dans sa période
@@ -223,15 +202,20 @@ export interface BulkOfferedFlows {
  * le montant du flux et le leur, qui pour une seule cible est celui du point 2 —, puis par leur nom.
  */
 export function bulkOfferedFlows(ledger: Ledger, targetIds: Id[]): BulkOfferedFlows {
+  return offeredToTargets(ledger, occurrenceIndex(ledger), concernedTargets(ledger, targetIds));
+}
+
+function offeredToTargets(ledger: Ledger, index: OccurrenceIndex, concerned: Operation[]): BulkOfferedFlows {
   if (alive(ledger.plannedFlows).length === 0) return { flows: [], refusal: 'noFlow' };
-  const concerned = concernedTargets(ledger, targetIds);
   if (concerned.length === 0) return { flows: [], refusal: 'noTarget' };
   const first = concerned[0]!;
   if (concerned.some((o) => o.accountId !== first.accountId || Math.sign(o.amount) !== Math.sign(first.amount))) return { flows: [], refusal: 'mixed' };
-  const ecart = (f: PlannedFlow) => concerned.reduce((s, o) => s + Math.abs(f.amount - o.amount), 0);
-  const flows = flowsWithFreeOccurrence(ledger, occurrenceIndex(ledger))
-    .filter((f) => sameAccountAndSign(f, first))
-    .sort((a, b) => ecart(a) - ecart(b) || a.name.localeCompare(b.name, 'fr'));
+  const ecarts = new Map(
+    flowsWithFreeOccurrence(ledger, index)
+      .filter((f) => sameAccountAndSign(f, first))
+      .map((f) => [f, concerned.reduce((s, o) => s + Math.abs(f.amount - o.amount), 0)] as const),
+  );
+  const flows = [...ecarts.keys()].sort((a, b) => ecarts.get(a)! - ecarts.get(b)! || a.name.localeCompare(b.name, 'fr'));
   return flows.length ? { flows } : { flows: [], refusal: 'noFree' };
 }
 
@@ -255,56 +239,176 @@ export interface BulkOccurrenceOutcome {
  * de deux), la plus proche de sa date ; une occurrence n'est prise qu'une fois : les couples d'une
  * cible et d'une occurrence se servent du plus proche en jours au plus éloigné — à égalité, la cible
  * la plus ancienne d'abord, puis l'occurrence la plus ancienne —, une cible et une occurrence à la
- * fois. Un flux qui n'est pas offert à ces cibles (`bulkOfferedFlows`) n'en reprend aucune.
+ * fois. Un flux qui n'est pas offert à ces cibles (`bulkOfferedFlows`) n'en reprend aucune. Le calcul
+ * ne croît pas comme le carré du nombre de cibles (`serveCouples`).
  */
 export function bulkOccurrencePlan(ledger: Ledger, targetIds: Id[], flowId: Id): BulkOccurrenceOutcome[] {
+  return planWith(ledger, occurrenceIndex(ledger), targetIds, flowId).outcomes;
+}
+
+function planWith(ledger: Ledger, index: OccurrenceIndex, targetIds: Id[], flowId: Id): { outcomes: BulkOccurrenceOutcome[]; flow?: PlannedFlow; ops: Map<Id, Operation> } {
   const ops = new Map(alive(ledger.operations).map((o) => [o.id, o]));
   const targets = targetIds.flatMap((id) => (ops.has(id) ? [ops.get(id)!] : []));
   const concerned = targets.filter(canResumeOccurrence);
-  const f = bulkOfferedFlows(ledger, targetIds).flows.find((x) => x.id === flowId);
-  const taken = new Map<Id, OfferedOccurrence>();
-  if (f) {
-    const index = occurrenceIndex(ledger);
-    // Une cible ne prend jamais plus loin que ses n occurrences libres les plus proches : les n − 1
-    // autres cibles en prennent au plus n − 1. Les couples au-delà ne servent jamais.
-    const n = concerned.length;
-    const pairs = concerned.flatMap((op) => nearestFree(index, f, op, n).map((occurrence) => ({ op, occurrence })));
-    pairs.sort(
-      (a, b) =>
-        a.occurrence.days - b.occurrence.days ||
-        compare(a.op.date, b.op.date) ||
-        compare(a.occurrence.date, b.occurrence.date) ||
-        compare(a.op.id, b.op.id),
-    );
-    const used = new Set<ISODate>();
-    for (const { op, occurrence } of pairs) {
-      if (taken.has(op.id) || used.has(occurrence.date)) continue;
-      taken.set(op.id, occurrence);
-      used.add(occurrence.date);
-    }
-  }
-  return targets.map((op) => {
+  const f = offeredToTargets(ledger, index, concerned).flows.find((x) => x.id === flowId);
+  const taken = f ? serveCouples(index, f, concerned) : new Map<Id, OfferedOccurrence>();
+  const outcomes = targets.map((op): BulkOccurrenceOutcome => {
     const occurrence = taken.get(op.id);
     if (occurrence) return { operationId: op.id, occurrence };
     return { operationId: op.id, refusal: canResumeOccurrence(op) ? 'noneLeft' : 'notConcerned' };
   });
+  return { outcomes, ...(f ? { flow: f } : {}), ops };
 }
 
-function compare(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+/**
+ * Les occurrences libres que des cibles datées de `from` à `to` peuvent prendre, dans l'ordre des
+ * dates : n cibles en prennent n au plus, si bien qu'aucune ne va au-delà des n libres qui précèdent
+ * `from` ni des n libres qui suivent `to`.
+ */
+function freeAround(index: OccurrenceIndex, f: PlannedFlow, from: ISODate, to: ISODate, n: number): Array<{ date: ISODate; entry?: Operation }> {
+  const libres = (dates: Iterable<ISODate>, limit = Infinity) => {
+    const out: Array<{ date: ISODate; entry?: Operation }> = [];
+    for (const date of dates) {
+      if (out.length >= limit) break;
+      const l = freeOccurrence(index, f.id, date);
+      if (l) out.push({ date, ...(l.entry ? { entry: l.entry } : {}) });
+    }
+    return out;
+  };
+  const jusquA = libres(upTo(f, to));
+  const premiere = jusquA.findIndex((o) => o.date >= from);
+  const debut = Math.max(0, (premiere < 0 ? jusquA.length : premiere) - n);
+  return [...jusquA.slice(debut), ...libres(forward(f, addDays(to, 1)), n)];
+}
+
+/** Un nœud de la file des dates : les cibles d'un même jour, de la plus petite à la plus grande par leur identifiant, ou une occurrence libre. */
+type Noeud =
+  | { kind: 'cibles'; day: number; date: ISODate; cibles: Operation[]; tete: number; prev?: Noeud | undefined; next?: Noeud | undefined; vivant: boolean }
+  | { kind: 'occurrence'; day: number; date: ISODate; entry?: Operation; prev?: Noeud | undefined; next?: Noeud | undefined; vivant: boolean };
+type Cibles = Extract<Noeud, { kind: 'cibles' }>;
+type Occ = Extract<Noeud, { kind: 'occurrence' }>;
+interface Couple {
+  days: number;
+  cibles: Cibles;
+  occ: Occ;
+  cible: Id;
+}
+
+/** L'ordre des couples (point 6) : en jours, puis la cible la plus ancienne, puis l'occurrence la plus ancienne, puis l'identifiant de la cible. */
+function avant(a: Couple, b: Couple): boolean {
+  if (a.days !== b.days) return a.days < b.days;
+  if (a.cibles.day !== b.cibles.day) return a.cibles.day < b.cibles.day;
+  if (a.occ.day !== b.occ.day) return a.occ.day < b.occ.day;
+  return a.cible < b.cible;
+}
+
+/**
+ * Sert les couples d'une cible et d'une occurrence du plus proche au plus éloigné, une cible et une
+ * occurrence à la fois (point 6). Sur une ligne de dates, le couple le plus proche est toujours fait de
+ * deux nœuds voisins — un jour de cibles et une occurrence —, puisqu'un nœud entre eux ferait un couple
+ * plus proche, ou aussi proche et servi avant (les cibles d'un même jour sont un seul nœud, servies par
+ * leur identifiant ; un jour n'a qu'une occurrence). Les nœuds vivent dans une file doublement chaînée,
+ * les couples voisins dans un tas : servir un couple retire au plus deux nœuds et ne crée que les
+ * couples de leurs voisins. Le calcul croît comme (cibles + occurrences) × log, non comme leur produit.
+ */
+function serveCouples(index: OccurrenceIndex, f: PlannedFlow, concerned: Operation[]): Map<Id, OfferedOccurrence> {
+  const taken = new Map<Id, OfferedOccurrence>();
+  if (concerned.length === 0) return taken;
+  const parJour = new Map<ISODate, Operation[]>();
+  for (const op of concerned) parJour.set(op.date, [...(parJour.get(op.date) ?? []), op]);
+  const jours = [...parJour.keys()].sort();
+  const noeuds: Noeud[] = [
+    ...jours.map((date): Noeud => ({ kind: 'cibles', day: toDayNumber(date), date, cibles: parJour.get(date)!.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)), tete: 0, vivant: true })),
+    ...freeAround(index, f, jours[0]!, jours[jours.length - 1]!, concerned.length).map((o): Noeud => ({ kind: 'occurrence', day: toDayNumber(o.date), ...o, vivant: true })),
+  ].sort((a, b) => a.day - b.day || (a.kind === b.kind ? 0 : a.kind === 'cibles' ? -1 : 1));
+  for (let i = 1; i < noeuds.length; i++) {
+    noeuds[i - 1]!.next = noeuds[i]!;
+    noeuds[i]!.prev = noeuds[i - 1]!;
+  }
+
+  const tas: Couple[] = [];
+  const pousser = (a: Noeud | undefined, b: Noeud | undefined) => {
+    if (!a || !b || a.kind === b.kind) return;
+    const cibles = a.kind === 'cibles' ? a : (b as Cibles);
+    const occ = a.kind === 'occurrence' ? a : (b as Occ);
+    if (cibles.tete >= cibles.cibles.length) return;
+    tas.push({ days: Math.abs(occ.day - cibles.day), cibles, occ, cible: cibles.cibles[cibles.tete]!.id });
+    for (let i = tas.length - 1; i > 0; ) {
+      const p = (i - 1) >> 1;
+      if (!avant(tas[i]!, tas[p]!)) break;
+      [tas[i], tas[p]] = [tas[p]!, tas[i]!];
+      i = p;
+    }
+  };
+  const extraire = (): Couple => {
+    const haut = tas[0]!;
+    const dernier = tas.pop()!;
+    if (tas.length) {
+      tas[0] = dernier;
+      for (let i = 0; ; ) {
+        const g = 2 * i + 1;
+        const d = g + 1;
+        let m = i;
+        if (g < tas.length && avant(tas[g]!, tas[m]!)) m = g;
+        if (d < tas.length && avant(tas[d]!, tas[m]!)) m = d;
+        if (m === i) break;
+        [tas[i], tas[m]] = [tas[m]!, tas[i]!];
+        i = m;
+      }
+    }
+    return haut;
+  };
+  const retirer = (n: Noeud) => {
+    n.vivant = false;
+    if (n.prev) n.prev.next = n.next;
+    if (n.next) n.next.prev = n.prev;
+    pousser(n.prev, n.next);
+  };
+
+  for (const n of noeuds) pousser(n, n.next);
+  while (tas.length) {
+    const c = extraire();
+    const { cibles, occ } = c;
+    // Un couple périmé : un de ses nœuds est servi, ils ne sont plus voisins, ou ce n'est plus la première cible du jour.
+    if (!cibles.vivant || !occ.vivant || (cibles.next !== occ && cibles.prev !== occ) || cibles.cibles[cibles.tete]?.id !== c.cible) continue;
+    const op = cibles.cibles[cibles.tete++]!;
+    const amount = occ.entry ? occ.entry.amount : f.amount;
+    taken.set(op.id, { flowId: f.id, date: occ.date, ...(occ.entry ? { entry: occ.entry } : {}), amount, gap: op.amount - amount, days: c.days });
+    retirer(occ);
+    if (cibles.tete >= cibles.cibles.length) retirer(cibles);
+    else {
+      pousser(cibles.prev, cibles);
+      pousser(cibles, cibles.next);
+    }
+  }
+  return taken;
 }
 
 /**
  * Point 6 : « Appliquer » — les reprises que montre l'aperçu (`bulkOccurrencePlan`), et elles seules :
- * chacune comme au point 7. Les occurrences sont distinctes : chaque reprise se lit sur le même grand
- * livre.
+ * chacune comme au point 7, par la même reprise (`resumeWith`, puis `applyMatch`). Les occurrences sont
+ * distinctes : chaque reprise se lit sur le même grand livre, réduit, pour chacune, à ce qu'elle lit —
+ * son opération, la saisie qu'elle reprendrait, leurs sous-opérations et le flux — pour ne pas
+ * parcourir tout le grand livre à chaque cible.
  */
 export function applyBulkOccurrence(ledger: Ledger, targetIds: Id[], flowId: Id): Patch {
   const patch = emptyPatch();
   const index = occurrenceIndex(ledger);
-  for (const o of bulkOccurrencePlan(ledger, targetIds, flowId)) {
+  const { outcomes, flow, ops } = planWith(ledger, index, targetIds, flowId);
+  if (!flow) return patch;
+  const sous = new Map<Id, Ledger['subOperations']>();
+  for (const s of ledger.subOperations) sous.set(s.operationId, [...(sous.get(s.operationId) ?? []), s]);
+  for (const o of outcomes) {
     if (!o.occurrence) continue;
-    const p = resumeWith(ledger, index, o.operationId, flowId, o.occurrence.date);
+    const op = ops.get(o.operationId)!;
+    const entry = o.occurrence.entry;
+    const reduit: Ledger = {
+      ...ledger,
+      operations: entry ? [op, entry] : [op],
+      subOperations: [...(sous.get(op.id) ?? []), ...(entry ? (sous.get(entry.id) ?? []) : [])],
+      plannedFlows: [flow],
+    };
+    const p = resumeWith(reduit, index, op.id, flowId, o.occurrence.date);
     patch.operations.push(...p.operations);
     patch.subOperations.push(...p.subOperations);
     patch.removedSubOperations!.push(...(p.removedSubOperations ?? []));

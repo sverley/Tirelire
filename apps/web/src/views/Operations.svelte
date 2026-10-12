@@ -432,16 +432,16 @@
   const bulkFlux = $derived(bulkOpen ? bulkOfferedFlows(app.ledger, targets) : { flows: [] as PlannedFlow[] });
   const bulkFlowChoisi = $derived(bulkFlux.flows.some((f) => f.id === bulkFlow) ? bulkFlow : '');
   const bulkReprises = $derived<BulkOccurrenceOutcome[]>(bulkOpen && bulkFlowChoisi ? bulkOccurrencePlan(app.ledger, targets, bulkFlowChoisi) : []);
+  // Aucune cible concernée, ou un projet sans flux : le panneau ne parle pas de la reprise (U1, U5).
   const bulkRefus = $derived(
-    bulkFlux.refusal === 'noTarget'
-      ? 'aucune des opérations visées ne le peut : seule une opération importée qui ne reprend rien reprend une occurrence.'
-      : bulkFlux.refusal === 'mixed'
-        ? 'aucun flux n’est offert, les opérations visées ne partagent pas un même compte et un même sens.'
-        : bulkFlux.refusal === 'noFree'
-          ? 'aucun flux de ce compte et de ce sens n’a d’occurrence libre.'
-          : '',
+    bulkFlux.refusal === 'mixed'
+      ? 'aucun flux n’est offert, les opérations visées ne partagent pas un même compte et un même sens.'
+      : bulkFlux.refusal === 'noFree'
+        ? 'aucun flux de ce compte et de ce sens n’a d’occurrence libre.'
+        : '',
   );
-  const operationParId = (id: string) => app.ledger.operations.find((o) => o.id === id)!;
+  const operationsParId = $derived(new Map(app.ledger.operations.map((o) => [o.id, o])));
+  const operationParId = (id: string) => operationsParId.get(id)!;
 
   /** Aperçu obligatoire (D26) : ce que l'action changerait, avant de l'appliquer. */
   const bulkPreview = $derived.by(() => {
