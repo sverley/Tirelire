@@ -250,3 +250,5 @@ details.explication > p { margin: 0 0 8px; }
 }
 /* Deux lignes se touchent à 12 px au moins : le « × » de l'une ne tombe pas sur le « Modifier » de la suivante (C9). */
 .card.tirelire .ligne { margin-bottom: 8px; }
+
+.row > .reprendre-occurrence { margin-left: auto; }
