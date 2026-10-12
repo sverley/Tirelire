@@ -277,7 +277,10 @@ export function labelSimilarity(a: string, b: string): number {
   return common / Math.min(ta.size, tb.size);
 }
 
-export function prepareImport(ledger: Ledger, parsed: ParsedRow[], profile: ImportProfile): ImportPreparation {
+/** Ce que la préparation lit d'un profil : où se trouve le compte de chaque ligne, et à quel compte il correspond. */
+export type ImportAccountTarget = Pick<ImportProfile, 'accountMap' | 'accountId'> & { columns: Pick<ImportColumns, 'account'> };
+
+export function prepareImport(ledger: Ledger, parsed: ParsedRow[], profile: ImportAccountTarget): ImportPreparation {
   const existing = alive(ledger.operations);
   const byKey = new Map(existing.map((o) => [o.id, o]));
   const byAccount = new Map<Id, Operation[]>();

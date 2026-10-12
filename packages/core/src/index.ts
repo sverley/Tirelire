@@ -19,6 +19,7 @@ export * from './example.js';
 export * from './suggestions.js';
 export * from './csv.js';
 export * from './importer.js';
+export * from './ofx.js';
 export * from './matching.js';
 export * from './ordre-depuis-virement.js';
 export * from './review.js';
