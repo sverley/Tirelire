@@ -90,7 +90,7 @@ export function decoderEntites(s: string): string {
   });
 }
 
-type Jeton = { t: 'ouvre' | 'ferme'; nom: string; auto?: boolean } | { t: 'texte'; texte: string };
+type Jeton = { t: 'debut' | 'fin'; nom: string; auto?: boolean } | { t: 'texte'; texte: string };
 
 function jetons(texte: string): Jeton[] {
   const out: Jeton[] = [];
@@ -105,10 +105,10 @@ function jetons(texte: string): Jeton[] {
     if (m[1] !== undefined) out.push({ t: 'texte', texte: m[1].replace(/&/g, '&amp;') }); // CDATA : littéral
     else if (m[3] !== undefined) {
       const nom = m[3].toUpperCase();
-      if (m[2]) out.push({ t: 'ferme', nom });
+      if (m[2]) out.push({ t: 'fin', nom });
       else if (m[4]) {
-        out.push({ t: 'ouvre', nom, auto: true });
-      } else out.push({ t: 'ouvre', nom });
+        out.push({ t: 'debut', nom, auto: true });
+      } else out.push({ t: 'debut', nom });
     }
   }
   pousseTexte(texte.slice(dernier));
@@ -127,12 +127,12 @@ function arbre(texte: string): Noeud {
   // Position de la dernière balise fermante de chaque nom, pour reconnaître un élément sans valeur qui contient d'autres éléments.
   const derniereFermeture = new Map<string, number>();
   js.forEach((j, i) => {
-    if (j.t === 'ferme') derniereFermeture.set(j.nom, i);
+    if (j.t === 'fin') derniereFermeture.set(j.nom, i);
   });
   for (let i = 0; i < js.length; i++) {
     const j = js[i]!;
     const courant = pile[pile.length - 1]!;
-    if (j.t === 'ferme') {
+    if (j.t === 'fin') {
       const rang = pile.map((n) => n.nom).lastIndexOf(j.nom);
       if (rang > 0) pile.length = rang;
       continue;
@@ -149,7 +149,7 @@ function arbre(texte: string): Noeud {
     let valeur = '';
     while (js[k]?.t === 'texte') valeur += (js[k] as { texte: string }).texte, k++;
     const f = js[k];
-    const fermeSoi = f?.t === 'ferme' && f.nom === j.nom;
+    const fermeSoi = f?.t === 'fin' && f.nom === j.nom;
     if (valeur.trim() !== '') {
       noeud.valeur = decoderEntites(valeur).trim();
       i = fermeSoi ? k : k - 1;
