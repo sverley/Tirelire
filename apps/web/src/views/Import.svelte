@@ -4,18 +4,21 @@
   import {
     alive,
     decodeBytes,
+    lireOctetsOfx,
     matchAccountByNumber,
     newProfileFromRows,
     normalizeAccountNumber,
     parseCsv,
     parseRows,
     prepareImport,
+    prepareOfxImport,
     runPipeline,
     todayISO,
     addDays,
     type ImportCandidate,
     type ImportProfile,
     type ImportPreparation,
+    type OfxLecture,
     type ParseResult,
     type PipelineReport,
   } from '@tirelire/core';
@@ -25,6 +28,9 @@
   let fileName = $state('');
   let rows = $state<string[][]>([]);
   let profile = $state<ImportProfile | undefined>(undefined);
+  // Un fichier OFX : lu tel quel, sans profil (rien du fichier ne se décrit) ; ses comptes se rattachent par leur numéro.
+  let ofx = $state<OfxLecture | undefined>(undefined);
+  let ofxComptes = $state<Record<string, string>>({}); // numéro de compte du fichier → compte de l'application ('' = ignorer)
   let isNewProfile = $state(false);
   let parsed = $state<ParseResult | undefined>(undefined);
   let prep = $state<ImportPreparation | undefined>(undefined);
@@ -48,6 +54,21 @@
     try {
       fileName = file.name;
       const bytes = new Uint8Array(await file.arrayBuffer());
+      // Le contenu décide, pas l'extension : un OFX se lit directement, sans rien décrire.
+      const lecture = lireOctetsOfx(bytes);
+      if (lecture) {
+        if (lecture.comptes.length === 0) throw new Error('Ce fichier est un OFX sans relevé de compte lisible : aucune opération n’est importée.');
+        ofx = lecture;
+        profile = undefined;
+        isNewProfile = false;
+        parsed = { rows: lecture.rows, errors: lecture.errors, headers: [] };
+        ofxComptes = {};
+        rememberNumber = {};
+        rattacherLesComptes();
+        step = 'profile';
+        return;
+      }
+      ofx = undefined;
       if (/\.xlsx?$/i.test(file.name)) {
         const XLSX = await import('xlsx');
         const wb = XLSX.read(bytes, { type: 'array', cellDates: false });
@@ -91,6 +112,16 @@
     }
   }
 
+  /** Les comptes du fichier OFX : celui qui porte déjà ce numéro est proposé tout de suite, les autres sont ignorés jusqu'au choix. */
+  function rattacherLesComptes() {
+    if (!ofx) return;
+    for (const c of ofx.comptes) {
+      if (!c.euro) continue; // une autre devise ne se rattache à aucun compte
+      ofxComptes[c.numero] = matchAccountByNumber(accounts, c.numero)?.id ?? '';
+      rememberNumber[c.numero] = true;
+    }
+  }
+
   /** Le compte choisi pour cette valeur n'a pas encore ce numéro mémorisé exactement. */
   function needsRemember(accountId: string, key: string): boolean {
     const acc = accounts.find((a) => a.id === accountId);
@@ -100,8 +131,16 @@
   }
 
   function toPreview() {
-    if (!profile || !parsed) return;
+    if (!parsed) return;
     error = '';
+    if (ofx) {
+      prep = prepareOfxImport(app.ledger, ofx, $state.snapshot(ofxComptes));
+      decisions = {};
+      for (const c of prep.candidates) if (c.probable) decisions[c.row.line] = (c.similarity ?? 0) < 0.5;
+      step = 'preview';
+      return;
+    }
+    if (!profile) return;
     // Retirer les comptes « ignorés » (valeur vide) : on les laisse non mappés, l'import les saute.
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(profile.accountMap)) if (v) cleaned[k] = v;
@@ -120,15 +159,15 @@
   }
 
   function doImport() {
-    if (!profile || !prep) return;
+    if (!prep || !(profile || ofx)) return;
     busy = true;
     try {
       const ops = prep.candidates.filter(toImport).map((c) => c.operation);
-      // Enregistrer le profil (avec la correspondance des comptes), les numéros à mémoriser,
-      // puis les opérations, puis la chaîne automatique.
+      // Enregistrer le profil d'un CSV (avec la correspondance des comptes), les numéros à mémoriser,
+      // puis les opérations, puis la chaîne automatique. Un OFX n'a pas de profil.
       const cleaned: Record<string, string> = {};
-      for (const [k, v] of Object.entries(profile.accountMap)) if (v) cleaned[k] = v;
-      app.store.upsert('importProfiles', { ...$state.snapshot(profile), accountMap: cleaned });
+      for (const [k, v] of Object.entries(ofx ? ofxComptes : profile!.accountMap)) if (v) cleaned[k] = v;
+      if (!ofx) app.store.upsert('importProfiles', { ...$state.snapshot(profile!), accountMap: cleaned });
       for (const [k, accId] of Object.entries(cleaned)) {
         if (!rememberNumber[k] || !needsRemember(accId, k)) continue;
         const acc = accounts.find((a) => a.id === accId);
@@ -153,6 +192,8 @@
     step = 'file';
     rows = [];
     profile = undefined;
+    ofx = undefined;
+    ofxComptes = {};
     parsed = undefined;
     prep = undefined;
     report = undefined;
@@ -188,9 +229,10 @@
     </ul>
     <p>Votre budget, lui, n'en a pas besoin : il se construit et se lit sans aucun import.</p>
   </div>
-  <p class="muted small">CSV ou Excel exporté de la banque ou de Linxo : le relevé du compte principal, celui par lequel tout transite. Le fichier est lu sur cet appareil et n'est envoyé nulle part. Un profil (colonnes, formats, correspondance des comptes) est mémorisé par type de fichier.</p>
-  <label class="btn primary">Choisir un fichier… <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv" onchange={onFile} hidden /></label>
+  <p class="muted small">CSV, Excel ou OFX exporté de la banque ou de Linxo : le relevé du compte principal, celui par lequel tout transite. Le fichier est lu sur cet appareil et n'est envoyé nulle part. Un fichier OFX se lit tel quel, sans rien décrire ; pour un CSV ou un Excel, un profil (colonnes, formats, correspondance des comptes) est mémorisé par type de fichier.</p>
+  <label class="btn primary">Choisir un fichier… <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls,.ofx,.qfx,text/csv" onchange={onFile} hidden /></label>
   {#if busy}<p class="muted">Lecture…</p>{/if}
+  {#if error}<div class="err">{error}</div>{/if}
   {#if profiles.length}
     <h2>Profils enregistrés</h2>
     <div class="card">
@@ -204,71 +246,98 @@
   {/if}
 {/if}
 
-{#if step === 'profile' && profile && parsed}
-  <p class="muted small">{fileName} · {rows.length} lignes lues · profil {isNewProfile ? 'nouveau (détecté)' : 'existant'}.</p>
+{#if step === 'profile' && parsed && (profile || ofx)}
+  <p class="muted small">{fileName} · {ofx ? `fichier OFX · ${ofx.comptes.length} compte(s)` : `${rows.length} lignes lues · profil ${isNewProfile ? 'nouveau (détecté)' : 'existant'}`}.</p>
   <form class="edit" onsubmit={(e) => { e.preventDefault(); toPreview(); }}>
-    <div class="grid">
-      <label class="f">Nom du profil <input bind:value={profile.name} /></label>
-      <label class="f">Source
-        <select bind:value={profile.source}>
-          <option value="bank">Banque</option>
-          <option value="linxo">Linxo</option>
-          <option value="other">Autre</option>
-        </select>
-      </label>
-      <label class="f">Ligne d'en-tête (0 = première) <input type="number" min="0" bind:value={profile.headerRow} onchange={reparse} /></label>
-      <label class="f">Format de date
-        <select bind:value={profile.dateFormat} onchange={reparse}>
-          <option value="DMY">JJ/MM/AAAA</option>
-          <option value="MDY">MM/JJ/AAAA</option>
-          <option value="YMD">AAAA-MM-JJ</option>
-        </select>
-      </label>
-    </div>
-    <h3>Colonnes</h3>
-    <div class="grid">
-      {#each columnFields as [key, label] (key)}
-        <label class="f">{label}
-          <select value={profile.columns[key] ?? ''} onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) profile!.columns[key] = v; else delete profile!.columns[key]; reparse(); }}>
-            <option value="">—</option>
-            {#each headers as h}<option value={h}>{h}</option>{/each}
-          </select>
-        </label>
-      {/each}
-      {#if profile.columns.debit || profile.columns.credit}
-        <label class="f check"><input type="checkbox" bind:checked={profile.debitPositive} onchange={reparse} /> Le débit est écrit en positif</label>
-      {/if}
-    </div>
-    <h3>Comptes</h3>
-    {#if profile.columns.account}
-      <p class="small muted">Valeurs trouvées dans la colonne compte ; laissez vide pour ignorer un compte.</p>
+    {#if ofx}
+      <h3>Comptes</h3>
+      <p class="small muted">Les comptes du fichier : choisissez où ranger les opérations de chacun, ou laissez « — ignorer » pour ne pas les importer.</p>
       <div class="grid">
-        {#each accountKeys as k (k)}
-          <label class="f">{k}
-            <select bind:value={profile.accountMap[k]}>
-              <option value="">— ignorer</option>
-              {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
-            </select>
-          </label>
-          {#if profile.accountMap[k] && needsRemember(profile.accountMap[k], k)}
-            <label class="f check" style="align-self:end">
-              <input type="checkbox" bind:checked={rememberNumber[k]} />
-              Mémoriser « {k} » comme numéro de {accounts.find((a) => a.id === profile!.accountMap[k])?.name}
+        {#each ofx.comptes as c (c.numero)}
+          {#if c.euro}
+            <label class="f">{c.numero || '(sans numéro)'} · {c.operations} opération(s)
+              <select bind:value={ofxComptes[c.numero]}>
+                <option value="">— ignorer</option>
+                {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+              </select>
             </label>
+            {#if ofxComptes[c.numero] && needsRemember(ofxComptes[c.numero]!, c.numero)}
+              <label class="f check" style="align-self:end">
+                <input type="checkbox" bind:checked={rememberNumber[c.numero]} />
+                Mémoriser « {c.numero} » comme numéro de {accounts.find((a) => a.id === ofxComptes[c.numero])?.name}
+              </label>
+            {/if}
+          {:else}
+            <div class="f">{c.numero || '(sans numéro)'} · {c.operations} opération(s)
+              <span class="small muted" data-autre-devise>En {c.devise} : ce compte n'est pas importé, seuls les relevés en euros le sont.</span>
+            </div>
           {/if}
         {/each}
       </div>
-    {:else}
-      <label class="f">Compte cible
-        <select bind:value={profile.accountId}>
-          <option value={undefined}>—</option>
-          {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
-        </select>
-      </label>
+    {:else if profile}
+      <div class="grid">
+        <label class="f">Nom du profil <input bind:value={profile.name} /></label>
+        <label class="f">Source
+          <select bind:value={profile.source}>
+            <option value="bank">Banque</option>
+            <option value="linxo">Linxo</option>
+            <option value="other">Autre</option>
+          </select>
+        </label>
+        <label class="f">Ligne d'en-tête (0 = première) <input type="number" min="0" bind:value={profile.headerRow} onchange={reparse} /></label>
+        <label class="f">Format de date
+          <select bind:value={profile.dateFormat} onchange={reparse}>
+            <option value="DMY">JJ/MM/AAAA</option>
+            <option value="MDY">MM/JJ/AAAA</option>
+            <option value="YMD">AAAA-MM-JJ</option>
+          </select>
+        </label>
+      </div>
+      <h3>Colonnes</h3>
+      <div class="grid">
+        {#each columnFields as [key, label] (key)}
+          <label class="f">{label}
+            <select value={profile.columns[key] ?? ''} onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) profile!.columns[key] = v; else delete profile!.columns[key]; reparse(); }}>
+              <option value="">—</option>
+              {#each headers as h}<option value={h}>{h}</option>{/each}
+            </select>
+          </label>
+        {/each}
+        {#if profile.columns.debit || profile.columns.credit}
+          <label class="f check"><input type="checkbox" bind:checked={profile.debitPositive} onchange={reparse} /> Le débit est écrit en positif</label>
+        {/if}
+      </div>
+      <h3>Comptes</h3>
+      {#if profile.columns.account}
+        <p class="small muted">Valeurs trouvées dans la colonne compte ; laissez vide pour ignorer un compte.</p>
+        <div class="grid">
+          {#each accountKeys as k (k)}
+            <label class="f">{k}
+              <select bind:value={profile.accountMap[k]}>
+                <option value="">— ignorer</option>
+                {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+              </select>
+            </label>
+            {#if profile.accountMap[k] && needsRemember(profile.accountMap[k], k)}
+              <label class="f check" style="align-self:end">
+                <input type="checkbox" bind:checked={rememberNumber[k]} />
+                Mémoriser « {k} » comme numéro de {accounts.find((a) => a.id === profile!.accountMap[k])?.name}
+              </label>
+            {/if}
+          {/each}
+        </div>
+      {:else}
+        <label class="f">Compte cible
+          <select bind:value={profile.accountId}>
+            <option value={undefined}>—</option>
+            {#each accounts as a}<option value={a.id}>{a.name}</option>{/each}
+          </select>
+        </label>
+      {/if}
     {/if}
-    <h3>Aperçu ({parsed.rows.length} opérations lisibles{parsed.errors.length ? `, ${parsed.errors.length} lignes illisibles` : ''})</h3>
+    <h3>Aperçu ({parsed.rows.length} opérations lisibles{parsed.errors.length ? `, ${parsed.errors.length} ${ofx ? 'opérations' : 'lignes'} illisibles` : ''})</h3>
     {#if parsed.errors.length}
-      <div class="warnings">{#each parsed.errors.slice(0, 5) as e}<div>Ligne {e.line} : {e.message}</div>{/each}</div>
+      <div class="warnings">{#each parsed.errors.slice(0, 5) as e}<div>{ofx ? 'Opération n°' : 'Ligne'} {e.line} : {e.message}</div>{/each}</div>
     {/if}
     <div class="card">
       {#each parsed.rows.slice(0, 8) as r (r.line)}

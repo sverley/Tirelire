@@ -85,10 +85,14 @@ Opérations importées : clé déterministe `op_` + les 16 premiers hexadécimau
 date, montant, libellé normalisé, rang parmi les identiques du jour) → identiques sur tous les
 appareils, fusion sans conflit. Le rang n'entre que dans la clé et ne se garde pas. Soixante-quatre
 bits suffisent largement à l'usage projeté, un import par mois : sur cent mille opérations, le risque
-que deux clés se confondent reste inférieur à un sur un milliard. Tout ce que l'utilisateur crée : UUID v7. Les exports bancaires n'ayant ni heure ni
+que deux clés se confondent reste inférieur à un sur un milliard. Tout ce que l'utilisateur crée : UUID v7. Les exports CSV des banques n'ayant ni heure ni
 identifiant de transaction, un **détecteur de doublons probables** (même compte, même montant,
 ±3 jours, libellé proche) compense les changements de libellé ou de date entre sources
-(Linxo ↔ banque, attente ↔ comptabilisé).
+(Linxo ↔ banque, attente ↔ comptabilisé). L'identifiant de transaction que porte un fichier OFX
+(`FITID`) n'entre ni dans la clé ni dans la base : il n'a de sens que pour la banque qui l'émet,
+une seconde identité ferait deux opérations de la même, et l'identité d'une opération importée se
+calcule de la même façon quelle que soit sa source ; le détecteur reste nécessaire, les libellés et
+les dates changeant d'un export à l'autre.
 
 Ce que l'hypothèse de l'import propre cachait : les exports bancaires se chevauchent, les libellés
 changent d'un export à l'autre, certaines banques exportent les opérations en attente. Sans
