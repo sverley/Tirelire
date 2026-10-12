@@ -1,8 +1,16 @@
 /**
- * Tests du codeur pour #364 — « La section Revenus et charges fixes sert à l'assistant et à l'écran Flux prévus » :
- * la section écrite une fois (point 1), sur le texte des sources ; le brouillon ouvert sur la section (point 9),
- * sans navigateur, sur un vrai dépôt (`LedgerStore`). Ce que l'écran et l'assistant montrent et enregistrent est
- * dans `section-revenus-charges-ecran.test.ts`.
+ * Harnais d'audit de #364 — « La section Revenus et charges fixes sert à l'assistant et à l'écran Flux
+ * prévus » : la section écrite une fois (point 1), sur le texte des sources ; le brouillon ouvert sur la
+ * section (point 9), sans navigateur, sur un vrai dépôt (`LedgerStore`). Ce que l'écran et l'assistant
+ * montrent et enregistrent est dans `section-revenus-charges-ecran-harnais.test.ts`.
+ *
+ * Les tests sont ceux du codeur (`section-revenus-charges.test.ts`, d'où ils sont déplacés en entier),
+ * classés par la suite de questions de D83. Point 1, niveau 1 : le principe 13 et I11, que la section rend
+ * vrais par construction (D94) ; vu rouge sur le `Wizard.svelte` et le `Flows.svelte` de `main`. Point 9 :
+ * la validation qui n'écrit que ce que les étapes ont changé, niveau 0 — la partie que couvre la section,
+ * les flux, porte aussi les échéances, les virements et les ordres, qu'une validation de toute la table
+ * réécrirait, ce que le code corrigé ne rendrait pas ; ce que le brouillon couvre, niveau 2 (cas de règle,
+ * comme pour #363 et #365) ; le titre, niveau 3.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -18,7 +26,7 @@ const composant = lire('src/lib/SectionRevenusCharges.svelte');
 const formulaire = lire('src/lib/FormulaireFlux.svelte');
 const module = lire('src/lib/sectionRevenusCharges.svelte.ts');
 
-describe('[niveau 4] #364 · 1 — une section, écrite une fois', () => {
+describe('[niveau 1] #364 · 1 — une section, écrite une fois', () => {
   it('les deux étapes de l’assistant et l’écran emploient la même section ; l’assistant sur son brouillon, l’écran sur le projet', () => {
     expect(wizard).toContain('<SectionRevenusCharges s={sectionFlux} genre="income" />');
     expect(wizard).toContain('<SectionRevenusCharges s={sectionFlux} genre="fixedCharge" />');
@@ -63,12 +71,12 @@ const flux = (id: string, name: string, kind: PlannedFlow['kind'], amount: numbe
   ...extra,
 });
 
-describe('[niveau 4] #364 · 9 — le brouillon ouvert sur la section Revenus et charges fixes', () => {
-  it('le titre nomme la section', () => {
+describe('#364 · 9 — le brouillon ouvert sur la section Revenus et charges fixes', () => {
+  it('[niveau 3] le titre nomme la section', () => {
     expect(titreDeLAssistant('revenus')).toBe('Compléter mes revenus et charges fixes');
   });
 
-  it('ouvert sur un projet vierge, il couvre les flux et le jour de début de période, celui de l’exemple proposé d’office ; ni le coussin, ni aucune autre partie', async () => {
+  it('[niveau 2] ouvert sur un projet vierge, il couvre les flux et le jour de début de période, celui de l’exemple proposé d’office ; ni le coussin, ni aucune autre partie', async () => {
     const store = await depot();
     const b = nouveauBrouillon(store.load(), 'revenus');
     expect(Object.keys(b.fichier.tables)).toEqual(['plannedFlows']);
@@ -77,7 +85,7 @@ describe('[niveau 4] #364 · 9 — le brouillon ouvert sur la section Revenus et
     expect(b.etape).toBe('income');
   });
 
-  it('la validation n’écrit que ce que les étapes ont changé : une échéance et un virement lus avec les flux restent ce que le projet porte, une ligne changée des deux côtés suit D93', async () => {
+  it('[niveau 0] la validation n’écrit que ce que les étapes ont changé : un virement lu avec les flux reste ce que le projet porte, une ligne changée des deux côtés suit D93', async () => {
     const store = await depot();
     store.upsert('accounts', { id: 'livret', name: 'Livret', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01' } as never);
     store.upsert('plannedFlows', flux('f-sal', 'Salaire', 'income', 200000));

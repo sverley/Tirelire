@@ -1,10 +1,20 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur pour #364 — « La section Revenus et charges fixes sert à l'assistant et à l'écran Flux prévus » :
- * l'écran Flux prévus et l'assistant ouvert sur la section, sur l'application montée sans navigateur (`ecran.ts`),
- * au jour des tests. Ce qui se lit ici est ce que l'écran montre et ce que le projet enregistré porte. Chaque titre
- * dit le point du « Fait quand » qu'il vérifie. Que les étapes de l'assistant complet restent ce qu'elles sont
- * (point 2) se vérifie par les tests que le point nomme.
+ * Harnais d'audit de #364 — « La section Revenus et charges fixes sert à l'assistant et à l'écran Flux
+ * prévus » : l'écran Flux prévus et l'assistant ouvert sur la section, sur l'application montée sans
+ * navigateur (`ecran.ts`), au jour des tests. Ce qui se lit ici est ce que l'écran montre et ce que le
+ * projet enregistré porte. Chaque titre dit le point du « Fait quand » qu'il tranche, et son niveau (D83).
+ *
+ * Les tests sont ceux du codeur (`section-revenus-charges-ecran.test.ts`, d'où ils sont déplacés en
+ * entier). Sont de moi, au point 4, que la ligne passe dans l'autre groupe à sa place dans l'ordre du
+ * projet, et qu'elle dit le montant variable et le verrouillage. Niveau 0 : un changement de genre qui
+ * romprait les reprises du flux ou perdrait les parts de son action ou la correction faite sur la ligne
+ * (point 4), ou une validation qui écrirait hors de la section (point 9), altérerait des données que le
+ * code corrigé ne rendrait pas ; vus rouges sur des mutations du code de la PR, dites dans la vérification
+ * de la PR. Niveau 1 : I5, l'écran vide porte ce qui le remplirait (point 6) ; vu rouge sur le
+ * `Flows.svelte` de `main`. Niveau 2 : les cas de D43, D56, D59 et #214 (points 3, 4, 5, 7). Niveau 3 :
+ * l'explication repliée (point 8). Que les étapes de l'assistant complet restent ce qu'elles sont (point 2)
+ * se vérifie par les tests que le point nomme.
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, MAIN_ACCOUNT_ID, alive, budgetSuggestions, euros, type PlannedFlow } from '@tirelire/core';
@@ -57,7 +67,7 @@ async function completerAvecLAssistant() {
 const exemple = budgetSuggestions();
 const nomsDeLExemple = (genre: 'incomes' | 'charges') => [...new Set(exemple[genre].map((f) => f.name))];
 
-describe('[niveau 4] #364 · 6, I5 — sur une base vide, l’écran porte les raccourcis, et rien n’est créé d’office', () => {
+describe('[niveau 1] #364 · 6, I5 — sur une base vide, l’écran porte les raccourcis, et rien n’est créé d’office', () => {
   it('aucun flux ; sous chaque groupe, ses raccourcis et son bouton d’ajout ; l’assistant est offert ; un raccourci crée le flux avec toutes ses versions, et disparaît', async () => {
     await ouvrirLApplication();
     await ouvrir();
@@ -82,7 +92,7 @@ describe('[niveau 4] #364 · 6, I5 — sur une base vide, l’écran porte les r
   });
 });
 
-describe('[niveau 4] #364 · 3 — les revenus et les charges fixes sont les lignes de la section', () => {
+describe('[niveau 2] #364 · 3 — les revenus et les charges fixes sont les lignes de la section', () => {
   it('dans l’ordre du projet ; corrigée sur place, une ligne s’écrit aussitôt et ne change pas de place ; le filtre d’état les range', async () => {
     await ouvrirLExemple();
     const ordre = (genre: string) => flux().filter((f) => f.kind === genre).map((f) => f.name);
@@ -122,7 +132,7 @@ describe('[niveau 4] #364 · 3 — les revenus et les charges fixes sont les lig
   });
 });
 
-describe('[niveau 4] #364 · 4 — le panneau des champs avancés', () => {
+describe('[niveau 2] #364 · 4 — le panneau des champs avancés', () => {
   it('« Modifier » ouvre sous la ligne « Modifier le flux — nom », réduit à ce que la ligne ne corrige pas, et le genre entre revenu et charge fixe seulement', async () => {
     await ouvrirLExemple();
     await geste('Loyer locatif', 'Modifier');
@@ -144,7 +154,7 @@ describe('[niveau 4] #364 · 4 — le panneau des champs avancés', () => {
     expect([...(champ('Type').el as HTMLSelectElement).options].map((o) => o.value)).toEqual(['income', 'fixedCharge']);
   });
 
-  it('changer le genre garde le flux, ses reprises et les parts de son action ; ce que la ligne a corrigé, panneau ouvert, reste ; la ligne passe dans l’autre groupe, à sa place', async () => {
+  it('[niveau 0] changer le genre garde le flux, ses reprises et les parts de son action ; ce que la ligne a corrigé, panneau ouvert, reste ; la ligne passe dans l’autre groupe, à sa place', async () => {
     await ouvrirLExemple();
     const salaire = flux().find((f) => f.id === 'flow-salaire')!;
     const parts = [{ tirelireId: alive(projet().tirelires)[0]!.id, share: { kind: 'fixed' as const, amount: euros(100) } }];
@@ -164,14 +174,23 @@ describe('[niveau 4] #364 · 4 — le panneau des champs avancés', () => {
     expect(apres.labelPattern).toBe('PAIE');
     expect(apres.action?.allocation).toEqual(parts);
     expect(reprises()).toEqual(avant);
-    const charges = flux().filter((f) => f.kind === 'fixedCharge').map((f) => f.id);
-    const vues = tous('main .ligne-flux').filter((l) => {
-      let x = l.previousElementSibling;
-      while (x && x.tagName !== 'H2') x = x.previousElementSibling;
-      return t(x) === 'Charges fixes';
-    });
-    expect(vues).toHaveLength(charges.length);
-    expect(charges.indexOf('flow-salaire')).toBeGreaterThanOrEqual(0);
+    // La ligne passe dans l'autre groupe, à sa place dans l'ordre du projet (ajouté par l'auditeur).
+    const ordre = (genre: string) => flux().filter((f) => f.kind === genre).map((f) => f.name);
+    expect(lignes().filter((l) => l.groupe === 'Charges fixes').map((l) => l.nom)).toEqual(ordre('fixedCharge'));
+    expect(lignes().filter((l) => l.groupe === 'Revenus').map((l) => l.nom)).toEqual(ordre('income'));
+    expect(lignes().filter((l) => l.nom === 'Salaire').map((l) => l.groupe).sort()).toEqual(flux().filter((f) => f.name === 'Salaire').map((f) => (f.kind === 'income' ? 'Revenus' : 'Charges fixes')).sort());
+    expect(ordre('fixedCharge')).toContain('Salaire');
+  });
+
+  it('la ligne dit, comme avant, un montant variable et le verrouillage (ajouté par l’auditeur)', async () => {
+    await ouvrirLExemple();
+    expect(ligneDe('Loyer locatif')!.textContent).not.toMatch(/montant variable|verrouille/);
+    await geste('Loyer locatif', 'Modifier');
+    await presser(champ('Montant variable (reprise à confirmer)').el);
+    await presser(champ('Verrouiller les opérations que ce flux reprend').el);
+    expect(await cliquerExactement('Enregistrer')).toBe(true);
+    expect(flux().find((f) => f.name === 'Loyer locatif')).toMatchObject({ variable: true, action: { state: 'lock' } });
+    expect(tous('.suite', ligneDe('Loyer locatif')).map(t)).toContain('montant variable · verrouille les opérations reprises');
   });
 
   it('un motif de libellé invalide est refusé, et le dit', async () => {
@@ -184,7 +203,7 @@ describe('[niveau 4] #364 · 4 — le panneau des champs avancés', () => {
   });
 });
 
-describe('[niveau 4] #364 · 5 — l’ajout dans l’écran', () => {
+describe('[niveau 2] #364 · 5 — l’ajout dans l’écran', () => {
   it('« Ajouter un revenu » ouvre sous lui le formulaire de la section, intitulé comme lui ; ses aides, champs avancés compris, viennent d’une même ligne de l’exemple ; nom et montant de l’aide font ce que fait le raccourci', async () => {
     await ouvrirLApplication();
     await ouvrir();
@@ -227,7 +246,7 @@ describe('[niveau 4] #364 · 5 — l’ajout dans l’écran', () => {
   });
 });
 
-describe('[niveau 4] #364 · 7 — ce que l’écran garde en propre', () => {
+describe('[niveau 2] #364 · 7 — ce que l’écran garde en propre', () => {
   it('« Ajouter une échéance ou un virement » ouvre le panneau d’aujourd’hui, intitulé comme lui, son type limité à ces deux genres ; une échéance garde sa ligne et son panneau', async () => {
     await ouvrirLExemple();
     expect(await cliquer('Ajouter une échéance ou un virement')).toBe(true);
@@ -242,7 +261,7 @@ describe('[niveau 4] #364 · 7 — ce que l’écran garde en propre', () => {
   });
 });
 
-describe('[niveau 4] #364 · 8 — l’explication repliée', () => {
+describe('[niveau 3] #364 · 8 — l’explication repliée', () => {
   it('« Comment ça marche ? » replie le texte de chaque genre et ce que l’écran explique de la sélection et de l’ordre permanent', async () => {
     await ouvrirLApplication();
     await ouvrir();
@@ -260,7 +279,7 @@ describe('[niveau 4] #364 · 8 — l’explication repliée', () => {
   });
 });
 
-describe('[niveau 4] #364 · 9 — l’assistant ouvert sur la section', () => {
+describe('[niveau 0] #364 · 9 — l’assistant ouvert sur la section', () => {
   it('sur une base vide, ouvert depuis l’écran et validé sans rien toucher : les revenus et charges fixes de l’exemple, toutes leurs versions, et le jour de début de période ; rien d’autre', async () => {
     await ouvrirLApplication();
     await ouvrir();
@@ -289,8 +308,12 @@ describe('[niveau 4] #364 · 9 — l’assistant ouvert sur la section', () => {
 
   it('sur l’exemple, rien ne se garnit, et la validation n’écrit que ce que les étapes ont changé : ni échéance, ni ordre, ni tirelire, ni compte', async () => {
     await ouvrirLExemple();
-    const avant = projet();
     await completerAvecLAssistant();
+    // Ailleurs, l'assistant ouvert : un virement corrigé dans le projet ; il reste tel que le projet le porte (D93, ajouté par l'auditeur).
+    const vir = alive(projet().plannedFlows).find((f) => f.kind === 'transfer')!;
+    expect(vir, 'l’exemple n’a aucun virement : ce test ne prouverait rien').toBeTruthy();
+    app.upsert('plannedFlows', { ...vir, amount: vir.amount - euros(10) });
+    const avant = projet();
     await saisir(ligneDe('Allocations')!.querySelector('input.mt') as HTMLInputElement, '150,00');
     expect(await cliquer('Suivant')).toBe(true);
     expect(await cliquer('Suivant')).toBe(true);
@@ -304,5 +327,6 @@ describe('[niveau 4] #364 · 9 — l’assistant ouvert sur la section', () => {
     expect(alive(p.accounts)).toEqual(alive(avant.accounts));
     expect(alive(p.categories)).toEqual(alive(avant.categories));
     expect(p.settings).toEqual(avant.settings);
+    expect(alive(p.plannedFlows).find((f) => f.id === vir.id)?.amount, 'le virement corrigé ailleurs a été réécrit').toBe(vir.amount - euros(10));
   });
 });
