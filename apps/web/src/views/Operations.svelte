@@ -50,6 +50,7 @@
     recordOrderFromTransfer,
     resumeFirstOccurrence,
     readAlerts,
+    operationListOrder,
     type AllocationLine,
     type Patch,
     type PlannedFlow,
@@ -164,7 +165,7 @@
       // Une opération qui se propose comme ordre est à traiter, quel que soit son état (#435, point 2).
       .filter((o) => restent.has(o.id) || (filter === 'all' ? true : filter === 'transfer' ? !!o.transferAccountId : o.state === filter || (filter === 'untreated' && ordresProposes.has(o.id))))
       .filter((o) => !periodOnly || (o.date >= period.start && o.date <= period.end))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : Math.abs(b.amount) - Math.abs(a.amount))),
+      .sort(operationListOrder),
   );
   /**
    * La liste se coupait à 300 lignes sans le dire : après l'import de plusieurs années, on voyait

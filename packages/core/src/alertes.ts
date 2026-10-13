@@ -15,7 +15,7 @@
  * Rien ne s'écrit (I10, D89 : « jamais stocker ce qui se recalcule ») : la fonction ne fait que lire,
  * et aucune proposition qu'elle rend ne s'applique, pas même une reprise que D12 dit automatique.
  */
-import type { Cents, Id, ISODate, Ledger, Tirelire } from './model.js';
+import type { Cents, Id, ISODate, Ledger, Operation, Tirelire } from './model.js';
 import { alive } from './model.js';
 import { addDays, diffDays, shortDate } from './dates.js';
 import { formatCents } from './money.js';
@@ -331,11 +331,27 @@ function untreatedOperations(ledger: Ledger): UntreatedOperationsAlert[] {
   ];
 }
 
+/**
+ * L'ordre de la liste d'Opérations : la date, de la plus récente à la plus ancienne, puis le montant,
+ * du plus grand au plus petit en valeur absolue. À égalité, la liste garde l'ordre du grand livre, son
+ * tri étant stable. Les reprises proposées, qu'Opérations montre sur cette liste, viennent dans le
+ * même ordre (point 4) : l'écran et la fonction le prennent d'ici.
+ */
+export function operationListOrder(a: Pick<Operation, 'date' | 'amount'>, b: Pick<Operation, 'date' | 'amount'>): number {
+  return a.date < b.date ? 1 : a.date > b.date ? -1 : Math.abs(b.amount) - Math.abs(a.amount);
+}
+
 function matchProposals(ledger: Ledger, today: ISODate): MatchProposalAlert[] {
   const p = budgetPeriodContaining(today, ledger.settings.periodStartDay);
   const ops = new Map(ledger.operations.map((o) => [o.id, o]));
   const flows = new Map(ledger.plannedFlows.map((f) => [f.id, f]));
-  return proposeMatches(ledger, addDays(p.start, -REPRISES_AVANT), addDays(p.end, REPRISES_APRES)).map((m) => {
+  const rang = new Map(ledger.operations.map((o, i) => [o.id, i]));
+  // Dans l'ordre de la liste d'Opérations, le seul écran qui les montre (point 4), pas dans celui de
+  // la sélection, par note décroissante.
+  const proposees = proposeMatches(ledger, addDays(p.start, -REPRISES_AVANT), addDays(p.end, REPRISES_APRES)).sort(
+    (a, b) => operationListOrder(ops.get(a.operationId)!, ops.get(b.operationId)!) || rang.get(a.operationId)! - rang.get(b.operationId)!,
+  );
+  return proposees.map((m) => {
     const op = ops.get(m.operationId)!;
     const flowName = flows.get(m.flowId)?.name ?? m.flowId;
     const saisie = m.resumedOperationId ? ops.get(m.resumedOperationId) : undefined;
