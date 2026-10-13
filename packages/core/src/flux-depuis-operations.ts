@@ -551,20 +551,20 @@ export function recordFlowFromOperations(ledger: Ledger, flow: ProposedFlow, res
   if (ops.some((o) => o.origin !== 'imported' || resumesSomething(o) || o.accountId !== flow.accountId || Math.sign(o.amount) !== Math.sign(flow.amount))) return undefined;
   ops.sort(byDate);
   const anchorDate = ops[0]?.date ?? flow.periodicity.anchorDate;
-  const enregistre: PlannedFlow = { ...flow, periodicity: { ...flow.periodicity, anchorDate } };
+  const nouveau: PlannedFlow = { ...flow, periodicity: { ...flow.periodicity, anchorDate } };
   const patch = emptyPatch();
-  if (!ops.length) return { flow: enregistre, patch };
-  const dates = occurrencesBetween(enregistre.periodicity, anchorDate, rhythmDate(ops[ops.length - 1]!.date, enregistre.periodicity, ops.length + 1)).map((date) => ({ date }));
+  if (!ops.length) return { flow: nouveau, patch };
+  const dates = occurrencesBetween(nouveau.periodicity, anchorDate, rhythmDate(ops[ops.length - 1]!.date, nouveau.periodicity, ops.length + 1)).map((date) => ({ date }));
   const sous = new Map<Id, Ledger['subOperations']>();
   for (const s of ledger.subOperations) if (ids.has(s.operationId)) sous.set(s.operationId, [...(sous.get(s.operationId) ?? []), s]);
   const servies = serveNearest(ops, dates);
   if (servies.size !== ops.length) return undefined;
   for (const op of ops) {
-    const reduit: Ledger = { ...ledger, operations: [op], subOperations: sous.get(op.id) ?? [], plannedFlows: [enregistre] };
-    const p = applyMatch(reduit, { operationId: op.id, flowId: enregistre.id, expectedDate: servies.get(op.id)!.slot.date, expectedAmount: enregistre.amount, score: 1, auto: false, reasons: [] });
+    const reduit: Ledger = { ...ledger, operations: [op], subOperations: sous.get(op.id) ?? [], plannedFlows: [nouveau] };
+    const p = applyMatch(reduit, { operationId: op.id, flowId: nouveau.id, expectedDate: servies.get(op.id)!.slot.date, expectedAmount: nouveau.amount, score: 1, auto: false, reasons: [] });
     patch.operations.push(...p.operations);
     patch.subOperations.push(...p.subOperations);
     patch.removedSubOperations!.push(...(p.removedSubOperations ?? []));
   }
-  return { flow: enregistre, patch };
+  return { flow: nouveau, patch };
 }
