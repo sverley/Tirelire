@@ -22,7 +22,8 @@
     stateShown,
     indexLedger,
     dueDateFlowForNeed,
-    dueDateShortfalls,
+    readAlerts,
+    tirelireShelfAccount,
     validityState,
     DEFAULT_PRIORITY,
     DEFAULT_VISIBILITY,
@@ -128,15 +129,20 @@
    * placement voulu, le compte principal, où restent ses dotations (D29) — un budget entier tient
    * sans placement, qui ne produit aucun écart (D40, D38).
    */
-  const principal = $derived(accounts.find((a) => a.kind === 'principal'));
-  const rangéeSous = (e: Tirelire) => (e.placement.length === 0 ? principal?.id : e.placement[0]?.accountId);
+  const rangéeSous = (e: Tirelire) => tirelireShelfAccount(app.ledger, e);
   const byPlacement = $derived(
     accounts
       .map((a) => ({ account: a, tirelires: tirelires.filter((e) => rangéeSous(e) === a.id && visible(e)) }))
       .filter((g) => g.tirelires.length > 0),
   );
-  /** À part, en alerte : la tirelire dont le placement vise un compte qui n'existe plus. */
-  const orphans = $derived(tirelires.filter((e) => !accounts.some((a) => a.id === rangéeSous(e)) && visible(e)));
+  /*
+   * Les alertes de l'écran, lues au cœur à la date de lecture (#463) : à part, en alerte, la tirelire
+   * dont le compte où elle se range n'existe plus, que le filtre d'état laisse voir (D56) ; et
+   * l'échéance en manque, ou déjà répondue, qu'on vient d'enregistrer (plus bas).
+   */
+  const alertes = $derived(readAlerts(app.ledger, { today: app.asOf }, ['orphanTirelire', 'dueDateShortfall']));
+  const sansCompte = $derived(new Set(alertes.filter((a) => a.code === 'orphanTirelire').map((a) => a.tirelireId)));
+  const orphans = $derived(tirelires.filter((e) => sansCompte.has(e.id) && visible(e)));
   /** Comptes offerts au placement : les vivants, plus ceux que la tirelire désigne déjà (D56). */
   const comptesPlacement = $derived(openAccounts(accounts, app.asOf, ...form.placement.map((p) => p.accountId)));
 
@@ -297,9 +303,7 @@
    * l'ordre permanent demande par période, avec la proposition de lisser (#184, point 3).
    */
   const annonceManque = $derived(
-    section.derniereEcheance
-      ? dueDateShortfalls(app.ledger, app.asOf).find((s) => s.needId === section.derniereEcheance && (s.amount > 0 || s.answer))
-      : undefined,
+    section.derniereEcheance ? alertes.filter((a) => a.code === 'dueDateShortfall').find((s) => s.needId === section.derniereEcheance) : undefined,
   );
 
   /**

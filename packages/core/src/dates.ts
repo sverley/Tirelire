@@ -93,6 +93,17 @@ export const MONTHS_FR = [
   'décembre',
 ] as const;
 
+const MOIS_ABREGES = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/**
+ * « 15 oct. 2026 » : une date telle que l'application l'écrit, sur ses écrans comme dans les messages
+ * que le cœur compose (les alertes d'un fichier, #463).
+ */
+export function shortDate(iso: ISODate): string {
+  const { y, m, d } = parseDate(iso);
+  return `${d} ${MOIS_ABREGES[m - 1]!} ${y}`;
+}
+
 /** Avance `iso` de `n` unités (n peut être négatif). */
 export function addUnits(iso: ISODate, n: number, unit: 'day' | 'week' | 'month' | 'year'): ISODate {
   if (unit === 'day') return addDays(iso, n);

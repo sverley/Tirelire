@@ -14,7 +14,7 @@
   import { avecVentilation } from '../lib/ventilationOrdre';
   import Manque from '../lib/Manque.svelte';
   import { supprimerOperations } from '../lib/suppression';
-  import { alive, computePlan, correctPlannedOperation, dueDateShortfalls, periodsAround, missingFlows, periodReadingDate, addDays, roundOrderUp, shortfallsForPeriod, standingTransferFlow, proposedOrderAllocation, keepStandingOrder, resumeStandingOrderProposal, transfersToOrder, type ForecastMovement, type Operation, type Period, type PlanTransfer, type AllocationLine } from '@tirelire/core';
+  import { alive, computePlan, correctPlannedOperation, periodsAround, periodReadingDate, roundOrderUp, standingTransferFlow, proposedOrderAllocation, keepStandingOrder, resumeStandingOrderProposal, readAlerts, PLAN_WARNING_CODES, type ForecastMovement, type Operation, type Period, type PlanTransfer, type AllocationLine, type TransferToOrderAlert } from '@tirelire/core';
 
   const accountsById = $derived(new Map(app.ledger.accounts.map((a) => [a.id, a])));
   const periods = $derived(periodsAround(app.ledger, app.asOf, 2, 3));
@@ -50,17 +50,20 @@
   }
 
   /*
-   * Les échéances en manque, ou qui ont reçu leur réponse (#184) : le plan de la période en cours et
-   * de chaque période jusqu'à leur date les signale, avec la proposition de lisser tant qu'elles
-   * n'ont pas de réponse. Elles se lisent à la date de lecture, quelle que soit la période regardée.
+   * Les alertes de la période regardée, lues au cœur (#463) : la date de lecture, et la période
+   * regardée pour seule période lue. Ses avertissements, dans l'ordre du plan ; les échéances en
+   * manque, ou qui ont reçu leur réponse, que son plan signale (#184), avec la proposition de lisser
+   * tant qu'elles n'ont pas de réponse ; les attendus non reçus ; les virements qui peuvent devenir un
+   * ordre. Le manque d'un solde prévu se lit ligne à ligne sur le plan affiché (point 14).
    */
-  const echeances = $derived(dueDateShortfalls(app.ledger, app.asOf));
-  const manques = $derived(shortfallsForPeriod(echeances, plan.period, app.asOf));
+  const alertes = $derived(readAlerts(app.ledger, { today: app.asOf, from: periode.start }, [...PLAN_WARNING_CODES, 'dueDateShortfall', 'missingFlow', 'transferToOrder']));
+  const avertissements = $derived(alertes.filter((a) => (PLAN_WARNING_CODES as readonly string[]).includes(a.code)));
+  const manques = $derived(alertes.filter((a) => a.code === 'dueDateShortfall').filter((a) => a.signaledIn.includes(periode.key)));
 
   const virtualLines = $derived(plan.lines.filter((l) => l.virtual));
   const transferLines = $derived(plan.lines.filter((l) => !l.virtual));
   const netOut = $derived(plan.transfers.reduce((s, t) => s + t.net, 0));
-  const missing = $derived(missingFlows(app.ledger, addDays(plan.period.start, -60), app.asOf));
+  const missing = $derived(alertes.filter((a) => a.code === 'missingFlow'));
   // Écarts qui n'impliquent pas le compte principal : ils ne sont dans aucun virement principal ↔ compte.
   const principalId = $derived(app.ledger.accounts.find((a) => a.kind === 'principal' && !a.deletedAt)?.id);
   const otherGaps = $derived(plan.gaps.filter((g) => g.fromAccountId !== principalId && g.toAccountId !== principalId));
@@ -163,17 +166,12 @@
 
   /*
    * Les virements importés qui peuvent devenir l'ordre d'un compte, le plan lu à la date de lecture
-   * comme l'écran Opérations les propose (#435, points 1 et 9) : par compte d'accueil, du plus ancien
-   * au plus récent. Rien ne s'écrit (I10).
+   * comme l'écran Opérations les propose (#435, points 1 et 9 ; #463, point 9) : par compte
+   * d'accueil, du plus ancien au plus récent, comme le cœur les rend. Rien ne s'écrit (I10).
    */
   const virementsQuiSeProposent = $derived.by(() => {
-    const parCompte = new Map<string, Operation[]>();
-    const proposes = transfersToOrder(app.ledger, app.asOf);
-    for (const o of alive(app.ledger.operations)) {
-      const vers = proposes.get(o.id);
-      if (vers) parCompte.set(vers, [...(parCompte.get(vers) ?? []), o]);
-    }
-    for (const liste of parCompte.values()) liste.sort((a, b) => a.date.localeCompare(b.date));
+    const parCompte = new Map<string, TransferToOrderAlert[]>();
+    for (const a of alertes) if (a.code === 'transferToOrder') parCompte.set(a.accountId, [...(parCompte.get(a.accountId) ?? []), a]);
     return parCompte;
   });
 
@@ -262,7 +260,6 @@
     const ids = [op.id, ...(jumelle && jumelle.origin === 'manual' && jumelle.transferOperationId === op.id ? [jumelle.id] : [])];
     supprimerOperations(ids);
   }
-  const hasImports = $derived(app.ledger.operations.some((o) => o.origin === 'imported' && !o.deletedAt));
 </script>
 
 {#if !hasData}
@@ -297,9 +294,9 @@
     </div>
   </div>
 
-  {#if plan.warnings.length}
+  {#if avertissements.length}
     <div class="warnings">
-      {#each plan.warnings as w}
+      {#each avertissements as w}
         <div>{w.message}</div>
       {/each}
     </div>
@@ -414,7 +411,7 @@
     </div>
   {/if}
 
-  {#if hasImports && missing.length}
+  {#if missing.length}
     <h2>Attendus, non reçus</h2>
     <div class="card warn">
       {#each missing as m (m.flowId + m.expectedDate)}
@@ -512,8 +509,8 @@
                 <p class="small" style="margin:6px 0 2px">
                   {virements.length > 1 ? 'Ces virements importés vers' : 'Ce virement importé vers'} « {t.accountName} » {virements.length > 1 ? 'peuvent' : 'peut'} devenir votre ordre permanent :
                 </p>
-                {#each virements as v (v.id)}
-                  <div class="row"><div class="label">{v.label}<span class="sub">du {shortDate(v.date)}</span></div><div class="num">{money(-v.amount)}</div></div>
+                {#each virements as v (v.operationId)}
+                  <div class="row"><div class="label">{v.operationLabel}<span class="sub">du {shortDate(v.date)}</span></div><div class="num">{money(-v.amount)}</div></div>
                 {/each}
                 <div class="actions" style="margin:4px 0 0">
                   <button class="btn small" onclick={() => app.switchTab('operations')}>{virements.length > 1 ? 'Voir ces virements dans les opérations' : 'Voir ce virement dans les opérations'}</button>

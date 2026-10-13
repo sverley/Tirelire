@@ -2,7 +2,7 @@ import {
   activeAt,
   formatCents,
   parseCents,
-  parseDate,
+  shortDate,
   validityState,
   type Account,
   type Cents,
@@ -20,13 +20,8 @@ export function moneyClass(c: Cents): string {
   return c < 0 ? 'num neg' : c > 0 ? 'num pos' : 'num';
 }
 
-const MOIS_ABREGES = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-
-/** « 15 oct. 2026 » */
-export function shortDate(iso: string): string {
-  const { y, m, d } = parseDate(iso);
-  return `${d} ${MOIS_ABREGES[m - 1]!} ${y}`;
-}
+/** « 15 oct. 2026 » : écrite au cœur, qui compose aussi les messages des alertes (#463). */
+export { shortDate };
 
 export function centsToInput(c: Cents | undefined): string {
   if (c === undefined) return '';
