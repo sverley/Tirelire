@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #463 — les écrans prennent leurs alertes de la fonction du cœur (`readAlerts`). Tous de
- * niveau 4 (D83). Point 15 du « Fait quand » : pour chaque écran, sur un fichier qui porte chacune des alertes qu'il
- * montre, l'écran en montre ce que la fonction rend — les noms, les montants, les dates —, à la même lecture.
+ * Harnais d'audit de #463 — les écrans prennent leurs alertes de la fonction du cœur (`readAlerts`). Côté
+ * écran ; les règles de la fonction : `packages/core/test/alertes-harnais.test.ts`. Point 15 du « Fait quand » :
+ * pour chaque écran, sur un fichier qui porte chacune des alertes qu'il montre, l'écran en montre ce que la fonction
+ * rend — les noms, les montants, les dates —, à la même lecture. Composé après le codage (auditeur.md, étape 2) : les
+ * tests du codeur (`alertes-ecrans.test.ts`, déplacé ici en entier), au niveau 2 (D83) : un écran qui montrerait un
+ * autre nom, un autre montant ou une autre date que la fonction donnerait un résultat faux, l'usage restant possible.
  *
  * Le fichier : l'exemple, sans le lissage décidé de la taxe foncière (une échéance en manque, sans réponse), le salaire
  * au tiers (des besoins non couverts), deux opérations importées sur le compte principal — un loyer qu'un flux
@@ -63,7 +66,7 @@ function sousLeTitre(titre: RegExp, rang = 'H2'): Element[] {
 }
 
 describe('#463 · 15. ce que les écrans montrent, pris de la fonction', () => {
-  it('l’accueil : l’historique en retard, sa date et le nombre de jours [niveau 4]', async () => {
+  it('l’accueil : l’historique en retard, sa date et le nombre de jours [niveau 2]', async () => {
     await ouvrirLeFichier();
     const [a] = readAlerts(projet(), { today: app.asOf }, ['staleHistory']);
     expect(a, 'le fichier ne porte pas l’alerte : ce test ne vérifie rien').toBeTruthy();
@@ -73,7 +76,7 @@ describe('#463 · 15. ce que les écrans montrent, pris de la fonction', () => {
     expect(tous<HTMLButtonElement>('button', carte).map(t)).toContain(`Lire au ${shortDate(a!.lastOperationDate)}`);
   });
 
-  it('le Plan, pour la période qu’il regarde : avertissements, échéances, attendus non reçus, virements qui peuvent devenir l’ordre, manques des soldes prévus [niveau 4]', async () => {
+  it('le Plan, pour la période qu’il regarde : avertissements, échéances, attendus non reçus, virements qui peuvent devenir l’ordre, manques des soldes prévus [niveau 2]', async () => {
     await ouvrirLeFichier();
     await allerA('Plan');
     const lues = readAlerts(projet(), { today: app.asOf });
@@ -113,7 +116,7 @@ describe('#463 · 15. ce que les écrans montrent, pris de la fonction', () => {
     }
   });
 
-  it('Opérations : le nombre des non traitées dans le titre, la reprise proposée et la proposition d’en faire l’ordre sur leur opération [niveau 4]', async () => {
+  it('Opérations : le nombre des non traitées dans le titre, la reprise proposée et la proposition d’en faire l’ordre sur leur opération [niveau 2]', async () => {
     await ouvrirLeFichier();
     await allerA('Opérations');
     const lues = readAlerts(projet(), { today: app.asOf }, ['untreatedOperations', 'matchProposal', 'transferToOrder']);
@@ -130,7 +133,7 @@ describe('#463 · 15. ce que les écrans montrent, pris de la fonction', () => {
     expect(t(ligne(ordre.operationLabel))).toContain(`Proposition : en faire votre ordre permanent vers « ${ordre.accountName} »`);
   });
 
-  it('Tirelires : sous « Sans compte de placement », les tirelires de l’alerte ; l’annonce du manque de l’échéance qu’on vient d’enregistrer [niveau 4]', async () => {
+  it('Tirelires : sous « Sans compte de placement », les tirelires de l’alerte ; l’annonce du manque de l’échéance qu’on vient d’enregistrer [niveau 2]', async () => {
     await ouvrirLeFichier();
     expect(await ecran('Tirelires')).toBe(true);
     const orphelines = readAlerts(projet(), { today: app.asOf }, ['orphanTirelire']);
@@ -157,7 +160,7 @@ describe('#463 · 15. ce que les écrans montrent, pris de la fonction', () => {
     expect(annonce).toContain(a!.proposal!.map((p) => `${fmt(p.amount)} le ${shortDate(p.date)}`).join(', '));
   });
 
-  it('le Bilan, dans chaque période de son horizon : les besoins non couverts et ce qui n’en est pas couvert ; les échéances de l’horizon [niveau 4]', async () => {
+  it('le Bilan, dans chaque période de son horizon : les besoins non couverts et ce qui n’en est pas couvert ; les échéances de l’horizon [niveau 2]', async () => {
     await ouvrirLeFichier();
     await allerA('Bilan');
     const horizon = 6;

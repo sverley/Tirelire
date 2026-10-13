@@ -1,11 +1,24 @@
 /**
- * Tests du codeur de #463 — « Rassembler les alertes d'un fichier dans une fonction du cœur ». Tous de
- * niveau 4 (D83). Chaque titre dit le point du « Fait quand » qu'il vérifie.
+ * Harnais d'audit de #463 — les alertes d'un fichier, rassemblées dans une fonction du cœur
+ * (`readAlerts`), que les écrans et la skill de #451 partagent (principe 13, D78, D89). Côté cœur ; ce
+ * que montrent les écrans : `apps/web/test/alertes-ecrans-harnais.test.ts`. Chaque `describe` reprend
+ * un point du « Fait quand » sous son numéro ; chaque titre porte son niveau (D83).
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur (`alertes.test.ts`,
+ * déplacé ici en entier). Niveaux, par le besoin que couvre chaque phrase :
+ * - 0 · point 2 : calculer les alertes n'écrit rien, pas même une reprise automatique (I10) ; une
+ *   reprise appliquée en cachette ne se défait pas en corrigeant le code (précédent : #184).
+ * - 1 · point 17 : chaque usage tient seul (I3).
+ * - 2 · les autres points : les règles de la lecture et de chaque genre (D12, D22, D52, D88, D89).
+ * - 4 · « chaque genre est porté par un des fichiers » : un contrôle du décor du point 3.
+ * Sont de moi : au point 3, la reconnaissance des montants du message, que les espaces de
+ * `formatCents` (U+202F, U+00A0) faisaient manquer, et son témoin ; au point 1, les dates de lecture
+ * écrites en clair ; au point 17, les témoins avec imports et avec besoins, lus d'abord.
  *
  * Décors : l'exemple (`exampleLedger`), lu au 6 ou au 20 septembre 2026, et ses variantes ; un foyer
  * écrit ici (`foyer`), au mois calendaire, lu au 20 septembre 2026, qui porte les alertes du
  * rapprochement : une opération importée non traitée qu'un flux reprendrait, un virement vers le livret
- * qui peut devenir l'ordre, un loyer attendu non reçu.
+ * qui peut devenir l'ordre, un loyer attendu non reçu. Données inventées (D84).
  */
 import { describe, expect, it } from 'vitest';
 import initSqlJs from 'sql.js';
@@ -76,14 +89,14 @@ const sans = <T extends object>(x: T, ...cles: string[]) => Object.fromEntries(O
 // ── 1. La fonction ───────────────────────────────────────────────────────────────────────────
 
 describe('#463 · 1. la lecture', () => {
-  it('sans période donnée, la seule période qui contient la date de lecture [niveau 4]', () => {
+  it('sans période donnée, la seule période qui contient la date de lecture [niveau 2]', () => {
     const l = exampleLedger();
     expect(readPeriods(l, { today: LECTURE }).map((p) => p.key)).toEqual(['2026-09']);
     const periodes = new Set(readAlerts(l, { today: LECTURE }).flatMap((a) => ('period' in a ? [a.period.key] : [])));
     expect([...periodes]).toEqual(['2026-09']);
   });
 
-  it('des périodes consécutives, de celle qui contient `from` [niveau 4]', () => {
+  it('des périodes consécutives, de celle qui contient `from` [niveau 2]', () => {
     const l = exampleLedger();
     expect(readPeriods(l, { today: LECTURE, from: '2026-08-10', count: 4 }).map((p) => [p.start, p.end])).toEqual([
       ['2026-07-28', '2026-08-27'],
@@ -94,12 +107,15 @@ describe('#463 · 1. la lecture', () => {
     expect(() => readPeriods(l, { today: LECTURE, count: 0 })).toThrow(RangeError);
   });
 
-  it('chaque période lue se lit comme le Plan la lit : à la date de lecture dans la sienne, à son premier jour ailleurs [niveau 4]', () => {
+  it('chaque période lue se lit comme le Plan la lit : à la date de lecture dans la sienne, à son premier jour ailleurs [niveau 2]', () => {
     const l = exampleLedger();
     const lecture = { today: LECTURE, from: '2026-08-10', count: 3 };
     const alertes = readAlerts(l, lecture);
+    // Août est passée : lue à son premier jour ; septembre contient la date de lecture ; octobre est à venir.
+    const lueLe: Record<string, string> = { '2026-08': '2026-07-28', '2026-09': LECTURE, '2026-10': '2026-09-28' };
+    expect(readPeriods(l, lecture).map((p) => [p.key, periodReadingDate(p, LECTURE)])).toEqual(Object.entries(lueLe));
     for (const p of readPeriods(l, lecture)) {
-      const plan = computePlan(l, periodReadingDate(p, LECTURE), LECTURE);
+      const plan = computePlan(l, lueLe[p.key]!, LECTURE);
       const lues = alertes.filter((a) => 'period' in a && a.period.key === p.key && a.code !== 'forecastShortfall');
       expect(lues.map((a) => [a.code, a.message]), p.label).toEqual(plan.warnings.map((w) => [w.code, w.message]));
     }
@@ -109,7 +125,7 @@ describe('#463 · 1. la lecture', () => {
 // ── 2. Rien ne s'écrit ───────────────────────────────────────────────────────────────────────
 
 describe('#463 · 2. rien ne s’écrit', () => {
-  it('la base relue est identique, et la reprise automatique proposée ne s’applique pas [niveau 4]', async () => {
+  it('la base relue est identique, et la reprise automatique proposée ne s’applique pas [niveau 0]', async () => {
     const s = await LedgerStore.create({ sqlJs: SQL, siteId: 'A' });
     const l = foyer();
     for (const key of LEDGER_KEYS) for (const row of l[key]) s.upsert(key, row as never);
@@ -130,7 +146,8 @@ describe('#463 · 2. rien ne s’écrit', () => {
 // ── 3. Ce que porte une alerte ───────────────────────────────────────────────────────────────
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
-const MONTANT = /−?\d{1,3}(?: \d{3})*,\d{2} €/g;
+/** Un montant tel que `formatCents` l'écrit : milliers séparés par U+202F, U+00A0 avant l'euro. */
+const MONTANT = /−?\d{1,3}(?:[   ]\d{3})*,\d{2}[  ]€/g;
 const DATE = /\d{1,2} (?:janv\.|févr\.|mars|avr\.|mai|juin|juil\.|août|sept\.|oct\.|nov\.|déc\.) \d{4}/g;
 
 /** Ce qu'une alerte porte à part du message : ses nombres et ses dates, tels que le message les écrirait. */
@@ -188,7 +205,12 @@ describe('#463 · 3. ce que porte une alerte', () => {
     );
   });
 
-  it('montants en centimes entiers, dates en AAAA-MM-JJ ; tout montant et toute date du message sont portés à part [niveau 4]', () => {
+  it('montants en centimes entiers, dates en AAAA-MM-JJ ; tout montant et toute date du message sont portés à part [niveau 2]', () => {
+    // Témoin : les messages des décors portent des montants et des dates, et les motifs les reconnaissent.
+    const trouves = (motif: RegExp) => lues.flatMap(({ a }) => a.message.match(motif) ?? []);
+    expect(trouves(MONTANT)).toContain(formatCents(euros(600)));
+    expect(trouves(MONTANT).length).toBeGreaterThan(10);
+    expect(trouves(DATE).length).toBeGreaterThan(10);
     for (const { f, a } of lues) {
       const { nombres, dates } = portes(a);
       for (const m of a.message.match(MONTANT) ?? []) expect(nombres.has(m), `${f} · ${a.code} : « ${m} » dans « ${a.message} »`).toBe(true);
@@ -197,14 +219,14 @@ describe('#463 · 3. ce que porte une alerte', () => {
     }
   });
 
-  it('un message en français, au vouvoiement [niveau 4]', () => {
+  it('un message en français, au vouvoiement [niveau 2]', () => {
     for (const { f, a } of lues) {
       expect(a.message.length, `${f} · ${a.code}`).toBeGreaterThan(0);
       expect(a.message, `${f} · ${a.code}`).not.toMatch(/\b(?:tu|toi|ton|ta|tes|te)\b/i);
     }
   });
 
-  it('ce qu’elle concerne, par ses identifiants et ses noms [niveau 4]', () => {
+  it('ce qu’elle concerne, par ses identifiants et ses noms [niveau 2]', () => {
     for (const { f, a } of lues) {
       const x = a as unknown as Record<string, unknown>;
       for (const [id, nom] of [['tirelireId', 'tirelireName'], ['needId', 'needName'], ['flowId', 'flowName'], ['operationId', 'operationLabel']] as const)
@@ -219,7 +241,7 @@ describe('#463 · 3. ce que porte une alerte', () => {
 // ── 4. Un seul calcul ────────────────────────────────────────────────────────────────────────
 
 describe('#463 · 4. un seul calcul', () => {
-  it('chaque genre est ce que rend le calcul du cœur qui le fait, dans son ordre [niveau 4]', () => {
+  it('chaque genre est ce que rend le calcul du cœur qui le fait, dans son ordre [niveau 2]', () => {
     const l = foyer();
     const a = readAlerts(l, { today: LECTURE });
     expect(deGenre(a, 'matchProposal').map((x) => sans(x, 'code', 'message', 'operationLabel', 'operationDate', 'operationAmount', 'flowName', 'resumedOperationLabel'))).toEqual(
@@ -233,7 +255,7 @@ describe('#463 · 4. un seul calcul', () => {
     expect(deGenre(b, 'dueDateShortfall').map((x) => sans(x, 'code', 'message', 'signaledIn', 'inReading'))).toEqual(dueDateShortfalls(e, '2026-09-06'));
   });
 
-  it('les non couverts sont ceux de la lecture du budget, période par période [niveau 4]', () => {
+  it('les non couverts sont ceux de la lecture du budget, période par période [niveau 2]', () => {
     const l = exampleLedger();
     for (const f of l.plannedFlows) if (f.kind === 'income') f.amount = Math.round(f.amount / 3);
     const lecture = readBudgetAhead(l, '2026-09-06', 3)!;
@@ -254,12 +276,12 @@ describe('#463 · 5. historique en retard', () => {
     l.operations.push(op('op-retiree', addDays(LECTURE, -1), 'CB RETIREE', -100, { deletedAt: '2026-09-19T00:00:00.000Z' }));
     return l;
   };
-  it('à 15 jours, pas d’alerte ; à 16, l’alerte, avec sa date et le nombre de jours [niveau 4]', () => {
+  it('à 15 jours, pas d’alerte ; à 16, l’alerte, avec sa date et le nombre de jours [niveau 2]', () => {
     expect(readAlerts(avecDerniere(addDays(LECTURE, -15)), { today: LECTURE }, ['staleHistory'])).toEqual([]);
     const [a] = readAlerts(avecDerniere(addDays(LECTURE, -16)), { today: LECTURE }, ['staleHistory']);
     expect(a && [a.lastOperationDate, a.days]).toEqual(['2026-09-04', 16]);
   });
-  it('sans opération, aucune [niveau 4]', () => {
+  it('sans opération, aucune [niveau 2]', () => {
     expect(readAlerts({ ...foyer(), operations: [] }, { today: LECTURE }, ['staleHistory'])).toEqual([]);
   });
 });
@@ -267,7 +289,7 @@ describe('#463 · 5. historique en retard', () => {
 // ── 6. Tirelire sans compte de placement ─────────────────────────────────────────────────────
 
 describe('#463 · 6. tirelire sans compte de placement', () => {
-  it('le compte où elle se range n’est pas un compte vivant : la tirelire, et le compte visé quand il y en a un [niveau 4]', () => {
+  it('le compte où elle se range n’est pas un compte vivant : la tirelire, et le compte visé quand il y en a un [niveau 2]', () => {
     const l = foyer();
     l.accounts.push({ id: 'acc-clos', name: 'Ancien livret', kind: 'epargne', openingBalance: 0, openingDate: '2025-01-01', deletedAt: '2026-06-01T00:00:00.000Z' });
     l.tirelires.push(
@@ -288,7 +310,7 @@ describe('#463 · 6. tirelire sans compte de placement', () => {
 // ── 7. Opérations non traitées ───────────────────────────────────────────────────────────────
 
 describe('#463 · 7. opérations non traitées', () => {
-  it('le nombre d’opérations vivantes non traitées, et chacune ; aucune alerte sans elles [niveau 4]', () => {
+  it('le nombre d’opérations vivantes non traitées, et chacune ; aucune alerte sans elles [niveau 2]', () => {
     const l = foyer();
     l.operations.push(op('op-cb', '2026-09-10', 'CB MARCHE', -2500), op('op-supprimee', '2026-09-11', 'CB X', -100, { deletedAt: '2026-09-12T00:00:00.000Z' }));
     const [a] = readAlerts(l, { today: LECTURE }, ['untreatedOperations']);
@@ -305,7 +327,7 @@ describe('#463 · 7. opérations non traitées', () => {
 // ── 8. Reprise proposée ──────────────────────────────────────────────────────────────────────
 
 describe('#463 · 8. reprise proposée', () => {
-  it('l’opération, le flux et la date de l’occurrence, le montant attendu, la note, les raisons, et si elle s’appliquerait sans confirmation [niveau 4]', () => {
+  it('l’opération, le flux et la date de l’occurrence, le montant attendu, la note, les raisons, et si elle s’appliquerait sans confirmation [niveau 2]', () => {
     const [a] = readAlerts(foyer(), { today: LECTURE }, ['matchProposal']);
     expect(a).toMatchObject({
       operationId: 'op-salaire',
@@ -322,7 +344,7 @@ describe('#463 · 8. reprise proposée', () => {
     expect(a?.score).toBeGreaterThan(0);
   });
 
-  it('la saisie qu’elle reprendrait, quand une saisie corrige déjà l’occurrence [niveau 4]', () => {
+  it('la saisie qu’elle reprendrait, quand une saisie corrige déjà l’occurrence [niveau 2]', () => {
     const l = foyer();
     l.operations.push(op('op-correction', '2026-08-28', 'Salaire corrigé', euros(2000), { origin: 'manual', state: 'locked', plannedFlowId: 'flow-salaire', plannedDate: '2026-08-28' }));
     const [a] = readAlerts(l, { today: LECTURE }, ['matchProposal']);
@@ -336,7 +358,7 @@ describe('#463 · 8. reprise proposée', () => {
     l.plannedFlows.push({ id: 'flow-abo', name: 'Abonnement', kind: 'fixedCharge', amount: -999, accountId: 'acc-principal', periodicity: { interval: 1, unit: 'week', anchorDate: '2025-07-28' }, dateWindowDays: 1, labelPattern: 'ABONNEMENT' });
     return l;
   };
-  it('de 400 jours avant le début de la période de la date de lecture à 40 jours après sa fin, bornes comprises [niveau 4]', () => {
+  it('de 400 jours avant le début de la période de la date de lecture à 40 jours après sa fin, bornes comprises [niveau 2]', () => {
     // Septembre 2026 : du 1er au 30 ; la fenêtre va du 28 juillet 2025 au 9 novembre 2026.
     expect(readAlerts(hebdo(['2025-07-28', '2026-11-09']), { today: LECTURE }, ['matchProposal']).map((a) => a.operationDate)).toEqual(expect.arrayContaining(['2025-07-28', '2026-11-09']));
     const dehors = hebdo(['2025-07-27', '2026-11-10']);
@@ -344,7 +366,7 @@ describe('#463 · 8. reprise proposée', () => {
     // Elles seraient proposées dans une fenêtre plus large : seule la fenêtre les écarte.
     expect(proposeMatches(dehors, '2025-07-01', '2026-12-31').map((m) => m.operationId).sort()).toEqual(['op-abo-0', 'op-abo-1']);
   });
-  it('la fenêtre suit la période de la date de lecture, pas les périodes lues [niveau 4]', () => {
+  it('la fenêtre suit la période de la date de lecture, pas les périodes lues [niveau 2]', () => {
     const l = hebdo(['2025-07-28']);
     expect(readAlerts(l, { today: LECTURE, from: '2027-03-01', count: 2 }, ['matchProposal']).map((a) => a.operationId)).toEqual(['op-abo-0']);
   });
@@ -353,11 +375,11 @@ describe('#463 · 8. reprise proposée', () => {
 // ── 9. Virement qui peut devenir un ordre permanent ──────────────────────────────────────────
 
 describe('#463 · 9. virement qui peut devenir un ordre permanent', () => {
-  it('l’opération, sa date, son montant, et le compte d’accueil, le plan lu à la date de lecture [niveau 4]', () => {
+  it('l’opération, sa date, son montant, et le compte d’accueil, le plan lu à la date de lecture [niveau 2]', () => {
     const a = readAlerts(foyer(), { today: LECTURE, from: '2027-01-01' }, ['transferToOrder']);
     expect(a.map((x) => [x.operationId, x.operationLabel, x.date, x.amount, x.accountId, x.accountName])).toEqual([['op-virement', 'VIR LIVRET', '2026-09-02', euros(-150), 'acc-livret', 'Livret A']]);
   });
-  it('du plus ancien au plus récent [niveau 4]', () => {
+  it('du plus ancien au plus récent [niveau 2]', () => {
     const l = foyer();
     l.operations.unshift(op('op-virement-2', '2026-09-15', 'VIR LIVRET', euros(-150), { transferAccountId: 'acc-livret', state: 'locked' }));
     l.operations.push(op('op-virement-0', '2026-08-02', 'VIR LIVRET', euros(-150), { transferAccountId: 'acc-livret', state: 'locked' }));
@@ -368,7 +390,7 @@ describe('#463 · 9. virement qui peut devenir un ordre permanent', () => {
 // ── 10. Échéance en manque ───────────────────────────────────────────────────────────────────
 
 describe('#463 · 10. échéance en manque', () => {
-  it('en manque sans réponse : le besoin, sa tirelire, la date, ce qui manquera, la croisière et la proposition de lisser [niveau 4]', () => {
+  it('en manque sans réponse : le besoin, sa tirelire, la date, ce qui manquera, la croisière et la proposition de lisser [niveau 2]', () => {
     const [a] = readAlerts(exempleSansReponse(), { today: '2026-09-06' }, ['dueDateShortfall']);
     const attendu = dueDateShortfalls(exempleSansReponse(), '2026-09-06')[0]!;
     expect(a).toMatchObject({ needId: 'need-tf', name: 'Taxe foncière', tirelireId: 'env-tf', tirelireName: 'Taxe foncière', dueDate: '2026-10-15' });
@@ -376,7 +398,7 @@ describe('#463 · 10. échéance en manque', () => {
     expect([a!.amount, a!.cruise, a!.proposal]).toEqual([attendu.amount, attendu.cruise, attendu.proposal]);
     expect(a!.answer).toBeUndefined();
   });
-  it('déjà répondue : le lissage, avec ses parts datées, ou le refus ; zéro quand la réponse y suffit [niveau 4]', () => {
+  it('déjà répondue : le lissage, avec ses parts datées, ou le refus ; zéro quand la réponse y suffit [niveau 2]', () => {
     const [lisse] = readAlerts(exampleLedger(), { today: '2026-09-06' }, ['dueDateShortfall']);
     expect(lisse!.amount).toBe(0);
     expect(lisse!.answer?.kind).toBe('smoothing');
@@ -388,7 +410,7 @@ describe('#463 · 10. échéance en manque', () => {
     expect(r!.answer?.kind).toBe('refusal');
     expect(r!.amount).toBeGreaterThan(0);
   });
-  it('une période passée ne la signale pas ; celle de la date de lecture et les suivantes jusqu’à sa date, oui ; et sa date tombe ou non dans les périodes lues [niveau 4]', () => {
+  it('une période passée ne la signale pas ; celle de la date de lecture et les suivantes jusqu’à sa date, oui ; et sa date tombe ou non dans les périodes lues [niveau 2]', () => {
     // Échéance du 15 octobre 2026, lue au 20 septembre : août est passée, septembre est la période de la date de lecture,
     // octobre la contient, novembre vient après.
     const lecture = { today: LECTURE, from: '2026-08-10', count: 4 };
@@ -407,7 +429,7 @@ describe('#463 · 10. échéance en manque', () => {
 describe('#463 · 11. avertissements du plan, selon leur code', () => {
   const septembre = { today: '2026-09-06' };
 
-  it('noIncome : la période seule [niveau 4]', () => {
+  it('noIncome : la période seule [niveau 2]', () => {
     const l = foyer();
     l.plannedFlows = l.plannedFlows.filter((f) => f.kind !== 'income');
     const [a] = readAlerts(l, { today: LECTURE }, ['noIncome']);
@@ -415,7 +437,7 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
     expect(a!.message).toBe('Aucun revenu prévu sur la période.');
   });
 
-  it('negativeMargin : ce qui manque aux revenus, charges fixes déduites, pour couvrir les dotations ; unfunded et reduced : demandé, couvert, non couvert [niveau 4]', () => {
+  it('negativeMargin : ce qui manque aux revenus, charges fixes déduites, pour couvrir les dotations ; unfunded et reduced : demandé, couvert, non couvert [niveau 2]', () => {
     const l = exampleLedger();
     for (const f of l.plannedFlows) if (f.kind === 'income') f.amount = Math.round(f.amount / 3);
     const plan = computePlan(l, '2026-09-06');
@@ -428,7 +450,7 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
     for (const x of deGenre(a, 'unfunded')) expect([x.funded, x.uncovered]).toEqual([0, x.requested]);
   });
 
-  it('belowCushion : la marge et le coussin [niveau 4]', () => {
+  it('belowCushion : la marge et le coussin [niveau 2]', () => {
     const l = exampleLedger();
     const [a] = readAlerts(l, { today: '2026-10-20' }, ['belowCushion']);
     const plan = computePlan(l, '2026-10-20');
@@ -436,7 +458,7 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
     expect(a!.margin).toBeLessThan(a!.cushion);
   });
 
-  it('payoutShort : le besoin et sa tirelire, ce qu’il verse et ce qu’il devrait verser, sa croisière [niveau 4]', () => {
+  it('payoutShort : le besoin et sa tirelire, ce qu’il verse et ce qu’il devrait verser, sa croisière [niveau 2]', () => {
     const l = exampleLedger();
     l.tirelires.push({ id: 'env-saison', name: 'Saison', placement: [], openingBalance: euros(50), openingDate: '2026-08-28' });
     l.needs.push({ id: 'need-saison', tirelireId: 'env-saison', kind: 'payout', amount: euros(1200), periodicity: { interval: 12, unit: 'month', anchorDate: '2026-08-28' }, priority: 5 });
@@ -444,14 +466,14 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
     expect(a && [a.needId, a.needName, a.tirelireId, a.tirelireName, a.paid, a.cruise]).toEqual(['need-saison', 'Saison', 'env-saison', 'Saison', euros(50), euros(100)]);
   });
 
-  it('principalOverdrawn : le compte principal et son non affecté, négatif [niveau 4]', () => {
+  it('principalOverdrawn : le compte principal et son non affecté, négatif [niveau 2]', () => {
     const l = exampleLedger();
     const [a] = readAlerts(l, { today: '2027-01-10' }, ['principalOverdrawn']);
     expect(a && [a.accountId, a.accountName, a.unallocated]).toEqual(['acc-principal', 'Compte courant', computePlan(l, '2027-01-10').totals.principalUnallocated]);
     expect(a!.unallocated).toBeLessThan(0);
   });
 
-  it('settlementBlocked : le compte tiers et le règlement bloqué, signé comme le plan le calcule [niveau 4]', () => {
+  it('settlementBlocked : le compte tiers et le règlement bloqué, signé comme le plan le calcule [niveau 2]', () => {
     const l = exampleLedger();
     Object.assign(l.accounts.find((a) => a.id === 'acc-marie')!, { settlementDirection: 'toThird', settlementThreshold: 0 });
     const [a] = readAlerts(l, septembre, ['settlementBlocked']);
@@ -459,7 +481,7 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
     expect(a!.message).toBe('Un règlement de -2000 centimes avec « Compte de Marie » est bloqué par le sens autorisé.');
   });
 
-  it('bankOrderDrift : le compte d’accueil, l’ordre enregistré, ce que le budget demande (zéro quand il ne demande plus rien), et si le compte est retiré [niveau 4]', () => {
+  it('bankOrderDrift : le compte d’accueil, l’ordre enregistré, ce que le budget demande (zéro quand il ne demande plus rien), et si le compte est retiré [niveau 2]', () => {
     const [a] = readAlerts(exampleLedger(), septembre, ['bankOrderDrift']);
     expect(a && [a.accountId, a.accountName, a.recorded, a.requested, a.accountRetired]).toEqual(['acc-livret', 'Livret A', euros(600), euros(650), false]);
     const retire = exampleLedger();
@@ -468,7 +490,7 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
     expect(b && [b.accountId, b.accountName, b.recorded, b.requested, b.accountRetired]).toEqual(['acc-livret', 'Livret A', euros(600), 0, true]);
   });
 
-  it('bankOrderPartDrift : le compte, la tirelire, sa part enregistrée et ce que le budget lui demande (zéro pour une tirelire retirée) [niveau 4]', () => {
+  it('bankOrderPartDrift : le compte, la tirelire, sa part enregistrée et ce que le budget lui demande (zéro pour une tirelire retirée) [niveau 2]', () => {
     const [a] = readAlerts(exampleLedger(), septembre, ['bankOrderPartDrift']);
     expect(a && [a.accountId, a.tirelireId, a.tirelireName, a.recorded, a.requested, a.tirelireRetired]).toEqual(['acc-livret', 'env-vac', 'Vacances', euros(150), euros(200), false]);
     const retiree = exampleLedger();
@@ -477,7 +499,7 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
     expect(b && [b.tirelireId, b.recorded, b.requested, b.tirelireRetired]).toEqual(['env-vac', euros(150), 0, true]);
   });
 
-  it('le message est celui que le plan rend, inchangé, dans l’ordre du plan [niveau 4]', () => {
+  it('le message est celui que le plan rend, inchangé, dans l’ordre du plan [niveau 2]', () => {
     for (const today of ['2026-09-06', '2026-10-20', '2027-01-10']) {
       const l = exampleLedger();
       const lues = readAlerts(l, { today }).filter((a) => 'period' in a && a.code !== 'forecastShortfall');
@@ -489,7 +511,7 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
 // ── 12. Manque d'un solde prévu ──────────────────────────────────────────────────────────────
 
 describe('#463 · 12. manque d’un solde prévu', () => {
-  it('pour une période à venir seulement : chaque compte et chaque tirelire, le montant et la date du point le plus bas [niveau 4]', () => {
+  it('pour une période à venir seulement : chaque compte et chaque tirelire, le montant et la date du point le plus bas [niveau 2]', () => {
     const l = exampleLedger();
     const lecture = { today: LECTURE, from: '2026-08-10', count: 3 };
     const a = readAlerts(l, lecture, ['forecastShortfall']);
@@ -508,11 +530,11 @@ describe('#463 · 12. manque d’un solde prévu', () => {
 // ── 13. Attendu, non reçu ────────────────────────────────────────────────────────────────────
 
 describe('#463 · 13. attendu, non reçu', () => {
-  it('le flux, la date attendue, le montant, la fin de la fenêtre [niveau 4]', () => {
+  it('le flux, la date attendue, le montant, la fin de la fenêtre [niveau 2]', () => {
     const a = readAlerts(foyer(), { today: LECTURE }, ['missingFlow']);
     expect(a.find((x) => x.expectedDate === '2026-09-05')).toMatchObject({ flowId: 'flow-loyer', name: 'Loyer', amount: euros(-800), windowEnd: '2026-09-08' });
   });
-  it('de 60 jours avant le début de la première période lue : une occurrence à la borne compte, une juste avant non [niveau 4]', () => {
+  it('de 60 jours avant le début de la première période lue : une occurrence à la borne compte, une juste avant non [niveau 2]', () => {
     // Septembre 2026 commence le 1er : la borne est le 3 juillet 2026.
     const l = foyer();
     l.plannedFlows.push(
@@ -531,8 +553,12 @@ describe('#463 · 13. attendu, non reçu', () => {
 
 // ── 17. Chaque usage tient seul ──────────────────────────────────────────────────────────────
 
-describe('#463 · 17. chaque usage tient seul', () => {
-  it('sans opération importée : ni reprise proposée, ni attendu non reçu [niveau 4]', () => {
+describe('#463 · 17. chaque usage tient seul (I3)', () => {
+  it('sans opération importée : ni reprise proposée, ni attendu non reçu [niveau 1]', () => {
+    // Témoin, lu d'abord : avec ses opérations importées, le foyer porte l'une et l'autre.
+    const avec = readAlerts(foyer(), { today: LECTURE, count: 3 }).map((a) => a.code);
+    expect(avec).toContain('matchProposal');
+    expect(avec).toContain('missingFlow');
     const l = foyer();
     l.operations = l.operations.map((o) => ({ ...o, origin: 'manual' as const }));
     const codes = readAlerts(l, { today: LECTURE, count: 3 }).map((a) => a.code);
@@ -544,9 +570,16 @@ describe('#463 · 17. chaque usage tient seul', () => {
     expect(parExemple).not.toContain('matchProposal');
     expect(parExemple).not.toContain('missingFlow');
   });
-  it('sans besoin : ni échéance en manque, ni unfunded, ni reduced [niveau 4]', () => {
-    const l = exampleLedger();
-    for (const f of l.plannedFlows) if (f.kind === 'income') f.amount = Math.round(f.amount / 3);
+  it('sans besoin : ni échéance en manque, ni unfunded, ni reduced [niveau 1]', () => {
+    const auTiers = (): Ledger => {
+      const l = exempleSansReponse();
+      for (const f of l.plannedFlows) if (f.kind === 'income') f.amount = Math.round(f.amount / 3);
+      return l;
+    };
+    // Témoin, lu d'abord, à la même lecture : avec ses besoins, le fichier porte les trois.
+    const avec = readAlerts(auTiers(), { today: '2026-09-06', count: 6 }).map((a) => a.code);
+    for (const c of ['dueDateShortfall', 'unfunded', 'reduced']) expect(avec).toContain(c);
+    const l = auTiers();
     l.needs = [];
     const codes = readAlerts(l, { today: '2026-09-06', count: 6 }).map((a) => a.code);
     for (const c of ['dueDateShortfall', 'unfunded', 'reduced']) expect(codes).not.toContain(c);
