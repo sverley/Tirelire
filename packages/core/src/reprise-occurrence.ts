@@ -281,58 +281,76 @@ function freeAround(index: OccurrenceIndex, f: PlannedFlow, from: ISODate, to: I
   return [...jusquA.slice(debut), ...libres(forward(f, addDays(to, 1)), n)];
 }
 
-/** Un nœud de la file des dates : les cibles d'un même jour, de la plus petite à la plus grande par leur identifiant, ou une occurrence libre. */
-type Noeud =
-  | { kind: 'cibles'; day: number; date: ISODate; cibles: Operation[]; tete: number; prev?: Noeud | undefined; next?: Noeud | undefined; vivant: boolean }
-  | { kind: 'occurrence'; day: number; date: ISODate; entry?: Operation; prev?: Noeud | undefined; next?: Noeud | undefined; vivant: boolean };
-type Cibles = Extract<Noeud, { kind: 'cibles' }>;
-type Occ = Extract<Noeud, { kind: 'occurrence' }>;
-interface Couple {
+/** Un nœud de la file des dates : les cibles d'un même jour, de la plus petite à la plus grande par leur identifiant, ou une date offerte. */
+type Noeud<T> =
+  | { kind: 'cibles'; day: number; date: ISODate; cibles: Operation[]; tete: number; prev?: Noeud<T> | undefined; next?: Noeud<T> | undefined; vivant: boolean }
+  | { kind: 'occurrence'; day: number; date: ISODate; slot: T; prev?: Noeud<T> | undefined; next?: Noeud<T> | undefined; vivant: boolean };
+type Cibles<T> = Extract<Noeud<T>, { kind: 'cibles' }>;
+type Occ<T> = Extract<Noeud<T>, { kind: 'occurrence' }>;
+interface Couple<T> {
   days: number;
-  cibles: Cibles;
-  occ: Occ;
+  cibles: Cibles<T>;
+  occ: Occ<T>;
   cible: Id;
 }
 
 /** L'ordre des couples (point 6) : en jours, puis la cible la plus ancienne, puis l'occurrence la plus ancienne, puis l'identifiant de la cible. */
-function avant(a: Couple, b: Couple): boolean {
+function avant<T>(a: Couple<T>, b: Couple<T>): boolean {
   if (a.days !== b.days) return a.days < b.days;
   if (a.cibles.day !== b.cibles.day) return a.cibles.day < b.cibles.day;
   if (a.occ.day !== b.occ.day) return a.occ.day < b.occ.day;
   return a.cible < b.cible;
 }
 
-/**
- * Sert les couples d'une cible et d'une occurrence du plus proche au plus éloigné, une cible et une
- * occurrence à la fois (point 6). Sur une ligne de dates, le couple le plus proche est toujours fait de
- * deux nœuds voisins — un jour de cibles et une occurrence —, puisqu'un nœud entre eux ferait un couple
- * plus proche, ou aussi proche et servi avant (les cibles d'un même jour sont un seul nœud, servies par
- * leur identifiant ; un jour n'a qu'une occurrence). Les nœuds vivent dans une file doublement chaînée,
- * les couples voisins dans un tas : servir un couple retire au plus deux nœuds et ne crée que les
- * couples de leurs voisins. Le calcul croît comme (cibles + occurrences) × log, non comme leur produit.
- */
+/** Point 6 : les occurrences libres que prennent les cibles concernées, servies par `serveNearest`. */
 function serveCouples(index: OccurrenceIndex, f: PlannedFlow, concerned: Operation[]): Map<Id, OfferedOccurrence> {
   const taken = new Map<Id, OfferedOccurrence>();
   if (concerned.length === 0) return taken;
+  const jours = concerned.map((o) => o.date).sort();
+  const libres = freeAround(index, f, jours[0]!, jours[jours.length - 1]!, concerned.length);
+  const ops = new Map(concerned.map((o) => [o.id, o]));
+  for (const [id, { slot, days }] of serveNearest(concerned, libres)) {
+    const amount = slot.entry ? slot.entry.amount : f.amount;
+    taken.set(id, { flowId: f.id, date: slot.date, ...(slot.entry ? { entry: slot.entry } : {}), amount, gap: ops.get(id)!.amount - amount, days });
+  }
+  return taken;
+}
+
+/**
+ * Sert les couples d'une cible et d'une date offerte du plus proche au plus éloigné, une cible et une
+ * date à la fois (point 6) — à égalité, la cible la plus ancienne d'abord, puis la date la plus
+ * ancienne, puis l'identifiant de la cible —, sans couple de plus de `maxDays` jours. Sur une ligne de
+ * dates, le couple le plus proche est toujours fait de deux nœuds voisins — un jour de cibles et une
+ * date offerte —, puisqu'un nœud entre eux ferait un couple plus proche, ou aussi proche et servi avant
+ * (les cibles d'un même jour sont un seul nœud, servies par leur identifiant ; les dates offertes sont
+ * distinctes). Les nœuds vivent dans une file doublement chaînée, les couples voisins dans un tas :
+ * servir un couple retire au plus deux nœuds et ne crée que les couples de leurs voisins. Le calcul
+ * croît comme (cibles + dates) × log, non comme leur produit. Un seul appariement pour la reprise
+ * groupée (#445) et pour les occurrences d'un flux fait d'opérations (#456).
+ */
+export function serveNearest<T extends { date: ISODate }>(targets: Operation[], slots: T[], maxDays = Infinity): Map<Id, { slot: T; days: number }> {
+  const taken = new Map<Id, { slot: T; days: number }>();
+  if (targets.length === 0 || slots.length === 0) return taken;
   const parJour = new Map<ISODate, Operation[]>();
-  for (const op of concerned) parJour.set(op.date, [...(parJour.get(op.date) ?? []), op]);
-  const jours = [...parJour.keys()].sort();
-  const noeuds: Noeud[] = [
-    ...jours.map((date): Noeud => ({ kind: 'cibles', day: toDayNumber(date), date, cibles: parJour.get(date)!.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)), tete: 0, vivant: true })),
-    ...freeAround(index, f, jours[0]!, jours[jours.length - 1]!, concerned.length).map((o): Noeud => ({ kind: 'occurrence', day: toDayNumber(o.date), ...o, vivant: true })),
+  for (const op of targets) parJour.set(op.date, [...(parJour.get(op.date) ?? []), op]);
+  const noeuds: Noeud<T>[] = [
+    ...[...parJour.keys()].map((date): Noeud<T> => ({ kind: 'cibles', day: toDayNumber(date), date, cibles: parJour.get(date)!.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)), tete: 0, vivant: true })),
+    ...slots.map((slot): Noeud<T> => ({ kind: 'occurrence', day: toDayNumber(slot.date), date: slot.date, slot, vivant: true })),
   ].sort((a, b) => a.day - b.day || (a.kind === b.kind ? 0 : a.kind === 'cibles' ? -1 : 1));
   for (let i = 1; i < noeuds.length; i++) {
     noeuds[i - 1]!.next = noeuds[i]!;
     noeuds[i]!.prev = noeuds[i - 1]!;
   }
 
-  const tas: Couple[] = [];
-  const pousser = (a: Noeud | undefined, b: Noeud | undefined) => {
+  const tas: Couple<T>[] = [];
+  const pousser = (a: Noeud<T> | undefined, b: Noeud<T> | undefined) => {
     if (!a || !b || a.kind === b.kind) return;
-    const cibles = a.kind === 'cibles' ? a : (b as Cibles);
-    const occ = a.kind === 'occurrence' ? a : (b as Occ);
+    const cibles = a.kind === 'cibles' ? a : (b as Cibles<T>);
+    const occ = a.kind === 'occurrence' ? a : (b as Occ<T>);
     if (cibles.tete >= cibles.cibles.length) return;
-    tas.push({ days: Math.abs(occ.day - cibles.day), cibles, occ, cible: cibles.cibles[cibles.tete]!.id });
+    const days = Math.abs(occ.day - cibles.day);
+    if (days > maxDays) return;
+    tas.push({ days, cibles, occ, cible: cibles.cibles[cibles.tete]!.id });
     for (let i = tas.length - 1; i > 0; ) {
       const p = (i - 1) >> 1;
       if (!avant(tas[i]!, tas[p]!)) break;
@@ -340,7 +358,7 @@ function serveCouples(index: OccurrenceIndex, f: PlannedFlow, concerned: Operati
       i = p;
     }
   };
-  const extraire = (): Couple => {
+  const extraire = (): Couple<T> => {
     const haut = tas[0]!;
     const dernier = tas.pop()!;
     if (tas.length) {
@@ -358,7 +376,7 @@ function serveCouples(index: OccurrenceIndex, f: PlannedFlow, concerned: Operati
     }
     return haut;
   };
-  const retirer = (n: Noeud) => {
+  const retirer = (n: Noeud<T>) => {
     n.vivant = false;
     if (n.prev) n.prev.next = n.next;
     if (n.next) n.next.prev = n.prev;
@@ -372,8 +390,7 @@ function serveCouples(index: OccurrenceIndex, f: PlannedFlow, concerned: Operati
     // Un couple périmé : un de ses nœuds est servi, ils ne sont plus voisins, ou ce n'est plus la première cible du jour.
     if (!cibles.vivant || !occ.vivant || (cibles.next !== occ && cibles.prev !== occ) || cibles.cibles[cibles.tete]?.id !== c.cible) continue;
     const op = cibles.cibles[cibles.tete++]!;
-    const amount = occ.entry ? occ.entry.amount : f.amount;
-    taken.set(op.id, { flowId: f.id, date: occ.date, ...(occ.entry ? { entry: occ.entry } : {}), amount, gap: op.amount - amount, days: c.days });
+    taken.set(op.id, { slot: occ.slot, days: c.days });
     retirer(occ);
     if (cibles.tete >= cibles.cibles.length) retirer(cibles);
     else {

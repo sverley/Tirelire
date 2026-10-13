@@ -889,17 +889,29 @@ export function standingTransferFlow(
     return next;
   }
   const allocation = proposedOrderAllocation(plan, transfer, amount);
+  // Sans ordre enregistré, le plan affiche le libellé tiré du nom : c'est celui que l'ordre prend.
+  const motif = transfer.labels[0] ?? transferLabel(transfer.accountName);
+  return newStandingOrder(principalId, { id: transfer.accountId, name: transfer.accountName }, id, amount, standingAnchor(plan), allocation, motif);
+}
+
+/**
+ * Un ordre permanent nouveau, tel que le plan le décrit (D57, D60) : un flux de virement du compte
+ * principal vers `account`, de `amount` (positif), mensuel, ancré sur `anchorDate`, nommé d'après le
+ * compte, avec la fenêtre et la tolérance de montant d'un ordre que le plan propose, son motif de
+ * libellé et, s'il en a une, sa ventilation `allocation`. Un seul code pour l'ordre que l'écran Plan
+ * enregistre (`standingTransferFlow`) et pour celui qu'on fait d'opérations importées (#434, #456).
+ */
+export function newStandingOrder(principalId: Id, account: { id: Id; name: string }, id: Id, amount: Cents, anchorDate: ISODate, allocation: AllocationLine[], labelPattern: string): PlannedFlow {
   return {
     id,
-    name: `Virement ${transfer.accountName}`,
+    name: `Virement ${account.name}`,
     kind: 'transfer',
     amount: -amount,
     accountId: principalId,
-    counterpartAccountId: transfer.accountId,
-    periodicity: { interval: 1, unit: 'month' as const, anchorDate: standingAnchor(plan) },
+    counterpartAccountId: account.id,
+    periodicity: { interval: 1, unit: 'month' as const, anchorDate },
     dateWindowDays: 5,
-    // Sans ordre enregistré, le plan affiche le libellé tiré du nom : c'est celui que l'ordre prend.
-    labelPattern: transfer.labels[0] ?? transferLabel(transfer.accountName),
+    labelPattern,
     amountTolerance: { pct: 20 },
     ...(allocation.length ? { action: { allocation } } : {}),
   };

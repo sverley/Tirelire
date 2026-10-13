@@ -22,9 +22,10 @@ import { suggestPattern } from './automations.js';
  * du compte principal reconnu comme virement vers un autre compte vivant — par le libellé, par
  * l'appariement, ou désignée à la main (D11, D22) : toutes portent `transferAccountId` — ; sans
  * reprise (D88) ; vers un compte qui n'a aucun ordre permanent vivant, quelle que soit sa validité
- * (#393, point 5). Reste au plan d'y proposer un ordre (`transferToOrder`).
+ * (#393, point 5). Reste au plan d'y proposer un ordre (`transferToOrder`). La même règle dit quel
+ * virement interne peut devenir un ordre sans budget (#456, point 1).
  */
-function transferTarget(ledger: Ledger, op: Operation, principalId: Id): Id | undefined {
+export function transferTarget(ledger: Ledger, op: Operation, principalId: Id): Id | undefined {
   if (op.deletedAt || op.origin !== 'imported' || resumesSomething(op)) return undefined;
   if (op.accountId !== principalId || op.amount >= 0) return undefined;
   const vers = op.transferAccountId;
