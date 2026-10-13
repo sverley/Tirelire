@@ -32,6 +32,10 @@ Des fondements :
   pas accès. Elle ne connaît un ordre que parce que l'utilisateur en valide la mise en place ; il est
   alors enregistré avec sa ventilation sur les tirelires.
 - **Principe 1.2** : le plan n'évolue que sur un changement de fond.
+- **D96** : le budget de la période ne compte que des montants par période, déclarés et validés —
+  dotations, ordres permanents qu'elles demandent, marge ; ce que le réel en dit — soldes, non
+  affecté, virements tirés du réel, manques — vit au suivi (domaine rapprochement et bilan) et y
+  devient une proposition.
 - **Principe 1.4, D60** : le rattrapage n'entre jamais dans un ordre permanent ; une dépense trop
   proche se signale par le montant qui manquera, en plus des ordres calculés sur la période complète.
 - **I3** : U2 tient seul, sans import ; U1 lit le plan de virements sans jamais avoir à valider un

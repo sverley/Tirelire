@@ -39,7 +39,15 @@ compte virtuel, et une étiquette exclusive des sous-opérations (D88).
 ## Non affecté
 
 Ce qui reste d'un compte réel une fois retirées les composantes qu'il héberge. Calculé, jamais saisi :
-pour chaque compte, solde bancaire = composantes hébergées + non affecté (I2).
+pour chaque compte, solde bancaire = composantes hébergées + non affecté (I2). C'est un solde, à une
+date : il se lit dans le **suivi**, jamais comme un montant de la période (D96).
+
+## Dotation
+
+Ce que le budget compte d'un besoin, chaque période : sa croisière, plus la part d'un lissage décidé ;
+pour un versement, sa part déclarée (D29, D48). Elle ne dépend d'aucun solde : ce que le réel en dit —
+une provision qui a déjà sa cible, un objectif atteint, une réserve qui ne tiendra pas — devient une
+proposition d'ajustement, que l'utilisateur valide ou refuse (D96).
 
 ## Provision
 
@@ -139,6 +147,14 @@ opérations saisies à une date future et les opérations prévues qui comptent 
 
 Un solde prévu négatif à une date (D88). Une opération « attendue, non reçue » (D12) n'en est pas un :
 elle cesse de compter dans le solde prévu, qui peut alors en montrer un.
+
+## Suivi
+
+La partie de l'application qui lit le réel à une date : soldes réels et prévus des comptes et des
+tirelires, non affecté, manques, attendus non reçus, virements tirés du réel — complément
+exceptionnel, à rapatrier, écarts entre comptes, règlements —, et les propositions d'ajustement qu'il
+en tire. Il vit dans le Bilan (D96). À ne pas confondre avec un compte **suivi**, qui porte des
+opérations importées (D88).
 
 ## Instance
 

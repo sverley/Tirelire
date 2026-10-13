@@ -35,7 +35,8 @@ gardent leur propre ancrage (`periodicity.anchorDate`), indépendant.
 Seul le compte principal est importé au départ (les autres comptes peuvent l'être plus tard sans changer le
 modèle : un compte passe de `third` à `holding`/`principal`). Un **compte tiers** est un compte réel
 non importé ; ses opérations utiles au plan sont saisies à la main et créent un **solde à régler**
-avec le compte principal, présenté comme virement ponctuel dans le plan (`settlementBalance`). Réglages par
+avec le compte principal, un solde lu sur le réel, que le suivi présente comme virement ponctuel
+proposé (`settlementBalance`, D96). Réglages par
 compte tiers : seuil de règlement, sens autorisé.
 
 Ce que l'hypothèse du relevé unique cachait : un budget placé sur un autre compte, avec sa propre
@@ -178,9 +179,10 @@ plusieurs comptes, et le suivi par objectif doit rester indépendant du compte q
 ### D20 · Placement voulu et écart
 
 Chaque tirelire déclare **où son argent devrait dormir**. L'écart entre position réelle et position
-voulue produit des propositions de virement dans le plan : jamais une correction d'office, jamais un
-blocage. Laisser un écart est légitime — un revenu arrive, on provisionnera plus tard — donc le plan
-doit pouvoir présenter un écart comme « à surveiller » plutôt que « à faire ». Le compte principal est un lieu
+voulue est un écart de soldes : il se lit au suivi, qui en produit des propositions de virement
+(D96) : jamais une correction d'office, jamais un blocage. Laisser un écart est légitime — un revenu
+arrive, on provisionnera plus tard — donc le suivi doit pouvoir présenter un écart comme « à
+surveiller » plutôt que « à faire ». Le compte principal est un lieu
 de stockage comme un autre, à durée de séjour courte : aucune règle particulière ne lui est attachée.
 
 ### D21 · Virement groupé, ventilé par ses parts
@@ -191,7 +193,7 @@ ordres est une souplesse sur demande (#25), et plusieurs flux de virement vers l
 s'additionnent. À l'import, la ligne bancaire est reconnue par montant et libellé (D11, D12), et
 l'opération qui reprend l'occurrence prend les parts du flux, comme pour tout automatisme (D24,
 D88). Ce que les parts n'absorbent pas — montant constaté différent, parts fixes qui n'ont pas
-suivi le budget — reste **non affecté** sur le compte d'accueil (D29), visible, et le plan le dit ;
+suivi le budget — reste **non affecté** sur le compte d'accueil (D29), visible, et le suivi le dit (D96) ;
 rien ne se répartit d'office. L'ordre de financement de D06 n'est pas une répartition rejouée sur
 l'opération : il est le contenu de ce que le plan **propose** — la ventilation d'un ordre à sa
 validation (U2), celle d'un virement importé qu'aucun flux ne reprend et dont on fait un flux (U3,
@@ -292,14 +294,17 @@ entre ses membres — s'obtient en fusionnant les tirelires plutôt qu'en les co
 ### D29 · Dotation calculée, virements neutres, report par libération
 
 Précise D06, D19 et D20 et remplace la part de D05 sur le « financement virtuel ». Chaque besoin
-(D28) est **doté** au début de chaque période de ce qu'il demande — sa croisière, plus la part d'un
-lissage décidé (D88), ou le rattrapage d'un déficit —
-sous forme de composante calculée sur le compte principal (ou sur le compte de placement s'il n'y a pas de
-principal), jamais stockée. Un virement interne ventilé sur une tirelire **ne change pas son solde** :
+(D28) est **doté** au début de chaque période de ce que le budget déclare pour lui — sa croisière,
+plus la part d'un lissage décidé (D88) ; pour un versement, sa part déclarée (D48) —, quel que soit le
+solde de sa tirelire (D96), sous forme de composante calculée sur le compte principal (ou sur le
+compte de placement s'il n'y a pas de principal), jamais stockée. Une provision qui a déjà sa cible,
+un objectif atteint, un déficit, une réserve qui ne tiendra pas ne changent pas la dotation : le
+suivi les lit, et chacun devient une proposition d'ajustement, que l'utilisateur valide ou refuse
+(D96). Un virement interne ventilé sur une tirelire **ne change pas son solde** :
 il déplace une composante d'un compte vers un autre ; le solde ne bouge que par les dotations, les
 revenus ventilés et les dépenses. Le financement par priorité de D06 devient une **lecture** : le
-plan dit ce que les revenus de la période couvrent et signale les lignes réduites ; la dotation,
-elle, est acquise, et le non affecté du compte principal dit si l'argent y est. Le report reste une propriété
+budget de la période dit ce que les revenus couvrent et signale les lignes réduites ; la dotation,
+elle, est acquise, et le suivi dit, par le non affecté du compte principal, si l'argent y est. Le report reste une propriété
 de la tirelire (`rollover`) : en fin de période, pour `none` tout solde positif au-delà de la
 réserve des besoins non récurrents (somme de leurs cibles) est **libéré** vers le non affecté du
 compte de placement ; pour `capped` c'est ce qui dépasse la réserve plus N croisières. Libération
@@ -307,7 +312,9 @@ calculée, datée du dernier jour de la période, comptée comme composante nég
 invariants de D19 tiennent puisque dotations et libérations sont des composantes comme les autres.
 Le solde d'une tirelire s'attribue à ses besoins dans l'ordre des priorités (un besoin à échéance
 retient jusqu'à sa cible, un objectif jusqu'à la sienne, le récurrent prend le reste) ; un déficit
-pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin.
+pèse sur le premier besoin récurrent avec report, sinon sur le premier besoin. Cette attribution est
+une lecture du solde : elle dit au suivi quel besoin a sa cible et lequel porte un déficit, et ne
+change pas la dotation.
 
 ### D30 · Version du format, et ce qu'une version inconnue devient
 
@@ -412,8 +419,9 @@ composante « reste » ; en son absence, ce qui dépasse est réputé vouloir re
 s'écrivent donc de la même façon qu'une ventilation.
 
 Les mêmes règles qu'avant s'appliquent ensuite : l'écart entre position réelle et position voulue
-nourrit le plan, « à faire » au-dessus du seuil, « à surveiller » en dessous, jamais corrigé
-d'office. Une tirelire sans placement déclaré ne produit aucun écart : elle est bien là où elle est.
+nourrit le suivi, « à faire » au-dessus du seuil, « à surveiller » en dessous, jamais corrigé
+d'office (D20, D96). Dans le budget, le placement dit seulement où dort la dotation, et donc l'ordre
+qu'elle demande (D52, D60). Une tirelire sans placement déclaré ne produit aucun écart : elle est bien là où elle est.
 
 ### D39 · Une règle s'appelle un automatisme, et se crée depuis la recherche
 
@@ -693,13 +701,15 @@ Trois choix, pris pour éviter des pièges :
 - Le versement **apporte des fonds au lieu d'en demander** : `fundByPriority` écrête à zéro et ne
   saurait pas traiter une demande négative, donc les versements sont réglés à part et leur total
   s'ajoute à ce que les autres besoins se partagent. D'où leur priorité par défaut à `0`.
-- Une réserve épuisée **avertit sans creuser** : on ne verse jamais plus que la tirelire ne porte,
-  et le plan signale (`payoutShort`) que le rythme annoncé n'est plus tenu. Réduire le train de vie
-  ou puiser ailleurs reste une décision du foyer, pas de l'application.
+- Une réserve qui s'épuise **se propose, elle ne se corrige pas** : le budget compte la part
+  déclarée à chaque période, quel que soit le solde de la tirelire (D29) ; le solde prévu de la
+  tirelire dit au suivi la date où elle ne la portera plus — un manque (D88) —, et l'application
+  propose d'ajuster le versement (D96). Réduire le train de vie ou puiser ailleurs reste une
+  décision du foyer, pas de l'application.
 
-Le reste vient sans travail : le virement depuis un livret se propose déjà par l'écart de placement
-(D20, D38), et le Bilan sait comparer une dotation à la réalité observée, donc le calibrage annuel
-du versement se lit là où se lit déjà celui des provisions.
+Le reste vient sans travail : le virement depuis un livret se propose au suivi par l'écart de
+placement (D20, D38), et le Bilan sait comparer une dotation à la réalité observée, donc le
+calibrage annuel du versement se lit là où se lit déjà celui des provisions.
 
 Les **intérêts d'un compte d'épargne ne relèvent pas de ce mécanisme**, malgré la ressemblance : ils
 restent sur le compte au lieu d'alimenter le budget, et un livret ne s'épuise pas — l'avertissement
@@ -845,20 +855,23 @@ Précise D20 et D29 ; son calcul est celui de D88. Le plan a deux dates : `asOf`
 regarde, et `today`, la date jusqu'à laquelle les soldes bancaires sont connus (par défaut `asOf` ;
 l'interface y passe sa **date de lecture**).
 
-Jusqu'à `today`, les écarts de placement se lisent sur le réel : si un virement des mois passés n'a
-pas été fait, l'argent est encore sur le compte principal et le plan doit le réclamer — c'est la
-raison d'être du « complément exceptionnel » de D21. Au-delà, le plan montre le **solde prévu** des
-comptes et des tirelires (D88) : le réel à la date de lecture, plus les opérations saisies à une
-date future et les opérations prévues qui comptent jusque-là, chacune affichée avec son origine. Il
-ne suppose rien (principe 1.3) : une opération prévue se calcule depuis un flux enregistré et se
-montre comme prévue (D88). Il dit aussi ce que chaque tirelire
-demande pour la période — sa dotation (D29) — et ce qu'il faut virer pour elle : cette dotation,
-répartie comme son placement la veut (`periodDemand`), calculée sur le seul solde de la tirelire,
-qui ne dépend d'aucun virement (D29).
+Le budget de la période dit ce que chaque tirelire demande — sa dotation (D29) — et ce qu'il faut
+virer pour elle : cette dotation, répartie comme son placement la veut (`periodDemand`), calculée
+sur le seul solde de la tirelire, qui ne dépend d'aucun virement (D29). Le placement ne change que
+l'endroit où dort la dotation, jamais son montant (D38, D96).
+
+Ce qui se lit sur le réel ou à une date est au suivi (D96). Jusqu'à `today`, les écarts de placement
+se lisent sur le réel : si un virement des mois passés n'a pas été fait, l'argent est encore sur le
+compte principal et le suivi propose de le virer — c'est la raison d'être du « complément
+exceptionnel » de D21. Au-delà, le suivi montre le **solde prévu** des comptes et des tirelires
+(D88) : le réel à la date de lecture, plus les opérations saisies à une date future et les
+opérations prévues qui comptent jusque-là, chacune affichée avec son origine. Il ne suppose rien
+(principe 1.3) : une opération prévue se calcule depuis un flux enregistré et se montre comme prévue
+(D88).
 
 Invariant tenu par les tests : pour une période à venir, ce qu'on vire vers un compte d'accueil vaut
 exactement ce que les tirelires placées là demandent pour cette période ; dans la période où l'on
-lit, moins le non affecté qu'on en rapatrie. Sans lui, le bloc « Virements à faire » recalculerait
+lit, moins le non affecté que le suivi propose d'en rapatrier. Sans lui, le bloc « Virements à faire » recalculerait
 l'écart depuis la position réelle du jour pendant que le bloc « Tirelires » simulerait période par
 période, et les deux se contrediraient dès la période suivante (sur l'exemple : 700 € demandés contre
 1 400 € virés en octobre). Aucun virement n'est tenu pour exécuté sans le dire : un virement permanent
@@ -867,7 +880,7 @@ sur un compte suivi, cesse de compter s'il n'arrive pas dans sa fenêtre (D12, D
 
 La question « ce virement a-t-il eu lieu ? » se lit sur les opérations : une opération prévue est
 reprise par l'opération bancaire qui la réalise, attendue dans sa fenêtre, ou attendue non reçue
-(D12), et le plan de sa période la montre. Sans suivi des opérations (U1), rien ne se confronte : les
+(D12), et le suivi la montre. Sans suivi des opérations (U1), rien ne se confronte : les
 opérations prévues comptent à leur date, et rien n'est dit manquant. Commencer à importer n'ajoute
 que ces lectures du réel ; ni les besoins, ni les virements permanents proposés ne changent.
 
@@ -881,9 +894,9 @@ daté de septembre 2026, se lit donc à sa date : ses périodes suivantes resten
 quelle que soit la date du jour.
 
 Ce qui se lit sur le réel — non affecté du compte principal, soldes à régler des comptes tiers,
-surplus des comptes d'accueil — se lit dans la période où l'on lit, à la date de lecture. Pour une
-période à venir, c'est le solde prévu qui parle : un solde prévu négatif est un **manque** (D88), sur
-un compte comme sur une tirelire.
+surplus des comptes d'accueil — se lit au suivi, à la date de lecture. Pour une période à venir,
+c'est le solde prévu qui parle : un solde prévu négatif est un **manque** (D88), sur un compte comme
+sur une tirelire.
 
 ### D53 · Une échéance montre sa provision, et l'exemple garde ses besoins
 
@@ -898,7 +911,8 @@ existent vérifient le moteur, ligne par ligne et chiffre par chiffre, et passer
 besoins disparaissaient à nouveau. `test/exemple-complet.test.ts` fige donc les propriétés que
 l'exemple doit garder quoi qu'on retouche à ses montants : une tirelire ne reste pas muette, le plan
 de la période en cours a des lignes et un total réservé non nul, les trois genres de besoin sont
-représentés dont deux échéances, aucune tirelire en déficit n'est laissée sans rattrapage, et la
+représentés dont deux échéances, aucune tirelire en déficit n'est laissée sans proposition de
+rattrapage (D96), et la
 marge reste inférieure au demandé — au-delà, l'ordre de financement de D06 ne se voit plus.
 
 **Le rattachement ne se voyait pas.** Une échéance a deux faces : le besoin qui la provisionne, sur
@@ -1287,7 +1301,7 @@ parts n'absorbent pas se répartit par l'ordre de financement au jour de l'opér
 planchers d'abord (`distributeTransfer`, `matching.ts`) ; un ordre sans ventilation enregistrée se
 répartit ainsi en entier~~ — amendé le 7 octobre 2026 : l'opération prend les parts de l'ordre,
 à l'import comme au solde prévu (D24, D88), et ce qu'elles n'absorbent pas reste non affecté sur le
-compte d'accueil, dit par le plan (D21, D29). La ventilation s'écrit comme l'action d'un automatisme
+compte d'accueil, dit par le suivi (D21, D29, D96). La ventilation s'écrit comme l'action d'un automatisme
 (D24). Le flux ne fige pas de montants tirés du plan au moment de l'enregistrement : la ventilation
 proposée à la validation, l'utilisateur la fait sienne en la validant.
 
@@ -1305,7 +1319,8 @@ tirelires placées sur ce compte, depuis le compte principal où naissent les do
 qu'il ait déjà été viré dans la période — c'est un régime, pas
 un reste à faire. Comparer l'ordre au reste à virer (`PlanTransfer.standing`) allumait l'alerte le
 lendemain de chaque virement. Quatre cas s'en déduisent, et sont tenus par le harnais : un objectif
-atteint sort de la somme (il ne demande plus rien, D06) ; une échéance déjà provisionnée y reste
+atteint y reste tant que l'utilisateur ne l'a pas changé — sa dotation est déclarée (D29) —, et le
+suivi propose de l'arrêter ou d'en relever la cible (D96) ; une échéance déjà provisionnée y reste
 (elle sera dépensée, l'épargne reprend juste après) ; un besoin versant (D48) n'y entre pas, il rend
 de l'argent ; une tirelire placée sur deux comptes partage sa dotation entre eux (D19) au lieu de
 l'exiger deux fois. Un lissage décidé n'en fait jamais partie (D88) : un ordre permanent ne se règle
@@ -1432,8 +1447,8 @@ opérations importées), une opération prévue dont la fenêtre (D12) est pass�
 compter, et se signale « attendue, non reçue ». Sur un compte sans suivi (U1), rien ne se confronte :
 ses opérations prévues comptent à leur date. Un **manque** est un solde prévu négatif à une date : la
 dépense trop proche du principe 1.4 comme l'opération attendue qui n'arrive pas se lisent par ce même
-calcul. Le plan d'une période à venir montre le solde prévu des comptes et des tirelires, avec les
-opérations prévues qui le font (D52).
+calcul. Le suivi montre, pour une période à venir, le solde prévu des comptes et des tirelires, avec
+les opérations prévues qui le font (D52, D96).
 
 **Le lissage.** Un lissage est une décision : l'application en propose un, calculé depuis le manque ;
 l'utilisateur l'accepte, le modifie ou le refuse. Accepté, il s'enregistre comme une opération divisée
@@ -1454,7 +1469,7 @@ individuelle, reste pour la suite.
 
 **Ce qui ne change pas.** Ce qui se fige (D57) ; l'ordre permanent, somme des croisières, et ce qui se
 recalcule, qui ne se stocke pas (D60) ; les fenêtres et tolérances de la reprise (D12) ; les états
-d'une opération (D22) ; le rattrapage d'un déficit (D29).
+d'une opération (D22).
 
 ### D89 · Le cœur calcule, l'interface affiche ; ce qui se stocke
 
@@ -1590,3 +1605,45 @@ le flux décalerait son rythme de quelques jours et ne reconnaîtrait plus toute
 un ancrage qu'un mois plus court a ramené (le 30 novembre d'un rythme du 31) fixe le jour des dates
 suivantes, comme tout ancrage (D47) ; le format ne sait pas dire « le 31 » autrement, et ne change
 pas.
+
+### D96 · Le budget se déclare, le réel propose
+
+Précise D29, D52 et D57 (#468). L'application a trois parties, chacune avec sa grandeur :
+
+- **le budget** — des montants par période : revenus, charges fixes, dotations (D29), ordres
+  permanents qu'elles demandent et leur ventilation (D60), marge. Aucun solde ;
+- **l'historique** — les opérations et leurs états : import, saisie, ventilation, automatismes,
+  reprises (D22, D88) ;
+- **le suivi** — des soldes à une date et des écarts : soldes réels et prévus des comptes et des
+  tirelires, non affecté, manques, attendus non reçus (D88), virements tirés du réel — complément
+  exceptionnel, à rapatrier, écarts entre comptes (D20, D52), règlements (D04) —, et les propositions
+  d'ajustement qu'il en tire. Le suivi vit dans le Bilan, sauf s'il l'alourdit au regard des standards
+  ergonomiques.
+
+**Le budget se déclare, et ne bouge pas avec le réel.** Il est ce que l'utilisateur a déclaré et
+validé : un besoin compte, chaque période, sa croisière, plus la part d'un lissage décidé ; un
+versement, sa part déclarée (D29, D48). Le placement voulu (D38) dit seulement où dort la dotation,
+une part fixe y restant un plafond de position : c'est la seule lecture d'un solde dans ce que le
+budget demande ; elle change l'ordre demandé, jamais la dotation, et l'écart avec un ordre enregistré
+se propose sans réécriture (I10, D60).
+
+**Le réel propose.** Ce que le réel dit du budget — une provision qui a déjà sa cible, un objectif
+atteint, un déficit, une réserve qui ne tiendra pas, une marge sous le coussin, un manque — devient
+une proposition d'ajustement, le plus tôt possible, que l'utilisateur valide ou refuse ; rien ne
+change sans validation (principe 4, I10).
+
+**Le seuil d'une proposition.** Une variation faible et sans impact gênant — un salaire qui varie
+d'une centaine d'euros, une facture d'électricité réelle — ne produit pas de proposition. Une
+proposition naît d'un écart qui gêne — un manque à venir, une marge sous le coussin, une réserve qui
+ne tiendra pas — ou d'un écart qui dure d'une période à l'autre ; sa durée se fixe avec le calcul des
+propositions. En deçà, la tolérance de montant et le flux variable reprennent déjà les petites
+variations à l'import (D12), et le pas d'arrondi des ordres fait taire les petits écarts d'un ordre
+permanent (I10, D60).
+
+L'hypothèse écartée, une dotation qui suit le solde, ne tenait pas : un besoin à échéance ne
+demandait plus rien quand sa tirelire retenait sa cible, un objectif demandait au plus ce qui lui
+manquait, un versement ne versait que ce que la tirelire portait. Le budget changeait alors sans
+validation, au fil du réel, et mêlait à des montants par période des soldes à une date — le non
+affecté du compte principal en est venu à se lire dans le budget, alors que c'est un solde (I2). La
+même information, une provision pleine ou une réserve qui s'épuise, devient ici une proposition :
+l'utilisateur la voit et décide (#468).
