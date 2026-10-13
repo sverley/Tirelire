@@ -23,6 +23,7 @@ export * from './ofx.js';
 export * from './matching.js';
 export * from './ordre-depuis-virement.js';
 export * from './reprise-occurrence.js';
+export * from './flux-depuis-operations.js';
 export * from './review.js';
 export * from './lecture-budget.js';
 export * from './alertes.js';

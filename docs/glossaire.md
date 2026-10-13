@@ -104,6 +104,13 @@ reprend l'opération prévue qu'elle corrige, ou, de zéro, qu'elle masque. Une 
 plus : celle qui la reprend compte à sa place, pour son propre montant, et l'écart entre les deux
 reste visible (D12, D88). Le rapprochement de flux de D22 en est une.
 
+## Série
+
+Ce que l'historique montre d'un flux qui n'existe pas encore : des opérations de même compte, même sens
+et même motif qui se suivent à un écart régulier. Elle se constate, elle ne se devine pas ; elle propose
+un flux (D95). Ce n'est pas une **récurrence**, la règle d'un flux, qui produit ses opérations prévues
+(D88).
+
 ## Étiquette
 
 Ce qui classe une sous-opération. **Exclusive** — compte réel, tirelire, catégorie, personne : une

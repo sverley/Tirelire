@@ -202,7 +202,13 @@ export interface MatchProposal {
   reasons: string[];
 }
 
-function amountWithinTolerance(flow: PlannedFlow, amount: Cents): { ok: boolean; ratio: number; exact: boolean } {
+/**
+ * Le montant `amount` est-il dans la tolérance du flux (D12, D24) ? Du signe du flux, à l'écart permis
+ * près : le plus grand de sa tolérance absolue et de sa tolérance en pourcentage — 30 % pour un flux
+ * variable qui n'en dit pas. Une seule lecture de la sélection d'un flux, pour le rapprochement
+ * (`proposeMatches`) comme pour les occurrences que l'historique propose (#456).
+ */
+export function amountWithinTolerance(flow: Pick<PlannedFlow, 'amount' | 'amountTolerance' | 'variable'>, amount: Cents): { ok: boolean; ratio: number; exact: boolean } {
   const expected = flow.amount;
   if (Math.sign(expected) !== Math.sign(amount)) return { ok: false, ratio: 0, exact: false };
   const diff = Math.abs(Math.abs(amount) - Math.abs(expected));
@@ -215,12 +221,23 @@ function amountWithinTolerance(flow: PlannedFlow, amount: Cents): { ok: boolean;
 
 /** Le motif de libellé du flux, lu sans ses blancs d'extrémité (`readLabelPattern`), reconnaît-il l'opération ? Un motif illisible ne reconnaît rien. */
 function labelRecognized(motif: string, op: Operation): boolean {
+  return labelMatcher(motif)(op);
+}
+
+/**
+ * La reconnaissance d'un motif de libellé, compilée une fois pour être lue sur beaucoup d'opérations
+ * (#456, point 12) : le libellé, le libellé normalisé ou le libellé complet. Un motif illisible ne
+ * reconnaît rien. Une seule lecture du motif d'une sélection, pour `proposeMatches` comme pour les
+ * occurrences que l'historique propose.
+ */
+export function labelMatcher(motif: string): (op: Operation) => boolean {
+  let re: RegExp;
   try {
-    const re = new RegExp(motif, 'i');
-    return re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '');
+    re = new RegExp(motif, 'i');
   } catch {
-    return false;
+    return () => false;
   }
+  return (op) => re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '');
 }
 
 /**

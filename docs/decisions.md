@@ -1316,7 +1316,9 @@ Un ordre déjà enregistré garde son ancrage quand on corrige son montant : le 
 la reconnaissance des virements déjà passés. Un ordre nouveau s'ancre sur la période en cours, et
 non sur celle qu'on regarde — le Plan se feuillette, et un ordre enregistré en lisant décembre vire
 dès ce mois-ci. Un ordre fait d'un virement importé s'ancre sur la date de ce virement, qui en est la
-première occurrence (#40, #434).
+première occurrence (#40, #434). Un flux fait d'opérations importées, un ordre compris, s'ancre sur la
+plus ancienne occurrence que l'utilisateur valide, un virement seul étant sa propre plus ancienne
+occurrence (#456).
 
 Le jeu d'exemple porte l'ordre, et le porte **décalé** : la banque vire 600 €, le budget en demande
 650, si bien que le plan du 6 septembre montre les deux montants côte à côte sans qu'on ait rien à
@@ -1534,3 +1536,57 @@ sa validation n'écrit que ce que la section a changé (D93) : les autres partie
 ce que le projet porte. L'application ne tient qu'un assistant à la fois : quand l'un a des
 changements non validés et qu'on en ouvre un autre, rien ne les remplace sans accord ; le même se
 reprend. Une partie qui devient une section reçoit ce point d'entrée par la même règle.
+
+### D95 · Une série se constate, et propose un flux
+
+Une **série** est ce que l'historique montre d'un flux qui n'existe pas encore : des opérations de
+même compte, même sens et même motif de libellé qui se suivent à un écart régulier (#456). Elle se
+constate sur des opérations enregistrées, elle ne se devine pas (principe 1.3) ; elle propose un flux,
+que l'utilisateur corrige et valide, et ne s'enregistre jamais : elle se recalcule (D89). Écarter une
+proposition n'enregistre rien.
+
+**La série.** Trois opérations au moins — deux si l'écart est d'un an —, toutes bancaires, vivantes,
+sans reprise, non marquées ponctuelles, du même compte, du même sens et du même motif ; un virement
+interne n'en fonde une que s'il peut devenir un ordre (#434). Leur écart est une semaine, un mois,
+trois mois ou un an : la plus ancienne fixe les dates, chacune des suivantes tombe à la date suivante
+de l'écart, à 1 jour près pour une semaine, à 5 jours près sinon, au calendrier de D47 ; et aucune
+autre opération de même compte, même sens et même motif, sans reprise, ne tombe entre la première et
+la dernière. Chaque opération fonde au plus une série ; quand une suite plus longue est possible en
+partant de la plus ancienne, elle l'emporte. Les opérations qu'un flux reprend déjà n'en fondent
+aucune.
+
+- **Trois, deux pour un an.** Un écart observé une seule fois ne dit rien d'un rythme ; trois
+  opérations donnent deux écarts qui concordent. Une charge annuelle ne se montre que deux fois sur
+  deux ans d'historique : sans cette exception, aucune provision ne naîtrait des séries d'un
+  historique de 12 à 24 mois.
+- **Cinq jours.** C'est la fenêtre que le produit pose déjà aux flux qu'il propose. Pas davantage : la
+  paie de décembre versée six jours avant le 25 n'y entre pas, et se reprend à la main (#445).
+- **Le même motif.** Une seule notion de ressemblance, celle de la sélection d'un flux (D24, D39) :
+  les opérations d'une série sont, une à une, celles que le flux proposé reconnaît (principe 13). Le
+  bénéficiaire dont le libellé change de mots d'un mois à l'autre ne forme pas de série ; la sélection
+  à la main reste ouverte.
+- **Un intrus ou un trou coupe la série.** Le repérage ne dit que ce qu'il constate : une série
+  interrompue en donne deux, et le flux de la première reconnaît, par sa sélection, les opérations
+  d'après la coupure qui tombent sur ses dates.
+
+**Le flux qu'elle propose**, par le même code que le flux fait d'une opération ou de plusieurs
+opérations désignées ensemble : son compte, son sens, son motif — celui d'un automatisme créé depuis
+l'opération (D39) — et la ventilation que portent ses opérations, toutes la même, sinon aucune (D24) ;
+pour rythme, l'écart de la série, et pour fenêtre, 1 jour pour une semaine, 5 jours sinon. Sans série,
+le rythme est inconnu : l'utilisateur le donne, et le flux ne s'enregistre pas avant. Les montants
+tous égaux au centime font un flux fixe ; différents, un flux variable, à leur moyenne, avec la plus
+petite tolérance par pas de 10 % qui les reconnaît tous (D12) — un loyer revalorisé passe ainsi en
+flux variable, à confirmer à chaque ligne, ce qui est prudent et se corrige. Un virement du principal
+vers un compte d'accueil est un ordre permanent (D57), décrit comme celui que le plan propose ; il est
+mensuel quand aucune série n'en constate un autre, comme l'ordre que #434 fait d'un virement, et se
+fait sans budget : sa ventilation est celle que le plan propose quand le budget demande un ordre vers
+ce compte, celle de l'opération sinon (D21).
+
+**L'ancrage** est dans D60 : la plus ancienne occurrence que l'utilisateur valide. C'est la date de
+cette occurrence, qui se désigne par son flux et sa date (D88) — la date du rythme proposé que
+reprend la plus ancienne opération validée —, et non la date de cette opération ; sans reprise
+validée, c'est la plus ancienne des opérations qui fondent le flux. Ancré sur la date de l'opération,
+le flux décalerait son rythme de quelques jours et ne reconnaîtrait plus toute sa série. Seul bord :
+un ancrage qu'un mois plus court a ramené (le 30 novembre d'un rythme du 31) fixe le jour des dates
+suivantes, comme tout ancrage (D47) ; le format ne sait pas dire « le 31 » autrement, et ne change
+pas.
