@@ -13,6 +13,10 @@
  * le repérage, la proposition et l'enregistrement sur une base sans budget, ni tirelire, ni catégorie
  * (point 7, I3). Le redémarrage (point 8) et I10 (point 9) sont au niveau 0, I2 (point 11) au
  * niveau 1, comme dans le harnais de #434 ; la durée (point 12) au niveau 3 ; le reste au niveau 2.
+ * Au second tour, les tests du codeur sur l'ancrage — la date de l'occurrence que reprend la plus
+ * ancienne opération désignée, non celle de l'opération, et le bord du 31 (point 8) ; la série
+ * reconnue par un flux ancré sur une occurrence plus ancienne (point 10) — sont déplacés ici en
+ * entier, au niveau 2 de leur point.
  *
  * Données inventées : un compte principal, un Livret A, un compte joint. Le budget, quand il y en a un,
  * place deux tirelires sur le livret — une échéance (400 €/mois) et un objectif (250 €/mois) : il y
@@ -456,6 +460,11 @@ async function base(l: Ledger): Promise<LedgerStore> {
 
 const edf = () => avec(comptes(), op('e0', '2026-02-03', EDF, -euros(80)), op('e1', '2026-03-05', EDF, -euros(80)), op('e2', '2026-04-05', EDF, -euros(80), { state: 'locked' }), op('e3', '2026-05-07', EDF, -euros(80)));
 
+/** L'exemple du point 8 : la paie du 21 juin, puis les 25 août, 25 septembre, 29 octobre et 25 novembre. */
+const paiesDuPoint8 = () =>
+  avec(comptes(), ...['2025-06-21', '2025-08-25', '2025-09-25', '2025-10-29', '2025-11-25'].map((d, i) => op(`p${i}`, d, SALAIRE, euros(2500))));
+const reprisesDe = (ops: Operation[]) => ops.filter((o) => o.plannedFlowId).map((o) => [o.id, o.plannedDate]);
+
 describe('[niveau 2] #456 · 8. enregistrer', () => {
   it('un flux au rythme inconnu, ou de montant nul, ne s’enregistre pas', () => {
     const l = avec(comptes(), op('a', '2026-03-05', EDF, -euros(80)));
@@ -466,7 +475,7 @@ describe('[niveau 2] #456 · 8. enregistrer', () => {
     expect(recordFlowFromOperations(l, mensuel, ['a'])?.flow.periodicity).toEqual(mensuel.periodicity);
   });
 
-  it('ancré sur la plus ancienne opération désignée ; chaque opération reprend l’occurrence la plus proche, rapprochée ou verrouillée, et prend la ventilation du flux si elle n’en porte pas', () => {
+  it('ancré sur l’occurrence que reprend la plus ancienne opération désignée, ici à sa date ; chaque opération reprend l’occurrence la plus proche, rapprochée ou verrouillée, et prend la ventilation du flux si elle n’en porte pas', () => {
     const l = ventile(edf(), { id: 's', operationId: 'e2', categoryId: 'energie', tirelireId: 'vac', share: { kind: 'variable' } });
     const { flow } = proposer(l, ['e1'])!;
     expect(flow.periodicity).toEqual({ interval: 1, unit: 'month', anchorDate: '2026-02-03' });
@@ -495,6 +504,64 @@ describe('[niveau 2] #456 · 8. enregistrer', () => {
     expect(recordFlowFromOperations(autre, flow, ['e1', 'j'])).toBeUndefined();
     // Un flux nouveau : il n'en réécrit aucun qui porterait son identifiant.
     expect(recordFlowFromOperations(enregistrer(l, flow, []).ledger, flow, [])).toBeUndefined();
+  });
+
+  it('l’exemple du point 8 : ancré sur l’occurrence, non sur l’opération — le 25 juin ; la paie du 29 octobre reprend le 25 octobre, celle du 27 décembre importée ensuite est reprise', () => {
+    const l = paiesDuPoint8();
+    const { flow } = proposer(l, ['p2'])!;
+    expect(flow.periodicity).toEqual({ interval: 1, unit: 'month', anchorDate: '2025-08-25' });
+    expect(historyOccurrences(l, flow, ['p2']).map((o) => [o.operation.id, o.expectedDate, o.days])).toEqual([
+      ['p0', '2025-06-25', 4],
+      ['p1', '2025-08-25', 0],
+      ['p2', '2025-09-25', 0],
+      ['p3', '2025-10-25', 4],
+      ['p4', '2025-11-25', 0],
+    ]);
+    const r = enregistrer(l, flow, ['p4', 'p3', 'p2', 'p1', 'p0']);
+    expect(r.flow.periodicity).toEqual({ interval: 1, unit: 'month', anchorDate: '2025-06-25' });
+    expect(reprisesDe(r.ledger.operations)).toEqual([
+      ['p0', '2025-06-25'],
+      ['p1', '2025-08-25'],
+      ['p2', '2025-09-25'],
+      ['p3', '2025-10-25'],
+      ['p4', '2025-11-25'],
+    ]);
+    const ensuite = avec(r.ledger, op('p5', '2025-12-27', SALAIRE, euros(2500)));
+    expect(proposeMatches(ensuite, '2025-01-01', '2026-12-31').map((m) => [m.operationId, m.flowId, m.expectedDate, m.auto])).toEqual([['p5', 'f', '2025-12-25', true]]);
+  });
+
+  it('une seule opération désignée, à quelques jours de son rythme : l’ancrage est la date de l’occurrence qu’elle reprend', () => {
+    const l = paiesDuPoint8();
+    const { flow } = proposer(l, ['p2'])!;
+    const r = recordFlowFromOperations(l, flow, ['p3'])!;
+    expect(r.flow.periodicity.anchorDate).toBe('2025-10-25');
+    expect(r.patch.operations.map((o) => [o.id, o.plannedDate])).toEqual([['p3', '2025-10-25']]);
+  });
+
+  it('un ancrage qu’un mois plus court a ramené (le 30 novembre d’un rythme du 31) devient le jour des dates suivantes (D47)', () => {
+    const l = avec(
+      comptes(),
+      op('e0', '2025-11-28', EDF, -euros(80)),
+      op('e1', '2026-01-31', EDF, -euros(80)),
+      op('e2', '2026-02-28', EDF, -euros(80)),
+      op('e3', '2026-03-31', EDF, -euros(80)),
+    );
+    const { flow } = proposer(l, ['e1'])!;
+    expect(flow.periodicity).toEqual({ interval: 1, unit: 'month', anchorDate: '2026-01-31' });
+    expect(historyOccurrences(l, flow, ['e1']).map((o) => [o.operation.id, o.expectedDate])).toEqual([
+      ['e0', '2025-11-30'],
+      ['e1', '2026-01-31'],
+      ['e2', '2026-02-28'],
+      ['e3', '2026-03-31'],
+    ]);
+    const r = recordFlowFromOperations(l, flow, ['e0', 'e1', 'e2', 'e3'])!;
+    expect(r.flow.periodicity.anchorDate).toBe('2025-11-30');
+    expect(r.patch.operations.map((o) => [o.id, o.plannedDate])).toEqual([
+      ['e0', '2025-11-30'],
+      ['e1', '2026-01-30'],
+      ['e2', '2026-02-28'],
+      ['e3', '2026-03-30'],
+    ]);
   });
 
   it('[niveau 0] le flux, ses reprises et leur ventilation se relisent après un redémarrage', async () => {
@@ -578,6 +645,22 @@ describe('[niveau 2] #456 · 10. un flux comme les autres', () => {
       ['e0', '2026-02-03', true],
       ['e1', '2026-03-03', true],
       ['e3', '2026-05-03', true],
+    ]);
+  });
+
+  it('ancré sur une occurrence plus ancienne — la seule paie du 21 juin gardée, au 25 juin —, le rapprochement retrouve chaque paie de la série à l’occurrence que son rythme lui assigne', () => {
+    const l = paiesDuPoint8();
+    const { ledger, flow } = enregistrer(l, proposer(l, ['p2'])!.flow, ['p0']);
+    expect(flow.periodicity.anchorDate).toBe('2025-06-25');
+    expect(
+      proposeMatches(ledger, '2025-01-01', '2026-12-31')
+        .map((m) => [m.operationId, m.expectedDate, m.auto])
+        .sort(),
+    ).toEqual([
+      ['p1', '2025-08-25', true],
+      ['p2', '2025-09-25', true],
+      ['p3', '2025-10-25', true],
+      ['p4', '2025-11-25', true],
     ]);
   });
 
