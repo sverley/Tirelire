@@ -1,7 +1,18 @@
 /**
- * Tests du codeur de #456 — faire d'une opération le flux prévu que l'historique propose, et repérer
- * les séries qui se répètent (cœur). Chaque `describe` nomme le point du « Fait quand » qu'il vérifie ;
- * tous sont de niveau 4 : l'auditeur choisit ceux qu'il retient et leur niveau (codeur.md, étape 3).
+ * Harnais d'audit de #456 — faire d'une opération le flux prévu que l'historique propose, et repérer
+ * les séries qui se répètent (cœur). Chaque `describe` reprend un point du « Fait quand » sous son
+ * numéro, et son niveau (D83).
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur
+ * (`flux-depuis-operations.test.ts`, déplacé ici en entier). Sont de moi, au niveau 0 : l'opération
+ * qui reprend déjà quelque chose ne propose rien, ne fonde ni série ni occurrence, et un
+ * enregistrement qui la désigne n'écrit rien, pas même pour les autres (points 1, 3, 6 et 8, D88) ;
+ * l'opération verrouillée qui le reste, et celle qui porte sa ventilation qui la garde, lue contre une
+ * copie prise avant (point 8, D22) ; le plan qui ne réécrit pas l'ordre fait d'une série, lu contre
+ * une copie prise avant, à deux dates et pour deux pas d'arrondi (point 10, D60, I10). Au niveau 1 :
+ * le repérage, la proposition et l'enregistrement sur une base sans budget, ni tirelire, ni catégorie
+ * (point 7, I3). Le redémarrage (point 8) et I10 (point 9) sont au niveau 0, I2 (point 11) au
+ * niveau 1, comme dans le harnais de #434 ; la durée (point 12) au niveau 3 ; le reste au niveau 2.
  *
  * Données inventées : un compte principal, un Livret A, un compte joint. Le budget, quand il y en a un,
  * place deux tirelires sur le livret — une échéance (400 €/mois) et un objectif (250 €/mois) : il y
@@ -85,19 +96,16 @@ const proposer = (l: Ledger, opIds: string[], id = 'f') => flowFromOperations(l,
 /** Les séries d'un historique de prélèvements EDF aux dates données. */
 const series = (dates: string[], montant = euros(80)) => detectSeries(avec(comptes(), ...dates.map((d, i) => op(`e${i}`, d, EDF, -montant))), LECTURE);
 
-describe('[niveau 4] #456 · 1. l’opération dont on fait un flux', () => {
+describe('[niveau 2] #456 · 1. l’opération dont on fait un flux', () => {
   it('bancaire, vivante, sans reprise : son compte, son sens et son état n’y changent rien', () => {
     for (const o of [op('a', '2026-03-05', EDF, -euros(80)), op('a', '2026-03-05', SALAIRE, euros(2500), { state: 'locked' }), op('a', '2026-03-05', EDF, -euros(80), { accountId: JOINT, state: 'reconciled' })])
       expect(canBecomeFlow(avec(comptes(), o), 'a'), o.label).toBe(true);
   });
 
-  it('rien pour une saisie, une opération qui reprend déjà quelque chose, une opération supprimée, ni un libellé sans motif', () => {
+  it('rien pour une saisie, une opération supprimée, ni un libellé sans motif (l’opération qui reprend déjà quelque chose : niveau 0, plus bas)', () => {
     const l = comptes();
-    l.plannedFlows.push({ id: 'pf', name: 'EDF', kind: 'fixedCharge', amount: -euros(80), accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-03-05' }, dateWindowDays: 5 });
     for (const o of [
       op('a', '2026-03-05', EDF, -euros(80), { origin: 'manual' }),
-      op('a', '2026-03-05', EDF, -euros(80), { plannedFlowId: 'pf', plannedDate: '2026-03-05' }),
-      op('a', '2026-03-05', EDF, -euros(80), { resumedOperationId: 'x' }),
       op('a', '2026-03-05', EDF, -euros(80), { deletedAt: '2026-03-06' }),
       op('a', '2026-03-05', '12 34', -euros(80)),
     ]) {
@@ -138,7 +146,30 @@ describe('[niveau 4] #456 · 1. l’opération dont on fait un flux', () => {
   });
 });
 
-describe('[niveau 4] #456 · 2. le flux proposé', () => {
+describe('[niveau 0] #456 · 1, 3, 6 et 8. une opération qui reprend déjà quelque chose ne propose ni ne fonde rien, et son enregistrement n’efface rien (D88)', () => {
+  it('ni l’occurrence d’un flux, ni une saisie ne se perdent', () => {
+    const flux: PlannedFlow = { id: 'f', name: 'EDF ELEC', kind: 'fixedCharge', amount: -euros(80), accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-03-05' }, dateWindowDays: 5, labelPattern: 'EDF.*ELEC' };
+    const cas: Array<[string, Partial<Operation>]> = [
+      ['reprend une occurrence', { plannedFlowId: 'pf', plannedDate: '2026-04-05', state: 'reconciled' }],
+      ['reprend une saisie', { resumedOperationId: 'saisie' }],
+    ];
+    for (const [nom, reprise] of cas) {
+      const l = avec(comptes(), op('saisie', '2026-04-04', 'SAISIE FACTURE', -euros(80), { origin: 'manual' }), op('e0', '2026-03-05', EDF, -euros(80)), op('a', '2026-04-05', EDF, -euros(80), reprise), op('e2', '2026-05-05', EDF, -euros(80)));
+      l.plannedFlows.push({ ...flux, id: 'pf', labelPattern: 'AUTRE' });
+      expect(canBecomeFlow(l, 'a'), nom).toBe(false);
+      expect(proposer(l, ['a']), nom).toBeUndefined();
+      expect(proposer(l, ['e0', 'a']), nom).toBeUndefined();
+      // Comptée, elle ferait des trois une série mensuelle.
+      expect(detectSeries(l, LECTURE), nom).toEqual([]);
+      expect(ids(historyOccurrences(l, flux, []).map((o) => o.operation)), nom).toEqual(['e0', 'e2']);
+      // Rien ne s'enregistre : la reprise qu'elle porte ne s'efface pas.
+      expect(recordFlowFromOperations(l, flux, ['a']), nom).toBeUndefined();
+      expect(recordFlowFromOperations(l, flux, ['e0', 'a', 'e2']), nom).toBeUndefined();
+    }
+  });
+});
+
+describe('[niveau 2] #456 · 2. le flux proposé', () => {
   it('compte, genre, motif qui la reconnaît, nom tiré du libellé, sans période de validité ni automatisme à côté', () => {
     const l = avec(comptes(), op('a', '2026-03-05', EDF, -euros(80), { accountId: JOINT }), op('s', '2026-03-28', SALAIRE, euros(2500)));
     const charge = proposer(l, ['a'])!.flow;
@@ -172,7 +203,7 @@ describe('[niveau 4] #456 · 2. le flux proposé', () => {
   });
 });
 
-describe('[niveau 4] #456 · 3. la périodicité proposée par constat', () => {
+describe('[niveau 2] #456 · 3. la périodicité proposée par constat', () => {
   const ecart = (dates: string[]) => series(dates).map((s) => [ids(s.operations).length, s.gap.interval, s.gap.unit]);
 
   it('les exemples du « Fait quand »', () => {
@@ -234,7 +265,7 @@ describe('[niveau 4] #456 · 3. la périodicité proposée par constat', () => {
   });
 });
 
-describe('[niveau 4] #456 · 4. le montant et la tolérance', () => {
+describe('[niveau 2] #456 · 4. le montant et la tolérance', () => {
   const flux = (montants: number[]) => detectSeries(avec(comptes(), ...montants.map((m, i) => op(`e${i}`, `2026-0${3 + i}-05`, EDF, -m))), LECTURE)[0]!.flow;
 
   it('tous égaux au centime : fixe, à ce montant, de son signe, sans tolérance ni marque « variable »', () => {
@@ -252,7 +283,7 @@ describe('[niveau 4] #456 · 4. le montant et la tolérance', () => {
   });
 });
 
-describe('[niveau 4] #456 · 5. l’ordre permanent', () => {
+describe('[niveau 2] #456 · 5. l’ordre permanent', () => {
   it('un virement qu’aucune série ne fonde, vers un compte où le budget demande un ordre : l’ordre de #434, en tout point', () => {
     const l = avec(budget(), vir('op-vir', '2026-09-02', euros(600)));
     expect(proposer(l, ['op-vir'], 'x')!.flow).toEqual(orderFromTransfer(l, 'op-vir', LECTURE, 'x'));
@@ -298,7 +329,7 @@ function paies(): Ledger {
   return avec(comptes(), ...dates.map((d, i) => op(`p${i}`, d, SALAIRE, euros(2500))));
 }
 
-describe('[niveau 4] #456 · 6. les occurrences', () => {
+describe('[niveau 2] #456 · 6. les occurrences', () => {
   it('la série interrompue : le flux de la première reconnaît, avant comme après, ce qui tombe sur ses dates ; la paie du 19 décembre n’en est pas', () => {
     const l = paies();
     expect(detectSeries(l, LECTURE).map((s) => ids(s.operations))).toEqual([
@@ -348,7 +379,7 @@ describe('[niveau 4] #456 · 6. les occurrences', () => {
   });
 });
 
-describe('[niveau 4] #456 · 7. le repérage', () => {
+describe('[niveau 2] #456 · 7. le repérage', () => {
   it('chaque série avec ses opérations dans l’ordre des dates, et le flux qu’elle deviendrait : celui d’une opération de la série, sa ventilation exceptée', () => {
     const l = ventile(avec(comptes(), ...['2026-05-05', '2026-03-05', '2026-04-06'].map((d, i) => op(`e${i}`, d, EDF, -euros(80)))), { id: 's', operationId: 'e2', categoryId: 'energie', share: { kind: 'variable' } });
     const [s] = detectSeries(l, LECTURE);
@@ -368,7 +399,7 @@ describe('[niveau 4] #456 · 7. le repérage', () => {
     expect(detectSeries(avec(l, ...ops), LECTURE)).toEqual([]);
   });
 
-  it('le même historique rend la même liste, dans le même ordre ; vide sans opération ; sans budget ni tirelire, elle se rend (I3)', () => {
+  it('le même historique rend la même liste, dans le même ordre ; vide sans opération', () => {
     const ops = [
       ...['2026-03-05', '2026-04-05', '2026-05-05'].map((d, i) => op(`e${i}`, d, EDF, -euros(80))),
       ...['2026-02-28', '2026-03-28', '2026-04-28'].map((d, i) => op(`s${i}`, d, SALAIRE, euros(2500))),
@@ -380,6 +411,25 @@ describe('[niveau 4] #456 · 7. le repérage', () => {
     expect(a.map((s) => s.operations[0]!.id)).toEqual(['s0', 'v0', 'e0']);
     expect(detectSeries(comptes(), LECTURE)).toEqual([]);
     expect(detectSeries(emptyLedger(), LECTURE)).toEqual([]);
+  });
+
+  it('[niveau 1] sans budget, ni tirelire, ni catégorie (U4, U5 ; I3) : le repérage, la proposition et l’enregistrement tiennent, l’ordre compris', () => {
+    const l = emptyLedger({ periodStartDay: 28, orderRounding: euros(10) });
+    l.accounts.push({ id: CC, name: 'Compte principal', kind: 'principal', openingBalance: euros(3000), openingDate: '2025-01-01' }, { id: LIVRET, name: 'Livret A', kind: 'epargne', openingBalance: 0, openingDate: '2025-01-01' });
+    l.operations.push(...['2026-03-05', '2026-04-05', '2026-05-05'].map((d, i) => op(`e${i}`, d, EDF, -euros(80))), ...['2026-03-02', '2026-04-02', '2026-05-02'].map((d, i) => vir(`v${i}`, d, euros(600))));
+    const trouvees = detectSeries(l, LECTURE);
+    expect(trouvees.map((s) => [s.flow.kind, ids(s.operations), s.flow.action])).toEqual([
+      ['transfer', ['v0', 'v1', 'v2'], undefined],
+      ['fixedCharge', ['e0', 'e1', 'e2'], undefined],
+    ]);
+    const ordre = proposer(l, ['v1'])!.flow;
+    expect([ordre.kind, ordre.counterpartAccountId, rhythmKnown(ordre)]).toEqual(['transfer', LIVRET, true]);
+    const r = recordFlowFromOperations(l, ordre, ['v0', 'v1', 'v2'])!;
+    expect(r.patch.operations.map((o) => [o.id, o.plannedFlowId])).toEqual([
+      ['v0', 'f'],
+      ['v1', 'f'],
+      ['v2', 'f'],
+    ]);
   });
 });
 
@@ -406,7 +456,7 @@ async function base(l: Ledger): Promise<LedgerStore> {
 
 const edf = () => avec(comptes(), op('e0', '2026-02-03', EDF, -euros(80)), op('e1', '2026-03-05', EDF, -euros(80)), op('e2', '2026-04-05', EDF, -euros(80), { state: 'locked' }), op('e3', '2026-05-07', EDF, -euros(80)));
 
-describe('[niveau 4] #456 · 8. enregistrer', () => {
+describe('[niveau 2] #456 · 8. enregistrer', () => {
   it('un flux au rythme inconnu, ou de montant nul, ne s’enregistre pas', () => {
     const l = avec(comptes(), op('a', '2026-03-05', EDF, -euros(80)));
     const { flow } = proposer(l, ['a'])!;
@@ -447,7 +497,7 @@ describe('[niveau 4] #456 · 8. enregistrer', () => {
     expect(recordFlowFromOperations(enregistrer(l, flow, []).ledger, flow, [])).toBeUndefined();
   });
 
-  it('le flux, ses reprises et leur ventilation se relisent après un redémarrage', async () => {
+  it('[niveau 0] le flux, ses reprises et leur ventilation se relisent après un redémarrage', async () => {
     const s = await base(edf());
     const { flow } = proposer(s.load(), ['e1'])!;
     const r = recordFlowFromOperations(s.load(), { ...flow, action: { categoryId: 'energie' } }, ['e0', 'e1', 'e3'])!;
@@ -478,9 +528,28 @@ describe('[niveau 4] #456 · 8. enregistrer', () => {
     expect(r.patch.operations).toEqual(attendu.patch.operations);
     expect(sansId(r.patch.subOperations)).toEqual(sansId(attendu.patch.subOperations));
   });
+
+  it('[niveau 0] verrouillée, elle le reste ; une opération qui porte sa ventilation la garde, verrouillée ou non (D22, D88)', () => {
+    const propres: SubOperation[] = [
+      { id: 's1', operationId: 'e1', tirelireId: 'taxe', share: { kind: 'variable' } },
+      { id: 's2', operationId: 'e2', categoryId: 'energie', tirelireId: 'vac', share: { kind: 'variable' } },
+    ];
+    const l = ventile(edf(), ...propres);
+    const avant = structuredClone(propres);
+    const r = recordFlowFromOperations(l, { ...proposer(l, ['e0'])!.flow, action: { categoryId: 'energie' } }, ['e0', 'e1', 'e2', 'e3'])!;
+    expect(r.patch.operations.map((o) => [o.id, o.state])).toEqual([
+      ['e0', 'reconciled'],
+      ['e1', 'reconciled'],
+      ['e2', 'locked'],
+      ['e3', 'reconciled'],
+    ]);
+    expect(r.patch.removedSubOperations ?? []).toEqual([]);
+    const apres = applyPatchToLedger({ ...l, plannedFlows: [r.flow] }, r.patch);
+    for (const id of ['e1', 'e2']) expect(apres.subOperations.filter((x) => x.operationId === id), id).toEqual(avant.filter((x) => x.operationId === id));
+  });
 });
 
-describe('[niveau 4] #456 · 9. rien ne s’écrit avant le geste (I10)', () => {
+describe('[niveau 0] #456 · 9. rien ne s’écrit avant le geste (I10)', () => {
   it('proposer, lire les occurrences, repérer ne modifient ni le grand livre lu ni la base', async () => {
     const s = await base(avec(budget(), ...edf().operations, vir('v1', '2026-07-02', euros(600)), vir('v2', '2026-08-02', euros(600)), vir('v3', '2026-09-02', euros(600))));
     const lu = s.load();
@@ -500,7 +569,7 @@ describe('[niveau 4] #456 · 9. rien ne s’écrit avant le geste (I10)', () => 
   });
 });
 
-describe('[niveau 4] #456 · 10. un flux comme les autres', () => {
+describe('[niveau 2] #456 · 10. un flux comme les autres', () => {
   it('enregistré sans reprise, le rapprochement retrouve chaque opération non verrouillée de la série, sans confirmation s’il est fixe', () => {
     const l = edf();
     const { ledger } = enregistrer(l, proposer(l, ['e1'])!.flow, []);
@@ -542,22 +611,36 @@ describe('[niveau 4] #456 · 10. un flux comme les autres', () => {
     expect(solde(enregistrer(l, flow, []).ledger) - solde(l)).toBe(-euros(240));
   });
 
-  it('un ordre fait d’une série trimestrielle est comparé par son équivalent mensuel, et le plan ne le réécrit pas', () => {
+  it('un ordre fait d’une série trimestrielle est comparé par son équivalent mensuel (sa non-réécriture : niveau 0, plus bas)', () => {
     const l = comptes();
     l.tirelires.push({ id: 'pre', name: 'Précaution', placement: [{ accountId: LIVRET, share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-01-01' });
     l.needs.push({ id: 'n-pre', tirelireId: 'pre', kind: 'goal', amount: euros(90000), monthlyAmount: euros(300), priority: 10 });
     const h = avec(l, vir('v1', '2026-01-02', euros(900)), vir('v2', '2026-04-02', euros(900)), vir('v3', '2026-07-02', euros(900)));
     const { flow } = proposer(h, ['v1'])!;
     expect([flow.periodicity, flow.action]).toEqual([{ interval: 3, unit: 'month', anchorDate: '2026-01-02' }, { allocation: [{ tirelireId: 'pre', share: { kind: 'fixed', amount: -euros(900) } }] }]);
-    const { ledger, flow: enregistre } = enregistrer(h, flow, ['v1', 'v2', 'v3']);
-    const copie = structuredClone(enregistre);
+    const { ledger } = enregistrer(h, flow, ['v1', 'v2', 'v3']);
     const t = computePlan(ledger, LECTURE).transfers.find((x) => x.accountId === LIVRET)!;
     expect([t.permanent, t.bankOrder?.amount, t.bankOrder?.drift, t.bankOrder?.signaled, t.bankOrder?.parts.map((p) => p.drift)]).toEqual([euros(300), euros(300), 0, false, [0]]);
-    expect(ledger.plannedFlows.find((f) => f.id === 'f')).toEqual(copie);
+  });
+
+  it('[niveau 0] le plan ne réécrit pas l’ordre fait d’une série, ni son montant ni ses parts, l’écart signalé ou non (D60, I10)', () => {
+    for (const pas of [euros(10), euros(200)]) {
+      const l = comptes();
+      l.settings.orderRounding = pas;
+      l.tirelires.push({ id: 'pre', name: 'Précaution', placement: [{ accountId: LIVRET, share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-01-01' });
+      l.needs.push({ id: 'n-pre', tirelireId: 'pre', kind: 'goal', amount: euros(90000), monthlyAmount: euros(400), priority: 10 });
+      const h = avec(l, vir('v1', '2026-01-02', euros(900)), vir('v2', '2026-04-02', euros(900)), vir('v3', '2026-07-02', euros(900)));
+      const { ledger } = enregistrer(h, proposer(h, ['v1'])!.flow, ['v1', 'v2', 'v3']);
+      const avant = structuredClone(ledger.plannedFlows.find((f) => f.id === 'f')!);
+      // 900 € par trimestre, 300 € par mois, pour 400 € demandés : un écart de 100 €.
+      expect(computePlan(ledger, LECTURE).transfers.find((x) => x.accountId === LIVRET)!.bankOrder?.signaled, `pas ${pas}`).toBe(pas < euros(100));
+      computePlan(ledger, '2026-10-06');
+      expect(ledger.plannedFlows.find((f) => f.id === 'f'), `pas ${pas}`).toEqual(avant);
+    }
   });
 });
 
-describe('[niveau 4] #456 · 11. le livre de compte tient (I2)', () => {
+describe('[niveau 1] #456 · 11. le livre de compte tient (I2)', () => {
   const verifier = (ledger: Ledger) => {
     const idx = indexLedger(ledger);
     for (const a of idx.accountsById.values()) expect(componentsOnAccount(a, idx, '2026-09-30') + unallocated(a, ledger, idx, '2026-09-30'), a.id).toBe(accountBalance(a, ledger, '2026-09-30'));
@@ -588,7 +671,7 @@ describe('[niveau 4] #456 · 11. le livre de compte tient (I2)', () => {
   });
 });
 
-describe('[niveau 4] #456 · 12. sans attente', () => {
+describe('[niveau 3] #456 · 12. sans attente', () => {
   it('avec 5 000 opérations importées, le repérage et les occurrences d’un flux corrigé se calculent chacun en moins d’une seconde', () => {
     const l = budget();
     const commerces = Array.from({ length: 150 }, (_, i) => `CARTE X1234 COMMERCE${String.fromCharCode(65 + (i % 26))}${String.fromCharCode(65 + Math.floor(i / 26))} PARIS`);
