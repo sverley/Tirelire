@@ -5,7 +5,8 @@
  * un point du « Fait quand » sous son numéro ; chaque titre porte son niveau (D83).
  *
  * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur (`alertes.test.ts`,
- * déplacé ici en entier). Niveaux, par le besoin que couvre chaque phrase :
+ * déplacé ici en entier ; au second tour, `alertes-ordre.test.ts`, l'ordre des reprises proposées,
+ * déplacé au point 4). Niveaux, par le besoin que couvre chaque phrase :
  * - 0 · point 2 : calculer les alertes n'écrit rien, pas même une reprise automatique (I10) ; une
  *   reprise appliquée en cachette ne se défait pas en corrigeant le code (précédent : #184).
  * - 1 · point 17 : chaque usage tient seul (I3).
@@ -241,12 +242,18 @@ describe('#463 · 3. ce que porte une alerte', () => {
 // ── 4. Un seul calcul ────────────────────────────────────────────────────────────────────────
 
 describe('#463 · 4. un seul calcul', () => {
-  it('chaque genre est ce que rend le calcul du cœur qui le fait, dans son ordre [niveau 2]', () => {
+  it('chaque genre est ce que rend le calcul du cœur qui le fait [niveau 2]', () => {
     const l = foyer();
     const a = readAlerts(l, { today: LECTURE });
-    expect(deGenre(a, 'matchProposal').map((x) => sans(x, 'code', 'message', 'operationLabel', 'operationDate', 'operationAmount', 'flowName', 'resumedOperationLabel'))).toEqual(
-      proposeMatches(l, addDays('2026-09-01', -400), addDays('2026-09-30', 40)),
-    );
+    // Les reprises proposées ne gardent pas l'ordre de leur calcul (par note) : leur ordre est celui
+    // d'Opérations, tranché plus bas ; ici, le contenu seul.
+    const parOperation = (x: { operationId: string; flowId: string }, y: { operationId: string; flowId: string }) =>
+      x.operationId.localeCompare(y.operationId) || x.flowId.localeCompare(y.flowId);
+    expect(
+      deGenre(a, 'matchProposal')
+        .sort(parOperation)
+        .map((x) => sans(x, 'code', 'message', 'operationLabel', 'operationDate', 'operationAmount', 'flowName', 'resumedOperationLabel')),
+    ).toEqual(proposeMatches(l, addDays('2026-09-01', -400), addDays('2026-09-30', 40)).sort(parOperation));
     expect(deGenre(a, 'missingFlow').map((x) => sans(x, 'code', 'message'))).toEqual(missingFlows(l, addDays('2026-09-01', -60), LECTURE));
     expect(new Map(deGenre(a, 'transferToOrder').map((x) => [x.operationId, x.accountId]))).toEqual(transfersToOrder(l, LECTURE));
 
@@ -264,6 +271,39 @@ describe('#463 · 4. un seul calcul', () => {
       const lues = a.filter((x) => (x.code === 'unfunded' || x.code === 'reduced') && x.period.key === p.period.key);
       expect(lues.map((x) => 'uncovered' in x && [x.needId, x.requested, x.funded, x.uncovered]), p.period.label).toEqual(p.uncovered.map((n) => [n.needId, n.requested, n.funded, n.uncovered]));
     }
+  });
+
+  // Du codeur, second tour (`alertes-ordre.test.ts`, déplacé ici). Décor : quatre opérations importées
+  // non traitées, chacune avec sa reprise proposée, dont l'ordre par note n'est pas celui de la liste.
+  function foyerQuatreReprises(): Ledger {
+    const l = emptyLedger();
+    l.accounts.push({ id: 'acc-principal', name: 'Compte courant', kind: 'principal', openingBalance: euros(3000), openingDate: '2025-01-01' });
+    l.plannedFlows.push(
+      { id: 'flow-salaire', name: 'Salaire', kind: 'income', amount: euros(2000), accountId: 'acc-principal', periodicity: mensuel('2026-01-28'), dateWindowDays: 3, labelPattern: 'SALAIRE' },
+      { id: 'flow-loyer', name: 'Loyer', kind: 'fixedCharge', amount: euros(-800), accountId: 'acc-principal', periodicity: mensuel('2026-01-05'), dateWindowDays: 3, labelPattern: 'LOYER' },
+      { id: 'flow-gaz', name: 'Gaz', kind: 'fixedCharge', amount: euros(-50), accountId: 'acc-principal', periodicity: mensuel('2026-01-05'), dateWindowDays: 3, labelPattern: 'GAZ' },
+      { id: 'flow-eau', name: 'Eau', kind: 'fixedCharge', amount: euros(-50), accountId: 'acc-principal', periodicity: mensuel('2026-01-07'), dateWindowDays: 3 },
+    );
+    // L'ordre du grand livre : l'eau avant le gaz, du même jour et du même montant.
+    l.operations.push(
+      op('op-eau', '2026-09-07', 'PRLV EAU', euros(-50)),
+      op('op-gaz', '2026-09-07', 'PRLV GAZ', euros(-50)),
+      op('op-loyer', '2026-09-07', 'PRLV LOYER', euros(-800)),
+      op('op-salaire', '2026-08-28', 'VIR SALAIRE', euros(2000)),
+    );
+    return l;
+  }
+
+  it('les reprises proposées, dans l’ordre de la liste d’Opérations : date décroissante, puis montant absolu décroissant, puis l’ordre du grand livre [niveau 2]', () => {
+    const l = foyerQuatreReprises();
+    // Témoin : la sélection des flux les rend par note décroissante, dans un autre ordre.
+    expect(proposeMatches(l, '2025-07-28', '2026-11-09').map((m) => m.operationId)).toEqual(['op-salaire', 'op-gaz', 'op-loyer', 'op-eau']);
+    expect(deGenre(readAlerts(l, { today: LECTURE }, ['matchProposal']), 'matchProposal').map((a) => a.operationId)).toEqual([
+      'op-loyer', // le 7 septembre, 800 €
+      'op-eau', // le 7 septembre, 50 €, avant le gaz dans le grand livre
+      'op-gaz',
+      'op-salaire', // le 28 août
+    ]);
   });
 });
 
