@@ -205,13 +205,33 @@ export interface BankOrder {
   kept?: boolean;
 }
 
+/** Les codes des avertissements du plan : un genre chacun, qui ne change pas (#463, point 3). */
+export const PLAN_WARNING_CODES = [
+  'negativeMargin',
+  'belowCushion',
+  'unfunded',
+  'reduced',
+  'settlementBlocked',
+  'noIncome',
+  'principalOverdrawn',
+  'payoutShort',
+  'bankOrderDrift',
+  'bankOrderPartDrift',
+] as const;
+
 export interface PlanWarning {
-  code: 'negativeMargin' | 'belowCushion' | 'unfunded' | 'reduced' | 'settlementBlocked' | 'noIncome' | 'principalOverdrawn'
-    | 'payoutShort' | 'bankOrderDrift' | 'bankOrderPartDrift';
+  code: (typeof PLAN_WARNING_CODES)[number];
   message: string;
   tirelireId?: Id;
   needId?: Id;
   accountId?: Id;
+  /**
+   * Le montant que l'avertissement dit sans qu'une autre partie du plan le porte (#463, point 11) :
+   * pour `negativeMargin`, ce qui manque aux revenus, charges fixes déduites, pour couvrir les
+   * dotations demandées ; pour `settlementBlocked`, le règlement bloqué, signé comme `settlement`.
+   * Les autres avertissements se lisent sur les lignes, les totaux et les virements du plan.
+   */
+  amount?: Cents;
 }
 
 export interface Plan {
@@ -365,10 +385,12 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   const totalFunded = lines.reduce((s, l) => s + l.funded, 0);
   const margin = totalIncomes - totalFixed - totalFunded;
   const cushion = ledger.settings.principalCushion;
-  if (totalIncomes - totalFixed - totalRequested < 0)
+  const manqueAuxRevenus = totalRequested - (totalIncomes - totalFixed);
+  if (manqueAuxRevenus > 0)
     warnings.push({
       code: 'negativeMargin',
       message: 'Les revenus ne couvrent pas toutes les dotations ; des lignes sont signalées selon leur priorité.',
+      amount: manqueAuxRevenus,
     });
   else if (margin < cushion)
     warnings.push({ code: 'belowCushion', message: 'La marge est inférieure au coussin minimum du compte principal.' });
@@ -519,6 +541,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
             code: 'settlementBlocked',
             message: `Un règlement de ${owes} centimes avec « ${a.name} » est bloqué par le sens autorisé.`,
             accountId: a.id,
+            amount: owes,
           });
       }
     } else if (!upcoming && a.kind === 'epargne') {

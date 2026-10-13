@@ -21,12 +21,10 @@
     type BulkOccurrenceOutcome,
     type OfferedOccurrence,
     findCategoryByName,
-    proposeMatches,
     resumeEntry,
     resumptionOf,
     undoResumption,
     budgetPeriodContaining,
-    addDays,
     type SubOperation,
     type Category,
     applyAutomations,
@@ -51,7 +49,7 @@
     orderFromTransfer,
     recordOrderFromTransfer,
     resumeFirstOccurrence,
-    transfersToOrder,
+    readAlerts,
     type AllocationLine,
     type Patch,
     type PlannedFlow,
@@ -121,16 +119,15 @@
     for (const o of alive(app.ledger.operations)) if (o.resumedOperationId) m.set(o.resumedOperationId, o);
     return m;
   });
-  const proposals = $derived.by(() => {
-    const m = new Map<string, MatchProposal>();
-    for (const p of proposeMatches(app.ledger, addDays(period.start, -400), addDays(period.end, 40))) m.set(p.operationId, p);
-    return m;
-  });
   /*
-   * Les virements importés qui peuvent devenir un ordre permanent, chacun avec son compte d'accueil,
-   * le plan lu à la date de lecture (#435, point 1 ; #434, D52). Rien ne s'écrit avant le geste (I10).
+   * Les alertes de l'écran, lues au cœur à la date de lecture (#463) : les opérations non traitées,
+   * les reprises proposées, et les virements importés qui peuvent devenir un ordre permanent, chacun
+   * avec son compte d'accueil, le plan lu à la date de lecture (#435, point 1 ; #434, D52). Rien ne
+   * s'écrit avant le geste (I10).
    */
-  const ordresProposes = $derived(transfersToOrder(app.ledger, app.asOf));
+  const alertes = $derived(readAlerts(app.ledger, { today: app.asOf }, ['untreatedOperations', 'matchProposal', 'transferToOrder']));
+  const proposals = $derived(new Map(alertes.filter((a) => a.code === 'matchProposal').map((a) => [a.operationId, a])));
+  const ordresProposes = $derived(new Map(alertes.filter((a) => a.code === 'transferToOrder').map((a) => [a.operationId, a.accountId])));
   /** Les opérations dont la ligne porte le geste « Reprendre une occurrence » (#445, point 5) ; dans un projet sans flux, aucune (U5). */
   const avecGeste = $derived(operationsOfferedAFlow(app.ledger));
   /**
@@ -179,7 +176,7 @@
   const operations = $derived(matching.slice(0, shown));
   const selectionActive = $derived(Object.keys(selection).length > 0);
   const totalOps = $derived(alive(app.ledger.operations).length);
-  const untreatedCount = $derived(alive(app.ledger.operations).filter((o) => o.state === 'untreated').length);
+  const untreatedCount = $derived(alertes.find((a) => a.code === 'untreatedOperations')?.count ?? 0);
   // Changer de critère repart de la première tranche : sinon on hérite du « voir plus » d'avant.
   $effect(() => {
     void selection;
