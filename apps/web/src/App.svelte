@@ -6,12 +6,13 @@
   import { BETA, texteSauvegarde, texteSynchronisation } from './lib/sauvegarde';
   import { miseAJour } from './lib/miseAJour.svelte';
   import { installation } from './lib/installation.svelte';
+  import { readAlerts } from '@tirelire/core';
 
   /**
-   * Au-delà de cet écart entre la dernière opération connue et la date de lecture, l'application
-   * prévient : le plan et les soldes reposent alors sur un historique qui s'arrête loin derrière.
+   * L'historique en retard (#463, point 5) : le cœur dit quand la dernière opération connue est trop
+   * loin derrière la date de lecture, sa date et le nombre de jours ; l'accueil l'affiche.
    */
-  const JOURS_AVANT_ALERTE = 15;
+  const enRetard = $derived(readAlerts(app.ledger, { today: app.asOf }, ['staleHistory'])[0]);
   import Plan from './views/Plan.svelte';
   import Accounts from './views/Accounts.svelte';
   import Tirelires from './views/Tirelires.svelte';
@@ -120,13 +121,13 @@
         </div>
       </div>
     {/if}
-    {#if app.staleDays > JOURS_AVANT_ALERTE && app.lastOperationDate}
+    {#if enRetard}
       <div class="card warn">
         <div class="row">
           <div class="label">
-            <strong>Dernière opération connue le {shortDate(app.lastOperationDate)}</strong>
+            <strong>Dernière opération connue le {shortDate(enRetard.lastOperationDate)}</strong>
             <span class="sub">
-              Il y a {app.staleDays} jours. Les soldes et le plan au {shortDate(app.asOf)} supposent
+              Il y a {enRetard.days} jours. Les soldes et le plan au {shortDate(app.asOf)} supposent
               qu'il ne s'est rien passé depuis : mettez vos opérations à jour, en important un relevé
               ou en les saisissant, ou lisez à cette date.
             </span>
@@ -136,7 +137,7 @@
         <div class="actions" style="margin:6px 0 0">
           <button class="btn small primary" onclick={() => app.switchTab('import')}>Importer un relevé</button>
           <button class="btn small primary" onclick={() => app.go('entries')}>Saisir une opération</button>
-          <button class="btn small" onclick={() => (app.asOf = app.lastOperationDate!)}>Lire au {shortDate(app.lastOperationDate)}</button>
+          <button class="btn small" onclick={() => (app.asOf = enRetard.lastOperationDate)}>Lire au {shortDate(enRetard.lastOperationDate)}</button>
         </div>
       </div>
     {/if}

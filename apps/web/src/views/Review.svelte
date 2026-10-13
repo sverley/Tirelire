@@ -2,7 +2,7 @@
   import { app } from '../lib/state.svelte';
   import { money, moneyClass, shortDate } from '../lib/format';
   import Manque from '../lib/Manque.svelte';
-  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, budgetPeriodContaining, minDate, needActive, needCruise, nextPeriod, automationsByRank, automationLabel, readBudgetAhead, type CategoryReview, type Automation, type Need, type BudgetNeedReading } from '@tirelire/core';
+  import { alive, monthsOf, lastPeriods, reviewCategories, reviewProvisions, reviewReplenishments, addMonths, budgetPeriodContaining, minDate, needActive, needCruise, nextPeriod, automationsByRank, automationLabel, readBudgetAhead, readAlerts, type CategoryReview, type Automation, type Need, type PlanWarningAlert } from '@tirelire/core';
 
   let horizon = $state(6);
   let showIncome = $state(false);
@@ -23,13 +23,21 @@
    * D52). Sans moyenne : les montants du budget, période par période. Absente sans besoin (U5).
    */
   const budget = $derived(readBudgetAhead(app.ledger, app.asOf, horizon));
+  /*
+   * Ses alertes, lues au cœur sur le même horizon (#463) : dans chaque période, les besoins que les
+   * revenus ne couvrent pas entièrement, avec ce qui n'en est pas couvert, comme le Plan les signale ;
+   * les échéances en manque, ou déjà répondues, dont la date tombe dans l'horizon.
+   */
+  const alertes = $derived(budget ? readAlerts(app.ledger, { today: app.asOf, count: horizon }, ['unfunded', 'reduced', 'dueDateShortfall']) : []);
+  const nonCouverts = (cle: string) => alertes.filter((a) => a.code !== 'dueDateShortfall').filter((a) => a.period.key === cle);
+  const echeances = $derived(alertes.filter((a) => a.code === 'dueDateShortfall').filter((a) => a.inReading));
   let periodesDepliees = $state<string[]>([]);
   function basculerPeriode(cle: string) {
     periodesDepliees = periodesDepliees.includes(cle) ? periodesDepliees.filter((x) => x !== cle) : [...periodesDepliees, cle];
   }
   /** Ce que le Plan dit d'un besoin que les revenus ne couvrent pas entièrement. */
-  const nonCouvert = (n: BudgetNeedReading) =>
-    n.status === 'unfunded' ? `« ${n.name} » n’est pas couverte par les revenus` : `« ${n.name} » n’est couverte qu’en partie par les revenus`;
+  const nonCouvert = (n: Extract<PlanWarningAlert, { code: 'unfunded' | 'reduced' }>) =>
+    n.code === 'unfunded' ? `« ${n.needName} » n’est pas couverte par les revenus` : `« ${n.needName} » n’est couverte qu’en partie par les revenus`;
 
   const keyOf = (r: CategoryReview) => `${r.categoryId ?? ''}|${r.tirelireId ?? ''}`;
 
@@ -108,7 +116,8 @@
     <p class="muted small">La période en cours et les suivantes : ce que le budget demande, ce que les revenus prévus en couvrent et la marge, comme le Plan le dit pour chacune. Des montants du budget, pas des moyennes.</p>
     {#each budget.periods as p, i (p.period.key)}
       {@const cle = p.period.key}
-      <div class="card" class:warn={p.uncovered.length > 0} data-periode={cle}>
+      {@const signales = nonCouverts(cle)}
+      <div class="card" class:warn={signales.length > 0} data-periode={cle}>
         <div class="row">
           <div class="label">
             <strong>Du {shortDate(p.period.start)} au {shortDate(p.period.end)}</strong>{#if i === 0}<span class="sub"> · période en cours</span>{/if}
@@ -123,7 +132,7 @@
             <div style="display:flex;justify-content:space-between;gap:8px"><span class="muted">{k}</span><span class="num">{money(v as number)}</span></div>
           {/each}
         </div>
-        {#each p.uncovered as n (n.needId)}
+        {#each signales as n (n.needId)}
           <div class="row">
             <div class="label neg">{nonCouvert(n)}</div>
             <div class="num neg">{money(n.uncovered)}<span class="sub"> non couverts</span></div>
@@ -150,11 +159,11 @@
       </div>
     {/each}
 
-    {#if budget.shortfalls.length}
+    {#if echeances.length}
       <h2>Échéances en manque</h2>
       <p class="muted small">Ce que les virements permanents ne réuniront pas à temps, sur ces périodes. Vous y répondez dans le Plan : lisser ou refuser.</p>
       <div class="card warn">
-        {#each budget.shortfalls as m (m.needId + m.dueDate)}
+        {#each echeances as m (m.needId + m.dueDate)}
           <Manque manque={m} repondre={false} />
         {/each}
         <div class="actions" style="margin:6px 0 0">
