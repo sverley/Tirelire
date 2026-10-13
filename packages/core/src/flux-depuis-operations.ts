@@ -77,6 +77,15 @@ function rhythmDates(anchor: ISODate, p: { interval: number; unit: Periodicity['
   return out;
 }
 
+/**
+ * Les dates d'un rythme qui passe par `anchor`, de `marge` pas avant la première des `dates` (dans
+ * l'ordre) à `marge` pas après la dernière : `n + 1` de chaque côté suffisent à servir `n` opérations.
+ */
+function rhythmAround(anchor: ISODate, p: { interval: number; unit: Periodicity['unit'] }, dates: ISODate[], marge: number): { date: ISODate }[] {
+  if (!dates.length) return [];
+  return rhythmDates(anchor, p, rhythmDate(dates[0]!, p, -marge), rhythmDate(dates[dates.length - 1]!, p, marge)).map((date) => ({ date }));
+}
+
 // ---------------------------------------------------------------------------
 // L'opération dont on fait un flux (point 1)
 // ---------------------------------------------------------------------------
@@ -512,10 +521,7 @@ export function historyOccurrences(ledger: Ledger, flow: ProposedFlow, designate
     // Les dates prises sont entre les bornes : au-delà, n + 1 dates libres de chaque côté suffisent à n opérations.
     const pris = new Set([...taken.values()].map((t) => t.date));
     const dates = [...restantes.map((o) => o.date), ...pris].sort();
-    const marge = restantes.length + 1;
-    const libres = rhythmDates(p.anchorDate, p, rhythmDate(dates[0]!, p, -marge), rhythmDate(dates[dates.length - 1]!, p, marge))
-      .filter((d) => !pris.has(d))
-      .map((date) => ({ date }));
+    const libres = rhythmAround(p.anchorDate, p, dates, restantes.length + 1).filter((s) => !pris.has(s.date));
     for (const [opId, { slot, days }] of serveNearest(restantes, libres)) taken.set(opId, { date: slot.date, days });
   }
   const proposees = new Map(reconnues.filter((o) => taken.has(o.id)).map((o) => [o.id, o]));
@@ -535,13 +541,19 @@ export function historyOccurrences(ledger: Ledger, flow: ProposedFlow, designate
  * ne peut pas reprendre une occurrence du flux (bancaire, vivante, sans reprise, de son compte et de son
  * sens).
  *
- * Le flux s'ancre sur la date de la plus ancienne opération désignée ; sans reprise désignée, sur
- * l'ancrage proposé, la plus ancienne des opérations qui le fondent (D60). Chaque opération désignée
- * reprend l'occurrence du flux qui lui est la plus proche, une occurrence n'étant reprise qu'une fois
- * (`serveNearest`), désignée par son flux et sa date (D88), comme une occurrence confirmée
+ * Le flux s'ancre sur la plus ancienne occurrence que l'utilisateur valide (D60) : la date de son
+ * rythme proposé — celui du point 6, qui passe par l'ancrage proposé, la plus ancienne des opérations
+ * qui le fondent — que reprend la plus ancienne opération désignée, et non la date de cette opération,
+ * car une occurrence se désigne par son flux et sa date (D88) ; sans reprise désignée, sur l'ancrage
+ * proposé. À partir de son ancrage, le flux enregistré a donc les dates du rythme proposé, sauf quand
+ * cet ancrage est un jour qu'un mois plus court a ramené (le 30 novembre d'un rythme du 31) : ce jour
+ * devient celui des dates suivantes, comme pour tout ancrage (D47). Chaque opération désignée reprend
+ * l'occurrence du flux enregistré qui lui est la plus proche, une occurrence n'étant reprise qu'une
+ * fois (`serveNearest`), désignée par son flux et sa date (D88), comme une occurrence confirmée
  * (`applyMatch`) : rapprochée, ou verrouillée si elle l'était (D22) ; la ventilation du flux si elle
- * n'en porte pas, la sienne sinon. Un virement seul, enregistré avec lui-même pour seule reprise,
- * donne ce que #434 enregistre (`recordOrderFromTransfer`). Rien ne s'écrit ici (I10).
+ * n'en porte pas, la sienne sinon. Un virement seul, enregistré avec lui-même pour seule reprise, est
+ * sa propre plus ancienne occurrence, et donne ce que #434 enregistre (`recordOrderFromTransfer`).
+ * Rien ne s'écrit ici (I10).
  */
 export function recordFlowFromOperations(ledger: Ledger, flow: ProposedFlow, resumptionIds: Id[]): { flow: PlannedFlow; patch: Patch } | undefined {
   if (!rhythmKnown(flow) || flow.amount === 0 || ledger.plannedFlows.some((f) => f.id === flow.id)) return undefined;
@@ -550,10 +562,15 @@ export function recordFlowFromOperations(ledger: Ledger, flow: ProposedFlow, res
   if (ops.length !== ids.size) return undefined;
   if (ops.some((o) => o.origin !== 'imported' || resumesSomething(o) || o.accountId !== flow.accountId || Math.sign(o.amount) !== Math.sign(flow.amount))) return undefined;
   ops.sort(byDate);
-  const anchorDate = ops[0]?.date ?? flow.periodicity.anchorDate;
-  const nouveau: PlannedFlow = { ...flow, periodicity: { ...flow.periodicity, anchorDate } };
+  const propose = flow.periodicity;
   const patch = emptyPatch();
-  if (!ops.length) return { flow: nouveau, patch };
+  if (!ops.length) return { flow: { ...flow, periodicity: { ...propose } }, patch };
+  // Les occurrences du rythme proposé que reprennent les opérations désignées, chacune la plus proche :
+  // l'ancrage est la plus ancienne, la plus ancienne occurrence que l'utilisateur valide (D60).
+  const validees = serveNearest(ops, rhythmAround(propose.anchorDate, propose, ops.map((o) => o.date), ops.length + 1));
+  if (validees.size !== ops.length) return undefined;
+  const anchorDate = [...validees.values()].map((v) => v.slot.date).sort()[0]!;
+  const nouveau: PlannedFlow = { ...flow, periodicity: { ...propose, anchorDate } };
   const dates = occurrencesBetween(nouveau.periodicity, anchorDate, rhythmDate(ops[ops.length - 1]!.date, nouveau.periodicity, ops.length + 1)).map((date) => ({ date }));
   const sous = new Map<Id, Ledger['subOperations']>();
   for (const s of ledger.subOperations) if (ids.has(s.operationId)) sous.set(s.operationId, [...(sous.get(s.operationId) ?? []), s]);

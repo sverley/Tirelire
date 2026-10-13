@@ -1578,6 +1578,15 @@ tous égaux au centime font un flux fixe ; différents, un flux variable, à leu
 petite tolérance par pas de 10 % qui les reconnaît tous (D12) — un loyer revalorisé passe ainsi en
 flux variable, à confirmer à chaque ligne, ce qui est prudent et se corrige. Un virement du principal
 vers un compte d'accueil est un ordre permanent (D57), décrit comme celui que le plan propose ; il est
-mensuel quand aucune série n'en constate un autre (D60), et se fait sans budget : sa ventilation est
-celle que le plan propose quand le budget demande un ordre vers ce compte, celle de l'opération sinon
-(D21). Son ancrage est dans D60 : la plus ancienne occurrence que l'utilisateur valide.
+mensuel quand aucune série n'en constate un autre, comme l'ordre que #434 fait d'un virement, et se
+fait sans budget : sa ventilation est celle que le plan propose quand le budget demande un ordre vers
+ce compte, celle de l'opération sinon (D21).
+
+**L'ancrage** est dans D60 : la plus ancienne occurrence que l'utilisateur valide. C'est la date de
+cette occurrence, qui se désigne par son flux et sa date (D88) — la date du rythme proposé que
+reprend la plus ancienne opération validée —, et non la date de cette opération ; sans reprise
+validée, c'est la plus ancienne des opérations qui fondent le flux. Ancré sur la date de l'opération,
+le flux décalerait son rythme de quelques jours et ne reconnaîtrait plus toute sa série. Seul bord :
+un ancrage qu'un mois plus court a ramené (le 30 novembre d'un rythme du 31) fixe le jour des dates
+suivantes, comme tout ancrage (D47) ; le format ne sait pas dire « le 31 » autrement, et ne change
+pas.
