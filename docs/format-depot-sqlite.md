@@ -178,10 +178,10 @@ permanent (D57, D60). Une contrainte de la table, `planned_flows.action` : l'ét
 | `date_window_days` | INTEGER | oui | non | saisie | entier | — | Fenêtre de ses occurrences, en jours autour de la date attendue (D12). |
 | `amount_tolerance` | TEXT | non | oui | saisie | JSON, forme « tolérance » | — | Tolérance sur le montant de l'opération qui réalise une occurrence. |
 | `label_pattern` | TEXT | non | oui | saisie | texte | — | Motif de libellé, une expression régulière insensible à la casse ; sans lui, aucun libellé n'est reconnu. |
-| `variable` | INTEGER | non | oui | saisie | `0`, `1` | — | Montant variable : tolérance large, jamais repris sans confirmation (D12). |
+| `variable` | INTEGER | non | oui | saisie | `0`, `1` | — | Montant variable : tolérance large, son occurrence n'est jamais rapprochée sans confirmation (D12). |
 | `active_from` | TEXT | non | oui | saisie | date `AAAA-MM-JJ` | — | Premier jour de validité du flux. |
 | `active_to` | TEXT | non | oui | saisie | date `AAAA-MM-JJ` | — | Dernier jour de validité du flux. |
-| `action` | TEXT | non | oui | saisie | JSON, forme « action » | — | Ce que le flux fait de l'opération qui reprend une occurrence (D24) : sa catégorie, sa tirelire — celle qu'une échéance vide —, sa ventilation, son état. |
+| `action` | TEXT | non | oui | saisie | JSON, forme « action » | — | Ce que le flux fait de l'opération qui rapproche une occurrence (D24) : sa catégorie, sa tirelire — celle qu'une échéance vide —, sa ventilation, son état. |
 | `kept` | TEXT | non | oui | saisie | JSON, forme « garde » | — | Sur un ordre permanent gardé tel quel (#205, D20) : ce que le budget demandait au geste. Absent : l'écart de l'ordre est à faire. |
 | `deleted_at` | TEXT | non | oui | établie | horodatage `AAAA-MM-JJTHH:MM:SS.mmmZ` | — | Suppression logique. |
 | `hlc` | TEXT | non | oui | établie | horloge | — | L'horloge de la ligne. |
@@ -192,8 +192,8 @@ Les opérations : un montant, une date, un compte. Une ligne de relevé importé
 main, passée ou future. Les opérations prévues, produites par les flux, ne sont jamais enregistrées
 (glossaire). Les colonnes d'une opération sont importées, saisies ou établies (D58) ; le libellé
 normalisé ne se stocke pas, il se recalcule à la lecture. Une contrainte de la table,
-`operations.reprise` : `planned_flow_id` et `planned_date` vont ensemble, et une opération en reprend
-au plus une autre (D88). Les colonnes d'une opération saisie à la main sont toutes saisies.
+`operations.reprise` : `planned_flow_id` et `planned_date` vont ensemble, et une opération en
+rapproche au plus une autre (D88). Les colonnes d'une opération saisie à la main sont toutes saisies.
 
 | Colonne | Type | Obligatoire | Peut manquer | Origine | Valeurs admises | Désigne | Sens |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -204,12 +204,12 @@ au plus une autre (D88). Les colonnes d'une opération saisie à la main sont to
 | `label` | TEXT | oui | non | importée ou saisie | texte | — | Libellé de l'opération, tel que la source le donne. |
 | `details` | TEXT | non | oui | importée ou saisie | texte | — | Libellé complet fourni par la banque, quand il diffère du libellé. |
 | `amount` | INTEGER | oui | non | importée ou saisie | entier | — | Montant signé, en centimes : négatif = débit du compte. |
-| `state` | TEXT | oui | non | établie | `untreated`, `reconciled`, `locked` | — | État de traitement (D22) : `untreated`, qu'aucun automatisme n'a vue ; `reconciled`, classée par un automatisme, reprise à chaque passage ; `locked`, de la vérité, qu'aucun automatisme ne réécrit. |
+| `state` | TEXT | oui | non | établie | `untreated`, `reconciled`, `locked` | — | État de traitement (D22) : `untreated`, qu'aucun automatisme n'a vue ; `reconciled`, classée par un automatisme, reclassée à chaque passage ; `locked`, de la vérité, qu'aucun automatisme ne réécrit. |
 | `one_off` | INTEGER | non | oui | saisie | `0`, `1` | — | Dépense exceptionnelle : comptée dans les soldes, exclue des moyennes du bilan. |
 | `suggested_category` | TEXT | non | oui | importée ou saisie | texte | — | La catégorie que propose la source (banque, Linxo), à confirmer. |
-| `planned_flow_id` | TEXT | non | oui | établie | texte | `planned_flows` | L'opération prévue reprise (D88), désignée par son flux… |
+| `planned_flow_id` | TEXT | non | oui | établie | texte | `planned_flows` | L'opération prévue rapprochée (D88), désignée par son flux… |
 | `planned_date` | TEXT | non | oui | établie | date `AAAA-MM-JJ` | — | … et par sa date. |
-| `resumed_operation_id` | TEXT | non | oui | établie | texte | `operations` | La saisie reprise (D88) : l'opération qui annonçait le même mouvement. |
+| `resumed_operation_id` | TEXT | non | oui | établie | texte | `operations` | La saisie rapprochée (D88) : l'opération qui annonçait le même mouvement. |
 | `transfer_account_id` | TEXT | non | oui | établie | texte | `accounts` | Virement interne : le compte de contrepartie. |
 | `transfer_operation_id` | TEXT | non | oui | établie | texte | `operations` | Virement interne : l'opération de contrepartie. |
 | `deleted_at` | TEXT | non | oui | établie | horodatage `AAAA-MM-JJTHH:MM:SS.mmmZ` | — | Suppression logique. |

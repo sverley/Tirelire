@@ -30,14 +30,14 @@ compte alors deux salaires certains mois, et zéro le mois suivant.
 `settings.budgetYearStart = { month, day }`. Sert aux budgets annuels et aux bilans. Les provisions
 gardent leur propre ancrage (`periodicity.anchorDate`), indépendant.
 
-### D04 · Relevé du compte principal seul, comptes tiers saisis à la main
+### D04 · Relevé du compte principal seul au départ, solde à régler des comptes tiers
 
-Seul le compte principal est importé au départ (les autres comptes peuvent l'être plus tard sans changer le
-modèle : un compte passe de `third` à `holding`/`principal`). Un **compte tiers** est un compte réel
-non importé ; ses opérations utiles au plan sont saisies à la main et créent un **solde à régler**
-avec le compte principal, un solde lu sur le réel, que le suivi présente comme virement ponctuel
-proposé (`settlementBalance`, D96). Réglages par
-compte tiers : seuil de règlement, sens autorisé.
+Seul le compte principal est importé au départ (les autres comptes peuvent l'être plus tard sans
+changer le modèle, ni le genre du compte, D45). Un **compte tiers** est un compte réel qui suit un
+**solde à régler** avec le compte principal (`tracksSettlement`, D45), qu'il soit importé ou saisi à
+la main ; ses opérations utiles au plan créent ce solde, lu sur le réel, que le suivi présente comme
+virement ponctuel proposé (`settlementBalance`, D96). Réglages par compte tiers : seuil de
+règlement, sens autorisé.
 
 Ce que l'hypothèse du relevé unique cachait : un budget placé sur un autre compte, avec sa propre
 carte, dépense hors du relevé du principal ; et sans le relevé d'un livret, rien ne dit que le virement
@@ -101,11 +101,12 @@ déduplication, chaque import double les dépenses.
 
 ### D10 · Ventilation : lignes catégorie + tirelire
 
-Une opération est ventilée en une ou plusieurs lignes (`Allocation`), chacune portant **une
-catégorie et une tirelire** ; l'opération simple a une seule ligne. `allocation.amount` est
-une part du montant de l'opération, dans son signe. Effet sur la tirelire : le montant pour une
-dépense ou un revenu ; pour un virement interne, +montant côté compte hôte de la tirelire,
-−montant côté compte de départ (`allocationEffect`).
+Une opération est ventilée en une ou plusieurs lignes (des sous-opérations, `SubOperation`, D88),
+chacune portant **une catégorie et une tirelire** ; l'opération simple a une seule ligne. Le
+montant d'une ligne (`CountedLine.amount`) est une part du montant de l'opération, dans son signe.
+Effet sur la tirelire : le montant pour une dépense ou un revenu ; pour un virement interne, le
+montant sur le compte de l'opération et son opposé sur le compte de contrepartie (`lineEffects`,
+D19).
 
 Ce que l'hypothèse d'une catégorie par opération cachait : un passage en grande surface mêle
 alimentation, vêtements et cadeau ; un virement à un livret alimente trois provisions à la fois.
@@ -120,11 +121,11 @@ son libellé est celui enregistré avec lui (D60), que le plan affiche et que l'
 renommer le compte ne change ni l'un ni l'autre (domaine plan et flux, hypothèse 3). À l'import, une
 opération ~~dont le libellé contient ce libellé~~ — amendé le 8 octobre 2026 : que le libellé d'un
 ordre enregistré vers ce compte reconnaît, comme la sélection de l'ordre le ferait (D12, D24) —
-seulement un débit du compte principal, d'où part l'ordre (D57) —, ou,
-vers un compte sans ordre enregistré, dont le libellé contient celui tiré de son nom — est reconnue
-comme un virement vers ce compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ —
-amendé le 7 octobre 2026 : ventilée par les parts de l'ordre qui la reprend (D12, D60), et non
-affectée sur ce compte sinon (D21).
+seulement un débit du compte principal, d'où part l'ordre (D57) —, ou, vers un compte sans ordre
+enregistré, dont le libellé contient celui tiré de son nom — est reconnue comme un virement vers ce
+compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ — amendé le 7 octobre
+2026 : ventilée par les parts de l'ordre dont elle rapproche une occurrence (D12, D60), et non affectée sur ce compte
+sinon (D21).
 
 ### D12 · Pointage prudent
 
@@ -191,28 +192,29 @@ Les écarts vers un même compte d'accueil donnent un **virement permanent uniqu
 flux de virement avec la ventilation que l'utilisateur a validée (D60) ; le diviser en plusieurs
 ordres est une souplesse sur demande (#25), et plusieurs flux de virement vers le même compte
 s'additionnent. À l'import, la ligne bancaire est reconnue par montant et libellé (D11, D12), et
-l'opération qui reprend l'occurrence prend les parts du flux, comme pour tout automatisme (D24,
-D88). Ce que les parts n'absorbent pas — montant constaté différent, parts fixes qui n'ont pas
-suivi le budget — reste **non affecté** sur le compte d'accueil (D29), visible, et le suivi le dit (D96) ;
+l'opération qui rapproche l'occurrence prend les parts du flux, comme pour tout automatisme (D24,
+D88). Ce que les parts n'absorbent pas — montant constaté différent, parts fixes qui n'ont pas suivi
+le budget — reste **non affecté** sur le compte d'accueil (D29), visible, et le suivi le dit (D96) ;
 rien ne se répartit d'office. L'ordre de financement de D06 n'est pas une répartition rejouée sur
 l'opération : il est le contenu de ce que le plan **propose** — la ventilation d'un ordre à sa
-validation (U2), celle d'un virement importé qu'aucun flux ne reprend et dont on fait un flux (U3,
-#16) —, que l'utilisateur garde, corrige ou refuse (principe 4.4). Une ventilation calculée depuis
+validation (U2), celle d'un virement importé qui ne rapproche aucune occurrence d'un flux et dont on
+fait un flux (U3, #16) —, que l'utilisateur garde, corrige ou refuse (principe 4.4). Une ventilation calculée depuis
 l'état du plan au jour de l'opération serait une ventilation supposée, ce que U4 interdit ; D27 la
 range parmi les aides, dont le résultat se fige sur l'opération quand il est accepté.
 
 ### D22 · Trois états d'une opération, la vérité est ce qui est verrouillé
 
-*Non traitée* (aucune règle ne l'a vue), *rapprochée* (classée par une règle, reprise à chaque
-passage, malléable), *verrouillée* (plus aucune règle ne l'atteint). Est vérité — donc stocké et
+*Non traitée* (aucune règle ne l'a vue), *classée* (par une règle, reclassée à chaque passage,
+malléable), *verrouillée* (plus aucune règle ne l'atteint). Est vérité — donc stocké et
 synchronisé — ce qui est verrouillé. Toute modification manuelle d'une opération la verrouille :
 c'est la modification qui change l'état, pas l'ouverture de l'éditeur. Seul l'utilisateur
 déverrouille, à l'unité ou par action groupée (D26). Renomme le pointage de D12 en **rapprochement
-de flux**, qui reste la mise en correspondance avec une échéance attendue — une reprise, au sens de
-D88, de l'opération prévue que désignent le flux et sa date — et ne change aucun état à lui seul ;
-les deux sens du mot ne doivent plus cohabiter dans le code ni dans l'interface. Ce qu'un flux
-reprend devient *rapproché* parce que le flux, un automatisme, le classe, et *verrouillé* si le flux
-le demande (D24).
+de flux**, qui reste la mise en correspondance avec une échéance attendue — un rapprochement, au
+sens de D88, de l'opération prévue que désignent le flux et sa date — et ne change aucun état à lui
+seul ; les deux sens du mot ne doivent plus cohabiter dans le code ni dans l'interface : un mot par
+sens, *rapprocher* pour le lien entre deux opérations, *classer* pour l'état. L'opération qui
+rapproche une occurrence d'un flux devient *classée* parce que le flux, un automatisme, la classe, et
+*verrouillée* si le flux le demande (D24).
 
 Ce que l'hypothèse de la donnée propre cachait : une opération importée, une opération saisie et une
 opération corrigée n'ont pas la même autorité ; sans état, la synchronisation écrase la correction
@@ -220,33 +222,36 @@ par l'import.
 
 ### D23 · Règles : sélection, action, rang
 
-Une règle a une **sélection** (libellé, montant, compte, date, période de validité) et une **action**
-dont chaque champ est facultatif : catégorie, tirelire, ventilation, état. L'état prend quatre
-valeurs — *Verrouiller*, *Rapprocher*, *Ne rien faire*, *Déverrouiller* — la dernière indisponible
-dans une règle. Défauts : *Rapprocher* pour une règle déterministe, *Ne rien faire* pour une règle
-contextuelle ou bayésienne ; un flux (D24) *Rapproche* ce qu'il reprend, et le *Verrouille* s'il le
-demande, portant alors toute sa classification. Le **rang** est l'index dans la liste ; les règles
-s'appliquent du rang le plus élevé au rang 1, chaque champ renseigné écrasant la valeur posée par
-une règle moins prioritaire, les champs vides laissant en place. Pas de détection de conflit : le
-rang tranche. Aperçu obligatoire avant validation, montrant l'avant et l'après sur les opérations concernées. Les règles ne sont pas
-de la vérité, ce sont des automatismes ; elles s'exportent avec leurs périodes de validité, ce qui
-les rend rejouables dans l'ordre chronologique sur un historique importé. Conséquence à traiter dans
-l'interface : avec *Ne rien faire*, une opération peut porter une classification tout en restant non
-traitée — « rien dessus » et « quelque chose que personne n'a regardé » doivent se distinguer.
+Une règle a une **sélection** (libellé, montant, compte, date, période de validité) et une
+**action** dont chaque champ est facultatif : catégorie, tirelire, ventilation, état. L'état prend
+quatre valeurs — *Verrouiller*, *Classer*, *Ne rien faire*, *Déverrouiller* — la dernière
+indisponible dans une règle. Défauts : *Classer* pour une règle déterministe, *Ne rien faire* pour
+une règle contextuelle ou bayésienne ; un flux (D24) *Classe* l'opération qui rapproche une de ses
+occurrences, et la *Verrouille* s'il le demande, portant alors toute sa classification. Une règle
+classe, elle ne rapproche pas : seul un flux rapproche (D24). Le **rang** est l'index dans la liste
+; les règles s'appliquent du rang le plus élevé au rang 1, chaque champ renseigné écrasant la valeur
+posée par une règle moins prioritaire, les champs vides laissant en place. Pas de détection de
+conflit : le rang tranche. Aperçu obligatoire avant validation, montrant l'avant et l'après sur les
+opérations concernées. Les règles ne sont pas de la vérité, ce sont des automatismes ; elles
+s'exportent avec leurs périodes de validité, ce qui les rend rejouables dans l'ordre chronologique
+sur un historique importé. Conséquence à traiter dans l'interface : avec *Ne rien faire*, une
+opération peut porter une classification tout en restant non traitée — « rien dessus » et « quelque
+chose que personne n'a regardé » doivent se distinguer.
 
 ### D24 · Un flux est un automatisme
 
 Un flux prévu est un automatisme doté d'une récurrence (D88) : sa sélection, la seule — son compte,
 son motif de libellé, sa tolérance de montant et la fenêtre de ses occurrences (D12) —, reconnaît
-l'opération qui réalise chaque occurrence, qui la reprend ; ses actions, facultatives, la classent :
-sa ventilation, que l'opération prend si elle n'en a pas, et le verrouillage, s'il le demande. Aucun
-automatisme n'est engendré à part d'un flux : une opération que sa sélection ne reconnaît pas n'est
-ni reprise ni classée par lui. Modifier le flux ne réécrit aucune opération déjà reprise : elle a
-pris, en le reprenant, ce que le flux lui donnait, et le moteur d'automatismes repart de ce que la
-reprise a établi (D33). L'action d'un flux a la forme de celle d'un automatisme (D23) : une
-ventilation en parts, chacune une sous-opération sans identifiant — tirelire, catégorie, et les axes
-qui viendront (D88) —, et l'état ; une seule forme et un seul code pour les automatismes et les flux,
-l'ordre permanent compris (D60). Un flux créé depuis une opération (#16) en prend la ventilation.
+l'opération qui réalise chaque occurrence, qui la rapproche ; ses actions, facultatives, la classent
+: sa ventilation, que l'opération prend si elle n'en a pas, et le verrouillage, s'il le demande.
+Aucun automatisme n'est engendré à part d'un flux : une opération que sa sélection ne reconnaît pas
+ne rapproche aucune de ses occurrences et n'est pas classée par lui. Modifier le flux ne réécrit
+aucune opération qui a déjà rapproché une occurrence : elle a pris, en la rapprochant, ce que le
+flux lui donnait, et le moteur d'automatismes repart de ce que le rapprochement a établi (D33).
+L'action d'un flux a la forme de celle d'un automatisme (D23) : une ventilation en parts, chacune
+une sous-opération sans identifiant — tirelire, catégorie, et les axes qui viendront (D88) —, et
+l'état ; une seule forme et un seul code pour les automatismes et les flux, l'ordre permanent
+compris (D60). Un flux créé depuis une opération (#16) en prend la ventilation.
 
 ### D25 · Abandon de l'année budgétaire
 
@@ -272,7 +277,8 @@ la part **variable** — calculée, égale au montant de l'opération moins les 
 opération a par défaut une ligne unique variable, qui prend donc l'intégralité du montant ; ajouter
 des lignes la réduit d'autant, jusqu'à zéro, jamais en négatif. Une seule ligne variable par
 ventilation. La ventilation ne dépend que de l'opération : le rejeu reste déterministe même à montant
-inconnu d'avance, donc un flux à montant variable peut classer et verrouiller ce qu'il reprend (D24).
+inconnu d'avance, donc un flux à montant variable peut classer et verrouiller l'opération qui
+rapproche son occurrence (D24).
 Une ventilation qui dépendrait du contexte — solde d'une tirelire, état du plan — sort de ce cadre :
 elle est une aide, et son résultat doit être figé sur l'opération au moment où il est produit.
 Remplace la ventilation de D10, dont « une catégorie et une tirelire par ligne » reste valable.
@@ -354,13 +360,14 @@ que retirer une règle défasse ce qu'elle avait posé. Mais le rapprochement de
 l'appariement des virements internes ne sont pas des règles, et un moteur qui repart vraiment de
 rien les efface aussitôt posés — le pipeline se défait lui-même.
 
-Le calcul part donc de ce que l'import a établi : une opération qui en reprend une autre (D88) ou
-appariée en virement interne est *rapprochée*, avec la ventilation que cette étape lui a donnée ;
+Le calcul part donc de ce que l'import a établi : une opération qui en rapproche une autre (D88) ou
+appariée en virement interne est *classée*, avec la ventilation que cette étape lui a donnée ;
 les autres partent vierges et non traitées. Les règles écrivent par-dessus, champ par champ, selon
 D23. Retirer une règle rend l'opération à cet état d'import, pas à rien.
 
-Conséquence : un flux n'a pas de règle à lui à côté de sa reprise (D24) ; ce qu'il reprend garde la
-ventilation qu'il lui a donnée, et un flux qui verrouille le met hors d'atteinte des règles (D22).
+Conséquence : un flux n'a pas de règle à lui à côté de son rapprochement (D24) ; l'opération qui
+rapproche son occurrence garde la ventilation qu'il lui a donnée, et un flux qui verrouille le met
+hors d'atteinte des règles (D22).
 
 ### D35 · Version « serveur web » = PWA statique + relais PHP sur hébergement mutualisé
 
@@ -382,10 +389,10 @@ la sélection d'une règle, et proposait de *deviner* un filtre à partir des li
 chemin le plus long vers une règle, et il part d'une approximation alors que l'utilisateur vient
 d'exprimer exactement ce qu'il voulait.
 
-Le filtre de recherche porte donc les champs de `RuleSelection` — motif de libellé, compte, montant
-minimum et maximum, dates — et rien d'autre. Les critères propres à la consultation (état,
+Le filtre de recherche porte donc les champs de `AutomationSelection` — motif de libellé, compte,
+montant minimum et maximum, dates — et rien d'autre. Les critères propres à la consultation (état,
 période courante) restent à côté et ne partent jamais dans une règle. Le bloc d'action porte les
-champs de `RuleAction` et reste visible sans rien cocher.
+champs de `AutomationAction` et reste visible sans rien cocher.
 
 Trois gestes en découlent, du même écran : appliquer aux lignes cochées, appliquer à tout ce que
 le filtre retourne, ou en faire une règle — auquel cas le filtre est repris tel quel, sans
@@ -730,7 +737,7 @@ chose — la dotation était sous-évaluée, ou la dépense n'était pas prévue
 simple virement à classer perdrait cette information ; le compter la rend exploitable.
 
 Ce n'est ni un revenu ni un besoin : rien de nouveau côté flux. C'est une **qualification portée par
-la ventilation** (`Allocation.replenishment`), qui distingue deux origines, parce qu'elles ne disent
+la ventilation** (`SubOperation.replenishment`), qui distingue deux origines, parce qu'elles ne disent
 pas la même chose : `internal`, l'argent était déjà chez nous et change de tirelire — la répartition
 était mauvaise, le patrimoine est inchangé ; `external`, un cadeau, un remboursement, une vente — le
 foyer a été sauvé du dehors, et le budget permanent ne peut pas compter dessus.
@@ -881,7 +888,7 @@ enregistré compte à sa date parce que son flux le prévoit, se montre comme un
 sur un compte suivi, cesse de compter s'il n'arrive pas dans sa fenêtre (D12, D88).
 
 La question « ce virement a-t-il eu lieu ? » se lit sur les opérations : une opération prévue est
-reprise par l'opération bancaire qui la réalise, attendue dans sa fenêtre, ou attendue non reçue
+rapprochée par l'opération bancaire qui la réalise, attendue dans sa fenêtre, ou attendue non reçue
 (D12), et le suivi la montre. Sans suivi des opérations (U1), rien ne se confronte : les
 opérations prévues comptent à leur date, et rien n'est dit manquant. Commencer à importer n'ajoute
 que ces lectures du réel ; ni les besoins, ni les virements permanents proposés ne changent.
@@ -1198,19 +1205,19 @@ sur la machine, chaque problème nommé. Le format est documenté dans
 
 Chaque colonne d'une opération est importée, saisie ou établie, et rien ne s'y stocke qui se
 recalcule (D89). Importées : `account_id`, `date`, `label`, `details`, `amount` et
-`suggested_category`, la catégorie que propose la source. Saisie : `one_off`, et toutes les
-colonnes d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit pas
-dans la forme de l'identifiant, qui n'est qu'une identité (D09). Six colonnes établies sont
-gardées : `state`, que posent l'import, les automatismes ou l'utilisateur (D22) ; `planned_flow_id`
-et `planned_date`, l'opération prévue reprise, désignée par son flux et sa date, ou
-`resumed_operation_id`, la saisie reprise, que la reprise établit (D88) ; `transfer_account_id` et
-`transfer_operation_id`, que la reconnaissance des virements établit. Elles ne se recalculent pas à
-l'identique : la reprise et la reconnaissance des virements dépendent des flux et des opérations du
-jour où elles ont eu lieu, une proposition confirmée ou un verrouillage est une décision de
-l'utilisateur (D12, D22), et le moteur d'automatismes repart de ce qu'elles établissent (D33). Le
-libellé normalisé, lui, se déduit du libellé seul (`normalizeLabel`) : il ne se stocke pas, il se
-recalcule à la lecture du fichier. Le rang parmi les identiques du jour n'entre que dans la clé
-(D09).
+`suggested_category`, la catégorie que propose la source. Saisie : `one_off`, et toutes les colonnes
+d'une opération saisie à la main. `origin` dit comment la ligne est née ; il ne se lit pas dans la
+forme de l'identifiant, qui n'est qu'une identité (D09). Six colonnes établies sont gardées :
+`state`, que posent l'import, les automatismes ou l'utilisateur (D22) ; `planned_flow_id` et
+`planned_date`, l'opération prévue rapprochée, désignée par son flux et sa date, ou
+`resumed_operation_id`, la saisie rapprochée, que le rapprochement établit (D88) ;
+`transfer_account_id` et `transfer_operation_id`, que la reconnaissance des virements établit. Elles
+ne se recalculent pas à l'identique : le rapprochement et la reconnaissance des virements dépendent
+des flux et des opérations du jour où elles ont eu lieu, une proposition confirmée ou un
+verrouillage est une décision de l'utilisateur (D12, D22), et le moteur d'automatismes repart de ce
+qu'elles établissent (D33). Le libellé normalisé, lui, se déduit du libellé seul (`normalizeLabel`)
+: il ne se stocke pas, il se recalcule à la lecture du fichier. Le rang parmi les identiques du jour
+n'entre que dans la clé (D09).
 
 ### D59 · Un panneau d'édition nomme ce qu'il modifie, et un harnais garde la règle
 
@@ -1292,6 +1299,15 @@ s'il dépasse le pas d'arrondi des ordres (`settings.orderRounding`), dans un se
 l'autre ; un pas nul fait proposer tout écart. Un ordre que le budget ne demande plus est signalé
 quel que soit son montant, plutôt que supprimé en douce : il continue de virer chez la banque tant
 que personne n'y a touché.
+
+**Garder l'ordre tel quel est une réponse** (glossaire), du même concept que la réponse au manque
+d'une échéance (D88) : l'utilisateur refuse, pour cet ordre, la proposition de l'aligner sur le
+budget (#205). Elle s'enregistre avec l'ordre (`kept`) : ce que le budget en demandait au geste — le
+montant, et les parts fixes de ses tirelires —, comme l'objet du refus, pour mesurer quand la
+proposition change de fond, et non comme une valeur qui vaudrait pour vraie : ce que le budget
+demande se relit toujours à chaque lecture du plan. Tant qu'il reste dans le pas d'arrondi de ces
+valeurs, l'écart se lit « à surveiller » (D20), sans avertissement ; au-delà, la proposition
+revient. Enregistrer l'ordre à un nouveau montant, ou le rendre à sa proposition, retire la réponse.
 
 **La ventilation de l'ordre est un choix de l'utilisateur**, enregistré avec l'ordre quand il en
 valide la mise en place (principe 4.1). Elle s'écrit en parts, comme celle d'une opération (D27) :
@@ -1395,7 +1411,11 @@ avec lui.
 un flux). Un flux n'est pas une opération : sans date ni montant total, c'est un automatisme qui en
 génère. Un automatisme est une sélection et des actions (D23, D39) ; celui d'un flux a en plus une
 récurrence, qui produit les opérations prévues, une par occurrence, et sa sélection, la seule,
-reconnaît l'opération bancaire qui réalise chacune (D24). Les opérations bancaires et saisies s'enregistrent, avec ce que l'utilisateur décide sur elles ; une opération prévue se calcule depuis
+reconnaît l'opération bancaire qui réalise chacune et la rapproche (D24). Un virement interne porte
+le compte de l'autre côté ; quand les deux côtés ont chacun leur opération — prévus, corrigés, ou
+importés des deux relevés —, ce sont deux opérations, une par compte, appariées (D58). Les
+opérations bancaires et saisies s'enregistrent, avec ce que l'utilisateur décide sur elles ; une
+opération prévue se calcule depuis
 son flux à chaque lecture, ne s'enregistre jamais, et se désigne par son flux et sa date. C'est la
 règle de D57 : se fige ce que la banque a fait et ce que l'utilisateur a validé, jamais une photo de
 ce que le budget prévoit. Une opération prévue n'est pas une hypothèse : calculée depuis un flux
@@ -1404,30 +1424,42 @@ et le principe 1.3 tient. Tous les calculs se font sur la base lue en mémoire :
 s'ajoute aux autres au moment de compter.
 
 **Les sous-opérations.** Une opération contient des sous-opérations, sur autant de niveaux qu'on
-veut ; leurs montants s'additionnent jusqu'au sien. Un seul concept couvre :
+veut ; leurs montants s'additionnent jusqu'au sien, sauf ceux d'un lissage (ci-dessous). Un seul
+concept couvre :
 
 - la **ventilation** (D10, D27) : diviser un montant entre tirelires, catégories ou personnes ; la
   **répartition** entre personnes est une ventilation par la personne ;
 - le **lissage** : diviser un montant dans le temps, en sous-opérations datées, énumérées et
   enregistrées ; un flux fait de même sans total ni fin, et ses opérations prévues, produites par sa
-  récurrence, se calculent ;
-- la **reprise** : une opération en reprend une autre qui désigne le même mouvement. L'opération
-  bancaire reprend la saisie qui l'annonçait, ou l'opération prévue qu'elle réalise — le
-  rapprochement de flux de D12 et D22 ; une saisie reprend l'opération prévue qu'elle corrige ; une
-  saisie de zéro, l'opération prévue qui n'aura pas lieu. L'opération reprise ne compte plus : celle
-  qui la reprend compte à sa place, pour son propre montant, et l'écart entre les deux reste visible.
-  La reprise est automatique quand un automatisme la permet, celui d'un flux compris (D12),
-  validée par l'utilisateur sinon (principe 4.4).
+  récurrence, se calculent.
 
-**Les étiquettes.** Une étiquette classe une sous-opération. Le compte réel, la tirelire, la catégorie
-et la personne sont des étiquettes **exclusives** : une seule valeur par sous-opération ; en porter
-plusieurs, c'est diviser le montant, et une somme par valeur ne compte jamais deux fois le même euro.
-Les étiquettes **libres** ne sont pas exclusives : autant qu'on veut, sans diviser le montant ; chacune
-compte le montant entier. Une sous-opération à qui il manque une étiquette sur un axe prend celle de
-l'opération qui la contient, de proche en proche ; une ventilation posée à un niveau vaut, en
-proportion, pour tout ce qu'il contient, sauf là où un niveau plus bas pose la sienne. Dans une
-reprise, l'opération qui reprend garde ce qui a été décidé sur elle (l'état verrouillé de D22) et
-prend, sinon, la ventilation de l'opération reprise ; leurs étiquettes libres s'ajoutent.
+**Le rapprochement.** Une opération en rapproche une autre qui désigne le même mouvement.
+L'opération bancaire rapproche la saisie qui l'annonçait, ou l'opération prévue qu'elle réalise — le
+rapprochement de flux de D12 et D22 ; une saisie rapproche l'opération prévue qu'elle corrige ; une
+saisie de zéro, l'opération prévue qui n'aura pas lieu. Une opération en rapproche au plus une autre,
+et n'est rapprochée qu'une fois. L'opération rapprochée ne compte plus : celle qui la rapproche compte
+à sa place, pour son propre montant, et l'écart entre les deux reste visible. Le lien est porté par
+l'opération qui rapproche — elle désigne l'opération prévue par son flux et sa date, ou la saisie
+(D58) —, pas par une sous-opération. Le rapprochement est automatique quand la sélection d'un flux le
+permet (D12), validé par l'utilisateur sinon (principe 4.4) ; un automatisme classe, il ne rapproche
+pas (D24). Le ranger parmi les sous-opérations ne tenait pas : une sous-opération divise un montant,
+alors que le rapprochement fait compter une opération à la place d'une autre ; porté par
+l'opération, il n'est qu'un lien, et l'implémentation n'en est pas alourdie, ce que le porteur
+posait comme condition à ce modèle (30 septembre).
+
+**Les étiquettes.** Une étiquette classe une sous-opération. Le compte réel, la tirelire, la
+catégorie et la personne sont des étiquettes **exclusives** : une seule valeur par sous-opération ;
+en porter plusieurs, c'est diviser le montant, et une somme par valeur ne compte jamais deux fois le
+même euro. Les étiquettes **libres** ne sont pas exclusives : autant qu'on veut, sans diviser le
+montant ; chacune compte le montant entier. Une sous-opération à qui il manque une étiquette sur un
+axe prend celle de l'opération qui la contient, de proche en proche ; une ventilation posée à un
+niveau vaut, en proportion, pour tout ce qu'il contient, sauf là où un niveau plus bas pose la
+sienne. Dans un rapprochement, l'opération qui rapproche garde ce qui a été décidé sur elle (l'état
+verrouillé de D22) et prend, sinon, la ventilation de l'opération rapprochée ; leurs étiquettes
+libres s'ajoutent. Le compte réel et la personne, comme étiquettes des sous-opérations, sont le
+modèle visé, non le code : le compte réel n'est porté que par l'opération — un virement en est deux,
+appariées, quand ses deux côtés en ont une —, et la personne n'existe pas encore (dette : #298,
+#485).
 
 **Le compte et la tirelire.** Une tirelire est un compte virtuel, placé sur des comptes réels (D19,
 D38) : son solde se lit comme celui d'un compte, somme de ce qui y est inscrit. « Compte virtuel » dit
@@ -1442,22 +1474,26 @@ compte peut avoir une personne pour titulaire : ce qu'il paie, elle l'a payé. C
 payé, moins ce qu'elle supporte, dit ce qu'elle doit ou ce qu'on lui doit ; un remboursement entre
 personnes est un virement entre comptes, pas une dépense.
 
-**Le solde prévu et le manque.** Le solde prévu d'un compte ou d'une tirelire à une date est son solde
-réel à la date de lecture, plus les opérations saisies à une date future et les opérations prévues
-qui comptent jusqu'à cette date ; les dotations d'une
-tirelire (D29) y comptent comme des opérations prévues sur elle. Sur un compte suivi (il porte des
-opérations importées), une opération prévue dont la fenêtre (D12) est passée sans reprise cesse de
-compter, et se signale « attendue, non reçue ». Sur un compte sans suivi (U1), rien ne se confronte :
-ses opérations prévues comptent à leur date. Un **manque** est un solde prévu négatif à une date : la
-dépense trop proche du principe 1.4 comme l'opération attendue qui n'arrive pas se lisent par ce même
-calcul. Le suivi montre, pour une période à venir, le solde prévu des comptes et des tirelires, avec
-les opérations prévues qui le font (D52, D96).
+**Le solde prévu et le manque.** Le solde prévu d'un compte ou d'une tirelire à une date est son
+solde réel à la date de lecture, plus les opérations saisies à une date future et les opérations
+prévues qui comptent jusqu'à cette date ; les dotations d'une tirelire (D29) y comptent comme des
+opérations prévues sur elle. Sur un compte suivi (il porte des opérations importées), une opération
+prévue dont la fenêtre (D12) est passée sans être rapprochée cesse de compter, et se signale «
+attendue, non reçue ». Sur un compte sans suivi (U1), rien ne se confronte : ses opérations prévues
+comptent à leur date. Un **manque** est un solde prévu négatif à une date : la dépense trop proche
+du principe 1.4 comme l'opération attendue qui n'arrive pas se lisent par ce même calcul. Le suivi
+montre, pour une période à venir, le solde prévu des comptes et des tirelires, avec les opérations
+prévues qui le font (D52, D96).
 
 **Le lissage.** Un lissage est une décision : l'application en propose un, calculé depuis le manque ;
-l'utilisateur l'accepte, le modifie ou le refuse. Accepté, il s'enregistre comme une opération divisée
-en sous-opérations datées, qui comptent comme des dotations. Rien ne se lisse d'office. Le refus
-s'enregistre aussi : la réponse, lissage retenu ou refus, est une par échéance, désignée par le besoin
-et la date de l'échéance ; tant qu'elle existe, la proposition ne revient pas, et le manque qui
+l'utilisateur l'accepte, le modifie ou le refuse. Accepté, il s'enregistre comme une saisie de
+montant nul, verrouillée, sur le compte où naissent les dotations de la tirelire (D29), divisée en
+sous-opérations datées — des parts fixes sur la tirelire, qui comptent comme des dotations. Ses
+sous-opérations dépassent ainsi son montant : c'est l'exception à « leurs montants s'additionnent
+jusqu'au sien », et le reste de sa division, négatif — à rebours du « jamais en négatif » de D27 —,
+demeure sur le compte réel, sans tirelire. Rien ne se lisse d'office. Le refus s'enregistre aussi :
+la réponse (glossaire), lissage retenu ou refus, est une par échéance, désignée par le besoin et la
+date de l'échéance ; tant qu'elle existe, la proposition ne revient pas, et le manque qui
 resterait se signale toujours. Un refus n'est pas une opération : il ne paraît ni dans les opérations,
 ni dans le bilan, ni dans un solde. Une sous-opération datée compte à sa date dans la tirelire et la
 catégorie qui valent pour elle ; le compte réel bouge à la date de l'opération. Une part de lissage
@@ -1471,8 +1507,8 @@ plusieurs instances, chacune avec ses clés ; l'application n'en tient qu'une au
 individuelle, reste pour la suite.
 
 **Ce qui ne change pas.** Ce qui se fige (D57) ; l'ordre permanent, somme des croisières, et ce qui se
-recalcule, qui ne se stocke pas (D60) ; les fenêtres et tolérances de la reprise (D12) ; les états
-d'une opération (D22).
+recalcule, qui ne se stocke pas (D60) ; les fenêtres et tolérances du rapprochement (D12) ; les
+états d'une opération (D22).
 
 ### D89 · Le cœur calcule, l'interface affiche ; ce qui se stocke
 
@@ -1499,7 +1535,7 @@ rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été ex
 Le porteur voulait reprendre un budget tenu ailleurs sans refaire l'assistant ni fabriquer un
 fichier SQLite (#366). Séparer le stockage — le budget en JSON, les opérations en SQLite — a été
 examiné et écarté : deux fichiers à sauvegarder ensemble (C5), des références d'une sous-opération ou
-d'une reprise qui franchiraient la frontière, deux mécanismes de synchronisation (I8) et deux
+d'un rapprochement qui franchiraient la frontière, deux mécanismes de synchronisation (I8) et deux
 formats à versionner (D30).
 
 Il n'y a donc qu'**un seul stockage, le fichier SQLite** (D08, D58). Le **budget JSON** est un format
@@ -1564,21 +1600,23 @@ que l'utilisateur corrige et valide, et ne s'enregistre jamais : elle se recalcu
 proposition n'enregistre rien.
 
 **La série.** Trois opérations au moins — deux si l'écart est d'un an —, toutes bancaires, vivantes,
-sans reprise, non marquées ponctuelles, du même compte, du même sens et du même motif ; un virement
+qui n'en rapprochent aucune autre, non marquées ponctuelles, du même compte, du même sens et du même
+motif ; un virement
 interne n'en fonde une que s'il peut devenir un ordre (#434). Leur écart est une semaine, un mois,
 trois mois ou un an : la plus ancienne fixe les dates, chacune des suivantes tombe à la date suivante
 de l'écart, à 1 jour près pour une semaine, à 5 jours près sinon, au calendrier de D47 ; et aucune
-autre opération de même compte, même sens et même motif, sans reprise, ne tombe entre la première et
+autre opération de même compte, même sens et même motif, qui n'en rapproche aucune autre, ne tombe
+entre la première et
 la dernière. Chaque opération fonde au plus une série ; quand une suite plus longue est possible en
-partant de la plus ancienne, elle l'emporte. Les opérations qu'un flux reprend déjà n'en fondent
-aucune.
+partant de la plus ancienne, elle l'emporte. Les opérations qui rapprochent déjà une occurrence d'un
+flux n'en fondent aucune.
 
 - **Trois, deux pour un an.** Un écart observé une seule fois ne dit rien d'un rythme ; trois
   opérations donnent deux écarts qui concordent. Une charge annuelle ne se montre que deux fois sur
   deux ans d'historique : sans cette exception, aucune provision ne naîtrait des séries d'un
   historique de 12 à 24 mois.
 - **Cinq jours.** C'est la fenêtre que le produit pose déjà aux flux qu'il propose. Pas davantage : la
-  paie de décembre versée six jours avant le 25 n'y entre pas, et se reprend à la main (#445).
+  paie de décembre versée six jours avant le 25 n'y entre pas, et se rapproche à la main (#445).
 - **Le même motif.** Une seule notion de ressemblance, celle de la sélection d'un flux (D24, D39) :
   les opérations d'une série sont, une à une, celles que le flux proposé reconnaît (principe 13). Le
   bénéficiaire dont le libellé change de mots d'un mois à l'autre ne forme pas de série ; la sélection
@@ -1602,12 +1640,12 @@ ce compte, celle de l'opération sinon (D21).
 
 **L'ancrage** est dans D60 : la plus ancienne occurrence que l'utilisateur valide. C'est la date de
 cette occurrence, qui se désigne par son flux et sa date (D88) — la date du rythme proposé que
-reprend la plus ancienne opération validée —, et non la date de cette opération ; sans reprise
-validée, c'est la plus ancienne des opérations qui fondent le flux. Ancré sur la date de l'opération,
-le flux décalerait son rythme de quelques jours et ne reconnaîtrait plus toute sa série. Seul bord :
-un ancrage qu'un mois plus court a ramené (le 30 novembre d'un rythme du 31) fixe le jour des dates
-suivantes, comme tout ancrage (D47) ; le format ne sait pas dire « le 31 » autrement, et ne change
-pas.
+rapproche la plus ancienne opération validée —, et non la date de cette opération ; sans
+rapprochement validé, c'est la plus ancienne des opérations qui fondent le flux. Ancré sur la date
+de l'opération, le flux décalerait son rythme de quelques jours et ne reconnaîtrait plus toute sa
+série. Seul bord : un ancrage qu'un mois plus court a ramené (le 30 novembre d'un rythme du 31) fixe
+le jour des dates suivantes, comme tout ancrage (D47) ; le format ne sait pas dire « le 31 »
+autrement, et ne change pas.
 
 ### D96 · Le budget se déclare, le réel propose
 
@@ -1616,7 +1654,7 @@ Précise D29, D52 et D57 (#468). L'application a trois parties, chacune avec sa 
 - **le budget** — des montants par période : revenus, charges fixes, dotations (D29), ordres
   permanents qu'elles demandent et leur ventilation (D60), marge. Aucun solde ;
 - **l'historique** — les opérations et leurs états : import, saisie, ventilation, automatismes,
-  reprises (D22, D88) ;
+  rapprochements (D22, D88) ;
 - **le suivi** — des soldes à une date et des écarts : soldes réels et prévus des comptes et des
   tirelires, non affecté, manques, attendus non reçus (D88), virements tirés du réel — complément
   exceptionnel, à rapatrier, écarts entre comptes (D20, D52), règlements (D04) —, et les propositions
@@ -1639,7 +1677,7 @@ change sans validation (principe 4, I10).
 d'une centaine d'euros, une facture d'électricité réelle — ne produit pas de proposition. Une
 proposition naît d'un écart qui gêne — un manque à venir, une marge sous le coussin, une réserve qui
 ne tiendra pas — ou d'un écart qui dure d'une période à l'autre ; sa durée se fixe avec le calcul des
-propositions. En deçà, la tolérance de montant et le flux variable reprennent déjà les petites
+propositions. En deçà, la tolérance de montant et le flux variable absorbent déjà les petites
 variations à l'import (D12), et le pas d'arrondi des ordres fait taire les petits écarts d'un ordre
 permanent (I10, D60).
 
