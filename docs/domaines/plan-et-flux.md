@@ -98,7 +98,7 @@ Propres au domaine :
    recalculé (I10). Le signaler reste à évaluer.
 7. Trois sources proposent un ordre : le plan, qui propose ce que le budget demande ; l'assistant,
    qui propose l'ordre de l'exemple (domaine assistant et exemple) ; un virement importé qu'aucun
-   flux ne reprend, dont on fait un flux (#16, U3, U4), prérempli par ce que le plan demande quand
+   flux ne rapproche, dont on fait un flux (#16, U3, U4), prérempli par ce que le plan demande quand
    un budget existe, par la ventilation de l'opération sinon (D21, D24). Un ordre est un flux de
    virement du principal vers un compte d'accueil, quelle que soit sa source (D57). Suivre l'exemple
    jusqu'au bout enregistre l'ordre de l'exemple, écart compris, et le plan en propose aussitôt
@@ -120,7 +120,7 @@ Propres au domaine :
   évolutions proposées quand le budget change.
 - **U1** : partage la proposition du plan de virements, le virement à faire du parcours U1 ; le
   domaine ne lui ajoute aucune étape.
-- **U3** : le virement importé qu'aucun flux ne reprend devient un ordre par le geste de U4,
+- **U3** : le virement importé qu'aucun flux ne rapproche devient un ordre par le geste de U4,
   prérempli par ce que le plan demande (hypothèse 7, D21) ; le rapprochement relève du domaine
   rapprochement et bilan.
 - **U4** : un plan tiré des opérations (intention ci-dessus : le plan à partir des opérations) garde

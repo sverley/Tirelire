@@ -16,7 +16,7 @@ Tirelire/
 │   ├── src/shortfall.ts    manque d'une échéance, proposition de lissage, réponse (lissage retenu ou refus)
 │   ├── src/csv.ts          décodage et parseur CSV
 │   ├── src/importer.ts     profils d'import, lecture des lignes, clés, doublons
-│   ├── src/matching.ts     virements internes, virements par compte, reprise (sélection des flux, saisies reprises, corrections), pipeline
+│   ├── src/matching.ts     virements internes, virements par compte, rapprochement (sélection des flux, saisies rapprochées, corrections), pipeline
 │   ├── src/automations.ts  moteur d'automatismes, aperçu, actions groupées
 │   ├── src/suboperations.ts  sous-opérations à tous les niveaux : parts par division, lignes comptées avec ce qui vaut pour elles, sous-opérations vivantes
 │   ├── src/edit.ts         édition manuelle : verrouillage, division à parts d'un niveau, à tout niveau
@@ -43,12 +43,12 @@ Tirelire/
 
 | Objet | Rôle | Identité |
 |---|---|---|
-| `Account` | compte réel : `principal`, `holding` (accueil), `third` (tiers, saisi à la main) ; ouverture et clôture datées (D56) | UUID v7 |
+| `Account` | compte réel : `principal`, `courant`, `epargne` (D45) ; suivi d'un solde à régler (`tracksSettlement`, compte tiers) ; ouverture et clôture datées (D56) | UUID v7 |
 | `Tirelire` | pot à solde unique, réparti sur les comptes ; déclare un placement voulu | UUID v7 |
-| `Need` | besoin porté par une tirelire : `recurring`, `dueDate`, `goal` ; priorité | UUID v7 |
+| `Need` | besoin porté par une tirelire : `recurring`, `dueDate`, `goal`, `payout` (D48) ; priorité | UUID v7 |
 | `Category` | classement des dépenses / revenus ; peut consommer un budget | UUID v7 |
-| `PlannedFlow` | revenu, charge fixe, échéance payée par une tirelire, virement attendu ; périodicité ; sa seule sélection (compte, motif, tolérance, fenêtre, D24) ; verrouiller ce qu'il reprend | UUID v7 |
-| `Operation` | ligne de relevé (`imported`) ou saisie (`manual`) ; état (non traitée / rapprochée / verrouillée) ; transfert ; ce qu'elle reprend (D88) : une opération prévue, désignée par son flux et sa date (`plannedFlowId`, `plannedDate`), ou une saisie (`resumedOperationId`) | clé déterministe ou UUID v7 |
+| `PlannedFlow` | revenu, charge fixe, échéance payée par une tirelire, virement attendu ; périodicité ; sa seule sélection (compte, motif, tolérance, fenêtre, D24) ; verrouiller l'opération qui rapproche son occurrence | UUID v7 |
+| `Operation` | ligne de relevé (`imported`) ou saisie (`manual`) ; état (non traitée / classée / verrouillée) ; transfert ; ce qu'elle rapproche (D88) : une opération prévue, désignée par son flux et sa date (`plannedFlowId`, `plannedDate`), ou une saisie (`resumedOperationId`) | clé déterministe ou UUID v7 |
 | `SubOperation` | sous-opération (D88) : part (fixe, pourcentage, variable) du niveau qui la contient — l'opération, ou une sous-opération (`parentId`) —, catégorie, tirelire, renflouement, date propre (une part de lissage) ; se divise à son tour, sans limite de niveaux | UUID v7 |
 | `ShortfallAnswer` | réponse au manque d'une échéance (D88, #184) : besoin, date de l'échéance, saisie du lissage retenu (absente pour un refus) ; une par échéance | `reponse:<besoin>:<date>` |
 | `Automation` | sélection + action à champs facultatifs + rang (clé triable) + validité | UUID v7 |
@@ -88,8 +88,8 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
    en mémoire au grand livre (`withPlannedOperations`), et les soldes se lisent avec les fonctions
    de `balances.ts` ; les dotations d'une tirelire (D29) y comptent comme des opérations prévues sur
    elle. Ce qui compte se décide par `flowOccurrencesThatCount` (`matching.ts`) : une occurrence
-   reprise — son flux et sa date, `Operation.plannedFlowId` et `plannedDate` — ne compte plus ; sur un compte suivi, une occurrence dont la
-   fenêtre (D12) est passée sans reprise non plus ; sur un compte sans suivi, chaque occurrence
+   rapprochée — son flux et sa date, `Operation.plannedFlowId` et `plannedDate` — ne compte plus ; sur un compte suivi, une occurrence dont la
+   fenêtre (D12) est passée sans être rapprochée non plus ; sur un compte sans suivi, chaque occurrence
    compte à sa date. Le même calcul fait le bloc « Attendus, non reçus » (`missingFlows`), seul
    endroit où une occurrence non reçue se signale. Un virement proposé mais non enregistré n'a pas
    de flux et ne compte pas. Les lignes d'une période à venir et leurs écarts de placement (étapes
@@ -127,15 +127,15 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
 
 ## États d'une opération (D22)
 
-`untreated` (aucune règle ne l'a vue) → `reconciled` (posée par une règle ou par l'import, reprise
-à chaque passage) → `locked` (vérité, plus aucune règle ne l'atteint). Toute modification manuelle
-verrouille (`edit.ts`) ; seul l'utilisateur déverrouille, à l'unité ou par action groupée.
+`untreated` (aucune règle ne l'a vue) → `reconciled`, *classée* (par une règle ou par l'import,
+reclassée à chaque passage) → `locked` (vérité, plus aucune règle ne l'atteint). Toute modification
+manuelle verrouille (`edit.ts`) ; seul l'utilisateur déverrouille, à l'unité ou par action groupée.
 
 ## Moteur d’automatismes (`automations.ts`, D23)
 
 Les règles se rejouent du rang le plus élevé au rang 1 sur les opérations non verrouillées : chaque
 champ renseigné écrase, les champs vides laissent en place, le rang tranche. Le calcul repart de ce
-que l'import a établi (D33), jamais de rien. `previewRules` donne l'avant/après sans écrire ;
+que l'import a établi (D33), jamais de rien. `previewAutomations` donne l'avant/après sans écrire ;
 `applyBulkAction` fait la même chose sur une sélection, avec en plus le déverrouillage (D26). Une
 règle ou une action groupée qui écrit la ventilation la remplace à tous ses niveaux par une seule
 division ; une ventilation que l'import a établie et qu'aucune règle n'écrit reste entière.
@@ -150,34 +150,35 @@ l'opération (D22), n'écrit que les sous-opérations qui changent et retire, av
 tout ce qu'elle contient. À la réception (`LedgerStore.receive`), une sous-opération restée sous un
 niveau retiré par une autre instance est retirée à son tour, datée de la suppression de ce niveau.
 
-## Reprise (D88)
+## Rapprochement (D88)
 
-Une opération en reprend au plus une autre : une opération prévue, désignée par son flux et sa date
+Une opération en rapproche au plus une autre : une opération prévue, désignée par son flux et sa date
 (`plannedFlowId`, `plannedDate`), ou une saisie (`resumedOperationId`) ; le fichier refuse le reste
-(`operations.reprise`). L'opération reprise ne compte plus : les soldes, réels et prévus, et les
+(`operations.reprise`). L'opération rapprochée ne compte plus : les soldes, réels et prévus, et les
 totaux lisent `countedOperations` (`model.ts`), par `indexLedger` et `accountBalance` ; une
-occurrence reprise sort du solde prévu et d'« Attendus, non reçus » (`flowOccurrences`).
+occurrence rapprochée sort du solde prévu et d'« Attendus, non reçus » (`flowOccurrences`).
 
 - La sélection d'un flux, la seule (D24, `proposeMatches`) : compte, motif de libellé, tolérance de
   montant, fenêtre de ses occurrences ; automatique selon D12, proposée sinon. Une occurrence
-  qu'une saisie corrige ou masque se reprend par cette saisie.
-- `applyMatch` : la reprise d'une occurrence (ou de la saisie qui la corrige), rapprochée,
-  verrouillée si l'action du flux le demande (`PlannedFlow.action`), avec la ventilation de cette
-  action si l'opération n'en a pas (`flowVentilation`, par `actionAllocation`, le calcul des
+  qu'une saisie corrige ou masque est rapprochée par cette saisie.
+- `applyMatch` : le rapprochement d'une occurrence (ou de la saisie qui la corrige), l'opération
+  classée, verrouillée si l'action du flux le demande (`PlannedFlow.action`), avec la ventilation de
+  cette action si l'opération n'en a pas (`flowVentilation`, par `actionAllocation`, le calcul des
   automatismes) ; ce que ses parts n'absorbent pas reste non affecté.
-- `entryCandidates`, `resumeEntry` : les saisies non reprises du même compte et du même sens, les
-  plus proches en date puis en montant, reprises sur validation, avec leur ventilation.
+- `entryCandidates`, `resumeEntry` : les saisies non rapprochées du même compte et du même sens, les
+  plus proches en date puis en montant, rapprochées sur validation, avec leur ventilation.
 - `correctPlannedOperation` : corriger une opération prévue, ou la masquer (montant nul), par une
-  saisie verrouillée qui la reprend ; un virement corrigé a ses deux côtés.
-- `resumptionOf` dit ce qu'une opération reprend et l'écart ; `undoResumption` défait la reprise.
-- `removalBlockers` : une saisie reprise ne se supprime pas tant que la reprise tient ; l'interface
-  supprime par `supprimerOperations` (`apps/web/src/lib/suppression.ts`), qui propose de défaire
-  d'abord la reprise.
+  saisie verrouillée qui la rapproche ; un virement corrigé a ses deux côtés.
+- `resumptionOf` dit ce qu'une opération rapproche et l'écart ; `undoResumption` défait le
+  rapprochement.
+- `removalBlockers` : une saisie rapprochée ne se supprime pas tant que le rapprochement tient ;
+  l'interface supprime par `supprimerOperations` (`apps/web/src/lib/suppression.ts`), qui propose de
+  défaire d'abord le rapprochement.
 
 ## Pipeline d'import (`runPipeline`)
 
 lecture (profil) → clés et doublons (`prepareImport`) → insertion → virements internes appariés
-→ virements par compte (libellé TIRELIRE, reconnus sans ventilation) → reprise
+→ virements par compte (libellé TIRELIRE, reconnus sans ventilation) → rapprochement
 automatique des occurrences sûres (D12) → moteur de règles → file de tri (interface).
 
 ## Dépôt et synchronisation

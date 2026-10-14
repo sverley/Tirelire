@@ -958,3 +958,29 @@ Puis, à la troisième question — le suivi, un écran à part ou le Bilan ? �
 Ce qui en est tiré : D96 ; D04, D20, D21, D29, D38, D48, D52, D53, D60 et D88 amendées ; le
 glossaire (non affecté, dotation, suivi) ; les domaines budget et tirelires, plan et flux,
 rapprochement et bilan.
+
+## 14 octobre 2026 · un mot par sens : rapprocher, classer
+
+Paroles du porteur, à l'architecte, sur le modèle que le code tient :
+
+> Est-ce que toutes les définitions/simplifications qui ont été faites pour réduire le nmobre de conepts dans le code ont bien été documentées ?
+
+Puis :
+
+> ou plutot, est-ce que ce qu'il en ressort (ce sur quoi on s'appuie maintenant) est bien documenté ? la simplification etait une etape, pas forcement nécessaire d'en garder trace complete
+
+Puis, sur l'audit du modèle du code contre les documents — le lien entre deux opérations qui
+désignent le même mouvement, rangé par le glossaire et D88 parmi les sous-opérations sous le nom de
+« reprise », alors que le code le porte par des champs de l'opération —, et à la recommandation
+d'aligner les mots sur le code :
+
+> ok mais "Reprise" n'est pas le bon voacbulaire. "Rapprochement" ?
+
+Puis, à la proposition « rapprochement pour le lien, classée pour l'état » :
+
+> oui
+
+Ce qui en est tiré : D04, D10, D11, D21, D22, D23, D24, D27, D33, D36, D49, D52, D58, D60, D88, D95
+et D96 amendées ; le glossaire (compte tiers, besoin, croisière, provision, objectif, budget,
+automatisme, flux prévu, opération, sous-opération, rapprochement, réponse, visée) ; le registre
+(I3) ; les domaines plan et flux, rapprochement et bilan.
