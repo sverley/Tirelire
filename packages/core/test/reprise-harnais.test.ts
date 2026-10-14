@@ -546,11 +546,12 @@ describe('[niveau 2] #306 · 7. l’exemple s’écrit et se relit au nouveau fo
     expect(sept.totals).toEqual({ incomes: 420000, fixedCharges: 122000, requested: 235000, funded: 235000, margin: 63000, cushion: 60000, principalUnallocated: 339000 });
     expect(net(sept)).toBe(68500);
     const oct = computePlan(exampleLedger(), '2026-10-20');
-    expect(oct.totals).toEqual({ incomes: 420000, fixedCharges: 122000, requested: 238600, funded: 238600, margin: 59400, cushion: 60000, principalUnallocated: 237400 });
+    // Depuis #477 (point 6), la dotation ne dépend plus du solde : le 20 octobre et le 10 janvier changent.
+    expect(oct.totals).toEqual({ incomes: 420000, fixedCharges: 122000, requested: 235000, funded: 235000, margin: 63000, cushion: 60000, principalUnallocated: 241000 });
     expect(net(oct)).toBe(138500);
     const jan = computePlan(exampleLedger(), '2027-01-10');
-    expect(jan.totals).toEqual({ incomes: 435000, fixedCharges: 27000, requested: 279500, funded: 279500, margin: 128500, cushion: 60000, principalUnallocated: -56100 });
-    expect(net(jan)).toBe(353500);
+    expect(jan.totals).toEqual({ incomes: 435000, fixedCharges: 27000, requested: 289500, funded: 289500, margin: 118500, cushion: 60000, principalUnallocated: -82500 });
+    expect(net(jan)).toBe(383500);
   });
 });
 

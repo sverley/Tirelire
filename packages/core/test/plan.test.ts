@@ -96,12 +96,14 @@ describe('[niveau 2] report (D05, D29)', () => {
     expect(componentsOnAccount(principal, idx, '2026-09-28')).toBeGreaterThan(0);
   });
 
-  it('report illimité : le déficit d’une période se rattrape à la suivante', () => {
+  it('report illimité : le déficit d’une période reste dans le solde de la tirelire à la suivante, qui demande sa croisière (D29, #477)', () => {
     const l = exampleLedger();
     const octobre = computePlan(l, '2026-09-28');
     expect(line(octobre, 'need-enfants').balance).toBe(euros(-36));
-    expect(line(octobre, 'need-enfants').catchUp).toBe(euros(236));
-    expect(line(octobre, 'need-enfants').requested).toBe(euros(236));
+    // Le déficit se lit sur la ligne du besoin qui le porte ; il ne se rattrape plus de lui-même.
+    expect(line(octobre, 'need-enfants').held).toBe(euros(-36));
+    expect(line(octobre, 'need-enfants').requested).toBe(euros(200));
+    expect(line(octobre, 'need-enfants').status).toBe('ok');
   });
 });
 
@@ -141,13 +143,15 @@ describe('[niveau 2] plan de période, sur l’exemple de l’analyse (D02, D28,
     expect(auto.status).toBe('ok');
   });
 
-  it('échéance entièrement provisionnée : dotation nulle', () => {
+  it('échéance entièrement provisionnée : elle demande sa croisière, et se dit en avance (D29, #477)', () => {
     const l = exampleLedger();
     l.tirelires.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
     // Sans lissage décidé (#184) : celui de l'exemple n'a plus de raison d'être.
     l.shortfallAnswers = [];
     l.operations = l.operations.filter((o) => o.id !== 'op-lissage-tf');
-    expect(line(computePlan(l, asOf), 'need-tf').requested).toBe(0);
+    const tf = line(computePlan(l, asOf), 'need-tf');
+    expect(tf.requested).toBe(euros(100));
+    expect(tf.status).toBe('ahead');
   });
 
   it('objectif : mensualité fixe', () => {

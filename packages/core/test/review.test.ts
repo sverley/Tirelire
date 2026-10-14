@@ -14,9 +14,11 @@ function withHistory(): Ledger {
   });
   l.operations.push({ id: 'op-frigo', accountId: 'acc-principal', origin: 'imported', date: '2026-06-10', label: 'FRIGO', normalizedLabel: 'FRIGO', amount: euros(-600), state: 'reconciled', oneOff: true });
   l.subOperations.push({ id: 'al-frigo', operationId: 'op-frigo', categoryId: 'cat-alim', tirelireId: 'env-alim', share: { kind: 'fixed', amount: euros(-600) } });
-  // Taxe foncière 2025 : provision à 1 200, payée 1 260 le 15 octobre 2025.
-  l.tirelires.find((e) => e.id === 'env-tf')!.openingDate = '2025-01-01';
-  l.tirelires.find((e) => e.id === 'env-tf')!.openingBalance = euros(1200);
+  // Taxe foncière 2025 : provision à 1 200, payée 1 260 le 15 octobre 2025. La tirelire s'ouvre vide
+  // le 28 octobre 2024, premier jour d'une période ; ses douze dotations déclarées de 100 € — du
+  // 28 octobre 2024 au 28 septembre 2025 — réunissent 1 200 € à l'échéance (D29, #477).
+  l.tirelires.find((e) => e.id === 'env-tf')!.openingDate = '2024-10-28';
+  l.tirelires.find((e) => e.id === 'env-tf')!.openingBalance = 0;
   l.needs.find((n) => n.id === 'need-tf')!.periodicity = { interval: 12, unit: 'month' as const, anchorDate: '2025-10-15' };
   l.operations.push({ id: 'op-tf-2025', accountId: 'acc-principal', origin: 'imported', date: '2025-10-16', label: 'DGFIP TAXE FONCIERE', normalizedLabel: 'DGFIP TAXE FONCIERE', amount: euros(-1260), state: 'reconciled', plannedFlowId: 'flow-tf' });
   l.subOperations.push({ id: 'al-tf-2025', operationId: 'op-tf-2025', categoryId: 'cat-logement', tirelireId: 'env-tf', share: { kind: 'fixed', amount: euros(-1260) } });

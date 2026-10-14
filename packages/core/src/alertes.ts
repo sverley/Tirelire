@@ -162,9 +162,9 @@ export type PlanWarningAlert =
       needName: string;
       tirelireId: Id;
       tirelireName: string;
-      /** Ce qu'il verse sur la période. */
-      paid: Cents;
-      /** Ce qu'il devrait verser : sa croisière. */
+      /** Ce que la réserve retient pour le versement au début de la période (D29). */
+      held: Cents;
+      /** Sa part déclarée pour la période (D48), que la réserve ne porte plus. */
       cruise: Cents;
     }>
   | InPlan<{
@@ -437,7 +437,7 @@ function planWarningAlert(ledger: Ledger, plan: Plan, lu: BudgetPeriodReading, w
     }
     case 'payoutShort': {
       const l = plan.lines.find((x) => x.needId === w.needId)!;
-      return { code: w.code, ...base, needId: l.needId, needName: l.name, tirelireId: l.tirelireId, tirelireName: l.tirelireName, paid: -l.requested, cruise: l.cruise };
+      return { code: w.code, ...base, needId: l.needId, needName: l.name, tirelireId: l.tirelireId, tirelireName: l.tirelireName, held: l.held, cruise: l.cruise };
     }
     case 'principalOverdrawn':
       return { code: w.code, ...base, accountId: w.accountId!, accountName: compte(w.accountId), unallocated: plan.totals.principalUnallocated };

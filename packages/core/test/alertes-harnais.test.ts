@@ -170,6 +170,16 @@ function portes(a: Alert): { nombres: Set<string>; dates: Set<string> } {
   return { nombres, dates };
 }
 
+/**
+ * L'exemple, son coussin relevé à 700 € : sa marge du 20 octobre, 630 €, est dessous. Depuis #477,
+ * l'exemple seul n'y est plus, Enfants et loisirs ne rattrapant plus ses 36 €.
+ */
+function coussinReleve(): Ledger {
+  const l = exampleLedger();
+  l.settings.principalCushion = euros(700);
+  return l;
+}
+
 /** Des fichiers qui, ensemble, portent chacun des genres. */
 function fichiersDeTousLesGenres(): Array<{ nom: string; l: Ledger; today: string; count: number; from?: string }> {
   const tiers = exampleLedger();
@@ -184,6 +194,7 @@ function fichiersDeTousLesGenres(): Array<{ nom: string; l: Ledger; today: strin
   const vacancesRetirees = exampleLedger();
   vacancesRetirees.tirelires.find((t) => t.id === 'env-vac')!.deletedAt = '2026-09-01T00:00:00.000Z';
   return [
+    { nom: 'coussin relevé', l: coussinReleve(), today: '2026-10-20', count: 1 },
     { nom: 'exemple', l: exampleLedger(), today: '2026-09-06', count: 3 },
     { nom: 'exemple, plus tard', l: exampleLedger(), today: '2027-01-10', count: 1 },
     { nom: 'exemple sans réponse', l: exempleSansReponse(), today: '2026-09-06', count: 2 },
@@ -491,19 +502,19 @@ describe('#463 · 11. avertissements du plan, selon leur code', () => {
   });
 
   it('belowCushion : la marge et le coussin [niveau 2]', () => {
-    const l = exampleLedger();
+    const l = coussinReleve();
     const [a] = readAlerts(l, { today: '2026-10-20' }, ['belowCushion']);
     const plan = computePlan(l, '2026-10-20');
     expect(a && [a.margin, a.cushion]).toEqual([plan.totals.margin, plan.totals.cushion]);
     expect(a!.margin).toBeLessThan(a!.cushion);
   });
 
-  it('payoutShort : le besoin et sa tirelire, ce qu’il verse et ce qu’il devrait verser, sa croisière [niveau 2]', () => {
+  it('payoutShort : le besoin et sa tirelire, ce que la réserve retient au début de la période et la part déclarée [niveau 2]', () => {
     const l = exampleLedger();
     l.tirelires.push({ id: 'env-saison', name: 'Saison', placement: [], openingBalance: euros(50), openingDate: '2026-08-28' });
     l.needs.push({ id: 'need-saison', tirelireId: 'env-saison', kind: 'payout', amount: euros(1200), periodicity: { interval: 12, unit: 'month', anchorDate: '2026-08-28' }, priority: 5 });
     const [a] = readAlerts(l, septembre, ['payoutShort']);
-    expect(a && [a.needId, a.needName, a.tirelireId, a.tirelireName, a.paid, a.cruise]).toEqual(['need-saison', 'Saison', 'env-saison', 'Saison', euros(50), euros(100)]);
+    expect(a && [a.needId, a.needName, a.tirelireId, a.tirelireName, a.held, a.cruise]).toEqual(['need-saison', 'Saison', 'env-saison', 'Saison', euros(50), euros(100)]);
   });
 
   it('principalOverdrawn : le compte principal et son non affecté, négatif [niveau 2]', () => {

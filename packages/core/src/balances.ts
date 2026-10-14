@@ -46,18 +46,22 @@ export interface TirelireEntry {
 /** Ce qu'un besoin retient et demande au début d'une période (D29). */
 export interface NeedSnapshot {
   needId: Id;
-  /** Part du solde de la tirelire attribuée à ce besoin (dans l'ordre des priorités). */
+  /**
+   * Part du solde de la tirelire attribuée à ce besoin (dans l'ordre des priorités) : une lecture,
+   * qui ne change pas la dotation (D29). Négative du montant du déficit sur le besoin qui le porte.
+   */
   held: Cents;
   /** Mensualité de croisière. */
   cruise: Cents;
   /**
-   * Ce que le besoin demande au-delà du régime : le rattrapage d'un déficit (D29) ; pour une
-   * échéance, ce qu'elle demande, lissage décidé compris — rien ne se lisse d'office (D88, #184).
+   * Ce que le besoin demande : sa dotation, comme `requested`, et 0 pour un versement. Un déficit ne
+   * s'y ajoute plus (D29, D96) : il reste dans le solde, et se lit sur `held`.
    */
   catchUp: Cents;
   /**
-   * Dotation de la période : pour une échéance, sa croisière plus la part d'un lissage décidé (D88) ;
-   * pour un autre besoin, max(croisière, rattrapage d'un déficit), 0 si l'objectif est atteint.
+   * Dotation de la période, déclarée, quel que soit le solde de la tirelire (D29, D96) : la croisière
+   * du besoin, plus la part d'un lissage décidé datée dans la période (D88) ; pour un versement, moins
+   * sa part déclarée (D48).
    */
   requested: Cents;
   /** Plancher en cas de marge négative (D06) : ce qu'une échéance demande, lissage décidé compris. */
@@ -242,14 +246,17 @@ function reserveOf(needs: Need[]): Cents {
 }
 
 /**
- * Attribue le solde aux besoins dans l'ordre des priorités et calcule ce que chacun demande
- * pour la période `p`. Un déficit pèse sur le premier besoin récurrent si la tirelire reporte,
- * sinon sur le premier besoin.
+ * Ce que chaque besoin demande pour la période `p`, et la part du solde qui lui revient.
  *
- * Une échéance demande sa croisière, plus la part d'un lissage décidé datée dans la période
- * (`smoothingOf`), et rien d'autre : ce qui ne sera pas réuni à temps est un manque, qui s'annonce
- * et ne se lisse que sur décision de l'utilisateur (principe 1.4, D88, #184). Entièrement
- * provisionnée, elle ne demande plus que la part d'un lissage décidé.
+ * La dotation est déclarée, quel que soit le solde de la tirelire (D29, D96) : la croisière du
+ * besoin, plus la part d'un lissage décidé datée dans la période (`smoothingOf`, D88) ; pour un
+ * versement, sa part déclarée (D48). Une provision qui a déjà sa cible, un objectif atteint, un
+ * déficit, une réserve qui ne tient pas ne la changent pas.
+ *
+ * L'attribution du solde aux besoins, dans l'ordre des priorités, est une lecture (D29) : une
+ * échéance retient jusqu'à sa cible, un objectif jusqu'à la sienne, le reste va aux suivants ; un
+ * déficit se lit sur le premier besoin récurrent si la tirelire reporte, sinon sur le premier
+ * besoin, dont la part retenue est négative de son montant.
  */
 export function needSnapshots(
   e: Tirelire,
@@ -271,8 +278,7 @@ export function needSnapshots(
         const held = Math.min(Math.max(remaining, 0), target);
         remaining -= held;
         const smoothing = smoothingOf(n.id);
-        // Entièrement provisionnée : plus de croisière avant l'échéance ; un lissage décidé reste dû.
-        const requested = (held >= target ? 0 : cruise) + smoothing;
+        const requested = cruise + smoothing;
         out.push({ needId: n.id, held, cruise, catchUp: requested, requested, floor: requested, smoothing, dueDate, target });
         break;
       }
@@ -280,17 +286,13 @@ export function needSnapshots(
         const target = n.amount;
         const held = target === undefined ? Math.max(remaining, 0) : Math.min(Math.max(remaining, 0), target);
         remaining -= held;
-        const reached = target !== undefined && held >= target;
-        const requested = reached ? 0 : target !== undefined ? Math.min(cruise, target - held) : cruise;
-        out.push({ needId: n.id, held, cruise, catchUp: requested, requested, floor: 0, smoothing: 0, ...(target !== undefined ? { target } : {}) });
+        out.push({ needId: n.id, held, cruise, catchUp: cruise, requested: cruise, floor: 0, smoothing: 0, ...(target !== undefined ? { target } : {}) });
         break;
       }
       case 'payout': {
-        // On ne verse que ce que la tirelire porte : une saison décevante réduit le versement.
         const held = Math.max(remaining, 0);
         remaining -= held;
-        const verse = Math.min(cruise, held);
-        out.push({ needId: n.id, held, cruise, catchUp: 0, requested: -verse || 0, floor: 0, smoothing: 0, target: n.amount ?? 0 });
+        out.push({ needId: n.id, held, cruise, catchUp: 0, requested: -cruise || 0, floor: 0, smoothing: 0, target: n.amount ?? 0 });
         break;
       }
       case 'recurring': {
@@ -305,8 +307,7 @@ export function needSnapshots(
     const rollover = e.rollover ?? { mode: 'unlimited' };
     const bearer =
       (rollover.mode !== 'none' ? out.find((s) => needs.find((n) => n.id === s.needId)?.kind === 'recurring') : undefined) ?? out[0]!;
-    bearer.catchUp += -remaining;
-    bearer.requested = Math.max(bearer.cruise, bearer.catchUp);
+    bearer.held += remaining;
   }
   return out;
 }
