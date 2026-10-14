@@ -1,10 +1,18 @@
 /**
- * Tests du codeur de #477 — « Cœur : la dotation est ce qui est déclaré, quel que soit le solde ».
- * Tous de niveau 4 : l'auditeur choisit ce qu'il retient pour le harnais, et lui donne son niveau.
+ * Harnais d'audit de #477 — « Cœur : la dotation est ce qui est déclaré, quel que soit le solde ».
+ * Composé après le codage (auditeur.md, étape 2), des tests du codeur, tous retenus.
  *
- * Chaque bloc nomme le point du « Fait quand » qu'il vérifie. Le point 6 (le plan de l'exemple) est
- * tenu par les tests adaptés (`manque-lissage-harnais`, `reprise-harnais`, et dans `apps/web/test`,
- * `compte-principal-cas` et `stockage-domaine`) ; le point 7, par les tests mesurés eux-mêmes.
+ * Niveaux (D83) :
+ * - point 1, niveau 1 : une dotation qui suivrait le solde ferait changer le budget sans validation,
+ *   ce que I10 interdit tel qu'il est écrit (D96, « l'hypothèse écartée ») ;
+ * - points 2, 4 et 5, niveau 2 : la lecture du solde (« retenu », statuts, `payoutShort`) donnerait
+ *   un résultat faux, l'usage restant possible (D29, D48) ;
+ * - point 3, niveau 1 : l'ordre demandé, comme le harnais du registre qui le tient déjà
+ *   (`flux-derives-besoin.test.ts`, I3 U2, I10) ; deux tests du même besoin ont le même niveau.
+ *
+ * Le point 6 (le plan de l'exemple) est tenu par les tests adaptés (`manque-lissage-harnais`,
+ * `reprise-harnais`, et dans `apps/web/test`, `compte-principal-cas` et `stockage-domaine`) ; le
+ * point 7, par les tests mesurés eux-mêmes ; le point 8 se vérifie à la relecture.
  */
 import { describe, expect, it } from 'vitest';
 import { computePlan, euros, exampleLedger, readAlerts, type Ledger, type Plan } from '../src/index.js';
@@ -35,7 +43,7 @@ function avecSaison(solde: number): Ledger {
 
 const dotations = (p: Plan) => Object.fromEntries(p.lines.map((l) => [l.needId, l.requested]));
 
-describe('[niveau 4] #477 · 1. la dotation est ce qui est déclaré, quel que soit le solde', () => {
+describe('[niveau 1] #477 · 1. la dotation est ce qui est déclaré, quel que soit le solde', () => {
   // Des soldes vides, en déficit, à la cible, au-delà : taxe foncière (cible 1 200 €), précaution
   // (objectif 6 000 €), Enfants et loisirs (récurrent avec report), et une saison qui verse.
   const variantes: Array<[string, Record<string, number>, number]> = [
@@ -79,7 +87,7 @@ describe('[niveau 4] #477 · 1. la dotation est ce qui est déclaré, quel que s
   });
 });
 
-describe('[niveau 4] #477 · 2. un déficit ne se rattrape plus de lui-même', () => {
+describe('[niveau 2] #477 · 2. un déficit ne se rattrape plus de lui-même', () => {
   it('Enfants et loisirs, 36 € de déficit fin septembre : octobre demande sa croisière, le « retenu » est de −36 €', () => {
     const oct = line(computePlan(exampleLedger(), OCTOBRE), 'need-enfants');
     expect([oct.balance, oct.held, oct.requested, oct.status]).toEqual([euros(-36), euros(-36), euros(200), 'ok']);
@@ -131,7 +139,7 @@ describe('[niveau 4] #477 · 2. un déficit ne se rattrape plus de lui-même', (
   });
 });
 
-describe('[niveau 4] #477 · 3. l’ordre permanent demandé compte l’objectif atteint', () => {
+describe('[niveau 1] #477 · 3. l’ordre permanent demandé compte l’objectif atteint', () => {
   const permanent = (l: Ledger) => computePlan(l, SEPTEMBRE).transfers.find((t) => t.accountId === 'acc-livret')!.permanent;
 
   it('l’épargne de précaution pleine, à 6 000 € ou au-delà, reste dans l’ordre vers le Livret A', () => {
@@ -150,7 +158,7 @@ describe('[niveau 4] #477 · 3. l’ordre permanent demandé compte l’objectif
   });
 });
 
-describe('[niveau 4] #477 · 4. le statut d’une ligne', () => {
+describe('[niveau 2] #477 · 4. le statut d’une ligne', () => {
   it('« en avance » : une échéance ou un objectif dont la part retenue atteint la cible ; la ligne demande sa croisière', () => {
     const p = computePlan(avecSoldes({ 'env-auto': euros(600), 'env-precaution': euros(6000) }), SEPTEMBRE);
     expect([line(p, 'need-auto').status, line(p, 'need-auto').requested]).toEqual(['ahead', euros(50)]);
@@ -189,7 +197,7 @@ describe('[niveau 4] #477 · 4. le statut d’une ligne', () => {
   });
 });
 
-describe('[niveau 4] #477 · 5. `payoutShort` dit que la réserve ne porte plus la part déclarée', () => {
+describe('[niveau 2] #477 · 5. `payoutShort` dit que la réserve ne porte plus la part déclarée', () => {
   const codes = (l: Ledger) => computePlan(l, SEPTEMBRE).warnings.filter((w) => w.code === 'payoutShort').map((w) => w.needId);
 
   it('il vient quand la part retenue au début de la période est inférieure à la part déclarée, et seulement alors', () => {
