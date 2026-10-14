@@ -22,9 +22,9 @@ Le Bilan accueille le suivi : il compare le prévu au réel et propose les ajust
 
 ## Hypothèses
 
-1. Un virement importé qu'aucun flux ne rapproche n'est pas ventilé d'office : l'application propose
-   d'en faire un flux (#16), prérempli par ce que le plan demande quand un budget existe (D21) ;
-   l'utilisateur garde, corrige ou refuse (principe 4.4, U3, U4). Une ventilation calculée depuis
+1. Un virement importé qui ne rapproche aucune occurrence d'un flux n'est pas ventilé d'office :
+   l'application propose d'en faire un flux (#16), prérempli par ce que le plan demande quand un
+   budget existe (D21) ; l'utilisateur garde, corrige ou refuse (principe 4.4, U3, U4). Une ventilation calculée depuis
    l'état du plan au jour de l'opération serait supposée, ce que U4 interdit.
 2. Le suivi montre ce qui se lit sur le réel ou à une date : soldes réels et prévus des comptes et
    des tirelires, non affecté, manques, attendus non reçus, virements tirés du réel — complément

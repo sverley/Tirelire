@@ -30,7 +30,7 @@ compte alors deux salaires certains mois, et zéro le mois suivant.
 `settings.budgetYearStart = { month, day }`. Sert aux budgets annuels et aux bilans. Les provisions
 gardent leur propre ancrage (`periodicity.anchorDate`), indépendant.
 
-### D04 · Relevé du compte principal seul, comptes tiers saisis à la main
+### D04 · Relevé du compte principal seul au départ, solde à régler des comptes tiers
 
 Seul le compte principal est importé au départ (les autres comptes peuvent l'être plus tard sans
 changer le modèle, ni le genre du compte, D45). Un **compte tiers** est un compte réel qui suit un
@@ -124,7 +124,7 @@ ordre enregistré vers ce compte reconnaît, comme la sélection de l'ordre le f
 seulement un débit du compte principal, d'où part l'ordre (D57) —, ou, vers un compte sans ordre
 enregistré, dont le libellé contient celui tiré de son nom — est reconnue comme un virement vers ce
 compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ — amendé le 7 octobre
-2026 : ventilée par les parts de l'ordre qui la rapproche (D12, D60), et non affectée sur ce compte
+2026 : ventilée par les parts de l'ordre dont elle rapproche une occurrence (D12, D60), et non affectée sur ce compte
 sinon (D21).
 
 ### D12 · Pointage prudent
@@ -197,8 +197,8 @@ D88). Ce que les parts n'absorbent pas — montant constaté différent, parts f
 le budget — reste **non affecté** sur le compte d'accueil (D29), visible, et le suivi le dit (D96) ;
 rien ne se répartit d'office. L'ordre de financement de D06 n'est pas une répartition rejouée sur
 l'opération : il est le contenu de ce que le plan **propose** — la ventilation d'un ordre à sa
-validation (U2), celle d'un virement importé qu'aucun flux ne rapproche et dont on fait un flux (U3,
-#16) —, que l'utilisateur garde, corrige ou refuse (principe 4.4). Une ventilation calculée depuis
+validation (U2), celle d'un virement importé qui ne rapproche aucune occurrence d'un flux et dont on
+fait un flux (U3, #16) —, que l'utilisateur garde, corrige ou refuse (principe 4.4). Une ventilation calculée depuis
 l'état du plan au jour de l'opération serait une ventilation supposée, ce que U4 interdit ; D27 la
 range parmi les aides, dont le résultat se fige sur l'opération quand il est accepté.
 

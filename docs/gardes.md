@@ -133,8 +133,9 @@ de son test.
   se lit dans le plan. Sinon, et notamment si elle ne touche que des tests, de l'outillage ou de la
   documentation : dire dans le compte rendu du codeur pourquoi l'application n'est pas atteinte.
 - **Harnais** · `packages/core/test/import.test.ts` — « rapprochement » (U3) : virements
-  « TIRELIRE … » reconnus par compte, sans ventilation d'office faute de flux qui les rapproche —
-  leur montant reste non affecté (D11, D21) —, flux rapprochés quand libellé et montant concordent.
+  « TIRELIRE … » reconnus par compte, sans ventilation d'office faute de flux dont ils rapprochent
+  une occurrence — leur montant reste non affecté (D11, D21) —, occurrences de flux rapprochées quand
+  libellé et montant concordent.
   Témoin rouge : « témoin rouge · un virement reconnu par son seul libellé, ventilé d’office »
 - **Vérification manuelle** · `VM-I3-u3-rapprochement` — Si la PR touche l'application, ou à la fin
   d'une version (`docs/versions.md`) : (U3) Construire un budget avec l'assistant sans valider les
@@ -144,7 +145,7 @@ de son test.
   Opérations propose d'en faire l'ordre permanent, au montant du virement et ventilé comme le plan le
   propose pour ce montant ; l'ordre enregistré, le virement en rapproche la première occurrence,
   avec ses parts, et l'écran Plan montre l'ordre enregistré et son écart avec ce que le budget
-  demande ; un relevé importé ensuite, avec le virement du mois suivant au même libellé et au même
+  demande ; dans un relevé importé ensuite, le virement du mois suivant, au même libellé et au même
   montant, en rapproche l'occurrence suivante sans rien demander. Sinon, et notamment si elle ne
   touche que des tests, de l'outillage ou de la documentation : dire dans le compte rendu du codeur
   pourquoi l'application n'est pas atteinte.
