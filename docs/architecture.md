@@ -11,7 +11,7 @@ Tirelire/
 │   ├── src/money.ts        centimes : parsing et formatage français
 │   ├── src/ids.ts          uuidv7, normalizeLabel, operationKey (`op_` + 16 hexadécimaux)
 │   ├── src/balances.ts     positions reconstruites (composantes par compte, besoins, dotations, demande d'une période répartie par placement, non affecté, solde à régler, état d'une tirelire)
-│   ├── src/plan.ts         plan de période : croisière, lissage décidé, rattrapage d'un déficit, priorités, virements
+│   ├── src/plan.ts         plan de période : dotation déclarée, lissage décidé, priorités, virements
 │   ├── src/forecast.ts     solde prévu d'une période à venir : opérations prévues en mémoire, mouvements et origines, manque
 │   ├── src/shortfall.ts    manque d'une échéance, proposition de lissage, réponse (lissage retenu ou refus)
 │   ├── src/csv.ts          décodage et parseur CSV
@@ -101,8 +101,10 @@ Dans le fichier, chaque table et chaque colonne porte le nom du domaine, la prop
    lit se lit sur le réel.
 1. Période contenant `asOf` ; revenus et charges fixes = occurrences des flux dans la période.
 2. Par besoin (D28) : part du solde de la tirelire qui lui revient (ordre des priorités), croisière,
-   rattrapage d'un déficit, dotation. Une échéance demande sa croisière plus la part d'un lissage
-   décidé datée dans la période, et rien d'autre ; son plancher est ce qu'elle demande (D06, D88).
+   dotation. La dotation est déclarée, quel que soit le solde (D29, D96) : la croisière, plus la part
+   d'un lissage décidé datée dans la période ; pour un versement, sa part déclarée (D48). La part du
+   solde est une lecture : elle dit quel besoin a sa cible et lequel porte un déficit, négative du
+   montant de celui-ci. Le plancher d'une échéance est ce qu'elle demande (D06, D88).
    Rien ne se lisse d'office : ce qui ne sera pas réuni à temps est un **manque**, le solde prévu
    négatif de la tirelire à la date de l'échéance (`dueDateShortfalls`), annoncé avec la proposition
    de le lisser tant que l'échéance n'a pas de réponse (#184).

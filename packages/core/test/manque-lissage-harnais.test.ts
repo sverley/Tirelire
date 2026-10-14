@@ -124,11 +124,12 @@ describe('[niveau 1] #184 · 1. le plan ne lisse plus rien d’office (principe 
   });
 });
 
-describe('[niveau 2] #184 · 1. le rattrapage d’un déficit ne change pas (D29)', () => {
-  it('Enfants : 236 € dépensés pour 200 € dotés en septembre ; octobre rattrape les 36 €', () => {
+describe('[niveau 2] #184 · 1. un déficit ne se rattrape plus de lui-même (D29 amendé, #477)', () => {
+  it('Enfants : 236 € dépensés pour 200 € dotés en septembre ; octobre demande sa croisière, et les 36 € se lisent sur sa ligne', () => {
     const enfants = line(computePlan(sansReponse(), '2026-10-20'), 'need-enfants');
-    expect(enfants.catchUp).toBe(euros(236));
-    expect(enfants.requested).toBe(euros(236));
+    expect(enfants.requested).toBe(euros(200));
+    expect(enfants.held).toBe(euros(-36));
+    expect(enfants.status).toBe('ok');
   });
 });
 
@@ -564,7 +565,9 @@ describe('[niveau 1] #184 · 7. le format change de version, et la version 4 est
 describe('[niveau 2] #184 · 8. le plan de l’exemple reste celui d’aujourd’hui, au centime près', () => {
   // Les montants que `main` donnait avant #184 (`apps/web/test/compte-principal-209.avant.json`),
   // comparés aussi, champ par champ, par l'auditeur : seuls rattrapage, plancher et statut des deux
-  // échéances sans rattrapage changent (point 1).
+  // échéances sans rattrapage changent (point 1). Depuis #477 (point 6), la dotation ne dépend plus
+  // du solde : le 20 octobre, Enfants et loisirs ne rattrape plus ses 36 € ; le 10 janvier, la taxe
+  // foncière, pleine, demande encore sa croisière.
   it('le 6 septembre', () => {
     const p = computePlan(exampleLedger(), '2026-09-06');
     const tf = line(p, 'need-tf');
@@ -578,12 +581,12 @@ describe('[niveau 2] #184 · 8. le plan de l’exemple reste celui d’aujourd�
   it('le 20 octobre et le 10 janvier', () => {
     const oct = computePlan(exampleLedger(), '2026-10-20');
     expect(line(oct, 'need-tf')).toMatchObject({ balance: 105000, requested: 15000, floor: 15000 });
-    expect(oct.totals).toEqual({ incomes: 420000, fixedCharges: 122000, requested: 238600, funded: 238600, margin: 59400, cushion: 60000, principalUnallocated: 237400 });
+    expect(oct.totals).toEqual({ incomes: 420000, fixedCharges: 122000, requested: 235000, funded: 235000, margin: 63000, cushion: 60000, principalUnallocated: 241000 });
     expect(oct.transfers.find((t) => t.accountId === 'acc-livret')!.net).toBe(138500);
     const jan = computePlan(exampleLedger(), '2027-01-10');
-    expect(line(jan, 'need-tf')).toMatchObject({ balance: 120000, requested: 0 });
-    expect(jan.totals).toEqual({ incomes: 435000, fixedCharges: 27000, requested: 279500, funded: 279500, margin: 128500, cushion: 60000, principalUnallocated: -56100 });
-    expect(jan.transfers.find((t) => t.accountId === 'acc-livret')!.net).toBe(353500);
+    expect(line(jan, 'need-tf')).toMatchObject({ balance: 140000, requested: 10000, status: 'ahead' });
+    expect(jan.totals).toEqual({ incomes: 435000, fixedCharges: 27000, requested: 289500, funded: 289500, margin: 118500, cushion: 60000, principalUnallocated: -82500 });
+    expect(jan.transfers.find((t) => t.accountId === 'acc-livret')!.net).toBe(383500);
   });
 
   it('lues le 6 septembre, les périodes à venir demandent la même chose, et l’exemple n’annonce aucun manque : la taxe foncière a sa réponse', () => {

@@ -55,15 +55,23 @@ describe('[niveau 2] le jeu d’exemple démontre l’application (D53)', () => 
     expect(margin).toBeLessThan(requested);
   });
 
-  it('aucune tirelire n’est laissée en déficit sans rattrapage', () => {
+  it('aucune tirelire en déficit ne le tait : son déficit se lit sur sa ligne (D29, #477)', () => {
     const octobre = computePlan(l, '2026-09-28');
-    for (const ligne of octobre.lines.filter((x) => x.balance < 0)) {
-      expect(ligne.requested, `« ${ligne.tirelireName} » en déficit sans dotation`).toBeGreaterThan(0);
+    const enDeficit = [...new Set(octobre.lines.filter((x) => x.balance < 0).map((x) => x.tirelireId))];
+    expect(enDeficit.length).toBeGreaterThan(0);
+    for (const id of enDeficit) {
+      const siennes = octobre.lines.filter((x) => x.tirelireId === id);
+      const solde = siennes[0]!.balance;
+      // Une ligne de la tirelire retient le déficit, en négatif de son montant.
+      expect(siennes.some((x) => x.held < 0), `« ${siennes[0]!.tirelireName} » tait son déficit`).toBe(true);
+      expect(siennes.reduce((s, x) => s + Math.min(x.held, 0), 0)).toBe(solde);
     }
-    // Enfants et loisirs : 200 dotés, 236 dépensés, report illimité → le trou est rattrapé.
+    // Enfants et loisirs : 200 dotés, 236 dépensés, report illimité → le trou reste dans le solde, et
+    // la tirelire demande sa croisière ; la proposition de rattrapage revient avec #478 (D53).
     const enfants = octobre.lines.find((x) => x.needId === 'need-enfants')!;
     expect(enfants.balance).toBe(euros(-36));
-    expect(enfants.requested).toBe(euros(236));
+    expect(enfants.held).toBe(euros(-36));
+    expect(enfants.requested).toBe(euros(200));
   });
 });
 

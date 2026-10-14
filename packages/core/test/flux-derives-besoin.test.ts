@@ -585,12 +585,13 @@ describe('[niveau 1] harnais du registre · I3 (U2), I10', () => {
       expect(demande(l, AVANT)).toBeLessThanOrEqual(avant);
     });
 
-    it('un objectif atteint ne réclame plus sa dotation (D06) : il sort de la somme demandée', () => {
-      // L'épargne de précaution vise 6 000 € ; on la dit pleine. Le financement ne lui donne plus
-      // rien (`requested = 0`) : un ordre qui la compterait encore virerait de l'argent sans emploi.
+    it('un objectif atteint reste dans la somme demandée (D60 amendé, #477) : sa dotation est déclarée', () => {
+      // L'épargne de précaution vise 6 000 € ; on la dit pleine. Sa dotation est déclarée, quel que
+      // soit le solde (D29) : l'ordre demandé la compte encore, et ce que le réel en dit devient une
+      // proposition (D96).
       const base = exampleLedger();
       const pleine: Ledger = { ...base, tirelires: base.tirelires.map((e) => (e.id === 'env-precaution' ? { ...e, openingBalance: euros(6000) } : e)) };
-      expect(demande(pleine, AVANT)).toBe(demande(base, AVANT) - euros(300));
+      expect(demande(pleine, AVANT)).toBe(demande(base, AVANT));
     });
   });
 

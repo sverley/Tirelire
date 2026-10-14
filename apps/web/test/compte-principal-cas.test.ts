@@ -18,7 +18,10 @@
  * le plan propose l'ordre et sa ventilation, le message dit « enregistré » ; le virement
  * « TIRELIRE LIVRET A » du relevé, que l'ordre de l'exemple reprend, prend ses parts, qu'il n'a pas
  * encore (#395), et reste non affecté, D21) ; adapté par #206 (le libellé du plan, `label`, devient la
- * liste `labels`, ici d'un seul libellé, le même), rien d'autre ne changeant.
+ * liste `labels`, ici d'un seul libellé, le même), rien d'autre ne changeant ; adapté par #477 (point 6
+ * de son « Fait quand » : la dotation ne dépend plus du solde ; le 20 octobre, Enfants et loisirs ne
+ * rattrape plus ses 36 €, et l'avertissement `belowCushion` disparaît ; le 10 janvier, la taxe
+ * foncière, pleine, demande encore sa croisière), et par cela seul.
  *
  * Niveaux (D83) : 2 — un résultat faux, l'usage restant possible.
  */

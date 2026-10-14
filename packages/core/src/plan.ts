@@ -55,18 +55,22 @@ export interface PlanLine {
   priority: number;
   /** Solde de la tirelire au début de la période, avant dotation. */
   balance: Cents;
-  /** Part de ce solde attribuée à ce besoin. */
+  /**
+   * Part de ce solde attribuée à ce besoin (« retenu ») : une lecture, qui ne change pas la dotation
+   * (D29). Négative du montant du déficit sur la ligne du besoin qui le porte.
+   */
   held: Cents;
   /** Mensualité de croisière (régime permanent). */
   cruise: Cents;
   /**
-   * Ce que le besoin demande au-delà du régime : le rattrapage d'un déficit (D29) ; pour une
-   * échéance, ce qu'elle demande, lissage décidé compris (D88, #184).
+   * Ce que le besoin demande, comme `requested`, et 0 pour un versement. Un déficit ne s'y ajoute plus
+   * (D29, D96) : il se lit sur `held`.
    */
   catchUp: Cents;
   /**
-   * Dotation de la période : pour une échéance, sa croisière plus la part d'un lissage décidé (D88) ;
-   * pour un autre besoin, max(croisière, rattrapage d'un déficit), 0 si l'objectif est atteint.
+   * Dotation de la période, déclarée, quel que soit le solde de la tirelire (D29, D96) : la croisière
+   * du besoin, plus la part d'un lissage décidé datée dans la période (D88) ; pour un versement, moins
+   * sa part déclarée (D48).
    */
   requested: Cents;
   /** Plancher en cas de marge négative (D06) : ce qu'une échéance demande, lissage décidé compris. */
@@ -102,7 +106,7 @@ export interface StandingOrder {
   tirelireName: string;
   /** Part permanente (jusqu'à la croisière des besoins de la tirelire). */
   standing: Cents;
-  /** Complément exceptionnel ce mois-ci (rattrapage d'un déficit, lissage décidé, écart ancien). */
+  /** Complément exceptionnel ce mois-ci (lissage décidé, écart ancien). */
   exceptional: Cents;
   /** Montant total signé : positif = principal → compte. */
   amount: Cents;
@@ -347,7 +351,7 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
 
   /*
    * Les versements (D48) ne se disputent pas les revenus : ils en apportent. Une tirelire de
-   * saison verse ce qu'elle porte, ce qui augmente d'autant ce que les autres besoins peuvent se
+   * saison verse sa part déclarée, ce qui augmente d'autant ce que les autres besoins peuvent se
    * partager. `fundByPriority` écrête à zéro et ne saurait pas traiter une demande négative.
    */
   const payouts = lines.filter((l) => l.kind === 'payout');
@@ -359,21 +363,29 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   );
   for (const l of lines) {
     if (l.kind === 'payout') {
-      // Le versement est « réduit » quand la tirelire n'a plus de quoi tenir le rythme annoncé.
-      l.status = -l.requested < l.cruise ? 'reduced' : 'ok';
-      if (l.status === 'reduced')
+      /*
+       * Le versement verse sa part déclarée, quel que soit le solde de sa tirelire (D29, D48) : sa
+       * ligne ne se dit pas « réduite ». Quand la part du solde qui lui revient, au début de la
+       * période, est inférieure à cette part, la réserve ne la porte plus, et le plan le dit.
+       */
+      l.status = 'ok';
+      if (l.held < l.cruise)
         warnings.push({
           code: 'payoutShort',
-          message: `« ${l.name} » ne verse plus le montant prévu : la réserve s'épuise.`,
+          message: `La réserve de « ${l.name} » ne porte plus sa part déclarée.`,
           tirelireId: l.tirelireId,
           needId: l.needId,
         });
       continue;
     }
-    if (l.requested === 0) l.status = 'ahead';
-    else if (l.funded === 0) l.status = 'unfunded';
+    // « Réduit » et « non financé » lisent le financement par les revenus (D06), avant tout autre
+    // statut. « En avance » dit seulement que la cible est déjà réunie : la ligne demande sa
+    // croisière, comme les autres (D29). « Rattrapage » ne vient que de la part d'un lissage décidé
+    // (D88) : un déficit ne se rattrape plus de lui-même, il se lit sur le « retenu ».
+    if (l.requested > 0 && l.funded === 0) l.status = 'unfunded';
     else if (l.funded < l.requested) l.status = 'reduced';
-    else if (l.catchUp > l.cruise) l.status = 'catchUp';
+    else if ((l.kind === 'dueDate' || l.kind === 'goal') && l.target !== undefined && l.held >= l.target) l.status = 'ahead';
+    else if (l.smoothing !== 0) l.status = 'catchUp';
     else l.status = 'ok';
     if (l.status === 'unfunded')
       warnings.push({ code: 'unfunded', message: `« ${l.name} » n'est pas couverte par les revenus ce mois-ci.`, tirelireId: l.tirelireId, needId: l.needId });
@@ -421,12 +433,12 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
   // Virements par compte (vue principal ↔ compte), règlements des tiers, surplus des comptes d'accueil.
   /*
    * Ce que chaque tirelire demande comme **dotation permanente**, compte par compte (D60). Quatre
-   * pièges, qu'un simple `needCruise` par tirelire ne verrait pas :
+   * cas, qu'un simple `needCruise` par tirelire ne verrait pas :
    *
-   * - un **objectif atteint** ne demande plus rien (D06) : un ordre qui le compterait encore
-   *   virerait de l'argent sans emploi ;
-   * - une **échéance déjà provisionnée**, elle, continue de compter : elle sera dépensée, et
-   *   l'épargne reprend juste après — on ne suspend pas un ordre permanent pour un mois ;
+   * - un **objectif atteint** y reste : sa dotation est déclarée (D29), et ce que le réel en dit
+   *   devient une proposition (D96) ;
+   * - une **échéance déjà provisionnée** continue de compter : elle sera dépensée, et l'épargne
+   *   reprend juste après — on ne suspend pas un ordre permanent pour un mois ;
    * - un **besoin versant** (D48) rend de l'argent au lieu d'en réclamer ;
    * - une tirelire **placée sur deux comptes** partage sa dotation entre eux (D37) au lieu de la
    *   demander deux fois.
@@ -437,14 +449,13 @@ export function computePlan(ledger: Ledger, asOf: ISODate, today: ISODate = asOf
    * un livret et déjà à 3 200 € n'en réclame plus rien, sans quoi le plan demanderait d'en rapatrier
    * l'excédent tout en réglant un ordre permanent qui l'y renvoie.
    *
-   * Ni le rattrapage d'un déficit ni un lissage décidé n'en font partie : ils sont exceptionnels, un
-   * ordre permanent ne s'y règle pas (D60) ; le virement de la période les porte en complément
-   * exceptionnel.
+   * Un lissage décidé n'en fait pas partie : il est exceptionnel, un ordre permanent ne s'y règle pas
+   * (D60) ; le virement de la période le porte en complément exceptionnel.
    */
   const wantedByAccount = new Map<Id, PlanTransfer['breakdown']>();
   for (const e of idx.tireliresById.values()) {
     const siennes = lines.filter((l) => l.tirelireId === e.id);
-    const dotation = siennes.filter((l) => l.kind !== 'payout' && !(l.kind === 'goal' && l.requested === 0)).reduce((s, l) => s + l.cruise, 0);
+    const dotation = siennes.filter((l) => l.kind !== 'payout').reduce((s, l) => s + l.cruise, 0);
     if (dotation <= 0) continue;
     const source = principal?.id ?? '';
     const solde = siennes[0]?.balance ?? 0;

@@ -157,25 +157,27 @@ describe('[niveau 2] tirelire de saison (D48)', () => {
     expect(plan.totals.margin).toBe(euros(200));
   });
 
-  it('ne verse que ce que la tirelire porte quand la saison a été mauvaise', () => {
-    // 300 € en caisse là où le rythme annoncé demanderait 1 000 € : on verse les 300 €.
+  it('verse sa part déclarée quand la saison a été mauvaise, et prévient que la réserve ne la porte plus (D29, D48, #477)', () => {
+    // 300 € en caisse là où la part déclarée est de 1 000 € : le budget compte les 1 000 €.
     const plan = computePlan(saison(300), '2026-01-10');
     const ligne = plan.lines.find((l) => l.needId === 'n-saison')!;
-    expect(ligne.requested).toBe(euros(-300));
+    expect(ligne.requested).toBe(euros(-1000));
     expect(ligne.cruise).toBe(euros(1000));
-    expect(ligne.status).toBe('reduced');
+    expect(ligne.held).toBe(euros(300));
+    expect(ligne.status).toBe('ok');
     expect(plan.warnings.map((w) => w.code)).toContain('payoutShort');
+    expect(plan.totals.margin).toBe(euros(200));
   });
 
-  it("prévient quand la réserve est épuisée, au lieu de creuser un solde négatif", () => {
-    // Le mois suivant, les 300 € ont été versés : il ne reste rien à verser.
+  it('la réserve épuisée, le versement verse toujours sa part déclarée, que la marge compte, et le plan prévient (D29, D48, #477)', () => {
+    // Le mois suivant, la réserve est en déficit des 700 € versés au-delà de ce qu'elle portait.
     const plan = computePlan(saison(300), '2026-02-10');
     const ligne = plan.lines.find((l) => l.needId === 'n-saison')!;
-    expect(ligne.requested).toBe(0);
-    expect(ligne.status).toBe('reduced');
+    expect(ligne.requested).toBe(euros(-1000));
+    expect(ligne.held).toBe(euros(-700));
+    expect(ligne.status).toBe('ok');
     expect(plan.warnings.map((w) => w.code)).toContain('payoutShort');
-    // Et la marge retombe au niveau qu'elle aurait sans la saison.
-    expect(plan.totals.margin).toBe(euros(-800));
+    expect(plan.totals.margin).toBe(euros(200));
   });
 });
 
