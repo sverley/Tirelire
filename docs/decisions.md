@@ -856,9 +856,10 @@ regarde, et `today`, la date jusqu'à laquelle les soldes bancaires sont connus 
 l'interface y passe sa **date de lecture**).
 
 Le budget de la période dit ce que chaque tirelire demande — sa dotation (D29) — et ce qu'il faut
-virer pour elle : cette dotation, répartie comme son placement la veut (`periodDemand`), calculée
-sur le seul solde de la tirelire, qui ne dépend d'aucun virement (D29). Le placement ne change que
-l'endroit où dort la dotation, jamais son montant (D38, D96).
+virer pour elle : cette dotation, répartie comme son placement la veut (`periodDemand`). Seule la
+répartition lit le solde de la tirelire — une part fixe du placement est un plafond de position —,
+jamais une position de compte ni un virement (D29, D38) ; elle change l'endroit où dort la dotation,
+jamais son montant (D96).
 
 Ce qui se lit sur le réel ou à une date est au suivi (D96). Jusqu'à `today`, les écarts de placement
 se lisent sur le réel : si un virement des mois passés n'a pas été fait, l'argent est encore sur le
@@ -869,9 +870,10 @@ opérations prévues qui comptent jusque-là, chacune affichée avec son origine
 (principe 1.3) : une opération prévue se calcule depuis un flux enregistré et se montre comme prévue
 (D88).
 
-Invariant tenu par les tests : pour une période à venir, ce qu'on vire vers un compte d'accueil vaut
-exactement ce que les tirelires placées là demandent pour cette période ; dans la période où l'on
-lit, moins le non affecté que le suivi propose d'en rapatrier. Sans lui, le bloc « Virements à faire » recalculerait
+Invariant tenu par les tests : pour chaque période, ce que le budget vire vers un compte d'accueil
+vaut exactement ce que les tirelires placées là demandent pour cette période. Ce qui se lit sur le
+réel — le non affecté à rapatrier d'un compte d'accueil, le complément exceptionnel — n'y entre pas :
+le suivi le propose comme un virement à part (D96). Sans lui, le bloc « Virements à faire » recalculerait
 l'écart depuis la position réelle du jour pendant que le bloc « Tirelires » simulerait période par
 période, et les deux se contrediraient dès la période suivante (sur l'exemple : 700 € demandés contre
 1 400 € virés en octobre). Aucun virement n'est tenu pour exécuté sans le dire : un virement permanent
@@ -1061,9 +1063,10 @@ seconde branche, allumer « Clos » ne montrerait rien — le budget clos d'hier
 bien en vigueur. Quand le filtre vide une carte de ses besoins, la ligne le dit et compte ceux qu'il
 range.
 
-**Ce que la clôture d'un compte ne fait pas.** Le plan continue de calculer les écarts de placement
-à partir des placements déclarés : il n'a pas appris à lire les dates d'un compte, et une tirelire
-qui vise un compte clos produira donc encore un virement. Ajouter cette lecture au plan demanderait
+**Ce que la clôture d'un compte ne fait pas.** Le suivi continue de calculer les écarts de placement
+à partir des placements déclarés (D20, D96), et le budget de répartir la dotation vers ce compte : ni
+l'un ni l'autre n'a appris à lire les dates d'un compte, et une tirelire qui vise un compte clos
+produira donc encore un virement. Ajouter cette lecture demanderait
 de décider ce que devient l'argent qui y dort, ce qui est une autre décision. En attendant, deux
 garde-fous d'interface : les menus ne proposent plus un compte clos — en gardant celui qu'une ligne
 existante désigne déjà, sans quoi le menu s'ouvrirait vide et l'enregistrement suivant effacerait le
@@ -1382,8 +1385,8 @@ boutons, messages, aides, documentation qui lui est destinée ; le tutoiement n'
 
 Précise D57, sous le principe 13 (#291).
 
-**Le budget et le plan.** Le budget se construit de manière générique, sans date ; le plan lit les
-écarts entre opérations, flux, tirelires et comptes. Un flux est la représentation abstraite
+**Le budget et le suivi.** Le budget se construit de manière générique, sans date ; le suivi lit les
+écarts entre opérations, flux, tirelires et comptes (D96). Un flux est la représentation abstraite
 d'opérations à venir ; ses opérations prévues en sont la représentation concrète, toujours cohérentes
 avec lui.
 
