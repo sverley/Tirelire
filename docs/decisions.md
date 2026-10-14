@@ -1535,7 +1535,7 @@ rétrocompatible (D30). Elle vient quand ce qui fait bouger le format a été ex
 Le porteur voulait reprendre un budget tenu ailleurs sans refaire l'assistant ni fabriquer un
 fichier SQLite (#366). Séparer le stockage — le budget en JSON, les opérations en SQLite — a été
 examiné et écarté : deux fichiers à sauvegarder ensemble (C5), des références d'une sous-opération ou
-d'une reprise qui franchiraient la frontière, deux mécanismes de synchronisation (I8) et deux
+d'un rapprochement qui franchiraient la frontière, deux mécanismes de synchronisation (I8) et deux
 formats à versionner (D30).
 
 Il n'y a donc qu'**un seul stockage, le fichier SQLite** (D08, D58). Le **budget JSON** est un format

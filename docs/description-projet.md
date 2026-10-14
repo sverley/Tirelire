@@ -980,7 +980,7 @@ Puis, à la proposition « rapprochement pour le lien, classée pour l'état » 
 
 > oui
 
-Ce qui en est tiré : D04, D10, D11, D21, D22, D23, D24, D27, D33, D36, D49, D52, D58, D60, D88, D95
-et D96 amendées ; le glossaire (compte tiers, besoin, croisière, provision, objectif, budget,
+Ce qui en est tiré : D04, D10, D11, D21, D22, D23, D24, D27, D33, D36, D49, D52, D58, D60, D88, D93,
+D95 et D96 amendées ; le glossaire (compte tiers, besoin, croisière, provision, objectif, budget,
 automatisme, flux prévu, opération, sous-opération, rapprochement, réponse, visée) ; le registre
 (I3) ; les domaines plan et flux, rapprochement et bilan.
