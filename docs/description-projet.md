@@ -935,3 +935,26 @@ Puis, après la confrontation des quatre propositions à U4 :
 
 Ce qui en est tiré : D21, D24, D57 et D60 amendées ; le glossaire (flux prévu) ; les domaines plan
 et flux, rapprochement et bilan, opérations.
+
+## 13 octobre 2026 · le budget se déclare, le réel propose
+
+Paroles du porteur, dans #468 :
+
+> L'application utilise le terme de 'Non affecté' dans le budget à cause d'une notion temporelle (le solde du compte principal). Or le concept meme de cette partie de l'application est de regarder les flux, pas les soldes. Analyse l'organisation actuelle de l'app pour éviter de mélanger les concepts (la partie de construction du budget avec ces flux (opération récurrentes, épargne, provisions...) ainsi que les virements que cela implique sur les comptes bancaires, la partie historique des opérations avec les classement, les automatismes, les rapprochements, et la partie bilan qui compare et analyse les écarts, propose de changement si besoin.
+> Propose une réorganisation si nécessaire, et propose une relecture des termes employés (non affecté est erroné par exemple dans le budget) pour etre clair et non ambigüe. Consigne ça dans des tickets (découpe si trop gros mais garde ce qui doit être réfléchit ensemble dans le meme ticket)
+
+Puis, à la première question de l'architecte — la dotation du budget est-elle toujours la croisière ? —, d'abord posée en termes abstraits :
+
+> Soit plus clair. J'ai des revenus par mois, et des revenus ponctuels dans l'année qui doivent être pris en compte sur l'année entière, quitte à reverser une partie de l'argent mise de côté au moment du paiement ponctuel depuis un compte épargné de stockage
+
+Et, à la même question reposée sur son exemple — une prime de 2 400 € en juin, vécue à 200 € par mois (D48) : « dans le budget, comptes-tu toujours 200 € par mois de la prime, même avant qu'elle soit tombée et même si elle a été plus faible, en laissant au suivi le soin de dire que la réserve ne tient pas ? » :
+
+> Réfléchi au plus simple. On utilise l'information le plus tôt possible pour proposer des aménagements du budget. Mais on ne change rien sans validation. On ne fait donc que des proposition d'ajustement du budget en fonction du réel. Attention quand meme à ce que des variations faibles et qui n'ont pas d'impact gênant ne génèrent pas des changements intempestifs (salaires variant d'une centaine d'euros, factures électriques réelle...)
+
+Puis, à la troisième question — le suivi, un écran à part ou le Bilan ? — :
+
+> Dans le bilan, sauf si trot lourd d'un point de vue des standards ergonomiques
+
+Ce qui en est tiré : D96 ; D04, D20, D21, D29, D38, D48, D52, D53, D60 et D88 amendées ; le
+glossaire (non affecté, dotation, suivi) ; les domaines budget et tirelires, plan et flux,
+rapprochement et bilan.
