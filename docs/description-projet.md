@@ -984,3 +984,14 @@ Ce qui en est tiré : D04, D10, D11, D21, D22, D23, D24, D27, D33, D36, D49, D52
 D95 et D96 amendées ; le glossaire (compte tiers, besoin, croisière, provision, objectif, budget,
 automatisme, flux prévu, opération, sous-opération, rapprochement, lissage, réponse, visée) ; le registre
 (I3) ; les domaines plan et flux, rapprochement et bilan.
+
+## 15 octobre 2026 · les virements internes, et des libellés lus souplement
+
+Dans #488, constaté sur un historique réel de 16 mois : l'appariement automatique des virements internes
+forme de fausses paires et en manque de vraies. Le porteur choisit d'apparier automatiquement seulement
+quand la destination est connue, et de proposer sinon. Il ajoute :
+
+> les comparaisons de libellés doivent être souples quand même (casse, accent, troncature, préfixe ou suffixe posé par la banque/Linxo). Peut-être prévoir une comparaison floue et un score mini de corrélation.
+
+Ce qui en est tiré : D11 et D33 amendées ; le glossaire (appariement) ; la ligne « Pipeline d'import »
+de l'architecture.

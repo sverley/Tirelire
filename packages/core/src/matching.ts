@@ -41,38 +41,219 @@ function subOperationsOf(ledger: Ledger, opId: Id): SubOperation[] {
 }
 
 // ---------------------------------------------------------------------------
-// Virements internes entre deux comptes importés
+// Virements internes entre deux comptes importés : l'appariement (#488)
 // ---------------------------------------------------------------------------
 
 /**
- * Apparie débit sur un compte et crédit du même montant sur un autre compte
- * suivi à ± `windowDays`. Ne touche qu'aux opérations en attente.
+ * Une paire possible de virement interne que l'appariement automatique n'a pas formée : un débit et un
+ * crédit, à confirmer par l'utilisateur (`acceptInternalTransfer`, #488, point 3).
+ */
+export interface TransferPairProposal {
+  debitId: Id;
+  creditId: Id;
+}
+
+/**
+ * La destination connue de chaque opération qui en a une (#488, point 1 ; D11) : le compte vers lequel
+ * (ou, pour un crédit, depuis lequel) elle est désignée comme virement, à la main ou par une
+ * désignation déjà posée (`transferAccountId`) ; pour un débit, le compte que reconnaît le libellé
+ * d'un ordre enregistré vers lui, ou « TIRELIRE <COMPTE> » vers un compte sans ordre
+ * (`matchTirelireTransfers`). Rien d'autre : ni le nom ni le numéro d'un compte cités dans un libellé,
+ * ni un montant égal.
+ */
+function knownDestinations(ledger: Ledger): Map<Id, Id> {
+  const out = new Map<Id, Id>();
+  for (const o of matchTirelireTransfers(ledger).operations) out.set(o.id, o.transferAccountId!);
+  for (const o of alive(ledger.operations)) if (o.transferAccountId) out.set(o.id, o.transferAccountId);
+  return out;
+}
+
+/** Une opération qui peut être un côté d'un virement interne encore sans autre côté : importée, vivante, sans autre côté, d'un montant non nul. */
+function sansAutreCote(o: Operation): boolean {
+  return o.origin === 'imported' && !o.transferOperationId && o.amount !== 0;
+}
+
+/** Les opérations, par montant : un virement n'apparie que des montants opposés. */
+function byAmount(ops: Operation[]): Map<Cents, Operation[]> {
+  const out = new Map<Cents, Operation[]>();
+  for (const o of ops) out.set(o.amount, [...(out.get(o.amount) ?? []), o]);
+  return out;
+}
+
+/** Les deux opérations sont-elles les deux côtés possibles d'un même virement : deux comptes, montants opposés, à ± `windowDays` ? */
+function cotesOpposes(a: Operation, b: Operation, windowDays: number): boolean {
+  return a.id !== b.id && a.accountId !== b.accountId && a.amount === -b.amount && Math.abs(diffDays(a.date, b.date)) <= windowDays;
+}
+
+/**
+ * Les deux opérations peuvent-elles s'apparier par la destination connue (#488, point 2) ? L'une a pour
+ * destination connue le compte de l'autre ; aucune n'a pour destination connue un autre compte que
+ * celui de l'autre ; une opération verrouillée n'entre que désignée (D22) : une désignation à la main
+ * compte, même verrouillée, mais une opération que l'utilisateur a verrouillée sans la désigner reste
+ * comme il l'a laissée.
+ */
+function parDestination(a: Operation, b: Operation, dest: Map<Id, Id>): boolean {
+  const da = dest.get(a.id);
+  const db = dest.get(b.id);
+  if (da !== b.accountId && db !== a.accountId) return false;
+  if ((da !== undefined && da !== b.accountId) || (db !== undefined && db !== a.accountId)) return false;
+  if ((isLocked(a) && da === undefined) || (isLocked(b) && db === undefined)) return false;
+  return true;
+}
+
+/** L'état d'un côté apparié par l'import : *classé*, ou *verrouillé* s'il l'était (D22, D33). */
+function pairOf(a: Operation, b: Operation, state?: Operation['state']): Operation[] {
+  return [
+    { ...a, state: state ?? (isLocked(a) ? 'locked' : 'reconciled'), transferAccountId: b.accountId, transferOperationId: b.id },
+    { ...b, state: state ?? (isLocked(b) ? 'locked' : 'reconciled'), transferAccountId: a.accountId, transferOperationId: a.id },
+  ];
+}
+
+/**
+ * Apparie les virements internes dont la destination est connue (#488, point 2 ; D11, D33), sur tout le
+ * grand livre : une opération importée sans autre côté, dont la destination est connue
+ * (`knownDestinations`), s'apparie à une opération importée du compte désigné, de montant opposé, à
+ * ± `windowDays`, quand chacune est, pour l'autre, la plus proche en date et la seule à cette distance.
+ * Les paires se forment par tours, chacun sur les opérations que les tours précédents ont laissées : le
+ * résultat ne dépend pas de l'ordre des opérations. Les deux côtés deviennent *classés* ; un côté
+ * verrouillé le reste ; aucune ventilation ne change. Une opération sans destination connue ne
+ * s'apparie jamais ici : un montant égal ne suffit pas, une coïncidence formerait une fausse paire. Les
+ * paires possibles que l'appariement ne forme pas se proposent (`proposeInternalTransfers`).
  */
 export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
   const patch = emptyPatch();
-  const pending = alive(ledger.operations).filter((o) => !isLocked(o) && !o.transferAccountId && !o.transferOperationId);
-  const used = new Set<Id>();
-  const debits = pending.filter((o) => o.amount < 0).sort((a, b) => (a.date < b.date ? -1 : 1));
-  const credits = pending.filter((o) => o.amount > 0);
-  for (const d of debits) {
-    if (used.has(d.id)) continue;
-    let best: Operation | undefined;
-    let bestGap = Infinity;
-    for (const c of credits) {
-      if (used.has(c.id) || c.accountId === d.accountId || c.amount !== -d.amount) continue;
-      const gap = Math.abs(diffDays(d.date, c.date));
-      if (gap > windowDays || gap >= bestGap) continue;
-      best = c;
-      bestGap = gap;
+  const dest = knownDestinations(ledger);
+  const ops = alive(ledger.operations).filter(sansAutreCote);
+  const parMontant = byAmount(ops);
+  const voisins = new Map<Id, Array<{ o: Operation; gap: number }>>();
+  for (const a of ops) {
+    if (!dest.has(a.id)) continue;
+    for (const b of parMontant.get(-a.amount) ?? []) {
+      if (!cotesOpposes(a, b, windowDays) || !parDestination(a, b, dest)) continue;
+      const gap = Math.abs(diffDays(a.date, b.date));
+      for (const [x, y] of [[a, b], [b, a]] as const) {
+        const vs = voisins.get(x.id) ?? [];
+        if (!vs.some((v) => v.o.id === y.id)) vs.push({ o: y, gap });
+        voisins.set(x.id, vs);
+      }
     }
-    if (!best) continue;
-    used.add(d.id);
-    used.add(best.id);
-    patch.operations.push(
-      { ...d, state: 'reconciled', transferAccountId: best.accountId, transferOperationId: best.id },
-      { ...best, state: 'reconciled', transferAccountId: d.accountId, transferOperationId: d.id },
-    );
   }
+  const pris = new Set<Id>();
+  /** Le voisin libre le plus proche en date, s'il est seul à cette distance. */
+  const plusProche = (id: Id): Operation | undefined => {
+    const libres = (voisins.get(id) ?? []).filter((v) => !pris.has(v.o.id));
+    const min = Math.min(...libres.map((v) => v.gap));
+    const aMin = libres.filter((v) => v.gap === min);
+    return aMin.length === 1 ? aMin[0]!.o : undefined;
+  };
+  for (;;) {
+    const tour: Array<[Operation, Operation]> = [];
+    for (const a of ops) {
+      if (pris.has(a.id) || !dest.has(a.id)) continue;
+      const b = plusProche(a.id);
+      if (!b || plusProche(b.id)?.id !== a.id) continue;
+      if (tour.some(([x, y]) => x.id === b.id || y.id === b.id)) continue;
+      tour.push(a.amount < 0 ? [a, b] : [b, a]);
+    }
+    if (!tour.length) break;
+    for (const [d, c] of tour) {
+      pris.add(d.id);
+      pris.add(c.id);
+      patch.operations.push(...pairOf(d, c));
+    }
+  }
+  return patch;
+}
+
+/**
+ * Les paires possibles de virement interne que l'appariement automatique n'a pas formées, à confirmer
+ * (#488, point 3) : un débit et un crédit importés de deux comptes différents, de montants opposés, à
+ * ± `windowDays`, ni l'un ni l'autre apparié, et soit tous deux non verrouillés et sans destination
+ * connue, soit l'un à destination connue que l'appariement n'a pu départager — limité alors aux
+ * opérations du compte désigné (`parDestination`). Une opération à plusieurs candidats en a autant de
+ * propositions. Rien ne s'écrit (I10) : ne pas apparier laisse la proposition, sans rien enregistrer.
+ * Dans l'ordre de la liste d'Opérations, par le débit, puis par le crédit.
+ */
+export function proposeInternalTransfers(ledger: Ledger, windowDays = 2): TransferPairProposal[] {
+  const dest = knownDestinations(ledger);
+  const ops = alive(ledger.operations).filter(sansAutreCote);
+  const parMontant = byAmount(ops);
+  const out: Array<{ d: Operation; c: Operation }> = [];
+  for (const d of ops) {
+    if (d.amount > 0) continue;
+    for (const c of parMontant.get(-d.amount) ?? []) {
+      if (!cotesOpposes(d, c, windowDays)) continue;
+      const libres = !dest.has(d.id) && !dest.has(c.id) && !isLocked(d) && !isLocked(c);
+      if (libres || parDestination(d, c, dest)) out.push({ d, c });
+    }
+  }
+  const parDate = (a: Operation, b: Operation) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id.localeCompare(b.id));
+  return out.sort((x, y) => parDate(x.d, y.d) || parDate(x.c, y.c)).map(({ d, c }) => ({ debitId: d.id, creditId: c.id }));
+}
+
+/**
+ * L'utilisateur apparie une paire proposée (#488, point 3) : les deux côtés se lient et se
+ * verrouillent (D22), sans que leur ventilation change. Rien si la paire n'est plus proposée.
+ */
+export function acceptInternalTransfer(ledger: Ledger, p: TransferPairProposal, windowDays = 2): Patch {
+  const patch = emptyPatch();
+  if (!proposeInternalTransfers(ledger, windowDays).some((x) => x.debitId === p.debitId && x.creditId === p.creditId)) return patch;
+  const ops = new Map(alive(ledger.operations).map((o) => [o.id, o]));
+  patch.operations.push(...pairOf(ops.get(p.debitId)!, ops.get(p.creditId)!, 'locked'));
+  return patch;
+}
+
+/**
+ * Défaire l'appariement de l'opération `operationId` (#488, point 5) : elle ne désigne plus d'autre
+ * côté, et l'autre côté — celui qu'elle désigne, et toute opération qui la désigne — ne désigne plus
+ * ni elle ni son compte, en gardant son état et sa ventilation. Ce que l'opération elle-même devient
+ * d'autre (sa désignation, son état) est au geste qui la défait. Aucun côté ne reste à désigner comme
+ * son autre côté une opération qui ne le désigne pas.
+ */
+export function unpairTransfer(ledger: Ledger, operationId: Id): Patch {
+  const patch = emptyPatch();
+  const op = alive(ledger.operations).find((o) => o.id === operationId);
+  if (!op) return patch;
+  const autres = alive(ledger.operations).filter((o) => o.id !== op.id && (o.id === op.transferOperationId || o.transferOperationId === op.id));
+  if (!op.transferOperationId && !autres.length) return patch;
+  const next: Operation = { ...op };
+  delete next.transferOperationId;
+  patch.operations.push(next);
+  for (const o of autres) {
+    const libre: Operation = { ...o };
+    delete libre.transferAccountId;
+    delete libre.transferOperationId;
+    patch.operations.push(libre);
+  }
+  return patch;
+}
+
+/**
+ * L'utilisateur désigne l'opération comme virement vers (ou, pour un crédit, depuis) le compte
+ * `accountId` (#488, point 4 ; D22) : elle se verrouille ; appariée à un autre compte, son appariement
+ * se défait des deux côtés (`unpairTransfer`). Quand l'autre côté est importé et seul candidat — une
+ * opération du compte désigné, sans autre côté, de montant opposé, à ± `windowDays`, qui peut
+ * s'apparier par cette destination (`parDestination`) —, elle s'apparie à lui, les deux côtés
+ * verrouillés. À plusieurs candidats, elle est désignée sans être appariée, et les candidats se
+ * proposent ; sans candidat, elle est désignée seule, et l'import qui apporte l'autre côté l'apparie.
+ */
+export function designateTransfer(ledger: Ledger, operationId: Id, accountId: Id, windowDays = 2): Patch {
+  const op = alive(ledger.operations).find((o) => o.id === operationId);
+  if (!op || accountId === op.accountId) return emptyPatch();
+  if (op.transferOperationId && op.transferAccountId === accountId) return { ...emptyPatch(), operations: [{ ...op, state: 'locked' }] };
+  const defait = unpairTransfer(ledger, op.id);
+  const apres = applyPatchToLedger(ledger, defait);
+  const next: Operation = { ...op, state: 'locked', transferAccountId: accountId };
+  delete next.transferOperationId;
+  const avec = applyPatchToLedger(apres, { ...emptyPatch(), operations: [next] });
+  const patch: Patch = { ...emptyPatch(), operations: defait.operations.filter((o) => o.id !== op.id) };
+  const dest = knownDestinations(avec);
+  const candidats =
+    op.origin === 'imported'
+      ? alive(avec.operations).filter((o) => o.accountId === accountId && sansAutreCote(o) && cotesOpposes(next, o, windowDays) && parDestination(next, o, dest))
+      : [];
+  if (candidats.length === 1) patch.operations.push(...pairOf(next, candidats[0]!, 'locked'));
+  else patch.operations.push(next);
   return patch;
 }
 
@@ -98,12 +279,12 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
 export function matchTirelireTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
   const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
-  const ordres = new Map<Id, string[]>();
+  const ordres = new Map<Id, Array<{ length: number; reconnait: (op: Operation) => boolean }>>();
   for (const f of alive(ledger.plannedFlows)) {
     const vers = principal ? standingOrderTarget(f, principal.id) : undefined;
     if (vers === undefined) continue;
     const motif = readLabelPattern(f.labelPattern);
-    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(motif ? [motif] : [])]);
+    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(motif ? [{ length: motif.length, reconnait: labelMatcher(motif) }] : [])]);
   }
   const accounts = alive(ledger.accounts).map((a) => ({
     a,
@@ -120,7 +301,7 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
       if (a.id === op.accountId) continue;
       if (patterns) {
         if (!dansLeSensDeLOrdre) continue;
-        const longest = Math.max(-1, ...patterns.filter((p) => labelRecognized(p, op)).map((p) => p.length));
+        const longest = Math.max(-1, ...patterns.filter((p) => p.reconnait(op)).map((p) => p.length));
         if (longest >= 0) parOrdre.push({ id: a.id, length: longest });
       } else if (name.length > 0 && /TIRELIRE/.test(op.normalizedLabel) && op.normalizedLabel.includes(name)) parNom.push({ id: a.id, length: name.length });
     }
@@ -224,11 +405,62 @@ function labelRecognized(motif: string, op: Operation): boolean {
   return labelMatcher(motif)(op);
 }
 
+/** Le score minimal de la reconnaissance souple d'un motif littéral (`labelScore`, #488, point 8). */
+export const LABEL_SCORE_MIN = 0.8;
+
+/** Les mots d'un libellé, sans casse ni accents : la ponctuation et les blancs les séparent. */
+function labelWords(s: string): string[] {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean);
+}
+
+/**
+ * La part des mots du motif que le texte contient, dans l'ordre, entre 0 et 1 (#488, point 8) : casse,
+ * accents, ponctuation et blancs ignorés ; un préfixe ou un suffixe ajouté par la source ignoré ; au
+ * plus deux mots insérés entre deux mots du motif. Un mot du texte qui commence par celui du motif le
+ * reconnaît (« BOURSO » dans « BOURSORAMA ») ; le dernier mot du texte, tronqué par la source à trois
+ * caractères au moins, reconnaît aussi le mot du motif qu'il commence.
+ */
+export function labelScore(motif: string, texte: string): number {
+  const m = labelWords(motif);
+  const t = labelWords(texte);
+  if (!m.length) return 0;
+  let best = 0;
+  for (let start = 0; start < t.length && best < 1; start++) {
+    let i = start;
+    let n = 0;
+    for (const mot of m) {
+      const k = t.slice(i, i + 3).findIndex((w, j) => w.startsWith(mot) || (i + j === t.length - 1 && w.length >= 3 && mot.startsWith(w)));
+      if (k < 0) continue;
+      n++;
+      i += k + 1;
+    }
+    best = Math.max(best, n / m.length);
+  }
+  return best;
+}
+
+/** Les parties d'un motif littéral, écrit « texte » ou « texte.*texte » ; `undefined` pour toute autre expression régulière. */
+function literalParts(motif: string): string[] | undefined {
+  const parts = motif
+    .split(/\.[*+]/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.length && parts.every((p) => !/[\\^$|?*+()[\]{}]/.test(p)) ? parts : undefined;
+}
+
 /**
  * La reconnaissance d'un motif de libellé, compilée une fois pour être lue sur beaucoup d'opérations
  * (#456, point 12) : le libellé, le libellé normalisé ou le libellé complet. Un motif illisible ne
- * reconnaît rien. Une seule lecture du motif d'une sélection, pour `proposeMatches` comme pour les
- * occurrences que l'historique propose.
+ * reconnaît rien. Une seule lecture du motif d'une sélection de flux (D24), pour `proposeMatches`, pour
+ * les ordres (`matchTirelireTransfers`, donc la destination connue) et pour les occurrences que
+ * l'historique propose. Un motif littéral, « texte » ou « texte.*texte », reconnaît aussi l'opération
+ * quand chacune de ses parties a un score d'au moins `LABEL_SCORE_MIN` (`labelScore`) sur le libellé ou
+ * le libellé complet (#488, point 8) ; une autre expression régulière garde sa seule lecture.
  */
 export function labelMatcher(motif: string): (op: Operation) => boolean {
   let re: RegExp;
@@ -237,7 +469,9 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
   } catch {
     return () => false;
   }
-  return (op) => re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '');
+  const parts = literalParts(motif);
+  const souple = (texte: string) => !!parts && parts.every((p) => labelScore(p, texte) >= LABEL_SCORE_MIN);
+  return (op) => re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '') || souple(op.label) || (!!op.details && souple(op.details));
 }
 
 /**
@@ -629,7 +863,10 @@ export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): Miss
 // ---------------------------------------------------------------------------
 
 export interface PipelineReport {
+  /** Les virements internes appariés à cet import, par leur destination connue (#488, point 2). */
   transfersPaired: number;
+  /** Les paires de virement interne à confirmer, après cet import (#488, points 3 et 7). */
+  transferProposals: number;
   tirelireTransfers: number;
   autoMatched: number;
   proposals: MatchProposal[];
@@ -653,10 +890,14 @@ export function runPipeline(ledger: Ledger, from: ISODate, to: ISODate, apply: (
     l = apply(applyMatch(l, m));
     autoMatched++;
   }
+  // Une opération que l'ordre d'un compte vient de reprendre a désormais sa destination connue.
+  const t2 = pairInternalTransfers(l);
+  if (t2.operations.length) l = apply(t2);
   const r = applyAutomations(l);
   l = apply(r);
   return {
-    transfersPaired: t.operations.length / 2,
+    transfersPaired: (t.operations.length + t2.operations.length) / 2,
+    transferProposals: proposeInternalTransfers(l).length,
     tirelireTransfers: e.operations.length,
     autoMatched,
     proposals: proposals.filter((p) => !p.auto),

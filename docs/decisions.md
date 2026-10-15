@@ -127,6 +127,17 @@ compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ �
 2026 : ventilée par les parts de l'ordre dont elle rapproche une occurrence (D12, D60), et non affectée sur ce compte
 sinon (D21).
 
+Amendé le 15 octobre 2026 (#488) : le compte ainsi reconnu, ou celui vers lequel (pour un crédit, depuis
+lequel) l'utilisateur a désigné l'opération comme virement, est sa **destination connue** ; rien d'autre
+n'en fait une — ni le nom ni le numéro d'un compte cités dans un libellé, ni un montant égal. Seule une
+opération à destination connue s'apparie sans confirmation à l'autre côté de son virement, sur le compte
+désigné (D33) ; les autres paires possibles se proposent. Le libellé de l'ordre enregistré se lit comme
+toute sélection de flux (D24) : un motif littéral, « texte » ou « texte.*texte », reconnaît aussi
+l'opération quand chacune de ses parties a un score d'au moins 0,8 sur le libellé ou le libellé complet
+— la part de ses mots présents dans l'ordre, sans casse, accents, ponctuation ni blancs, préfixe ou
+suffixe ajouté par la source ignoré, au plus deux mots insérés, un mot ou le dernier mot tronqué qui en
+commence un autre (`labelScore`) ; une autre expression régulière garde sa seule lecture.
+
 ### D12 · Pointage prudent
 
 Un flux prévu est pointé automatiquement seulement si le montant est exact (ou dans la tolérance
@@ -362,7 +373,11 @@ rien les efface aussitôt posés — le pipeline se défait lui-même.
 
 Le calcul part donc de ce que l'import a établi : une opération qui en rapproche une autre (D88) ou
 appariée en virement interne est *classée*, avec la ventilation que cette étape lui a donnée ;
-les autres partent vierges et non traitées. Les règles écrivent par-dessus, champ par champ, selon
+les autres partent vierges et non traitées. — Amendé le 15 octobre 2026 (#488) : l'import n'apparie que
+les virements internes dont la destination est connue (D11), et les deux côtés deviennent *classés* — un
+côté que l'utilisateur avait désigné reste *verrouillé* ; aucune ventilation ne change. Une paire que
+l'utilisateur confirme, ou que sa désignation forme, est *verrouillée* (D22) : aucune règle ne la
+réécrit. Les autres paires possibles se proposent, sans rien écrire (I10). Les règles écrivent par-dessus, champ par champ, selon
 D23. Retirer une règle rend l'opération à cet état d'import, pas à rien.
 
 Conséquence : un flux n'a pas de règle à lui à côté de son rapprochement (D24) ; l'opération qui

@@ -389,6 +389,7 @@
     <h2 style="margin-top:0">Import terminé</h2>
     <div class="row"><div class="label">Opérations importées</div><div class="num">{report.inserted}</div></div>
     <div class="row"><div class="label">Virements internes appariés</div><div class="num">{report.transfersPaired}</div></div>
+    <div class="row"><div class="label">Virements internes à confirmer</div><div class="num">{report.transferProposals}</div></div>
     <div class="row"><div class="label">Virements vers des tirelires reconnus</div><div class="num">{report.tirelireTransfers}</div></div>
     <div class="row"><div class="label">Flux prévus rapprochés automatiquement</div><div class="num">{report.autoMatched}</div></div>
     <div class="row"><div class="label">Rapprochements de flux à confirmer</div><div class="num">{report.proposals.length}</div></div>

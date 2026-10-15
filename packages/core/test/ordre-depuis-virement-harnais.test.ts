@@ -29,6 +29,7 @@ import {
   matchTirelireTransfers,
   normalizeLabel,
   orderFromTransfer,
+  acceptInternalTransfer,
   pairInternalTransfers,
   proposeMatches,
   recordOrderFromTransfer,
@@ -99,12 +100,16 @@ describe('[niveau 2] #434 · 1. le virement qui peut devenir un ordre', () => {
     expect(orderFromTransfer(l2, 'op-vir', LECTURE, 'x')?.amount).toBe(-euros(600));
   });
 
-  it('reconnu par l’appariement au crédit du même montant ; le côté compte d’accueil ne propose rien', () => {
+  it('reconnu par l’appariement au crédit du même montant, une fois la paire confirmée (#488, point 6) ; le côté compte d’accueil ne propose rien', () => {
     const debit = virement(euros(600), { state: 'untreated' });
     delete debit.transferAccountId;
     const credit: Operation = { id: 'op-credit', accountId: LIVRET, origin: 'imported', date: '2026-09-03', label: 'VIR RECU', normalizedLabel: 'VIR RECU', amount: euros(600), state: 'untreated' };
     const l = avec(budget(), debit, credit);
-    const l2 = applyPatchToLedger(l, pairInternalTransfers(l));
+    // Sans destination connue, l'appariement ne la forme pas seul : la paire reste à confirmer, et ne propose aucun ordre.
+    const l1 = applyPatchToLedger(l, pairInternalTransfers(l));
+    expect(l1.operations.find((o) => o.id === 'op-vir')!.transferOperationId).toBeUndefined();
+    expect(orderFromTransfer(l1, 'op-vir', LECTURE, 'x')).toBeUndefined();
+    const l2 = applyPatchToLedger(l1, acceptInternalTransfer(l1, { debitId: 'op-vir', creditId: 'op-credit' }));
     expect(l2.operations.find((o) => o.id === 'op-vir')!.transferOperationId).toBe('op-credit');
     expect(orderFromTransfer(l2, 'op-vir', LECTURE, 'x')?.amount).toBe(-euros(600));
     expect(orderFromTransfer(l2, 'op-credit', LECTURE, 'x')).toBeUndefined();
@@ -316,7 +321,8 @@ describe('[niveau 1] #434 · 6. le livre de compte tient (I2, D19)', () => {
     delete debit.transferAccountId;
     const credit: Operation = { id: 'op-credit', accountId: LIVRET, origin: 'imported', date: '2026-09-03', label: 'VIR RECU', normalizedLabel: 'VIR RECU', amount: euros(600), state: 'untreated' };
     const l = avec(budget(), debit, credit);
-    const { ledger } = enregistrer(applyPatchToLedger(l, pairInternalTransfers(l)));
+    // La paire confirmée (#488, point 6) : sans destination connue, l'appariement ne la forme pas seul.
+    const { ledger } = enregistrer(applyPatchToLedger(l, acceptInternalTransfer(l, { debitId: 'op-vir', creditId: 'op-credit' })));
     verifier(ledger, 0);
     // Le relevé du livret dit 600 € : tout est dans ses tirelires, rien n'y reste non affecté.
     const idx = indexLedger(ledger);

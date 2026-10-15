@@ -6,7 +6,7 @@
  * l'application le dit, et propose de défaire d'abord la reprise. La reprise défaite, la saisie se
  * supprime, et l'occurrence qu'elle corrigeait ou masquait compte de nouveau.
  */
-import { liveSubOperations, removalBlockers, undoResumption } from '@tirelire/core';
+import { liveSubOperations, removalBlockers, undoResumption, unpairTransfer } from '@tirelire/core';
 import { app } from './state.svelte';
 import { shortDate } from './format';
 
@@ -23,6 +23,8 @@ export function supprimerOperations(ids: string[], question?: string): boolean {
     for (const o of reprises) app.applyPatch(undoResumption(app.ledger, o.id));
   } else if (question && !confirm(question)) return false;
   const cibles = new Set(ids);
+  // Un côté apparié supprimé : l'autre côté ne le désigne plus, et redevient libre de s'apparier (#488, point 5).
+  for (const id of ids) for (const o of unpairTransfer(app.ledger, id).operations) if (!cibles.has(o.id)) app.upsert('operations', o);
   for (const s of liveSubOperations(app.ledger.subOperations)) if (cibles.has(s.operationId)) app.store.remove('subOperations', s.id);
   for (const id of ids) app.remove('operations', id);
   return true;

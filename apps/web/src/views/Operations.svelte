@@ -51,6 +51,10 @@
     resumeFirstOccurrence,
     readAlerts,
     operationListOrder,
+    acceptInternalTransfer,
+    designateTransfer,
+    unpairTransfer,
+    type TransferPairProposalAlert,
     type AllocationLine,
     type Patch,
     type PlannedFlow,
@@ -122,11 +126,21 @@
   });
   /*
    * Les alertes de l'écran, lues au cœur à la date de lecture (#463) : les opérations non traitées,
-   * les reprises proposées, et les virements importés qui peuvent devenir un ordre permanent, chacun
-   * avec son compte d'accueil, le plan lu à la date de lecture (#435, point 1 ; #434, D52). Rien ne
-   * s'écrit avant le geste (I10).
+   * les reprises proposées, les paires de virement interne à confirmer (#488, point 3), et les virements
+   * importés qui peuvent devenir un ordre permanent, chacun avec son compte d'accueil, le plan lu à la
+   * date de lecture (#435, point 1 ; #434, D52). Rien ne s'écrit avant le geste (I10).
    */
-  const alertes = $derived(readAlerts(app.ledger, { today: app.asOf }, ['untreatedOperations', 'matchProposal', 'transferToOrder']));
+  const alertes = $derived(readAlerts(app.ledger, { today: app.asOf }, ['untreatedOperations', 'matchProposal', 'transferPairProposal', 'transferToOrder']));
+  /** Pour chaque opération, les paires de virement interne qu'elle peut former, chacune avec l'autre côté (#488, point 3). */
+  const pairesProposees = $derived.by(() => {
+    const m = new Map<string, Array<{ p: TransferPairProposalAlert; autre: TransferPairProposalAlert['debit'] }>>();
+    for (const a of alertes) {
+      if (a.code !== 'transferPairProposal') continue;
+      m.set(a.debitId, [...(m.get(a.debitId) ?? []), { p: a, autre: a.credit }]);
+      m.set(a.creditId, [...(m.get(a.creditId) ?? []), { p: a, autre: a.debit }]);
+    }
+    return m;
+  });
   const proposals = $derived(new Map(alertes.filter((a) => a.code === 'matchProposal').map((a) => [a.operationId, a])));
   const ordresProposes = $derived(new Map(alertes.filter((a) => a.code === 'transferToOrder').map((a) => [a.operationId, a.accountId])));
   /** Les opérations dont la ligne porte le geste « Reprendre une occurrence » (#445, point 5) ; dans un projet sans flux, aucune (U5). */
@@ -162,8 +176,8 @@
   const matching = $derived(
     alive(app.ledger.operations)
       .filter((o) => selects(selection, o))
-      // Une opération qui se propose comme ordre est à traiter, quel que soit son état (#435, point 2).
-      .filter((o) => restent.has(o.id) || (filter === 'all' ? true : filter === 'transfer' ? !!o.transferAccountId : o.state === filter || (filter === 'untreated' && ordresProposes.has(o.id))))
+      // Une opération qui se propose comme ordre, ou comme côté d'un virement interne, est à traiter, quel que soit son état (#435, point 2 ; #488, point 3).
+      .filter((o) => restent.has(o.id) || (filter === 'all' ? true : filter === 'transfer' ? !!o.transferAccountId : o.state === filter || (filter === 'untreated' && (ordresProposes.has(o.id) || pairesProposees.has(o.id)))))
       .filter((o) => !periodOnly || (o.date >= period.start && o.date <= period.end))
       .sort(operationListOrder),
   );
@@ -539,8 +553,15 @@
   function markTransfer(op: Operation, accountId: string) {
     if (!accountId) return;
     garderALEcran(op.id); // elle ne quitte pas l'écran : si elle se propose alors, sa proposition s'y lit (#435, point 2)
-    // Désigner un virement est une modification manuelle : elle verrouille (D22).
-    app.upsert('operations', { ...op, state: 'locked', transferAccountId: accountId });
+    // Désigner un virement est une modification manuelle : elle verrouille (D22), et s'apparie à l'autre côté s'il est seul candidat (#488, point 4).
+    app.applyPatch(designateTransfer(app.ledger, op.id, accountId));
+  }
+
+  /** « Apparier » : les deux côtés se lient et se verrouillent (#488, point 3 ; D22). Ils restent à l'écran. */
+  function apparier(p: TransferPairProposalAlert) {
+    garderALEcran(p.debitId);
+    garderALEcran(p.creditId);
+    app.applyPatch(acceptInternalTransfer(app.ledger, { debitId: p.debitId, creditId: p.creditId }));
   }
 
   /**
@@ -582,8 +603,12 @@
     editingId = undefined;
   }
 
-  /** Repartir de zéro : plus de reprise, plus de virement, plus de ventilation. */
+  /**
+   * Repartir de zéro : plus de reprise, plus de virement, plus de ventilation. Appariée, l'opération
+   * défait l'appariement des deux côtés : l'autre côté ne la désigne plus (#488, point 5).
+   */
   function unlink(op: Operation) {
+    for (const o of unpairTransfer(app.ledger, op.id).operations) if (o.id !== op.id) app.upsert('operations', o);
     const next: Operation = { ...op, state: 'untreated' };
     delete next.plannedFlowId;
     delete next.plannedDate;
@@ -828,11 +853,18 @@
         {#if ordresProposes.has(op.id)}
           <span class="sub proposition-ordre" style="color:var(--accent)">Proposition : en faire votre ordre permanent vers « {accountName(ordresProposes.get(op.id))} »</span>
         {/if}
+        {#each pairesProposees.get(op.id) ?? [] as { autre } (autre.id)}
+          <span class="sub proposition-virement" style="color:var(--accent)">Virement avec {accountName(autre.accountId)} du {shortDate(autre.date)} ?</span>
+        {/each}
         {#if prop && op.state !== 'locked'}
           <span class="sub" style="color:var(--accent)">Proposition : reprendre {propositionText(prop)} ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
         {/if}
       </button>
       <div class="num {op.amount > 0 ? 'pos' : ''}">{money(op.amount)}</div>
+      {#each pairesProposees.get(op.id) ?? [] as { p, autre } (autre.id)}
+        <!-- Une paire de virement interne à confirmer (#488, point 3) : un bouton par candidat, à part du bouton de la ligne. -->
+        <button class="btn small apparier" type="button" aria-label="Apparier avec « {autre.label} » du {shortDate(autre.date)} sur {accountName(autre.accountId)}" onclick={() => apparier(p)}>Apparier</button>
+      {/each}
       {#if avecGeste.has(op.id)}
         <!-- Le geste de la ligne (#445, point 5) : à part du bouton de la ligne, qui ouvre toujours l'opération. -->
         <button class="btn small reprendre-occurrence" type="button" aria-expanded={repriseLigne?.id === op.id} onclick={() => basculerRepriseLigne(op)}>Reprendre une occurrence</button>
