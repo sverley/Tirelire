@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 /**
- * Tests du codeur de #488, côté écran : l'application montée sans navigateur (`ecran.ts`). Ce que montrent
- * les écrans Opérations et Import des virements internes ; les règles elles-mêmes sont au cœur
- * (`packages/core/test/virements-internes-488.test.ts`). Chaque `describe` nomme le point du « Fait quand ».
+ * Harnais d'audit de #488 — les virements internes sur l'écran Opérations, l'application montée sans
+ * navigateur (`ecran.ts`), l'issue disant « Navigateur : aucun ». Les règles elles-mêmes :
+ * `packages/core/test/virements-internes-harnais.test.ts`. Chaque `describe` nomme le point du « Fait
+ * quand » ; chaque test porte son niveau (D83).
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur
+ * (`virements-internes-488-ecran.test.ts`, déplacé ici en entier). Sont de moi : au point 3, une
+ * opération à deux candidats qui montre chacun ; au point 5, la suppression d'un côté apparié.
+ * Niveaux : 0 pour le point 5 (un côté qui pointe dans le vide resterait dans la base) ; 1 pour la
+ * proposition lue sans budget ni tirelire (I3, U5) et la désignation qui apparie le seul candidat (I2) ;
+ * 2 pour le reste.
  *
  * Données inventées (D84) : un compte principal, un compte de Léa, un Livret A, sans budget ni ordre (U5).
  * Un virement de 34 € du compte de Léa vers un club, et un remboursement de 34 € le même jour sur le
@@ -55,7 +63,7 @@ const ligneDe = (libelle: string) => lignes().find((l) => l.texte.startsWith(lib
 const de = (id: string) => projet().operations.find((o) => o.id === id)!;
 
 describe('#488 · 3. une proposition, sur l’écran Opérations', () => {
-  it('[niveau 4] la proposition se lit sur le débit et sur le crédit, avec un bouton « Apparier » ; sans budget ni tirelire (U5)', async () => {
+  it('[niveau 1] la proposition se lit sur le débit et sur le crédit, avec un bouton « Apparier » ; sans budget ni tirelire (U5)', async () => {
     await ouvrir(projetDeDepart());
     const club = ligneDe('VIR SEPA CLUB DE FOOT');
     const cpam = ligneDe('VIR RECU CPAM REMBOURSEMENT');
@@ -66,7 +74,7 @@ describe('#488 · 3. une proposition, sur l’écran Opérations', () => {
     expect(de('club').transferOperationId).toBeUndefined();
   });
 
-  it('[niveau 4] « Apparier » lie les deux côtés et les verrouille ; la proposition disparaît', async () => {
+  it('[niveau 2] « Apparier » lie les deux côtés et les verrouille ; la proposition disparaît', async () => {
     await ouvrir(projetDeDepart());
     await presser(tous<HTMLButtonElement>('button.apparier', ligneDe('VIR SEPA CLUB DE FOOT')!.ligne)[0]!);
     expect([de('club').transferOperationId, de('club').transferAccountId, de('club').state]).toEqual(['cpam', CC, 'locked']);
@@ -79,16 +87,25 @@ describe('#488 · 3. une proposition, sur l’écran Opérations', () => {
     expect(ligneDe('VIR SEPA MISE DE COTE')?.texte).toContain('Virement avec Livret A');
   });
 
-  it('[niveau 4] la proposition se lit quelles que soient les dates, même hors de la période', async () => {
+  it('[niveau 2] la proposition se lit quelles que soient les dates, même hors de la période', async () => {
     const l = projetDeDepart();
     l.operations = l.operations.map((o) => (o.id === 'club' || o.id === 'cpam' ? { ...o, date: '2025-03-12' } : o));
     await ouvrir(l);
     expect(ligneDe('VIR SEPA CLUB DE FOOT')?.texte).toContain(`Virement avec Compte principal du ${shortDate('2025-03-12')} ?`);
   });
+  it('[niveau 2] une opération à deux candidats montre chacun, avec son bouton « Apparier »', async () => {
+    const l = projetDeDepart();
+    l.operations.push(op('recu-lea', LEA, '2026-09-01', 'VIR RECU', euros(600)));
+    await ouvrir(l);
+    const vers = ligneDe('VIR SEPA MISE DE COTE')!;
+    expect(vers.texte).toContain(`Virement avec Livret A du ${shortDate('2026-09-03')} ?`);
+    expect(vers.texte).toContain(`Virement avec Léa du ${shortDate('2026-09-01')} ?`);
+    expect(tous('button.apparier', vers.ligne).map(t)).toEqual(['Apparier', 'Apparier']);
+  });
 });
 
 describe('#488 · 4. désigner à la main un virement, sur l’écran Opérations', () => {
-  it('[niveau 4] « Virement interne vers… » apparie l’autre côté, seul candidat : les deux verrouillés', async () => {
+  it('[niveau 1] « Virement interne vers… » apparie l’autre côté, seul candidat : les deux verrouillés', async () => {
     await ouvrir(projetDeDepart());
     const l = ligneDe('VIR SEPA MISE DE COTE')!;
     await presser(l.ligne.querySelector<HTMLButtonElement>(':scope > button.label')!);
@@ -100,7 +117,7 @@ describe('#488 · 4. désigner à la main un virement, sur l’écran Opération
 });
 
 describe('#488 · 5. « Tout remettre à zéro » sur un côté apparié', () => {
-  it('[niveau 4] l’autre côté ne désigne plus l’opération ni son compte, et garde son état', async () => {
+  it('[niveau 0] l’autre côté ne désigne plus l’opération ni son compte, et garde son état', async () => {
     const l = projetDeDepart();
     l.operations = l.operations.map((o) =>
       o.id === 'vers-livret' ? { ...o, state: 'locked', transferAccountId: LIVRET, transferOperationId: 'recu-livret' } : o.id === 'recu-livret' ? { ...o, state: 'locked', transferAccountId: CC, transferOperationId: 'vers-livret' } : o,
@@ -114,5 +131,24 @@ describe('#488 · 5. « Tout remettre à zéro » sur un côté apparié', () =>
     await presser(remettre);
     expect([de('vers-livret').transferOperationId, de('vers-livret').transferAccountId, de('vers-livret').state]).toEqual([undefined, undefined, 'untreated']);
     expect([de('recu-livret').transferOperationId, de('recu-livret').transferAccountId, de('recu-livret').state]).toEqual([undefined, undefined, 'locked']);
+  });
+  it('[niveau 0] « Supprimer » un côté apparié : l’autre côté ne le désigne plus ni son compte, et garde son état', async () => {
+    const l = projetDeDepart();
+    l.operations = l.operations.map((o) =>
+      o.id === 'vers-livret' ? { ...o, state: 'locked', transferAccountId: LIVRET, transferOperationId: 'recu-livret' } : o.id === 'recu-livret' ? { ...o, state: 'reconciled', transferAccountId: CC, transferOperationId: 'vers-livret' } : o,
+    );
+    await ouvrir(l);
+    const filtre = tous<HTMLSelectElement>('main select').find((s) => [...s.options].some((o) => o.value === 'all'))!;
+    await saisir(filtre, 'all');
+    await presser(ligneDe('VIR SEPA MISE DE COTE')!.ligne.querySelector<HTMLButtonElement>(':scope > button.label')!);
+    const confirmer = window.confirm;
+    window.confirm = () => true;
+    try {
+      await presser(tous<HTMLButtonElement>('button', ligneDe('VIR SEPA MISE DE COTE')!.ligne).find((b) => t(b) === 'Supprimer')!);
+    } finally {
+      window.confirm = confirmer;
+    }
+    expect(de('vers-livret').deletedAt).toBeTruthy();
+    expect([de('recu-livret').transferOperationId, de('recu-livret').transferAccountId, de('recu-livret').state]).toEqual([undefined, undefined, 'reconciled']);
   });
 });

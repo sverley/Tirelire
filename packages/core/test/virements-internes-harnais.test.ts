@@ -1,16 +1,36 @@
 /**
- * Tests du codeur de #488 — « Virements internes : appariement automatique seulement quand la
- * destination est connue, et reconnaissance souple des libellés ». Côté cœur ; ce que montrent les
- * écrans Opérations et Import est dans `apps/web/test/virements-internes-488-ecran.test.ts`. Chaque
- * `describe` nomme le point du « Fait quand » qu'il vérifie.
+ * Harnais d'audit de #488 — « Virements internes : appariement automatique seulement quand la
+ * destination est connue, et reconnaissance souple des libellés » (D11, D22, D24, D33, D88). Côté
+ * cœur ; ce que montrent et font les écrans Opérations et Import :
+ * `apps/web/test/virements-internes-ecran-harnais.test.ts`. Chaque `describe` reprend un point du
+ * « Fait quand » sous son numéro ; chaque test porte son niveau (D83).
+ *
+ * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur
+ * (`virements-internes-488.test.ts`, déplacé ici en entier). Est de moi : au point 3, la lecture des
+ * propositions et des alertes, et l'import, qui n'écrivent rien de ce qui reste à confirmer, relus dans
+ * la base (I10).
+ *
+ * Niveaux (D83), par le besoin que couvre chaque phrase :
+ * - 0 · ce qu'une correction du code ne rendrait pas : une opération sans destination connue jamais
+ *   appariée sans confirmation, ni avec un autre compte que celui désigné, ni une opération verrouillée
+ *   sans désignation (points 1 à 3) ; une proposition qui ne s'écrit pas (point 3, I10) ; un côté
+ *   désigné qui reste verrouillé avec sa ventilation (point 2) ; défaire un appariement sans laisser de
+ *   côté pointer dans le vide, l'autre gardant son état et sa ventilation (point 5).
+ * - 1 · I2 : la désignation à la main qui apparie le seul candidat retire le double compte (point 4) ;
+ *   un ordre ne se propose que sur une paire sûre (point 6 ; principes 1.3, 4.4, I10).
+ * - 2 · les autres cas des règles : les destinations connues, les départages, l'import suivant, la
+ *   proposition qui disparaît, le rapport, la reconnaissance souple (points 1, 2, 3, 4, 7, 8).
  *
  * Données inventées (D84) : un compte principal, deux comptes enfants, « Léa » et « Tom », et un
  * Livret A. Le principal vire 45 € à chaque enfant le 1er du mois, par un ordre enregistré vers
  * chacun ; chaque enfant reverse aussitôt 45 € par un prélèvement vers un plan d'épargne, qui n'est
  * pas un compte suivi.
  */
+import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
 import {
+  LedgerStore,
+  readAlerts,
   LABEL_SCORE_MIN,
   acceptInternalTransfer,
   applyPatchToLedger,
@@ -86,7 +106,7 @@ function moisEnfants(m: string, jours: { versLea: string; versTom: string; recuL
 const JUSTES = (m: string) => [`${m}-vers-lea>${m}-recu-lea`, `${m}-vers-tom>${m}-recu-tom`];
 
 describe('#488 · 1. une destination connue', () => {
-  it('[niveau 4] désignée, reconnue par le libellé d’un ordre, ou « TIRELIRE <COMPTE> » sans ordre : elle apparie', () => {
+  it('[niveau 2] désignée, reconnue par le libellé d’un ordre, ou « TIRELIRE <COMPTE> » sans ordre : elle apparie', () => {
     const l = avec(
       comptes(),
       op('designe', CC, '2026-03-10', 'VIR SEPA MISE DE COTE', -euros(80), { state: 'locked', transferAccountId: LIVRET }),
@@ -99,7 +119,7 @@ describe('#488 · 1. une destination connue', () => {
     expect(paires(apparie(l))).toEqual(['designe>recu-designe', 'par-nom>recu-nom', 'par-ordre>recu-ordre']);
   });
 
-  it('[niveau 4] ni le nom d’un compte cité dans le libellé, ni son numéro, ni un montant égal n’en font une', () => {
+  it('[niveau 0] ni le nom d’un compte cité dans le libellé, ni son numéro, ni un montant égal n’en font une', () => {
     const l = comptes(false);
     l.accounts = l.accounts.map((a) => (a.id === LEA ? { ...a, accountNumber: '00099999999' } : a));
     const ops = [
@@ -118,7 +138,7 @@ describe('#488 · 1. une destination connue', () => {
 });
 
 describe('#488 · 2. l’appariement automatique ne se fait qu’avec la destination', () => {
-  it('[niveau 4] le piège des comptes enfants : les deux vraies paires de chaque mois, aucune fausse, quel que soit l’ordre des dates ; le prélèvement vers le plan d’épargne n’est apparié à rien', () => {
+  it('[niveau 0] le piège des comptes enfants : les deux vraies paires de chaque mois, aucune fausse, quel que soit l’ordre des dates ; le prélèvement vers le plan d’épargne n’est apparié à rien', () => {
     const variantes = [
       // L'exemple du besoin : le prélèvement de Léa, daté du 30, passe avant le virement du principal, daté du 1er.
       { versLea: '2026-04-01', versTom: '2026-04-01', recuLea: '2026-04-01', recuTom: '2026-04-01', prlvLea: '2026-03-30', prlvTom: '2026-03-31' },
@@ -137,7 +157,7 @@ describe('#488 · 2. l’appariement automatique ne se fait qu’avec la destina
     }
   });
 
-  it('[niveau 4] plusieurs mois dans un seul import, ou un import par mois et par compte : les mêmes paires', () => {
+  it('[niveau 2] plusieurs mois dans un seul import, ou un import par mois et par compte : les mêmes paires', () => {
     const jours = (m: string, prev: string) => ({ versLea: `${m}-01`, versTom: `${m}-01`, recuLea: `${m}-01`, recuTom: `${m}-02`, prlvLea: `${prev}-30`, prlvTom: `${m}-01` });
     const mois = [moisEnfants('fev', jours('2026-02', '2026-01')), moisEnfants('mar', jours('2026-03', '2026-02')), moisEnfants('avr', jours('2026-04', '2026-03'))];
     const attendu = [...JUSTES('fev'), ...JUSTES('mar'), ...JUSTES('avr')].sort();
@@ -159,7 +179,7 @@ describe('#488 · 2. l’appariement automatique ne se fait qu’avec la destina
     expect(proposeInternalTransfers(parMois)).toEqual([]);
   });
 
-  it('[niveau 4] deux candidats à la même distance : aucun appariement, ils se proposent', () => {
+  it('[niveau 2] deux candidats à la même distance : aucun appariement, ils se proposent', () => {
     const l = apparie(
       avec(comptes(), op('vers', CC, '2026-04-02', 'VIR SEPA ARGENT POCHE LEA', -euros(45)), op('c1', LEA, '2026-04-01', 'VIR RECU', euros(45)), op('c2', LEA, '2026-04-03', 'VIR RECU', euros(45))),
     );
@@ -167,13 +187,13 @@ describe('#488 · 2. l’appariement automatique ne se fait qu’avec la destina
     expect(proposees(l)).toEqual(['vers>c1', 'vers>c2']);
   });
 
-  it('[niveau 4] deux candidats, dont un sur un autre compte que celui désigné : l’appariement se fait avec le compte désigné, seul proposé sinon', () => {
+  it('[niveau 0] deux candidats, dont un sur un autre compte que celui désigné : l’appariement se fait avec le compte désigné, seul proposé sinon', () => {
     const l = apparie(avec(comptes(), op('vers', CC, '2026-04-02', 'VIR SEPA ARGENT POCHE LEA', -euros(45)), op('lea', LEA, '2026-04-03', 'VIR RECU', euros(45)), op('tom', TOM, '2026-04-02', 'VIR RECU', euros(45))));
     expect(paires(l)).toEqual(['vers>lea']);
     expect(de(l, 'tom').transferOperationId).toBeUndefined();
   });
 
-  it('[niveau 4] deux débits qui se disputent un crédit : le plus proche en date l’emporte ; à égalité, aucun', () => {
+  it('[niveau 2] deux débits qui se disputent un crédit : le plus proche en date l’emporte ; à égalité, aucun', () => {
     const proche = apparie(
       avec(comptes(), op('loin', CC, '2026-04-01', 'VIR SEPA ARGENT POCHE LEA', -euros(45)), op('pres', CC, '2026-04-03', 'VIR SEPA ARGENT POCHE LEA', -euros(45)), op('c', LEA, '2026-04-03', 'VIR RECU', euros(45))),
     );
@@ -185,7 +205,7 @@ describe('#488 · 2. l’appariement automatique ne se fait qu’avec la destina
     expect(proposees(egal)).toEqual(['d1>c', 'd2>c']);
   });
 
-  it('[niveau 4] une désignation à la main, verrouillée, s’apparie à l’import qui apporte l’autre côté ; elle reste verrouillée, sa ventilation ne change pas', () => {
+  it('[niveau 0] une désignation à la main, verrouillée, s’apparie à l’import qui apporte l’autre côté ; elle reste verrouillée, sa ventilation ne change pas', () => {
     let l = avec(comptes(false), op('vers', CC, '2026-04-02', 'VIR SEPA MISE DE COTE', -euros(80), { state: 'locked', transferAccountId: LIVRET }));
     l.tirelires.push({ id: 'vac', name: 'Vacances', placement: [{ accountId: LIVRET, share: { kind: 'variable' } }], openingBalance: 0, openingDate: '2026-01-01' });
     l.subOperations.push({ id: 's1', operationId: 'vers', tirelireId: 'vac', share: { kind: 'variable' } });
@@ -196,14 +216,14 @@ describe('#488 · 2. l’appariement automatique ne se fait qu’avec la destina
     expect(l.subOperations.filter((s) => !s.deletedAt).map((s) => [s.id, s.operationId, s.tirelireId])).toEqual([['s1', 'vers', 'vac']]);
   });
 
-  it('[niveau 4] une opération verrouillée sans désignation n’est pas appariée', () => {
+  it('[niveau 0] une opération verrouillée sans désignation n’est pas appariée', () => {
     const l = apparie(avec(comptes(), op('vers', CC, '2026-04-01', 'VIR SEPA ARGENT POCHE LEA', -euros(45)), op('recu', LEA, '2026-04-01', 'VIR RECU', euros(45), { state: 'locked' })));
     expect(paires(l)).toEqual([]);
   });
 });
 
 describe('#488 · 3. une proposition, sinon', () => {
-  it('[niveau 4] la coïncidence : rien n’est apparié, une proposition est faite ; confirmée, la paire est verrouillée', () => {
+  it('[niveau 0] la coïncidence : rien n’est apparié, une proposition est faite ; confirmée, la paire est verrouillée', () => {
     const l = apparie(avec(comptes(), op('vers-tiers', LEA, '2026-05-12', 'VIR SEPA CLUB DE FOOT', -euros(34)), op('sante', CC, '2026-05-12', 'VIR RECU CPAM REMBOURSEMENT', euros(34))));
     expect(paires(l)).toEqual([]);
     const props = proposeInternalTransfers(l);
@@ -217,7 +237,7 @@ describe('#488 · 3. une proposition, sinon', () => {
     expect(proposeInternalTransfers(l2)).toEqual([]);
   });
 
-  it('[niveau 4] la proposition disparaît dès qu’un côté est apparié, verrouillé, désigné ou supprimé ; ignorée, elle reste', () => {
+  it('[niveau 2] la proposition disparaît dès qu’un côté est apparié, verrouillé, désigné ou supprimé ; ignorée, elle reste', () => {
     const base = avec(comptes(false), op('d', LEA, '2026-05-12', 'VIR SEPA CLUB', -euros(34)), op('c', CC, '2026-05-12', 'VIR RECU CPAM', euros(34)));
     expect(proposees(base)).toEqual(['d>c']);
     expect(proposees(apparie(base)), 'ignorée : rien ne la retire').toEqual(['d>c']);
@@ -228,7 +248,7 @@ describe('#488 · 3. une proposition, sinon', () => {
     expect(proposees(change('c', { transferAccountId: TOM, transferOperationId: 'x' })), 'apparié ailleurs').toEqual([]);
   });
 
-  it('[niveau 4] sans destination connue nulle part (U5, aucun budget, aucun ordre) : tout se propose, rien ne s’apparie seul', () => {
+  it('[niveau 0] sans destination connue nulle part (U5, aucun budget, aucun ordre) : tout se propose, rien ne s’apparie seul', () => {
     const l = emptyLedger();
     l.accounts.push({ id: 'a', name: 'Courant', kind: 'courant', openingBalance: 0, openingDate: '2026-01-01' }, { id: 'b', name: 'Épargne', kind: 'epargne', openingBalance: 0, openingDate: '2026-01-01' });
     let u5 = avec(l, op('d1', 'a', '2026-05-01', 'VIR SEPA EPARGNE', -euros(100)), op('c1', 'b', '2026-05-02', 'VIR RECU', euros(100)), op('d2', 'b', '2026-05-10', 'VIR SEPA RETOUR', -euros(20)), op('c2', 'a', '2026-05-10', 'VIR RECU', euros(20)));
@@ -237,6 +257,32 @@ describe('#488 · 3. une proposition, sinon', () => {
     expect(rapport.transferProposals).toBe(2);
     expect(paires(u5)).toEqual([]);
     expect(proposees(u5)).toEqual(['d1>c1', 'd2>c2']);
+  });
+  it('[niveau 0] lire les propositions et les alertes, puis importer, n’écrit rien de ce qui reste à confirmer, dans le grand livre lu ni dans la base (I10)', async () => {
+    const SQL = await initSqlJs();
+    const s = await LedgerStore.create({ sqlJs: SQL, siteId: 'audit-488' });
+    const l = avec(comptes(), op('vers-tiers', LEA, '2026-05-12', 'VIR SEPA CLUB DE FOOT', -euros(34)), op('sante', CC, '2026-05-12', 'VIR RECU CPAM REMBOURSEMENT', euros(34)));
+    for (const a of l.accounts) s.upsert('accounts', a);
+    for (const f of l.plannedFlows) s.upsert('plannedFlows', f);
+    for (const o of l.operations) s.upsert('operations', o);
+    const lu = s.load();
+    const avant = structuredClone(lu);
+    const baseAvant = JSON.stringify(s.load());
+    expect(proposeInternalTransfers(lu)).toHaveLength(1);
+    expect(readAlerts(lu, { today: '2026-05-20' }, ['transferPairProposal'])).toHaveLength(1);
+    expect(lu).toEqual(avant);
+    expect(JSON.stringify(s.load())).toBe(baseAvant);
+    // L'import écrit ce qu'il établit, et rien de la paire à confirmer.
+    runPipeline(s.load(), '2026-05-01', '2026-05-31', (p) => {
+      for (const o of p.operations) s.upsert('operations', o);
+      return s.load();
+    });
+    const relu = (await LedgerStore.create({ sqlJs: SQL, siteId: 'audit-488', bytes: s.export() })).load();
+    for (const id of ['vers-tiers', 'sante']) {
+      const o = relu.operations.find((x) => x.id === id)!;
+      expect([o.transferAccountId, o.transferOperationId, o.state], id).toEqual([undefined, undefined, 'untreated']);
+    }
+    s.close();
   });
 });
 
@@ -247,7 +293,7 @@ describe('#488 · 4. désigner à la main un virement', () => {
     return l;
   };
 
-  it('[niveau 4] un seul candidat : les deux côtés appariés et verrouillés ; le double compte des composantes disparaît (I2)', () => {
+  it('[niveau 1] un seul candidat : les deux côtés appariés et verrouillés ; le double compte des composantes disparaît (I2)', () => {
     const l = ventile(avec(comptes(false), op('d', CC, '2026-06-02', 'VIR SEPA MISE DE COTE', -euros(600)), op('c', LIVRET, '2026-06-03', 'VIR RECU', euros(600))));
     // Sans appariement, désigné seul, le débit porte aussi la composante du livret, que le crédit porte déjà.
     const seul = appliquer(l, { operations: [{ ...de(l, 'd'), state: 'locked', transferAccountId: LIVRET }], subOperations: [] });
@@ -260,12 +306,12 @@ describe('#488 · 4. désigner à la main un virement', () => {
     expect(vac(l2).get(CC)).toBe(-euros(600));
   });
 
-  it('[niveau 4] le crédit désigné « depuis » un compte s’apparie de même', () => {
+  it('[niveau 2] le crédit désigné « depuis » un compte s’apparie de même', () => {
     const l = avec(comptes(false), op('d', CC, '2026-06-02', 'VIR SEPA MISE DE COTE', -euros(600)), op('c', LIVRET, '2026-06-03', 'VIR RECU', euros(600)));
     expect(paires(appliquer(l, designateTransfer(l, 'c', CC)))).toEqual(['d>c']);
   });
 
-  it('[niveau 4] deux candidats : désignée sans être appariée, les candidats du compte désigné se proposent', () => {
+  it('[niveau 2] deux candidats : désignée sans être appariée, les candidats du compte désigné se proposent', () => {
     const l = avec(comptes(false), op('d', CC, '2026-06-02', 'VIR SEPA MISE DE COTE', -euros(600)), op('c1', LIVRET, '2026-06-01', 'VIR RECU', euros(600)), op('c2', LIVRET, '2026-06-03', 'VIR RECU', euros(600)), op('t', TOM, '2026-06-02', 'VIR RECU', euros(600)));
     const l2 = appliquer(l, designateTransfer(l, 'd', LIVRET));
     expect(paires(l2)).toEqual([]);
@@ -273,7 +319,7 @@ describe('#488 · 4. désigner à la main un virement', () => {
     expect(proposees(l2)).toEqual(['d>c1', 'd>c2']);
   });
 
-  it('[niveau 4] sans candidat : désignée seule, puis appariée à l’import qui apporte l’autre côté', () => {
+  it('[niveau 2] sans candidat : désignée seule, puis appariée à l’import qui apporte l’autre côté', () => {
     let l = avec(comptes(false), op('d', CC, '2026-06-02', 'VIR SEPA MISE DE COTE', -euros(600)));
     l = appliquer(l, designateTransfer(l, 'd', LIVRET));
     expect([de(l, 'd').state, de(l, 'd').transferAccountId, de(l, 'd').transferOperationId]).toEqual(['locked', LIVRET, undefined]);
@@ -292,7 +338,7 @@ describe('#488 · 5. défaire un appariement ne laisse pas un côté pointer dan
     for (const o of vivants.values()) if (o.transferOperationId) expect(vivants.get(o.transferOperationId)?.transferOperationId, `${o.id} désigne ${o.transferOperationId}`).toBe(o.id);
   };
 
-  it('[niveau 4] défaire un côté : l’autre ne le désigne plus ni son compte, et garde son état et sa ventilation', () => {
+  it('[niveau 0] défaire un côté : l’autre ne le désigne plus ni son compte, et garde son état et sa ventilation', () => {
     let l = paire();
     l.subOperations.push({ id: 's-c', operationId: 'c', categoryId: 'cat', share: { kind: 'variable' } });
     l = appliquer(l, unpairTransfer(l, 'd'));
@@ -302,7 +348,7 @@ describe('#488 · 5. défaire un appariement ne laisse pas un côté pointer dan
     coherent(l);
   });
 
-  it('[niveau 4] désigner un côté apparié vers un autre compte défait l’appariement des deux côtés', () => {
+  it('[niveau 0] désigner un côté apparié vers un autre compte défait l’appariement des deux côtés', () => {
     let l = paire();
     l = appliquer(l, designateTransfer(l, 'd', TOM));
     expect([de(l, 'd').transferAccountId, de(l, 'd').transferOperationId, de(l, 'd').state]).toEqual([TOM, undefined, 'locked']);
@@ -310,7 +356,7 @@ describe('#488 · 5. défaire un appariement ne laisse pas un côté pointer dan
     coherent(l);
   });
 
-  it('[niveau 4] un côté supprimé : défaire l’appariement libère l’autre', () => {
+  it('[niveau 0] un côté supprimé : défaire l’appariement libère l’autre', () => {
     let l = paire();
     l = appliquer(l, unpairTransfer(l, 'c'));
     l = { ...l, operations: l.operations.map((o) => (o.id === 'c' ? { ...o, deletedAt: '2026-06-02T00:00:00Z' } : o)) };
@@ -326,7 +372,7 @@ describe('#488 · 6. un ordre ne se propose que sur une paire sûre', () => {
     l.plannedFlows.push({ id: 'salaire', name: 'Salaire', kind: 'income', amount: euros(2500), accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-28' }, dateWindowDays: 3 });
     return l;
   };
-  it('[niveau 4] à confirmer, aucune proposition d’ordre ; confirmée, le débit la propose, le crédit non', () => {
+  it('[niveau 1] à confirmer, aucune proposition d’ordre ; confirmée, le débit la propose, le crédit non', () => {
     const l = apparie(budget(avec(comptes(false), op('d', CC, '2026-06-02', 'VIR SEPA MISE DE COTE', -euros(250)), op('c', LIVRET, '2026-06-03', 'VIR RECU', euros(250)))));
     expect(proposees(l)).toEqual(['d>c']);
     expect(transfersToOrder(l, '2026-06-10').size).toBe(0);
@@ -336,7 +382,7 @@ describe('#488 · 6. un ordre ne se propose que sur une paire sûre', () => {
 });
 
 describe('#488 · 7. le rapport d’import', () => {
-  it('[niveau 4] compte les virements internes appariés et les paires à confirmer', () => {
+  it('[niveau 2] compte les virements internes appariés et les paires à confirmer', () => {
     let l = avec(comptes(), ...moisEnfants('avr', { versLea: '2026-04-01', versTom: '2026-04-01', recuLea: '2026-04-01', recuTom: '2026-04-01', prlvLea: '2026-03-30', prlvTom: '2026-03-31' }), op('d', LEA, '2026-04-12', 'VIR SEPA CLUB', -euros(34)), op('c', CC, '2026-04-12', 'VIR RECU CPAM', euros(34)));
     const r = runPipeline(l, '2026-03-30', '2026-04-13', (p) => (l = appliquer(l, p)));
     expect([r.transfersPaired, r.transferProposals]).toEqual([2, 1]);
@@ -344,7 +390,7 @@ describe('#488 · 7. le rapport d’import', () => {
 });
 
 describe('#488 · 8. reconnaissance souple des libellés d’un flux', () => {
-  it('[niveau 4] le score, sur les exemples du « Fait quand »', () => {
+  it('[niveau 2] le score, sur les exemples du « Fait quand »', () => {
     expect(LABEL_SCORE_MIN).toBe(0.8);
     expect(labelScore('vir sepa tirelire léa', 'VIR SEPA TIRELIRE LEA')).toBe(1);
     expect(labelScore('TIRELIRE-LIVRET', 'TIRELIRE LIVRET')).toBe(1);
@@ -359,7 +405,7 @@ describe('#488 · 8. reconnaissance souple des libellés d’un flux', () => {
     expect(labelScore('TIRELIRE LEA', 'TIRELIRE TOM')).toBe(0.5);
   });
 
-  it('[niveau 4] un motif littéral reconnaît chaque altération du tableau, une à la fois ; ce qu’il reconnaissait, il le reconnaît encore', () => {
+  it('[niveau 2] un motif littéral reconnaît chaque altération du tableau, une à la fois ; ce qu’il reconnaissait, il le reconnaît encore', () => {
     const motif = 'ARGENT DE POCHE MENSUEL LÉA';
     const brut = 'VIR SEPA ARGENT DE POCHE MENSUEL LÉA REF 2026';
     const libelle = (label: string, details?: string) => op('x', CC, '2026-04-01', label, -euros(45), details ? { details } : {});
@@ -384,14 +430,14 @@ describe('#488 · 8. reconnaissance souple des libellés d’un flux', () => {
     expect(labelMatcher('ARGENT.*POCHE LÉA')(libelle('vir argent de poche tom'))).toBe(false);
   });
 
-  it('[niveau 4] « TIRELIRE LEA » ne reconnaît pas « TIRELIRE TOM » ; trois mots insérés, non ; une coupure qui fait disparaître la référence, non', () => {
+  it('[niveau 2] « TIRELIRE LEA » ne reconnaît pas « TIRELIRE TOM » ; trois mots insérés, non ; une coupure qui fait disparaître la référence, non', () => {
     const lit = (motif: string, label: string) => labelMatcher(motif)(op('x', CC, '2026-04-01', label, -euros(45)));
     expect(lit('TIRELIRE LEA', 'VIR TIRELIRE TOM')).toBe(false);
     expect(lit('ARGENT POCHE', 'ARGENT DE LA BELLE POCHE')).toBe(false);
     expect(lit('ARGENT POCHE LEA', 'VIR SEPA ARGENT')).toBe(false);
   });
 
-  it('[niveau 4] une expression régulière garde sa seule lecture, sans le score', () => {
+  it('[niveau 2] une expression régulière garde sa seule lecture, sans le score', () => {
     const lit = (motif: string, label: string) => labelMatcher(motif)(op('x', CC, '2026-04-01', label, -euros(45)));
     expect(lit('^VIR (EMENT)?SALAIRE', 'vir salaire')).toBe(true);
     expect(lit('^VIR (EMENT)?SALAIRE', 'PRLV VIR SALAIRE')).toBe(false);
@@ -401,7 +447,7 @@ describe('#488 · 8. reconnaissance souple des libellés d’un flux', () => {
     expect(lit('(TAXE) FONC', 'PRLV TAXE D FONCIERE')).toBe(false);
   });
 
-  it('[niveau 4] la destination connue suit la lecture souple du libellé de l’ordre', () => {
+  it('[niveau 2] la destination connue suit la lecture souple du libellé de l’ordre', () => {
     const l = avec(comptes(), op('d', CC, '2026-04-01', 'prlv vir-sepa argent poche léa', -euros(45)), op('c', LEA, '2026-04-01', 'VIR RECU', euros(45)));
     expect(matchTirelireTransfers(l).operations.map((o) => [o.id, o.transferAccountId])).toEqual([['d', LEA]]);
     expect(paires(apparie(l))).toEqual(['d>c']);
