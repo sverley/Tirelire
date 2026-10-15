@@ -8,7 +8,8 @@
  * Composé après le codage (auditeur.md, étape 2), parmi les tests du codeur
  * (`virements-internes-488.test.ts`, déplacé ici en entier). Est de moi : au point 3, la lecture des
  * propositions et des alertes, et l'import, qui n'écrivent rien de ce qui reste à confirmer, relus dans
- * la base (I10).
+ * la base (I10). Au second tour, le point 8 amendé (porteur, 16/10) : les tests du codeur
+ * (`virements-internes-488-fin-coupee.test.ts`, déplacé ici en entier), à la fin de ce fichier.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce qu'une correction du code ne rendrait pas : une opération sans destination connue jamais
@@ -18,6 +19,9 @@
  *   côté pointer dans le vide, l'autre gardant son état et sa ventilation (point 5).
  * - 1 · I2 : la désignation à la main qui apparie le seul candidat retire le double compte (point 4) ;
  *   un ordre ne se propose que sur une paire sûre (point 6 ; principes 1.3, 4.4, I10).
+ * - 0 aussi · le piège des ordres d'une famille (point 8) : aucune fausse paire, rien d'apparié ni de
+ *   repris d'office sur un libellé que plusieurs ordres ne reconnaissent que souplement, ni par l'ordre
+ *   d'un autre enfant — le besoin du piège des comptes enfants (point 2).
  * - 2 · les autres cas des règles : les destinations connues, les départages, l'import suivant, la
  *   proposition qui disparaît, le rapport, la reconnaissance souple (points 1, 2, 3, 4, 7, 8).
  *
@@ -38,12 +42,15 @@ import {
   emptyLedger,
   euros,
   indexLedger,
+  labelCutScore,
   labelMatcher,
+  labelRecognizer,
   labelScore,
   matchTirelireTransfers,
   normalizeLabel,
   pairInternalTransfers,
   proposeInternalTransfers,
+  proposeMatches,
   runPipeline,
   tirelireComponents,
   transfersToOrder,
@@ -451,5 +458,124 @@ describe('#488 · 8. reconnaissance souple des libellés d’un flux', () => {
     const l = avec(comptes(), op('d', CC, '2026-04-01', 'prlv vir-sepa argent poche léa', -euros(45)), op('c', LEA, '2026-04-01', 'VIR RECU', euros(45)));
     expect(matchTirelireTransfers(l).operations.map((o) => [o.id, o.transferAccountId])).toEqual([['d', LEA]]);
     expect(paires(apparie(l))).toEqual(['d>c']);
+  });
+});
+
+// Le point 8 amendé (porteur, 16/10) : données inventées (D84), « Léa » et « Thomas », et les libellés du
+// « piège des ordres d'une famille » de l'issue.
+const THOMAS = 'acc-thomas';
+const MOTIF_LEA = 'VIR SEPA ARGENT POCHE LEA';
+const MOTIF_THOMAS = 'VIR SEPA ARGENT POCHE THOMAS';
+const COUPE = 'VIR SEPA ARGENT POCHE';
+
+function ordreFamille(id: string, vers: string, motif: string): PlannedFlow {
+  return { id, name: `Virement ${vers}`, kind: 'transfer', amount: -euros(20), accountId: CC, counterpartAccountId: vers, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-01' }, dateWindowDays: 5, labelPattern: motif, amountTolerance: { pct: 20 } };
+}
+
+/** Les comptes, et les ordres demandés : `lea`, `thomas`. */
+function famille(...ordres: Array<'lea' | 'thomas'>): Ledger {
+  const l = emptyLedger();
+  l.accounts.push(
+    { id: CC, name: 'Compte principal', kind: 'principal', openingBalance: euros(2000), openingDate: '2025-12-31' },
+    { id: LEA, name: 'Léa', kind: 'courant', openingBalance: 0, openingDate: '2025-12-31' },
+    { id: THOMAS, name: 'Thomas', kind: 'courant', openingBalance: 0, openingDate: '2025-12-31' },
+  );
+  if (ordres.includes('lea')) l.plannedFlows.push(ordreFamille('ordre-lea', LEA, MOTIF_LEA));
+  if (ordres.includes('thomas')) l.plannedFlows.push(ordreFamille('ordre-thomas', THOMAS, MOTIF_THOMAS));
+  return l;
+}
+
+function importer(l: Ledger): Ledger {
+  let out = l;
+  runPipeline(out, '2026-03-25', '2026-04-10', (p) => (out = applyPatchToLedger(out, p)));
+  return out;
+}
+
+const crédits = () => [op('c-lea', LEA, '2026-04-01', 'VIR RECU', euros(20)), op('c-thomas', THOMAS, '2026-04-02', 'VIR RECU', euros(20))];
+
+describe('#488 · 8. les 20 % tolérés ne couvrent que la fin coupée', () => {
+  it('[niveau 2] le score de la fin coupée, sur les exemples du « Fait quand »', () => {
+    // Coupé par la source : 4 mots sur 5, oui.
+    expect(labelCutScore(MOTIF_LEA, COUPE)).toBe(0.8);
+    expect(labelCutScore(MOTIF_THOMAS, COUPE)).toBe(0.8);
+    // Un autre mot à la place du mot absent : non, alors que la part des mots présents est 0,8.
+    expect(labelScore(MOTIF_THOMAS, MOTIF_LEA)).toBe(0.8);
+    expect(labelCutScore(MOTIF_THOMAS, MOTIF_LEA)).toBe(0);
+    // Un mot du motif absent au milieu ou au début du texte : non.
+    expect(labelCutScore(MOTIF_LEA, 'VIR SEPA POCHE LEA')).toBe(0);
+    expect(labelCutScore(MOTIF_LEA, 'SEPA ARGENT POCHE LEA')).toBe(0);
+    // Un suffixe ajouté après la fin coupée : le texte ne s'arrête plus avant le mot absent.
+    expect(labelCutScore(MOTIF_LEA, `${COUPE} REF 9`)).toBe(0);
+    // 3 mots sur 4, même coupés : sous le seuil.
+    expect(labelCutScore('A B C D', 'X A B C')).toBe(0.75);
+    // Ce que la reconnaissance tolérait déjà reste : préfixe, suffixe, deux mots insérés, dernier mot tronqué.
+    expect(labelCutScore(MOTIF_LEA, `PRLV 12 ${MOTIF_LEA} REF 9`)).toBe(1);
+    expect(labelCutScore('A B C', 'A X Y B C')).toBe(1);
+    expect(labelCutScore('A B C', 'A X Y Z B C')).toBe(0);
+    expect(labelCutScore('ARGENT POCHE MENSUEL', 'VIR ARGENT POCHE MEN')).toBe(1);
+    expect(labelCutScore('TIRELIRE LEA', 'TIRELIRE TOM')).toBe(0);
+  });
+
+  it('[niveau 2] la reconnaissance du motif : exacte, souple ou aucune', () => {
+    const lit = (motif: string, label: string) => labelRecognizer(motif)(op('x', CC, '2026-04-01', label, -euros(20)));
+    expect(lit(MOTIF_LEA, `PRLV ${MOTIF_LEA}`)).toBe('exact');
+    expect(lit(MOTIF_LEA, 'vir sepa argent poche léa')).toBe('exact');
+    expect(lit(MOTIF_LEA, COUPE)).toBe('souple');
+    expect(lit(MOTIF_THOMAS, MOTIF_LEA)).toBeUndefined();
+    expect(labelMatcher(MOTIF_THOMAS)(op('x', CC, '2026-04-01', MOTIF_LEA, -euros(20)))).toBe(false);
+    // Une expression régulière garde sa seule lecture.
+    expect(lit('VIR SEPA (ARGENT|AP) POCHE LEA', 'VIR SEPA ARGENT POCHE LEA')).toBe('exact');
+    expect(lit('VIR SEPA (ARGENT|AP) POCHE LEA', COUPE)).toBeUndefined();
+  });
+});
+
+describe('#488 · 8. le piège des ordres d’une famille', () => {
+  it('[niveau 0] chaque virement s’apparie à son crédit, aucune fausse paire', () => {
+    const l = importer(avec(famille('lea', 'thomas'), op('d-lea', CC, '2026-04-01', MOTIF_LEA, -euros(20)), op('d-thomas', CC, '2026-04-04', MOTIF_THOMAS, -euros(20)), ...crédits()));
+    const lien = (id: string) => l.operations.find((o) => o.id === id)?.transferOperationId;
+    expect([lien('d-lea'), lien('d-thomas')]).toEqual(['c-lea', 'c-thomas']);
+    expect([lien('c-lea'), lien('c-thomas')]).toEqual(['d-lea', 'd-thomas']);
+    expect(l.operations.find((o) => o.id === 'd-lea')?.plannedFlowId).toBe('ordre-lea');
+    expect(l.operations.find((o) => o.id === 'd-thomas')?.plannedFlowId).toBe('ordre-thomas');
+  });
+
+  it('[niveau 0] le libellé coupé n’a pas de destination connue : il se propose avec chaque crédit, rien ne s’apparie seul ni ne se rapproche d’office', () => {
+    const avant = avec(famille('lea', 'thomas'), op('d', CC, '2026-04-01', COUPE, -euros(20)), ...crédits());
+    expect(matchTirelireTransfers(avant).operations).toEqual([]);
+    expect(proposeMatches(avant, '2026-03-25', '2026-04-10').filter((p) => p.operationId === 'd' && p.auto)).toEqual([]);
+    const l = importer(avant);
+    const d = l.operations.find((o) => o.id === 'd')!;
+    expect(d.transferOperationId).toBeUndefined();
+    expect(d.transferAccountId).toBeUndefined();
+    expect(d.plannedFlowId).toBeUndefined();
+    expect(proposeInternalTransfers(l).filter((p) => p.debitId === 'd').map((p) => p.creditId).sort()).toEqual(['c-lea', 'c-thomas']);
+  });
+
+  it('[niveau 0] avec le seul ordre de Thomas, le virement « … LEA » n’est pas rapproché de lui', () => {
+    const avant = avec(famille('thomas'), op('d', CC, '2026-04-01', MOTIF_LEA, -euros(20)), ...crédits());
+    expect(matchTirelireTransfers(avant).operations).toEqual([]);
+    expect(proposeMatches(avant, '2026-03-25', '2026-04-10').filter((p) => p.operationId === 'd')).toEqual([]);
+    const d = importer(avant).operations.find((o) => o.id === 'd')!;
+    expect([d.plannedFlowId, d.transferAccountId, d.transferOperationId]).toEqual([undefined, undefined, undefined]);
+  });
+
+  it('[niveau 2] un seul ordre reconnaît le libellé coupé : son compte en est la destination', () => {
+    const avant = avec(famille('lea'), op('d', CC, '2026-04-01', COUPE, -euros(20)), ...crédits());
+    expect(matchTirelireTransfers(avant).operations.map((o) => [o.id, o.transferAccountId])).toEqual([['d', LEA]]);
+    const d = importer(avant).operations.find((o) => o.id === 'd')!;
+    expect([d.transferAccountId, d.transferOperationId]).toEqual([LEA, 'c-lea']);
+  });
+
+  it('[niveau 2] l’exacte l’emporte sur la souple, même d’un motif plus long', () => {
+    const l = famille('lea');
+    // Un ordre vers Thomas au motif plus long, qui ne reconnaît le libellé que souplement (fin coupée).
+    l.plannedFlows.push(ordreFamille('ordre-thomas', THOMAS, `${COUPE} THOMAS MENSUEL`));
+    l.plannedFlows[0] = { ...l.plannedFlows[0]!, labelPattern: COUPE };
+    const avant = avec(l, op('d', CC, '2026-04-01', `${COUPE} THOMAS`, -euros(20)));
+    expect(labelRecognizer(`${COUPE} THOMAS MENSUEL`)(avant.operations[0]!)).toBe('souple');
+    expect(labelRecognizer(COUPE)(avant.operations[0]!)).toBe('exact');
+    expect(matchTirelireTransfers(avant).operations.map((o) => o.transferAccountId)).toEqual([LEA]);
+    const auto = proposeMatches(avant, '2026-03-25', '2026-04-10').filter((p) => p.operationId === 'd');
+    expect(auto.map((p) => p.flowId)).toEqual(['ordre-lea']);
   });
 });
