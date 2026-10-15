@@ -136,7 +136,16 @@ toute sélection de flux (D24) : un motif littéral, « texte » ou « texte.*te
 l'opération quand chacune de ses parties a un score d'au moins 0,8 sur le libellé ou le libellé complet
 — la part de ses mots présents dans l'ordre, sans casse, accents, ponctuation ni blancs, préfixe ou
 suffixe ajouté par la source ignoré, au plus deux mots insérés, un mot ou le dernier mot tronqué qui en
-commence un autre (`labelScore`) ; une autre expression régulière garde sa seule lecture.
+commence un autre (`labelScore`) ; une autre expression régulière garde sa seule lecture. Les mots
+absents tolérés ne sont que ceux d'une fin coupée par la source (porteur, 16 octobre 2026) : le texte
+s'arrête au dernier mot du motif reconnu, et seuls les mots du motif qui le suivent manquent
+(`labelCutScore`) ; un mot remplacé par un autre, ou absent au début ou au milieu, n'est pas reconnu.
+Entre plusieurs ordres, une reconnaissance exacte — l'expression régulière, ou un score de 1 — décide
+comme avant (le plus long ; à égalité, aucun compte) et l'emporte sur une reconnaissance souple ; quand
+aucun ordre ne reconnaît le libellé exactement et que les ordres de plusieurs comptes le reconnaissent
+souplement, la destination n'est pas connue, et la paire se propose ; le compte seul à le reconnaître
+souplement en est la destination (`labelRecognizer`). Un libellé coupé qui convient à deux ordres ne
+désigne ni l'un ni l'autre, et n'est repris automatiquement par aucun (D12).
 
 ### D12 · Pointage prudent
 

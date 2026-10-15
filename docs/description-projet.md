@@ -994,4 +994,6 @@ quand la destination est connue, et de proposer sinon. Il ajoute :
 > les comparaisons de libellés doivent être souples quand même (casse, accent, troncature, préfixe ou suffixe posé par la banque/Linxo). Peut-être prévoir une comparaison floue et un score mini de corrélation.
 
 Ce qui en est tiré : D11 et D33 amendées ; le glossaire (appariement) ; la ligne « Pipeline d'import »
-de l'architecture.
+de l'architecture. Le 16 octobre, sur une question de l'auditeur, le porteur limite les mots absents
+tolérés à une fin coupée par la source, et un libellé que plusieurs ordres ne reconnaissent que
+souplement n'a pas de destination connue (D11).

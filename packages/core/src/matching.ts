@@ -271,7 +271,10 @@ export function designateTransfer(ledger: Ledger, operationId: Id, accountId: Id
  *   (`transferLabel`). Celui d'un compte qui a un ordre ne reconnaît rien : renommer le compte ne
  *   change pas ce qui est reconnu (domaine plan et flux, hypothèse 3).
  * Entre plusieurs comptes, le libellé d'un ordre l'emporte sur un libellé tiré d'un nom ; entre
- * libellés de même sorte, le plus long ; à égalité, aucun compte. Elle n'est pas ventilée d'office :
+ * libellés de même sorte, le plus long ; à égalité, aucun compte. Le libellé d'un ordre reconnu
+ * exactement l'emporte sur un libellé reconnu souplement (`labelRecognizer`) ; quand aucun ordre ne la
+ * reconnaît exactement, le compte seul à la reconnaître souplement en est la destination, et, s'ils
+ * sont plusieurs, aucun compte (#488, point 8). Elle n'est pas ventilée d'office :
  * son montant y reste non affecté (D21 ; domaine rapprochement et bilan, hypothèse 1). Quand un ordre
  * vers ce compte la reprend (D12), c'est lui qui la ventile par son action (`applyMatch`), qu'il passe
  * avant ou après cette reconnaissance : elle ne pose aucune sous-opération.
@@ -279,12 +282,12 @@ export function designateTransfer(ledger: Ledger, operationId: Id, accountId: Id
 export function matchTirelireTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
   const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
-  const ordres = new Map<Id, Array<{ length: number; reconnait: (op: Operation) => boolean }>>();
+  const ordres = new Map<Id, Array<{ length: number; reconnait: (op: Operation) => LabelRecognition }>>();
   for (const f of alive(ledger.plannedFlows)) {
     const vers = principal ? standingOrderTarget(f, principal.id) : undefined;
     if (vers === undefined) continue;
     const motif = readLabelPattern(f.labelPattern);
-    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(motif ? [{ length: motif.length, reconnait: labelMatcher(motif) }] : [])]);
+    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(motif ? [{ length: motif.length, reconnait: labelRecognizer(motif) }] : [])]);
   }
   const accounts = alive(ledger.accounts).map((a) => ({
     a,
@@ -295,17 +298,21 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
     if (op.origin !== 'imported') continue;
     if (isLocked(op) || op.transferAccountId || resumesSomething(op)) continue;
     const parOrdre: Array<{ id: Id; length: number }> = [];
+    const parOrdreSouple: Id[] = [];
     const parNom: Array<{ id: Id; length: number }> = [];
     const dansLeSensDeLOrdre = !!principal && op.accountId === principal.id && op.amount < 0;
     for (const { a, patterns, name } of accounts) {
       if (a.id === op.accountId) continue;
       if (patterns) {
         if (!dansLeSensDeLOrdre) continue;
-        const longest = Math.max(-1, ...patterns.filter((p) => p.reconnait(op)).map((p) => p.length));
+        const lus = patterns.map((p) => ({ length: p.length, comment: p.reconnait(op) }));
+        const longest = Math.max(-1, ...lus.filter((p) => p.comment === 'exact').map((p) => p.length));
         if (longest >= 0) parOrdre.push({ id: a.id, length: longest });
+        else if (lus.some((p) => p.comment === 'souple')) parOrdreSouple.push(a.id);
       } else if (name.length > 0 && /TIRELIRE/.test(op.normalizedLabel) && op.normalizedLabel.includes(name)) parNom.push({ id: a.id, length: name.length });
     }
-    const hit = longestAlone(parOrdre.length ? parOrdre : parNom);
+    // L'exacte l'emporte ; entre comptes reconnus souplement seulement, un seul compte, ou aucun (#488, point 8).
+    const hit = parOrdre.length ? longestAlone(parOrdre) : parOrdreSouple.length ? (parOrdreSouple.length === 1 ? parOrdreSouple[0] : undefined) : longestAlone(parNom);
     if (!hit) continue;
     patch.operations.push({ ...op, state: 'reconciled', transferAccountId: hit });
   }
@@ -400,11 +407,6 @@ export function amountWithinTolerance(flow: Pick<PlannedFlow, 'amount' | 'amount
   return { ok: diff <= allowed + 0.5, ratio, exact: diff === 0 };
 }
 
-/** Le motif de libellé du flux, lu sans ses blancs d'extrémité (`readLabelPattern`), reconnaît-il l'opération ? Un motif illisible ne reconnaît rien. */
-function labelRecognized(motif: string, op: Operation): boolean {
-  return labelMatcher(motif)(op);
-}
-
 /** Le score minimal de la reconnaissance souple d'un motif littéral (`labelScore`, #488, point 8). */
 export const LABEL_SCORE_MIN = 0.8;
 
@@ -423,7 +425,8 @@ function labelWords(s: string): string[] {
  * accents, ponctuation et blancs ignorés ; un préfixe ou un suffixe ajouté par la source ignoré ; au
  * plus deux mots insérés entre deux mots du motif. Un mot du texte qui commence par celui du motif le
  * reconnaît (« BOURSO » dans « BOURSORAMA ») ; le dernier mot du texte, tronqué par la source à trois
- * caractères au moins, reconnaît aussi le mot du motif qu'il commence.
+ * caractères au moins, reconnaît aussi le mot du motif qu'il commence. Ce que la reconnaissance en
+ * tolère est `labelCutScore`.
  */
 export function labelScore(motif: string, texte: string): number {
   const m = labelWords(motif);
@@ -434,13 +437,48 @@ export function labelScore(motif: string, texte: string): number {
     let i = start;
     let n = 0;
     for (const mot of m) {
-      const k = t.slice(i, i + 3).findIndex((w, j) => w.startsWith(mot) || (i + j === t.length - 1 && w.length >= 3 && mot.startsWith(w)));
+      const k = t.slice(i, i + 3).findIndex((w, j) => wordRecognizes(mot, t, i + j));
       if (k < 0) continue;
       n++;
       i += k + 1;
     }
     best = Math.max(best, n / m.length);
   }
+  return best;
+}
+
+/** Le mot `t[ti]` reconnaît-il le mot du motif `mot` : il le commence, ou, dernier du texte, il en est la coupure à trois caractères au moins. */
+function wordRecognizes(mot: string, t: string[], ti: number): boolean {
+  const w = t[ti]!;
+  return w.startsWith(mot) || (ti === t.length - 1 && w.length >= 3 && mot.startsWith(w));
+}
+
+/**
+ * Le score de `labelScore` limité à la fin coupée (porteur, 16/10 ; #488, point 8) : 1 quand tous les
+ * mots du motif sont reconnus ; sinon, la part des premiers mots du motif reconnus quand le texte
+ * s'arrête au dernier d'entre eux — aucun mot du texte ne le suit —, les mots du motif qui le suivent
+ * étant les seuls absents ; 0 autrement. Un mot remplacé par un autre (« … THOMAS » contre « … LEA »),
+ * ou absent au début ou au milieu, n'est pas une coupure.
+ */
+export function labelCutScore(motif: string, texte: string): number {
+  const m = labelWords(motif);
+  const t = labelWords(texte);
+  if (!m.length) return 0;
+  const memo = new Map<number, number>();
+  // Le meilleur score quand les `mi` premiers mots du motif sont reconnus, et que le suivant se cherche
+  // à partir du mot `ti` du texte, au plus deux mots plus loin.
+  const suite = (mi: number, ti: number): number => {
+    if (mi === m.length) return 1;
+    const cle = mi * (t.length + 1) + ti;
+    const connu = memo.get(cle);
+    if (connu !== undefined) return connu;
+    let best = ti === t.length ? mi / m.length : 0;
+    for (let k = 0; k < 3 && ti + k < t.length && best < 1; k++) if (wordRecognizes(m[mi]!, t, ti + k)) best = Math.max(best, suite(mi + 1, ti + k + 1));
+    memo.set(cle, best);
+    return best;
+  };
+  let best = 0;
+  for (let start = 0; start < t.length && best < 1; start++) if (wordRecognizes(m[0]!, t, start)) best = Math.max(best, suite(1, start + 1));
   return best;
 }
 
@@ -454,24 +492,43 @@ function literalParts(motif: string): string[] | undefined {
 }
 
 /**
+ * Comment un motif de libellé reconnaît une opération (#488, point 8) : `exact`, par sa lecture en
+ * expression régulière ou par un score de 1 ; `souple`, par un score d'au moins `LABEL_SCORE_MIN`
+ * seulement ; `undefined`, pas du tout.
+ */
+export type LabelRecognition = 'exact' | 'souple' | undefined;
+
+/**
  * La reconnaissance d'un motif de libellé, compilée une fois pour être lue sur beaucoup d'opérations
  * (#456, point 12) : le libellé, le libellé normalisé ou le libellé complet. Un motif illisible ne
  * reconnaît rien. Une seule lecture du motif d'une sélection de flux (D24), pour `proposeMatches`, pour
  * les ordres (`matchTirelireTransfers`, donc la destination connue) et pour les occurrences que
  * l'historique propose. Un motif littéral, « texte » ou « texte.*texte », reconnaît aussi l'opération
- * quand chacune de ses parties a un score d'au moins `LABEL_SCORE_MIN` (`labelScore`) sur le libellé ou
- * le libellé complet (#488, point 8) ; une autre expression régulière garde sa seule lecture.
+ * quand chacune de ses parties a un score d'au moins `LABEL_SCORE_MIN` sur le libellé ou le libellé
+ * complet, les mots absents n'étant tolérés qu'à la fin coupée (`labelCutScore` ; #488, point 8) ; une autre expression régulière garde sa seule lecture. La
+ * reconnaissance dit si elle est exacte ou souple : entre plusieurs ordres, l'exacte l'emporte.
  */
-export function labelMatcher(motif: string): (op: Operation) => boolean {
+export function labelRecognizer(motif: string): (op: Operation) => LabelRecognition {
   let re: RegExp;
   try {
     re = new RegExp(motif, 'i');
   } catch {
-    return () => false;
+    return () => undefined;
   }
   const parts = literalParts(motif);
-  const souple = (texte: string) => !!parts && parts.every((p) => labelScore(p, texte) >= LABEL_SCORE_MIN);
-  return (op) => re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '') || souple(op.label) || (!!op.details && souple(op.details));
+  return (op) => {
+    if (re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '')) return 'exact';
+    if (!parts) return undefined;
+    // Chaque partie, sur le libellé ou le libellé complet, sa fin seule pouvant manquer ; la plus faible décide.
+    const score = Math.min(...parts.map((p) => Math.max(labelCutScore(p, op.label), op.details ? labelCutScore(p, op.details) : 0)));
+    return score >= 1 ? 'exact' : score >= LABEL_SCORE_MIN ? 'souple' : undefined;
+  };
+}
+
+/** Le motif de libellé reconnaît-il l'opération, exactement ou souplement (`labelRecognizer`) ? */
+export function labelMatcher(motif: string): (op: Operation) => boolean {
+  const reconnait = labelRecognizer(motif);
+  return (op) => reconnait(op) !== undefined;
 }
 
 /**
@@ -481,7 +538,11 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
  * ni ne le classe.
  *
  * Automatique selon D12 — montant exact, ou dans la tolérance avec le libellé reconnu, flux non
- * variable —, proposée sinon. Une occurrence n'est reprise qu'une fois, et une opération en reprend
+ * variable —, proposée sinon. Le libellé d'un flux reconnu exactement l'emporte sur un libellé reconnu
+ * souplement (`labelRecognizer`) : les flux qui ne le reconnaissent que souplement ne la sélectionnent
+ * pas ; et quand plusieurs flux ne la reconnaissent que souplement, aucun ne la reprend sans
+ * confirmation (#488, point 8 : un libellé coupé qui convient à deux ordres ne désigne ni l'un ni
+ * l'autre). Une occurrence n'est reprise qu'une fois, et une opération en reprend
  * au plus une : la mieux notée. Une occurrence qu'une saisie corrige ou masque déjà se reprend par
  * cette saisie (D88).
  */
@@ -490,17 +551,22 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
   const index = occurrenceIndex(ledger);
   const resumed = index.resumed;
   const ops = alive(ledger.operations).filter((o) => o.origin === 'imported' && !isLocked(o) && !resumesSomething(o) && !resumed.has(o.id) && o.date >= from && o.date <= to);
+  const lecteurs = new Map(flows.map((f) => [f.id, readLabelPattern(f.labelPattern)] as const).flatMap(([id, motif]) => (motif ? [[id, labelRecognizer(motif)] as const] : [])));
   const candidates: MatchProposal[] = [];
   for (const op of ops) {
+    const lus = new Map(flows.flatMap((f) => (f.accountId === op.accountId && lecteurs.has(f.id) ? [[f.id, lecteurs.get(f.id)!(op)] as const] : [])));
+    const exacte = [...lus.values()].includes('exact');
+    const souples = [...lus.values()].filter((r) => r === 'souple').length;
     for (const f of flows) {
       if (f.accountId !== op.accountId) continue;
       if (f.activeFrom && op.date < f.activeFrom) continue;
       if (f.activeTo && op.date > f.activeTo) continue;
       const amt = amountWithinTolerance(f, op.amount);
       if (!amt.ok) continue;
-      const motif = readLabelPattern(f.labelPattern);
-      const label = motif ? labelRecognized(motif, op) : undefined;
+      const lu = lus.get(f.id);
+      const label = lecteurs.has(f.id) ? lu !== undefined : undefined;
       if (label === false) continue;
+      if (lu === 'souple' && exacte) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
@@ -515,7 +581,7 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       reasons.push(amt.exact ? 'montant exact' : 'montant dans la tolérance');
       if (taker) reasons.push('déjà corrigée par une saisie');
       const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
-      const auto = !f.variable && (amt.exact || label === true);
+      const auto = !f.variable && (amt.exact || label === true) && !(lu === 'souple' && souples > 1);
       candidates.push({
         operationId: op.id,
         flowId: f.id,
