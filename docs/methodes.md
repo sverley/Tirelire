@@ -572,6 +572,26 @@ que le principe 10.1 demande à la CI vaut pour elle (#351).
 - **Des écrits proportionnés.** Le compte rendu du codeur et la vérification de l'auditeur se
   proportionnent : le relevé phrase par phrase du « Fait quand » pour ce qu'un test tranche ; pour
   une documentation, quelques lignes.
+- **La voie courte de l'architecte.** Quand l'issue porte, de la main du porteur, une section
+  « Comportement » et la construction qu'il a choisie, l'architecte ne lit pas tous les fondateurs :
+  il lit les principes et les usages de la description, ce que l'issue nomme, les entrées du
+  registre que la garde désignera pour les fichiers de la construction, et le glossaire par
+  extraits ; son « Fait quand » renvoie à la section « Comportement » sans la réécrire
+  (`docs/roles/architecte.md`). L'analyse du besoin reste faite (principe 8) : le porteur l'a écrite,
+  l'architecte la borne et la confronte au registre ; l'auditeur, qui lit le « Fait quand » de son
+  côté, est le filet de ce qu'une lecture réduite manquerait (D80). Lire tous les fondateurs ne coûte
+  pas une fois : un contexte lourd ralentit chacun des appels qui suivent. Au relevé de #489, les
+  documents fondateurs pesaient près de 390 ko, et #487, qui portait une
+  implémentation proposée complète, était « en cours » depuis 19 minutes sans « Fait quand » ni
+  « Invariants et contraintes ».
+- **Mesurer avant d'outiller.** Une session qui lance un agent, quel que soit son rôle, rapporte sa
+  durée, son nombre d'appels d'outils et son nombre de tokens (`CLAUDE.md`, « Pratique »). Au relevé
+  de #489, #480, une documentation seule, avait mis 45 minutes de « en cours » à « PR prête », dont
+  26 avant la première PR, et son auditeur avait consommé 193 389 tokens en 60 appels d'outils au
+  premier tour. Aucun outillage nouveau pour l'économie des sessions — agent, skill — ne s'ajoute
+  avant que ces mesures se comparent sur les issues suivantes, voie courte ou non : un agent de plus
+  ajoute des relectures et des relais séquentiels, et un skill qui redirait des règles en serait une
+  seconde source (D77, D78).
 
 L'hypothèse écartée, tout lire en entier et tout rejouer pour ne rien manquer, ne tenait pas : le
 tour de #349, une modification de documentation, a coûté environ 340 000 tokens à trois sessions,
