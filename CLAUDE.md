@@ -7,8 +7,8 @@ jamais (D77). Travail en français.
   glossaire et les catalogues : `docs/invariants.md`, `docs/contraintes.md`, `docs/cibles.md`,
   `docs/decisions.md`, `docs/methodes.md`, `docs/gardes.md` ; les documents des domaines,
   `docs/domaines/` ; le catalogue des versions, `docs/versions.md`. Ce que chaque session en lit
-  d'abord est dans son rôle : l'architecte les lit tous ; le codeur et l'auditeur, l'issue, le
-  glossaire et ce que l'issue cite.
+  d'abord est dans son rôle : l'architecte les lit tous, sauf sur la voie courte (D92) ; le codeur
+  et l'auditeur, l'issue, le glossaire et ce que l'issue cite.
 - La méthode est dans `docs/methodes.md`.
 - Chaque session tient un seul rôle, donné dans le premier message avec son objet, et décrit dans
   `docs/roles/` : `architecte.md`, `auditeur.md`, `codeur.md`, `porteur.md`. Commence par ce
@@ -57,8 +57,10 @@ La façon de travailler dans l'environnement des sessions (porteur, #403).
   `TIRELIRE_NAV=/opt/pw-browsers/chromium-1194/chrome-linux/chrome` ; `/usr/bin/chromium-browser`
   ne se lance pas ici. Si ce chemin ne répond plus, cherche le Chromium présent sous
   `/opt/pw-browsers/`.
-- Si tu lances un agent (codeur, auditeur), rapporte dans ton commentaire de tour, sur la PR, le
-  nombre de tokens que l'outil rend à sa fin.
+- Si tu lances un agent, quel que soit son rôle (architecte, codeur, auditeur), rapporte les trois
+  mesures que l'outil rend à sa fin : sa durée, son nombre d'appels d'outils et son nombre de
+  tokens. Écris-les dans ton commentaire de tour sur la PR, ou sur l'issue tant qu'il n'y a pas de
+  PR (D92).
 - Ne cite pas Claude dans les commits ni dans aucun texte que tu consignes ou déposes sur internet
   ou sur GitHub. Ne fais pas mention de ce que l'outil ajoute tout seul.
 - Travaille seulement dans le conteneur cloud de la session : n'utilise ni les fichiers, ni le
