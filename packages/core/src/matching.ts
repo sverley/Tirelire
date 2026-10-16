@@ -561,12 +561,14 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
  * doute, on propose) :
  * - un virement que plusieurs flux retiennent, dont l'une des reconnaissances de libellé au moins est
  *   souple (`labelRecognizer`), n'est repris d'office par aucun : la reprise se propose avec chacun. Un
- *   flux retient un virement quand sa sélection entière le reconnaît — son compte, son motif, sa
- *   tolérance de montant, la fenêtre de ses occurrences — ; un flux que le montant ou la fenêtre écarte
- *   n'est pas un candidat et ne compte pas (porteur, 16/10 : « on filtre les opérations avec les
- *   informations que l'automatisme ou le rapprochement contient ») ;
+ *   flux retient un virement quand sa sélection entière le reconnaît — son compte, son motif s'il en a
+ *   un, sa tolérance de montant, la fenêtre de ses occurrences — ; un flux sans motif dont le reste
+ *   convient le retient donc, et compte ; un flux que le montant ou la fenêtre écarte n'est pas un
+ *   candidat et ne compte pas (porteur, 16/10 : « on filtre les opérations avec les informations que
+ *   l'automatisme ou le rapprochement contient ») ;
  * - un virement n'est repris d'office que par un ordre du compte qui en est la destination connue
- *   (`transferRecognitions`, ou le compte déjà désigné) ; un virement que les ordres de plusieurs
+ *   (`transferRecognitions`, ou le compte déjà désigné) : un flux qui n'est pas un ordre vers elle ne
+ *   fait que se proposer ; un virement que les ordres de plusieurs
  *   comptes reconnaissent sans que rien les départage n'est repris d'office par aucun, et se propose
  *   avec chacun ; un flux de virement vers un autre compte que sa destination connue ne le sélectionne
  *   pas : le flux qui reprend un virement et le compte qui en est la destination ne divergent pas.
@@ -588,8 +590,9 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
     // La destination connue : le compte déjà désigné, ou celui que reconnaissent les libellés des ordres seuls.
     const destination = op.transferAccountId ?? reconnus.get(op.id);
     const sansDestination = !op.transferAccountId && reconnus.has(op.id) && destination === undefined;
-    // Les reconnaissances de libellé des flux qui retiennent le virement, leur sélection entière (D24).
-    const lus: NonNullable<LabelRecognition>[] = [];
+    // Les flux qui retiennent le virement, leur sélection entière (D24), motif ou non, et si l'un le lit souplement.
+    let retiennent = 0;
+    let souple = false;
     const siens: MatchProposal[] = [];
     for (const f of flows) {
       if (f.accountId !== op.accountId) continue;
@@ -604,7 +607,8 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       if (label === false) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
-      if (lu !== undefined) lus.push(lu);
+      retiennent++;
+      if (lu === 'souple') souple = true;
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
       // Reprise par une opération bancaire, ou par une saisie déjà reprise : l'occurrence est servie.
       const libre = freeOccurrence(index, f.id, expectedDate);
@@ -617,7 +621,8 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       reasons.push(amt.exact ? 'montant exact' : 'montant dans la tolérance');
       if (taker) reasons.push('déjà corrigée par une saisie');
       const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
-      const auto = !f.variable && (amt.exact || label === true);
+      // Une destination connue n'est reprise d'office que par un ordre vers elle (#488, point 8).
+      const auto = !f.variable && (amt.exact || label === true) && (destination === undefined || vers === destination);
       siens.push({
         operationId: op.id,
         flowId: f.id,
@@ -629,7 +634,7 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
         reasons,
       });
     }
-    const douteuse = (lus.length > 1 && lus.includes('souple')) || sansDestination;
+    const douteuse = (retiennent > 1 && souple) || sansDestination;
     if (douteuse) douteuses.add(op.id);
     candidates.push(...(douteuse ? siens.map((c) => ({ ...c, auto: false })) : siens));
   }
