@@ -297,10 +297,11 @@ describe('l’import d’un OFX sur l’écran Import · #443', () => {
         app.reload();
       };
       // Principal : un achat classé par l'automatisme, un virement vers le Livret A, deux achats identiques du même jour.
+      // Le virement porte le libellé de l'ordre de l'exemple vers le Livret A : sa destination est connue, il s'apparie (#488, point 2).
       const courant: string[][] = [
         ['20261001', '-85.40', 'CARTE X2009 01/10 SUPERMARCHE LYON', 'CARTE X2009 01/10 SUPERMARCHE LYON FACTURE 12'],
         ['20261001', '-85.40', 'CARTE X2009 01/10 SUPERMARCHE LYON', 'CARTE X2009 01/10 SUPERMARCHE LYON FACTURE 12'],
-        ['20261002', '-200.00', 'VIR PERM LIVRET', 'VIR PERM LIVRET MOTIF: EPARGNE'],
+        ['20261002', '-200.00', 'VIR PERM TIRELIRE LIVRET A', 'VIR PERM TIRELIRE LIVRET A MOTIF: EPARGNE'],
       ];
       const livret: string[][] = [['20261003', '200.00', 'VIR RECU COMPTE COURANT']];
       const ligne = (num: string, nom: string, o: string[]) => {

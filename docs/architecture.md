@@ -177,9 +177,12 @@ occurrence rapprochée sort du solde prévu et d'« Attendus, non reçus » (`fl
 
 ## Pipeline d'import (`runPipeline`)
 
-lecture (profil) → clés et doublons (`prepareImport`) → insertion → virements internes appariés
-→ virements par compte (libellé TIRELIRE, reconnus sans ventilation) → rapprochement
-automatique des occurrences sûres (D12) → moteur de règles → file de tri (interface).
+lecture (profil) → clés et doublons (`prepareImport`) → insertion → virements internes appariés,
+seulement ceux dont la destination est connue (D11, `pairInternalTransfers`) → virements par compte
+(libellé de l'ordre ou TIRELIRE, reconnus sans ventilation) → rapprochement automatique des occurrences
+sûres (D12) → second appariement, pour ce que les étapes précédentes ont fait connaître → moteur de
+règles → file de tri (interface). Les autres paires de virement interne se proposent sur l'écran
+Opérations (`proposeInternalTransfers`), et le rapport d'import les compte.
 
 ## Dépôt et synchronisation
 

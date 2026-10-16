@@ -127,6 +127,29 @@ compte (`matchTirelireTransfers`), ~~puis ventilée sur ses tirelires (D60)~~ �
 2026 : ventilée par les parts de l'ordre dont elle rapproche une occurrence (D12, D60), et non affectée sur ce compte
 sinon (D21).
 
+Amendé le 15 octobre 2026 (#488) : le compte ainsi reconnu, ou celui vers lequel (pour un crédit, depuis
+lequel) l'utilisateur a désigné l'opération comme virement, est sa **destination connue** ; rien d'autre
+n'en fait une — ni le nom ni le numéro d'un compte cités dans un libellé, ni un montant égal. Seule une
+opération à destination connue s'apparie sans confirmation à l'autre côté de son virement, sur le compte
+désigné (D33) ; les autres paires possibles se proposent. Le libellé de l'ordre enregistré se lit comme
+toute sélection de flux (D24) : un motif littéral, « texte » ou « texte.*texte », reconnaît aussi
+l'opération quand chacune de ses parties a un score d'au moins 0,8 sur le libellé ou le libellé complet
+— la part de ses mots présents dans l'ordre, sans casse, accents, ponctuation ni blancs, préfixe ou
+suffixe ajouté par la source ignoré, au plus deux mots insérés, un mot ou le dernier mot tronqué qui en
+commence un autre (`labelScore`) ; une autre expression régulière garde sa seule lecture. Les mots
+absents tolérés ne sont que ceux d'une fin coupée par la source (porteur, 16 octobre 2026) : le texte
+s'arrête au dernier mot du motif reconnu, et seuls les mots du motif qui le suivent manquent
+(`labelCutScore`) ; un mot remplacé par un autre, ou absent au début ou au milieu, n'est pas reconnu.
+Une reconnaissance est *exacte* quand la lecture d'avant la donnait — l'expression régulière du motif —,
+*souple* quand seul le score la donne, un score de 1 compris (`labelRecognizer`). Dans le doute, on
+propose (porteur, 16 octobre 2026) : quand les ordres de plusieurs comptes reconnaissent un libellé et
+que l'une de ces reconnaissances au moins est souple, la destination n'est pas connue, la paire se
+propose, et aucun de ces ordres ne reprend le virement automatiquement ; quand elles sont toutes exactes,
+le plus long l'emporte, comme avant, et, à égalité, aucun compte ; le compte seul à reconnaître le
+libellé, exactement ou souplement, en est la destination. Un virement n'est repris automatiquement que
+par un ordre du compte qui en est la destination connue (D12) : le flux qui reprend un virement et le
+compte qui en est la destination ne divergent pas.
+
 ### D12 · Pointage prudent
 
 Un flux prévu est pointé automatiquement seulement si le montant est exact (ou dans la tolérance
@@ -140,6 +163,27 @@ Ce que l'hypothèse du pointage exact cachait : un prélèvement du 5 passe le 7
 samedi, une facture varie, un salaire varie avec les heures supplémentaires, et deux abonnements
 peuvent avoir le même montant. Trop strict, rien n'est reconnu ; trop lâche, c'est la mauvaise
 opération qui est pointée.
+
+Amendé le 16 octobre 2026 (#488) : un pointage automatique n'a qu'un candidat sérieux. Un flux retient
+une opération quand sa sélection entière la reconnaît (D24) : son compte, son motif de libellé, lu
+exactement ou souplement (le score de D11), sa tolérance de montant, la fenêtre de ses occurrences ; un
+flux que le montant ou la fenêtre écarte n'est pas un candidat et ne compte pas (porteur, 16 octobre
+2026). Chaque flux qui la retient lui donne la note de sa proposition, où un libellé reconnu compte de
+même, exactement ou souplement. Quand plusieurs flux la retiennent, le mieux noté la pointe — quand il le
+peut par ailleurs — si aucun autre n'a une note à la fois élevée, d'au moins 0,7, et proche de la sienne,
+à 0,1 près au plus (`MATCH_SCORE_HIGH`, `MATCH_SCORE_CLOSE`) : il est alors seul à la pointer ou à se
+proposer. Sinon, aucun ne la pointe automatiquement, et le pointage se propose avec chacun (porteur,
+16 octobre 2026). À égalité de note au plus haut, même sous 0,7, aucun n'est « le mieux noté » : on ne
+peut pas déterminer qu'un seul correspond vraiment, et le pointage se propose avec chacun. Un virement
+n'est pointé automatiquement que par un ordre du compte qui en est la destination connue (D11).
+
+La même règle vaut dans l'autre sens (porteur, 16 octobre 2026 : « Consigne la règle édictée et applique
+la aussi dans l'autre sens ») : une occurrence que plusieurs opérations se disputent — chacune la
+pointerait ou se la verrait proposer d'après ce qui précède — est pointée par la mieux notée, avec la note
+qu'elle reçoit de ce flux, quand elle le peut par ailleurs, si aucune autre n'a une note élevée et proche
+de la sienne, ni la même : elle est alors seule à la pointer ou à se la voir proposer. Sinon, aucune ne la
+pointe automatiquement, et le pointage se propose avec chacune ; dès que l'une la pointe, la proposition
+des autres disparaît. Mêmes seuils, même note : une seule règle, dans les deux sens (principe 13).
 
 ### D13 · Nom de code « Tirelire »
 
@@ -362,7 +406,11 @@ rien les efface aussitôt posés — le pipeline se défait lui-même.
 
 Le calcul part donc de ce que l'import a établi : une opération qui en rapproche une autre (D88) ou
 appariée en virement interne est *classée*, avec la ventilation que cette étape lui a donnée ;
-les autres partent vierges et non traitées. Les règles écrivent par-dessus, champ par champ, selon
+les autres partent vierges et non traitées. — Amendé le 15 octobre 2026 (#488) : l'import n'apparie que
+les virements internes dont la destination est connue (D11), et les deux côtés deviennent *classés* — un
+côté que l'utilisateur avait désigné reste *verrouillé* ; aucune ventilation ne change. Une paire que
+l'utilisateur confirme, ou que sa désignation forme, est *verrouillée* (D22) : aucune règle ne la
+réécrit. Les autres paires possibles se proposent, sans rien écrire (I10). Les règles écrivent par-dessus, champ par champ, selon
 D23. Retirer une règle rend l'opération à cet état d'import, pas à rien.
 
 Conséquence : un flux n'a pas de règle à lui à côté de son rapprochement (D24) ; l'opération qui

@@ -8,7 +8,8 @@
  * Aucun calcul propre (point 4) : chaque genre vient du calcul du cœur qui le fait — le plan de chaque
  * période lue (`readBudgetPeriod`, lu comme l'écran Plan le lit), les échéances en manque
  * (`dueDateShortfalls`), les attendus non reçus (`missingFlows`), les reprises proposées
- * (`proposeMatches`), les virements qui peuvent devenir un ordre (`transfersToOrder`) —, et ses
+ * (`proposeMatches`), les paires de virement interne à confirmer (`proposeInternalTransfers`), les
+ * virements qui peuvent devenir un ordre (`transfersToOrder`) —, et ses
  * montants et ses dates sont ceux que ce calcul rend, portés à part du message : qui lit l'alerte n'a
  * rien à extraire du message ni à recalculer (point 3).
  *
@@ -23,7 +24,7 @@ import { budgetPeriodContaining, nextPeriod, type Period } from './periods.js';
 import { PLAN_WARNING_CODES, type Plan, type PlanWarning } from './plan.js';
 import { readBudgetPeriod, shortfallsWithin, type BudgetPeriodReading } from './lecture-budget.js';
 import { dueDateShortfalls, shortfallsForPeriod, type DueDateShortfall } from './shortfall.js';
-import { missingFlows, proposeMatches, type MatchProposal, type MissingFlow } from './matching.js';
+import { missingFlows, proposeInternalTransfers, proposeMatches, type MatchProposal, type MissingFlow } from './matching.js';
 import { transfersToOrder } from './ordre-depuis-virement.js';
 
 /** Au-delà de ce nombre de jours entre la dernière opération connue et la date de lecture, l'historique est en retard. */
@@ -103,6 +104,18 @@ export interface MatchProposalAlert extends Said, MatchProposal {
   flowName: string;
   /** Le libellé de la saisie qu'elle reprendrait, quand une saisie corrige ou masque déjà l'occurrence. */
   resumedOperationLabel?: string;
+}
+
+/**
+ * Une paire possible de virement interne, à confirmer (#488, point 3) : un débit et un crédit de deux
+ * comptes, de montants opposés, que l'appariement automatique n'a pas formée (`proposeInternalTransfers`).
+ */
+export interface TransferPairProposalAlert extends Said {
+  code: 'transferPairProposal';
+  debitId: Id;
+  creditId: Id;
+  debit: AlertOperation;
+  credit: AlertOperation;
 }
 
 /** Une opération qui peut devenir l'ordre permanent d'un compte d'accueil (point 9, #434, #435). */
@@ -226,6 +239,7 @@ export type Alert =
   | OrphanTirelireAlert
   | UntreatedOperationsAlert
   | MatchProposalAlert
+  | TransferPairProposalAlert
   | TransferToOrderAlert
   | DueDateShortfallAlert
   | PlanWarningAlert
@@ -268,6 +282,7 @@ export function readAlerts<C extends AlertCode = AlertCode>(ledger: Ledger, read
   if (voulu('orphanTirelire')) out.push(...orphanTirelires(ledger));
   if (voulu('untreatedOperations')) out.push(...untreatedOperations(ledger));
   if (voulu('matchProposal')) out.push(...matchProposals(ledger, today));
+  if (voulu('transferPairProposal')) out.push(...transferPairProposals(ledger));
   if (voulu('transferToOrder')) out.push(...transfersToOrderAlerts(ledger, today));
   if (voulu('dueDateShortfall')) out.push(...dueDateShortfallAlerts(ledger, today, periods));
   if (PLAN_WARNING_CODES.some(voulu) || voulu('forecastShortfall'))
@@ -367,6 +382,27 @@ function matchProposals(ledger: Ledger, today: ISODate): MatchProposalAlert[] {
         `L’opération « ${op.label} » du ${shortDate(op.date)}, de ${formatCents(op.amount)}, peut reprendre l’opération prévue « ${flowName} » du ${shortDate(m.expectedDate)}, de ${formatCents(m.expectedAmount)}` +
         (saisie ? `, par la saisie « ${saisie.label} » qui la corrige` : '') +
         (m.auto ? ' : elle s’appliquerait sans confirmation.' : ' : à confirmer.'),
+    };
+  });
+}
+
+/** Les paires de virement interne à confirmer, quelles que soient leurs dates, comme les opérations non traitées (#488, point 3). */
+function transferPairProposals(ledger: Ledger): TransferPairProposalAlert[] {
+  const proposees = proposeInternalTransfers(ledger);
+  if (!proposees.length) return [];
+  const ops = new Map(ledger.operations.map((o) => [o.id, o]));
+  const comptes = new Map(ledger.accounts.map((a) => [a.id, a.name]));
+  const vue = (o: Operation): AlertOperation => ({ id: o.id, label: o.label, accountId: o.accountId, date: o.date, amount: o.amount });
+  return proposees.map((p) => {
+    const d = ops.get(p.debitId)!;
+    const c = ops.get(p.creditId)!;
+    return {
+      code: 'transferPairProposal',
+      debitId: d.id,
+      creditId: c.id,
+      debit: vue(d),
+      credit: vue(c),
+      message: `Le débit « ${d.label} » du ${shortDate(d.date)} sur « ${comptes.get(d.accountId) ?? d.accountId} » et le crédit « ${c.label} » du ${shortDate(c.date)} sur « ${comptes.get(c.accountId) ?? c.accountId} », de ${formatCents(c.amount)}, peuvent être les deux côtés d’un même virement interne : à confirmer.`,
     };
   });
 }

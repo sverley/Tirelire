@@ -41,38 +41,219 @@ function subOperationsOf(ledger: Ledger, opId: Id): SubOperation[] {
 }
 
 // ---------------------------------------------------------------------------
-// Virements internes entre deux comptes importés
+// Virements internes entre deux comptes importés : l'appariement (#488)
 // ---------------------------------------------------------------------------
 
 /**
- * Apparie débit sur un compte et crédit du même montant sur un autre compte
- * suivi à ± `windowDays`. Ne touche qu'aux opérations en attente.
+ * Une paire possible de virement interne que l'appariement automatique n'a pas formée : un débit et un
+ * crédit, à confirmer par l'utilisateur (`acceptInternalTransfer`, #488, point 3).
+ */
+export interface TransferPairProposal {
+  debitId: Id;
+  creditId: Id;
+}
+
+/**
+ * La destination connue de chaque opération qui en a une (#488, point 1 ; D11) : le compte vers lequel
+ * (ou, pour un crédit, depuis lequel) elle est désignée comme virement, à la main ou par une
+ * désignation déjà posée (`transferAccountId`) ; pour un débit, le compte que reconnaît le libellé
+ * d'un ordre enregistré vers lui, ou « TIRELIRE <COMPTE> » vers un compte sans ordre
+ * (`matchTirelireTransfers`). Rien d'autre : ni le nom ni le numéro d'un compte cités dans un libellé,
+ * ni un montant égal.
+ */
+function knownDestinations(ledger: Ledger): Map<Id, Id> {
+  const out = new Map<Id, Id>();
+  for (const o of matchTirelireTransfers(ledger).operations) out.set(o.id, o.transferAccountId!);
+  for (const o of alive(ledger.operations)) if (o.transferAccountId) out.set(o.id, o.transferAccountId);
+  return out;
+}
+
+/** Une opération qui peut être un côté d'un virement interne encore sans autre côté : importée, vivante, sans autre côté, d'un montant non nul. */
+function sansAutreCote(o: Operation): boolean {
+  return o.origin === 'imported' && !o.transferOperationId && o.amount !== 0;
+}
+
+/** Les opérations, par montant : un virement n'apparie que des montants opposés. */
+function byAmount(ops: Operation[]): Map<Cents, Operation[]> {
+  const out = new Map<Cents, Operation[]>();
+  for (const o of ops) out.set(o.amount, [...(out.get(o.amount) ?? []), o]);
+  return out;
+}
+
+/** Les deux opérations sont-elles les deux côtés possibles d'un même virement : deux comptes, montants opposés, à ± `windowDays` ? */
+function cotesOpposes(a: Operation, b: Operation, windowDays: number): boolean {
+  return a.id !== b.id && a.accountId !== b.accountId && a.amount === -b.amount && Math.abs(diffDays(a.date, b.date)) <= windowDays;
+}
+
+/**
+ * Les deux opérations peuvent-elles s'apparier par la destination connue (#488, point 2) ? L'une a pour
+ * destination connue le compte de l'autre ; aucune n'a pour destination connue un autre compte que
+ * celui de l'autre ; une opération verrouillée n'entre que désignée (D22) : une désignation à la main
+ * compte, même verrouillée, mais une opération que l'utilisateur a verrouillée sans la désigner reste
+ * comme il l'a laissée.
+ */
+function parDestination(a: Operation, b: Operation, dest: Map<Id, Id>): boolean {
+  const da = dest.get(a.id);
+  const db = dest.get(b.id);
+  if (da !== b.accountId && db !== a.accountId) return false;
+  if ((da !== undefined && da !== b.accountId) || (db !== undefined && db !== a.accountId)) return false;
+  if ((isLocked(a) && da === undefined) || (isLocked(b) && db === undefined)) return false;
+  return true;
+}
+
+/** L'état d'un côté apparié par l'import : *classé*, ou *verrouillé* s'il l'était (D22, D33). */
+function pairOf(a: Operation, b: Operation, state?: Operation['state']): Operation[] {
+  return [
+    { ...a, state: state ?? (isLocked(a) ? 'locked' : 'reconciled'), transferAccountId: b.accountId, transferOperationId: b.id },
+    { ...b, state: state ?? (isLocked(b) ? 'locked' : 'reconciled'), transferAccountId: a.accountId, transferOperationId: a.id },
+  ];
+}
+
+/**
+ * Apparie les virements internes dont la destination est connue (#488, point 2 ; D11, D33), sur tout le
+ * grand livre : une opération importée sans autre côté, dont la destination est connue
+ * (`knownDestinations`), s'apparie à une opération importée du compte désigné, de montant opposé, à
+ * ± `windowDays`, quand chacune est, pour l'autre, la plus proche en date et la seule à cette distance.
+ * Les paires se forment par tours, chacun sur les opérations que les tours précédents ont laissées : le
+ * résultat ne dépend pas de l'ordre des opérations. Les deux côtés deviennent *classés* ; un côté
+ * verrouillé le reste ; aucune ventilation ne change. Une opération sans destination connue ne
+ * s'apparie jamais ici : un montant égal ne suffit pas, une coïncidence formerait une fausse paire. Les
+ * paires possibles que l'appariement ne forme pas se proposent (`proposeInternalTransfers`).
  */
 export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
   const patch = emptyPatch();
-  const pending = alive(ledger.operations).filter((o) => !isLocked(o) && !o.transferAccountId && !o.transferOperationId);
-  const used = new Set<Id>();
-  const debits = pending.filter((o) => o.amount < 0).sort((a, b) => (a.date < b.date ? -1 : 1));
-  const credits = pending.filter((o) => o.amount > 0);
-  for (const d of debits) {
-    if (used.has(d.id)) continue;
-    let best: Operation | undefined;
-    let bestGap = Infinity;
-    for (const c of credits) {
-      if (used.has(c.id) || c.accountId === d.accountId || c.amount !== -d.amount) continue;
-      const gap = Math.abs(diffDays(d.date, c.date));
-      if (gap > windowDays || gap >= bestGap) continue;
-      best = c;
-      bestGap = gap;
+  const dest = knownDestinations(ledger);
+  const ops = alive(ledger.operations).filter(sansAutreCote);
+  const parMontant = byAmount(ops);
+  const voisins = new Map<Id, Array<{ o: Operation; gap: number }>>();
+  for (const a of ops) {
+    if (!dest.has(a.id)) continue;
+    for (const b of parMontant.get(-a.amount) ?? []) {
+      if (!cotesOpposes(a, b, windowDays) || !parDestination(a, b, dest)) continue;
+      const gap = Math.abs(diffDays(a.date, b.date));
+      for (const [x, y] of [[a, b], [b, a]] as const) {
+        const vs = voisins.get(x.id) ?? [];
+        if (!vs.some((v) => v.o.id === y.id)) vs.push({ o: y, gap });
+        voisins.set(x.id, vs);
+      }
     }
-    if (!best) continue;
-    used.add(d.id);
-    used.add(best.id);
-    patch.operations.push(
-      { ...d, state: 'reconciled', transferAccountId: best.accountId, transferOperationId: best.id },
-      { ...best, state: 'reconciled', transferAccountId: d.accountId, transferOperationId: d.id },
-    );
   }
+  const pris = new Set<Id>();
+  /** Le voisin libre le plus proche en date, s'il est seul à cette distance. */
+  const plusProche = (id: Id): Operation | undefined => {
+    const libres = (voisins.get(id) ?? []).filter((v) => !pris.has(v.o.id));
+    const min = Math.min(...libres.map((v) => v.gap));
+    const aMin = libres.filter((v) => v.gap === min);
+    return aMin.length === 1 ? aMin[0]!.o : undefined;
+  };
+  for (;;) {
+    const tour: Array<[Operation, Operation]> = [];
+    for (const a of ops) {
+      if (pris.has(a.id) || !dest.has(a.id)) continue;
+      const b = plusProche(a.id);
+      if (!b || plusProche(b.id)?.id !== a.id) continue;
+      if (tour.some(([x, y]) => x.id === b.id || y.id === b.id)) continue;
+      tour.push(a.amount < 0 ? [a, b] : [b, a]);
+    }
+    if (!tour.length) break;
+    for (const [d, c] of tour) {
+      pris.add(d.id);
+      pris.add(c.id);
+      patch.operations.push(...pairOf(d, c));
+    }
+  }
+  return patch;
+}
+
+/**
+ * Les paires possibles de virement interne que l'appariement automatique n'a pas formées, à confirmer
+ * (#488, point 3) : un débit et un crédit importés de deux comptes différents, de montants opposés, à
+ * ± `windowDays`, ni l'un ni l'autre apparié, et soit tous deux non verrouillés et sans destination
+ * connue, soit l'un à destination connue que l'appariement n'a pu départager — limité alors aux
+ * opérations du compte désigné (`parDestination`). Une opération à plusieurs candidats en a autant de
+ * propositions. Rien ne s'écrit (I10) : ne pas apparier laisse la proposition, sans rien enregistrer.
+ * Dans l'ordre de la liste d'Opérations, par le débit, puis par le crédit.
+ */
+export function proposeInternalTransfers(ledger: Ledger, windowDays = 2): TransferPairProposal[] {
+  const dest = knownDestinations(ledger);
+  const ops = alive(ledger.operations).filter(sansAutreCote);
+  const parMontant = byAmount(ops);
+  const out: Array<{ d: Operation; c: Operation }> = [];
+  for (const d of ops) {
+    if (d.amount > 0) continue;
+    for (const c of parMontant.get(-d.amount) ?? []) {
+      if (!cotesOpposes(d, c, windowDays)) continue;
+      const libres = !dest.has(d.id) && !dest.has(c.id) && !isLocked(d) && !isLocked(c);
+      if (libres || parDestination(d, c, dest)) out.push({ d, c });
+    }
+  }
+  const parDate = (a: Operation, b: Operation) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id.localeCompare(b.id));
+  return out.sort((x, y) => parDate(x.d, y.d) || parDate(x.c, y.c)).map(({ d, c }) => ({ debitId: d.id, creditId: c.id }));
+}
+
+/**
+ * L'utilisateur apparie une paire proposée (#488, point 3) : les deux côtés se lient et se
+ * verrouillent (D22), sans que leur ventilation change. Rien si la paire n'est plus proposée.
+ */
+export function acceptInternalTransfer(ledger: Ledger, p: TransferPairProposal, windowDays = 2): Patch {
+  const patch = emptyPatch();
+  if (!proposeInternalTransfers(ledger, windowDays).some((x) => x.debitId === p.debitId && x.creditId === p.creditId)) return patch;
+  const ops = new Map(alive(ledger.operations).map((o) => [o.id, o]));
+  patch.operations.push(...pairOf(ops.get(p.debitId)!, ops.get(p.creditId)!, 'locked'));
+  return patch;
+}
+
+/**
+ * Défaire l'appariement de l'opération `operationId` (#488, point 5) : elle ne désigne plus d'autre
+ * côté, et l'autre côté — celui qu'elle désigne, et toute opération qui la désigne — ne désigne plus
+ * ni elle ni son compte, en gardant son état et sa ventilation. Ce que l'opération elle-même devient
+ * d'autre (sa désignation, son état) est au geste qui la défait. Aucun côté ne reste à désigner comme
+ * son autre côté une opération qui ne le désigne pas.
+ */
+export function unpairTransfer(ledger: Ledger, operationId: Id): Patch {
+  const patch = emptyPatch();
+  const op = alive(ledger.operations).find((o) => o.id === operationId);
+  if (!op) return patch;
+  const autres = alive(ledger.operations).filter((o) => o.id !== op.id && (o.id === op.transferOperationId || o.transferOperationId === op.id));
+  if (!op.transferOperationId && !autres.length) return patch;
+  const next: Operation = { ...op };
+  delete next.transferOperationId;
+  patch.operations.push(next);
+  for (const o of autres) {
+    const libre: Operation = { ...o };
+    delete libre.transferAccountId;
+    delete libre.transferOperationId;
+    patch.operations.push(libre);
+  }
+  return patch;
+}
+
+/**
+ * L'utilisateur désigne l'opération comme virement vers (ou, pour un crédit, depuis) le compte
+ * `accountId` (#488, point 4 ; D22) : elle se verrouille ; appariée à un autre compte, son appariement
+ * se défait des deux côtés (`unpairTransfer`). Quand l'autre côté est importé et seul candidat — une
+ * opération du compte désigné, sans autre côté, de montant opposé, à ± `windowDays`, qui peut
+ * s'apparier par cette destination (`parDestination`) —, elle s'apparie à lui, les deux côtés
+ * verrouillés. À plusieurs candidats, elle est désignée sans être appariée, et les candidats se
+ * proposent ; sans candidat, elle est désignée seule, et l'import qui apporte l'autre côté l'apparie.
+ */
+export function designateTransfer(ledger: Ledger, operationId: Id, accountId: Id, windowDays = 2): Patch {
+  const op = alive(ledger.operations).find((o) => o.id === operationId);
+  if (!op || accountId === op.accountId) return emptyPatch();
+  if (op.transferOperationId && op.transferAccountId === accountId) return { ...emptyPatch(), operations: [{ ...op, state: 'locked' }] };
+  const defait = unpairTransfer(ledger, op.id);
+  const apres = applyPatchToLedger(ledger, defait);
+  const next: Operation = { ...op, state: 'locked', transferAccountId: accountId };
+  delete next.transferOperationId;
+  const avec = applyPatchToLedger(apres, { ...emptyPatch(), operations: [next] });
+  const patch: Patch = { ...emptyPatch(), operations: defait.operations.filter((o) => o.id !== op.id) };
+  const dest = knownDestinations(avec);
+  const candidats =
+    op.origin === 'imported'
+      ? alive(avec.operations).filter((o) => o.accountId === accountId && sansAutreCote(o) && cotesOpposes(next, o, windowDays) && parDestination(next, o, dest))
+      : [];
+  if (candidats.length === 1) patch.operations.push(...pairOf(next, candidats[0]!, 'locked'));
+  else patch.operations.push(next);
   return patch;
 }
 
@@ -89,21 +270,40 @@ export function pairInternalTransfers(ledger: Ledger, windowDays = 2): Patch {
  * - vers un compte sans ordre enregistré, quand elle contient le libellé tiré de son nom actuel
  *   (`transferLabel`). Celui d'un compte qui a un ordre ne reconnaît rien : renommer le compte ne
  *   change pas ce qui est reconnu (domaine plan et flux, hypothèse 3).
- * Entre plusieurs comptes, le libellé d'un ordre l'emporte sur un libellé tiré d'un nom ; entre
- * libellés de même sorte, le plus long ; à égalité, aucun compte. Elle n'est pas ventilée d'office :
+ * Entre plusieurs comptes, le libellé d'un ordre l'emporte sur un libellé tiré d'un nom. Le compte seul
+ * dont un ordre reconnaît le libellé, exactement ou souplement (`labelRecognizer`), en est la
+ * destination ; quand les ordres de plusieurs comptes le reconnaissent et que l'une de ces
+ * reconnaissances au moins est souple, aucun compte : dans le doute, la paire se propose (#488,
+ * point 8) ; quand elles sont toutes exactes, le plus long, et, à égalité, aucun compte, comme entre
+ * libellés tirés d'un nom. Elle n'est pas ventilée d'office :
  * son montant y reste non affecté (D21 ; domaine rapprochement et bilan, hypothèse 1). Quand un ordre
  * vers ce compte la reprend (D12), c'est lui qui la ventile par son action (`applyMatch`), qu'il passe
  * avant ou après cette reconnaissance : elle ne pose aucune sous-opération.
  */
 export function matchTirelireTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
+  const parOp = new Map(alive(ledger.operations).map((o) => [o.id, o]));
+  for (const [id, hit] of transferRecognitions(ledger)) {
+    if (hit === undefined) continue;
+    patch.operations.push({ ...parOp.get(id)!, state: 'reconciled', transferAccountId: hit });
+  }
+  return patch;
+}
+
+/**
+ * Ce que les libellés des ordres et des comptes reconnaissent (`matchTirelireTransfers`), pour chaque
+ * opération qu'ils reconnaissent : le compte qui en est la destination, ou `undefined` quand plusieurs
+ * le sont sans que rien les départage (#488, point 8). Une opération absente n'est reconnue par aucun.
+ */
+function transferRecognitions(ledger: Ledger): Map<Id, Id | undefined> {
+  const out = new Map<Id, Id | undefined>();
   const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
-  const ordres = new Map<Id, string[]>();
+  const ordres = new Map<Id, Array<{ length: number; reconnait: (op: Operation) => LabelRecognition }>>();
   for (const f of alive(ledger.plannedFlows)) {
     const vers = principal ? standingOrderTarget(f, principal.id) : undefined;
     if (vers === undefined) continue;
     const motif = readLabelPattern(f.labelPattern);
-    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(motif ? [motif] : [])]);
+    ordres.set(vers, [...(ordres.get(vers) ?? []), ...(motif ? [{ length: motif.length, reconnait: labelRecognizer(motif) }] : [])]);
   }
   const accounts = alive(ledger.accounts).map((a) => ({
     a,
@@ -113,22 +313,25 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
     if (isLocked(op) || op.transferAccountId || resumesSomething(op)) continue;
-    const parOrdre: Array<{ id: Id; length: number }> = [];
+    const parOrdre: Array<{ id: Id; length: number; exacte: boolean }> = [];
     const parNom: Array<{ id: Id; length: number }> = [];
     const dansLeSensDeLOrdre = !!principal && op.accountId === principal.id && op.amount < 0;
     for (const { a, patterns, name } of accounts) {
       if (a.id === op.accountId) continue;
       if (patterns) {
         if (!dansLeSensDeLOrdre) continue;
-        const longest = Math.max(-1, ...patterns.filter((p) => labelRecognized(p, op)).map((p) => p.length));
-        if (longest >= 0) parOrdre.push({ id: a.id, length: longest });
+        const lus = patterns.map((p) => ({ length: p.length, comment: p.reconnait(op) }));
+        const exactes = lus.filter((p) => p.comment === 'exact');
+        if (exactes.length) parOrdre.push({ id: a.id, length: Math.max(...exactes.map((p) => p.length)), exacte: true });
+        else if (lus.some((p) => p.comment === 'souple')) parOrdre.push({ id: a.id, length: 0, exacte: false });
       } else if (name.length > 0 && /TIRELIRE/.test(op.normalizedLabel) && op.normalizedLabel.includes(name)) parNom.push({ id: a.id, length: name.length });
     }
-    const hit = longestAlone(parOrdre.length ? parOrdre : parNom);
-    if (!hit) continue;
-    patch.operations.push({ ...op, state: 'reconciled', transferAccountId: hit });
+    if (!parOrdre.length && !parNom.length) continue;
+    // Un seul compte : le sien ; plusieurs, dont l'un souplement : aucun ; tous exactement : le plus long (#488, point 8).
+    const hit = parOrdre.length === 1 ? parOrdre[0]!.id : parOrdre.length ? (parOrdre.every((h) => h.exacte) ? longestAlone(parOrdre) : undefined) : longestAlone(parNom);
+    out.set(op.id, hit);
   }
-  return patch;
+  return out;
 }
 
 /** Le compte au libellé le plus long, s'il est seul à cette longueur. */
@@ -219,25 +422,162 @@ export function amountWithinTolerance(flow: Pick<PlannedFlow, 'amount' | 'amount
   return { ok: diff <= allowed + 0.5, ratio, exact: diff === 0 };
 }
 
-/** Le motif de libellé du flux, lu sans ses blancs d'extrémité (`readLabelPattern`), reconnaît-il l'opération ? Un motif illisible ne reconnaît rien. */
-function labelRecognized(motif: string, op: Operation): boolean {
-  return labelMatcher(motif)(op);
+/**
+ * Une note de rapprochement élevée (`proposeMatches`, #488, point 8) : entre plusieurs flux qui retiennent
+ * une opération, ou entre plusieurs opérations qui se disputent une occurrence, une autre note au moins
+ * aussi haute, et proche de la meilleure, empêche le mieux noté de reprendre d'office (`seDistingue`).
+ */
+export const MATCH_SCORE_HIGH = 0.7;
+
+/** L'écart de note au plus qui rend deux notes proches (`MATCH_SCORE_HIGH`, `seDistingue`). */
+export const MATCH_SCORE_CLOSE = 0.1;
+
+/** Deux notes égales, aux arrondis près (0,80 − 0,70). */
+const noteEgale = (a: number, b: number) => Math.abs(a - b) <= 1e-9;
+
+/**
+ * Le mieux noté d'une liste, et s'il se distingue (#488, point 8) : aucun autre n'a la même note, ni une
+ * note à la fois élevée, d'au moins `MATCH_SCORE_HIGH`, et proche de la sienne, à `MATCH_SCORE_CLOSE` près
+ * au plus, bornes comprises. Une seule règle, dans les deux sens (principe 13) : entre les flux qui
+ * retiennent une opération, et entre les opérations qui se disputent une occurrence. À égalité au plus
+ * haut, même sous `MATCH_SCORE_HIGH`, aucun n'est « le mieux noté » : on ne peut pas déterminer qu'un seul
+ * correspond vraiment (porteur, 16/10).
+ */
+function seDistingue<T extends { score: number }>(notes: T[]): { meilleur: T | undefined; distingue: boolean } {
+  const meilleur = notes.reduce<T | undefined>((m, r) => (!m || r.score > m.score ? r : m), undefined);
+  if (!meilleur) return { meilleur, distingue: false };
+  const eleve = (n: number) => n >= MATCH_SCORE_HIGH || noteEgale(n, MATCH_SCORE_HIGH);
+  const proche = (n: number) => meilleur.score - n <= MATCH_SCORE_CLOSE || noteEgale(meilleur.score - n, MATCH_SCORE_CLOSE);
+  const rival = (r: T) => r !== meilleur && (noteEgale(r.score, meilleur.score) || (eleve(r.score) && proche(r.score)));
+  return { meilleur, distingue: !notes.some(rival) };
 }
+
+/** Le score minimal de la reconnaissance souple d'un motif littéral (`labelScore`, #488, point 8). */
+export const LABEL_SCORE_MIN = 0.8;
+
+/** Les mots d'un libellé, sans casse ni accents : la ponctuation et les blancs les séparent. */
+function labelWords(s: string): string[] {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean);
+}
+
+/**
+ * La part des mots du motif que le texte contient, dans l'ordre, entre 0 et 1 (#488, point 8) : casse,
+ * accents, ponctuation et blancs ignorés ; un préfixe ou un suffixe ajouté par la source ignoré ; au
+ * plus deux mots insérés entre deux mots du motif. Un mot du texte qui commence par celui du motif le
+ * reconnaît (« BOURSO » dans « BOURSORAMA ») ; le dernier mot du texte, tronqué par la source à trois
+ * caractères au moins, reconnaît aussi le mot du motif qu'il commence. Ce que la reconnaissance en
+ * tolère est `labelCutScore`.
+ */
+export function labelScore(motif: string, texte: string): number {
+  const m = labelWords(motif);
+  const t = labelWords(texte);
+  if (!m.length) return 0;
+  let best = 0;
+  for (let start = 0; start < t.length && best < 1; start++) {
+    let i = start;
+    let n = 0;
+    for (const mot of m) {
+      const k = t.slice(i, i + 3).findIndex((w, j) => wordRecognizes(mot, t, i + j));
+      if (k < 0) continue;
+      n++;
+      i += k + 1;
+    }
+    best = Math.max(best, n / m.length);
+  }
+  return best;
+}
+
+/** Le mot `t[ti]` reconnaît-il le mot du motif `mot` : il le commence, ou, dernier du texte, il en est la coupure à trois caractères au moins. */
+function wordRecognizes(mot: string, t: string[], ti: number): boolean {
+  const w = t[ti]!;
+  return w.startsWith(mot) || (ti === t.length - 1 && w.length >= 3 && mot.startsWith(w));
+}
+
+/**
+ * Le score de `labelScore` limité à la fin coupée (porteur, 16/10 ; #488, point 8) : 1 quand tous les
+ * mots du motif sont reconnus ; sinon, la part des premiers mots du motif reconnus quand le texte
+ * s'arrête au dernier d'entre eux — aucun mot du texte ne le suit —, les mots du motif qui le suivent
+ * étant les seuls absents ; 0 autrement. Un mot remplacé par un autre (« … THOMAS » contre « … LEA »),
+ * ou absent au début ou au milieu, n'est pas une coupure.
+ */
+export function labelCutScore(motif: string, texte: string): number {
+  const m = labelWords(motif);
+  const t = labelWords(texte);
+  if (!m.length) return 0;
+  const memo = new Map<number, number>();
+  // Le meilleur score quand les `mi` premiers mots du motif sont reconnus, et que le suivant se cherche
+  // à partir du mot `ti` du texte, au plus deux mots plus loin.
+  const suite = (mi: number, ti: number): number => {
+    if (mi === m.length) return 1;
+    const cle = mi * (t.length + 1) + ti;
+    const connu = memo.get(cle);
+    if (connu !== undefined) return connu;
+    let best = ti === t.length ? mi / m.length : 0;
+    for (let k = 0; k < 3 && ti + k < t.length && best < 1; k++) if (wordRecognizes(m[mi]!, t, ti + k)) best = Math.max(best, suite(mi + 1, ti + k + 1));
+    memo.set(cle, best);
+    return best;
+  };
+  let best = 0;
+  for (let start = 0; start < t.length && best < 1; start++) if (wordRecognizes(m[0]!, t, start)) best = Math.max(best, suite(1, start + 1));
+  return best;
+}
+
+/** Les parties d'un motif littéral, écrit « texte » ou « texte.*texte » ; `undefined` pour toute autre expression régulière. */
+function literalParts(motif: string): string[] | undefined {
+  const parts = motif
+    .split(/\.[*+]/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.length && parts.every((p) => !/[\\^$|?*+()[\]{}]/.test(p)) ? parts : undefined;
+}
+
+/**
+ * Comment un motif de libellé reconnaît une opération (#488, point 8) : `exact`, quand la lecture d'avant
+ * la donnait — l'expression régulière du motif, sur le libellé, le libellé normalisé ou le libellé
+ * complet ; `souple`, quand seul le score la donne, un score de 1 compris (« LEA », dernier mot du
+ * libellé, reconnaît ainsi un motif qui a « LEANE ») ; `undefined`, pas du tout.
+ */
+export type LabelRecognition = 'exact' | 'souple' | undefined;
 
 /**
  * La reconnaissance d'un motif de libellé, compilée une fois pour être lue sur beaucoup d'opérations
  * (#456, point 12) : le libellé, le libellé normalisé ou le libellé complet. Un motif illisible ne
- * reconnaît rien. Une seule lecture du motif d'une sélection, pour `proposeMatches` comme pour les
- * occurrences que l'historique propose.
+ * reconnaît rien. Une seule lecture du motif d'une sélection de flux (D24), pour `proposeMatches`, pour
+ * les ordres (`matchTirelireTransfers`, donc la destination connue) et pour les occurrences que
+ * l'historique propose. Un motif littéral, « texte » ou « texte.*texte », reconnaît aussi l'opération
+ * quand chacune de ses parties a un score d'au moins `LABEL_SCORE_MIN` sur le libellé ou le libellé
+ * complet, les mots absents n'étant tolérés qu'à la fin coupée (`labelCutScore` ; #488, point 8) ; une
+ * autre expression régulière garde sa seule lecture. La reconnaissance dit si elle est exacte ou souple :
+ * entre les ordres de plusieurs comptes, une seule souple suffit à ce qu'aucun n'en soit la destination
+ * (`matchTirelireTransfers`) ; entre les flux qui retiennent une opération, seule la note décide
+ * (`proposeMatches`), où un libellé reconnu compte de même, exactement ou souplement.
  */
-export function labelMatcher(motif: string): (op: Operation) => boolean {
+export function labelRecognizer(motif: string): (op: Operation) => LabelRecognition {
   let re: RegExp;
   try {
     re = new RegExp(motif, 'i');
   } catch {
-    return () => false;
+    return () => undefined;
   }
-  return (op) => re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '');
+  const parts = literalParts(motif);
+  return (op) => {
+    if (re.test(op.label) || re.test(op.normalizedLabel) || re.test(op.details ?? '')) return 'exact';
+    if (!parts) return undefined;
+    // Chaque partie, sur le libellé ou le libellé complet, sa fin seule pouvant manquer ; la plus faible décide.
+    const score = Math.min(...parts.map((p) => Math.max(labelCutScore(p, op.label), op.details ? labelCutScore(p, op.details) : 0)));
+    return score >= LABEL_SCORE_MIN ? 'souple' : undefined;
+  };
+}
+
+/** Le motif de libellé reconnaît-il l'opération, exactement ou souplement (`labelRecognizer`) ? */
+export function labelMatcher(motif: string): (op: Operation) => boolean {
+  const reconnait = labelRecognizer(motif);
+  return (op) => reconnait(op) !== undefined;
 }
 
 /**
@@ -247,65 +587,120 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
  * ni ne le classe.
  *
  * Automatique selon D12 — montant exact, ou dans la tolérance avec le libellé reconnu, flux non
- * variable —, proposée sinon. Une occurrence n'est reprise qu'une fois, et une opération en reprend
- * au plus une : la mieux notée. Une occurrence qu'une saisie corrige ou masque déjà se reprend par
- * cette saisie (D88).
+ * variable —, proposée sinon. Une reprise automatique n'a qu'un candidat sérieux (#488, point 8 : dans
+ * le doute, on propose) :
+ * - un flux retient une opération quand sa sélection entière la reconnaît — son compte, son motif s'il en
+ *   a un, exactement ou souplement (`labelRecognizer`), sa tolérance de montant, la fenêtre de ses
+ *   occurrences — ; un flux sans motif dont le reste convient la retient donc ; un flux que le montant ou
+ *   la fenêtre écarte n'est pas un candidat et ne compte pas (porteur, 16/10 : « on filtre les opérations
+ *   avec les informations que l'automatisme ou le rapprochement contient ») ;
+ * - chaque flux qui la retient lui donne sa note ; le mieux noté ne la reprend, ou ne se propose, que
+ *   s'il se distingue : aucun autre flux qui la retient n'a une note à la fois élevée, d'au moins
+ *   `MATCH_SCORE_HIGH`, et proche de la sienne, à `MATCH_SCORE_CLOSE` près, ni la même note que lui ;
+ *   les autres ne se proposent pas. Sinon, aucun ne la reprend d'office, et la reprise se propose avec
+ *   chacun (porteur, 16/10 : « si les 2 ont des score de rapprochement proches et élevés, ce n'est pas
+ *   le meilleur qui gagne, on propose ») ;
+ * - un virement n'est repris d'office que par un ordre du compte qui en est la destination connue
+ *   (`transferRecognitions`, ou le compte déjà désigné) : un flux qui n'est pas un ordre vers elle ne
+ *   fait que se proposer ; un virement que les ordres de plusieurs
+ *   comptes reconnaissent sans que rien les départage n'est repris d'office par aucun, et se propose
+ *   avec chacun ; un flux de virement vers un autre compte que sa destination connue ne le sélectionne
+ *   pas : le flux qui reprend un virement et le compte qui en est la destination ne divergent pas.
+ * La même règle dans l'autre sens (porteur, 16/10 : « Consigne la règle édictée et applique la aussi
+ * dans l'autre sens ») : une occurrence, désignée par son flux et sa date (D88), que plusieurs opérations
+ * se disputent — chacune la reprendrait, son flux étant le mieux noté qui se distingue, ou se la verrait
+ * proposer, son flux étant l'un de ceux qui se proposent ensemble —, la mieux notée, avec la note qu'elle
+ * reçoit de ce flux, la prend, d'office quand elle le peut par ailleurs, ou se la voit seule proposer, si
+ * elle se distingue (`seDistingue`) ; les autres ne se la voient pas proposer. Sinon, aucune ne la prend
+ * d'office, et la reprise se propose avec chacune. Une occurrence déjà reprise ne se dispute pas : elle
+ * n'est plus proposée à personne. Une opération en reprend toujours au plus une : celle qui n'est pas
+ * douteuse ne prétend qu'à une occurrence, celle de son mieux noté ; la douteuse ne reprend rien d'office.
+ * Une occurrence qu'une saisie corrige ou masque déjà se reprend par cette saisie (D88).
  */
 export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): MatchProposal[] {
   const flows = alive(ledger.plannedFlows);
   const index = occurrenceIndex(ledger);
   const resumed = index.resumed;
   const ops = alive(ledger.operations).filter((o) => o.origin === 'imported' && !isLocked(o) && !resumesSomething(o) && !resumed.has(o.id) && o.date >= from && o.date <= to);
+  const lecteurs = new Map(flows.map((f) => [f.id, readLabelPattern(f.labelPattern)] as const).flatMap(([id, motif]) => (motif ? [[id, labelRecognizer(motif)] as const] : [])));
+  const reconnus = transferRecognitions(ledger);
   const candidates: MatchProposal[] = [];
+  const douteuses = new Set<Id>();
   for (const op of ops) {
+    // La destination connue : le compte déjà désigné, ou celui que reconnaissent les libellés des ordres seuls.
+    const destination = op.transferAccountId ?? reconnus.get(op.id);
+    const sansDestination = !op.transferAccountId && reconnus.has(op.id) && destination === undefined;
+    // Les flux qui retiennent l'opération, leur sélection entière (D24), motif ou non, avec leur note ; la
+    // reprise de chacun, si son occurrence est libre.
+    const retenus: { score: number; reprise?: MatchProposal }[] = [];
     for (const f of flows) {
       if (f.accountId !== op.accountId) continue;
       if (f.activeFrom && op.date < f.activeFrom) continue;
       if (f.activeTo && op.date > f.activeTo) continue;
+      const vers = f.kind === 'transfer' ? f.counterpartAccountId : undefined;
+      if (vers !== undefined && destination !== undefined && vers !== destination) continue;
       const amt = amountWithinTolerance(f, op.amount);
       if (!amt.ok) continue;
-      const motif = readLabelPattern(f.labelPattern);
-      const label = motif ? labelRecognized(motif, op) : undefined;
+      const label = lecteurs.has(f.id) ? lecteurs.get(f.id)!(op) !== undefined : undefined;
       if (label === false) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
+      const dateScore = 1 - Math.abs(diffDays(expectedDate, op.date)) / (f.dateWindowDays + 1);
+      const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
       // Reprise par une opération bancaire, ou par une saisie déjà reprise : l'occurrence est servie.
       const libre = freeOccurrence(index, f.id, expectedDate);
-      if (!libre) continue;
+      if (!libre) {
+        retenus.push({ score });
+        continue;
+      }
       const taker = libre.entry;
       const reasons: string[] = [];
-      const dateScore = 1 - Math.abs(diffDays(expectedDate, op.date)) / (f.dateWindowDays + 1);
       reasons.push(`date à ${Math.abs(diffDays(expectedDate, op.date))} j`);
       if (label) reasons.push('libellé reconnu');
       reasons.push(amt.exact ? 'montant exact' : 'montant dans la tolérance');
       if (taker) reasons.push('déjà corrigée par une saisie');
-      const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
-      const auto = !f.variable && (amt.exact || label === true);
-      candidates.push({
-        operationId: op.id,
-        flowId: f.id,
-        expectedDate,
-        expectedAmount: f.amount,
-        ...(taker ? { resumedOperationId: taker.id } : {}),
+      // Une destination connue n'est reprise d'office que par un ordre vers elle (#488, point 8).
+      const auto = !f.variable && (amt.exact || label === true) && (destination === undefined || vers === destination);
+      retenus.push({
         score,
-        auto,
-        reasons,
+        reprise: {
+          operationId: op.id,
+          flowId: f.id,
+          expectedDate,
+          expectedAmount: f.amount,
+          ...(taker ? { resumedOperationId: taker.id } : {}),
+          score,
+          auto,
+          reasons,
+        },
       });
     }
+    // Le mieux noté, s'il se distingue ; sinon, dans le doute, chacun se propose (#488, point 8).
+    const { meilleur, distingue } = seDistingue(retenus);
+    const douteuse = sansDestination || (retenus.length > 0 && !distingue);
+    if (douteuse) {
+      douteuses.add(op.id);
+      candidates.push(...retenus.flatMap((r) => (r.reprise ? [{ ...r.reprise, auto: false }] : [])));
+    } else if (meilleur?.reprise) candidates.push(meilleur.reprise);
   }
-  // Attribution gloutonne : meilleure note d'abord, une opération et une occurrence à la fois.
+  // Dans l'autre sens : chaque occurrence libre, à ceux qui se la disputent, la même règle (#488, point 8).
   candidates.sort((a, b) => b.score - a.score);
-  const usedOps = new Set<Id>();
-  const taken = new Set<string>();
-  const out: MatchProposal[] = [];
+  const pretendants = new Map<string, MatchProposal[]>();
   for (const c of candidates) {
     const key = occurrenceKey(c.flowId, c.expectedDate);
-    if (usedOps.has(c.operationId) || taken.has(key)) continue;
-    usedOps.add(c.operationId);
-    taken.add(key);
-    out.push(c);
+    pretendants.set(key, [...(pretendants.get(key) ?? []), c]);
   }
+  // D'abord ce que prend une opération qui n'est pas douteuse, puis ce qui se propose, les mieux notés d'abord.
+  const pris: MatchProposal[] = [];
+  const proposes: MatchProposal[] = [];
+  for (const ceux of pretendants.values()) {
+    const { meilleur, distingue } = seDistingue(ceux);
+    if (distingue) (douteuses.has(meilleur!.operationId) ? proposes : pris).push(meilleur!);
+    else proposes.push(...ceux.map((c) => ({ ...c, auto: false })));
+  }
+  const parNote = (a: MatchProposal, b: MatchProposal) => b.score - a.score;
+  const out = [...pris.sort(parNote), ...proposes.sort(parNote)];
   return out;
 }
 
@@ -337,7 +732,8 @@ function stateOnResumption(op: Operation, f: PlannedFlow | undefined): Operation
  * Applique une proposition : l'opération reprend l'occurrence, désignée par son flux et sa date, ou la
  * saisie qui la corrige ou la masque déjà (D88). Elle devient rapprochée, verrouillée si le flux le
  * demande (D22, D24), et garde ce qui a été décidé sur elle : sa ventilation, si elle en a une ;
- * sinon, elle prend celle de ce qu'elle reprend.
+ * sinon, elle prend celle de ce qu'elle reprend. Reprise par un ordre vers un autre compte que celui
+ * qu'elle désigne, son appariement se défait des deux côtés (`unpairTransfer` ; #488, point 5).
  */
 export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   const patch = emptyPatch();
@@ -347,7 +743,12 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   if (m.resumedOperationId) return resumeEntryWith(ledger, op, m.resumedOperationId, f);
   const next: Operation = { ...op, state: stateOnResumption(op, f), plannedFlowId: f.id, plannedDate: m.expectedDate };
   delete next.resumedOperationId;
-  if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
+  if (f.kind === 'transfer' && f.counterpartAccountId && f.counterpartAccountId !== op.transferAccountId) {
+    // Un ordre d'un autre compte que celui désigné : l'appariement se défait des deux côtés (#488, point 5).
+    patch.operations.push(...unpairTransfer(ledger, op.id).operations.filter((o) => o.id !== op.id));
+    next.transferAccountId = f.counterpartAccountId;
+    delete next.transferOperationId;
+  }
   patch.operations.push(next);
   if (subOperationsOf(ledger, op.id).length === 0) patch.subOperations.push(...flowVentilation(ledger, f, op.id));
   return patch;
@@ -629,7 +1030,10 @@ export function missingFlows(ledger: Ledger, from: ISODate, asOf: ISODate): Miss
 // ---------------------------------------------------------------------------
 
 export interface PipelineReport {
+  /** Les virements internes appariés à cet import, par leur destination connue (#488, point 2). */
   transfersPaired: number;
+  /** Les paires de virement interne à confirmer, après cet import (#488, points 3 et 7). */
+  transferProposals: number;
   tirelireTransfers: number;
   autoMatched: number;
   proposals: MatchProposal[];
@@ -653,10 +1057,14 @@ export function runPipeline(ledger: Ledger, from: ISODate, to: ISODate, apply: (
     l = apply(applyMatch(l, m));
     autoMatched++;
   }
+  // Une opération que l'ordre d'un compte vient de reprendre a désormais sa destination connue.
+  const t2 = pairInternalTransfers(l);
+  if (t2.operations.length) l = apply(t2);
   const r = applyAutomations(l);
   l = apply(r);
   return {
-    transfersPaired: t.operations.length / 2,
+    transfersPaired: (t.operations.length + t2.operations.length) / 2,
+    transferProposals: proposeInternalTransfers(l).length,
     tirelireTransfers: e.operations.length,
     autoMatched,
     proposals: proposals.filter((p) => !p.auto),

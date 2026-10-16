@@ -158,7 +158,9 @@ describe('[niveau 2] #306 · 1. une occurrence se désigne par son flux et sa da
   it('reprise, l’occurrence ne compte plus ni ne manque, et n’est plus proposée à personne', () => {
     let l = budget();
     l.operations.push(opération({ id: 'loyer-relevé', date: '2026-09-04', amount: -euros(690), label: 'PRLV LOYER SEPT', normalizedLabel: 'PRLV LOYER SEPT' }));
-    l.operations.push(opération({ id: 'loyer-doublon', date: '2026-09-06', amount: -euros(700), label: 'PRLV LOYER BIS', normalizedLabel: 'PRLV LOYER BIS' }));
+    // Le doublon, au bord de la fenêtre, est retenu par le loyer, mais d'une note qui laisse le relevé se
+    // distinguer : une seule opération prend l'occurrence ou se la voit proposer (#488, point 10).
+    l.operations.push(opération({ id: 'loyer-doublon', date: '2026-09-08', amount: -euros(700), label: 'PRLV LOYER BIS', normalizedLabel: 'PRLV LOYER BIS' }));
     const propositions = proposeMatches(l, '2026-09-01', '2026-09-30').filter((p) => p.flowId === 'f-loyer');
     expect(propositions).toHaveLength(1);
     l = appliquer(l, applyMatch(l, propositions[0]!));

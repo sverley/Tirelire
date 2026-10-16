@@ -130,8 +130,18 @@ rapproche l'opération prévue qu'elle corrige, ou, de zéro, qu'elle masque. Un
 au plus une autre, et n'est rapprochée qu'une fois. L'opération rapprochée ne compte plus : celle qui
 la rapproche compte à sa place, pour son propre montant, et l'écart entre les deux reste visible
 (D12, D88). Le lien est porté par l'opération qui rapproche, pas par une sous-opération. Il est
-automatique quand la sélection d'un flux le permet (D12), validé par l'utilisateur sinon (principe
-4.4). À ne pas confondre avec l'état *classée* d'une opération (D22).
+automatique quand la sélection d'un flux le permet et que le candidat se distingue — entre les flux qui
+retiennent l'opération, comme entre les opérations qui se disputent une occurrence, aucun autre n'a une
+note élevée et proche de la sienne, ni la même (D12) —, validé par l'utilisateur sinon (principe 4.4).
+À ne pas confondre avec l'état *classée* d'une opération (D22).
+
+## Appariement
+
+Le lien entre les deux côtés d'un virement interne, un débit et un crédit de deux comptes suivis : chacun
+désigne l'autre, de sorte que le virement ne compte qu'une fois (D88). Il se fait sans confirmation
+seulement quand la destination du virement est connue — un compte que l'utilisateur a désigné, ou que
+reconnaît le libellé d'un ordre enregistré vers lui (D11) —, et se propose sinon. À ne pas confondre avec
+le **rapprochement**, le lien entre deux opérations qui désignent le même mouvement.
 
 ## Série
 

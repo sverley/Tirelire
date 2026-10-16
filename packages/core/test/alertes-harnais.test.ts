@@ -293,7 +293,9 @@ describe('#463 · 4. un seul calcul', () => {
       { id: 'flow-salaire', name: 'Salaire', kind: 'income', amount: euros(2000), accountId: 'acc-principal', periodicity: mensuel('2026-01-28'), dateWindowDays: 3, labelPattern: 'SALAIRE' },
       { id: 'flow-loyer', name: 'Loyer', kind: 'fixedCharge', amount: euros(-800), accountId: 'acc-principal', periodicity: mensuel('2026-01-05'), dateWindowDays: 3, labelPattern: 'LOYER' },
       { id: 'flow-gaz', name: 'Gaz', kind: 'fixedCharge', amount: euros(-50), accountId: 'acc-principal', periodicity: mensuel('2026-01-05'), dateWindowDays: 3, labelPattern: 'GAZ' },
-      { id: 'flow-eau', name: 'Eau', kind: 'fixedCharge', amount: euros(-50), accountId: 'acc-principal', periodicity: mensuel('2026-01-07'), dateWindowDays: 3 },
+      // Un motif, pour que l'eau ne retienne pas le gaz du même montant (#488, point 10 : un seul flux
+      // retient chaque opération) ; le 4, pour que sa note la laisse dernière.
+      { id: 'flow-eau', name: 'Eau', kind: 'fixedCharge', amount: euros(-50), accountId: 'acc-principal', periodicity: mensuel('2026-01-04'), dateWindowDays: 3, labelPattern: 'EAU' },
     );
     // L'ordre du grand livre : l'eau avant le gaz, du même jour et du même montant.
     l.operations.push(

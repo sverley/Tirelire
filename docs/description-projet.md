@@ -984,3 +984,43 @@ Ce qui en est tiré : D04, D10, D11, D21, D22, D23, D24, D27, D33, D36, D49, D52
 D95 et D96 amendées ; le glossaire (compte tiers, besoin, croisière, provision, objectif, budget,
 automatisme, flux prévu, opération, sous-opération, rapprochement, lissage, réponse, visée) ; le registre
 (I3) ; les domaines plan et flux, rapprochement et bilan.
+
+## 15 octobre 2026 · les virements internes, et des libellés lus souplement
+
+Dans #488, constaté sur un historique réel de 16 mois : l'appariement automatique des virements internes
+forme de fausses paires et en manque de vraies. Le porteur choisit d'apparier automatiquement seulement
+quand la destination est connue, et de proposer sinon. Il ajoute :
+
+> les comparaisons de libellés doivent être souples quand même (casse, accent, troncature, préfixe ou suffixe posé par la banque/Linxo). Peut-être prévoir une comparaison floue et un score mini de corrélation.
+
+Le 16 octobre, sur une seconde question de l'auditeur — deux prénoms dont l'un commence l'autre —, il
+répond :
+
+> Je pense que la clé est déjà écrite dans les principes. Dans le doute, on propose. Il faut voir les choses dans l'autre sens. Est-ce que cette ligne pourrait matcher plusieurs rapprochements automatiques ?
+
+Le même jour, sur une troisième question de l'auditeur — un flux que son montant ou sa fenêtre écarte
+compte-t-il parmi les flux qui reconnaissent un libellé ? —, il répond :
+
+> on conserve la logique de discrimination des cas possibles avant le rapprochement : on filtre les opérations avec les informations que l'automatisme ou le rapprochement contient. Le cas que tu donne ne tient pas
+
+Le même jour, sur une remarque de l'auditeur — un virement vers Léa que retiennent l'ordre vers Léa et une
+dépense sans motif de même montant, la dépense étant la mieux notée —, il répond :
+
+> Non, corrige ici le point ouvert. Si on peut déterminer qu'entre les 2 opérations, une seule correspond vraiment, ok pour rapprocher. Mais si les 2 ont des score de rapprochement proches et élevés, ce n'est pas le meilleur qui gagne, on propose
+
+Le même jour, après le sixième tour, sur cette règle (« le mieux noté ne l'emporte que s'il se
+distingue »), il demande :
+
+> Consigne la règle édictée et applique la aussi dans l'autre sens
+
+Ce qui en est tiré : D11, D12 et D33 amendées ; le glossaire (appariement) ; la ligne « Pipeline
+d'import » de l'architecture. Le 16 octobre, sur une première question de l'auditeur, le porteur limite
+les mots absents tolérés à une fin coupée par la source ; sur la seconde, un libellé que les ordres de
+plusieurs comptes reconnaissent, dont l'un souplement, n'a pas de destination connue (D11) ; sur la
+troisième, ne comptent parmi les flux qui reprendraient une opération que ceux qui la retiennent, leur
+sélection entière : un flux que le montant ou la fenêtre écarte ne compte pas (D12) ; sur la remarque de
+l'auditeur, le mieux noté des flux qui retiennent une opération ne la reprend automatiquement que si aucun
+autre n'a une note élevée et proche de la sienne, ni la même ; sinon, la reprise se propose avec chacun
+(D12). Après le sixième tour, la même règle vaut dans l'autre sens : la mieux notée des opérations qui se
+disputent une occurrence ne la prend automatiquement que si aucune autre n'a une note élevée et proche de
+la sienne, ni la même ; sinon, la reprise se propose avec chacune (D12, le glossaire, « Rapprochement »).

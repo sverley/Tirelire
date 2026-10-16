@@ -39,7 +39,7 @@ import {
   LedgerStore,
   normalizeLabel,
   orderFromTransfer,
-  pairInternalTransfers,
+  acceptInternalTransfer,
   proposeMatches,
   recordFlowFromOperations,
   recordOrderFromTransfer,
@@ -745,7 +745,8 @@ describe('[niveau 1] #456 · 11. le livre de compte tient (I2)', () => {
     for (const o of debits.operations) delete o.transferAccountId;
     const credits = debits.operations.map((o) => op(`c-${o.id}`, o.date, 'VIR RECU', euros(600), { accountId: LIVRET }));
     let l = avec(debits, ...credits);
-    l = applyPatchToLedger(l, pairInternalTransfers(l));
+    // Les paires confirmées (#488, point 6) : sans destination connue, l'appariement ne les forme pas seul.
+    for (const c of credits) l = applyPatchToLedger(l, acceptInternalTransfer(l, { debitId: c.id.slice(2), creditId: c.id }));
     const { ledger } = enregistrer(l, proposer(l, ['v3'])!.flow, ['v1', 'v2', 'v3']);
     verifier(ledger);
     const idx = indexLedger(ledger);
