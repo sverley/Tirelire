@@ -20,7 +20,10 @@
  * point 8 amendé une quatrième fois (porteur, 16/10 : « ce n'est pas le meilleur qui gagne, on
  * propose ») : le piège de l'ordre et de la dépense, et la règle des notes élevées et proches pour toute
  * opération, repris des tests du codeur (`virements-internes-488-notes.test.ts`), avant le point 5 ;
- * deux titres du troisième et du quatrième tour, qui nommaient la règle remplacée, disent la note.
+ * deux titres du troisième et du quatrième tour, qui nommaient la règle remplacée, disent la note. Au
+ * septième tour, le point 8 amendé une cinquième fois (porteur, 16/10 : « applique la aussi dans l'autre
+ * sens ») : le piège du doublon, et l'opération douteuse qui dispute une occurrence, repris des tests du
+ * codeur (`virements-internes-488-notes.test.ts`), avant le point 5 ; l'état après l'import est de moi.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce qu'une correction du code ne rendrait pas : une opération sans destination connue jamais
@@ -41,7 +44,8 @@
  *   mieux noté qui ne reprend que s'il se distingue, le piège de l'ordre et de la dépense, et la reprise
  *   d'office par un ordre vers la destination connue seul (points 1, 2, 3, 4, 7, 8 ; D11,
  *   D12) : dans ces derniers, tout va vers Léa, aucune fausse paire n'y est possible ; un flux qui reprend
- *   à tort laisse l'appariement, et la reprise, classée, se corrige.
+ *   à tort laisse l'appariement, et la reprise, classée, se corrige. De même, dans l'autre sens, le
+ *   piège du doublon : une occurrence prise à tort par une opération se corrige d'un geste.
  * - 4 · deux diagnostics du codeur : un seul flux reconnaît le libellé, il le reprend comme avant ; une
  *   reprise par l'ordre du compte déjà désigné laisse l'appariement.
  *
@@ -854,6 +858,61 @@ describe('#488 · 8. le mieux noté ne l’emporte que s’il se distingue, pour
     expect(notes(base([charge('a', '07', 3), charge('b', '06', 2)], PRLV)).sort()).toEqual([
       ['o', 'a', 0.8, false],
       ['o', 'b', 0.7, false],
+    ]);
+  });
+});
+
+describe('#488 · 8. la même règle dans l’autre sens : le piège du doublon', () => {
+  // Un loyer de 700 €, sans motif, le 5 de chaque mois, fenêtre de 5 jours.
+  const LOYER = fluxLe('05', { id: 'loyer', kind: 'fixedCharge', amount: -euros(700) }, 5);
+  const CHARGE = fluxLe('05', { id: 'charge', kind: 'fixedCharge', amount: -euros(700) }, 0);
+  const prlv = (id: string, jour: string) => op(id, CC, `2026-04-${jour}`, 'PRLV LOYER', -euros(700));
+
+  it('[niveau 2] le 5 (0,80) et le 6 (0,75) : élevées et proches, aucun ne prend l’occurrence d’office, la reprise se propose avec chacun', () => {
+    const avant = base([LOYER], prlv('p5', '05'), prlv('p6', '06'));
+    expect(notes(avant)).toEqual([
+      ['p5', 'loyer', 0.8, false],
+      ['p6', 'loyer', 0.75, false],
+    ]);
+    const après = importer(avant);
+    expect([de(après, 'p5').plannedFlowId, de(après, 'p6').plannedFlowId]).toEqual([undefined, undefined]);
+  });
+
+  it('[niveau 2] le prélèvement que l’utilisateur rapproche prend l’occurrence, et la proposition de l’autre disparaît', () => {
+    let l = base([LOYER], prlv('p5', '05'), prlv('p6', '06'));
+    l = appliquer(l, applyMatch(l, proposeMatches(l, '2026-03-25', '2026-04-10').find((p) => p.operationId === 'p6')!));
+    expect(de(l, 'p6')).toMatchObject({ plannedFlowId: 'loyer', plannedDate: '2026-04-05' });
+    expect(notes(l)).toEqual([]);
+  });
+
+  it('[niveau 2] deux prélèvements de même note, le même jour : aucun ne la prend, chacun se la voit proposer', () => {
+    expect(notes(base([LOYER], prlv('a', '05'), prlv('b', '05'))).sort()).toEqual([
+      ['a', 'loyer', 0.8, false],
+      ['b', 'loyer', 0.8, false],
+    ]);
+  });
+
+  it('[niveau 2] le second du 9 (0,60) : celui du 5 se distingue et la prend d’office ; celui du 9 ne se voit rien proposer', () => {
+    const avant = base([LOYER], prlv('p5', '05'), prlv('p9', '09'));
+    expect(notes(avant)).toEqual([['p5', 'loyer', 0.8, true]]);
+    const après = importer(avant);
+    expect([de(après, 'p5').plannedFlowId, de(après, 'p5').plannedDate, de(après, 'p9').plannedFlowId]).toEqual(['loyer', '2026-04-05', undefined]);
+  });
+
+  it('[niveau 2] une opération douteuse prétend aux occurrences de chacun de ses flux : proche d’une autre, aucune ne prend d’office', () => {
+    // « p5 », retenu par le loyer et par une charge de même montant le même jour (0,80 et 0,80), est
+    // douteux ; « p6 », retenu par le loyer seul (0,75), lui dispute l’occurrence du loyer.
+    expect(notes(base([LOYER, CHARGE], prlv('p5', '05'), prlv('p6', '06'))).sort()).toEqual([
+      ['p5', 'charge', 0.8, false],
+      ['p5', 'loyer', 0.8, false],
+      ['p6', 'loyer', 0.75, false],
+    ]);
+  });
+
+  it('[niveau 2] une opération douteuse qui se distingue est seule à se voir proposer l’occurrence ; l’autre n’a rien', () => {
+    expect(notes(base([LOYER, CHARGE], prlv('p5', '05'), prlv('p9', '09'))).sort()).toEqual([
+      ['p5', 'charge', 0.8, false],
+      ['p5', 'loyer', 0.8, false],
     ]);
   });
 });
