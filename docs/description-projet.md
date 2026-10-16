@@ -993,7 +993,13 @@ quand la destination est connue, et de proposer sinon. Il ajoute :
 
 > les comparaisons de libellés doivent être souples quand même (casse, accent, troncature, préfixe ou suffixe posé par la banque/Linxo). Peut-être prévoir une comparaison floue et un score mini de corrélation.
 
-Ce qui en est tiré : D11 et D33 amendées ; le glossaire (appariement) ; la ligne « Pipeline d'import »
-de l'architecture. Le 16 octobre, sur une question de l'auditeur, le porteur limite les mots absents
-tolérés à une fin coupée par la source, et un libellé que plusieurs ordres ne reconnaissent que
-souplement n'a pas de destination connue (D11).
+Le 16 octobre, sur une seconde question de l'auditeur — deux prénoms dont l'un commence l'autre —, il
+répond :
+
+> Je pense que la clé est déjà écrite dans les principes. Dans le doute, on propose. Il faut voir les choses dans l'autre sens. Est-ce que cette ligne pourrait matcher plusieurs rapprochements automatiques ?
+
+Ce qui en est tiré : D11, D12 et D33 amendées ; le glossaire (appariement) ; la ligne « Pipeline
+d'import » de l'architecture. Le 16 octobre, sur une première question de l'auditeur, le porteur limite
+les mots absents tolérés à une fin coupée par la source ; sur la seconde, un libellé que les ordres de
+plusieurs comptes reconnaissent, dont l'un souplement, n'a pas de destination connue, et un libellé que
+plusieurs flux reconnaissent, dont l'un souplement, n'est repris automatiquement par aucun (D11, D12).

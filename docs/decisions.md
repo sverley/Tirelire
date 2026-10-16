@@ -140,12 +140,15 @@ commence un autre (`labelScore`) ; une autre expression régulière garde sa seu
 absents tolérés ne sont que ceux d'une fin coupée par la source (porteur, 16 octobre 2026) : le texte
 s'arrête au dernier mot du motif reconnu, et seuls les mots du motif qui le suivent manquent
 (`labelCutScore`) ; un mot remplacé par un autre, ou absent au début ou au milieu, n'est pas reconnu.
-Entre plusieurs ordres, une reconnaissance exacte — l'expression régulière, ou un score de 1 — décide
-comme avant (le plus long ; à égalité, aucun compte) et l'emporte sur une reconnaissance souple ; quand
-aucun ordre ne reconnaît le libellé exactement et que les ordres de plusieurs comptes le reconnaissent
-souplement, la destination n'est pas connue, et la paire se propose ; le compte seul à le reconnaître
-souplement en est la destination (`labelRecognizer`). Un libellé coupé qui convient à deux ordres ne
-désigne ni l'un ni l'autre, et n'est repris automatiquement par aucun (D12).
+Une reconnaissance est *exacte* quand la lecture d'avant la donnait — l'expression régulière du motif —,
+*souple* quand seul le score la donne, un score de 1 compris (`labelRecognizer`). Dans le doute, on
+propose (porteur, 16 octobre 2026) : quand les ordres de plusieurs comptes reconnaissent un libellé et
+que l'une de ces reconnaissances au moins est souple, la destination n'est pas connue, la paire se
+propose, et aucun de ces ordres ne reprend le virement automatiquement ; quand elles sont toutes exactes,
+le plus long l'emporte, comme avant, et, à égalité, aucun compte ; le compte seul à reconnaître le
+libellé, exactement ou souplement, en est la destination. Un virement n'est repris automatiquement que
+par un ordre du compte qui en est la destination connue (D12) : le flux qui reprend un virement et le
+compte qui en est la destination ne divergent pas.
 
 ### D12 · Pointage prudent
 
@@ -160,6 +163,11 @@ Ce que l'hypothèse du pointage exact cachait : un prélèvement du 5 passe le 7
 samedi, une facture varie, un salaire varie avec les heures supplémentaires, et deux abonnements
 peuvent avoir le même montant. Trop strict, rien n'est reconnu ; trop lâche, c'est la mauvaise
 opération qui est pointée.
+
+Amendé le 16 octobre 2026 (#488) : un pointage automatique n'a qu'un candidat. Un libellé que plusieurs
+flux reconnaissent, dont l'un au moins souplement (le score de D11), n'est pointé automatiquement par
+aucun : le pointage se propose avec chacun. Un virement n'est pointé automatiquement que par un ordre du
+compte qui en est la destination connue (D11).
 
 ### D13 · Nom de code « Tirelire »
 

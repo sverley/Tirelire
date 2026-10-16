@@ -270,17 +270,33 @@ export function designateTransfer(ledger: Ledger, operationId: Id, accountId: Id
  * - vers un compte sans ordre enregistré, quand elle contient le libellé tiré de son nom actuel
  *   (`transferLabel`). Celui d'un compte qui a un ordre ne reconnaît rien : renommer le compte ne
  *   change pas ce qui est reconnu (domaine plan et flux, hypothèse 3).
- * Entre plusieurs comptes, le libellé d'un ordre l'emporte sur un libellé tiré d'un nom ; entre
- * libellés de même sorte, le plus long ; à égalité, aucun compte. Le libellé d'un ordre reconnu
- * exactement l'emporte sur un libellé reconnu souplement (`labelRecognizer`) ; quand aucun ordre ne la
- * reconnaît exactement, le compte seul à la reconnaître souplement en est la destination, et, s'ils
- * sont plusieurs, aucun compte (#488, point 8). Elle n'est pas ventilée d'office :
+ * Entre plusieurs comptes, le libellé d'un ordre l'emporte sur un libellé tiré d'un nom. Le compte seul
+ * dont un ordre reconnaît le libellé, exactement ou souplement (`labelRecognizer`), en est la
+ * destination ; quand les ordres de plusieurs comptes le reconnaissent et que l'une de ces
+ * reconnaissances au moins est souple, aucun compte : dans le doute, la paire se propose (#488,
+ * point 8) ; quand elles sont toutes exactes, le plus long, et, à égalité, aucun compte, comme entre
+ * libellés tirés d'un nom. Elle n'est pas ventilée d'office :
  * son montant y reste non affecté (D21 ; domaine rapprochement et bilan, hypothèse 1). Quand un ordre
  * vers ce compte la reprend (D12), c'est lui qui la ventile par son action (`applyMatch`), qu'il passe
  * avant ou après cette reconnaissance : elle ne pose aucune sous-opération.
  */
 export function matchTirelireTransfers(ledger: Ledger): Patch {
   const patch = emptyPatch();
+  const parOp = new Map(alive(ledger.operations).map((o) => [o.id, o]));
+  for (const [id, hit] of transferRecognitions(ledger)) {
+    if (hit === undefined) continue;
+    patch.operations.push({ ...parOp.get(id)!, state: 'reconciled', transferAccountId: hit });
+  }
+  return patch;
+}
+
+/**
+ * Ce que les libellés des ordres et des comptes reconnaissent (`matchTirelireTransfers`), pour chaque
+ * opération qu'ils reconnaissent : le compte qui en est la destination, ou `undefined` quand plusieurs
+ * le sont sans que rien les départage (#488, point 8). Une opération absente n'est reconnue par aucun.
+ */
+function transferRecognitions(ledger: Ledger): Map<Id, Id | undefined> {
+  const out = new Map<Id, Id | undefined>();
   const principal = alive(ledger.accounts).find((a) => a.kind === 'principal');
   const ordres = new Map<Id, Array<{ length: number; reconnait: (op: Operation) => LabelRecognition }>>();
   for (const f of alive(ledger.plannedFlows)) {
@@ -297,8 +313,7 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
   for (const op of alive(ledger.operations)) {
     if (op.origin !== 'imported') continue;
     if (isLocked(op) || op.transferAccountId || resumesSomething(op)) continue;
-    const parOrdre: Array<{ id: Id; length: number }> = [];
-    const parOrdreSouple: Id[] = [];
+    const parOrdre: Array<{ id: Id; length: number; exacte: boolean }> = [];
     const parNom: Array<{ id: Id; length: number }> = [];
     const dansLeSensDeLOrdre = !!principal && op.accountId === principal.id && op.amount < 0;
     for (const { a, patterns, name } of accounts) {
@@ -306,17 +321,17 @@ export function matchTirelireTransfers(ledger: Ledger): Patch {
       if (patterns) {
         if (!dansLeSensDeLOrdre) continue;
         const lus = patterns.map((p) => ({ length: p.length, comment: p.reconnait(op) }));
-        const longest = Math.max(-1, ...lus.filter((p) => p.comment === 'exact').map((p) => p.length));
-        if (longest >= 0) parOrdre.push({ id: a.id, length: longest });
-        else if (lus.some((p) => p.comment === 'souple')) parOrdreSouple.push(a.id);
+        const exactes = lus.filter((p) => p.comment === 'exact');
+        if (exactes.length) parOrdre.push({ id: a.id, length: Math.max(...exactes.map((p) => p.length)), exacte: true });
+        else if (lus.some((p) => p.comment === 'souple')) parOrdre.push({ id: a.id, length: 0, exacte: false });
       } else if (name.length > 0 && /TIRELIRE/.test(op.normalizedLabel) && op.normalizedLabel.includes(name)) parNom.push({ id: a.id, length: name.length });
     }
-    // L'exacte l'emporte ; entre comptes reconnus souplement seulement, un seul compte, ou aucun (#488, point 8).
-    const hit = parOrdre.length ? longestAlone(parOrdre) : parOrdreSouple.length ? (parOrdreSouple.length === 1 ? parOrdreSouple[0] : undefined) : longestAlone(parNom);
-    if (!hit) continue;
-    patch.operations.push({ ...op, state: 'reconciled', transferAccountId: hit });
+    if (!parOrdre.length && !parNom.length) continue;
+    // Un seul compte : le sien ; plusieurs, dont l'un souplement : aucun ; tous exactement : le plus long (#488, point 8).
+    const hit = parOrdre.length === 1 ? parOrdre[0]!.id : parOrdre.length ? (parOrdre.every((h) => h.exacte) ? longestAlone(parOrdre) : undefined) : longestAlone(parNom);
+    out.set(op.id, hit);
   }
-  return patch;
+  return out;
 }
 
 /** Le compte au libellé le plus long, s'il est seul à cette longueur. */
@@ -492,9 +507,10 @@ function literalParts(motif: string): string[] | undefined {
 }
 
 /**
- * Comment un motif de libellé reconnaît une opération (#488, point 8) : `exact`, par sa lecture en
- * expression régulière ou par un score de 1 ; `souple`, par un score d'au moins `LABEL_SCORE_MIN`
- * seulement ; `undefined`, pas du tout.
+ * Comment un motif de libellé reconnaît une opération (#488, point 8) : `exact`, quand la lecture d'avant
+ * la donnait — l'expression régulière du motif, sur le libellé, le libellé normalisé ou le libellé
+ * complet ; `souple`, quand seul le score la donne, un score de 1 compris (« LEA », dernier mot du
+ * libellé, reconnaît ainsi un motif qui a « LEANE ») ; `undefined`, pas du tout.
  */
 export type LabelRecognition = 'exact' | 'souple' | undefined;
 
@@ -505,8 +521,11 @@ export type LabelRecognition = 'exact' | 'souple' | undefined;
  * les ordres (`matchTirelireTransfers`, donc la destination connue) et pour les occurrences que
  * l'historique propose. Un motif littéral, « texte » ou « texte.*texte », reconnaît aussi l'opération
  * quand chacune de ses parties a un score d'au moins `LABEL_SCORE_MIN` sur le libellé ou le libellé
- * complet, les mots absents n'étant tolérés qu'à la fin coupée (`labelCutScore` ; #488, point 8) ; une autre expression régulière garde sa seule lecture. La
- * reconnaissance dit si elle est exacte ou souple : entre plusieurs ordres, l'exacte l'emporte.
+ * complet, les mots absents n'étant tolérés qu'à la fin coupée (`labelCutScore` ; #488, point 8) ; une
+ * autre expression régulière garde sa seule lecture. La reconnaissance dit si elle est exacte ou souple :
+ * entre plusieurs flux qui reconnaissent un libellé, une seule souple suffit à ce qu'aucun ne le reprenne
+ * d'office (`proposeMatches`), et entre les ordres de plusieurs comptes, à ce qu'aucun n'en soit la
+ * destination (`matchTirelireTransfers`).
  */
 export function labelRecognizer(motif: string): (op: Operation) => LabelRecognition {
   let re: RegExp;
@@ -521,7 +540,7 @@ export function labelRecognizer(motif: string): (op: Operation) => LabelRecognit
     if (!parts) return undefined;
     // Chaque partie, sur le libellé ou le libellé complet, sa fin seule pouvant manquer ; la plus faible décide.
     const score = Math.min(...parts.map((p) => Math.max(labelCutScore(p, op.label), op.details ? labelCutScore(p, op.details) : 0)));
-    return score >= 1 ? 'exact' : score >= LABEL_SCORE_MIN ? 'souple' : undefined;
+    return score >= LABEL_SCORE_MIN ? 'souple' : undefined;
   };
 }
 
@@ -538,13 +557,19 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
  * ni ne le classe.
  *
  * Automatique selon D12 — montant exact, ou dans la tolérance avec le libellé reconnu, flux non
- * variable —, proposée sinon. Le libellé d'un flux reconnu exactement l'emporte sur un libellé reconnu
- * souplement (`labelRecognizer`) : les flux qui ne le reconnaissent que souplement ne la sélectionnent
- * pas ; et quand plusieurs flux ne la reconnaissent que souplement, aucun ne la reprend sans
- * confirmation (#488, point 8 : un libellé coupé qui convient à deux ordres ne désigne ni l'un ni
- * l'autre). Une occurrence n'est reprise qu'une fois, et une opération en reprend
- * au plus une : la mieux notée. Une occurrence qu'une saisie corrige ou masque déjà se reprend par
- * cette saisie (D88).
+ * variable —, proposée sinon. Une reprise automatique n'a qu'un candidat (#488, point 8 : dans le
+ * doute, on propose) :
+ * - un libellé que plusieurs flux reconnaissent, dont l'une des reconnaissances au moins est souple
+ *   (`labelRecognizer`), n'est repris d'office par aucun : la reprise se propose avec chacun ;
+ * - un virement n'est repris d'office que par un ordre du compte qui en est la destination connue
+ *   (`transferRecognitions`, ou le compte déjà désigné) ; un virement que les ordres de plusieurs
+ *   comptes reconnaissent sans que rien les départage n'est repris d'office par aucun, et se propose
+ *   avec chacun ; un flux de virement vers un autre compte que sa destination connue ne le sélectionne
+ *   pas : le flux qui reprend un virement et le compte qui en est la destination ne divergent pas.
+ * Une occurrence n'est reprise qu'une fois, et une opération en reprend au plus une : la mieux notée,
+ * sauf une opération dont la reprise se propose avec chacun, après les autres, sur les occurrences
+ * qu'elles laissent. Une occurrence qu'une saisie corrige ou masque déjà se reprend par cette saisie
+ * (D88).
  */
 export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): MatchProposal[] {
   const flows = alive(ledger.plannedFlows);
@@ -552,21 +577,25 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
   const resumed = index.resumed;
   const ops = alive(ledger.operations).filter((o) => o.origin === 'imported' && !isLocked(o) && !resumesSomething(o) && !resumed.has(o.id) && o.date >= from && o.date <= to);
   const lecteurs = new Map(flows.map((f) => [f.id, readLabelPattern(f.labelPattern)] as const).flatMap(([id, motif]) => (motif ? [[id, labelRecognizer(motif)] as const] : [])));
+  const reconnus = transferRecognitions(ledger);
   const candidates: MatchProposal[] = [];
+  const douteuses = new Set<Id>();
   for (const op of ops) {
-    const lus = new Map(flows.flatMap((f) => (f.accountId === op.accountId && lecteurs.has(f.id) ? [[f.id, lecteurs.get(f.id)!(op)] as const] : [])));
-    const exacte = [...lus.values()].includes('exact');
-    const souples = [...lus.values()].filter((r) => r === 'souple').length;
+    const lus = [...flows].flatMap((f) => (f.accountId === op.accountId && lecteurs.has(f.id) ? [lecteurs.get(f.id)!(op)] : [])).filter((r) => r !== undefined);
+    // La destination connue : le compte déjà désigné, ou celui que reconnaissent les libellés des ordres.
+    const destination = op.transferAccountId ?? reconnus.get(op.id);
+    const sansDestination = !op.transferAccountId && reconnus.has(op.id) && destination === undefined;
+    if ((lus.length > 1 && lus.includes('souple')) || sansDestination) douteuses.add(op.id);
     for (const f of flows) {
       if (f.accountId !== op.accountId) continue;
       if (f.activeFrom && op.date < f.activeFrom) continue;
       if (f.activeTo && op.date > f.activeTo) continue;
+      const vers = f.kind === 'transfer' ? f.counterpartAccountId : undefined;
+      if (vers !== undefined && destination !== undefined && vers !== destination) continue;
       const amt = amountWithinTolerance(f, op.amount);
       if (!amt.ok) continue;
-      const lu = lus.get(f.id);
-      const label = lecteurs.has(f.id) ? lu !== undefined : undefined;
+      const label = lecteurs.has(f.id) ? lecteurs.get(f.id)!(op) !== undefined : undefined;
       if (label === false) continue;
-      if (lu === 'souple' && exacte) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
@@ -581,7 +610,7 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       reasons.push(amt.exact ? 'montant exact' : 'montant dans la tolérance');
       if (taker) reasons.push('déjà corrigée par une saisie');
       const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
-      const auto = !f.variable && (amt.exact || label === true) && !(lu === 'souple' && souples > 1);
+      const auto = !f.variable && (amt.exact || label === true) && !douteuses.has(op.id);
       candidates.push({
         operationId: op.id,
         flowId: f.id,
@@ -601,9 +630,17 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
   const out: MatchProposal[] = [];
   for (const c of candidates) {
     const key = occurrenceKey(c.flowId, c.expectedDate);
-    if (usedOps.has(c.operationId) || taken.has(key)) continue;
+    if (douteuses.has(c.operationId) || usedOps.has(c.operationId) || taken.has(key)) continue;
     usedOps.add(c.operationId);
     taken.add(key);
+    out.push(c);
+  }
+  // Dans le doute, la reprise se propose avec chacun des flux, sur les occurrences que les autres laissent.
+  const proposees = new Set<string>();
+  for (const c of candidates) {
+    const cle = `${c.operationId}|${c.flowId}`;
+    if (!douteuses.has(c.operationId) || proposees.has(cle) || taken.has(occurrenceKey(c.flowId, c.expectedDate))) continue;
+    proposees.add(cle);
     out.push(c);
   }
   return out;
@@ -637,7 +674,8 @@ function stateOnResumption(op: Operation, f: PlannedFlow | undefined): Operation
  * Applique une proposition : l'opération reprend l'occurrence, désignée par son flux et sa date, ou la
  * saisie qui la corrige ou la masque déjà (D88). Elle devient rapprochée, verrouillée si le flux le
  * demande (D22, D24), et garde ce qui a été décidé sur elle : sa ventilation, si elle en a une ;
- * sinon, elle prend celle de ce qu'elle reprend.
+ * sinon, elle prend celle de ce qu'elle reprend. Reprise par un ordre vers un autre compte que celui
+ * qu'elle désigne, son appariement se défait des deux côtés (`unpairTransfer` ; #488, point 5).
  */
 export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   const patch = emptyPatch();
@@ -647,7 +685,12 @@ export function applyMatch(ledger: Ledger, m: MatchProposal): Patch {
   if (m.resumedOperationId) return resumeEntryWith(ledger, op, m.resumedOperationId, f);
   const next: Operation = { ...op, state: stateOnResumption(op, f), plannedFlowId: f.id, plannedDate: m.expectedDate };
   delete next.resumedOperationId;
-  if (f.kind === 'transfer' && f.counterpartAccountId) next.transferAccountId = f.counterpartAccountId;
+  if (f.kind === 'transfer' && f.counterpartAccountId && f.counterpartAccountId !== op.transferAccountId) {
+    // Un ordre d'un autre compte que celui désigné : l'appariement se défait des deux côtés (#488, point 5).
+    patch.operations.push(...unpairTransfer(ledger, op.id).operations.filter((o) => o.id !== op.id));
+    next.transferAccountId = f.counterpartAccountId;
+    delete next.transferOperationId;
+  }
   patch.operations.push(next);
   if (subOperationsOf(ledger, op.id).length === 0) patch.subOperations.push(...flowVentilation(ledger, f, op.id));
   return patch;

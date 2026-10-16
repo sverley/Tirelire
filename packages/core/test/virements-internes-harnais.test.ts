@@ -566,7 +566,7 @@ describe('#488 · 8. le piège des ordres d’une famille', () => {
     expect([d.transferAccountId, d.transferOperationId]).toEqual([LEA, 'c-lea']);
   });
 
-  it('[niveau 2] l’exacte l’emporte sur la souple, même d’un motif plus long', () => {
+  it('[niveau 2] plusieurs comptes, l’un exactement et l’autre souplement : aucune destination, et la reprise se propose avec chacun', () => {
     const l = famille('lea');
     // Un ordre vers Thomas au motif plus long, qui ne reconnaît le libellé que souplement (fin coupée).
     l.plannedFlows.push(ordreFamille('ordre-thomas', THOMAS, `${COUPE} THOMAS MENSUEL`));
@@ -574,8 +574,12 @@ describe('#488 · 8. le piège des ordres d’une famille', () => {
     const avant = avec(l, op('d', CC, '2026-04-01', `${COUPE} THOMAS`, -euros(20)));
     expect(labelRecognizer(`${COUPE} THOMAS MENSUEL`)(avant.operations[0]!)).toBe('souple');
     expect(labelRecognizer(COUPE)(avant.operations[0]!)).toBe('exact');
-    expect(matchTirelireTransfers(avant).operations.map((o) => o.transferAccountId)).toEqual([LEA]);
-    const auto = proposeMatches(avant, '2026-03-25', '2026-04-10').filter((p) => p.operationId === 'd');
-    expect(auto.map((p) => p.flowId)).toEqual(['ordre-lea']);
+    // Dans le doute, on propose (porteur, 16/10) : ni l'une ni l'autre ne l'emporte.
+    expect(matchTirelireTransfers(avant).operations).toEqual([]);
+    const reprises = proposeMatches(avant, '2026-03-25', '2026-04-10').filter((p) => p.operationId === 'd');
+    expect(reprises.map((p) => [p.flowId, p.auto]).sort()).toEqual([
+      ['ordre-lea', false],
+      ['ordre-thomas', false],
+    ]);
   });
 });

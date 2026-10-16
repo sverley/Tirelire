@@ -141,7 +141,10 @@
     }
     return m;
   });
-  const proposals = $derived(new Map(alertes.filter((a) => a.code === 'matchProposal').map((a) => [a.operationId, a])));
+  // Une opération peut avoir plusieurs reprises proposées : dans le doute, chacun des flux (#488, point 8).
+  const proposals = $derived(
+    alertes.reduce((m, a) => (a.code === 'matchProposal' ? m.set(a.operationId, [...(m.get(a.operationId) ?? []), a]) : m), new Map<string, MatchProposal[]>()),
+  );
   const ordresProposes = $derived(new Map(alertes.filter((a) => a.code === 'transferToOrder').map((a) => [a.operationId, a.accountId])));
   /** Les opérations dont la ligne porte le geste « Reprendre une occurrence » (#445, point 5) ; dans un projet sans flux, aucune (U5). */
   const avecGeste = $derived(operationsOfferedAFlow(app.ledger));
@@ -543,9 +546,7 @@
     sel = { labelPattern: '', regex: false, accountId: '', amountMin: '', amountMax: '', dateFrom: '', dateTo: '' };
   }
 
-  function acceptMatch(op: Operation) {
-    const p = proposals.get(op.id);
-    if (!p) return;
+  function acceptMatch(p: MatchProposal) {
     app.applyPatch(applyMatch(app.ledger, p));
     editingId = undefined;
   }
@@ -833,7 +834,7 @@
 <div class="card">
   {#each operations as op (op.id)}
     {@const allocs = allocByOp.get(op.id) ?? []}
-    {@const prop = proposals.get(op.id)}
+    {@const props = proposals.get(op.id) ?? []}
     <div class="row" style="flex-wrap:wrap">
       <!-- L'étiquette porte la cible : une case à cocher nue fait 13 px de côté, on la manque au doigt. -->
       <label class="cocher" aria-label="Sélectionner l’opération {op.label}">
@@ -856,8 +857,10 @@
         {#each pairesProposees.get(op.id) ?? [] as { autre } (autre.id)}
           <span class="sub proposition-virement" style="color:var(--accent)">Virement avec {accountName(autre.accountId)} du {shortDate(autre.date)} ?</span>
         {/each}
-        {#if prop && op.state !== 'locked'}
-          <span class="sub" style="color:var(--accent)">Proposition : reprendre {propositionText(prop)} ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
+        {#if op.state !== 'locked'}
+          {#each props as prop (prop.flowId)}
+            <span class="sub" style="color:var(--accent)">Proposition : reprendre {propositionText(prop)} ({Math.round(prop.score * 100)} %, {prop.reasons.join(', ')})</span>
+          {/each}
         {/if}
       </button>
       <div class="num {op.amount > 0 ? 'pos' : ''}">{money(op.amount)}</div>
@@ -924,9 +927,11 @@
         {/if}
         <form class="edit" style="width:100%" onsubmit={(e) => { e.preventDefault(); save(op); }}>
           {#if op.details}<p class="small muted">{op.details}</p>{/if}
-          {#if prop && op.state !== 'locked'}
+          {#if props.length && op.state !== 'locked'}
             <div class="actions" style="margin:0">
-              <button class="btn primary" type="button" onclick={() => acceptMatch(op)}>Reprendre {propositionText(prop)}</button>
+              {#each props as prop (prop.flowId)}
+                <button class="btn primary" type="button" onclick={() => acceptMatch(prop)}>Reprendre {propositionText(prop)}</button>
+              {/each}
             </div>
           {/if}
           {#if repriseText(op)}
