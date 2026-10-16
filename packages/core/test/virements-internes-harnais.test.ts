@@ -16,7 +16,11 @@
  * repris des tests du codeur (`virements-internes-488-noel.test.ts`), avant le point 5. Au cinquième
  * tour, sur mes deux retours : un flux sans motif retient le virement, et une destination connue n'est
  * reprise d'office que par un ordre vers elle, crédit compris, repris des tests du codeur
- * (`virements-internes-488-candidats.test.ts`), après le piège de l'ordre de Noël.
+ * (`virements-internes-488-candidats.test.ts`), après le piège de l'ordre de Noël. Au sixième tour, le
+ * point 8 amendé une quatrième fois (porteur, 16/10 : « ce n'est pas le meilleur qui gagne, on
+ * propose ») : le piège de l'ordre et de la dépense, et la règle des notes élevées et proches pour toute
+ * opération, repris des tests du codeur (`virements-internes-488-notes.test.ts`), avant le point 5 ;
+ * deux titres du troisième et du quatrième tour, qui nommaient la règle remplacée, disent la note.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce qu'une correction du code ne rendrait pas : une opération sans destination connue jamais
@@ -33,8 +37,9 @@
  *   compte qui défait l'appariement des deux côtés (point 5).
  * - 2 · les autres cas des règles : les destinations connues, les départages, l'import suivant, la
  *   proposition qui disparaît, le rapport, la reconnaissance souple, exacte ou souple, l'égalité entre
- *   ordres, la reprise qui n'a qu'un candidat, flux sans motif compris, le piège de l'ordre de Noël, et
- *   la reprise d'office par un ordre vers la destination connue seul (points 1, 2, 3, 4, 7, 8 ; D11,
+ *   ordres, la reprise qui n'a qu'un candidat, flux sans motif compris, le piège de l'ordre de Noël, le
+ *   mieux noté qui ne reprend que s'il se distingue, le piège de l'ordre et de la dépense, et la reprise
+ *   d'office par un ordre vers la destination connue seul (points 1, 2, 3, 4, 7, 8 ; D11,
  *   D12) : dans ces derniers, tout va vers Léa, aucune fausse paire n'y est possible ; un flux qui reprend
  *   à tort laisse l'appariement, et la reprise, classée, se corrige.
  * - 4 · deux diagnostics du codeur : un seul flux reconnaît le libellé, il le reprend comme avant ; une
@@ -688,7 +693,8 @@ describe('#488 · 8. le piège des prénoms dont l’un commence l’autre', () 
 });
 
 describe('#488 · 8. une reprise automatique n’a qu’un candidat', () => {
-  it('[niveau 2] deux flux reconnaissent un libellé, l’un souplement : aucun ne le reprend d’office, chacun se propose', () => {
+  // Sixième tour : la souplesse ne compte plus que dans la note ; ici, les deux flux sont notés 1,00.
+  it('[niveau 2] deux flux reconnaissent un libellé, l’un exactement, l’autre souplement, notés 1,00 tous deux : élevées et proches, aucun ne le reprend d’office, chacun se propose', () => {
     const flux = (id: string, motif: string): PlannedFlow => ({ id, name: id, kind: 'fixedCharge', amount: -euros(30), accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-05' }, dateWindowDays: 5, labelPattern: motif });
     const avant = base([flux('court', 'ABONNEMENT SALLE SPORT'), flux('long', 'ABONNEMENT SALLE SPORT CLUB ANNUEL')], op('d', CC, '2026-04-05', 'PRLV ABONNEMENT SALLE SPORT CLUB', -euros(30)));
     expect(labelRecognizer('ABONNEMENT SALLE SPORT')(avant.operations[0]!)).toBe('exact');
@@ -734,7 +740,7 @@ describe('#488 · 8. le piège de l’ordre de Noël : seuls comptent les flux q
     expect(reprisesAvril(base([ordreFamille('ordre-mois', LEA, MOTIF_LEA), ordreNoel({ amount: -euros(20) })], ...avril()))).toEqual([['d-avril', 'ordre-mois', true]]);
   });
 
-  it('[niveau 2] si le montant et la fenêtre de l’ordre de Noël le retenaient aussi, aucun ne le reprend d’office : la reprise se propose avec chacun', () => {
+  it('[niveau 2] si le montant et la fenêtre de l’ordre de Noël le retenaient aussi, avec une note élevée et proche de celle de l’ordre mensuel, aucun ne le reprend d’office : la reprise se propose avec chacun', () => {
     const avant = base([ordreFamille('ordre-mois', LEA, MOTIF_LEA), ordreNoel({ amount: -euros(20), ...MENSUEL_PAR_MOIS })], ...avril());
     expect(reprisesAvril(avant).sort()).toEqual([
       ['d-avril', 'ordre-mois', false],
@@ -785,6 +791,70 @@ describe('#488 · 8. un virement n’est repris d’office que par un ordre vers
     const recu = fluxMensuel({ id: 'ordre-recu', kind: 'transfer', amount: euros(20), accountId: LEA, counterpartAccountId: CC });
     expect(reprisesAvril(base([revenu], credit))).toEqual([['c-avril', 'revenu', false]]);
     expect(reprisesAvril(base([recu], credit))).toEqual([['c-avril', 'ordre-recu', true]]);
+  });
+});
+
+// Sixième tour : le point 8 amendé une quatrième fois (porteur, 16/10, sur la remarque de l'auditeur au
+// cinquième tour). « Le mieux noté ne l'emporte que s'il se distingue », et « Le piège de l'ordre et de
+// la dépense » de l'issue, libellés inventés (D84). Tests du codeur (`virements-internes-488-notes.test.ts`).
+const notes = (l: Ledger) => proposeMatches(l, '2026-03-25', '2026-04-10').map((p) => [p.operationId, p.flowId, Math.round(p.score * 100) / 100, p.auto]);
+/** Un flux mensuel du principal, ancré au jour donné, de fenêtre 5 jours sauf ce que le test change. */
+const fluxLe = (jour: string, o: Partial<PlannedFlow> & Pick<PlannedFlow, 'id' | 'kind' | 'amount'>, fenetre = 5): PlannedFlow => ({ name: o.id, accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: `2026-01-${jour}` }, dateWindowDays: fenetre, ...o });
+/** L'ordre du principal vers Léa, 20 € le 1er ; une dépense sans motif, 20 € le 5. */
+const ORDRE_1ER = fluxLe('01', { id: 'ordre-lea', kind: 'transfer', amount: -euros(20), counterpartAccountId: LEA, labelPattern: MOTIF_LEA });
+const DEPENSE_5 = fluxLe('05', { id: 'depense', kind: 'fixedCharge', amount: -euros(20) });
+const virementLe = (jour: string) => [op('d', CC, `2026-04-${jour}`, MOTIF_LEA, -euros(20)), op('c', LEA, `2026-04-${jour}`, 'VIR RECU', euros(20))];
+
+describe('#488 · 8. le piège de l’ordre et de la dépense', () => {
+  it('[niveau 2] le virement le 5 : 0,80 pour l’ordre, 0,80 pour la dépense, élevées et proches : aucun ne le reprend d’office, la reprise se propose avec chacun, et l’appariement se fait avec Léa', () => {
+    const avant = base([ORDRE_1ER, DEPENSE_5], ...virementLe('05'));
+    expect(notes(avant).sort()).toEqual([
+      ['d', 'depense', 0.8, false],
+      ['d', 'ordre-lea', 0.8, false],
+    ]);
+    const d = de(importer(avant), 'd');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c', undefined]);
+  });
+
+  it('[niveau 2] le virement le 1er : 1,00 pour l’ordre, 0,60 pour la dépense : l’ordre se distingue et le reprend d’office ; la dépense ne se propose pas', () => {
+    const avant = base([ORDRE_1ER, DEPENSE_5], ...virementLe('01'));
+    expect(notes(avant)).toEqual([['d', 'ordre-lea', 1, true]]);
+    const d = de(importer(avant), 'd');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c', 'ordre-lea']);
+  });
+
+  it('[niveau 2] à date et montant égaux, un libellé reconnu départage : l’ordre ancré le 5, 1,00, contre la dépense, 0,80', () => {
+    expect(notes(base([{ ...ORDRE_1ER, periodicity: DEPENSE_5.periodicity }, DEPENSE_5], ...virementLe('05')))).toEqual([['d', 'ordre-lea', 1, true]]);
+  });
+});
+
+describe('#488 · 8. le mieux noté ne l’emporte que s’il se distingue, pour toute opération', () => {
+  const PRLV = op('o', CC, '2026-04-07', 'PRLV GAZ', -euros(50));
+  const gaz = fluxLe('05', { id: 'gaz', kind: 'fixedCharge', amount: -euros(50), labelPattern: 'GAZ' }, 3);
+  const charge = (id: string, jour: string, fenetre: number) => fluxLe(jour, { id, kind: 'fixedCharge', amount: -euros(50) }, fenetre);
+
+  it('[niveau 2] une charge que retiennent un flux reconnu, 0,85, et un flux sans motif, 0,80 : aucun ne la reprend d’office, chacun se propose', () => {
+    const avant = base([gaz, charge('sans-motif', '07', 3)], PRLV);
+    expect(notes(avant).sort()).toEqual([
+      ['o', 'gaz', 0.85, false],
+      ['o', 'sans-motif', 0.8, false],
+    ]);
+    expect(de(importer(avant), 'o').plannedFlowId).toBeUndefined();
+  });
+
+  it('[niveau 2] l’autre, à 0,58, ne lui est pas proche : le flux reconnu la reprend d’office, seul', () => {
+    expect(notes(base([gaz, charge('loin', '04', 3)], PRLV))).toEqual([['o', 'gaz', 0.85, true]]);
+  });
+
+  it('[niveau 2] proches mais pas élevées, 0,65 et 0,60 : le mieux noté la reprend d’office, seul', () => {
+    expect(notes(base([charge('a', '05', 3), charge('b', '03', 5)], PRLV))).toEqual([['o', 'a', 0.65, true]]);
+  });
+
+  it('[niveau 2] les deux bornes comprises : 0,80 et 0,70, élevée et proche, chacun se propose', () => {
+    expect(notes(base([charge('a', '07', 3), charge('b', '06', 2)], PRLV)).sort()).toEqual([
+      ['o', 'a', 0.8, false],
+      ['o', 'b', 0.7, false],
+    ]);
   });
 });
 
