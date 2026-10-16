@@ -10,7 +10,8 @@
  * opération à deux candidats qui montre chacun ; au point 5, la suppression d'un côté apparié.
  * Niveaux : 0 pour le point 5 (un côté qui pointe dans le vide resterait dans la base) ; 1 pour la
  * proposition lue sans budget ni tirelire (I3, U5) et la désignation qui apparie le seul candidat (I2) ;
- * 2 pour le reste.
+ * 2 pour le reste. Au troisième tour, le test du codeur (`virements-internes-488-doute-ecran.test.ts`,
+ * déplacé ici en entier, à la fin) : la reprise qui se propose avec chacun des ordres (point 8), niveau 2.
  *
  * Données inventées (D84) : un compte principal, un compte de Léa, un Livret A, sans budget ni ordre (U5).
  * Un virement de 34 € du compte de Léa vers un club, et un remboursement de 34 € le même jour sur le
@@ -18,7 +19,7 @@
  * lendemain sur le livret, encore non désigné.
  */
 import { describe, expect, it } from 'vitest';
-import { emptyLedger, euros, normalizeLabel, type Ledger, type Operation } from '@tirelire/core';
+import { emptyLedger, euros, normalizeLabel, type Ledger, type Operation, type PlannedFlow } from '@tirelire/core';
 import { shortDate } from '../src/lib/format';
 import { allerA, app, ouvrirLApplication, presser, projet, rendu, saisir, t, tous } from './ecran';
 
@@ -150,5 +151,49 @@ describe('#488 · 5. « Tout remettre à zéro » sur un côté apparié', () =>
     }
     expect(de('vers-livret').deletedAt).toBeTruthy();
     expect([de('recu-livret').transferOperationId, de('recu-livret').transferAccountId, de('recu-livret').state]).toEqual([undefined, undefined, 'reconciled']);
+  });
+});
+
+// Le point 8 amendé une seconde fois (porteur, 16/10, « dans le doute, on propose ») : le test du codeur
+// du troisième tour (`virements-internes-488-doute-ecran.test.ts`, déplacé ici en entier). Données
+// inventées (D84) : les comptes de Léa et de Léane, un ordre vers chacune.
+const LEANE = 'acc-leane';
+
+function ordreEnfant(id: string, nom: string, vers: string, motif: string): PlannedFlow {
+  return { id, name: nom, kind: 'transfer', amount: -euros(20), accountId: CC, counterpartAccountId: vers, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-01' }, dateWindowDays: 5, labelPattern: motif };
+}
+
+function projetLeaLeane(): Ledger {
+  const l = emptyLedger();
+  l.accounts.push(
+    { id: CC, name: 'Compte principal', kind: 'principal', openingBalance: euros(2000), openingDate: '2026-08-01' },
+    { id: LEA, name: 'Léa', kind: 'courant', openingBalance: 0, openingDate: '2026-08-01' },
+    { id: LEANE, name: 'Léane', kind: 'courant', openingBalance: 0, openingDate: '2026-08-01' },
+  );
+  l.plannedFlows.push(ordreEnfant('ordre-lea', 'Argent de poche Léa', LEA, 'VIR SEPA ARGENT POCHE LEA'), ordreEnfant('ordre-leane', 'Argent de poche Léane', LEANE, 'VIR SEPA ARGENT POCHE LEANE'));
+  l.operations.push(op('d-lea', CC, '2026-09-01', 'VIR SEPA ARGENT POCHE LEA', -euros(20)));
+  return l;
+}
+
+describe('#488 · 8. dans le doute, la reprise se propose avec chacun, à l’écran', () => {
+  it('[niveau 2] la ligne montre une proposition par ordre, l’opération ouverte un bouton par ordre, et le bouton choisi reprend avec cet ordre', async () => {
+    await ouvrirLApplication();
+    await app.replaceWith(projetLeaLeane());
+    await rendu();
+    await allerA('Opérations');
+    const ligne = tous('main .card > .row').find((r) => t(r.querySelector(':scope > button.label strong')) === 'VIR SEPA ARGENT POCHE LEA')!;
+    expect(ligne, 'la ligne du virement n’est pas à l’écran').toBeTruthy();
+    const texte = t(ligne.querySelector(':scope > button.label'));
+    expect(texte).toMatch(/Proposition : reprendre l’opération prévue « Argent de poche Léa »/);
+    expect(texte).toMatch(/Proposition : reprendre l’opération prévue « Argent de poche Léane »/);
+    await presser(ligne.querySelector<HTMLButtonElement>(':scope > button.label')!);
+    const boutons = tous<HTMLButtonElement>('main button.primary').filter((b) => /^Reprendre l’opération prévue/.test(t(b)));
+    expect(boutons.map(t).sort()).toEqual([
+      expect.stringMatching(/« Argent de poche Léa »/),
+      expect.stringMatching(/« Argent de poche Léane »/),
+    ]);
+    await presser(boutons.find((b) => /« Argent de poche Léa »/.test(t(b)))!);
+    const d = projet().operations.find((o) => o.id === 'd-lea')!;
+    expect([d.plannedFlowId, d.transferAccountId]).toEqual(['ordre-lea', LEA]);
   });
 });

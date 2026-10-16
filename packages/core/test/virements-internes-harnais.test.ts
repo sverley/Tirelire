@@ -9,7 +9,9 @@
  * (`virements-internes-488.test.ts`, déplacé ici en entier). Est de moi : au point 3, la lecture des
  * propositions et des alertes, et l'import, qui n'écrivent rien de ce qui reste à confirmer, relus dans
  * la base (I10). Au second tour, le point 8 amendé (porteur, 16/10) : les tests du codeur
- * (`virements-internes-488-fin-coupee.test.ts`, déplacé ici en entier), à la fin de ce fichier.
+ * (`virements-internes-488-fin-coupee.test.ts`, déplacé ici en entier), à la fin de ce fichier. Au
+ * troisième tour, le point 8 amendé une seconde fois (porteur, 16/10, « dans le doute, on propose ») :
+ * les tests du codeur (`virements-internes-488-doute.test.ts`, déplacé ici en entier), après eux.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce qu'une correction du code ne rendrait pas : une opération sans destination connue jamais
@@ -21,9 +23,14 @@
  *   un ordre ne se propose que sur une paire sûre (point 6 ; principes 1.3, 4.4, I10).
  * - 0 aussi · le piège des ordres d'une famille (point 8) : aucune fausse paire, rien d'apparié ni de
  *   repris d'office sur un libellé que plusieurs ordres ne reconnaissent que souplement, ni par l'ordre
- *   d'un autre enfant — le besoin du piège des comptes enfants (point 2).
+ *   d'un autre enfant — le besoin du piège des comptes enfants (point 2) ; de même, le piège des
+ *   prénoms dont l'un commence l'autre (« … LEA », « … LEANE »), et la reprise par l'ordre d'un autre
+ *   compte qui défait l'appariement des deux côtés (point 5).
  * - 2 · les autres cas des règles : les destinations connues, les départages, l'import suivant, la
- *   proposition qui disparaît, le rapport, la reconnaissance souple (points 1, 2, 3, 4, 7, 8).
+ *   proposition qui disparaît, le rapport, la reconnaissance souple, exacte ou souple, l'égalité entre
+ *   ordres et la reprise qui n'a qu'un candidat (points 1, 2, 3, 4, 7, 8 ; D11, D12).
+ * - 4 · deux diagnostics du codeur : un seul flux reconnaît le libellé, il le reprend comme avant ; une
+ *   reprise par l'ordre du compte déjà désigné laisse l'appariement.
  *
  * Données inventées (D84) : un compte principal, deux comptes enfants, « Léa » et « Tom », et un
  * Livret A. Le principal vire 45 € à chaque enfant le 1er du mois, par un ordre enregistré vers
@@ -34,6 +41,7 @@ import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
 import {
   LedgerStore,
+  applyMatch,
   readAlerts,
   LABEL_SCORE_MIN,
   acceptInternalTransfer,
@@ -581,5 +589,132 @@ describe('#488 · 8. le piège des ordres d’une famille', () => {
       ['ordre-lea', false],
       ['ordre-thomas', false],
     ]);
+  });
+});
+
+// Le point 8 amendé une seconde fois (porteur, 16/10, « dans le doute, on propose ») : les tests du
+// codeur du troisième tour (`virements-internes-488-doute.test.ts`, déplacé ici en entier). Données
+// inventées (D84) : « Léa », « Léane » et « Thomas », et les libellés du « piège des prénoms dont l'un
+// commence l'autre » de l'issue.
+const LEANE = 'acc-leane';
+const MOTIF_LEANE = 'VIR SEPA ARGENT POCHE LEANE';
+
+function base(flows: PlannedFlow[], ...ops: Operation[]): Ledger {
+  const l = emptyLedger();
+  l.accounts.push(
+    { id: CC, name: 'Compte principal', kind: 'principal', openingBalance: euros(2000), openingDate: '2025-12-31' },
+    { id: LEA, name: 'Léa', kind: 'courant', openingBalance: 0, openingDate: '2025-12-31' },
+    { id: LEANE, name: 'Léane', kind: 'courant', openingBalance: 0, openingDate: '2025-12-31' },
+    { id: THOMAS, name: 'Thomas', kind: 'courant', openingBalance: 0, openingDate: '2025-12-31' },
+  );
+  l.plannedFlows.push(...flows);
+  l.operations.push(...ops);
+  return l;
+}
+
+const creditsLeaLeane = () => [op('c-lea', LEA, '2026-04-01', 'VIR RECU', euros(20)), op('c-leane', LEANE, '2026-04-02', 'VIR RECU', euros(20))];
+
+describe('#488 · 8. exacte ou souple : la lecture d’avant, ou le score seul', () => {
+  it('[niveau 2] un score de 1 est une reconnaissance souple ; l’expression régulière, sur le libellé normalisé compris, est exacte', () => {
+    const lit = (motif: string, label: string) => labelRecognizer(motif)(op('x', CC, '2026-04-01', label, -euros(20)));
+    // « LEA », dernier mot du libellé, lu comme « LEANE » coupé : score de 1, mais souple.
+    expect(lit(MOTIF_LEANE, MOTIF_LEA)).toBe('souple');
+    expect(lit(MOTIF_LEA, MOTIF_LEA)).toBe('exact');
+    expect(lit(MOTIF_LEA, `PRLV ${MOTIF_LEA} REF 9`)).toBe('exact');
+    expect(lit(MOTIF_LEA, 'vir sepa argent poche léa')).toBe('exact');
+    // Ce que seul le score reconnaît, sans mot absent : souple aussi.
+    expect(lit(MOTIF_LEA, 'VIR-SEPA ARGENT DE POCHE LEA')).toBe('souple');
+  });
+});
+
+describe('#488 · 8. le piège des prénoms dont l’un commence l’autre', () => {
+  it('[niveau 0] « … LEANE », reconnu exactement par les deux ordres : le plus long l’emporte, il s’apparie au crédit de Léane et l’ordre de Léane le reprend', () => {
+    const avant = base([ordreFamille('ordre-lea', LEA, MOTIF_LEA), ordreFamille('ordre-leane', LEANE, MOTIF_LEANE)], op('d-leane', CC, '2026-04-04', MOTIF_LEANE, -euros(20)), ...creditsLeaLeane());
+    expect(matchTirelireTransfers(avant).operations.map((o) => [o.id, o.transferAccountId])).toEqual([['d-leane', LEANE]]);
+    // La reprise ne diverge pas de la destination : l'ordre de Léa ne la sélectionne pas.
+    expect(proposeMatches(avant, '2026-03-25', '2026-04-10').map((p) => [p.flowId, p.auto])).toEqual([['ordre-leane', true]]);
+    const d = de(importer(avant), 'd-leane');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEANE, 'c-leane', 'ordre-leane']);
+  });
+
+  it('[niveau 0] « … LEA », exact pour Léa et souple pour Léane : pas de destination, la paire se propose avec chaque crédit, et la reprise avec chaque ordre, sans rien d’office', () => {
+    const avant = base([ordreFamille('ordre-lea', LEA, MOTIF_LEA), ordreFamille('ordre-leane', LEANE, MOTIF_LEANE)], op('d-lea', CC, '2026-04-01', MOTIF_LEA, -euros(20)), ...creditsLeaLeane());
+    expect(matchTirelireTransfers(avant).operations).toEqual([]);
+    const reprises = proposeMatches(avant, '2026-03-25', '2026-04-10');
+    expect(reprises.map((p) => [p.operationId, p.flowId, p.auto]).sort()).toEqual([
+      ['d-lea', 'ordre-lea', false],
+      ['d-lea', 'ordre-leane', false],
+    ]);
+    const l = importer(avant);
+    const d = de(l, 'd-lea');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([undefined, undefined, undefined]);
+    expect(proposeInternalTransfers(l).filter((p) => p.debitId === 'd-lea').map((p) => p.creditId).sort()).toEqual(['c-lea', 'c-leane']);
+  });
+
+  it('[niveau 0] les deux virements du mois : « … LEANE » s’apparie, « … LEA » se propose, aucune fausse paire', () => {
+    const l = importer(
+      base([ordreFamille('ordre-lea', LEA, MOTIF_LEA), ordreFamille('ordre-leane', LEANE, MOTIF_LEANE)], op('d-lea', CC, '2026-04-01', MOTIF_LEA, -euros(20)), op('d-leane', CC, '2026-04-04', MOTIF_LEANE, -euros(20)), ...creditsLeaLeane()),
+    );
+    expect(de(l, 'd-leane').transferOperationId).toBe('c-leane');
+    expect(de(l, 'c-leane').transferOperationId).toBe('d-leane');
+    expect(de(l, 'd-lea').transferOperationId).toBeUndefined();
+    expect(de(l, 'c-lea').transferOperationId).toBeUndefined();
+    expect(proposeInternalTransfers(l).map((p) => [p.debitId, p.creditId])).toEqual([['d-lea', 'c-lea']]);
+  });
+
+  it('[niveau 2] avec le seul ordre de Léane, « … LEA » est reconnu par lui seul : sa destination est Léane', () => {
+    const avant = base([ordreFamille('ordre-leane', LEANE, MOTIF_LEANE)], op('d-lea', CC, '2026-04-01', MOTIF_LEA, -euros(20)), ...creditsLeaLeane());
+    expect(matchTirelireTransfers(avant).operations.map((o) => [o.id, o.transferAccountId])).toEqual([['d-lea', LEANE]]);
+    const d = de(importer(avant), 'd-lea');
+    expect([d.transferAccountId, d.transferOperationId]).toEqual([LEANE, 'c-leane']);
+  });
+
+  it('[niveau 2] deux ordres reconnaissent exactement, à égalité de longueur : aucune destination, aucune reprise d’office, chacun se propose', () => {
+    const avant = base([ordreFamille('ordre-lea', LEA, 'LEA'), ordreFamille('ordre-thomas', THOMAS, 'TOM')], op('d', CC, '2026-04-01', 'VIR LEA TOM', -euros(20)));
+    expect(matchTirelireTransfers(avant).operations).toEqual([]);
+    expect(proposeMatches(avant, '2026-03-25', '2026-04-10').map((p) => [p.flowId, p.auto]).sort()).toEqual([
+      ['ordre-lea', false],
+      ['ordre-thomas', false],
+    ]);
+  });
+});
+
+describe('#488 · 8. une reprise automatique n’a qu’un candidat', () => {
+  it('[niveau 2] deux flux reconnaissent un libellé, l’un souplement : aucun ne le reprend d’office, chacun se propose', () => {
+    const flux = (id: string, motif: string): PlannedFlow => ({ id, name: id, kind: 'fixedCharge', amount: -euros(30), accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-05' }, dateWindowDays: 5, labelPattern: motif });
+    const avant = base([flux('court', 'ABONNEMENT SALLE SPORT'), flux('long', 'ABONNEMENT SALLE SPORT CLUB ANNUEL')], op('d', CC, '2026-04-05', 'PRLV ABONNEMENT SALLE SPORT CLUB', -euros(30)));
+    expect(labelRecognizer('ABONNEMENT SALLE SPORT')(avant.operations[0]!)).toBe('exact');
+    expect(labelRecognizer('ABONNEMENT SALLE SPORT CLUB ANNUEL')(avant.operations[0]!)).toBe('souple');
+    expect(proposeMatches(avant, '2026-03-25', '2026-04-10').map((p) => [p.flowId, p.auto]).sort()).toEqual([
+      ['court', false],
+      ['long', false],
+    ]);
+    expect(de(importer(avant), 'd').plannedFlowId).toBeUndefined();
+  });
+
+  it('[niveau 4] un seul flux reconnaît le libellé, exactement : il le reprend d’office, comme avant', () => {
+    const flux: PlannedFlow = { id: 'court', name: 'court', kind: 'fixedCharge', amount: -euros(30), accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-05' }, dateWindowDays: 5, labelPattern: 'ABONNEMENT SALLE SPORT' };
+    const avant = base([flux], op('d', CC, '2026-04-05', 'PRLV ABONNEMENT SALLE SPORT CLUB', -euros(30)));
+    expect(proposeMatches(avant, '2026-03-25', '2026-04-10').map((p) => [p.flowId, p.auto])).toEqual([['court', true]]);
+  });
+});
+
+describe('#488 · 5. une reprise par l’ordre d’un autre compte défait l’appariement', () => {
+  it('[niveau 0] le côté apparié repris par un ordre vers un autre compte : les deux côtés ne se désignent plus, l’autre garde son état', () => {
+    const l = importer(base([ordreFamille('ordre-lea', LEA, MOTIF_LEA)], op('d', CC, '2026-04-01', MOTIF_LEA, -euros(20)), op('c', LEA, '2026-04-01', 'VIR RECU', euros(20))));
+    expect(de(l, 'd').transferOperationId).toBe('c');
+    // L'utilisateur confirme une reprise par un ordre vers Thomas (« Reprendre une occurrence »).
+    const avecThomas: Ledger = { ...l, plannedFlows: [...l.plannedFlows, ordreFamille('ordre-thomas', THOMAS, 'AUTRE MOTIF')] };
+    const apres = applyPatchToLedger(avecThomas, applyMatch(avecThomas, { operationId: 'd', flowId: 'ordre-thomas', expectedDate: '2026-04-01', expectedAmount: -euros(20), score: 1, auto: false, reasons: [] }));
+    const d = de(apres, 'd');
+    const c = de(apres, 'c');
+    expect([d.transferAccountId, d.transferOperationId]).toEqual([THOMAS, undefined]);
+    expect([c.transferAccountId, c.transferOperationId, c.state]).toEqual([undefined, undefined, de(l, 'c').state]);
+  });
+
+  it('[niveau 4] repris par un ordre vers le compte qu’il désigne déjà : l’appariement reste', () => {
+    const avant = base([ordreFamille('ordre-lea', LEA, 'AUTRE MOTIF')], op('d', CC, '2026-04-01', 'VIR SEPA', -euros(20), { transferAccountId: LEA, transferOperationId: 'c', state: 'reconciled' }), op('c', LEA, '2026-04-01', 'VIR RECU', euros(20), { transferAccountId: CC, transferOperationId: 'd', state: 'reconciled' }));
+    const apres = applyPatchToLedger(avant, applyMatch(avant, { operationId: 'd', flowId: 'ordre-lea', expectedDate: '2026-04-01', expectedAmount: -euros(20), score: 1, auto: false, reasons: [] }));
+    expect([de(apres, 'd').transferOperationId, de(apres, 'c').transferOperationId]).toEqual(['c', 'd']);
   });
 });
