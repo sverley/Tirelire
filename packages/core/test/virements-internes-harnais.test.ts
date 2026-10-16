@@ -11,7 +11,9 @@
  * la base (I10). Au second tour, le point 8 amendé (porteur, 16/10) : les tests du codeur
  * (`virements-internes-488-fin-coupee.test.ts`, déplacé ici en entier), à la fin de ce fichier. Au
  * troisième tour, le point 8 amendé une seconde fois (porteur, 16/10, « dans le doute, on propose ») :
- * les tests du codeur (`virements-internes-488-doute.test.ts`, déplacé ici en entier), après eux.
+ * les tests du codeur (`virements-internes-488-doute.test.ts`, déplacé ici en entier), après eux. Au
+ * quatrième tour, le point 8 amendé une troisième fois (porteur, 16/10) : le piège de l'ordre de Noël,
+ * repris des tests du codeur (`virements-internes-488-noel.test.ts`), avant le point 5.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce qu'une correction du code ne rendrait pas : une opération sans destination connue jamais
@@ -28,7 +30,8 @@
  *   compte qui défait l'appariement des deux côtés (point 5).
  * - 2 · les autres cas des règles : les destinations connues, les départages, l'import suivant, la
  *   proposition qui disparaît, le rapport, la reconnaissance souple, exacte ou souple, l'égalité entre
- *   ordres et la reprise qui n'a qu'un candidat (points 1, 2, 3, 4, 7, 8 ; D11, D12).
+ *   ordres, la reprise qui n'a qu'un candidat et le piège de l'ordre de Noël (points 1, 2, 3, 4, 7, 8 ;
+ *   D11, D12) : tous deux vont vers Léa, aucune fausse paire n'y est possible.
  * - 4 · deux diagnostics du codeur : un seul flux reconnaît le libellé, il le reprend comme avant ; une
  *   reprise par l'ordre du compte déjà désigné laisse l'appariement.
  *
@@ -696,6 +699,44 @@ describe('#488 · 8. une reprise automatique n’a qu’un candidat', () => {
     const flux: PlannedFlow = { id: 'court', name: 'court', kind: 'fixedCharge', amount: -euros(30), accountId: CC, periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-05' }, dateWindowDays: 5, labelPattern: 'ABONNEMENT SALLE SPORT' };
     const avant = base([flux], op('d', CC, '2026-04-05', 'PRLV ABONNEMENT SALLE SPORT CLUB', -euros(30)));
     expect(proposeMatches(avant, '2026-03-25', '2026-04-10').map((p) => [p.flowId, p.auto])).toEqual([['court', true]]);
+  });
+});
+
+// Le point 8 amendé une troisième fois (porteur, 16/10) : « Le piège de l'ordre de Noël » de l'issue,
+// libellés inventés (D84). Seuls comptent les flux qui retiennent le virement, leur sélection entière.
+const MOTIF_NOEL = 'VIR SEPA ARGENT POCHE LEA NOEL';
+
+/** L'ordre de Noël vers Léa, 50 € chaque 1er décembre, sauf ce que le test change. */
+function ordreNoel(o: Partial<PlannedFlow> = {}): PlannedFlow {
+  return { ...ordreFamille('ordre-noel', LEA, MOTIF_NOEL), amount: -euros(50), periodicity: { interval: 1, unit: 'year', anchorDate: '2025-12-01' }, ...o };
+}
+
+const avril = () => [op('d-avril', CC, '2026-04-01', MOTIF_LEA, -euros(20)), op('c-avril', LEA, '2026-04-01', 'VIR RECU', euros(20))];
+const reprisesAvril = (l: Ledger) => proposeMatches(l, '2026-03-25', '2026-04-10').map((p) => [p.operationId, p.flowId, p.auto]);
+const MENSUEL_PAR_MOIS = { periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-01' } } as const;
+
+describe('#488 · 8. le piège de l’ordre de Noël : seuls comptent les flux qui retiennent le virement', () => {
+  it('[niveau 2] l’ordre de Noël, que son montant et sa fenêtre écartent, ne compte pas : l’ordre mensuel reprend le virement d’office, et l’appariement se fait', () => {
+    const avant = base([ordreFamille('ordre-mois', LEA, MOTIF_LEA), ordreNoel()], ...avril());
+    expect([labelRecognizer(MOTIF_LEA)(avant.operations[0]!), labelRecognizer(MOTIF_NOEL)(avant.operations[0]!)]).toEqual(['exact', 'souple']);
+    expect(reprisesAvril(avant)).toEqual([['d-avril', 'ordre-mois', true]]);
+    const d = de(importer(avant), 'd-avril');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId, d.state]).toEqual([LEA, 'c-avril', 'ordre-mois', 'reconciled']);
+  });
+
+  it('[niveau 2] le montant seul, ou la fenêtre seule, l’écarte : l’ordre mensuel le reprend d’office', () => {
+    expect(reprisesAvril(base([ordreFamille('ordre-mois', LEA, MOTIF_LEA), ordreNoel(MENSUEL_PAR_MOIS)], ...avril()))).toEqual([['d-avril', 'ordre-mois', true]]);
+    expect(reprisesAvril(base([ordreFamille('ordre-mois', LEA, MOTIF_LEA), ordreNoel({ amount: -euros(20) })], ...avril()))).toEqual([['d-avril', 'ordre-mois', true]]);
+  });
+
+  it('[niveau 2] si le montant et la fenêtre de l’ordre de Noël le retenaient aussi, aucun ne le reprend d’office : la reprise se propose avec chacun', () => {
+    const avant = base([ordreFamille('ordre-mois', LEA, MOTIF_LEA), ordreNoel({ amount: -euros(20), ...MENSUEL_PAR_MOIS })], ...avril());
+    expect(reprisesAvril(avant).sort()).toEqual([
+      ['d-avril', 'ordre-mois', false],
+      ['d-avril', 'ordre-noel', false],
+    ]);
+    const d = de(importer(avant), 'd-avril');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c-avril', undefined]);
   });
 });
 
