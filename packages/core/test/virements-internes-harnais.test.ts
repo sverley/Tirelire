@@ -13,7 +13,10 @@
  * troisième tour, le point 8 amendé une seconde fois (porteur, 16/10, « dans le doute, on propose ») :
  * les tests du codeur (`virements-internes-488-doute.test.ts`, déplacé ici en entier), après eux. Au
  * quatrième tour, le point 8 amendé une troisième fois (porteur, 16/10) : le piège de l'ordre de Noël,
- * repris des tests du codeur (`virements-internes-488-noel.test.ts`), avant le point 5.
+ * repris des tests du codeur (`virements-internes-488-noel.test.ts`), avant le point 5. Au cinquième
+ * tour, sur mes deux retours : un flux sans motif retient le virement, et une destination connue n'est
+ * reprise d'office que par un ordre vers elle, crédit compris, repris des tests du codeur
+ * (`virements-internes-488-candidats.test.ts`), après le piège de l'ordre de Noël.
  *
  * Niveaux (D83), par le besoin que couvre chaque phrase :
  * - 0 · ce qu'une correction du code ne rendrait pas : une opération sans destination connue jamais
@@ -30,8 +33,10 @@
  *   compte qui défait l'appariement des deux côtés (point 5).
  * - 2 · les autres cas des règles : les destinations connues, les départages, l'import suivant, la
  *   proposition qui disparaît, le rapport, la reconnaissance souple, exacte ou souple, l'égalité entre
- *   ordres, la reprise qui n'a qu'un candidat et le piège de l'ordre de Noël (points 1, 2, 3, 4, 7, 8 ;
- *   D11, D12) : tous deux vont vers Léa, aucune fausse paire n'y est possible.
+ *   ordres, la reprise qui n'a qu'un candidat, flux sans motif compris, le piège de l'ordre de Noël, et
+ *   la reprise d'office par un ordre vers la destination connue seul (points 1, 2, 3, 4, 7, 8 ; D11,
+ *   D12) : dans ces derniers, tout va vers Léa, aucune fausse paire n'y est possible ; un flux qui reprend
+ *   à tort laisse l'appariement, et la reprise, classée, se corrige.
  * - 4 · deux diagnostics du codeur : un seul flux reconnaît le libellé, il le reprend comme avant ; une
  *   reprise par l'ordre du compte déjà désigné laisse l'appariement.
  *
@@ -737,6 +742,52 @@ describe('#488 · 8. le piège de l’ordre de Noël : seuls comptent les flux q
     ]);
     const d = de(importer(avant), 'd-avril');
     expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c-avril', undefined]);
+  });
+});
+
+// Cinquième tour : un flux sans motif retient le virement (sa sélection entière), et une destination
+// connue n'est reprise d'office que par un ordre vers elle. Tests du codeur
+// (`virements-internes-488-candidats.test.ts`), repris sur les données du piège de l'ordre de Noël.
+const NOEL_20 = ordreNoel({ amount: -euros(20), ...MENSUEL_PAR_MOIS });
+const fluxMensuel = (o: Partial<PlannedFlow> & Pick<PlannedFlow, 'id' | 'kind' | 'amount' | 'accountId'>): PlannedFlow => ({ name: o.id, ...MENSUEL_PAR_MOIS, dateWindowDays: 5, amountTolerance: { pct: 20 }, ...o });
+/** Une dépense sans motif, 20 € chaque mois, sur le compte principal. */
+const DEPENSE = fluxMensuel({ id: 'depense', kind: 'fixedCharge', amount: -euros(20), accountId: CC });
+
+describe('#488 · 8. une reprise automatique n’a qu’un candidat : un flux sans motif retient le virement', () => {
+  it('[niveau 2] l’ordre de Noël à 20 € chaque mois et une dépense sans motif de 20 € : aucun ne le reprend d’office, la reprise se propose avec chacun', () => {
+    const avant = base([NOEL_20, DEPENSE], ...avril());
+    expect(reprisesAvril(avant).sort()).toEqual([
+      ['d-avril', 'depense', false],
+      ['d-avril', 'ordre-noel', false],
+    ]);
+    const d = de(importer(avant), 'd-avril');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c-avril', undefined]);
+  });
+
+  it('[niveau 2] de même avec un ordre vers Léa sans motif', () => {
+    const sansMotif = fluxMensuel({ id: 'ordre-sans-motif', kind: 'transfer', amount: -euros(20), accountId: CC, counterpartAccountId: LEA });
+    expect(reprisesAvril(base([NOEL_20, sansMotif], ...avril())).sort()).toEqual([
+      ['d-avril', 'ordre-noel', false],
+      ['d-avril', 'ordre-sans-motif', false],
+    ]);
+  });
+});
+
+describe('#488 · 8. un virement n’est repris d’office que par un ordre vers sa destination connue', () => {
+  it('[niveau 2] l’ordre mensuel, hors de sa fenêtre, donne la destination Léa : la dépense sans motif de 20 € se propose seulement', () => {
+    const le15 = { ...ordreFamille('ordre-mois', LEA, MOTIF_LEA), periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-15' } } as PlannedFlow;
+    const avant = base([le15, DEPENSE], ...avril());
+    expect(reprisesAvril(avant)).toEqual([['d-avril', 'depense', false]]);
+    const d = de(importer(avant), 'd-avril');
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c-avril', undefined]);
+  });
+
+  it('[niveau 2] un crédit désigné depuis le principal : un revenu sans motif du compte de Léa se propose seulement, un ordre de Léa depuis le principal le reprend d’office', () => {
+    const credit = op('c-avril', LEA, '2026-04-01', 'VIR RECU', euros(20), { transferAccountId: CC, state: 'reconciled' });
+    const revenu = fluxMensuel({ id: 'revenu', kind: 'income', amount: euros(20), accountId: LEA });
+    const recu = fluxMensuel({ id: 'ordre-recu', kind: 'transfer', amount: euros(20), accountId: LEA, counterpartAccountId: CC });
+    expect(reprisesAvril(base([revenu], credit))).toEqual([['c-avril', 'revenu', false]]);
+    expect(reprisesAvril(base([recu], credit))).toEqual([['c-avril', 'ordre-recu', true]]);
   });
 });
 

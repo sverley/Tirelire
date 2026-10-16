@@ -1,10 +1,9 @@
 /**
  * Tests du codeur de #488, cinquième tour : le point 8, « Une reprise automatique n'a qu'un candidat »,
  * sur les deux retours de l'auditeur (PR #491, quatrième tour).
- * - Un flux sans motif dont le compte, le montant et la fenêtre conviennent retient le virement : il
- *   compte parmi les « plusieurs flux ».
- * - « Un virement n'est repris automatiquement que par un ordre du compte qui en est la destination
- *   connue » : un flux qui n'est pas un ordre vers elle ne fait que se proposer.
+ * Les tests qui tranchent ces deux retours sont passés dans le harnais d'audit
+ * (`virements-internes-harnais.test.ts`) ; restent ici deux diagnostics : un seul flux qui retient le
+ * virement le reprend d'office, et D12 inchangée sans destination connue.
  *
  * Données inventées (D84) : un compte principal et le compte de Léa ; « Le piège de l'ordre de Noël ».
  */
@@ -29,19 +28,6 @@ function flux(o: Partial<PlannedFlow> & Pick<PlannedFlow, 'id' | 'kind' | 'amoun
 const noel20 = flux({ id: 'ordre-noel', kind: 'transfer', amount: -euros(20), accountId: CC, counterpartAccountId: LEA, labelPattern: MOTIF_NOEL });
 /** Une dépense sans motif, 20 € chaque mois, sur le compte principal. */
 const depense = flux({ id: 'depense', kind: 'fixedCharge', amount: -euros(20), accountId: CC });
-/** Un ordre vers Léa sans motif, 20 € chaque mois. */
-const ordreSansMotif = flux({ id: 'ordre-sans-motif', kind: 'transfer', amount: -euros(20), accountId: CC, counterpartAccountId: LEA });
-/** L'ordre mensuel « … LEA », le 15 : il donne la destination Léa, sans retenir le virement du 1er (sa fenêtre). */
-const mensuelLe15 = flux({
-  id: 'poche',
-  kind: 'transfer',
-  amount: -euros(20),
-  accountId: CC,
-  counterpartAccountId: LEA,
-  labelPattern: MOTIF_MOIS,
-  periodicity: { interval: 1, unit: 'month', anchorDate: '2026-01-15' },
-});
-
 function base(flows: PlannedFlow[], operations: Operation[] = [op('d-avril', CC, '2026-04-01', MOTIF_MOIS, -euros(20))]): Ledger {
   const l = emptyLedger();
   l.accounts.push(
@@ -59,39 +45,13 @@ const reprises = (l: Ledger) =>
     .sort((a, b) => a[1].localeCompare(b[1]));
 
 describe('#488 · 8. un flux sans motif retient le virement, et compte parmi les « plusieurs flux »', () => {
-  it('[niveau 4] l’ordre de Noël à 20 € et une dépense sans motif de 20 € : aucun ne le reprend d’office, la reprise se propose avec chacun', () => {
-    expect(reprises(base([noel20, depense]))).toEqual([
-      ['d-avril', 'depense', false],
-      ['d-avril', 'ordre-noel', false],
-    ]);
-  });
-
-  it('[niveau 4] de même avec un ordre vers Léa sans motif', () => {
-    expect(reprises(base([noel20, ordreSansMotif]))).toEqual([
-      ['d-avril', 'ordre-noel', false],
-      ['d-avril', 'ordre-sans-motif', false],
-    ]);
-  });
-
   it('[niveau 4] l’ordre de Noël seul le reprend d’office : un seul flux le retient', () => {
     expect(reprises(base([noel20]))).toEqual([['d-avril', 'ordre-noel', true]]);
   });
 });
 
 describe('#488 · 8. un virement à destination connue n’est repris d’office que par un ordre vers elle', () => {
-  it('[niveau 4] l’ordre mensuel hors de sa fenêtre donne la destination Léa : la dépense sans motif de 20 € se propose seulement', () => {
-    expect(reprises(base([mensuelLe15, depense]))).toEqual([['d-avril', 'depense', false]]);
-  });
-
   it('[niveau 4] sans destination connue, la dépense sans motif de montant exact reprend d’office, comme avant', () => {
     expect(reprises(base([depense], [op('d-avril', CC, '2026-04-01', 'PRLV QUELCONQUE', -euros(20))]))).toEqual([['d-avril', 'depense', true]]);
-  });
-
-  it('[niveau 4] un crédit désigné depuis le principal : un revenu sans motif du compte de Léa se propose seulement, un ordre vers le principal le reprend d’office', () => {
-    const credit = op('c-avril', LEA, '2026-04-01', 'VIR RECU', euros(20), { transferAccountId: CC, state: 'reconciled' });
-    const revenu = flux({ id: 'revenu', kind: 'income', amount: euros(20), accountId: LEA });
-    const ordreRecu = flux({ id: 'ordre-recu', kind: 'transfer', amount: euros(20), accountId: LEA, counterpartAccountId: CC });
-    expect(reprises(base([revenu], [credit]))).toEqual([['c-avril', 'revenu', false]]);
-    expect(reprises(base([ordreRecu], [credit]))).toEqual([['c-avril', 'ordre-recu', true]]);
   });
 });
