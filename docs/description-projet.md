@@ -998,8 +998,15 @@ répond :
 
 > Je pense que la clé est déjà écrite dans les principes. Dans le doute, on propose. Il faut voir les choses dans l'autre sens. Est-ce que cette ligne pourrait matcher plusieurs rapprochements automatiques ?
 
+Le même jour, sur une troisième question de l'auditeur — un flux que son montant ou sa fenêtre écarte
+compte-t-il parmi les flux qui reconnaissent un libellé ? —, il répond :
+
+> on conserve la logique de discrimination des cas possibles avant le rapprochement : on filtre les opérations avec les informations que l'automatisme ou le rapprochement contient. Le cas que tu donne ne tient pas
+
 Ce qui en est tiré : D11, D12 et D33 amendées ; le glossaire (appariement) ; la ligne « Pipeline
 d'import » de l'architecture. Le 16 octobre, sur une première question de l'auditeur, le porteur limite
 les mots absents tolérés à une fin coupée par la source ; sur la seconde, un libellé que les ordres de
 plusieurs comptes reconnaissent, dont l'un souplement, n'a pas de destination connue, et un libellé que
-plusieurs flux reconnaissent, dont l'un souplement, n'est repris automatiquement par aucun (D11, D12).
+plusieurs flux reconnaissent, dont l'un souplement, n'est repris automatiquement par aucun (D11, D12) ;
+sur la troisième, ne comptent parmi ces flux que ceux qui retiennent l'opération, leur sélection entière :
+un flux que le montant ou la fenêtre écarte ne compte pas (D12).

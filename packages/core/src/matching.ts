@@ -559,8 +559,12 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
  * Automatique selon D12 — montant exact, ou dans la tolérance avec le libellé reconnu, flux non
  * variable —, proposée sinon. Une reprise automatique n'a qu'un candidat (#488, point 8 : dans le
  * doute, on propose) :
- * - un libellé que plusieurs flux reconnaissent, dont l'une des reconnaissances au moins est souple
- *   (`labelRecognizer`), n'est repris d'office par aucun : la reprise se propose avec chacun ;
+ * - un virement que plusieurs flux retiennent, dont l'une des reconnaissances de libellé au moins est
+ *   souple (`labelRecognizer`), n'est repris d'office par aucun : la reprise se propose avec chacun. Un
+ *   flux retient un virement quand sa sélection entière le reconnaît — son compte, son motif, sa
+ *   tolérance de montant, la fenêtre de ses occurrences — ; un flux que le montant ou la fenêtre écarte
+ *   n'est pas un candidat et ne compte pas (porteur, 16/10 : « on filtre les opérations avec les
+ *   informations que l'automatisme ou le rapprochement contient ») ;
  * - un virement n'est repris d'office que par un ordre du compte qui en est la destination connue
  *   (`transferRecognitions`, ou le compte déjà désigné) ; un virement que les ordres de plusieurs
  *   comptes reconnaissent sans que rien les départage n'est repris d'office par aucun, et se propose
@@ -581,11 +585,12 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
   const candidates: MatchProposal[] = [];
   const douteuses = new Set<Id>();
   for (const op of ops) {
-    const lus = [...flows].flatMap((f) => (f.accountId === op.accountId && lecteurs.has(f.id) ? [lecteurs.get(f.id)!(op)] : [])).filter((r) => r !== undefined);
-    // La destination connue : le compte déjà désigné, ou celui que reconnaissent les libellés des ordres.
+    // La destination connue : le compte déjà désigné, ou celui que reconnaissent les libellés des ordres seuls.
     const destination = op.transferAccountId ?? reconnus.get(op.id);
     const sansDestination = !op.transferAccountId && reconnus.has(op.id) && destination === undefined;
-    if ((lus.length > 1 && lus.includes('souple')) || sansDestination) douteuses.add(op.id);
+    // Les reconnaissances de libellé des flux qui retiennent le virement, leur sélection entière (D24).
+    const lus: NonNullable<LabelRecognition>[] = [];
+    const siens: MatchProposal[] = [];
     for (const f of flows) {
       if (f.accountId !== op.accountId) continue;
       if (f.activeFrom && op.date < f.activeFrom) continue;
@@ -594,10 +599,12 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       if (vers !== undefined && destination !== undefined && vers !== destination) continue;
       const amt = amountWithinTolerance(f, op.amount);
       if (!amt.ok) continue;
-      const label = lecteurs.has(f.id) ? lecteurs.get(f.id)!(op) !== undefined : undefined;
+      const lu = lecteurs.has(f.id) ? lecteurs.get(f.id)!(op) : undefined;
+      const label = lecteurs.has(f.id) ? lu !== undefined : undefined;
       if (label === false) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
+      if (lu !== undefined) lus.push(lu);
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
       // Reprise par une opération bancaire, ou par une saisie déjà reprise : l'occurrence est servie.
       const libre = freeOccurrence(index, f.id, expectedDate);
@@ -610,8 +617,8 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       reasons.push(amt.exact ? 'montant exact' : 'montant dans la tolérance');
       if (taker) reasons.push('déjà corrigée par une saisie');
       const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
-      const auto = !f.variable && (amt.exact || label === true) && !douteuses.has(op.id);
-      candidates.push({
+      const auto = !f.variable && (amt.exact || label === true);
+      siens.push({
         operationId: op.id,
         flowId: f.id,
         expectedDate,
@@ -622,6 +629,9 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
         reasons,
       });
     }
+    const douteuse = (lus.length > 1 && lus.includes('souple')) || sansDestination;
+    if (douteuse) douteuses.add(op.id);
+    candidates.push(...(douteuse ? siens.map((c) => ({ ...c, auto: false })) : siens));
   }
   // Attribution gloutonne : meilleure note d'abord, une opération et une occurrence à la fois.
   candidates.sort((a, b) => b.score - a.score);
