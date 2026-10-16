@@ -423,14 +423,34 @@ export function amountWithinTolerance(flow: Pick<PlannedFlow, 'amount' | 'amount
 }
 
 /**
- * Entre plusieurs flux qui retiennent une opération, une note élevée (`proposeMatches`, #488, point 8) :
- * un autre flux de note au moins aussi haute, et proche de celle du mieux noté, empêche celui-ci de la
- * reprendre d'office.
+ * Une note de rapprochement élevée (`proposeMatches`, #488, point 8) : entre plusieurs flux qui retiennent
+ * une opération, ou entre plusieurs opérations qui se disputent une occurrence, une autre note au moins
+ * aussi haute, et proche de la meilleure, empêche le mieux noté de reprendre d'office (`seDistingue`).
  */
 export const MATCH_SCORE_HIGH = 0.7;
 
-/** L'écart de note au plus qui rend deux flux proches (`MATCH_SCORE_HIGH`, `proposeMatches`). */
+/** L'écart de note au plus qui rend deux notes proches (`MATCH_SCORE_HIGH`, `seDistingue`). */
 export const MATCH_SCORE_CLOSE = 0.1;
+
+/** Deux notes égales, aux arrondis près (0,80 − 0,70). */
+const noteEgale = (a: number, b: number) => Math.abs(a - b) <= 1e-9;
+
+/**
+ * Le mieux noté d'une liste, et s'il se distingue (#488, point 8) : aucun autre n'a la même note, ni une
+ * note à la fois élevée, d'au moins `MATCH_SCORE_HIGH`, et proche de la sienne, à `MATCH_SCORE_CLOSE` près
+ * au plus, bornes comprises. Une seule règle, dans les deux sens (principe 13) : entre les flux qui
+ * retiennent une opération, et entre les opérations qui se disputent une occurrence. À égalité au plus
+ * haut, même sous `MATCH_SCORE_HIGH`, aucun n'est « le mieux noté » : on ne peut pas déterminer qu'un seul
+ * correspond vraiment (porteur, 16/10).
+ */
+function seDistingue<T extends { score: number }>(notes: T[]): { meilleur: T | undefined; distingue: boolean } {
+  const meilleur = notes.reduce<T | undefined>((m, r) => (!m || r.score > m.score ? r : m), undefined);
+  if (!meilleur) return { meilleur, distingue: false };
+  const eleve = (n: number) => n >= MATCH_SCORE_HIGH || noteEgale(n, MATCH_SCORE_HIGH);
+  const proche = (n: number) => meilleur.score - n <= MATCH_SCORE_CLOSE || noteEgale(meilleur.score - n, MATCH_SCORE_CLOSE);
+  const rival = (r: T) => r !== meilleur && (noteEgale(r.score, meilleur.score) || (eleve(r.score) && proche(r.score)));
+  return { meilleur, distingue: !notes.some(rival) };
+}
 
 /** Le score minimal de la reconnaissance souple d'un motif littéral (`labelScore`, #488, point 8). */
 export const LABEL_SCORE_MIN = 0.8;
@@ -586,10 +606,16 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
  *   comptes reconnaissent sans que rien les départage n'est repris d'office par aucun, et se propose
  *   avec chacun ; un flux de virement vers un autre compte que sa destination connue ne le sélectionne
  *   pas : le flux qui reprend un virement et le compte qui en est la destination ne divergent pas.
- * Une occurrence n'est reprise qu'une fois, et une opération en reprend au plus une : la mieux notée,
- * sauf une opération dont la reprise se propose avec chacun, après les autres, sur les occurrences
- * qu'elles laissent. Une occurrence qu'une saisie corrige ou masque déjà se reprend par cette saisie
- * (D88).
+ * La même règle dans l'autre sens (porteur, 16/10 : « Consigne la règle édictée et applique la aussi
+ * dans l'autre sens ») : une occurrence, désignée par son flux et sa date (D88), que plusieurs opérations
+ * se disputent — chacune la reprendrait, son flux étant le mieux noté qui se distingue, ou se la verrait
+ * proposer, son flux étant l'un de ceux qui se proposent ensemble —, la mieux notée, avec la note qu'elle
+ * reçoit de ce flux, la prend, d'office quand elle le peut par ailleurs, ou se la voit seule proposer, si
+ * elle se distingue (`seDistingue`) ; les autres ne se la voient pas proposer. Sinon, aucune ne la prend
+ * d'office, et la reprise se propose avec chacune. Une occurrence déjà reprise ne se dispute pas : elle
+ * n'est plus proposée à personne. Une opération en reprend toujours au plus une : celle qui n'est pas
+ * douteuse ne prétend qu'à une occurrence, celle de son mieux noté ; la douteuse ne reprend rien d'office.
+ * Une occurrence qu'une saisie corrige ou masque déjà se reprend par cette saisie (D88).
  */
 export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): MatchProposal[] {
   const flows = alive(ledger.plannedFlows);
@@ -651,36 +677,30 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       });
     }
     // Le mieux noté, s'il se distingue ; sinon, dans le doute, chacun se propose (#488, point 8).
-    const meilleur = retenus.reduce<(typeof retenus)[number] | undefined>((m, r) => (!m || r.score > m.score ? r : m), undefined);
-    const egal = (a: number, b: number) => Math.abs(a - b) <= 1e-9;
-    const rival = (r: (typeof retenus)[number]) =>
-      r !== meilleur && (egal(r.score, meilleur!.score) || ((r.score >= MATCH_SCORE_HIGH || egal(r.score, MATCH_SCORE_HIGH)) && (meilleur!.score - r.score <= MATCH_SCORE_CLOSE || egal(meilleur!.score - r.score, MATCH_SCORE_CLOSE))));
-    const douteuse = sansDestination || retenus.some(rival);
+    const { meilleur, distingue } = seDistingue(retenus);
+    const douteuse = sansDestination || (retenus.length > 0 && !distingue);
     if (douteuse) {
       douteuses.add(op.id);
       candidates.push(...retenus.flatMap((r) => (r.reprise ? [{ ...r.reprise, auto: false }] : [])));
     } else if (meilleur?.reprise) candidates.push(meilleur.reprise);
   }
-  // Attribution gloutonne : meilleure note d'abord, une opération et une occurrence à la fois.
+  // Dans l'autre sens : chaque occurrence libre, à ceux qui se la disputent, la même règle (#488, point 8).
   candidates.sort((a, b) => b.score - a.score);
-  const usedOps = new Set<Id>();
-  const taken = new Set<string>();
-  const out: MatchProposal[] = [];
+  const pretendants = new Map<string, MatchProposal[]>();
   for (const c of candidates) {
     const key = occurrenceKey(c.flowId, c.expectedDate);
-    if (douteuses.has(c.operationId) || usedOps.has(c.operationId) || taken.has(key)) continue;
-    usedOps.add(c.operationId);
-    taken.add(key);
-    out.push(c);
+    pretendants.set(key, [...(pretendants.get(key) ?? []), c]);
   }
-  // Dans le doute, la reprise se propose avec chacun des flux, sur les occurrences que les autres laissent.
-  const proposees = new Set<string>();
-  for (const c of candidates) {
-    const cle = `${c.operationId}|${c.flowId}`;
-    if (!douteuses.has(c.operationId) || proposees.has(cle) || taken.has(occurrenceKey(c.flowId, c.expectedDate))) continue;
-    proposees.add(cle);
-    out.push(c);
+  // D'abord ce que prend une opération qui n'est pas douteuse, puis ce qui se propose, les mieux notés d'abord.
+  const pris: MatchProposal[] = [];
+  const proposes: MatchProposal[] = [];
+  for (const ceux of pretendants.values()) {
+    const { meilleur, distingue } = seDistingue(ceux);
+    if (distingue) (douteuses.has(meilleur!.operationId) ? proposes : pris).push(meilleur!);
+    else proposes.push(...ceux.map((c) => ({ ...c, auto: false })));
   }
+  const parNote = (a: MatchProposal, b: MatchProposal) => b.score - a.score;
+  const out = [...pris.sort(parNote), ...proposes.sort(parNote)];
   return out;
 }
 

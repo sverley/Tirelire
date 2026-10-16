@@ -173,8 +173,17 @@ même, exactement ou souplement. Quand plusieurs flux la retiennent, le mieux no
 peut par ailleurs — si aucun autre n'a une note à la fois élevée, d'au moins 0,7, et proche de la sienne,
 à 0,1 près au plus (`MATCH_SCORE_HIGH`, `MATCH_SCORE_CLOSE`) : il est alors seul à la pointer ou à se
 proposer. Sinon, aucun ne la pointe automatiquement, et le pointage se propose avec chacun (porteur,
-16 octobre 2026). Un virement n'est pointé automatiquement que par un ordre du compte qui en est la
-destination connue (D11).
+16 octobre 2026). À égalité de note au plus haut, même sous 0,7, aucun n'est « le mieux noté » : on ne
+peut pas déterminer qu'un seul correspond vraiment, et le pointage se propose avec chacun. Un virement
+n'est pointé automatiquement que par un ordre du compte qui en est la destination connue (D11).
+
+La même règle vaut dans l'autre sens (porteur, 16 octobre 2026 : « Consigne la règle édictée et applique
+la aussi dans l'autre sens ») : une occurrence que plusieurs opérations se disputent — chacune la
+pointerait ou se la verrait proposer d'après ce qui précède — est pointée par la mieux notée, avec la note
+qu'elle reçoit de ce flux, quand elle le peut par ailleurs, si aucune autre n'a une note élevée et proche
+de la sienne, ni la même : elle est alors seule à la pointer ou à se la voir proposer. Sinon, aucune ne la
+pointe automatiquement, et le pointage se propose avec chacune ; dès que l'une la pointe, la proposition
+des autres disparaît. Mêmes seuils, même note : une seule règle, dans les deux sens (principe 13).
 
 ### D13 · Nom de code « Tirelire »
 
