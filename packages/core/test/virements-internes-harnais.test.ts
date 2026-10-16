@@ -754,22 +754,19 @@ const fluxMensuel = (o: Partial<PlannedFlow> & Pick<PlannedFlow, 'id' | 'kind' |
 const DEPENSE = fluxMensuel({ id: 'depense', kind: 'fixedCharge', amount: -euros(20), accountId: CC });
 
 describe('#488 · 8. une reprise automatique n’a qu’un candidat : un flux sans motif retient le virement', () => {
-  it('[niveau 2] l’ordre de Noël à 20 € chaque mois et une dépense sans motif de 20 € : aucun ne le reprend d’office, la reprise se propose avec chacun', () => {
+  // Réécrits au sixième tour (#488, point 10) : l'ordre de Noël, noté 1,00, se distingue d'un flux sans
+  // motif, noté 0,80 ; il reprend le virement d'office, et l'autre ne se propose pas.
+  it('[niveau 2] l’ordre de Noël à 20 € chaque mois et une dépense sans motif de 20 € : l’ordre de Noël, noté 1,00, se distingue de la dépense, notée 0,80, et le reprend d’office ; la dépense ne se propose pas', () => {
     const avant = base([NOEL_20, DEPENSE], ...avril());
-    expect(reprisesAvril(avant).sort()).toEqual([
-      ['d-avril', 'depense', false],
-      ['d-avril', 'ordre-noel', false],
-    ]);
+    expect(proposeMatches(avant, '2026-03-25', '2026-04-10').map((p) => [p.flowId, Math.round(p.score * 100) / 100])).toEqual([['ordre-noel', 1]]);
+    expect(reprisesAvril(avant)).toEqual([['d-avril', 'ordre-noel', true]]);
     const d = de(importer(avant), 'd-avril');
-    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c-avril', undefined]);
+    expect([d.transferAccountId, d.transferOperationId, d.plannedFlowId]).toEqual([LEA, 'c-avril', 'ordre-noel']);
   });
 
   it('[niveau 2] de même avec un ordre vers Léa sans motif', () => {
     const sansMotif = fluxMensuel({ id: 'ordre-sans-motif', kind: 'transfer', amount: -euros(20), accountId: CC, counterpartAccountId: LEA });
-    expect(reprisesAvril(base([NOEL_20, sansMotif], ...avril())).sort()).toEqual([
-      ['d-avril', 'ordre-noel', false],
-      ['d-avril', 'ordre-sans-motif', false],
-    ]);
+    expect(reprisesAvril(base([NOEL_20, sansMotif], ...avril()))).toEqual([['d-avril', 'ordre-noel', true]]);
   });
 });
 

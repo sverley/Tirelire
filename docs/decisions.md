@@ -164,13 +164,17 @@ samedi, une facture varie, un salaire varie avec les heures supplémentaires, et
 peuvent avoir le même montant. Trop strict, rien n'est reconnu ; trop lâche, c'est la mauvaise
 opération qui est pointée.
 
-Amendé le 16 octobre 2026 (#488) : un pointage automatique n'a qu'un candidat. Une opération que plusieurs
-flux retiennent, dont l'un au moins par une reconnaissance souple de son libellé (le score de D11), n'est
-pointée automatiquement par aucun : le pointage se propose avec chacun. Un flux retient une opération
-quand sa sélection entière la reconnaît (D24) : son compte, son motif de libellé, sa tolérance de montant,
-la fenêtre de ses occurrences ; un flux que le montant ou la fenêtre écarte n'est pas un candidat et ne
-compte pas (porteur, 16 octobre 2026). Un virement n'est pointé automatiquement que par un ordre du
-compte qui en est la destination connue (D11).
+Amendé le 16 octobre 2026 (#488) : un pointage automatique n'a qu'un candidat sérieux. Un flux retient
+une opération quand sa sélection entière la reconnaît (D24) : son compte, son motif de libellé, lu
+exactement ou souplement (le score de D11), sa tolérance de montant, la fenêtre de ses occurrences ; un
+flux que le montant ou la fenêtre écarte n'est pas un candidat et ne compte pas (porteur, 16 octobre
+2026). Chaque flux qui la retient lui donne la note de sa proposition, où un libellé reconnu compte de
+même, exactement ou souplement. Quand plusieurs flux la retiennent, le mieux noté la pointe — quand il le
+peut par ailleurs — si aucun autre n'a une note à la fois élevée, d'au moins 0,7, et proche de la sienne,
+à 0,1 près au plus (`MATCH_SCORE_HIGH`, `MATCH_SCORE_CLOSE`) : il est alors seul à la pointer ou à se
+proposer. Sinon, aucun ne la pointe automatiquement, et le pointage se propose avec chacun (porteur,
+16 octobre 2026). Un virement n'est pointé automatiquement que par un ordre du compte qui en est la
+destination connue (D11).
 
 ### D13 · Nom de code « Tirelire »
 

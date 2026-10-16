@@ -422,6 +422,16 @@ export function amountWithinTolerance(flow: Pick<PlannedFlow, 'amount' | 'amount
   return { ok: diff <= allowed + 0.5, ratio, exact: diff === 0 };
 }
 
+/**
+ * Entre plusieurs flux qui retiennent une opération, une note élevée (`proposeMatches`, #488, point 8) :
+ * un autre flux de note au moins aussi haute, et proche de celle du mieux noté, empêche celui-ci de la
+ * reprendre d'office.
+ */
+export const MATCH_SCORE_HIGH = 0.7;
+
+/** L'écart de note au plus qui rend deux flux proches (`MATCH_SCORE_HIGH`, `proposeMatches`). */
+export const MATCH_SCORE_CLOSE = 0.1;
+
 /** Le score minimal de la reconnaissance souple d'un motif littéral (`labelScore`, #488, point 8). */
 export const LABEL_SCORE_MIN = 0.8;
 
@@ -523,9 +533,9 @@ export type LabelRecognition = 'exact' | 'souple' | undefined;
  * quand chacune de ses parties a un score d'au moins `LABEL_SCORE_MIN` sur le libellé ou le libellé
  * complet, les mots absents n'étant tolérés qu'à la fin coupée (`labelCutScore` ; #488, point 8) ; une
  * autre expression régulière garde sa seule lecture. La reconnaissance dit si elle est exacte ou souple :
- * entre plusieurs flux qui reconnaissent un libellé, une seule souple suffit à ce qu'aucun ne le reprenne
- * d'office (`proposeMatches`), et entre les ordres de plusieurs comptes, à ce qu'aucun n'en soit la
- * destination (`matchTirelireTransfers`).
+ * entre les ordres de plusieurs comptes, une seule souple suffit à ce qu'aucun n'en soit la destination
+ * (`matchTirelireTransfers`) ; entre les flux qui retiennent une opération, seule la note décide
+ * (`proposeMatches`), où un libellé reconnu compte de même, exactement ou souplement.
  */
 export function labelRecognizer(motif: string): (op: Operation) => LabelRecognition {
   let re: RegExp;
@@ -557,15 +567,19 @@ export function labelMatcher(motif: string): (op: Operation) => boolean {
  * ni ne le classe.
  *
  * Automatique selon D12 — montant exact, ou dans la tolérance avec le libellé reconnu, flux non
- * variable —, proposée sinon. Une reprise automatique n'a qu'un candidat (#488, point 8 : dans le
- * doute, on propose) :
- * - un virement que plusieurs flux retiennent, dont l'une des reconnaissances de libellé au moins est
- *   souple (`labelRecognizer`), n'est repris d'office par aucun : la reprise se propose avec chacun. Un
- *   flux retient un virement quand sa sélection entière le reconnaît — son compte, son motif s'il en a
- *   un, sa tolérance de montant, la fenêtre de ses occurrences — ; un flux sans motif dont le reste
- *   convient le retient donc, et compte ; un flux que le montant ou la fenêtre écarte n'est pas un
- *   candidat et ne compte pas (porteur, 16/10 : « on filtre les opérations avec les informations que
- *   l'automatisme ou le rapprochement contient ») ;
+ * variable —, proposée sinon. Une reprise automatique n'a qu'un candidat sérieux (#488, point 8 : dans
+ * le doute, on propose) :
+ * - un flux retient une opération quand sa sélection entière la reconnaît — son compte, son motif s'il en
+ *   a un, exactement ou souplement (`labelRecognizer`), sa tolérance de montant, la fenêtre de ses
+ *   occurrences — ; un flux sans motif dont le reste convient la retient donc ; un flux que le montant ou
+ *   la fenêtre écarte n'est pas un candidat et ne compte pas (porteur, 16/10 : « on filtre les opérations
+ *   avec les informations que l'automatisme ou le rapprochement contient ») ;
+ * - chaque flux qui la retient lui donne sa note ; le mieux noté ne la reprend, ou ne se propose, que
+ *   s'il se distingue : aucun autre flux qui la retient n'a une note à la fois élevée, d'au moins
+ *   `MATCH_SCORE_HIGH`, et proche de la sienne, à `MATCH_SCORE_CLOSE` près, ni la même note que lui ;
+ *   les autres ne se proposent pas. Sinon, aucun ne la reprend d'office, et la reprise se propose avec
+ *   chacun (porteur, 16/10 : « si les 2 ont des score de rapprochement proches et élevés, ce n'est pas
+ *   le meilleur qui gagne, on propose ») ;
  * - un virement n'est repris d'office que par un ordre du compte qui en est la destination connue
  *   (`transferRecognitions`, ou le compte déjà désigné) : un flux qui n'est pas un ordre vers elle ne
  *   fait que se proposer ; un virement que les ordres de plusieurs
@@ -590,10 +604,9 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
     // La destination connue : le compte déjà désigné, ou celui que reconnaissent les libellés des ordres seuls.
     const destination = op.transferAccountId ?? reconnus.get(op.id);
     const sansDestination = !op.transferAccountId && reconnus.has(op.id) && destination === undefined;
-    // Les flux qui retiennent le virement, leur sélection entière (D24), motif ou non, et si l'un le lit souplement.
-    let retiennent = 0;
-    let souple = false;
-    const siens: MatchProposal[] = [];
+    // Les flux qui retiennent l'opération, leur sélection entière (D24), motif ou non, avec leur note ; la
+    // reprise de chacun, si son occurrence est libre.
+    const retenus: { score: number; reprise?: MatchProposal }[] = [];
     for (const f of flows) {
       if (f.accountId !== op.accountId) continue;
       if (f.activeFrom && op.date < f.activeFrom) continue;
@@ -602,41 +615,51 @@ export function proposeMatches(ledger: Ledger, from: ISODate, to: ISODate): Matc
       if (vers !== undefined && destination !== undefined && vers !== destination) continue;
       const amt = amountWithinTolerance(f, op.amount);
       if (!amt.ok) continue;
-      const lu = lecteurs.has(f.id) ? lecteurs.get(f.id)!(op) : undefined;
-      const label = lecteurs.has(f.id) ? lu !== undefined : undefined;
+      const label = lecteurs.has(f.id) ? lecteurs.get(f.id)!(op) !== undefined : undefined;
       if (label === false) continue;
       const occ = occurrencesBetween(f.periodicity, addDays(op.date, -f.dateWindowDays), addDays(op.date, f.dateWindowDays));
       if (occ.length === 0) continue;
-      retiennent++;
-      if (lu === 'souple') souple = true;
       const expectedDate = occ.sort((a, b) => Math.abs(diffDays(a, op.date)) - Math.abs(diffDays(b, op.date)))[0]!;
+      const dateScore = 1 - Math.abs(diffDays(expectedDate, op.date)) / (f.dateWindowDays + 1);
+      const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
       // Reprise par une opération bancaire, ou par une saisie déjà reprise : l'occurrence est servie.
       const libre = freeOccurrence(index, f.id, expectedDate);
-      if (!libre) continue;
+      if (!libre) {
+        retenus.push({ score });
+        continue;
+      }
       const taker = libre.entry;
       const reasons: string[] = [];
-      const dateScore = 1 - Math.abs(diffDays(expectedDate, op.date)) / (f.dateWindowDays + 1);
       reasons.push(`date à ${Math.abs(diffDays(expectedDate, op.date))} j`);
       if (label) reasons.push('libellé reconnu');
       reasons.push(amt.exact ? 'montant exact' : 'montant dans la tolérance');
       if (taker) reasons.push('déjà corrigée par une saisie');
-      const score = 0.3 * dateScore + 0.3 * amt.ratio + 0.4 * (label ? 1 : 0.5);
       // Une destination connue n'est reprise d'office que par un ordre vers elle (#488, point 8).
       const auto = !f.variable && (amt.exact || label === true) && (destination === undefined || vers === destination);
-      siens.push({
-        operationId: op.id,
-        flowId: f.id,
-        expectedDate,
-        expectedAmount: f.amount,
-        ...(taker ? { resumedOperationId: taker.id } : {}),
+      retenus.push({
         score,
-        auto,
-        reasons,
+        reprise: {
+          operationId: op.id,
+          flowId: f.id,
+          expectedDate,
+          expectedAmount: f.amount,
+          ...(taker ? { resumedOperationId: taker.id } : {}),
+          score,
+          auto,
+          reasons,
+        },
       });
     }
-    const douteuse = (retiennent > 1 && souple) || sansDestination;
-    if (douteuse) douteuses.add(op.id);
-    candidates.push(...(douteuse ? siens.map((c) => ({ ...c, auto: false })) : siens));
+    // Le mieux noté, s'il se distingue ; sinon, dans le doute, chacun se propose (#488, point 8).
+    const meilleur = retenus.reduce<(typeof retenus)[number] | undefined>((m, r) => (!m || r.score > m.score ? r : m), undefined);
+    const egal = (a: number, b: number) => Math.abs(a - b) <= 1e-9;
+    const rival = (r: (typeof retenus)[number]) =>
+      r !== meilleur && (egal(r.score, meilleur!.score) || ((r.score >= MATCH_SCORE_HIGH || egal(r.score, MATCH_SCORE_HIGH)) && (meilleur!.score - r.score <= MATCH_SCORE_CLOSE || egal(meilleur!.score - r.score, MATCH_SCORE_CLOSE))));
+    const douteuse = sansDestination || retenus.some(rival);
+    if (douteuse) {
+      douteuses.add(op.id);
+      candidates.push(...retenus.flatMap((r) => (r.reprise ? [{ ...r.reprise, auto: false }] : [])));
+    } else if (meilleur?.reprise) candidates.push(meilleur.reprise);
   }
   // Attribution gloutonne : meilleure note d'abord, une opération et une occurrence à la fois.
   candidates.sort((a, b) => b.score - a.score);
